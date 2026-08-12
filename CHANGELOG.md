@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Give every durable steering admission one stable `SteeringReceipt { entryId, sequence }` across idempotent retries, and journal exact `SteeringAccepted`, `SteeringConsumed`, and `SteeringDiscarded` lifecycle facts atomically with steering insertion, model-operation consumption, and terminal disposition in memory, SQLite, PostgreSQL, and MySQL.
+
 ## 0.21.3
 
 - Harden live previews: each Run gets its own conflated memory-only preview lane with a retained cumulative snapshot replayed to late subscribers, and a clear tombstone with a generation guard so a stale preview can never publish after commit or interruption. Subscribers register before replay with an atomic high-water so a large replay cannot overflow a bounded queue, and PostgreSQL/MySQL multi-subscriber polling advances the cursor exactly once.

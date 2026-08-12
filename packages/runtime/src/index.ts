@@ -177,6 +177,7 @@ import {
   RunFailure as RunEvent_RunFailure,
   RunEvent as RunEvent_RunEvent,
   LifecycleTag as RunEvent_LifecycleTag,
+  SteeringDiscardReason as RunEvent_SteeringDiscardReason,
   eventIdFor as RunEvent_eventIdFor,
 } from "./run-event.js"
 export const RunEvent = {
@@ -187,6 +188,7 @@ export const RunEvent = {
   RunFailure: RunEvent_RunFailure,
   RunEvent: RunEvent_RunEvent,
   LifecycleTag: RunEvent_LifecycleTag,
+  SteeringDiscardReason: RunEvent_SteeringDiscardReason,
   eventIdFor: RunEvent_eventIdFor,
 } as typeof import("./run-event.js")
 export namespace RunEvent {
@@ -200,6 +202,10 @@ export namespace RunEvent {
   export type RunAttemptStarted = import("./run-event.js").RunAttemptStarted
   export type RunWaiting = import("./run-event.js").RunWaiting
   export type RunResumed = import("./run-event.js").RunResumed
+  export type SteeringAccepted = import("./run-event.js").SteeringAccepted
+  export type SteeringConsumed = import("./run-event.js").SteeringConsumed
+  export type SteeringDiscarded = import("./run-event.js").SteeringDiscarded
+  export type SteeringDiscardReason = import("./run-event.js").SteeringDiscardReason
   export type OperationUnknown = import("./run-event.js").OperationUnknown
   export type ChildLinked = import("./run-event.js").ChildLinked
   export type ChildSettled = import("./run-event.js").ChildSettled
@@ -228,6 +234,8 @@ export namespace ModelPreview {
   export type PreviewFrame = import("./model-preview.js").PreviewFrame
   export type PreviewCleared = import("./model-preview.js").PreviewCleared
 }
+
+export * as Steering from "./steering.js"
 
 import { Runtime as Runtime_Runtime } from "./runtime.js"
 import { layer as Runtime_layer, layerMemory as Runtime_layerMemory } from "./memory/runtime-layer.js"
@@ -270,6 +278,7 @@ export namespace Runtime {
   export type CancelSessionInput = import("./runtime.js").CancelSessionInput
   export type AwaitSessionTerminalInput = import("./runtime.js").AwaitSessionTerminalInput
   export type SteerInput = import("./runtime.js").SteerInput
+  export type SteeringReceipt = import("./steering.js").SteeringReceipt
   export type SendMessageInput = import("./runtime.js").SendMessageInput
   export type MessagesInput = import("./runtime.js").MessagesInput
   export type ChildSettlementsInput = import("./runtime.js").ChildSettlementsInput
@@ -359,6 +368,7 @@ export namespace RunStore {
   export type AdmitSteeringInput = import("./run-store.js").AdmitSteeringInput
   export type CompletionOutcome = import("./run-store.js").CompletionOutcome
   export type SteeringEntry = import("./steering.js").SteeringEntry
+  export type SteeringReceipt = import("./steering.js").SteeringReceipt
   export type ExecutionContinuation = import("./steering.js").ExecutionContinuation
 }
 import { RunSchema as RunSchema_RunSchema } from "./sql/postgres/run-schema.js"

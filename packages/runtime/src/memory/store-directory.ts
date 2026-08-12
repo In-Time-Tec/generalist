@@ -31,6 +31,7 @@ import {
   type Notification,
 } from "../child-settlement.js"
 import type { RunEvent } from "../run-event.js"
+import { appendLifecycle } from "./append.js"
 
 const requireRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -443,6 +444,18 @@ export const deliverPendingMessages: {
     if (delivered.length === 0) return [[], state] as const
     const runs = new Map(state.runs)
     runs.set(run.runId, { ...run, steering })
-    return [delivered, { ...state, nextSteeringCounter: counter, messages, runs }] as const
+    let next: MemoryState = { ...state, nextSteeringCounter: counter, messages, runs }
+    for (const entry of steering.slice(run.steering.length)) {
+      const [, accepted] = yield* appendLifecycle(next, run.runId, {
+        _tag: "SteeringAccepted",
+        entryId: entry.entryId,
+        steeringSequence: entry.sequence,
+        idempotencyKey: entry.idempotencyKey,
+        digest: entry.digest,
+        prompt: entry.prompt,
+      })
+      next = accepted
+    }
+    return [delivered, next] as const
   }),
 )

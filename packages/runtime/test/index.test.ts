@@ -10,6 +10,7 @@ import {
   RunStore,
   RunTree,
   Runtime,
+  Steering,
   ExecutionHost,
   ExecutionResult,
   RunFailure,
@@ -27,6 +28,8 @@ describe("@batonfx/runtime public surface", () => {
     expect(typeof Message.make).toBe("function")
     expect(typeof Run.isTerminal).toBe("function")
     expect(typeof RunEvent.eventIdFor).toBe("function")
+    expect(RunEvent.SteeringDiscardReason).toBeDefined()
+    expect(Steering.SteeringReceipt).toBeDefined()
     expect(typeof Runtime.layerMemory).toBe("function")
     expect(typeof RunStore.layerMemory).toBe("function")
     expect(typeof ExecutionHost.ExecutionHost).toBe("function")

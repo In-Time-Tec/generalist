@@ -48,7 +48,7 @@ import type { CancelInput, InitialChildInput, RespondInput, SignalInput, SpawnIn
 import type { ResolveOperationInput } from "./operation-resolution.js"
 import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { OperationKind, OperationRecord, OperationStatus, ReplayPolicy } from "./sql/operations.js"
-import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
+import type { ExecutionContinuation, SteeringEntry, SteeringReceipt } from "./steering.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { AdmitFanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
@@ -292,7 +292,7 @@ export interface Interface {
   }) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable>
   readonly admitSteering: (
     input: AdmitSteeringInput,
-  ) => Effect.Effect<void, RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable>
+  ) => Effect.Effect<SteeringReceipt, RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable>
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
   /**
    * @experimental The authoritative directory record for one Run.

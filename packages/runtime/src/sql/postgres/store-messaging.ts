@@ -3,6 +3,7 @@ import type { SqlClient } from "effect/unstable/sql"
 import type { Interface as RunStoreInterface } from "../../run-store.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { RunFn } from "./store-ops.js"
+import type { EventHub } from "../subscribers.js"
 import {
   admitMessage,
   deliverPendingMessages,
@@ -17,6 +18,7 @@ import {
 export const messagingStoreMethods = (input: {
   readonly run: RunFn
   readonly runNoTxn: RunFn
+  readonly hub: EventHub
   readonly lockRun: (runId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
   readonly lockMailbox: (targetSessionId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
 }): Pick<
@@ -38,5 +40,11 @@ export const messagingStoreMethods = (input: {
     input.run(input.lockMailbox(request.targetSessionId).pipe(Effect.andThen(admitMessage(request)))),
   pendingMessages: (request) => input.runNoTxn(pendingMessages(request)),
   deliverPendingMessages: (request) =>
-    input.run(input.lockRun(request.runId).pipe(Effect.andThen(deliverPendingMessages(request)))),
+    input.run(
+      input.lockRun(request.runId).pipe(
+        Effect.andThen(directory(request.runId)),
+        Effect.flatMap((entry) => input.lockMailbox(entry.sessionId)),
+        Effect.andThen(deliverPendingMessages(input.hub, request)),
+      ),
+    ),
 })

@@ -373,12 +373,16 @@ describePostgres("postgres run store", () => {
           idempotencyKey: "run",
           prompt: "start",
         })
-        yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "one", prompt: "first" })
-        yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "two", prompt: "second" })
+        const first = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "one", prompt: "first" })
+        expect(yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "one", prompt: "first" })).toEqual(first)
+        const second = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "two", prompt: "second" })
+        expect(second.sequence).toBe(first.sequence + 1)
+        expect(second.entryId).not.toBe(first.entryId)
         const [claim] = yield* claims.claimReadyRuns({ workerId: "steering", limit: 1, lease: "10 seconds" })
         expect(claim).toBeDefined()
         const executionClaim = { runId: claim!.run.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence }
         const entries = yield* store.readSteering(executionClaim)
+        expect(entries.map((entry) => entry.entryId)).toEqual([first.entryId, second.entryId])
         expect(entries.map((entry) => JSON.stringify(entry.prompt))).toEqual([
           expect.stringContaining("first"),
           expect.stringContaining("second"),
@@ -386,6 +390,40 @@ describePostgres("postgres run store", () => {
         expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toMatchObject({
           _tag: "SteeringPending",
         })
+        const operation = yield* store.recordOperation({
+          ...executionClaim,
+          operationKey: "model:steering",
+          kind: "model",
+          inputDigest: "model:steering",
+          input: { prompt: "steered" },
+          replayPolicy: "provider-idempotent",
+          attempt: executionClaim.attemptFence,
+          continuation: null,
+          steeringEntryIds: entries.map((entry) => entry.entryId),
+        })
+        const remaining = yield* runtime.steer({
+          runId: receipt.runId,
+          idempotencyKey: "remaining",
+          prompt: "remaining",
+        })
+        yield* store.fail({ ...executionClaim, error: Errors.AgentExecutionFailure.make({ message: "failed" }) })
+        const lifecycle = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
+          (event) =>
+            event._tag === "SteeringAccepted" ||
+            event._tag === "SteeringConsumed" ||
+            event._tag === "SteeringDiscarded",
+        )
+        expect(lifecycle).toEqual([
+          expect.objectContaining({ _tag: "SteeringAccepted", entryId: first.entryId, steeringSequence: 0 }),
+          expect.objectContaining({ _tag: "SteeringAccepted", entryId: second.entryId, steeringSequence: 1 }),
+          expect.objectContaining({
+            _tag: "SteeringConsumed",
+            entryIds: [first.entryId, second.entryId],
+            operationId: operation.operationId,
+          }),
+          expect.objectContaining({ _tag: "SteeringAccepted", entryId: remaining.entryId, steeringSequence: 2 }),
+          expect.objectContaining({ _tag: "SteeringDiscarded", entryIds: [remaining.entryId], reason: "failed" }),
+        ])
       }).pipe(scopedWith(postgresLayer(url))),
     ),
   )

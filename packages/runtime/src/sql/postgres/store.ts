@@ -302,9 +302,9 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
         ),
       cancel: (input) => run(lockRun(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
       cancelSession: (input) => run(cancelSessionRuns({ lockRun, cancelRun, ...input })),
-      admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
+      admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(transactionHub, input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
-      ...messagingStoreMethods({ run, runNoTxn, lockRun, lockMailbox }),
+      ...messagingStoreMethods({ run, runNoTxn, hub: transactionHub, lockRun, lockMailbox }),
       settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
       inspect: (runId) =>
         runNoTxn(

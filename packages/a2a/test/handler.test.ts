@@ -171,7 +171,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       return Effect.void
     },
     signal: () => Effect.void,
-    steer: () => Effect.void,
+    steer: () => Effect.succeed({ entryId: "steering:test", sequence: 0 }),
     sendMessage: () => Effect.die("not used"),
     messages: () => Effect.die("not used"),
     childSettlements: () => Effect.die("not used"),

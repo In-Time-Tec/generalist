@@ -4,11 +4,17 @@ import { SqlClient } from "effect/unstable/sql"
 import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../run-store.js"
-import { encodeContinuation, type ExecutionContinuation, type SteeringEntry } from "../steering.js"
+import {
+  encodeContinuation,
+  type ExecutionContinuation,
+  type SteeringEntry,
+  type SteeringReceipt,
+} from "../steering.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { ExecutionResult } from "../execution-state.js"
-import { loadRun } from "./store-helpers.js"
+import { appendEvent, loadRun } from "./store-helpers.js"
 import { decodeJson, encodeJson } from "./codecs.js"
+import type { EventHub } from "./subscribers.js"
 
 interface SteeringRow {
   readonly entry_id: string
@@ -28,7 +34,16 @@ const decode = (row: SteeringRow): SteeringEntry => ({
   prompt: decodeJson(Prompt.Prompt, row.prompt_json),
 })
 
-export const admitSteering = (input: AdmitSteeringInput) =>
+type AdmitSteeringEffect = Effect.Effect<
+  SteeringReceipt,
+  RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | SqlError,
+  SqlClient.SqlClient
+>
+
+export const admitSteering: {
+  (input: AdmitSteeringInput): (hub: EventHub) => AdmitSteeringEffect
+  (hub: EventHub, input: AdmitSteeringInput): AdmitSteeringEffect
+} = Function.dual(2, (hub: EventHub, input: AdmitSteeringInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(input.runId)
@@ -39,7 +54,9 @@ export const admitSteering = (input: AdmitSteeringInput) =>
     `
     const prior = existing[0]
     if (prior !== undefined) {
-      if (prior.digest === input.digest) return
+      if (prior.digest === input.digest) {
+        return { entryId: prior.entry_id, sequence: Number(prior.sequence) } satisfies SteeringReceipt
+      }
       return yield* SteeringConflict.make({ runId: input.runId, idempotencyKey: input.idempotencyKey })
     }
     if (isTerminal(run.status) || run.pendingOutcome !== undefined) {
@@ -55,23 +72,33 @@ export const admitSteering = (input: AdmitSteeringInput) =>
       FROM baton_run_steering WHERE run_id = ${input.runId}
     `
     const sequence = Number(rows[0]?.next_sequence ?? 0)
+    const entryId = `${input.runId}:steering:${sequence}`
     const encoded = encodeJson(Prompt.Prompt, input.prompt)
     yield* sql`
       INSERT INTO baton_run_steering (
-        entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id
+        entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id, discarded_reason
       ) VALUES (
-        ${`${input.runId}:steering:${sequence}`}, ${input.runId}, ${sequence}, ${input.idempotencyKey},
-        ${input.digest}, ${encoded}, NULL
+        ${entryId}, ${input.runId}, ${sequence}, ${input.idempotencyKey}, ${input.digest}, ${encoded}, NULL, NULL
       )
     `
-  })
+    yield* appendEvent(hub, run, {
+      _tag: "SteeringAccepted",
+      entryId,
+      steeringSequence: sequence,
+      idempotencyKey: input.idempotencyKey,
+      digest: input.digest,
+      prompt: input.prompt,
+    })
+    return { entryId, sequence } satisfies SteeringReceipt
+  }),
+)
 
 const readPendingSteering = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<SteeringRow>`
       SELECT * FROM baton_run_steering
-      WHERE run_id = ${runId} AND consumed_operation_id IS NULL
+      WHERE run_id = ${runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
       ORDER BY sequence
     `
     return rows.map(decode)

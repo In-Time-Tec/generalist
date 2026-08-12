@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const NOTIFY_CHANNEL = "baton_run_events"
@@ -111,11 +111,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   digest TEXT NOT NULL,
   prompt_json TEXT NOT NULL,
   consumed_operation_id TEXT,
+  discarded_reason TEXT,
   UNIQUE (run_id, sequence),
   UNIQUE (run_id, idempotency_key)
 )`,
   `CREATE INDEX IF NOT EXISTS baton_run_steering_pending_idx
-    ON baton_run_steering(run_id, sequence) WHERE consumed_operation_id IS NULL`,
+    ON baton_run_steering(run_id, sequence) WHERE consumed_operation_id IS NULL AND discarded_reason IS NULL`,
   `CREATE TABLE IF NOT EXISTS baton_agent_names (
   scope TEXT NOT NULL,
   name TEXT NOT NULL,

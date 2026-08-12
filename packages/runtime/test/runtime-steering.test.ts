@@ -3,6 +3,7 @@ import { provideScoped } from "./scoped-provide.js"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, DurableDriver, ToolExecutor } from "@batonfx/core"
+import { Database } from "bun:sqlite"
 import { closedTestAgent, testExecutable } from "./identity.js"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
 import { assistant, assistantAddress, assistantRef, completedResult, memoryLayer, registrationsFor } from "./helpers.js"
@@ -44,9 +45,15 @@ const verifyInbox = Effect.gen(function* () {
       options: { baton: { region: "local", priority: 1 } },
     }),
   ])
-  yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: first })
-  yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: reordered })
-  yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:2", prompt: "second" })
+  const accepted = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: first })
+  const retry = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: reordered })
+  const sameText = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:2", prompt: reordered })
+  const second = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:3", prompt: "second" })
+  expect(retry).toEqual(accepted)
+  expect(accepted.sequence).toBe(0)
+  expect(sameText.sequence).toBe(1)
+  expect(second.sequence).toBe(2)
+  expect(new Set([accepted.entryId, sameText.entryId, second.entryId])).toHaveLength(3)
   const conflict = yield* runtime
     .steer({
       runId: receipt.runId,
@@ -67,6 +74,18 @@ const verifyInbox = Effect.gen(function* () {
   expect(firstRead.map((entry) => entry.entryId)).toEqual(secondRead.map((entry) => entry.entryId))
   expect(firstRead.map((entry) => JSON.stringify(entry.prompt))).toEqual([
     expect.stringContaining("first"),
+    expect.stringContaining("first"),
+    expect.stringContaining("second"),
+  ])
+  const acceptance = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
+    (event) => event._tag === "SteeringAccepted",
+  )
+  expect(acceptance).toHaveLength(3)
+  expect(acceptance.map((event) => event.entryId)).toEqual([accepted.entryId, sameText.entryId, second.entryId])
+  expect(acceptance.map((event) => event.steeringSequence)).toEqual([0, 1, 2])
+  expect(acceptance.map((event) => JSON.stringify(event.prompt))).toEqual([
+    expect.stringContaining("first"),
+    expect.stringContaining("first"),
     expect.stringContaining("second"),
   ])
   expect((yield* store.complete({ ...claim, result: completedResult("premature") }))._tag).toBe("SteeringPending")
@@ -85,7 +104,7 @@ const verifyInbox = Effect.gen(function* () {
     .pipe(Effect.flip)
   expect(invalidConsumption).toBeInstanceOf(Errors.RuntimeUnavailable)
 
-  yield* store.recordOperation({
+  const operationInput = {
     ...claim,
     operationKey: "model:steering",
     kind: "model",
@@ -94,18 +113,32 @@ const verifyInbox = Effect.gen(function* () {
     replayPolicy: "provider-idempotent",
     attempt: claim.attemptFence,
     steeringEntryIds: firstRead.map((entry) => entry.entryId),
-  })
-  yield* store.recordOperation({
-    ...claim,
-    operationKey: "model:steering",
-    kind: "model",
-    inputDigest: "model:steering",
-    input: { prompt: "steering" },
-    replayPolicy: "provider-idempotent",
-    attempt: claim.attemptFence,
-    steeringEntryIds: firstRead.map((entry) => entry.entryId),
-  })
+  } as const
+  const skippedMiddle = yield* store
+    .recordOperation({
+      ...operationInput,
+      operationKey: "model:skipped-middle",
+      steeringEntryIds: [firstRead[0]!.entryId, firstRead[2]!.entryId],
+    })
+    .pipe(Effect.flip)
+  expect(skippedMiddle).toBeInstanceOf(Errors.RuntimeUnavailable)
+
+  const operation = yield* store.recordOperation(operationInput)
+  yield* store.recordOperation(operationInput)
+  const divergentRetry = yield* store
+    .recordOperation({ ...operationInput, steeringEntryIds: firstRead.slice(0, 2).map((entry) => entry.entryId) })
+    .pipe(Effect.flip)
+  expect(divergentRetry).toBeInstanceOf(Errors.RuntimeUnavailable)
   expect(yield* store.readSteering(claim)).toEqual([])
+  const consumed = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
+    (event) => event._tag === "SteeringConsumed",
+  )
+  expect(consumed).toEqual([
+    expect.objectContaining({
+      entryIds: firstRead.map((entry) => entry.entryId),
+      operationId: operation.operationId,
+    }),
+  ])
   expect((yield* store.complete({ ...claim, result: completedResult("done") }))._tag).toBe("Completed")
   const terminal = yield* runtime
     .steer({ runId: receipt.runId, idempotencyKey: "steer:terminal", prompt: "late" })
@@ -189,26 +222,196 @@ for (const backend of ["memory", "sqlite"] as const) {
 it.live("persists accepted steering across a SQLite close and reopen", () => {
   const filename = tempDbPath("runtime-steering-reopen")
   let runId = ""
+  let steeringReceipt: { readonly entryId: string; readonly sequence: number } | undefined
   const admit = provideScoped(
     sqliteLayer(filename),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const receipt = yield* admitRun
       runId = receipt.runId
-      yield* runtime.steer({ runId, idempotencyKey: "steer:reopen", prompt: "survive restart" })
+      steeringReceipt = yield* runtime.steer({
+        runId,
+        idempotencyKey: "steer:reopen",
+        prompt: "survive restart",
+      })
     }),
   )
   const reopen = provideScoped(
     sqliteLayer(filename),
     Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
+      expect(yield* runtime.steer({ runId, idempotencyKey: "steer:reopen", prompt: "survive restart" })).toEqual(
+        steeringReceipt,
+      )
       const claim = yield* store.claimExecution({ runId, ownerId: "reopened" })
       const entries = yield* store.readSteering(claim)
       expect(entries).toHaveLength(1)
+      expect(entries[0]).toMatchObject(steeringReceipt!)
       expect(encodeJson(entries[0]?.prompt)).toContain("survive restart")
+      expect(
+        (yield* runtime.history({ runId, cursor: -1, limit: 100 })).filter(
+          (event) => event._tag === "SteeringAccepted",
+        ),
+      ).toHaveLength(1)
     }),
   )
   return admit.pipe(Effect.andThen(reopen))
+})
+
+for (const backend of ["memory", "sqlite"] as const) {
+  const lifecycleLayer =
+    backend === "memory" ? memoryLayer : sqliteLayer(tempDbPath(`steering-terminal-disposition-${backend}`))
+  layer(lifecycleLayer)(`${backend} steering terminal disposition`, (test) => {
+    test.effect("discards every unconsumed entry on completion, failure, and cancellation", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const settle = (reason: "completed" | "failed" | "cancelled") =>
+          Effect.gen(function* () {
+            const run = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: `session:steering-discard:${backend}:${reason}`,
+              idempotencyKey: "run",
+              prompt: "start",
+            })
+            const first = yield* runtime.steer({ runId: run.runId, idempotencyKey: "first", prompt: "one" })
+            const second = yield* runtime.steer({ runId: run.runId, idempotencyKey: "second", prompt: "two" })
+            if (reason === "cancelled") {
+              yield* runtime.cancel({ runId: run.runId, reason: "caller stopped" })
+            } else {
+              const claim = yield* store.claimExecution({ runId: run.runId, ownerId: `discard-${reason}` })
+              if (reason === "completed") {
+                yield* store.complete({ ...claim, result: { _tag: "Program", value: "done" } })
+              } else {
+                yield* store.fail({
+                  ...claim,
+                  error: Errors.AgentExecutionFailure.make({ message: "failed" }),
+                })
+              }
+            }
+            const history = yield* runtime.history({ runId: run.runId, cursor: -1, limit: 100 })
+            const discardedIndex = history.findIndex((event) => event._tag === "SteeringDiscarded")
+            const terminalIndex = history.findIndex(
+              (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+            )
+            expect(discardedIndex).toBeGreaterThan(-1)
+            expect(discardedIndex).toBeLessThan(terminalIndex)
+            expect(history[discardedIndex]).toMatchObject({
+              _tag: "SteeringDiscarded",
+              entryIds: [first.entryId, second.entryId],
+              reason,
+            })
+          })
+        yield* Effect.forEach(["completed", "failed", "cancelled"] as const, settle, { discard: true })
+      }),
+    )
+  })
+}
+
+it.live("rolls back every SQLite steering lifecycle boundary atomically", () => {
+  const filename = tempDbPath("runtime-steering-atomic-boundaries")
+  return provideScoped(
+    sqliteLayer(filename),
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const database = new Database(filename)
+      const run = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:steering-atomic-boundaries",
+        idempotencyKey: "run",
+        prompt: "start",
+      })
+
+      database.exec(`
+        CREATE TRIGGER fail_steering_acceptance
+        BEFORE INSERT ON baton_run_events
+        WHEN NEW.event_json LIKE '%"_tag":"SteeringAccepted"%'
+        BEGIN
+          SELECT RAISE(ABORT, 'forced steering acceptance rollback');
+        END
+      `)
+      expect(
+        (yield* runtime.steer({ runId: run.runId, idempotencyKey: "atomic", prompt: "atomic" }).pipe(Effect.exit))._tag,
+      ).toBe("Failure")
+      database.exec("DROP TRIGGER fail_steering_acceptance")
+      const steering = yield* runtime.steer({ runId: run.runId, idempotencyKey: "atomic", prompt: "atomic" })
+      expect(steering.sequence).toBe(0)
+      expect(
+        (yield* runtime.history({ runId: run.runId, cursor: -1, limit: 100 })).filter(
+          (event) => event._tag === "SteeringAccepted",
+        ),
+      ).toHaveLength(1)
+
+      const claim = yield* store.claimExecution({ runId: run.runId, ownerId: "atomic" })
+      const entries = yield* store.readSteering(claim)
+      database.exec(`
+        CREATE TRIGGER fail_steering_consumption
+        BEFORE INSERT ON baton_run_events
+        WHEN NEW.event_json LIKE '%"_tag":"SteeringConsumed"%'
+        BEGIN
+          SELECT RAISE(ABORT, 'forced steering consumption rollback');
+        END
+      `)
+      const operationInput = {
+        ...claim,
+        operationKey: "model:atomic",
+        kind: "model" as const,
+        inputDigest: "model:atomic",
+        input: { prompt: "atomic" },
+        replayPolicy: "provider-idempotent" as const,
+        attempt: claim.attemptFence,
+        steeringEntryIds: entries.map((entry) => entry.entryId),
+      }
+      expect((yield* store.recordOperation(operationInput).pipe(Effect.exit))._tag).toBe("Failure")
+      expect(yield* store.readSteering(claim)).toHaveLength(1)
+      expect(yield* store.getOperationByKey({ runId: run.runId, operationKey: "model:atomic" })).toBeUndefined()
+      database.exec("DROP TRIGGER fail_steering_consumption")
+      yield* store.recordOperation(operationInput)
+      expect(yield* store.readSteering(claim)).toEqual([])
+
+      const terminalRun = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:steering-atomic-terminal",
+        idempotencyKey: "run",
+        prompt: "start",
+      })
+      const terminalSteering = yield* runtime.steer({
+        runId: terminalRun.runId,
+        idempotencyKey: "pending",
+        prompt: "pending",
+      })
+      const terminalClaim = yield* store.claimExecution({ runId: terminalRun.runId, ownerId: "atomic-terminal" })
+      database.exec(`
+        CREATE TRIGGER fail_steering_terminal
+        BEFORE INSERT ON baton_run_events
+        WHEN NEW.event_json LIKE '%"_tag":"RunCompleted"%'
+        BEGIN
+          SELECT RAISE(ABORT, 'forced steering terminal rollback');
+        END
+      `)
+      expect(
+        (yield* store.complete({ ...terminalClaim, result: { _tag: "Program", value: "done" } }).pipe(Effect.exit))
+          ._tag,
+      ).toBe("Failure")
+      expect(yield* store.readSteering(terminalClaim)).toHaveLength(1)
+      expect(
+        (yield* runtime.history({ runId: terminalRun.runId, cursor: -1, limit: 100 })).some(
+          (event) => event._tag === "SteeringDiscarded",
+        ),
+      ).toBe(false)
+      database.exec("DROP TRIGGER fail_steering_terminal")
+      yield* store.complete({ ...terminalClaim, result: { _tag: "Program", value: "done" } })
+      const discarded = (yield* runtime.history({ runId: terminalRun.runId, cursor: -1, limit: 100 })).filter(
+        (event) => event._tag === "SteeringDiscarded",
+      )
+      expect(discarded).toEqual([
+        expect.objectContaining({ entryIds: [terminalSteering.entryId], reason: "completed" }),
+      ])
+      database.close()
+    }),
+  )
 })
 
 it.live("atomically persists steering consumption and model scheduling before SQLite dispatch", () => {

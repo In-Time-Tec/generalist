@@ -1,7 +1,7 @@
-import { DateTime, Effect, Function, Option, Queue } from "effect"
+import { DateTime, Effect, Function, Option } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
-import { RuntimeUnavailable, SubscriberLagged } from "../errors.js"
+import { RuntimeUnavailable } from "../errors.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import type { DurableAgentLoopEvent } from "../agent-event.js"
 import type { ExecutionResult } from "../execution-state.js"
@@ -56,20 +56,40 @@ export const appendEvent: {
       const sequence = run.lastSequence + 1
       const at = yield* occurredAt
       const event = build(baseFields(run, sequence, at), run)
+      const discardReason =
+        event._tag === "RunCompleted"
+          ? "completed"
+          : event._tag === "RunFailed"
+            ? "failed"
+            : event._tag === "RunCancelled"
+              ? "cancelled"
+              : undefined
+      const pendingSteering = run.steering.filter(
+        (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
+      )
+      if (discardReason !== undefined && pendingSteering.length > 0) {
+        const runs = new Map(state.runs)
+        runs.set(run.runId, {
+          ...run,
+          steering: run.steering.map((entry) =>
+            pendingSteering.some((pending) => pending.entryId === entry.entryId)
+              ? { ...entry, discardedReason: discardReason }
+              : entry,
+          ),
+        })
+        const [, discarded] = yield* appendEvent({ ...state, runs }, runId, (base) => ({
+          ...base,
+          _tag: "SteeringDiscarded",
+          entryIds: pendingSteering.map((entry) => entry.entryId),
+          reason: discardReason,
+        }))
+        return yield* appendEvent(discarded, runId, build, nextStatus)
+      }
       const root = state.treeRoots.get(run.rootRunId)
       if (root === undefined) {
         return yield* RuntimeUnavailable.make({ message: `tree root ${run.rootRunId} missing during append` })
       }
       const position = root.lastPosition + 1
-      yield* Effect.forEach(root.subscribers.values(), (queue) => Queue.offer(queue, undefined), { discard: true })
-      const subscribers = new Map(run.subscribers)
-      for (const [subscriberId, queue] of run.subscribers) {
-        const offered = yield* Queue.offer(queue, event)
-        if (!offered) {
-          yield* Queue.fail(queue, SubscriberLagged.make({ runId, lastDeliveredSequence: run.lastSequence }))
-          subscribers.delete(subscriberId)
-        }
-      }
       const updated: StoredRun = {
         ...run,
         runId: run.runId,
@@ -85,7 +105,7 @@ export const appendEvent: {
         cancellationRequested: event._tag === "RunCancellationRequested" ? true : run.cancellationRequested,
         children: run.children,
         events: [...run.events, event],
-        subscribers,
+        subscribers: run.subscribers,
         ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
         ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
         ...(event._tag === "RunWaiting"
@@ -125,7 +145,24 @@ export const appendEvent: {
         lastPosition: position,
         events: [...root.events, projectTreeEvent(event, position, run)],
       })
-      return [event, { ...state, runs, treeRoots }] as const
+      return [
+        event,
+        {
+          ...state,
+          runs,
+          treeRoots,
+          publications: [
+            ...state.publications,
+            {
+              runId,
+              event,
+              lastDeliveredSequence: run.lastSequence,
+              subscribers: run.subscribers,
+              treeSubscribers: root.subscribers,
+            },
+          ],
+        },
+      ] as const
     }),
 )
 

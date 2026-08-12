@@ -4,7 +4,7 @@ import type { Address } from "../address.js"
 import type { ExecutableManifest, ExecutableRef, PinnedExecutable } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import type { RunReceipt, RunStatus } from "../run.js"
-import type { RunEvent } from "../run-event.js"
+import type { RunEvent, SteeringDiscardReason } from "../run-event.js"
 import type { CursorExpired, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { OperationRecord } from "../sql/operations.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
@@ -21,6 +21,15 @@ import type { Session } from "@batonfx/core"
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
 export type TreeSubscriberQueue = Queue.Queue<void, RuntimeUnavailable>
+
+/** @experimental Internal publication deferred until the owning memory transition commits. */
+export interface MemoryPublication {
+  readonly runId: string
+  readonly event: RunEvent
+  readonly lastDeliveredSequence: number
+  readonly subscribers: ReadonlyMap<number, SubscriberQueue>
+  readonly treeSubscribers: ReadonlyMap<number, TreeSubscriberQueue>
+}
 
 export interface IdempotencyEntry {
   readonly digest: string
@@ -55,7 +64,9 @@ export interface StoredRun {
   readonly children: ReadonlyArray<string>
   readonly events: ReadonlyArray<RunEvent>
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
-  readonly steering: ReadonlyArray<SteeringEntry & { readonly consumedOperationId?: string }>
+  readonly steering: ReadonlyArray<
+    SteeringEntry & { readonly consumedOperationId?: string; readonly discardedReason?: SteeringDiscardReason }
+  >
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
@@ -92,6 +103,7 @@ export interface MemoryState {
   readonly messages: ReadonlyMap<string, MailboxEntry>
   readonly agentNames: ReadonlyMap<string, string>
   readonly subscriberQueueCapacity: number
+  readonly publications: ReadonlyArray<MemoryPublication>
 }
 
 export interface TreeRoot {
@@ -147,6 +159,7 @@ export const emptyState = (input: {
   messages: new Map(),
   agentNames: new Map(),
   subscriberQueueCapacity: input.subscriberQueueCapacity,
+  publications: [],
 })
 
 export const operationMapKey: {

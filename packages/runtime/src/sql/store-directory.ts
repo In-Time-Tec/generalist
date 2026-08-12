@@ -1,4 +1,4 @@
-import { Clock, Effect } from "effect"
+import { Clock, Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
@@ -17,6 +17,7 @@ import {
   MailboxRateLimited,
   MessageConflict,
   RunNotFound,
+  RuntimeUnavailable,
 } from "../errors.js"
 import { deliveryPrompt, steeringKey, type MailboxEntry, type MessageReceipt } from "../mailbox.js"
 import { Metadata } from "../message.js"
@@ -24,7 +25,9 @@ import { isTerminal, type RunStatus } from "../run.js"
 import type { AdmitMessageInput } from "../run-store.js"
 import { digest as steeringDigest } from "../steering.js"
 import { decodeJson, encodeJson } from "./codecs.js"
-import { loadRun } from "./store-helpers.js"
+import { appendEvent, loadRun } from "./store-helpers.js"
+import type { EventHub } from "./subscribers.js"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 
 interface NameRow {
   readonly scope: string
@@ -369,7 +372,16 @@ export const admitMessage = (input: AdmitMessageInput) =>
  * loop drains it only at a turn boundary. Binding delivery to that one mechanism is what makes
  * delivery exactly-once from the consumer's view and keeps it out of an active model turn.
  */
-export const deliverPendingMessages = (input: { readonly runId: string }) =>
+type DeliverPendingMessagesEffect = Effect.Effect<
+  ReadonlyArray<MailboxEntry>,
+  RunNotFound | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+
+export const deliverPendingMessages: {
+  (input: { readonly runId: string }): (hub: EventHub) => DeliverPendingMessagesEffect
+  (hub: EventHub, input: { readonly runId: string }): DeliverPendingMessagesEffect
+} = Function.dual(2, (hub: EventHub, input: { readonly runId: string }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(input.runId)
@@ -421,12 +433,13 @@ export const deliverPendingMessages = (input: { readonly runId: string }) =>
       const sequence = Number(rows[0]?.next_sequence ?? 0)
       const steeringEntryId = `${input.runId}:steering:${sequence}`
       const prompt = deliveryPrompt(entry)
+      const digest = steeringDigest(prompt)
       yield* sql`
         INSERT INTO baton_run_steering (
-          entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id
+          entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id, discarded_reason
         ) VALUES (
-          ${steeringEntryId}, ${input.runId}, ${sequence}, ${idempotencyKey}, ${steeringDigest(prompt)},
-          ${encodeJson(Prompt.Prompt, prompt)}, NULL
+          ${steeringEntryId}, ${input.runId}, ${sequence}, ${idempotencyKey}, ${digest},
+          ${encodeJson(Prompt.Prompt, prompt)}, NULL, NULL
         )
       `
       yield* sql`
@@ -434,7 +447,16 @@ export const deliverPendingMessages = (input: { readonly runId: string }) =>
         SET delivered_run_id = ${input.runId}, steering_entry_id = ${steeringEntryId}
         WHERE entry_id = ${entry.entryId}
       `
+      yield* appendEvent(hub, (yield* loadRun(input.runId))!, {
+        _tag: "SteeringAccepted",
+        entryId: steeringEntryId,
+        steeringSequence: sequence,
+        idempotencyKey,
+        digest,
+        prompt,
+      })
       delivered.push({ ...entry, deliveredRunId: input.runId, steeringEntryId })
     }
     return delivered
-  })
+  }),
+)

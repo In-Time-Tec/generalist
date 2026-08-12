@@ -33,7 +33,9 @@ const nextId = (prefix: string): Effect.Effect<string> =>
 
 interface SteeringConsumptionRow {
   readonly entry_id: string
+  readonly sequence: number | string
   readonly consumed_operation_id: string | null
+  readonly discarded_reason: string | null
 }
 
 const requireRun = (runId: string) =>
@@ -82,25 +84,29 @@ export const recordOperation: {
     `
     const prior = existing[0]
     if (prior !== undefined) {
-      for (const entryId of new Set(input.steeringEntryIds ?? [])) {
-        const rows = yield* sql<SteeringConsumptionRow>`
-          SELECT entry_id, consumed_operation_id FROM baton_run_steering
-          WHERE run_id = ${input.runId} AND entry_id = ${entryId}
-        `
-        if (rows[0]?.consumed_operation_id !== prior.operation_id) {
-          return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
-        }
+      const consumed = yield* sql<{ readonly entry_id: string }>`
+        SELECT entry_id FROM baton_run_steering
+        WHERE run_id = ${input.runId} AND consumed_operation_id = ${prior.operation_id}
+        ORDER BY sequence
+      `
+      const retried = input.steeringEntryIds ?? []
+      if (consumed.length !== retried.length || consumed.some((entry, index) => entry.entry_id !== retried[index])) {
+        return yield* RuntimeUnavailable.make({ message: "steering consumption does not match operation" })
       }
       return toOperationRecord(prior)
     }
-    for (const entryId of new Set(input.steeringEntryIds ?? [])) {
-      const rows = yield* sql<SteeringConsumptionRow>`
-        SELECT entry_id, consumed_operation_id FROM baton_run_steering
-        WHERE run_id = ${input.runId} AND entry_id = ${entryId}
-      `
-      if (rows[0] === undefined || rows[0].consumed_operation_id !== null) {
-        return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} is not pending` })
-      }
+    const steeringEntryIds = input.steeringEntryIds ?? []
+    const pending = yield* sql<SteeringConsumptionRow>`
+      SELECT entry_id, sequence, consumed_operation_id, discarded_reason FROM baton_run_steering
+      WHERE run_id = ${input.runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
+      ORDER BY sequence
+    `
+    const selected = pending.slice(0, steeringEntryIds.length)
+    if (
+      selected.length !== steeringEntryIds.length ||
+      selected.some((entry, index) => entry.entry_id !== steeringEntryIds[index])
+    ) {
+      return yield* RuntimeUnavailable.make({ message: "steering entries are not the pending prefix" })
     }
     const operationId = yield* nextId("op")
     const executableRef = yield* Effect.try({
@@ -128,11 +134,19 @@ export const recordOperation: {
         WHERE run_id = ${input.runId}
       `
     }
-    for (const entryId of input.steeringEntryIds ?? []) {
+    for (const entryId of steeringEntryIds) {
       yield* sql`
         UPDATE baton_run_steering SET consumed_operation_id = ${operationId}
-        WHERE run_id = ${input.runId} AND entry_id = ${entryId} AND consumed_operation_id IS NULL
+        WHERE run_id = ${input.runId} AND entry_id = ${entryId}
+          AND consumed_operation_id IS NULL AND discarded_reason IS NULL
       `
+    }
+    if (steeringEntryIds.length > 0) {
+      yield* appendEvent(hub, yield* requireRun(input.runId), {
+        _tag: "SteeringConsumed",
+        entryIds: steeringEntryIds,
+        operationId,
+      })
     }
     for (const event of input.steeringEvents ?? []) {
       const current = yield* requireRun(input.runId)

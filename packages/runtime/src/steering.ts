@@ -2,6 +2,15 @@ import { Pins } from "@batonfx/core"
 import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 
+/** @experimental Stable identity returned for durable steering admission and every identical retry. */
+export const SteeringReceipt = Schema.Struct({
+  entryId: Schema.String,
+  sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+})
+
+/** @experimental Stable identity returned for durable steering admission and every identical retry. */
+export type SteeringReceipt = typeof SteeringReceipt.Type
+
 /** @experimental Durable steering accepted for a Run. */
 export interface SteeringEntry {
   readonly entryId: string

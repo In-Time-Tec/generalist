@@ -32,6 +32,7 @@ import { RuntimeUnavailable } from "../errors.js"
 import { checkpointRef, decodePinned } from "../executable-manifest.js"
 import { PendingRunOutcome } from "../run-store.js"
 import { admitChildSettlementFromEventId } from "./settlement-notifications.js"
+import { discardPendingSteering } from "./store-steering-disposition.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -216,6 +217,11 @@ export const appendEvent: {
     const partial = partialOrNextStatus as EventPartial
     return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
+      const discarded = yield* discardPendingSteering({ runId: run.runId, terminalTag: partial._tag })
+      if (discarded !== undefined) {
+        yield* appendEvent(hub, run, discarded)
+        return yield* appendEvent(hub, (yield* loadRun(run.runId))!, partial, nextStatus)
+      }
       const sequence = run.lastSequence + 1
       const occurredAt = yield* nowIso
       const event = {

@@ -48,17 +48,29 @@ export const recordOperation: {
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     const byKey = state.operations.get(operationKeyMapKey(input.runId, input.operationKey))
     if (byKey !== undefined) {
-      for (const entryId of input.steeringEntryIds ?? []) {
-        const entry = run.steering.find((candidate) => candidate.entryId === entryId)
-        if (entry?.consumedOperationId !== byKey.operationId) {
-          return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
-        }
+      const consumed = run.steering
+        .filter((entry) => entry.consumedOperationId === byKey.operationId)
+        .map((entry) => entry.entryId)
+      const retried = input.steeringEntryIds ?? []
+      if (consumed.length !== retried.length || consumed.some((entryId, index) => entryId !== retried[index])) {
+        return yield* RuntimeUnavailable.make({ message: "steering consumption does not match operation" })
       }
       return [byKey, state] as const
     }
-    for (const entryId of input.steeringEntryIds ?? []) {
+    const steeringEntryIds = input.steeringEntryIds ?? []
+    const selected = run.steering
+      .filter((entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined)
+      .slice(0, steeringEntryIds.length)
+      .map((entry) => entry.entryId)
+    if (
+      selected.length !== steeringEntryIds.length ||
+      selected.some((entryId, index) => entryId !== steeringEntryIds[index])
+    ) {
+      return yield* RuntimeUnavailable.make({ message: "steering entries are not in pending order" })
+    }
+    for (const entryId of steeringEntryIds) {
       const entry = run.steering.find((candidate) => candidate.entryId === entryId)
-      if (entry === undefined || entry.consumedOperationId !== undefined) {
+      if (entry === undefined || entry.consumedOperationId !== undefined || entry.discardedReason !== undefined) {
         return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} is not pending` })
       }
     }
@@ -88,17 +100,7 @@ export const recordOperation: {
       ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
       ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
       steering: run.steering.map((entry) =>
-        (input.steeringEntryIds ?? []).includes(entry.entryId)
-          ? {
-              entryId: entry.entryId,
-              runId: entry.runId,
-              sequence: entry.sequence,
-              idempotencyKey: entry.idempotencyKey,
-              digest: entry.digest,
-              prompt: entry.prompt,
-              consumedOperationId: operationId,
-            }
-          : entry,
+        steeringEntryIds.includes(entry.entryId) ? { ...entry, consumedOperationId: operationId } : entry,
       ),
     }
     if (input.continuation === null) {
@@ -108,6 +110,14 @@ export const recordOperation: {
       runs.set(run.runId, updatedRun)
     }
     let next: MemoryState = { ...state, nextOperationCounter: state.nextOperationCounter + 1, operations, runs }
+    if (steeringEntryIds.length > 0) {
+      const [, consumed] = yield* appendLifecycle(next, input.runId, {
+        _tag: "SteeringConsumed",
+        entryIds: steeringEntryIds,
+        operationId,
+      })
+      next = consumed
+    }
     for (const event of input.steeringEvents ?? []) {
       const [, appended] = yield* appendAgentEvent(next, input.runId, event)
       next = appended

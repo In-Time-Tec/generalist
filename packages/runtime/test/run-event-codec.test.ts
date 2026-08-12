@@ -82,6 +82,49 @@ it("round-trips every RunFailure variant through the durable RunEvent codec", ()
   }
 })
 
+it("round-trips exact identity-bearing steering lifecycle facts", () => {
+  const common = {
+    specVersion: "1" as const,
+    runId: "run:steering-codec",
+    executableRef: assistantRef.ref,
+    rootRunId: "run:steering-codec",
+    occurredAt: "2026-08-05T00:00:00.000Z",
+  }
+  const events: ReadonlyArray<RunEvent.RunEvent> = [
+    {
+      ...common,
+      _tag: "SteeringAccepted",
+      eventId: "event:steering:accepted",
+      sequence: 3,
+      entryId: "opaque-entry",
+      steeringSequence: 0,
+      idempotencyKey: "steer:1",
+      digest: "digest:1",
+      prompt: textPrompt("change direction"),
+    },
+    {
+      ...common,
+      _tag: "SteeringConsumed",
+      eventId: "event:steering:consumed",
+      sequence: 4,
+      entryIds: ["opaque-entry", "opaque-entry-2"],
+      operationId: "operation:1",
+    },
+    {
+      ...common,
+      _tag: "SteeringDiscarded",
+      eventId: "event:steering:discarded",
+      sequence: 5,
+      entryIds: ["opaque-entry-3"],
+      reason: "cancelled",
+    },
+  ]
+
+  for (const event of events) {
+    expect(decodeEvent(encodeEvent(event))).toEqual(event)
+  }
+})
+
 it("round-trips the canonical ApprovalRequested identity and payload", () => {
   const call = Response.makePart("tool-call", {
     id: "call:delete",

@@ -47,6 +47,7 @@ import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
 import type { FanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
 import type { ResolveOperationInput } from "./operation-resolution.js"
+import type { SteeringReceipt } from "./steering.js"
 import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Duration } from "effect"
@@ -317,7 +318,7 @@ export interface Interface {
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly cancelSession: (input: CancelSessionInput) => Effect.Effect<void, RuntimeUnavailable>
   readonly awaitSessionTerminal: (input: AwaitSessionTerminalInput) => Effect.Effect<void, RuntimeUnavailable>
-  readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>
+  readonly steer: (input: SteerInput) => Effect.Effect<SteeringReceipt, SteerError>
   /**
    * @experimental Send one addressed message into the target's durable inbox.
    *

@@ -57,6 +57,31 @@ export type RunResumed = RunEventBase & {
   readonly waitId: string
   readonly resolution: WaitResolution
 }
+/** @experimental Exact durable steering admission fact. */
+export type SteeringAccepted = RunEventBase & {
+  readonly _tag: "SteeringAccepted"
+  readonly entryId: string
+  readonly steeringSequence: number
+  readonly idempotencyKey: string
+  readonly digest: string
+  readonly prompt: Prompt.Prompt
+}
+/** @experimental Exact durable steering consumption fact. */
+export type SteeringConsumed = RunEventBase & {
+  readonly _tag: "SteeringConsumed"
+  readonly entryIds: ReadonlyArray<string>
+  readonly operationId: string
+}
+/** @experimental Terminal disposition category for accepted steering. */
+export const SteeringDiscardReason = Schema.Literals(["completed", "failed", "cancelled"])
+/** @experimental Terminal disposition category for accepted steering. */
+export type SteeringDiscardReason = typeof SteeringDiscardReason.Type
+/** @experimental Exact terminal disposition fact for unconsumed steering. */
+export type SteeringDiscarded = RunEventBase & {
+  readonly _tag: "SteeringDiscarded"
+  readonly entryIds: ReadonlyArray<string>
+  readonly reason: SteeringDiscardReason
+}
 export type OperationUnknown = RunEventBase & {
   readonly _tag: "OperationUnknown"
   readonly operationId: string
@@ -123,6 +148,9 @@ export type LifecycleEvent =
   | RunAttemptStarted
   | RunWaiting
   | RunResumed
+  | SteeringAccepted
+  | SteeringConsumed
+  | SteeringDiscarded
   | OperationUnknown
   | ChildLinked
   | ChildSettled
@@ -141,6 +169,9 @@ export const LifecycleTag = Schema.Literals([
   "RunAttemptStarted",
   "RunWaiting",
   "RunResumed",
+  "SteeringAccepted",
+  "SteeringConsumed",
+  "SteeringDiscarded",
   "OperationUnknown",
   "ChildLinked",
   "ChildSettled",
@@ -321,6 +352,21 @@ const LifecycleEventSchema = Schema.Union([
   Schema.TaggedStruct("RunAttemptStarted", { attempt: Schema.Finite }),
   Schema.TaggedStruct("RunWaiting", { wait: RunWait }),
   Schema.TaggedStruct("RunResumed", { waitId: Schema.String, resolution: WaitResolution }),
+  Schema.TaggedStruct("SteeringAccepted", {
+    entryId: Schema.String,
+    steeringSequence: Sequence,
+    idempotencyKey: Schema.String,
+    digest: Schema.String,
+    prompt: Prompt.Prompt,
+  }),
+  Schema.TaggedStruct("SteeringConsumed", {
+    entryIds: Schema.Array(Schema.String),
+    operationId: Schema.String,
+  }),
+  Schema.TaggedStruct("SteeringDiscarded", {
+    entryIds: Schema.Array(Schema.String),
+    reason: SteeringDiscardReason,
+  }),
   Schema.TaggedStruct("OperationUnknown", { operationId: Schema.String }),
   Schema.TaggedStruct("ChildLinked", {
     childRunId: RunId,

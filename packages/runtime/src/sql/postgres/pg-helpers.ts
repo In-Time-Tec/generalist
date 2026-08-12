@@ -32,6 +32,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
 import { OperationResolution } from "../../operation-resolution.js"
 import { admitChildSettlementFromEventId } from "../settlement-notifications.js"
+import { discardPendingSteering } from "../store-steering-disposition.js"
 
 type StoreError = RuntimeUnavailable | SqlError
 type StoreEffect<A> = Effect.Effect<A, StoreError, SqlClient.SqlClient>
@@ -121,6 +122,11 @@ export const appendEvent: {
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const pg = yield* PgClient.PgClient
+      const discarded = yield* discardPendingSteering({ runId: run.runId, terminalTag: partial._tag })
+      if (discarded !== undefined) {
+        yield* appendEvent(_hub, run, discarded)
+        return yield* appendEvent(_hub, (yield* loadRun(run.runId))!, partial, nextStatus)
+      }
       const sequence = yield* allocateSequence(run.runId)
       const occurredAt = yield* nowIso
       const event = {

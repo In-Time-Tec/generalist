@@ -43,6 +43,18 @@ export const messagingDeliveryIdempotenceSuite = <StoreError, Extra = never>(
           steering.filter((entry) => entry.idempotencyKey === Mailbox.steeringKey(firstPass[0]!.entryId)),
         ).toHaveLength(1)
         expect(steering).toHaveLength(1)
+        const accepted = (yield* runtime.history({ runId: first.runId, cursor: -1, limit: 100 })).filter(
+          (event) => event._tag === "SteeringAccepted",
+        )
+        expect(accepted).toEqual([
+          expect.objectContaining({
+            entryId: firstPass[0]!.steeringEntryId,
+            steeringSequence: steering[0]!.sequence,
+            idempotencyKey: steering[0]!.idempotencyKey,
+            digest: steering[0]!.digest,
+            prompt: steering[0]!.prompt,
+          }),
+        ])
       }).pipe(provided),
     )
 

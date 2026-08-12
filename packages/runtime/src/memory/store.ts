@@ -1,16 +1,17 @@
-import { Effect, Layer, Option, SynchronizedRef } from "effect"
+import { Effect, Layer, Option, Queue, Ref, SynchronizedRef } from "effect"
 import {
   AddressNotFound,
   CursorExpired,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
+  SubscriberLagged,
   TreeCursorExpired,
   TreeCursorInvalid,
 } from "../errors.js"
 import { RunStore, type CompletionOutcome } from "../run-store.js"
 import type { LayerOptions } from "../runtime.js"
-import { emptyState, idempotencyKey, type MemoryState } from "./state.js"
+import { emptyState, idempotencyKey, type MemoryPublication, type MemoryState } from "./state.js"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store-admit.js"
 import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
 import { respondApproval } from "./store-approval.js"
@@ -74,10 +75,55 @@ export const makeRunStore = (options: LayerOptions) =>
     )
     yield* Effect.addFinalizer(() => shutdownStore(stateRef))
 
+    const publish = (initial: MemoryState, publications: ReadonlyArray<MemoryPublication>) =>
+      Effect.gen(function* () {
+        let state = initial
+        for (const publication of publications) {
+          yield* Effect.forEach(publication.treeSubscribers.values(), (queue) => Queue.offer(queue, undefined), {
+            discard: true,
+          })
+          for (const [subscriberId, queue] of publication.subscribers) {
+            const run = state.runs.get(publication.runId)
+            if (run?.subscribers.get(subscriberId) !== queue) continue
+            const offered = yield* Queue.offer(queue, publication.event)
+            if (offered) continue
+            yield* Queue.fail(
+              queue,
+              SubscriberLagged.make({
+                runId: publication.runId,
+                lastDeliveredSequence: publication.lastDeliveredSequence,
+              }),
+            )
+            const subscribers = new Map(run.subscribers)
+            subscribers.delete(subscriberId)
+            const runs = new Map(state.runs)
+            runs.set(run.runId, { ...run, subscribers })
+            state = { ...state, runs }
+          }
+        }
+        return state
+      })
+
+    const modifyState = <A, E>(
+      transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
+    ): Effect.Effect<A, E> =>
+      stateRef.semaphore.withPermit(
+        Effect.gen(function* () {
+          const state = yield* Ref.get(stateRef.backing)
+          const [result, next] = yield* transition(state)
+          const publications = next.publications
+          const committed: MemoryState = { ...next, publications: [] }
+          yield* Ref.set(stateRef.backing, committed)
+          const published = yield* publish(committed, publications)
+          if (published !== committed) yield* Ref.set(stateRef.backing, published)
+          return result
+        }).pipe(Effect.uninterruptible),
+      )
+
     const update = <E>(transition: (state: MemoryState) => Effect.Effect<MemoryState, E>) =>
-      SynchronizedRef.modifyEffect(stateRef, (state) =>
-        transition(state).pipe(Effect.map((next) => [undefined, next] as const)),
-      ).pipe(Effect.asVoid)
+      modifyState((state) => transition(state).pipe(Effect.map((next) => [undefined, next] as const))).pipe(
+        Effect.asVoid,
+      )
     const fencedUpdate = <E>(
       input: import("../run-store.js").ExecutionClaim,
       transition: (state: MemoryState) => Effect.Effect<MemoryState, E>,
@@ -85,10 +131,7 @@ export const makeRunStore = (options: LayerOptions) =>
     const fencedModify = <A, E>(
       input: import("../run-store.js").ExecutionClaim,
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
-    ) =>
-      SynchronizedRef.modifyEffect(stateRef, (state) =>
-        requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))),
-      )
+    ) => modifyState((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
 
     return RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
@@ -118,10 +161,10 @@ export const makeRunStore = (options: LayerOptions) =>
           if (!equals(binding, admitted)) {
             return yield* AddressNotFound.make({ address: input.message.to })
           }
-          return yield* SynchronizedRef.modifyEffect(stateRef, (state) => admitSend(state, input))
+          return yield* modifyState((state) => admitSend(state, input))
         }),
-      admitStart: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitStart(state, input)),
-      admitSpawn: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitSpawn(state, input)),
+      admitStart: (input) => modifyState((state) => admitStart(state, input)),
+      admitSpawn: (input) => modifyState((state) => admitSpawn(state, input)),
       admitProgramChild: (input) => fencedModify(input, (state) => admitProgramChild(state, input)),
       admitProgramChildAndSuspend: (input) =>
         fencedModify(input, (state) =>
@@ -135,8 +178,8 @@ export const makeRunStore = (options: LayerOptions) =>
       respondApproval: (input) => update((state) => respondApproval(state, input)),
       signal: (input) => update((state) => signal(state, input)),
       cancel: (input) => update((state) => cancel(state, input)),
-      cancelSession: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => cancelSession(state, input)),
-      admitSteering: (input) => update((state) => admitSteering(state, input)),
+      cancelSession: (input) => modifyState((state) => cancelSession(state, input)),
+      admitSteering: (input) => modifyState((state) => admitSteering(state, input)),
       readSteering: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>
@@ -149,9 +192,9 @@ export const makeRunStore = (options: LayerOptions) =>
       directory: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => directory(state, runId))),
       resolveAddress: (address) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => resolveAddress(state, address))),
-      registerAgentName: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => registerAgentName(state, input)),
+      registerAgentName: (input) => modifyState((state) => registerAgentName(state, input)),
       listRelated: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => listRelated(state, runId))),
-      admitMessage: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitMessage(state, input)),
+      admitMessage: (input) => modifyState((state) => admitMessage(state, input)),
       pendingMessages: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>
@@ -162,8 +205,7 @@ export const makeRunStore = (options: LayerOptions) =>
         ),
       settlementNotifications: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => settlementNotifications(state, input))),
-      deliverPendingMessages: (input) =>
-        SynchronizedRef.modifyEffect(stateRef, (state) => deliverPendingMessages(state, input)),
+      deliverPendingMessages: (input) => modifyState((state) => deliverPendingMessages(state, input)),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
       snapshot: (runId) =>
         SynchronizedRef.get(stateRef).pipe(
@@ -291,7 +333,7 @@ export const makeRunStore = (options: LayerOptions) =>
           }),
         ),
       complete: (input) =>
-        SynchronizedRef.modifyEffect(stateRef, (state) =>
+        modifyState((state) =>
           requireExecutionClaim(state, input).pipe(
             Effect.andThen(
               ((): Effect.Effect<
@@ -300,7 +342,9 @@ export const makeRunStore = (options: LayerOptions) =>
               > =>
                 Effect.gen(function* () {
                   const run = state.runs.get(input.runId)!
-                  const pending = run.steering.filter((entry) => entry.consumedOperationId === undefined)
+                  const pending = run.steering.filter(
+                    (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
+                  )
                   if (!run.cancellationRequested && pending.length > 0 && "transcript" in input.result) {
                     const continuation = {
                       schemaVersion: 1 as const,
@@ -358,12 +402,12 @@ export const makeRunStore = (options: LayerOptions) =>
             }),
           ),
         ),
-      claimExecution: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => claimExecution(state, input)),
+      claimExecution: (input) => modifyState((state) => claimExecution(state, input)),
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),
       saveExecution: (input) => update((state) => saveExecution(state, input)),
-      retryExecution: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => retryExecution(state, input)),
-      admitFanOut: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitFanOut(state, input)),
+      retryExecution: (input) => modifyState((state) => retryExecution(state, input)),
+      admitFanOut: (input) => modifyState((state) => admitFanOut(state, input)),
       inspectFanOut: (fanOutId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectFanOut(state, fanOutId))),
       reserveProgramOperation: (input) => fencedModify(input, (state) => reserveProgramOperation(state, input)),

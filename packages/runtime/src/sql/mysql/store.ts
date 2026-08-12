@@ -309,7 +309,7 @@ export const makeMysqlServices = (
         ),
       cancelSession: (input) =>
         run(cancelSessionRuns({ hub: transactionHub, lockRun, lockParent, clearClaim, ...input })),
-      admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
+      admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(transactionHub, input)))),
       readSteering: (input) => fenced(input, readSteering(input)),
       directory: (runId) => runNoTxn(directory(runId)),
       resolveAddress: (address) => runNoTxn(resolveAddress(address)),
@@ -318,7 +318,15 @@ export const makeMysqlServices = (
       admitMessage: (input) => run(lockNamed(`baton:mailbox:${input.targetSessionId}`, admitMessage(input))),
       pendingMessages: (input) => runNoTxn(pendingMessages(input)),
       settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
-      deliverPendingMessages: (input) => run(lockRun(input.runId).pipe(Effect.andThen(deliverPendingMessages(input)))),
+      deliverPendingMessages: (input) =>
+        run(
+          lockRun(input.runId).pipe(
+            Effect.andThen(directory(input.runId)),
+            Effect.flatMap((entry) =>
+              lockNamed(`baton:mailbox:${entry.sessionId}`, deliverPendingMessages(transactionHub, input)),
+            ),
+          ),
+        ),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {

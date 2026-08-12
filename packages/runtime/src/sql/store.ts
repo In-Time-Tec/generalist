@@ -165,7 +165,7 @@ export const makeSqliteRunStore = (
       signal: (input) => runBuffered((transactionHub) => signal(transactionHub, input)),
       cancel: (input) => runBuffered((transactionHub) => cancel(transactionHub, input)),
       cancelSession: (input) => runBuffered((transactionHub) => cancelSession(transactionHub, input)),
-      admitSteering: (input) => run(admitSteering(input)),
+      admitSteering: (input) => runBuffered((transactionHub) => admitSteering(transactionHub, input)),
       readSteering: (input) => fenced(input, () => readSteering(input)),
       directory: (runId) => runNoTxn(directory(runId)),
       resolveAddress: (address) => runNoTxn(resolveAddress(address)),
@@ -174,7 +174,7 @@ export const makeSqliteRunStore = (
       admitMessage: (input) => run(admitMessage(input)),
       pendingMessages: (input) => runNoTxn(pendingMessages(input)),
       settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
-      deliverPendingMessages: (input) => run(deliverPendingMessages(input)),
+      deliverPendingMessages: (input) => runBuffered((transactionHub) => deliverPendingMessages(transactionHub, input)),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {

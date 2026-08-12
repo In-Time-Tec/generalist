@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
@@ -128,9 +128,10 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   digest VARCHAR(128) NOT NULL,
   prompt_json LONGTEXT NOT NULL,
   consumed_operation_id VARCHAR(255),
+  discarded_reason VARCHAR(32),
   UNIQUE KEY baton_run_steering_sequence_key (run_id, sequence),
   UNIQUE KEY baton_run_steering_idempotency_key (run_id, idempotency_key),
-  KEY baton_run_steering_pending_idx (run_id, consumed_operation_id, sequence),
+  KEY baton_run_steering_pending_idx (run_id, consumed_operation_id, discarded_reason, sequence),
   CONSTRAINT baton_run_steering_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS baton_agent_names (
