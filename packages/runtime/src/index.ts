@@ -42,6 +42,8 @@ export namespace ExecutableManifest {
 
 export * as ExecutableRegistration from "./executable-registration.js"
 
+export * as TreePolicy from "./tree-policy.js"
+
 export * as ExecutableResolver from "./executable-resolver.js"
 
 import {

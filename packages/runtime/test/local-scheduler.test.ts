@@ -13,7 +13,7 @@ import {
   researcherRef,
   suspension,
 } from "./helpers.js"
-import { Agent } from "@batonfx/core"
+import { Agent, AgentEvent } from "@batonfx/core"
 import { closedTestAgent } from "./identity.js"
 import { makeStatic } from "../src/executable-resolver.js"
 import { layer as activeExecutionsLayer } from "../src/active-executions.js"
@@ -28,6 +28,16 @@ const finish = Response.makePart("finish", {
   }),
   response: undefined,
 })
+
+const childSuspension = (childRunId: string, waitId: string) =>
+  AgentEvent.AgentSuspended.make({
+    token: childRunId,
+    reason: "tool-wait",
+    tool_call_id: waitId,
+    tool_name: ChildRuns.toolName,
+    tool_params: {},
+    tool_call_batch: [],
+  })
 
 for (const backend of ["memory", "sqlite"] as const) {
   {
@@ -151,7 +161,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           yield* store.suspend({
             ...parentClaim,
             wait: openWait({ waitId: "child-tool" }),
-            suspension: suspension({ waitId: "child-tool" }),
+            suspension: childSuspension(childOutcome.token, "child-tool"),
           })
           yield* store.complete({
             ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "finished-child" })),
@@ -408,7 +418,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         ? Runtime.layerMemory(options)
         : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded") })
 
-    layer(runtimeLayer)(`${backend} terminal reconciliation stays bounded past the query window`, (it) => {
+    layer(runtimeLayer)(`${backend} scheduler never scans terminal or waiting Runs for child settlement`, (it) => {
       it.effect(
         "stays bounded past the query window",
         () =>
@@ -451,15 +461,16 @@ for (const backend of ["memory", "sqlite"] as const) {
               const before = calls.length
               yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
               const tickCalls = calls.slice(before)
-              // A terminal backlog of any size is never scanned: reconciliation reads waiting parents only.
-              expect(tickCalls.length).toBe(4)
+              // Child settlement is store-authoritative, so scheduler work is only cancellation and ready selection.
+              expect(tickCalls.length).toBe(3)
               for (const call of tickCalls) {
                 expect(call.input.limit).toBeLessThanOrEqual(64)
               }
               expect(
                 tickCalls.filter(
                   (call) =>
-                    call.method === "list" && ["succeeded", "failed", "cancelled"].includes(String(call.input.status)),
+                    call.method === "list" &&
+                    ["waiting", "succeeded", "failed", "cancelled"].includes(String(call.input.status)),
                 ),
               ).toHaveLength(0)
             }
@@ -495,7 +506,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             yield* store.suspend({
               ...parentClaim,
               wait: openWait({ waitId: "order-child" }),
-              suspension: suspension({ waitId: "order-child" }),
+              suspension: childSuspension(childOutcome.token, "order-child"),
             })
             const later = yield* runtime.send({
               to: assistantAddress,
@@ -558,7 +569,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             yield* store.suspend({
               ...parentClaim,
               wait: openWait({ waitId: "backlog-child" }),
-              suspension: suspension({ waitId: "backlog-child" }),
+              suspension: childSuspension(childOutcome.token, "backlog-child"),
             })
             yield* store.complete({
               ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "backlog-child-worker" })),
@@ -622,7 +633,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             yield* store.suspend({
               ...parentClaim,
               wait: openWait({ waitId: "starve-child" }),
-              suspension: suspension({ waitId: "starve-child" }),
+              suspension: childSuspension(childOutcome.token, "starve-child"),
             })
             yield* store.complete({
               ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "starve-child-worker" })),
@@ -641,8 +652,8 @@ for (const backend of ["memory", "sqlite"] as const) {
       )
     })
 
-    layer(runtimeLayer)(`${backend} idle reconciliation short-circuits`, (it) => {
-      it.effect("does no reconciliation work while nothing changes", () =>
+    layer(runtimeLayer)(`${backend} idle scheduler performs no child-settlement polling`, (it) => {
+      it.effect("does no child-settlement work while nothing changes", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const scheduler = yield* LocalScheduler.LocalScheduler
@@ -678,16 +689,14 @@ for (const backend of ["memory", "sqlite"] as const) {
           yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
           calls.length = 0
           yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
-          const waiting = yield* store.list({ status: "waiting", order: "oldest", limit: 64 })
-          // An idle tick reads one bounded waiting page and never scans the terminal backlog.
-          expect(calls.filter((call) => call.method === "list" && call.status === "waiting")).toHaveLength(1)
+          expect(calls.filter((call) => call.method === "list" && call.status === "waiting")).toHaveLength(0)
           expect(
             calls.filter(
               (call) => call.method === "list" && ["succeeded", "failed", "cancelled"].includes(call.status ?? ""),
             ),
           ).toHaveLength(0)
-          // Only a parent that still holds an open wait is inspected, never a settled Run.
-          expect(calls.filter((call) => call.method === "listRelated").length).toBeLessThanOrEqual(waiting.length)
+          expect(calls.filter((call) => call.method === "listRelated")).toHaveLength(0)
+          expect(calls.filter((call) => call.method === "snapshot")).toHaveLength(0)
         }),
       )
     })
@@ -743,7 +752,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           yield* store.suspend({
             ...parentClaim,
             wait: openWait({ waitId: "child-tool" }),
-            suspension: suspension({ waitId: "child-tool" }),
+            suspension: childSuspension(outcome.token, "child-tool"),
           })
           yield* scheduler.tick
           yield* scheduler.idle
@@ -822,7 +831,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           yield* store.suspend({
             ...parentClaim,
             wait: openWait({ waitId: "child-tool" }),
-            suspension: suspension({ waitId: "child-tool" }),
+            suspension: childSuspension(outcome.token, "child-tool"),
           })
           yield* store.complete({
             ...(yield* store.claimExecution({ runId: outcome.token, ownerId: "manual-child" })),

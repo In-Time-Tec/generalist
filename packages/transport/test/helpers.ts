@@ -1,5 +1,5 @@
 import { Effect, Function, Layer, Stream } from "effect"
-import { ExecutableManifest, Runtime } from "@batonfx/runtime"
+import { ExecutableManifest, Runtime, TreePolicy } from "@batonfx/runtime"
 import type { RunEvent } from "@batonfx/runtime"
 
 export const executable: ExecutableManifest.PinnedExecutable = ExecutableManifest.makeTest("assistant", "1")
@@ -19,6 +19,7 @@ export const event: {
       sequence,
       executableRef: agent,
       rootRunId: "run-1",
+      depth: 0,
       occurredAt: "2026-08-03T00:00:00.000Z",
       attempt: 1,
     }) as RunEvent.RunEvent,
@@ -41,6 +42,8 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
             status: "running",
             executableRef: agent,
             executableManifest: executable.manifest,
+            depth: 0,
+            treePolicy: TreePolicy.defaultTreePolicy,
             lastSequence: 2,
             durability: "durable",
           },
@@ -75,6 +78,8 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
           status: "running",
           executableRef: agent,
           executableManifest: executable.manifest,
+          depth: 0,
+          treePolicy: TreePolicy.defaultTreePolicy,
           lastSequence: 2,
           durability: "durable",
         }),

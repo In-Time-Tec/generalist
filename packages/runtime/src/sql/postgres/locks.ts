@@ -16,6 +16,22 @@ export const lockRun = (runId: string) =>
     yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${runId} FOR UPDATE`
   })
 
+export const lockRunHierarchy = (runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const hierarchy = [runId]
+    let current = runId
+    while (true) {
+      const row = (yield* sql<{ parent_run_id: string | null }>`
+        SELECT parent_run_id FROM baton_runs WHERE run_id = ${current}
+      `)[0]
+      if (row?.parent_run_id === null || row?.parent_run_id === undefined) break
+      hierarchy.push(row.parent_run_id)
+      current = row.parent_run_id
+    }
+    for (const id of hierarchy.reverse()) yield* lockRun(id)
+  })
+
 /**
  * One mailbox-level lock serializing admission into one target session's inbox.
  *

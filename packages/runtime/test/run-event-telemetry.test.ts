@@ -24,6 +24,7 @@ const base = {
     active: `agent-pin:v1:sha256:${"b".repeat(64)}`,
   },
   rootRunId: "run",
+  depth: 0,
   occurredAt: "2026-01-01T00:00:00.000Z",
 }
 

@@ -64,7 +64,9 @@ runtime.awaitChildSettlement({ parentRunId, childRunId })
 
 Join modes are `AllSuccess`, `AllSettled`, `FirstSuccess`, `Quorum`, and `BestEffort`. Remainder policies are `await`, `request-cancel`, and `abandon`. `terminate` is rejected until a host can prove that all member effects terminated.
 
-For model-authored work, `ChildRuns.tool` keeps `run_child` blocking for one dependent child. `ChildRuns.startGroupTool` returns ordered durable receipts without blocking, and `ChildRuns.awaitGroupTool` later joins that group through one durable parent suspension. `ChildRuns.makeTools` narrows model-facing selections from declared child authority.
+For model-authored work, `ChildRuns.tool` keeps `run_child` blocking for one dependent child. `ChildRuns.runGroupTool` (`run_child_group`) atomically admits an exact group and blocks through one durable parent suspension until all members settle, returning complete outcomes in admission order. `ChildRuns.startGroupTool` and `ChildRuns.awaitGroupTool` remain lower-level detached admission/join operations. `ChildRuns.makeTools` narrows model-facing selections from declared child authority.
+
+Each root admission may pin `{ maxDepth, maxSubagents }`. Root depth is zero; child depth is derived from its parent. `maxSubagents` is a per-parent lifetime direct-child limit shared by singleton and group paths, not a global depth pool. Replays do not spend quota again, terminal children are never refunded, and an over-limit exact group leaves no partial state.
 
 ## Testing against PostgreSQL and MySQL
 

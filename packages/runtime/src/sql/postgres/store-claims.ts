@@ -5,12 +5,11 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { AgentExecutionFailure, RunNotFound, RunTerminal, RuntimeUnavailable, failureMessage } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import { StaleClaim } from "../errors.js"
-import type { RunRow } from "../rows.js"
-import { decodeRunEffect } from "../store-helpers.js"
 import type { EventHub } from "../subscribers.js"
 import { claimReadyRuns, refreshLease, releaseClaim } from "./claims.js"
 import { RunClaims, type Interface as ClaimsInterface } from "../run-claims.js"
 import { afterTerminal, appendEvent, completeRun, loadEventsAfter, loadRun, settleParent } from "./pg-helpers.js"
+import { lockRunHierarchy } from "./locks.js"
 import type { WithoutSqlError } from "../sql-effect.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
@@ -27,7 +26,7 @@ export const makePostgresClaims = (input: {
     reason: string | undefined,
   ) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable | SqlError, SqlR>
 }): ClaimsInterface => {
-  const { sql, hub, run, cancelRun } = input
+  const { hub, run, cancelRun } = input
   return RunClaims.of({
     claimReadyRuns: (claimInput) =>
       run(
@@ -70,22 +69,19 @@ export const makePostgresClaims = (input: {
     commitWithClaim: (commitInput) =>
       run(
         Effect.gen(function* () {
-          const rows = yield* sql<RunRow>`
-            SELECT * FROM baton_runs
-            WHERE run_id = ${commitInput.runId}
-              AND owner_worker_id = ${commitInput.workerId}
-              AND attempt_fence = ${commitInput.attemptFence}
-            FOR UPDATE
-          `
-          const row = rows[0]
-          if (row === undefined) {
+          yield* lockRunHierarchy(commitInput.runId)
+          const loaded = yield* loadRun(commitInput.runId)
+          if (
+            loaded === undefined ||
+            loaded.ownerWorkerId !== commitInput.workerId ||
+            loaded.attemptFence !== commitInput.attemptFence
+          ) {
             return yield* StaleClaim.make({
               runId: commitInput.runId,
               workerId: commitInput.workerId,
               attemptFence: commitInput.attemptFence,
             })
           }
-          const loaded = yield* decodeRunEffect(row)
           if (commitInput.transition === "cancel") {
             yield* cancelRun(commitInput.runId, commitInput.reason)
             return

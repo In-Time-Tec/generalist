@@ -18,6 +18,7 @@ const baseFields = (run: StoredRun, sequence: number, occurredAtValue: string): 
   sequence,
   executableRef: run.executableRef,
   rootRunId: run.rootRunId,
+  depth: run.depth,
   occurredAt: occurredAtValue,
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
   ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
@@ -253,28 +254,43 @@ export const makeUnknown = (operationId: string) =>
     operationId,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "OperationUnknown" }>, keyof RunEventBase>
 
+type ChildLinked = Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
+type ChildLinkedDetails = Pick<ChildLinked, "key" | "label" | "origin">
+
 export const makeChildLinked: {
   (
     invocationId: string,
     selection: string,
     prompt: Prompt.Prompt,
-  ): (childRunId: string) => Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
+    childDepth: number,
+    details?: ChildLinkedDetails,
+  ): (childRunId: string) => ChildLinked
   (
     childRunId: string,
     invocationId: string,
     selection: string,
     prompt: Prompt.Prompt,
-  ): Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
+    childDepth: number,
+    details?: ChildLinkedDetails,
+  ): ChildLinked
 } = Function.dual(
-  4,
-  (childRunId: string, invocationId: string, selection: string, prompt: Prompt.Prompt) =>
-    ({
-      _tag: "ChildLinked" as const,
-      childRunId,
-      invocationId,
-      selection,
-      prompt,
-    }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>,
+  (args) => args.length === 6 || typeof args[2] === "string",
+  (
+    childRunId: string,
+    invocationId: string,
+    selection: string,
+    prompt: Prompt.Prompt,
+    childDepth: number,
+    details?: ChildLinkedDetails,
+  ): ChildLinked => ({
+    _tag: "ChildLinked",
+    childRunId,
+    invocationId,
+    selection,
+    prompt,
+    childDepth,
+    ...details,
+  }),
 )
 
 export const makeChildSettled: {

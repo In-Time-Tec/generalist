@@ -33,6 +33,9 @@ import {
   MailboxRateLimited as Errors_MailboxRateLimited,
   MessageConflict as Errors_MessageConflict,
   AgentNameConflict as Errors_AgentNameConflict,
+  ChildDepthExceeded as Errors_ChildDepthExceeded,
+  ChildLimitExceeded as Errors_ChildLimitExceeded,
+  TreePolicyInvalid as Errors_TreePolicyInvalid,
 } from "../errors.js"
 import {
   SchemaDirty as Errors_SchemaDirty,
@@ -78,6 +81,9 @@ export const Errors = {
   MailboxRateLimited: Errors_MailboxRateLimited,
   MessageConflict: Errors_MessageConflict,
   AgentNameConflict: Errors_AgentNameConflict,
+  ChildDepthExceeded: Errors_ChildDepthExceeded,
+  ChildLimitExceeded: Errors_ChildLimitExceeded,
+  TreePolicyInvalid: Errors_TreePolicyInvalid,
   SchemaDirty: Errors_SchemaDirty,
   SchemaChecksumMismatch: Errors_SchemaChecksumMismatch,
   SchemaVersionUnsupported: Errors_SchemaVersionUnsupported,
@@ -121,6 +127,9 @@ export namespace Errors {
   export type MailboxRateLimited = import("../errors.js").MailboxRateLimited
   export type MessageConflict = import("../errors.js").MessageConflict
   export type AgentNameConflict = import("../errors.js").AgentNameConflict
+  export type ChildDepthExceeded = import("../errors.js").ChildDepthExceeded
+  export type ChildLimitExceeded = import("../errors.js").ChildLimitExceeded
+  export type TreePolicyInvalid = import("../errors.js").TreePolicyInvalid
   export type SchemaDirty = import("../sql/errors.js").SchemaDirty
   export type SchemaChecksumMismatch = import("../sql/errors.js").SchemaChecksumMismatch
   export type SchemaVersionUnsupported = import("../sql/errors.js").SchemaVersionUnsupported

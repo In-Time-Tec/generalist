@@ -13,6 +13,7 @@ const base = (sequence: number, runId = rootRunId): RunEvent.RunEventBase => ({
   runId,
   sequence,
   executableRef: assistantRef.ref,
+  depth: 0,
   rootRunId,
   occurredAt: "2026-08-05T00:00:00.000Z",
 })
@@ -64,6 +65,7 @@ const representativeEvents: ReadonlyArray<RunTree.TreeEvent> = [
       invocationId: "invoke:child",
       selection: "researcher",
       prompt: Prompt.make("research the request"),
+      childDepth: 1,
     },
     cursor: makeCursor(rootRunId, 2),
   },

@@ -20,15 +20,7 @@ import { encodeReason, WaitResolution } from "../run-wait.js"
 import { checkpointRef } from "../executable-manifest.js"
 import { StringArray, encodeExecutableRef, encodeJson } from "./codecs.js"
 import { encodeContinuation } from "../steering.js"
-import {
-  afterTerminal,
-  appendEvent,
-  hasUnsettledChild,
-  loadRun,
-  loadRunWait,
-  nowIso,
-  settleParent,
-} from "./store-helpers.js"
+import { afterTerminal, appendEvent, loadRun, loadRunWait, nowIso, settleParent } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import type { DecodedRun } from "./rows.js"
 import { reconcileProgramCancellation } from "./store-program.js"
@@ -36,6 +28,7 @@ import { PendingRunOutcome } from "../run-store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { inspectFanOut } from "./store-fan-out.js"
 import { approvalResponse } from "./respond-approval.js"
+import { hasUnsettledChild, loadTerminalEvent, reconcileChildWaitWith } from "./store-child-settlement.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(
@@ -385,6 +378,18 @@ export const suspend: {
         closed_at = NULL
     `
     yield* appendEvent(hub, run, { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } }, "waiting")
+    const child = typeof input.suspension.token === "string" ? yield* loadRun(input.suspension.token) : undefined
+    const terminalEvent =
+      child?.terminalEventId === undefined ? undefined : yield* loadTerminalEvent(child.terminalEventId)
+    if (child !== undefined && terminalEvent !== undefined) {
+      yield* reconcileChildWaitWith({
+        hub,
+        parent: (yield* loadRun(run.runId))!,
+        child,
+        event: terminalEvent,
+        append: appendEvent,
+      })
+    }
     const groupId = groupIdFromSuspension(input.suspension)
     if (groupId !== undefined) {
       const rows = yield* sql<{ parent_run_id: string; status: string }>`

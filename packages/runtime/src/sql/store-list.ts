@@ -37,6 +37,8 @@ export const listRuns = (input: {
           status: loaded.status,
           executableRef: loaded.executableRef,
           executableManifest: loaded.executableManifest,
+          depth: loaded.depth,
+          treePolicy: loaded.treePolicy,
           lastSequence: loaded.lastSequence,
           durability: "durable",
           ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),

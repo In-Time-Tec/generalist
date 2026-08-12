@@ -7,7 +7,7 @@ import { ExecutionResult as ExecutionResultSchema, RunFailure as RunFailureSchem
 import { RunWait, WaitResolution } from "./run-wait.js"
 import { Address } from "./address.js"
 import { AgentEvent, ModelTelemetry } from "@batonfx/core"
-import { FanOutJoin, FanOutRemainder } from "./fan-out.js"
+import { FanOutJoin, FanOutMemberOrigin, FanOutRemainder, type FanOutMemberOrigin as FanOutOrigin } from "./fan-out.js"
 
 export type { DurableAgentLoopEvent, ExecutionResult }
 
@@ -29,6 +29,7 @@ export const RunEventBase = Schema.Struct({
   attemptId: Schema.optionalKey(Schema.String),
   rootRunId: RunId,
   parentRunId: Schema.optionalKey(RunId),
+  depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   causationId: Schema.optionalKey(Schema.String),
   correlationId: Schema.optionalKey(Schema.String),
   occurredAt: Schema.String,
@@ -92,6 +93,10 @@ export type ChildLinked = RunEventBase & {
   readonly invocationId: string
   readonly selection: string
   readonly prompt: Prompt.Prompt
+  readonly childDepth: number
+  readonly key?: string
+  readonly label?: string
+  readonly origin?: FanOutOrigin
 }
 export type ChildSettled = RunEventBase & {
   readonly _tag: "ChildSettled"
@@ -373,6 +378,10 @@ const LifecycleEventSchema = Schema.Union([
     invocationId: Schema.String,
     selection: Schema.String,
     prompt: Prompt.Prompt,
+    childDepth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    key: Schema.optionalKey(Schema.String),
+    label: Schema.optionalKey(Schema.String),
+    origin: Schema.optionalKey(FanOutMemberOrigin),
   }),
   Schema.TaggedStruct("ChildSettled", { childRunId: RunId, terminalEventId: Schema.String }),
   Schema.TaggedStruct("FanOutAdmitted", {

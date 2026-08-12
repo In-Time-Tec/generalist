@@ -26,9 +26,11 @@ export const fanOutMember = <
   M extends {
     readonly key: string
     readonly selection: string
+    readonly label?: string
     readonly prompt: P
     readonly sessionId?: string
     readonly metadata?: Readonly<Record<string, unknown>>
+    readonly origin?: import("./fan-out.js").FanOutMemberOrigin
   },
   P,
 >(input: {
@@ -39,9 +41,11 @@ export const fanOutMember = <
 }) => ({
   ordinal: input.ordinal,
   key: input.member.key,
+  ...(input.member.label === undefined ? {} : { label: input.member.label }),
   childRunId: input.childRunIdFor(input.fanOutId, input.ordinal),
   selection: input.member.selection,
   prompt: input.member.prompt,
   sessionId: input.member.sessionId ?? fanOutMemberSessionId({ fanOutId: input.fanOutId, key: input.member.key }),
   metadata: input.member.metadata ?? {},
+  ...(input.member.origin === undefined ? {} : { origin: input.member.origin }),
 })

@@ -249,6 +249,7 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
         parentRunId: parent.runId,
         toolCallId: "child-call",
         selection: "researcher",
+        label: "Research card",
         prompt: "research",
       }
       const first = yield* children.invoke(input)
@@ -256,13 +257,14 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
       expect(first._tag).toBe("Suspend")
       expect(replay).toEqual(first)
       if (first._tag !== "Suspend") return
+      const large = "終🚀".repeat(7_000)
       yield* store.complete({
         ...(yield* store.claimExecution({ runId: first.token, ownerId: "test" })),
-        result: completedResult("durable notes"),
+        result: completedResult(large),
       })
       expect(yield* children.invoke(input)).toMatchObject({
         _tag: "Success",
-        result: { _tag: "Succeeded", childRunId: first.token, text: "durable notes" },
+        result: { _tag: "Succeeded", childRunId: first.token, label: "Research card", text: large },
       })
     }),
   )

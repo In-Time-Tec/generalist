@@ -29,12 +29,22 @@ export const FanOutMemberStatus = Schema.Literals([
 ])
 export type FanOutMemberStatus = typeof FanOutMemberStatus.Type
 
+/** @experimental Durable correlation for the parent operation that admitted one member. */
+export const FanOutMemberOrigin = Schema.Struct({
+  parentToolCallId: Schema.optionalKey(Schema.String),
+  operationKey: Schema.optionalKey(Schema.String),
+})
+/** @experimental */
+export type FanOutMemberOrigin = typeof FanOutMemberOrigin.Type
+
 export interface FanOutMemberInput {
   readonly key: string
   readonly selection: string
+  readonly label?: string
   readonly prompt: Prompt.Prompt | Prompt.RawInput
   readonly sessionId?: string
   readonly metadata?: Readonly<Record<string, unknown>>
+  readonly origin?: FanOutMemberOrigin
 }
 
 export interface FanOutInput {
@@ -50,6 +60,34 @@ export interface InitialFanOutInput extends Omit<FanOutInput, "parentRunId"> {}
 
 export const MAX_FAN_OUT_MEMBERS = 64
 
+/** @experimental Validate the exact normalized member set accepted by every RunStore backend. */
+export const validateAdmission = (input: AdmitFanOutInput): string | undefined => {
+  if (input.members.length < 1 || input.members.length > MAX_FAN_OUT_MEMBERS) {
+    return `fan-out requires between 1 and ${MAX_FAN_OUT_MEMBERS} members`
+  }
+  if (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1 || input.concurrency > input.members.length) {
+    return "fan-out concurrency must be a positive safe integer no greater than member count"
+  }
+  if (new Set(input.members.map((member) => member.key)).size !== input.members.length) {
+    return "fan-out member keys must be unique"
+  }
+  if (new Set(input.members.map((member) => member.childRunId)).size !== input.members.length) {
+    return "fan-out child Run ids must be unique"
+  }
+  if (input.members.some((member, ordinal) => member.ordinal !== ordinal)) {
+    return "fan-out member ordinals must be dense and ordered from zero"
+  }
+  if (
+    input.join._tag === "Quorum" &&
+    (!Number.isSafeInteger(input.join.required) ||
+      input.join.required < 1 ||
+      input.join.required > input.members.length)
+  ) {
+    return "fan-out quorum must be a positive safe integer no greater than member count"
+  }
+  return undefined
+}
+
 export const FanOutReceipt = Schema.Struct({
   fanOutId: Schema.String,
   parentRunId: RunId,
@@ -61,11 +99,17 @@ export type FanOutReceipt = typeof FanOutReceipt.Type
 export const FanOutMemberResult = Schema.Struct({
   ordinal: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   key: Schema.String,
+  selection: Schema.String,
+  label: Schema.optionalKey(Schema.String),
+  prompt: Prompt.Prompt,
+  origin: Schema.optionalKey(FanOutMemberOrigin),
   childRunId: RunId,
+  depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: FanOutMemberStatus,
   terminalEventId: Schema.optionalKey(Schema.String),
   result: Schema.optionalKey(Schema.Unknown),
   error: Schema.optionalKey(Schema.Unknown),
+  reason: Schema.optionalKey(Schema.String),
 })
 export type FanOutMemberResult = typeof FanOutMemberResult.Type
 
@@ -86,10 +130,12 @@ export interface StoredFanOutMember {
   readonly key: string
   readonly childRunId: string
   readonly selection: string
+  readonly label?: string
   readonly executableRef: ExecutableRef
   readonly prompt: Prompt.Prompt
   readonly sessionId: string
   readonly metadata: Readonly<Record<string, unknown>>
+  readonly origin?: FanOutMemberOrigin
 }
 
 export interface AdmitFanOutInput {
@@ -135,9 +181,11 @@ export const digestFanOut = (input: {
       key: member.key,
       childRunId: member.childRunId,
       selection: member.selection,
+      label: member.label ?? null,
       executableRef: member.executableRef,
       prompt: Schema.encodeSync(Prompt.Prompt)(member.prompt),
       sessionId: member.sessionId,
       metadata: member.metadata,
+      origin: member.origin ?? null,
     })),
   })

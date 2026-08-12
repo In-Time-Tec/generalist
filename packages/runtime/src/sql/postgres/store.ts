@@ -5,6 +5,7 @@ import { PgClient } from "@effect/sql-pg"
 import { ApprovalStale, CursorExpired, IdempotencyConflict, ResponseConflict } from "../../errors.js"
 import { ChildSelectionMissing, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
 import { childDigest } from "../../memory/digest.js"
+import { enforceChildAdmission } from "../store-admit-send.js"
 import { equals, resolveChild } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
 import { PendingRunOutcome, RunStore } from "../../run-store.js"
@@ -42,7 +43,7 @@ import {
   settleParent,
 } from "./pg-helpers.js"
 import type { PostgresStoreOptions } from "./runtime-layer.js"
-import { lockMailbox, lockRun, lockSpawnParent } from "./locks.js"
+import { lockMailbox, lockRun, lockRunHierarchy, lockSpawnParent } from "./locks.js"
 import { programStoreMethods } from "./store-program.js"
 import { admitStart as admitExactStart } from "../store-admit.js"
 import { admitSend } from "./store-admit.js"
@@ -96,7 +97,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             if (executableRef === undefined) {
               return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
             }
-            const digest = childDigest(input.message, executableRef)
+            const digest = childDigest(input.message, executableRef, {
+              parentRunId: parent.runId,
+              invocationId: input.invocationId,
+              ...(input.label === undefined ? {} : { label: input.label }),
+              ...(input.origin === undefined ? {} : { origin: input.origin }),
+            })
             const executable = yield* decodePinnedEffect({
               ref: executableRef,
               manifest: parent.executableManifest,
@@ -132,6 +138,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               }
             }
             const runId = yield* nextId("run")
+            yield* enforceChildAdmission(parent, 1)
             yield* insertRun({
               runId,
               status: "queued",
@@ -140,6 +147,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               executableRef,
               executableManifest: parent.executableManifest,
               rootRunId: parent.rootRunId,
+              depth: parent.depth + 1,
+              treePolicy: parent.treePolicy,
               parentRunId: parent.runId,
               invocationId: input.invocationId,
               acceptedSequence: 0,
@@ -155,6 +164,9 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               invocationId: input.invocationId,
               selection: input.selection,
               prompt: input.message.prompt,
+              childDepth: parent.depth + 1,
+              ...(input.label === undefined ? {} : { label: input.label }),
+              ...(input.origin === undefined ? {} : { origin: input.origin }),
             })
             const child = (yield* loadRun(runId))!
             yield* appendEvent(
@@ -300,7 +312,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             )
           }),
         ),
-      cancel: (input) => run(lockRun(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
+      cancel: (input) => run(lockRunHierarchy(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
       cancelSession: (input) => run(cancelSessionRuns({ lockRun, cancelRun, ...input })),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(transactionHub, input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
@@ -316,6 +328,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               status: loaded.status,
               executableRef: loaded.executableRef,
               executableManifest: loaded.executableManifest,
+              depth: loaded.depth,
+              treePolicy: loaded.treePolicy,
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
@@ -354,7 +368,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       complete: (input) =>
         run(
           Effect.gen(function* () {
-            yield* lockRun(input.runId)
+            yield* lockRunHierarchy(input.runId)
             yield* requireExecutionClaim(input)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
@@ -369,7 +383,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       fail: (input) =>
         run(
           Effect.gen(function* () {
-            yield* lockRun(input.runId)
+            yield* lockRunHierarchy(input.runId)
             yield* requireExecutionClaim(input)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
@@ -467,7 +481,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       retryExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(retryExecution(transactionHub, input)))),
       ...fanOutStoreMethods({ sql, pg, hub: transactionHub, run, runNoTxn }),
       ...operations,
-      ...programStoreMethods({ sql, hub: transactionHub, run, runNoTxn }),
+      ...programStoreMethods({ sql, hub: transactionHub, run, runNoTxn, lockRunHierarchy }),
     })
     const claims = makePostgresClaims({ sql, hub: transactionHub, run, cancelRun })
     return { store, claims }

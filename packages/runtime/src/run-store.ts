@@ -27,31 +27,29 @@ import type {
   StartInvalid,
   FanOutRemainderUnsupported,
   AgentNameConflict,
-  MailboxFull,
-  MailboxRateLimited,
-  MessageConflict,
+  ChildDepthExceeded,
+  ChildLimitExceeded,
+  TreePolicyInvalid,
 } from "./errors.js"
-import type { Message, Metadata } from "./message.js"
-import type { AddressInvalid, AgentName, DirectoryEntry } from "./agent-directory.js"
-import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./mailbox.js"
+import type { Message } from "./message.js"
+import type { AgentName, DirectoryEntry } from "./agent-directory.js"
+import type { MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunWait, WaitResolution } from "./run-wait.js"
-import type { DurableAgentLoopEvent, EmittableAgentLoopEvent } from "./agent-event.js"
+import type { EmittableAgentLoopEvent } from "./agent-event.js"
 import type { CommitModelResponseInput } from "./model-response-commit.js"
 import type { CommitInterruptedModelResponseInput } from "./model-response-interrupted.js"
 import { ExecutionResult } from "./execution-state.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "./execution-state.js"
 import { RunFailure } from "./run-event.js"
 import type { RunEvent } from "./run-event.js"
-import type { ExecutableManifest, ExecutableRef } from "./executable-manifest.js"
-import type { CancelInput, InitialChildInput, RespondInput, SignalInput, SpawnInput, StartReceipt } from "./runtime.js"
+import type { CancelInput, RespondInput, SignalInput, SpawnInput, StartReceipt } from "./runtime.js"
 import type { ResolveOperationInput } from "./operation-resolution.js"
 import type { RespondInput as RespondApprovalInput } from "./approval.js"
-import type { OperationKind, OperationRecord, OperationStatus, ReplayPolicy } from "./sql/operations.js"
+import type { OperationRecord, OperationStatus } from "./sql/operations.js"
 import type { ExecutionContinuation, SteeringEntry, SteeringReceipt } from "./steering.js"
-import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Prompt } from "effect/unstable/ai"
-import type { AdmitFanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
+import type { AdmitFanOutInput, FanOutInspection, FanOutReceipt } from "./fan-out.js"
 import type { Notification as ChildSettlementNotification } from "./child-settlement.js"
 import type {
   CompleteProgramInput,
@@ -64,27 +62,45 @@ import type {
   SuspendProgramOperationInput,
   CommitProgramLogInput,
 } from "./program-store.js"
-
-export type Durability = "ephemeral" | "durable"
-export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
-
-export interface AdmitSendInput {
-  readonly message: Message
-  readonly executableRef: ExecutableRef
-  readonly executableManifest: ExecutableManifest
-  readonly registrations: ReadonlyArray<ExecutableRegistration>
-  readonly runId?: string
-}
-
-export interface AdmitStartInput extends AdmitSendInput {
-  readonly initialChildren: ReadonlyArray<Omit<InitialChildInput, "prompt"> & { readonly prompt: Prompt.Prompt }>
-  readonly initialFanOuts: ReadonlyArray<
-    Omit<InitialFanOutInput, "members"> & {
-      readonly members: ReadonlyArray<
-        Omit<InitialFanOutInput["members"][number], "prompt"> & { readonly prompt: Prompt.Prompt }
-      >
-    }
-  >
+import type {
+  AdmitMessageError,
+  AdmitMessageInput,
+  AdmitProgramChildAndSuspendInput,
+  AdmitProgramChildInput,
+  AdmitSendInput,
+  AdmitStartInput,
+  AdmitSteeringInput,
+  CompletionOutcome,
+  DirectoryLookupError,
+  Durability,
+  ExecutionClaim,
+  ExecutionRecord,
+  OperationCompletionOutcome,
+  RecordOperationInput,
+  ResolveAddressError,
+  StoreBackend,
+  StoreInfo,
+  WorkerMutationError,
+} from "./run-store-types.js"
+export type {
+  AdmitMessageError,
+  AdmitMessageInput,
+  AdmitProgramChildAndSuspendInput,
+  AdmitProgramChildInput,
+  AdmitSendInput,
+  AdmitStartInput,
+  AdmitSteeringInput,
+  CompletionOutcome,
+  DirectoryLookupError,
+  Durability,
+  ExecutionClaim,
+  ExecutionRecord,
+  OperationCompletionOutcome,
+  RecordOperationInput,
+  ResolveAddressError,
+  StoreBackend,
+  StoreInfo,
+  WorkerMutationError,
 }
 
 export const PendingRunOutcome = Schema.Union([
@@ -92,122 +108,6 @@ export const PendingRunOutcome = Schema.Union([
   Schema.TaggedStruct("Failed", { error: RunFailure }),
 ])
 export type PendingRunOutcome = typeof PendingRunOutcome.Type
-
-/** @experimental Exact Runtime-internal Program child admission. */
-export interface AdmitProgramChildInput extends ExecutionClaim {
-  readonly childRunId: string
-  readonly invocationId: string
-  readonly message: Message
-  readonly executableRef: ExecutableRef
-  readonly executableManifest: ExecutableManifest
-  readonly registrations: ReadonlyArray<ExecutableRegistration>
-}
-
-/** @experimental Atomic Code Mode child admission and parent suspension. */
-export interface AdmitProgramChildAndSuspendInput extends AdmitProgramChildInput {
-  readonly wait: RunWait
-  readonly suspension: ExecutionSuspension
-  readonly checkpoint?: ExecutionCheckpoint
-  readonly transcript?: Prompt.Prompt
-  readonly continuation?: ExecutionContinuation | null
-}
-
-export interface StoreInfo {
-  readonly durability: Durability
-  readonly backend: StoreBackend
-  readonly multiWorker: boolean
-}
-
-export interface RecordOperationInput extends ExecutionClaim {
-  readonly runId: string
-  readonly operationKey: string
-  readonly kind: OperationKind
-  readonly inputDigest: string
-  readonly input: unknown
-  readonly replayPolicy: ReplayPolicy
-  readonly attempt: number
-  readonly checkpoint?: ExecutionCheckpoint
-  readonly transcript?: Prompt.Prompt
-  readonly continuation?: ExecutionContinuation | null
-  readonly steeringEntryIds?: ReadonlyArray<string>
-  readonly steeringEvents?: ReadonlyArray<DurableAgentLoopEvent>
-}
-
-/** @experimental Exact durable mailbox admission derived from authoritative sender identity. */
-export interface AdmitMessageInput {
-  readonly fromRunId: string
-  readonly fromAddress: Address
-  readonly to: Address
-  readonly targetSessionId: string
-  readonly messageId: string
-  readonly idempotencyKey: string
-  readonly digest: string
-  readonly bytes: number
-  readonly prompt: Prompt.Prompt
-  readonly correlationId: string
-  readonly causationId?: string
-  readonly inReplyTo?: string
-  readonly metadata: Metadata
-  readonly bounds: MailboxBounds
-}
-
-/** @experimental */
-export type AdmitMessageError = MailboxFull | MailboxRateLimited | MessageConflict | RunNotFound | RuntimeUnavailable
-
-/** @experimental */
-export type DirectoryLookupError = RunNotFound | RuntimeUnavailable
-
-/** @experimental */
-export type ResolveAddressError = AddressNotFound | AddressInvalid | RuntimeUnavailable
-
-export interface AdmitSteeringInput {
-  readonly runId: string
-  readonly idempotencyKey: string
-  readonly digest: string
-  readonly prompt: Prompt.Prompt
-}
-
-export type CompletionOutcome =
-  | { readonly _tag: "Completed" }
-  | { readonly _tag: "SteeringPending"; readonly continuation: ExecutionContinuation }
-
-export type OperationCompletionOutcome =
-  | { readonly _tag: "Succeeded"; readonly value: unknown }
-  | { readonly _tag: "Failed"; readonly error: unknown }
-  | { readonly _tag: "Unknown" }
-
-export interface ExecutionRecord {
-  readonly runId: string
-  readonly rootRunId: string
-  readonly parentRunId?: string
-  readonly invocationId?: string
-  readonly ownerId?: string
-  readonly admittedAt: string
-  readonly message: Message
-  readonly executableRef: ExecutableRef
-  readonly executableManifest: ExecutableManifest
-  readonly attempt: number
-  readonly attemptFence: number
-  readonly checkpoint?: ExecutionCheckpoint
-  readonly suspension?: ExecutionSuspension
-  readonly resolution?: WaitResolution
-  readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
-  readonly continuation?: ExecutionContinuation
-  readonly registrations: ReadonlyArray<ExecutableRegistration>
-}
-
-export interface ExecutionClaim {
-  readonly runId: string
-  readonly ownerId: string
-  readonly attemptFence: number
-}
-
-export type WorkerMutationError =
-  | RunNotFound
-  | RunTerminal
-  | RuntimeUnavailable
-  | import("./sql/errors.js").StaleClaim
-  | import("effect/unstable/sql/SqlError").SqlError
 
 export interface Interface {
   readonly info: Effect.Effect<StoreInfo>
@@ -227,7 +127,12 @@ export interface Interface {
     input: AdmitSendInput,
   ) => Effect.Effect<
     RunReceipt,
-    AddressNotFound | IdempotencyConflict | RunIdConflict | ExecutableRegistrationConflict | RuntimeUnavailable
+    | AddressNotFound
+    | IdempotencyConflict
+    | RunIdConflict
+    | ExecutableRegistrationConflict
+    | RuntimeUnavailable
+    | TreePolicyInvalid
   >
   readonly admitStart: (
     input: AdmitStartInput,
@@ -242,6 +147,9 @@ export interface Interface {
     | FanOutInvalid
     | FanOutRemainderUnsupported
     | RuntimeUnavailable
+    | ChildDepthExceeded
+    | ChildLimitExceeded
+    | TreePolicyInvalid
   >
   readonly admitSpawn: (
     input: SpawnInput & {
@@ -250,7 +158,13 @@ export interface Interface {
     },
   ) => Effect.Effect<
     RunReceipt,
-    RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
+    | RunNotFound
+    | RunTerminal
+    | ChildSelectionMissing
+    | IdempotencyConflict
+    | RuntimeUnavailable
+    | ChildDepthExceeded
+    | ChildLimitExceeded
   >
   readonly admitProgramChild: (
     input: AdmitProgramChildInput,
@@ -262,6 +176,8 @@ export interface Interface {
     | RunIdConflict
     | RuntimeUnavailable
     | import("./sql/errors.js").StaleClaim
+    | ChildDepthExceeded
+    | ChildLimitExceeded
   >
   readonly admitProgramChildAndSuspend: (
     input: AdmitProgramChildAndSuspendInput,
@@ -273,6 +189,8 @@ export interface Interface {
     | RunIdConflict
     | RuntimeUnavailable
     | import("./sql/errors.js").StaleClaim
+    | ChildDepthExceeded
+    | ChildLimitExceeded
   >
   readonly events: (input: {
     readonly runId: string
@@ -457,7 +375,14 @@ export interface Interface {
     input: AdmitFanOutInput,
   ) => Effect.Effect<
     FanOutReceipt,
-    RunNotFound | RunTerminal | ChildSelectionMissing | FanOutConflict | FanOutInvalid | RuntimeUnavailable
+    | RunNotFound
+    | RunTerminal
+    | ChildSelectionMissing
+    | FanOutConflict
+    | FanOutInvalid
+    | RuntimeUnavailable
+    | ChildDepthExceeded
+    | ChildLimitExceeded
   >
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable>
   readonly reserveProgramOperation: (
@@ -467,7 +392,13 @@ export interface Interface {
     input: AdmitProgramAgentsInput,
   ) => Effect.Effect<
     ProgramOperationRecord,
-    WorkerMutationError | ProgramStoreFailure | FanOutInvalid | FanOutConflict | ChildSelectionMissing
+    | WorkerMutationError
+    | ProgramStoreFailure
+    | FanOutInvalid
+    | FanOutConflict
+    | ChildSelectionMissing
+    | ChildDepthExceeded
+    | ChildLimitExceeded
   >
   readonly suspendProgramOperation: (
     input: SuspendProgramOperationInput,

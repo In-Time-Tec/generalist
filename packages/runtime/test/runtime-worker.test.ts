@@ -60,11 +60,7 @@ it.effect("interrupts a claimed Run once another node persists cancellation", ()
     const started = yield* Deferred.make<void>()
     const interrupted = yield* Deferred.make<void>()
     const host = ExecutionHost.of({
-      execute: () =>
-        Deferred.succeed(started, undefined).pipe(
-          Effect.andThen(Effect.never),
-          Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined)),
-        ),
+      execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(interrupted))),
       interrupt: () => Deferred.succeed(interrupted, undefined),
     })
     const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(

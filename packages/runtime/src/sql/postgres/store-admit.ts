@@ -1,15 +1,16 @@
 import { Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { AddressNotFound, IdempotencyConflict, RunIdConflict } from "../../errors.js"
+import { AddressNotFound, IdempotencyConflict, RunIdConflict, TreePolicyInvalid } from "../../errors.js"
 import type { PinnedExecutable } from "../../executable-manifest.js"
 import { equals } from "../../executable-manifest.js"
 import type { AdmitSendInput } from "../../run-store.js"
-import { messageDigest } from "../../memory/digest.js"
+import { rootDigest } from "../../memory/digest.js"
 import type { RunRow } from "../rows.js"
 import { appendEvent, enqueueLane, insertRun, loadRun } from "./pg-helpers.js"
 import type { EventHub } from "../subscribers.js"
 import { associateRegistrations, persistRegistrations } from "../executable-registrations.js"
 import { decodePinnedEffect, decodeStoredPinnedEffect } from "../codecs.js"
+import { normalize as normalizeTreePolicy } from "../../tree-policy.js"
 
 /** Exact addressed admission for the PostgreSQL store. */
 export const admitSend: {
@@ -24,6 +25,7 @@ export const admitSend: {
     | AddressNotFound
     | IdempotencyConflict
     | RunIdConflict
+    | TreePolicyInvalid
     | import("../../errors.js").RuntimeUnavailable
     | import("effect/unstable/sql/SqlError").SqlError,
     SqlClient.SqlClient
@@ -38,6 +40,7 @@ export const admitSend: {
     | AddressNotFound
     | IdempotencyConflict
     | RunIdConflict
+    | TreePolicyInvalid
     | import("../../errors.js").RuntimeUnavailable
     | import("effect/unstable/sql/SqlError").SqlError,
     SqlClient.SqlClient
@@ -66,7 +69,8 @@ export const admitSend: {
       if (input.runId !== undefined) {
         yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`run:${input.runId}`}))`
       }
-      const digest = messageDigest(input.message)
+      const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
+      const digest = rootDigest(input.message, treePolicy)
       const existing = yield* sql<RunRow>`
       SELECT * FROM baton_runs
       WHERE address = ${input.message.to}
@@ -112,6 +116,8 @@ export const admitSend: {
         executableRef: input.executableRef,
         executableManifest: input.executableManifest,
         rootRunId: runId,
+        depth: 0,
+        treePolicy,
         acceptedSequence: enqueued.acceptedSequence,
       })
       yield* sql`SELECT pg_advisory_xact_lock(hashtext('baton:executable-registrations'))`

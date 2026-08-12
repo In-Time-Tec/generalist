@@ -12,6 +12,7 @@ import {
   RunTerminal,
   RuntimeUnavailable,
   StartInvalid,
+  TreePolicyInvalid,
 } from "../errors.js"
 import { decodePinned, equals, resolveChild } from "../executable-manifest.js"
 import { childDigest, startDigest } from "../memory/digest.js"
@@ -21,6 +22,7 @@ import type { Message } from "../message.js"
 import { decodePinnedExecutable } from "./codecs.js"
 import type { RunRow } from "./rows.js"
 import { appendEvent, insertRun, loadRun, nowIso } from "./store-helpers.js"
+import { enforceChildAdmission } from "./store-admit-send.js"
 import type { EventHub } from "./subscribers.js"
 import { associateRegistrations, loadRegistrations, persistRegistrations } from "./executable-registrations.js"
 import { narrow } from "../executable-registration.js"
@@ -28,6 +30,7 @@ import { make as makeAddress } from "../address.js"
 import { make as makeMessage } from "../message.js"
 import { admitInitialFanOuts } from "./store-fan-out.js"
 import { nextId } from "./store-admit-send.js"
+import { normalize as normalizeTreePolicy } from "../tree-policy.js"
 
 type SendReceipt = { runId: string; messageId: string; acceptedSequence: number; duplicate: boolean }
 type StartReceipt = SendReceipt & {
@@ -44,17 +47,32 @@ type StartEffect = Effect.Effect<
   | RunIdConflict
   | RuntimeUnavailable
   | SqlError
-  | StartInvalid,
+  | StartInvalid
+  | TreePolicyInvalid,
   SqlClient.SqlClient
 >
 type SpawnEffect = Effect.Effect<
   SendReceipt,
-  ChildSelectionMissing | IdempotencyConflict | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,
+  | ChildSelectionMissing
+  | IdempotencyConflict
+  | RunNotFound
+  | RunTerminal
+  | RuntimeUnavailable
+  | import("../errors.js").ChildDepthExceeded
+  | import("../errors.js").ChildLimitExceeded
+  | SqlError,
   SqlClient.SqlClient
 >
 type ChildEffect = Effect.Effect<
   SendReceipt,
-  IdempotencyConflict | RunIdConflict | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,
+  | IdempotencyConflict
+  | RunIdConflict
+  | RunNotFound
+  | RunTerminal
+  | RuntimeUnavailable
+  | import("../errors.js").ChildDepthExceeded
+  | import("../errors.js").ChildLimitExceeded
+  | SqlError,
   SqlClient.SqlClient
 >
 
@@ -64,6 +82,8 @@ export const admitStart: {
 } = Function.dual(2, (hub: EventHub, input: AdmitStartInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
+    const normalizedInput = { ...input, treePolicy }
     const admitted = yield* Effect.try({
       try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
@@ -103,7 +123,7 @@ export const admitStart: {
       })
     }
     yield* persistRegistrations(input.registrations)
-    const digest = startDigest(input)
+    const digest = startDigest(normalizedInput)
     const existing = yield* sql<RunRow>`
       SELECT * FROM baton_runs
       WHERE address = ${input.message.to}
@@ -193,6 +213,8 @@ export const admitStart: {
       executableRef: input.executableRef,
       executableManifest: input.executableManifest,
       rootRunId: runId,
+      depth: 0,
+      treePolicy,
       acceptedSequence: 0,
       attempt: 0,
     })
@@ -250,7 +272,12 @@ export const admitSpawn: {
     if (executableRef === undefined) {
       return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
     }
-    const digest = childDigest(input.message, executableRef)
+    const digest = childDigest(input.message, executableRef, {
+      parentRunId: parent.runId,
+      invocationId: input.invocationId,
+      ...(input.label === undefined ? {} : { label: input.label }),
+      ...(input.origin === undefined ? {} : { origin: input.origin }),
+    })
     const executable = yield* Effect.try({
       try: () => decodePinned({ ref: executableRef, manifest: parent.executableManifest }),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
@@ -287,6 +314,7 @@ export const admitSpawn: {
       }
     }
     const runId = yield* nextId("run")
+    yield* enforceChildAdmission(parent, 1)
     yield* insertRun({
       runId,
       status: "queued",
@@ -295,6 +323,8 @@ export const admitSpawn: {
       executableRef,
       executableManifest: parent.executableManifest,
       rootRunId: parent.rootRunId,
+      depth: parent.depth + 1,
+      treePolicy: parent.treePolicy,
       parentRunId: parent.runId,
       invocationId: input.invocationId,
       acceptedSequence: 0,
@@ -312,6 +342,9 @@ export const admitSpawn: {
       invocationId: input.invocationId,
       selection: input.selection,
       prompt: input.message.prompt,
+      childDepth: parent.depth + 1,
+      ...(input.label === undefined ? {} : { label: input.label }),
+      ...(input.origin === undefined ? {} : { origin: input.origin }),
     })
     const child = (yield* loadRun(runId))!
     yield* appendEvent(
@@ -381,6 +414,7 @@ export const admitProgramChild: {
     if (byId[0] !== undefined) {
       return yield* RunIdConflict.make({ runId: input.childRunId, existingRunId: byId[0].run_id })
     }
+    yield* enforceChildAdmission(parent, 1)
     yield* insertRun({
       runId: input.childRunId,
       status: "queued",
@@ -389,6 +423,8 @@ export const admitProgramChild: {
       executableRef: input.executableRef,
       executableManifest: input.executableManifest,
       rootRunId: parent.rootRunId,
+      depth: parent.depth + 1,
+      treePolicy: parent.treePolicy,
       parentRunId: parent.runId,
       invocationId: input.invocationId,
       acceptedSequence: 0,
@@ -406,6 +442,7 @@ export const admitProgramChild: {
       invocationId: input.invocationId,
       selection: input.executableRef.active,
       prompt: input.message.prompt,
+      childDepth: parent.depth + 1,
     })
     const child = (yield* loadRun(input.childRunId))!
     yield* appendEvent(

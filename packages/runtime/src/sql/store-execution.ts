@@ -30,6 +30,8 @@ const executionRecord = (
 ): ExecutionRecord => ({
   runId: run.runId,
   rootRunId: run.rootRunId,
+  depth: run.depth,
+  treePolicy: run.treePolicy,
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
   ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
   ...(run.ownerWorkerId === undefined ? {} : { ownerId: run.ownerWorkerId }),

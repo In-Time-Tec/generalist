@@ -14,6 +14,8 @@ export const claimReadyWorker =
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const claims = yield* RunClaims.RunClaims
-      if ((yield* runtime.inspect(runId)).status !== "queued") return
-      yield* claims.claimReadyRuns({ workerId, limit: 16, lease: "60 seconds" })
+      while ((yield* runtime.inspect(runId)).status === "queued") {
+        const claimed = yield* claims.claimReadyRuns({ workerId, limit: 16, lease: "60 seconds" })
+        if (claimed.length === 0) return yield* Effect.die(`Run ${runId} could not be activated`)
+      }
     }).pipe(Effect.orDie)

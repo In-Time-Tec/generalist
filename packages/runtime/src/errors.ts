@@ -99,6 +99,37 @@ export class ChildSelectionMissing extends Schema.TaggedErrorClass<ChildSelectio
   { parentRunId: Schema.String, selection: Schema.String },
 ) {}
 
+export class ChildDepthExceeded extends Schema.TaggedErrorClass<ChildDepthExceeded>()(
+  "@batonfx/runtime/ChildDepthExceeded",
+  {
+    parentRunId: Schema.String,
+    rootRunId: Schema.String,
+    parentDepth: Schema.Int,
+    depth: Schema.Int,
+    requested: Schema.Int,
+    current: Schema.Int,
+    limit: Schema.Int,
+  },
+) {}
+
+export class ChildLimitExceeded extends Schema.TaggedErrorClass<ChildLimitExceeded>()(
+  "@batonfx/runtime/ChildLimitExceeded",
+  {
+    parentRunId: Schema.String,
+    rootRunId: Schema.String,
+    parentDepth: Schema.Int,
+    depth: Schema.Int,
+    requested: Schema.Int,
+    current: Schema.Int,
+    limit: Schema.Int,
+  },
+) {}
+
+export class TreePolicyInvalid extends Schema.TaggedErrorClass<TreePolicyInvalid>()(
+  "@batonfx/runtime/TreePolicyInvalid",
+  { message: Schema.String },
+) {}
+
 export class StartInvalid extends Schema.TaggedErrorClass<StartInvalid>()("@batonfx/runtime/StartInvalid", {
   message: Schema.String,
 }) {}

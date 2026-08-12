@@ -186,6 +186,8 @@ export const makeSqliteRunStore = (
               status: loaded.status,
               executableRef: loaded.executableRef,
               executableManifest: loaded.executableManifest,
+              depth: loaded.depth,
+              treePolicy: loaded.treePolicy,
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),

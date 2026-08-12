@@ -43,6 +43,7 @@ import { childSessionId, fanOutMemberSessionId } from "../child-session.js"
 import { parseAddress, runAddress } from "../agent-directory.js"
 import { authorize, makePolicy, reachable } from "../messaging.js"
 import { defaultBounds, digest as messageDigest, promptBytes } from "../mailbox.js"
+import { defaultTreePolicy } from "../tree-policy.js"
 import { RunTerminal } from "../errors.js"
 import { isTerminal } from "../run.js"
 import { awaitSessionTerminal } from "../session-lifecycle.js"
@@ -210,11 +211,13 @@ export const makeRuntime = (
         const members = input.members.map((member, ordinal) => ({
           ordinal,
           key: member.key,
+          ...(member.label === undefined ? {} : { label: member.label }),
           childRunId: childRunIdFor(fanOutId, ordinal),
           selection: member.selection,
           prompt: normalizePrompt(member.prompt),
           sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
           metadata: member.metadata ?? {},
+          ...(member.origin === undefined ? {} : { origin: member.origin }),
         }))
         return {
           parentRunId,
@@ -309,6 +312,7 @@ export const makeRuntime = (
             executableRef: executable.ref,
             executableManifest: executable.manifest,
             registrations,
+            treePolicy: input.treePolicy ?? defaultTreePolicy,
             initialChildren: initialChildren.map(normalizeInitialChild),
             initialFanOuts: initialFanOuts.map(normalizeInitialFanOut),
             ...(input.runId === undefined ? {} : { runId: input.runId }),
@@ -345,6 +349,7 @@ export const makeRuntime = (
             executableRef: executable.ref,
             executableManifest: executable.manifest,
             registrations,
+            treePolicy: input.treePolicy ?? defaultTreePolicy,
             ...(input.runId === undefined ? {} : { runId: input.runId }),
           })
         }),

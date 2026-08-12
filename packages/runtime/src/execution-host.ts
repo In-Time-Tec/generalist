@@ -26,6 +26,7 @@ import { make as makeExecutionRetry } from "./execution-retry.js"
 import { make as makeAgentRunOptions } from "./agent-run-options.js"
 import { ModelPreviewLane, open as openModelPreview } from "./model-preview.js"
 import { clearDriverOperation, commitDriverOperation, verifyCommittedModelEvent } from "./execution-model-response.js"
+import { makeTools as makeChildRunTools } from "./child-runs.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -102,6 +103,10 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
             const activeEntry = claimed.executableManifest.entries.find(
               (entry) => entry._tag === "Agent" && entry.pin === claimed.executableRef.active,
             )
+            const childRunTools =
+              activeEntry?._tag === "Agent" && activeEntry.manifest.children.length > 0
+                ? makeChildRunTools({ children: activeEntry.manifest.children })
+                : undefined
             const programAuthority = activeEntry?._tag === "Agent" ? activeEntry.manifest.programAuthority : undefined
             const codeMode =
               programAuthority === undefined
@@ -462,7 +467,11 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                     claimed.suspension !== undefined,
                   )
                 }
-                yield* codeMode === undefined ? runHosted(agent) : runHosted(withCodeModeTool(agent, codeMode))
+                const withChildren =
+                  childRunTools === undefined
+                    ? agent
+                    : Agent.withTools(agent, [childRunTools.runChild, childRunTools.runChildGroup])
+                yield* runHosted(codeMode === undefined ? withChildren : withCodeModeTool(withChildren, codeMode))
               })
 
             yield* resolved.agent.open(runClosed)
@@ -482,9 +491,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
         )
         yield* execution
       }).pipe(Effect.orDie)
-
     const execute = (claim: ExecutionClaim): Effect.Effect<void> => active.run(claim.runId, executeClaim(claim))
-
     return ExecutionHost.of({ execute, interrupt: (runId) => active.interrupt(runId) })
   })
 

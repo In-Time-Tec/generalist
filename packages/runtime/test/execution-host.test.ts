@@ -17,6 +17,7 @@ import {
 import { closedTestAgent, testExecutable } from "./identity.js"
 import {
   Address,
+  ChildRuns,
   ExecutionHost,
   Cursor,
   Errors,
@@ -989,6 +990,130 @@ describe("ExecutionHost", () => {
         expect((yield* runtime.inspect(cancelled.runId)).status).toBe("cancelled")
       }),
     )
+  })
+
+  it.effect("hosts blocking run_child_group across a SQLite reopen and resumes the same Run", () => {
+    const filename = tempDbPath("hosted-child-group")
+    const address = Address.make("agent:hosted-child-group")
+    const advertisedTools: Array<ReadonlyArray<string>> = []
+    const prompts: Array<string> = []
+    let modelCalls = 0
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: (options) => {
+          modelCalls += 1
+          advertisedTools.push(options.tools.map((tool) => tool.name))
+          prompts.push(JSON.stringify(options.prompt.content))
+          return Stream.fromIterable<Response.StreamPartEncoded>(
+            modelCalls === 1
+              ? [
+                  Response.makePart("tool-call", {
+                    id: "hosted-group-call",
+                    name: ChildRuns.runGroupToolName,
+                    params: {
+                      concurrency: 2,
+                      members: [
+                        {
+                          key: "research",
+                          selection: "researcher",
+                          label: "Research card",
+                          prompt: "research",
+                        },
+                        {
+                          key: "analysis",
+                          selection: "analyst",
+                          label: "Analysis card",
+                          prompt: "analyze",
+                        },
+                      ],
+                    },
+                    providerExecuted: false,
+                  }),
+                  finish,
+                ]
+              : [
+                  Response.makePart("text-start", { id: "answer" }),
+                  Response.makePart("text-delta", { id: "answer", delta: "parent resumed" }),
+                  Response.makePart("text-end", { id: "answer" }),
+                  finish,
+                ],
+          )
+        },
+      }),
+    )
+    const resolver = ExecutableResolver.makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }])
+    const layerSqlite = () =>
+      Runtime.layerSqlite({
+        filename,
+        resolver,
+        addresses: [{ address, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+        scheduler: { pollInterval: "1 day" },
+      })
+
+    return Effect.gen(function* () {
+      const admitted = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const parent = yield* runtime.send({
+            to: address,
+            sessionId: "session:hosted-child-group",
+            idempotencyKey: "hosted-child-group",
+            prompt: "delegate",
+            treePolicy: { maxDepth: 1, maxSubagents: 2 },
+          })
+          yield* host.execute(yield* store.claimExecution({ runId: parent.runId, ownerId: "parent:first" }))
+          expect(yield* runtime.inspect(parent.runId)).toMatchObject({
+            status: "waiting",
+            wait: { waitId: "hosted-group-call", status: "open" },
+          })
+          const history = yield* runtime.history({ runId: parent.runId, limit: 100 })
+          const fanOut = history.find((event) => event._tag === "FanOutAdmitted")
+          if (fanOut?._tag !== "FanOutAdmitted") return yield* Effect.die("hosted child group was not admitted")
+          return { parentRunId: parent.runId, fanOutId: fanOut.fanOutId }
+        }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
+      )
+
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const group = yield* runtime.inspectFanOut(admitted.fanOutId)
+          expect(group.members.map(({ key, label, depth }) => ({ key, label, depth }))).toEqual([
+            { key: "research", label: "Research card", depth: 1 },
+            { key: "analysis", label: "Analysis card", depth: 1 },
+          ])
+          yield* store.fail({
+            ...(yield* store.claimExecution({ runId: group.members[1]!.childRunId, ownerId: "child:analysis" })),
+            error: Errors.AgentExecutionFailure.make({ message: "second child failed" }),
+          })
+          expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("waiting")
+          yield* store.complete({
+            ...(yield* store.claimExecution({ runId: group.members[0]!.childRunId, ownerId: "child:research" })),
+            result: { text: "first child complete", turns: 1, transcript: Prompt.make("first child complete") },
+          })
+          expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("running")
+          yield* host.execute(yield* store.claimExecution({ runId: admitted.parentRunId, ownerId: "parent:resumed" }))
+          expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("succeeded")
+          expect((yield* store.snapshot(admitted.parentRunId)).outcome).toMatchObject({
+            _tag: "Succeeded",
+            result: { text: "parent resumed" },
+          })
+          const history = yield* runtime.history({ runId: admitted.parentRunId, limit: 200 })
+          expect(history.filter((event) => event._tag === "RunWaiting")).toHaveLength(1)
+          expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
+        }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
+      )
+
+      expect(advertisedTools[0]).toEqual(expect.arrayContaining(["run_child", "run_child_group"]))
+      expect(prompts[1]).toContain("first child complete")
+      expect(prompts[1]).toContain("second child failed")
+      expect(modelCalls).toBe(2)
+    })
   })
 
   it.effect("persists distinct suspension checkpoints when one turn suspends twice after a resume", () => {

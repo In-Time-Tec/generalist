@@ -6,7 +6,6 @@ import {
   ChildSelectionMissing,
   FanOutConflict,
   FanOutInvalid,
-  FanOutNotFound,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
@@ -16,8 +15,9 @@ import {
   digestFanOut,
   fanOutIdFor,
   FanOutJoin,
+  FanOutMemberOrigin,
+  validateAdmission,
   type AdmitFanOutInput,
-  type FanOutInspection,
   type FanOutReceipt,
   type StoredFanOutMember,
 } from "../fan-out.js"
@@ -26,7 +26,8 @@ import { make as makeMessage } from "../message.js"
 import { isTerminal } from "../run.js"
 import type { RunEvent } from "../run-event.js"
 import { decodeEvent, decodeJson, encodeJson, encodeJsonValue } from "./codecs.js"
-import { decodeMember, loadFanOut, outcomeFor, type FanOutRow } from "./store-fan-out-rows.js"
+import { decodeMember, inspectFanOut, loadFanOut, outcomeFor, type FanOutRow } from "./store-fan-out-rows.js"
+export { inspectFanOut }
 import {
   afterTerminal as defaultAfterTerminal,
   appendEvent as defaultAppendEvent,
@@ -34,6 +35,7 @@ import {
   loadRun,
   nowIso,
 } from "./store-helpers.js"
+import { enforceChildAdmission } from "./store-admit-send.js"
 import type { EventHub } from "./subscribers.js"
 import { associateRegistrations, loadRegistrations } from "./executable-registrations.js"
 import { narrow } from "../executable-registration.js"
@@ -41,29 +43,29 @@ import type { AdmitStartInput } from "../run-store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { WaitResolution } from "../run-wait.js"
 import { fanOutMember } from "../child-session.js"
-export const inspectFanOut = (fanOutId: string) =>
-  Effect.gen(function* () {
-    const loaded = yield* loadFanOut(fanOutId)
-    if (loaded === undefined) return yield* FanOutNotFound.make({ fanOutId })
-    return {
-      fanOutId: loaded.fanOut.fan_out_id,
-      parentRunId: loaded.fanOut.parent_run_id,
-      idempotencyKey: loaded.fanOut.idempotency_key,
-      status: loaded.fanOut.status,
-      join: decodeJson(FanOutJoin, loaded.fanOut.join_json),
-      remainder: loaded.fanOut.remainder,
-      concurrency: Number(loaded.fanOut.concurrency),
-      members: loaded.members.map(decodeMember),
-    } satisfies FanOutInspection
-  })
+import { Prompt } from "effect/unstable/ai"
 type FanOutEffect = Effect.Effect<
   FanOutReceipt,
-  ChildSelectionMissing | FanOutConflict | FanOutInvalid | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,
+  | ChildSelectionMissing
+  | FanOutConflict
+  | FanOutInvalid
+  | RunNotFound
+  | RunTerminal
+  | RuntimeUnavailable
+  | import("../errors.js").ChildDepthExceeded
+  | import("../errors.js").ChildLimitExceeded
+  | SqlError,
   SqlClient.SqlClient
 >
 type InitialFanOutsEffect = Effect.Effect<
   FanOutReceipt[],
-  ChildSelectionMissing | FanOutConflict | FanOutInvalid | RuntimeUnavailable | SqlError,
+  | ChildSelectionMissing
+  | FanOutConflict
+  | FanOutInvalid
+  | RuntimeUnavailable
+  | import("../errors.js").ChildDepthExceeded
+  | import("../errors.js").ChildLimitExceeded
+  | SqlError,
   SqlClient.SqlClient
 >
 type AppendRun = Parameters<typeof defaultAppendEvent>[1]
@@ -87,6 +89,8 @@ export const admitFanOut: {
 } = Function.dual(2, (hub: EventHub, input: AdmitFanOutInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const invalid = validateAdmission(input)
+    if (invalid !== undefined) return yield* FanOutInvalid.make({ message: invalid })
     const parent = yield* loadRun(input.parentRunId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
     const parentRegistrations = yield* loadRegistrations(parent.runId)
@@ -128,6 +132,7 @@ export const admitFanOut: {
     if (isTerminal(parent.status)) {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
+    yield* enforceChildAdmission(parent, members.length)
     const created = yield* nowIso
     yield* sql`
       INSERT INTO baton_fan_outs (
@@ -158,6 +163,8 @@ export const admitFanOut: {
         executableRef: member.executableRef,
         executableManifest: parent.executableManifest,
         rootRunId: parent.rootRunId,
+        depth: parent.depth + 1,
+        treePolicy: parent.treePolicy,
         parentRunId: parent.runId,
         invocationId: `${input.fanOutId}:${member.key}`,
         acceptedSequence: member.ordinal,
@@ -173,8 +180,15 @@ export const admitFanOut: {
         VALUES (${parent.runId}, ${member.childRunId}, ${`${input.fanOutId}:${member.key}`}, NULL, ${created}, NULL)
       `
       yield* sql`
-        INSERT INTO baton_fan_out_members (fan_out_id, ordinal, member_key, child_run_id, status, terminal_event_id, outcome_json)
-        VALUES (${input.fanOutId}, ${member.ordinal}, ${member.key}, ${member.childRunId}, ${active ? "running" : "pending"}, NULL, NULL)
+        INSERT INTO baton_fan_out_members (
+          fan_out_id, ordinal, member_key, selection, display_label, prompt_json, origin_json,
+          child_run_id, depth, status, terminal_event_id, outcome_json
+        ) VALUES (
+          ${input.fanOutId}, ${member.ordinal}, ${member.key}, ${member.selection}, ${member.label ?? null},
+          ${encodeJson(Prompt.Prompt, member.prompt)},
+          ${member.origin === undefined ? null : encodeJson(FanOutMemberOrigin, member.origin)},
+          ${member.childRunId}, ${parent.depth + 1}, ${active ? "running" : "pending"}, NULL, NULL
+        )
       `
       const currentParent = (yield* loadRun(parent.runId))!
       yield* defaultAppendEvent(hub, currentParent, {
@@ -183,6 +197,10 @@ export const admitFanOut: {
         invocationId: `${input.fanOutId}:${member.key}`,
         selection: member.selection,
         prompt: member.prompt,
+        childDepth: parent.depth + 1,
+        key: member.key,
+        ...(member.label === undefined ? {} : { label: member.label }),
+        ...(member.origin === undefined ? {} : { origin: member.origin }),
       })
       const child = (yield* loadRun(member.childRunId))!
       yield* defaultAppendEvent(hub, child, { _tag: "RunAccepted", messageId: message.id, address }, "queued")
@@ -340,7 +358,8 @@ export const reconcileFanOutWith: {
             "cancelled",
           )
           yield* sql`
-          UPDATE baton_fan_out_members SET status = 'cancelled', terminal_event_id = ${cancelledEvent.eventId}, outcome_json = '{}'
+          UPDATE baton_fan_out_members SET status = 'cancelled', terminal_event_id = ${cancelledEvent.eventId},
+            outcome_json = ${encodeJsonValue(outcomeFor(cancelledEvent))}
           WHERE child_run_id = ${member.childRunId}
         `
           yield* settle(hub, (yield* loadRun(member.childRunId))!, cancelledEvent.eventId)
