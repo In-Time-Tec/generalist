@@ -1311,7 +1311,7 @@ describePostgres("postgres run store", () => {
           result: completedResult("child-done"),
         })
         const parentTags = yield* runtime.events({ runId: parent.runId, cursor: -1 }).pipe(
-          Stream.take(4),
+          Stream.take(5),
           Stream.runCollect,
           Effect.map((chunk) => [...chunk].map((event) => event._tag)),
         )
