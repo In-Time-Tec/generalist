@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.24.0
+
+- Redefine root-pinned `TreePolicy.maxSubagents` as each parent's active direct-child capacity: exact groups may exceed it, persist excess members as queued, and promote them automatically as ready children settle without changing ordered all-settled results.
+- Project durable child readiness through Run, tree, and fan-out inspection plus `ChildLinked` and `ChildReadinessChanged`, with equivalent restart-safe admission, promotion, cancellation, and blocking resume across memory, SQLite, PostgreSQL, and MySQL.
+
 ## 0.23.0
 
 - Replace direct child Agent-pin edges with version-2 Agent selection allowlists and one version-2 executable-level pinned profile registry, enabling finite self- and mutually recursive profiles without static depth unrolling or digest cycles.
