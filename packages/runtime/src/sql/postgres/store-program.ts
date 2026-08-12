@@ -32,6 +32,7 @@ export const programStoreMethods = (input: {
   readonly hub: EventHub
   readonly run: Run
   readonly runNoTxn: Run
+  readonly lockRunHierarchy: (runId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
 }): Pick<
   RunStore,
   | "reserveProgramOperation"
@@ -67,9 +68,10 @@ export const programStoreMethods = (input: {
       input.runNoTxn(requireRun(operation.runId).pipe(Effect.andThen(getProgramOperation(operation)))),
     commitProgramLog: (operation) => fenced(operation, commitProgramLog(input.hub, operation)),
     completeProgram: (operation) =>
-      fenced(
-        operation,
+      input.run(
         Effect.gen(function* () {
+          yield* input.lockRunHierarchy(operation.runId)
+          yield* requireExecutionClaim(operation)
           if (operation.outputBytes > operation.outputLimit)
             return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
               dimension: "outputBytes",

@@ -1,4 +1,4 @@
-import { Effect, Function } from "effect"
+import { Effect, Function, Option } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
@@ -16,6 +16,7 @@ import { requireExecutionClaim } from "../store-execution.js"
 import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
 import { inspectFanOut } from "../store-fan-out.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
+import { loadTerminalEvent, reconcileChildWaitWith } from "../store-child-settlement.js"
 
 type SuspendEffect = Effect.Effect<
   undefined,
@@ -61,6 +62,22 @@ export const suspend: {
         status = 'open', reason = EXCLUDED.reason, response_json = NULL, opened_at = EXCLUDED.opened_at, closed_at = NULL
     `
     yield* appendEvent(hub, loaded, { _tag: "RunWaiting", wait: input.wait }, "waiting")
+    const child =
+      typeof input.suspension.token === "string"
+        ? yield* requireRun(input.suspension.token).pipe(Effect.option)
+        : Option.none()
+    if (child._tag === "Some" && child.value.terminalEventId !== undefined) {
+      const terminalEvent = yield* loadTerminalEvent(child.value.terminalEventId)
+      if (terminalEvent !== undefined) {
+        yield* reconcileChildWaitWith({
+          hub,
+          parent: yield* requireRun(loaded.runId),
+          child: child.value,
+          event: terminalEvent,
+          append: appendEvent,
+        })
+      }
+    }
     const groupId = groupIdFromSuspension(input.suspension)
     if (groupId !== undefined) {
       const rows = yield* sql<{ parent_run_id: string; status: string }>`

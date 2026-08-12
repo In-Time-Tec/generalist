@@ -13,10 +13,8 @@ import {
   appendLifecycle,
   makeCancellationRequested,
   makeCancelled,
-  makeChildSettled,
   makeCompleted,
   makeFailed,
-  makeAttemptStarted,
   makeResumed,
   makeWaiting,
   rejectIfTerminal,
@@ -26,7 +24,7 @@ import type { MemoryState, StoredRun } from "./state.js"
 import { reconcileFanOut } from "./store-fan-out.js"
 import { ProgramCapabilities } from "@batonfx/core"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
-import { admitChildSettlement } from "./store-directory.js"
+import { hasUnsettledChild, reconcileChildWait, settleParentChild } from "./store-child-settlement.js"
 
 type RespondResult = Effect.Effect<
   MemoryState,
@@ -50,45 +48,8 @@ const getRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, Run
   return run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run)
 }
 
-const settleParentChild = (
-  state: MemoryState,
-  child: StoredRun,
-  terminalEventId: string,
-): Effect.Effect<MemoryState, RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    if (child.parentRunId === undefined) return state
-    const parent = state.runs.get(child.parentRunId)
-    if (parent === undefined) return state
-    const terminalEvent = child.events.find((event) => event.eventId === terminalEventId)
-    const notified =
-      terminalEvent === undefined ? state : yield* admitChildSettlement(state, { parent, child, event: terminalEvent })
-    if (isTerminal(parent.status)) return notified
-    const already = parent.events.some((event) => event._tag === "ChildSettled" && event.childRunId === child.runId)
-    if (already) return notified
-    const [, next] = yield* appendLifecycle(notified, parent.runId, makeChildSettled(child.runId, terminalEventId))
-    const currentParent = next.runs.get(parent.runId)
-    if (currentParent?.status !== "queued" || hasUnsettledChild(next, parent.runId)) return next
-    const [, started] = yield* appendLifecycle(
-      next,
-      parent.runId,
-      makeAttemptStarted(currentParent.attempt + 1),
-      "running",
-    )
-    return started
-  })
-
 const hasRunningOwnedFanOut = (state: MemoryState, runId: string): boolean =>
   [...state.fanOuts.values()].some((fanOut) => fanOut.parentRunId === runId && fanOut.status === "running")
-
-/** A Run stays non-terminal while it still owns unsettled work. */
-const hasUnsettledChild = (state: MemoryState, runId: string): boolean => {
-  const run = state.runs.get(runId)
-  if (run === undefined) return false
-  return run.children.some((childRunId) => {
-    const child = state.runs.get(childRunId)
-    return child !== undefined && !isTerminal(child.status)
-  })
-}
 
 const reconcileProgramCancellation = (state: MemoryState, runId: string, reason?: string): MemoryState => {
   const programOperations = new Map(state.programOperations)
@@ -424,6 +385,14 @@ export const suspend: {
     const { ownerId: _, ...waiting } = waitingRuns.get(run.runId)!
     waitingRuns.set(run.runId, waiting)
     const released = { ...next, runs: waitingRuns }
+    const child = typeof input.suspension.token === "string" ? released.runs.get(input.suspension.token) : undefined
+    const terminalEvent = child?.events.find(
+      (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+    )
+    if (child !== undefined && terminalEvent !== undefined) {
+      const reconciled = yield* reconcileChildWait(released, released.runs.get(run.runId)!, child, terminalEvent)
+      if (reconciled !== released) return reconciled
+    }
     const groupId = groupIdFromSuspension(input.suspension)
     const group = groupId === undefined ? undefined : released.fanOuts.get(groupId)
     if (group === undefined || group.parentRunId !== run.runId || group.status === "running") return released

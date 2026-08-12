@@ -15,6 +15,9 @@ const callIdentity = (event: RunEvent) => {
   ) {
     toolCallId = event.call.id
   }
+  if (event._tag === "ChildLinked" && event.origin?.parentToolCallId !== undefined) {
+    toolCallId = event.origin.parentToolCallId
+  }
   return {
     ...(modelCallId === undefined ? {} : { modelCallId }),
     ...(modelAttemptId === undefined ? {} : { modelAttemptId }),

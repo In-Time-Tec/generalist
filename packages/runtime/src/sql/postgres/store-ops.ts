@@ -25,6 +25,7 @@ import {
   sameHandoffCheckpoint,
   sameHandoffCommit,
 } from "../../handoff-session.js"
+import { lockRunHierarchy } from "./locks.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 export type RunFn = <A, E>(
@@ -345,7 +346,7 @@ export const postgresOperations = (input: {
     resolveOperation: (op) =>
       run(
         Effect.gen(function* () {
-          yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${op.runId} FOR UPDATE`
+          yield* lockRunHierarchy(op.runId)
           const loaded = yield* requireRun(op.runId)
           const program = yield* getProgramOperation({ runId: op.runId, operation: op.operationId })
           if (program !== undefined) {

@@ -28,6 +28,7 @@ import { OperationResolution } from "../operation-resolution.js"
 import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
 import { reconcileFanOut } from "./store-fan-out.js"
+import { hasUnsettledChild, loadTerminalEvent, reconcileChildWaitWith } from "./store-child-settlement.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { checkpointRef, decodePinned } from "../executable-manifest.js"
 import { PendingRunOutcome } from "../run-store.js"
@@ -66,6 +67,8 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     executableRef: executable.ref,
     executableManifest: executable.manifest,
     rootRunId: row.root_run_id,
+    depth: Number(row.depth),
+    treePolicy: { maxDepth: Number(row.max_depth), maxSubagents: Number(row.max_subagents) },
     admittedAt: asIso(row.created_at)!,
     attempt: Number(row.attempt),
     attemptFence: Number(row.attempt_fence),
@@ -231,6 +234,7 @@ export const appendEvent: {
         sequence,
         executableRef: run.executableRef,
         rootRunId: run.rootRunId,
+        depth: run.depth,
         occurredAt,
         ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
         ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
@@ -371,21 +375,6 @@ export const afterTerminal: {
   })
 }
 
-export const hasUnsettledChild = (
-  runId: string,
-): Effect.Effect<boolean, RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const pending = yield* sql<{ child_run_id: string }>`
-      SELECT l.child_run_id FROM baton_run_links l
-      JOIN baton_runs r ON r.run_id = l.child_run_id
-      WHERE l.parent_run_id = ${runId}
-        AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
-      LIMIT 1
-    `
-    return pending.length > 0
-  })
-
 export const settleParent: {
   (hub: EventHub, child: DecodedRun, terminalEventId: string): TerminalEffect
   (child: DecodedRun, terminalEventId: string): (hub: EventHub) => TerminalEffect
@@ -419,7 +408,12 @@ export const settleParent: {
       })
     }
     yield* reconcileFanOut(hub, child.runId, terminalEventId, settleParent)
-    const currentParent = yield* loadRun(parent.runId)
+    let currentParent = yield* loadRun(parent.runId)
+    const terminalEvent = yield* loadTerminalEvent(terminalEventId)
+    if (currentParent !== undefined && terminalEvent !== undefined) {
+      yield* reconcileChildWaitWith({ hub, parent: currentParent, child, event: terminalEvent, append: appendEvent })
+      currentParent = yield* loadRun(parent.runId)
+    }
     if (currentParent?.status === "queued" && !(yield* hasUnsettledChild(parent.runId))) {
       const attempt = currentParent.attempt + 1
       yield* sql`UPDATE baton_runs SET attempt_fence = ${attempt} WHERE run_id = ${parent.runId}`
@@ -455,6 +449,8 @@ export const insertRun = (input: {
   readonly executableRef: ExecutableRef
   readonly executableManifest: ExecutableManifest
   readonly rootRunId: string
+  readonly depth: number
+  readonly treePolicy: import("../tree-policy.js").TreePolicy
   readonly parentRunId?: string
   readonly invocationId?: string
   readonly acceptedSequence: number
@@ -466,14 +462,14 @@ export const insertRun = (input: {
     yield* sql`
       INSERT INTO baton_runs (
         run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-        executable_ref_json, executable_manifest_json, root_run_id, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
+        executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
         last_sequence, cancellation_requested, cancel_reason, terminal_event_id, accepted_sequence,
         responded_wait_ids_json, created_at, updated_at
       ) VALUES (
         ${input.runId}, ${input.status}, ${input.message.to}, ${input.message.sessionId}, ${input.message.id},
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
-        ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
+        ${input.rootRunId}, ${input.depth}, ${input.treePolicy.maxDepth}, ${input.treePolicy.maxSubagents}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
         NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, ${false}, NULL, NULL, ${input.acceptedSequence},
         ${encodeJson(StringArray, [])}, ${created}, ${created}
       )

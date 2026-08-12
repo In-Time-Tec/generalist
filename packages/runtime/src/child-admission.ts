@@ -67,6 +67,8 @@ export interface ChildInspection {
  * that does not own it.
  */
 export type AdmitChildError =
+  | import("./errors.js").ChildDepthExceeded
+  | import("./errors.js").ChildLimitExceeded
   | ChildSelectionMissing
   | IdempotencyConflict
   | RunIdConflict

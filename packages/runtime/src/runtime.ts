@@ -1,5 +1,6 @@
 import { Context, Effect, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import type { TreePolicy } from "./tree-policy.js"
 import type { Address } from "./address.js"
 import type { PinnedExecutable } from "./executable-manifest.js"
 import type { Interface as ExecutableResolverInterface } from "./executable-resolver.js"
@@ -28,6 +29,9 @@ import type {
   FanOutNotFound,
   FanOutRemainderUnsupported,
   TreeCursorInvalid,
+  ChildDepthExceeded,
+  ChildLimitExceeded,
+  TreePolicyInvalid,
   TreeCursorExpired,
   ChildSelectionMissing,
   OperationResolutionConflict,
@@ -45,7 +49,7 @@ import type { Interface as MessagingPolicyInterface } from "./messaging.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
-import type { FanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
+import type { FanOutInput, FanOutInspection, FanOutMemberOrigin, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
 import type { ResolveOperationInput } from "./operation-resolution.js"
 import type { SteeringReceipt } from "./steering.js"
 import type { RespondInput as RespondApprovalInput } from "./approval.js"
@@ -77,6 +81,7 @@ export interface LayerOptions {
 
 export interface SendInput {
   readonly runId?: string
+  readonly treePolicy?: TreePolicy
   readonly to: Address
   readonly from?: Address
   readonly sessionId: string
@@ -91,6 +96,7 @@ export interface SendInput {
 
 export interface StartInput {
   readonly runId?: string
+  readonly treePolicy?: TreePolicy
   readonly executable: PinnedExecutable
   readonly registrations: ReadonlyArray<ExecutableRegistration>
   readonly sessionId: string
@@ -124,6 +130,8 @@ export interface SpawnInput {
   readonly parentRunId: string
   readonly invocationId: string
   readonly selection: string
+  readonly label?: string
+  readonly origin?: FanOutMemberOrigin
   readonly prompt: Prompt.Prompt | Prompt.RawInput
   readonly sessionId?: string
   readonly idempotencyKey?: string
@@ -242,8 +250,11 @@ export type SendError =
   | ExecutableRegistrationInvalid
   | ExecutableRegistrationConflict
   | ExecutableRegistrationMissing
+  | TreePolicyInvalid
   | RuntimeUnavailable
 export type StartError =
+  | ChildDepthExceeded
+  | ChildLimitExceeded
   | IdempotencyConflict
   | RunIdConflict
   | ExecutableIdentityMismatch
@@ -256,8 +267,16 @@ export type StartError =
   | FanOutConflict
   | FanOutInvalid
   | FanOutRemainderUnsupported
+  | TreePolicyInvalid
   | RuntimeUnavailable
-export type SpawnError = RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
+export type SpawnError =
+  | RunNotFound
+  | RunTerminal
+  | ChildSelectionMissing
+  | IdempotencyConflict
+  | RuntimeUnavailable
+  | ChildDepthExceeded
+  | ChildLimitExceeded
 export type SendMessageError =
   | AddressNotFound
   | AddressInvalid
@@ -281,6 +300,8 @@ export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeU
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
 export type FanOutError =
+  | ChildDepthExceeded
+  | ChildLimitExceeded
   | RunNotFound
   | RunTerminal
   | FanOutConflict

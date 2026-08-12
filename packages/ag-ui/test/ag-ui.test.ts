@@ -1,7 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest"
 import type { RunAgentInput } from "@ag-ui/core"
 import { Effect, Layer, Stream } from "effect"
-import { Address, Approval, ExecutableManifest, Errors as RuntimeErrors, Runtime } from "@batonfx/runtime"
+import { Address, Approval, ExecutableManifest, Errors as RuntimeErrors, Runtime, TreePolicy } from "@batonfx/runtime"
 import { AgUi } from "../src/index.js"
 
 const address = Address.make("agent:assistant")
@@ -29,6 +29,7 @@ const accepted = {
   sequence: 0,
   executableRef: agent,
   rootRunId: "client-run-1",
+  depth: 0,
   occurredAt: "2026-08-03T00:00:00.000Z",
   _tag: "RunAccepted" as const,
   messageId: "message-1",
@@ -157,6 +158,8 @@ describe("AgUi", () => {
         status: "waiting" as const,
         executableRef: agent,
         executableManifest: executable.manifest,
+        depth: 0,
+        treePolicy: TreePolicy.defaultTreePolicy,
         wait: {
           waitId: "wait-1",
           reason: {
@@ -225,6 +228,8 @@ describe("AgUi", () => {
         status: "running" as const,
         executableRef: agent,
         executableManifest: executable.manifest,
+        depth: 0,
+        treePolicy: TreePolicy.defaultTreePolicy,
         lastSequence: 8,
         durability: "ephemeral" as const,
       },
@@ -268,6 +273,8 @@ describe("AgUi", () => {
         status: "running" as const,
         executableRef: agent,
         executableManifest: executable.manifest,
+        depth: 0,
+        treePolicy: TreePolicy.defaultTreePolicy,
         lastSequence: 12,
         durability: "durable" as const,
       },

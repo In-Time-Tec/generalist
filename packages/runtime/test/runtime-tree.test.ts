@@ -500,6 +500,8 @@ layer(memoryLayer)("RunTree", (it) => {
               status: rootRun.status,
               executableRef: rootRun.executableRef,
               executableManifest: rootRun.executableManifest,
+              depth: rootRun.depth,
+              treePolicy: rootRun.treePolicy,
               lastSequence: rootRun.lastSequence,
               durability: rootRun.durability,
               ...(wait === undefined ? {} : { wait }),

@@ -65,6 +65,7 @@ import { reconcileCancellationRequested, sessionRoots } from "../session-lifecyc
 import { cancelSessionRuns } from "./session-cancellation.js"
 import { makeMysqlModelResponseOperations } from "./store-model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
+import { loadTerminalEvent, reconcileChildWaitWith } from "../store-child-settlement.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -175,6 +176,18 @@ export const makeMysqlServices = (
           { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } },
           "waiting",
         )
+        const child = typeof input.suspension.token === "string" ? yield* loadRun(input.suspension.token) : undefined
+        const terminalEvent =
+          child?.terminalEventId === undefined ? undefined : yield* loadTerminalEvent(child.terminalEventId)
+        if (child !== undefined && terminalEvent !== undefined) {
+          yield* reconcileChildWaitWith({
+            hub: transactionHub,
+            parent: (yield* loadRun(loaded.runId))!,
+            child,
+            event: terminalEvent,
+            append: appendEvent,
+          })
+        }
         const groupId = groupIdFromSuspension(input.suspension)
         if (groupId !== undefined) {
           const rows = yield* sql<{ parent_run_id: string; status: string }>`
@@ -338,6 +351,8 @@ export const makeMysqlServices = (
               status: loaded.status,
               executableRef: loaded.executableRef,
               executableManifest: loaded.executableManifest,
+              depth: loaded.depth,
+              treePolicy: loaded.treePolicy,
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),

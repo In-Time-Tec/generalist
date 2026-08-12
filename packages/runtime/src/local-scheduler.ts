@@ -4,7 +4,6 @@ import { AgentExecutionFailure } from "./errors.js"
 import { ExecutionHost } from "./execution-host.js"
 import { RunStore } from "./run-store.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
-import { isTerminal, type RunInspection } from "./run.js"
 
 export interface Options {
   readonly workerId: string
@@ -34,71 +33,9 @@ export const make = (
     const selectionWindow = concurrency === undefined ? 64 : Math.max(concurrency * 2, 16)
     const reconcileWindow = 32
 
-    const waitingCursor = yield* Ref.make<string | undefined>(undefined)
     const cancellingCursor = yield* Ref.make<string | undefined>(undefined)
     const runningCursor = yield* Ref.make<string | undefined>(undefined)
     const queuedCursor = yield* Ref.make<string | undefined>(undefined)
-
-    const reconcileChild = (store: RunStoreInterface, parent: RunInspection, runId: string): Effect.Effect<void> =>
-      Effect.gen(function* () {
-        const execution = yield* store.loadExecution(runId)
-        const metadata = execution.message.metadata
-        if (metadata?.runtimeChildTool !== true) return
-        if (typeof metadata.parentRunId !== "string" || typeof metadata.parentToolCallId !== "string") return
-        if (metadata.parentRunId !== parent.runId || metadata.parentToolCallId !== parent.wait?.waitId) return
-        const snapshot = yield* store.snapshot(runId)
-        if (snapshot.outcome === undefined) return
-        const result =
-          snapshot.outcome._tag === "Succeeded"
-            ? metadata.codeMode === true && "value" in snapshot.outcome.result
-              ? snapshot.outcome.result.value
-              : "text" in snapshot.outcome.result
-                ? {
-                    _tag: "Succeeded" as const,
-                    childRunId: runId,
-                    text: snapshot.outcome.result.text,
-                    turns: snapshot.outcome.result.turns,
-                  }
-                : { _tag: "Failed" as const, childRunId: runId, message: "child resolved a non-Agent executable" }
-            : snapshot.outcome._tag === "Failed"
-              ? { _tag: "Failed" as const, childRunId: runId, message: snapshot.outcome.error.message }
-              : {
-                  _tag: "Cancelled" as const,
-                  childRunId: runId,
-                  ...(snapshot.outcome.reason === undefined ? {} : { reason: snapshot.outcome.reason }),
-                }
-        yield* store.resume({
-          runId: parent.runId,
-          waitId: metadata.parentToolCallId,
-          resolution: { _tag: "ToolResult", result, encodedResult: result },
-        })
-      }).pipe(Effect.ignore)
-
-    const reconcileWaitingParent = (store: RunStoreInterface, parent: RunInspection) =>
-      Effect.gen(function* () {
-        if (parent.wait?.status !== "open") return
-        const related = yield* store.listRelated(parent.runId)
-        for (const entry of related) {
-          if (entry.parentRunId !== parent.runId || !isTerminal(entry.status)) continue
-          const current = yield* store.inspect(parent.runId)
-          if (current.wait?.waitId !== parent.wait.waitId || current.wait.status !== "open") return
-          yield* reconcileChild(store, current, entry.runId)
-        }
-      }).pipe(Effect.ignore)
-
-    const reconcileTerminalChildren = (store: RunStoreInterface) =>
-      Effect.gen(function* () {
-        const cursor = yield* Ref.get(waitingCursor)
-        const waiting = yield* store.list({
-          status: "waiting",
-          order: "oldest",
-          limit: reconcileWindow,
-          ...(cursor === undefined ? {} : { afterRunId: cursor }),
-        })
-        for (const parent of waiting) yield* reconcileWaitingParent(store, parent)
-        const last = waiting[waiting.length - 1]
-        yield* Ref.set(waitingCursor, waiting.length === reconcileWindow ? last?.runId : undefined)
-      })
 
     const sweepCancelling = (store: RunStoreInterface) =>
       Effect.gen(function* () {
@@ -200,7 +137,6 @@ export const make = (
 
     const tick = Effect.gen(function* () {
       const store = yield* RunStore
-      yield* reconcileTerminalChildren(store)
       yield* sweepCancelling(store)
       yield* selectReadyRuns(store)
     }).pipe(Effect.ignore, tickLock.withPermit)

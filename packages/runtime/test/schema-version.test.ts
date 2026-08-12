@@ -9,7 +9,7 @@ it("freezes schema checksums for every dialect", () => {
     postgresVersion: 5,
     mysqlVersion: 5,
   })
-  expect(sqliteChecksum()).toBe("ce0e7adfbced0457bfe706458590c829cae5c5333740ff7329ab4d928048de6b")
-  expect(postgresChecksum()).toBe("effcf8cdaeddba5bfc6c5bf8c4cd942e7d10d0d0fdaf3d5d8050f856bfaebaf3")
-  expect(mysqlChecksum()).toBe("2331207f562571d887456e5bbbd2b196210e6121372c95e28a02dcc2a60ea27b")
+  expect(sqliteChecksum()).toBe("2f7577598f2eb330eecfd0103fd5da32f7afb56b302b2cffefb17f9dcb9124bd")
+  expect(postgresChecksum()).toBe("8c6590014f6b8c9935896fc29d9ec061274023fc7f41c9a283ad5e84d2bf2f26")
+  expect(mysqlChecksum()).toBe("3b1418878291309105920ede9eaadf823fa823bfb7d50f770457fe834e7abbd6")
 })

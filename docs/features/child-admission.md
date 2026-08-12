@@ -1,6 +1,6 @@
 # Non-blocking child admission
 
-`ChildAdmission` is the direct-child route that returns at admission rather than at completion. `ChildRuns` keeps the blocking `run_child` path and the child-group operations unchanged; this is an additional route.
+`ChildAdmission` is the direct-child route that returns at admission rather than at completion. `ChildRuns` owns the blocking `run_child` and `run_child_group` paths; this is an additional detached route.
 
 - `admit` returns `AdmitReceipt { childRunId, key, duplicate }` once the durable child Run exists. `key` is host-supplied admission identity: two admissions under one key name one child, and the second reports `duplicate: true`.
 - `listDirect`, `inspect`, `join`, and `cancel` operate on direct children only. `join` reads the child's current state; it does **not** block until the child is terminal, so a caller that must wait polls it or follows Run events.

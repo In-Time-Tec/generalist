@@ -14,6 +14,7 @@ const base = {
   sequence: 1,
   executableRef,
   rootRunId: "run-1",
+  depth: 0,
   occurredAt: "2026-08-03T00:00:00.000Z",
 }
 

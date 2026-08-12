@@ -43,6 +43,8 @@ const loadRuns = (rootRunId: string) =>
             status: run.status,
             executableRef: run.executableRef,
             executableManifest: run.executableManifest,
+            depth: run.depth,
+            treePolicy: run.treePolicy,
             lastSequence: run.lastSequence,
             durability: "durable" as const,
             ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),

@@ -15,6 +15,7 @@ import type { TreeEvent } from "../tree.js"
 import type { ProgramOperationRecord, ProgramRunState } from "../program-store.js"
 import type { ExecutableRegistration } from "../executable-registration.js"
 import type { PendingRunOutcome } from "../run-store.js"
+import type { TreePolicy } from "../tree-policy.js"
 import type { MailboxEntry } from "../mailbox.js"
 import type { Session } from "@batonfx/core"
 
@@ -45,6 +46,8 @@ export interface StoredRun {
   readonly address: Address
   readonly message: Message
   readonly rootRunId: string
+  readonly depth: number
+  readonly treePolicy: TreePolicy
   readonly parentRunId?: string
   readonly invocationId?: string
   readonly activeWaitId?: string

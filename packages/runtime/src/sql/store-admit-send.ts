@@ -2,20 +2,63 @@ import { Clock, Effect, Function, Random } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   AddressNotFound,
+  ChildDepthExceeded,
+  ChildLimitExceeded,
   ExecutableRegistrationConflict,
   IdempotencyConflict,
   RunIdConflict,
   RuntimeUnavailable,
+  TreePolicyInvalid,
 } from "../errors.js"
 import { decodePinned, equals, type PinnedExecutable } from "../executable-manifest.js"
-import { messageDigest } from "../memory/digest.js"
+import { rootDigest } from "../memory/digest.js"
 import type { AdmitSendInput } from "../run-store.js"
 import { decodePinnedExecutable, decodeQueue, encodeQueue } from "./codecs.js"
 import type { RunRow } from "./rows.js"
+import type { DecodedRun } from "./rows.js"
 import { appendEvent, insertRun, loadRun, promoteHead } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import { associateRegistrations, persistRegistrations } from "./executable-registrations.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
+import { normalize as normalizeTreePolicy } from "../tree-policy.js"
+
+type AdmissionEffect = Effect.Effect<undefined, ChildDepthExceeded | ChildLimitExceeded | SqlError, SqlClient.SqlClient>
+
+export const enforceChildAdmission: {
+  (requested: number): (parent: DecodedRun) => AdmissionEffect
+  (parent: DecodedRun, requested: number): AdmissionEffect
+} = Function.dual(2, (parent: DecodedRun, requested: number) =>
+  Effect.gen(function* () {
+    const depth = parent.depth + 1
+    if (depth > parent.treePolicy.maxDepth) {
+      return yield* ChildDepthExceeded.make({
+        parentRunId: parent.runId,
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested: depth,
+        current: parent.depth,
+        limit: parent.treePolicy.maxDepth,
+      })
+    }
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<{ count: number | string }>`
+      SELECT COUNT(*) AS count FROM baton_run_links WHERE parent_run_id = ${parent.runId}
+    `
+    const current = Number(rows[0]?.count ?? 0)
+    if (current + requested > parent.treePolicy.maxSubagents) {
+      return yield* ChildLimitExceeded.make({
+        parentRunId: parent.runId,
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested,
+        current,
+        limit: parent.treePolicy.maxSubagents,
+      })
+    }
+  }),
+)
 
 export const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.gen(function* () {
@@ -32,6 +75,7 @@ type SendEffect = Effect.Effect<
   | IdempotencyConflict
   | RunIdConflict
   | RuntimeUnavailable
+  | TreePolicyInvalid
   | SqlError,
   SqlClient.SqlClient
 >
@@ -69,7 +113,8 @@ export const admitSend: {
         catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
       })
       if (!equals(binding, admitted)) return yield* AddressNotFound.make({ address: input.message.to })
-      const digest = messageDigest(input.message)
+      const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
+      const digest = rootDigest(input.message, treePolicy)
       const existing = yield* sql<RunRow>`
       SELECT * FROM baton_runs
       WHERE address = ${input.message.to}
@@ -133,6 +178,8 @@ export const admitSend: {
         executableRef: input.executableRef,
         executableManifest: input.executableManifest,
         rootRunId: runId,
+        depth: 0,
+        treePolicy,
         acceptedSequence,
       })
       yield* persistRegistrations(input.registrations)

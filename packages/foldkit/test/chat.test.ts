@@ -13,6 +13,7 @@ const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.R
     sequence,
     executableRef: agent,
     rootRunId: "run-1",
+    depth: 0,
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,
   }) as RunEvent.RunEvent

@@ -321,8 +321,11 @@ describe("Runtime code_mode Program children", () => {
           .runId
         yield* scheduler.tick
         yield* scheduler.idle
-        expect((yield* runtime.inspect(rootRunId)).status).toBe("waiting")
+        expect((yield* runtime.inspect(rootRunId)).status).toBe("running")
         expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
+        expect(
+          (yield* runtime.history({ runId: rootRunId, limit: 100 })).filter((event) => event._tag === "RunResumed"),
+        ).toHaveLength(1)
         expect(counts.model).toBe(1)
         expect(counts.capability).toBe(1)
       }),
@@ -334,6 +337,9 @@ describe("Runtime code_mode Program children", () => {
         yield* Effect.forEach([0, 1, 2], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), { discard: true })
         expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
         expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
+        expect(
+          (yield* runtime.history({ runId: rootRunId, limit: 100 })).filter((event) => event._tag === "RunResumed"),
+        ).toHaveLength(1)
         expect(counts.model).toBe(2)
         expect(counts.capability).toBe(1)
       }),

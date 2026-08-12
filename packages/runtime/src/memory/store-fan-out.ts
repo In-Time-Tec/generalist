@@ -9,6 +9,8 @@ import {
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
+  ChildDepthExceeded,
+  ChildLimitExceeded,
 } from "../errors.js"
 import type { AdmitFanOutInput, FanOutInspection, FanOutMemberResult, FanOutReceipt } from "../fan-out.js"
 import { make as makeMessage } from "../message.js"
@@ -27,7 +29,7 @@ import {
 } from "./append.js"
 import type { MemoryState, StoredFanOut, StoredRun } from "./state.js"
 import { resolveChild } from "../executable-manifest.js"
-import { digestFanOut } from "../fan-out.js"
+import { digestFanOut, validateAdmission } from "../fan-out.js"
 import { narrow } from "../executable-registration.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { admitChildSettlement } from "./store-directory.js"
@@ -59,18 +61,34 @@ export const admitFanOut: {
     state: MemoryState,
   ) => Effect.Effect<
     readonly [FanOutReceipt, MemoryState],
-    FanOutConflict | FanOutInvalid | ChildSelectionMissing | RunNotFound | RunTerminal | RuntimeUnavailable
+    | FanOutConflict
+    | FanOutInvalid
+    | ChildSelectionMissing
+    | RunNotFound
+    | RunTerminal
+    | RuntimeUnavailable
+    | ChildDepthExceeded
+    | ChildLimitExceeded
   >
   (
     state: MemoryState,
     input: AdmitFanOutInput,
   ): Effect.Effect<
     readonly [FanOutReceipt, MemoryState],
-    FanOutConflict | FanOutInvalid | ChildSelectionMissing | RunNotFound | RunTerminal | RuntimeUnavailable
+    | FanOutConflict
+    | FanOutInvalid
+    | ChildSelectionMissing
+    | RunNotFound
+    | RunTerminal
+    | RuntimeUnavailable
+    | ChildDepthExceeded
+    | ChildLimitExceeded
   >
 } = Function.dual(2, (state: MemoryState, input: AdmitFanOutInput) =>
   Effect.gen(function* () {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
+    const invalid = validateAdmission(input)
+    if (invalid !== undefined) return yield* FanOutInvalid.make({ message: invalid })
     const parent = state.runs.get(input.parentRunId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
     const members = [] as Array<import("../fan-out.js").StoredFanOutMember>
@@ -113,6 +131,29 @@ export const admitFanOut: {
     if (isTerminal(parent.status)) {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
+    const depth = parent.depth + 1
+    if (depth > parent.treePolicy.maxDepth) {
+      return yield* ChildDepthExceeded.make({
+        parentRunId: parent.runId,
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested: depth,
+        current: parent.depth,
+        limit: parent.treePolicy.maxDepth,
+      })
+    }
+    if (parent.children.length + members.length > parent.treePolicy.maxSubagents) {
+      return yield* ChildLimitExceeded.make({
+        parentRunId: parent.runId,
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested: members.length,
+        current: parent.children.length,
+        limit: parent.treePolicy.maxSubagents,
+      })
+    }
 
     let next = state
     const memberResults: Array<FanOutMemberResult> = []
@@ -136,6 +177,8 @@ export const admitFanOut: {
         address,
         message,
         rootRunId: parent.rootRunId,
+        depth,
+        treePolicy: parent.treePolicy,
         parentRunId: parent.runId,
         invocationId: `${input.fanOutId}:${member.key}`,
         respondedWaitIds: new Set(),
@@ -162,7 +205,11 @@ export const admitFanOut: {
       const [, linked] = yield* appendLifecycle(
         next,
         parent.runId,
-        makeChildLinked(member.childRunId, `${input.fanOutId}:${member.key}`, member.selection, member.prompt),
+        makeChildLinked(member.childRunId, `${input.fanOutId}:${member.key}`, member.selection, member.prompt, depth, {
+          key: member.key,
+          ...(member.label === undefined ? {} : { label: member.label }),
+          ...(member.origin === undefined ? {} : { origin: member.origin }),
+        }),
       )
       next = linked
       const [, accepted] = yield* appendLifecycle(next, member.childRunId, makeAccepted(address, message.id), "queued")
@@ -170,7 +217,12 @@ export const admitFanOut: {
       memberResults.push({
         ordinal: member.ordinal,
         key: member.key,
+        selection: member.selection,
+        ...(member.label === undefined ? {} : { label: member.label }),
+        prompt: member.prompt,
+        ...(member.origin === undefined ? {} : { origin: member.origin }),
         childRunId: member.childRunId,
+        depth,
         status: active ? "running" : "pending",
       })
     }
@@ -200,7 +252,12 @@ const terminalResult = (member: FanOutMemberResult, event: RunEvent): FanOutMemb
     return { ...member, status: "succeeded", terminalEventId: event.eventId, result: event.result }
   if (event._tag === "RunFailed")
     return { ...member, status: "failed", terminalEventId: event.eventId, error: event.error }
-  return { ...member, status: "cancelled", terminalEventId: event.eventId }
+  return {
+    ...member,
+    status: "cancelled",
+    terminalEventId: event.eventId,
+    ...(event._tag === "RunCancelled" && event.reason !== undefined ? { reason: event.reason } : {}),
+  }
 }
 
 export const reconcileFanOut: {
@@ -328,7 +385,12 @@ export const reconcileFanOut: {
             )
             next = settled
           }
-          members[index] = { ...member, status: "cancelled", terminalEventId: cancelledEvent.eventId }
+          members[index] = {
+            ...member,
+            status: "cancelled",
+            terminalEventId: cancelledEvent.eventId,
+            reason: "fan-out remainder",
+          }
         }
       }
       if (joined === undefined) {

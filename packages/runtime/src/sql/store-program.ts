@@ -214,7 +214,13 @@ type SuspendProgramEffect = Effect.Effect<
 >
 type AdmitAgentsEffect = Effect.Effect<
   ProgramOperation,
-  ChildSelectionMissing | FanOutConflict | FanOutInvalid | ProgramStoreFailure | WorkerMutationError,
+  | ChildSelectionMissing
+  | FanOutConflict
+  | FanOutInvalid
+  | ProgramStoreFailure
+  | WorkerMutationError
+  | import("../errors.js").ChildDepthExceeded
+  | import("../errors.js").ChildLimitExceeded,
   SqlClient.SqlClient
 >
 type CommitLogEffect = Effect.Effect<

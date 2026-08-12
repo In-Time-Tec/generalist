@@ -33,6 +33,7 @@ import { StaleClaim } from "../errors.js"
 import { OperationResolution } from "../../operation-resolution.js"
 import { admitChildSettlementFromEventId } from "../settlement-notifications.js"
 import { discardPendingSteering } from "../store-steering-disposition.js"
+import { loadTerminalEvent, reconcileChildWaitWith } from "../store-child-settlement.js"
 
 type StoreError = RuntimeUnavailable | SqlError
 type StoreEffect<A> = Effect.Effect<A, StoreError, SqlClient.SqlClient>
@@ -136,6 +137,7 @@ export const appendEvent: {
         sequence,
         executableRef: run.executableRef,
         rootRunId: run.rootRunId,
+        depth: run.depth,
         occurredAt,
         ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
         ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
@@ -360,7 +362,12 @@ export const settleParent: {
       })
     }
     yield* reconcileFanOutWith(hub, child.runId, terminalEventId, appendEvent, settleParent, afterTerminal)
-    const currentParent = yield* loadRun(parent.runId)
+    let currentParent = yield* loadRun(parent.runId)
+    const terminalEvent = yield* loadTerminalEvent(terminalEventId)
+    if (currentParent !== undefined && terminalEvent !== undefined) {
+      yield* reconcileChildWaitWith({ hub, parent: currentParent, child, event: terminalEvent, append: appendEvent })
+      currentParent = yield* loadRun(parent.runId)
+    }
     if (currentParent?.status === "queued") {
       const unsettled = yield* sql<{ child_run_id: string }>`
         SELECT l.child_run_id FROM baton_run_links l
@@ -405,6 +412,8 @@ export const insertRun = (input: {
   readonly executableRef: ExecutableRef
   readonly executableManifest: ExecutableManifest
   readonly rootRunId: string
+  readonly depth: number
+  readonly treePolicy: import("../../tree-policy.js").TreePolicy
   readonly parentRunId?: string
   readonly invocationId?: string
   readonly acceptedSequence: number
@@ -415,14 +424,14 @@ export const insertRun = (input: {
     yield* sql`
       INSERT INTO baton_runs (
         run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-        executable_ref_json, executable_manifest_json, root_run_id, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
+        executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
         last_sequence, cancellation_requested, cancel_reason, terminal_event_id, accepted_sequence,
         responded_wait_ids_json, owner_worker_id, lease_expires_at, created_at, updated_at
       ) VALUES (
         ${input.runId}, ${input.status}, ${input.message.to}, ${input.message.sessionId}, ${input.message.id},
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
-        ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
+        ${input.rootRunId}, ${input.depth}, ${input.treePolicy.maxDepth}, ${input.treePolicy.maxSubagents}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
         NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, FALSE, NULL, NULL, ${input.acceptedSequence},
         ${encodeJson(StringArray, [])}, NULL, NULL, NOW(), NOW()
       )

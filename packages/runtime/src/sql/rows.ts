@@ -1,6 +1,7 @@
 import type { ExecutableManifest, ExecutableRef } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import type { RunStatus } from "../run.js"
+import type { TreePolicy } from "../tree-policy.js"
 import type { OperationKind, OperationStatus, ReplayPolicy } from "./operations.js"
 
 export interface RunRow {
@@ -15,6 +16,9 @@ export interface RunRow {
   readonly executable_ref_json: string
   readonly executable_manifest_json: string
   readonly root_run_id: string
+  readonly depth: number
+  readonly max_depth: number
+  readonly max_subagents: number
   readonly parent_run_id: string | null
   readonly invocation_id: string | null
   readonly active_wait_id: string | null
@@ -87,6 +91,8 @@ export interface DecodedRun {
   readonly executableRef: ExecutableRef
   readonly executableManifest: ExecutableManifest
   readonly rootRunId: string
+  readonly depth: number
+  readonly treePolicy: TreePolicy
   readonly parentRunId?: string
   readonly invocationId?: string
   readonly activeWaitId?: string

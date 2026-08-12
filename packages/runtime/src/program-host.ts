@@ -278,6 +278,7 @@ export const make = (input: {
               prompt: member.prompt,
               sessionId: fanOutMemberSessionId({ fanOutId, key: member.member }),
               metadata: { programOperation: request.operation, programMember: member.member },
+              origin: { operationKey: request.operation },
             })),
             concurrency,
             join: { _tag: "AllSuccess" },

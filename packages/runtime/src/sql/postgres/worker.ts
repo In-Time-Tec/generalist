@@ -47,7 +47,7 @@ export const makeWorker = (
         Effect.andThen(store.inspect(runId)),
         Effect.flatMap((run) =>
           run.status === "cancelling"
-            ? host.interrupt(runId)
+            ? host.interrupt(runId).pipe(Effect.andThen(watchCancellation(runId)))
             : isTerminal(run.status)
               ? Effect.void
               : watchCancellation(runId),

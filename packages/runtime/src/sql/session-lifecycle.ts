@@ -36,7 +36,7 @@ export const sessionRuns = (sessionId: string) =>
       SELECT r.run_id FROM baton_runs r
       JOIN baton_runs root ON root.run_id = r.root_run_id
       WHERE root.root_run_id = root.run_id AND root.session_id = ${sessionId}
-      ORDER BY root.created_at, root.run_id, r.created_at, r.run_id
+      ORDER BY root.created_at, root.run_id, r.depth, r.created_at, r.run_id
     `
     return runs.map((row) => row.run_id)
   })

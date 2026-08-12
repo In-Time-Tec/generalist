@@ -1,7 +1,7 @@
 import type { AgentCard, Message, SendMessageRequest, StreamResponse } from "@a2a-js/sdk"
 import { Role, TaskState } from "@a2a-js/sdk"
 import { ServerCallContext } from "@a2a-js/sdk/server"
-import { Address, ExecutableManifest, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
+import { Address, ExecutableManifest, TreePolicy, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
@@ -35,6 +35,7 @@ const base = (runId: string, sequence: number) => ({
   sequence,
   executableRef: agent,
   rootRunId: runId,
+  depth: 0,
   correlationId: `context:${runId}`,
   occurredAt: `2026-08-03T00:00:0${sequence}.000Z`,
 })
@@ -92,6 +93,8 @@ const makeRuntime = (acceptedSequence = 0) => {
     status: run.status,
     executableRef: agent,
     executableManifest: executable.manifest,
+    depth: 0,
+    treePolicy: TreePolicy.defaultTreePolicy,
     ...(run.wait === undefined ? {} : { wait: run.wait }),
     lastSequence: run.events.at(-1)?.sequence ?? -1,
     durability: "ephemeral",

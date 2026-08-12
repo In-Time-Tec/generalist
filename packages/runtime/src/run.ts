@@ -14,6 +14,7 @@ import {
 } from "./errors.js"
 import { ExecutionResult as ExecutionResultSchema } from "./execution-state.js"
 import type { ExecutionResult as ExecutionResultType } from "./execution-state.js"
+import { TreePolicy } from "./tree-policy.js"
 
 export const ExecutionResult = ExecutionResultSchema
 export type ExecutionResult = ExecutionResultType
@@ -57,6 +58,8 @@ export interface RunInspection {
   readonly executableRef: ExecutableRef
   readonly executableManifest: ExecutableManifest
   readonly parentRunId?: RunId
+  readonly depth: number
+  readonly treePolicy: TreePolicy
   readonly wait?: RunWait
   readonly lastSequence: number
   readonly durability: "ephemeral" | "durable"
@@ -87,6 +90,8 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
   executableRef: ExecutableRef,
   executableManifest: ExecutableManifest,
   parentRunId: Schema.optionalKey(RunId),
+  depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  treePolicy: TreePolicy,
   wait: Schema.optionalKey(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   durability: Schema.Literals(["ephemeral", "durable"]),
@@ -293,6 +298,8 @@ export interface Run {
   readonly sessionId: string
   readonly rootRunId: RunId
   readonly parentRunId?: RunId
+  readonly depth: number
+  readonly treePolicy: TreePolicy
   readonly wait?: RunWait
   readonly lastSequence: number
   readonly attempt: number
@@ -315,6 +322,8 @@ export const Run: Schema.Codec<Run, RunEncoded> = Schema.Struct({
   sessionId: Schema.String,
   rootRunId: RunId,
   parentRunId: Schema.optionalKey(RunId),
+  depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  treePolicy: TreePolicy,
   wait: Schema.optionalKey(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),

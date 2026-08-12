@@ -65,6 +65,7 @@ const failedEvent = (error: RunFailureType) => ({
   runId: "run:codec",
   sequence: 0,
   executableRef: assistantRef.ref,
+  depth: 0,
   rootRunId: "run:codec",
   occurredAt: "2026-08-05T00:00:00.000Z",
   error,
@@ -88,6 +89,7 @@ it("round-trips exact identity-bearing steering lifecycle facts", () => {
     runId: "run:steering-codec",
     executableRef: assistantRef.ref,
     rootRunId: "run:steering-codec",
+    depth: 0,
     occurredAt: "2026-08-05T00:00:00.000Z",
   }
   const events: ReadonlyArray<RunEvent.RunEvent> = [

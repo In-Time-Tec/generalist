@@ -1,5 +1,6 @@
-import { Context, Effect, Schema, SchemaIssue } from "effect"
-import { ToolContext, ToolExecutor } from "@batonfx/core"
+import { Context, Effect, Layer, Option, Schema, SchemaIssue } from "effect"
+import { Tool } from "effect/unstable/ai"
+import { Agent, ToolContext, ToolExecutor } from "@batonfx/core"
 import type { Interface as RunStoreInterface } from "./run-store.js"
 import { make as makeAddress } from "./address.js"
 import { make as makeMessage } from "./message.js"
@@ -8,14 +9,17 @@ import { childRunIdFor, fanOutIdFor } from "./fan-out.js"
 import { fanOutMemberSessionId } from "./child-session.js"
 import {
   AwaitGroupParameters,
+  Failure,
   GroupReceipt,
   Parameters,
   StartGroupParameters,
   awaitGroupToolName,
   resultFromInspection,
+  runGroupToolName,
   startGroupToolName,
   toolName,
 } from "./child-group.js"
+import { ChildDepthExceeded, ChildLimitExceeded } from "./errors.js"
 
 export * from "./child-group.js"
 
@@ -23,12 +27,14 @@ export * from "./child-group.js"
 export type Input = typeof Parameters.Type & {
   readonly parentRunId: string
   readonly toolCallId: string
+  readonly operationKey?: string
 }
 
 /** @experimental Input for one non-blocking bounded child-group admission. */
 export type StartGroupInput = StartGroupParameters & {
   readonly parentRunId: string
   readonly toolCallId: string
+  readonly operationKey?: string
 }
 
 /** @experimental Input for one durable child-group join. */
@@ -40,6 +46,7 @@ export type AwaitGroupInput = AwaitGroupParameters & {
 /** @experimental Runtime-owned child execution operations used by the model-facing routes. */
 export interface Interface {
   readonly invoke: (input: Input) => Effect.Effect<ToolExecutor.Outcome>
+  readonly runGroup: (input: StartGroupInput) => Effect.Effect<ToolExecutor.Outcome>
   readonly startGroup: (input: StartGroupInput) => Effect.Effect<ToolExecutor.Outcome>
   readonly awaitGroup: (input: AwaitGroupInput) => Effect.Effect<ToolExecutor.Outcome>
 }
@@ -50,10 +57,14 @@ export class ChildRuns extends Context.Service<ChildRuns, Interface>()("@batonfx
 const success = (result: unknown): ToolExecutor.Outcome => ({ _tag: "Success", result, encodedResult: result })
 
 const domainFailure = (error: unknown): ToolExecutor.Outcome => {
-  const failure = {
-    message: typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error),
-  }
-  return { _tag: "DomainFailure", failure, encodedFailure: failure }
+  const failure =
+    Schema.is(ChildDepthExceeded)(error) || Schema.is(ChildLimitExceeded)(error)
+      ? error
+      : {
+          message:
+            typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error),
+        }
+  return { _tag: "DomainFailure", failure, encodedFailure: Schema.encodeSync(Failure)(failure) }
 }
 
 const schemaIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1()
@@ -86,6 +97,11 @@ export const make = (store: RunStoreInterface): Interface => {
         parentRunId: input.parentRunId,
         invocationId: input.toolCallId,
         selection: input.selection,
+        ...(input.label === undefined ? {} : { label: input.label }),
+        origin: {
+          parentToolCallId: input.toolCallId,
+          ...(input.operationKey === undefined ? {} : { operationKey: input.operationKey }),
+        },
         prompt: input.prompt,
         message: makeMessage({
           id: `spawn:${idempotencyKey}`,
@@ -98,6 +114,7 @@ export const make = (store: RunStoreInterface): Interface => {
             runtimeChildTool: true,
             parentRunId: input.parentRunId,
             parentToolCallId: input.toolCallId,
+            ...(input.label === undefined ? {} : { childLabel: input.label }),
           },
         }),
       })
@@ -108,16 +125,23 @@ export const make = (store: RunStoreInterface): Interface => {
             ? {
                 _tag: "Succeeded" as const,
                 childRunId: receipt.runId,
+                ...(input.label === undefined ? {} : { label: input.label }),
                 text: snapshot.outcome.result.text,
                 turns: snapshot.outcome.result.turns,
               }
-            : { _tag: "Failed" as const, childRunId: receipt.runId, message: "non-Agent child executable" }
+            : {
+                _tag: "Failed" as const,
+                childRunId: receipt.runId,
+                ...(input.label === undefined ? {} : { label: input.label }),
+                message: "non-Agent child executable",
+              }
         return success(result)
       }
       if (snapshot.outcome?._tag === "Failed") {
         return success({
           _tag: "Failed" as const,
           childRunId: receipt.runId,
+          ...(input.label === undefined ? {} : { label: input.label }),
           message: snapshot.outcome.error.message,
         })
       }
@@ -125,13 +149,14 @@ export const make = (store: RunStoreInterface): Interface => {
         return success({
           _tag: "Cancelled" as const,
           childRunId: receipt.runId,
+          ...(input.label === undefined ? {} : { label: input.label }),
           ...(snapshot.outcome.reason === undefined ? {} : { reason: snapshot.outcome.reason }),
         })
       }
       return { _tag: "Suspend" as const, token: receipt.runId }
     }).pipe(Effect.catch((error) => Effect.succeed(domainFailure(error))))
 
-  const startGroup: Interface["startGroup"] = (input) =>
+  const admitGroup = (input: StartGroupInput) =>
     Effect.gen(function* () {
       const idempotencyKey = `child-group:${input.parentRunId}:${input.toolCallId}`
       const groupId = fanOutIdFor(input.parentRunId, idempotencyKey)
@@ -145,6 +170,7 @@ export const make = (store: RunStoreInterface): Interface => {
         members: input.members.map((member, ordinal) => ({
           ordinal,
           key: member.key,
+          ...(member.label === undefined ? {} : { label: member.label }),
           childRunId: childRunIdFor(groupId, ordinal),
           selection: member.selection,
           prompt: normalizePrompt(member.prompt),
@@ -155,18 +181,43 @@ export const make = (store: RunStoreInterface): Interface => {
             parentToolCallId: input.toolCallId,
             childGroupId: groupId,
             childGroupKey: member.key,
+            ...(member.label === undefined ? {} : { childGroupLabel: member.label }),
+          },
+          origin: {
+            parentToolCallId: input.toolCallId,
+            ...(input.operationKey === undefined ? {} : { operationKey: input.operationKey }),
           },
         })),
       })
+      const inspection = yield* store.inspectFanOut(receipt.fanOutId)
       const result: GroupReceipt = {
         groupId: receipt.fanOutId,
-        children: input.members.map((member, ordinal) => ({
+        children: inspection.members.map((member) => ({
           key: member.key,
-          childRunId: receipt.childRunIds[ordinal]!,
+          selection: member.selection,
+          ...(member.label === undefined ? {} : { label: member.label }),
+          childRunId: member.childRunId,
+          depth: member.depth,
         })),
       }
-      return success(result)
-    }).pipe(Effect.catch((error) => Effect.succeed(domainFailure(error))))
+      return { receipt: result, inspection }
+    })
+
+  const startGroup: Interface["startGroup"] = (input) =>
+    admitGroup(input).pipe(
+      Effect.map(({ receipt }) => success(receipt)),
+      Effect.catch((error) => Effect.succeed(domainFailure(error))),
+    )
+
+  const runGroup: Interface["runGroup"] = (input) =>
+    admitGroup(input).pipe(
+      Effect.map(({ receipt, inspection }) =>
+        inspection.status === "running"
+          ? ({ _tag: "Suspend", token: receipt.groupId } as const)
+          : success(resultFromInspection(inspection)),
+      ),
+      Effect.catch((error) => Effect.succeed(domainFailure(error))),
+    )
 
   const awaitGroup: Interface["awaitGroup"] = (input) =>
     store.inspectFanOut(input.groupId).pipe(
@@ -183,8 +234,33 @@ export const make = (store: RunStoreInterface): Interface => {
       Effect.catch((error) => Effect.succeed(domainFailure(error))),
     )
 
-  return ChildRuns.of({ invoke, startGroup, awaitGroup })
+  return ChildRuns.of({ invoke, runGroup, startGroup, awaitGroup })
 }
+
+/** @experimental Route Runtime-owned child tools and preserve every resolved upstream handler. */
+export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
+  readonly agent: Agent.Agent<Tools, R>
+  readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
+  readonly implementation: Interface
+  readonly upstream: Option.Option<ToolExecutor.Interface>
+}): ToolExecutor.Interface =>
+  ToolExecutor.ToolExecutor.of({
+    execute: (request) =>
+      route.matches(request)
+        ? route.execute(request).pipe(Effect.provideService(ChildRuns, options.implementation))
+        : Option.isSome(options.upstream)
+          ? options.upstream.value.execute(request)
+          : Effect.flatMap(Effect.context<ToolContext.ToolContext>(), (context) =>
+              Effect.scoped(
+                Effect.flatMap(Layer.build(options.environment), (environment) =>
+                  ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
+                    Effect.provideContext(context),
+                    Effect.provideContext(environment),
+                  ),
+                ),
+              ),
+            ),
+  })
 
 const runtimeContext = Effect.gen(function* () {
   const context = yield* ToolContext.ToolContext
@@ -201,7 +277,7 @@ const runtimeContext = Effect.gen(function* () {
 
 /** @experimental Route for the blocking and grouped child tools. */
 export const route: ToolExecutor.Route<ChildRuns | ToolContext.ToolContext> = ToolExecutor.route({
-  tools: [toolName, startGroupToolName, awaitGroupToolName],
+  tools: [toolName, runGroupToolName, startGroupToolName, awaitGroupToolName],
   execute: (request) =>
     Effect.gen(function* () {
       const { context, children } = yield* runtimeContext
@@ -215,19 +291,32 @@ export const route: ToolExecutor.Route<ChildRuns | ToolContext.ToolContext> = To
             }),
           ),
         )
-        return yield* children.invoke({ ...input, parentRunId: context.runId!, toolCallId: context.toolCallId! })
+        return yield* children.invoke({
+          ...input,
+          parentRunId: context.runId!,
+          toolCallId: context.toolCallId!,
+          ...(context.operationKey === undefined ? {} : { operationKey: context.operationKey }),
+        })
       }
-      if (request.call.name === startGroupToolName) {
+      if (request.call.name === runGroupToolName || request.call.name === startGroupToolName) {
         const input = yield* Schema.decodeUnknownEffect(StartGroupParameters)(request.call.params).pipe(
           Effect.mapError((error) =>
             ToolExecutor.FrameworkFailure.make({
               stage: "decode-input",
-              tool: startGroupToolName,
+              tool: request.call.name,
               message: schemaIssueMessage(error),
             }),
           ),
         )
-        return yield* children.startGroup({ ...input, parentRunId: context.runId!, toolCallId: context.toolCallId! })
+        const groupInput = {
+          ...input,
+          parentRunId: context.runId!,
+          toolCallId: context.toolCallId!,
+          ...(context.operationKey === undefined ? {} : { operationKey: context.operationKey }),
+        }
+        return yield* request.call.name === runGroupToolName
+          ? children.runGroup(groupInput)
+          : children.startGroup(groupInput)
       }
       const input = yield* Schema.decodeUnknownEffect(AwaitGroupParameters)(request.call.params).pipe(
         Effect.mapError(() =>
