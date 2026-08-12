@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.22.0
+
+- Add root-pinned bounded recursive subagents with derived depth, per-parent lifetime direct-child quotas, atomic exact group admission, and typed policy failures across memory, SQLite, PostgreSQL, and MySQL.
+- Expose replay-safe blocking `run_child` and `run_child_group` hosted tools with durable same-parent resume, complete ordered all-settled results, recursive cancellation, and independent child key, selection, display label, prompt, origin, Run identity, and depth metadata.
+
 ## 0.21.6
 
 - Keep the claim-wide model preview sink open across tool continuations so every model call in one execution can publish live frames; provider terminal parts still flush attempt state and final execution cleanup still clears the memory-only lane.
