@@ -8,6 +8,7 @@ import type { ExecutionResult } from "../execution-state.js"
 import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run-event.js"
 import type { MemoryState, StoredRun, SubscriberQueue } from "./state.js"
 import { projectTreeEvent } from "../tree-event.js"
+import { appendTerminalToolResults } from "./session-store.js"
 
 const occurredAt = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -86,7 +87,19 @@ export const appendEvent: {
         }))
         return yield* appendEvent(discarded, runId, build, nextStatus)
       }
-      const root = state.treeRoots.get(run.rootRunId)
+      const terminalState =
+        event._tag === "RunCancelled"
+          ? yield* appendTerminalToolResults({
+              state,
+              runId,
+              terminal: { _tag: "RunCancelled", ...(event.reason === undefined ? {} : { reason: event.reason }) },
+            })
+          : event._tag === "RunFailed"
+            ? yield* appendTerminalToolResults({ state, runId, terminal: { _tag: "RunFailed", error: event.error } })
+            : event._tag === "RunCompleted"
+              ? yield* appendTerminalToolResults({ state, runId, terminal: { _tag: "RunCompleted" } })
+              : state
+      const root = terminalState.treeRoots.get(run.rootRunId)
       if (root === undefined) {
         return yield* RuntimeUnavailable.make({ message: `tree root ${run.rootRunId} missing during append` })
       }
@@ -133,14 +146,14 @@ export const appendEvent: {
             ? {}
             : { terminalEventId: run.terminalEventId }),
       }
-      const runs = new Map(state.runs)
+      const runs = new Map(terminalState.runs)
       if (event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed") {
         const { continuation: _, pendingOutcome: __, ...withoutTerminalState } = updated
         runs.set(runId, withoutTerminalState)
       } else {
         runs.set(runId, updated)
       }
-      const treeRoots = new Map(state.treeRoots)
+      const treeRoots = new Map(terminalState.treeRoots)
       treeRoots.set(run.rootRunId, {
         ...root,
         lastPosition: position,
@@ -149,11 +162,11 @@ export const appendEvent: {
       return [
         event,
         {
-          ...state,
+          ...terminalState,
           runs,
           treeRoots,
           publications: [
-            ...state.publications,
+            ...terminalState.publications,
             {
               runId,
               event,

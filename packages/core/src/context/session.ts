@@ -388,7 +388,13 @@ const setLeafState = (state: State, id: EntryId | null): readonly [Result<void>,
   return [success(undefined), { ...state, leaf: id }]
 }
 
-export { buildContext, buildMemoryContext } from "./session-projection.js"
+export {
+  ContextInvalid,
+  buildContext,
+  buildMemoryContext,
+  unresolvedToolCalls,
+  validateContext,
+} from "./session-projection.js"
 
 /** @experimental Ref-backed non-durable session store. */
 export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(
