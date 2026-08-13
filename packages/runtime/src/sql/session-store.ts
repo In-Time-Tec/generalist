@@ -66,6 +66,42 @@ const toEntry = (row: EntryRow): Entry =>
     parentId: row.parent_id,
   }) as Entry
 
+const pathFromRows = (
+  rows: ReadonlyArray<EntryRow>,
+  leaf: string | null,
+): ReadonlyArray<Session.Entry> | Session.SessionStoreError => {
+  if (leaf === null) return []
+  const byId = new Map(rows.map((row) => [row.entry_id, row] as const))
+  const walked: Array<Session.Entry> = []
+  let cursor: string | null = leaf
+  while (cursor !== null) {
+    if (walked.length > rows.length) return storeError(`Session path for leaf ${leaf} contains a cycle`)
+    const row = byId.get(cursor)
+    if (row === undefined) return storeError(`Session entry ${cursor} does not exist`)
+    walked.push(toEntry(row))
+    cursor = row.parent_id
+  }
+  return walked.toReversed()
+}
+
+const requireActive = (
+  rows: ReadonlyArray<EntryRow>,
+  leaf: string | null,
+  entryId: string,
+  reason: "stale-leaf" | "checkpoint-not-on-active-path" = "stale-leaf",
+): Session.SessionConflict | undefined => {
+  const path = pathFromRows(rows, leaf)
+  if (Schema.is(Session.SessionStoreError)(path)) {
+    return Session.SessionConflict.make({ reason, message: path.message })
+  }
+  return path.some((entry) => entry.id === entryId)
+    ? undefined
+    : Session.SessionConflict.make({
+        reason,
+        message: `Session entry id ${entryId} is not on the active path from ${String(leaf)}`,
+      })
+}
+
 const fromEntry = (entry: { readonly _tag: string } & Record<string, unknown>): string => {
   const { id: _id, parentId: _parentId, ...payload } = entry as Record<string, unknown>
   return encodePayload(payload as Session.EntryPayload)
@@ -77,7 +113,9 @@ export const SessionStorage: {
   readonly storeError: (message: string) => Session.SessionStoreError
   readonly encodePayload: (payload: Session.EntryPayload) => string
   readonly toEntry: (row: EntryRow) => Entry
-} = { entryPayloadEquivalence, storeError, encodePayload, toEntry }
+  readonly pathFromRows: typeof pathFromRows
+  readonly requireActive: typeof requireActive
+} = { entryPayloadEquivalence, storeError, encodePayload, toEntry, pathFromRows, requireActive }
 
 /** Append or verify one stable interrupted assistant projection inside the caller's SQL transaction. */
 export const appendInterruptedSessionEntry = (

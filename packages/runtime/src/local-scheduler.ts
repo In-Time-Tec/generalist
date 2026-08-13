@@ -94,7 +94,6 @@ export const make = (
         })
         const lastQueued = queued[queued.length - 1]
         yield* Ref.set(queuedCursor, queued.length === selectionWindow ? lastQueued?.runId : undefined)
-        const info = yield* store.info
         // Re-admitting a Run this process is already executing would fence out and interrupt that execution.
         const executing = yield* active.active
         const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([runId]) => runId)))
@@ -107,10 +106,7 @@ export const make = (
                   .loadExecution(run.runId)
                   .pipe(
                     Effect.map(
-                      (execution) =>
-                        info.backend === "sqlite" ||
-                        execution.ownerId === undefined ||
-                        execution.ownerId === options.workerId,
+                      (execution) => execution.ownerId === undefined || execution.ownerId === options.workerId,
                     ),
                   ),
         )

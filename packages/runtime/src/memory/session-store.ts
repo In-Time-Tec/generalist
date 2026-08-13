@@ -1,8 +1,10 @@
 import { Effect, Schema, SynchronizedRef } from "effect"
 import { Session } from "@batonfx/core"
 import type { InterruptedSessionEntry } from "../agent-event.js"
+import { RuntimeUnavailable } from "../errors.js"
 import type { CompletedSessionEntry } from "../model-response-commit.js"
 import { handoffPayload, type HandoffSessionEntry } from "../handoff-session.js"
+import { terminalToolMessage, type RunTerminalOutcome } from "../session-tool-results.js"
 import type { MemorySession, MemoryState } from "./state.js"
 
 type Entry = Session.Entry
@@ -233,6 +235,57 @@ export const appendInterruptedSessionEntry = (input: {
       nextSession = result[1]
     }
     return { ...state, sessions: new Map(state.sessions).set(interrupted.sessionId, nextSession) }
+  })
+
+export const appendTerminalToolResults = (input: {
+  readonly state: MemoryState
+  readonly runId: string
+  readonly terminal: RunTerminalOutcome
+}): Effect.Effect<MemoryState, RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const run = input.state.runs.get(input.runId)
+    if (run === undefined) return input.state
+    const session = input.state.sessions.get(run.message.sessionId)
+    if (session === undefined) return input.state
+    const id = `${input.runId}:terminal-tool-results`
+    const existing = session.entries.get(id)
+    const parentId = existing === undefined ? session.leaf : existing.parentId
+    const path = parentId === null ? [] : pathTo(session, parentId)
+    if (Schema.is(Session.SessionStoreError)(path)) {
+      return yield* RuntimeUnavailable.make({ message: path.message })
+    }
+    const operations = new Map(
+      [...input.state.operations.values()]
+        .filter((operation) => operation.runId === input.runId)
+        .map((operation) => [operation.operationId, operation] as const),
+    )
+    const message = yield* terminalToolMessage({
+      runId: input.runId,
+      path,
+      events: run.events,
+      operations: [...operations.values()],
+      terminal: input.terminal,
+    })
+    if (message === undefined) return input.state
+    const payload = {
+      _tag: "Message" as const,
+      message,
+      metadata: { terminalRunId: input.runId, terminalTag: input.terminal._tag },
+    }
+    if (existing !== undefined) {
+      if (!samePayload(existing, payload) || !onActivePath(session, existing.id)) {
+        return yield* RuntimeUnavailable.make({ message: `Terminal Session entry ${id} conflicts with its retry` })
+      }
+      return input.state
+    }
+    const result = append(session, payload, { id, expectedLeafId: session.leaf })
+    if (!isAppendSuccess(result)) {
+      return yield* RuntimeUnavailable.make({ message: result.message })
+    }
+    return {
+      ...input.state,
+      sessions: new Map(input.state.sessions).set(run.message.sessionId, result[1]),
+    }
   })
 
 const updateSession = <A, E>(

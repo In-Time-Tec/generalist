@@ -9,7 +9,6 @@ import { isTerminal, type RunStatus } from "../run.js"
 import {
   StringArray,
   decodeJson,
-  decodeJsonValue,
   decodePinnedExecutable,
   decodeEvent,
   decodeMessage,
@@ -22,10 +21,8 @@ import {
   encodeQueue,
 } from "./codecs.js"
 import type { EventHub } from "./subscribers.js"
-import type { DecodedRun, EventRow, OperationRow, RunRow, WaitRow } from "./rows.js"
+import type { DecodedRun, EventRow, RunRow, WaitRow } from "./rows.js"
 import { decodeReason, WaitResolution, type RunWait } from "../run-wait.js"
-import { OperationResolution } from "../operation-resolution.js"
-import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
 import { reconcileFanOut } from "./store-fan-out.js"
 import { hasUnsettledChild, loadTerminalEvent, reconcileChildWaitWith } from "./store-child-settlement.js"
@@ -33,6 +30,7 @@ import { RuntimeUnavailable } from "../errors.js"
 import { PendingRunOutcome } from "../run-store.js"
 import { admitChildSettlementFromEventId } from "./settlement-notifications.js"
 import { discardPendingSteering } from "./store-steering-disposition.js"
+import { appendTerminalToolResultsForEvent } from "./session-terminalization.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -199,7 +197,7 @@ export const loadRunWait: {
 }
 export type EventPartial = { readonly _tag: string } & Record<string, unknown>
 type EventRows = ReadonlyArray<EventRow>
-type EventEffect = Effect.Effect<RunEvent, SqlError, SqlClient.SqlClient>
+type EventEffect = Effect.Effect<RunEvent, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
 type TerminalEffect = Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
 export const appendEvent: {
   (run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus): (hub: EventHub) => EventEffect
@@ -224,6 +222,7 @@ export const appendEvent: {
         yield* appendEvent(hub, run, discarded)
         return yield* appendEvent(hub, (yield* loadRun(run.runId))!, partial, nextStatus)
       }
+      yield* appendTerminalToolResultsForEvent({ run, event: partial })
       const sequence = run.lastSequence + 1
       const occurredAt = yield* nowIso
       const event = {
@@ -483,18 +482,4 @@ export const insertRun = (input: {
     }
   })
 
-export const toOperationRecord = (row: OperationRow): OperationRecord => ({
-  runId: row.run_id,
-  operationId: row.operation_id,
-  operationKey: row.operation_key,
-  kind: row.kind,
-  status: row.status,
-  inputDigest: row.input_digest,
-  input: decodeJsonValue(row.input_json),
-  replayPolicy: row.replay_policy,
-  attempt: Number(row.attempt),
-  ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
-  ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
-  ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-  ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
-})
+export { toOperationRecord } from "./operations.js"

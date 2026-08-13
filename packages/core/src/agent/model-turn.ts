@@ -29,6 +29,7 @@ import { committedEvent } from "./model-turn-commit.js"
 import { text as modelResponseText } from "../model/model-response-builder.js"
 import { clearCommittedResponse, makeAttemptResponse } from "./model-turn-response.js"
 import { makeActiveTurn } from "./model-turn-active.js"
+import { validateContext } from "../context/session.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
@@ -282,6 +283,11 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                     const history = yield* Ref.get(chat.history)
                     preparedState = { history, preparedPrompt }
                     const responsePrompt = Prompt.concat(history, preparedPrompt)
+                    yield* validateContext(responsePrompt).pipe(
+                      Effect.mapError((cause) =>
+                        AgentError.make({ message: "Invalid framework tool history", turn, cause }),
+                      ),
+                    )
                     const sessionPath = yield* syncSession(turn, responsePrompt)
                     const sessionParentId = sessionPath.at(-1)?.id ?? null
                     if (Option.isSome(compactionService)) {

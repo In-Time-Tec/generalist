@@ -8,8 +8,6 @@ import type { Message } from "../../message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
 import {
   StringArray,
-  decodeJson,
-  decodeJsonValue,
   decodeMessage,
   decodeQueue,
   encodeExecutableManifest,
@@ -21,8 +19,7 @@ import {
 } from "../codecs.js"
 import type { EventHub } from "../subscribers.js"
 import { reconcileFanOutWith } from "../store-fan-out.js"
-import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
-import type { OperationRecord } from "../operations.js"
+import type { DecodedRun, EventRow, RunRow } from "../rows.js"
 import { decodePersistedEvents, decodeRunEffect, nowIso } from "../store-helpers.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import type { EmittableAgentLoopEvent } from "../../agent-event.js"
@@ -30,15 +27,15 @@ import { PendingRunOutcome, type ExecutionClaim } from "../../run-store.js"
 import type { ExecutionResult } from "../../execution-state.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
-import { OperationResolution } from "../../operation-resolution.js"
 import { admitChildSettlementFromEventId } from "../settlement-notifications.js"
 import { discardPendingSteering } from "../store-steering-disposition.js"
-import { loadTerminalEvent, reconcileChildWaitWith } from "../store-child-settlement.js"
+import { hasUnsettledChild, loadTerminalEvent, reconcileChildWaitWith } from "../store-child-settlement.js"
+import { appendTerminalToolResultsForEvent } from "../session-terminalization.js"
 
 type StoreError = RuntimeUnavailable | SqlError
 type StoreEffect<A> = Effect.Effect<A, StoreError, SqlClient.SqlClient>
 type SqlOnlyEffect<A> = Effect.Effect<A, SqlError, SqlClient.SqlClient>
-type RunEventEffect = Effect.Effect<RunEvent, SqlError, SqlClient.SqlClient>
+type RunEventEffect = Effect.Effect<RunEvent, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
 type LaneEffect = Effect.Effect<{ acceptedSequence: number; isHead: boolean }, SqlError, SqlClient.SqlClient>
 type AgentEventError = RunNotFound | RunTerminal | StoreError | StaleClaim
 type AgentEventEffect = Effect.Effect<undefined, AgentEventError, SqlClient.SqlClient>
@@ -128,6 +125,7 @@ export const appendEvent: {
         yield* appendEvent(_hub, run, discarded)
         return yield* appendEvent(_hub, (yield* loadRun(run.runId))!, partial, nextStatus)
       }
+      yield* appendTerminalToolResultsForEvent({ run, event: partial })
       const sequence = yield* allocateSequence(run.runId)
       const occurredAt = yield* nowIso
       const event = {
@@ -273,19 +271,6 @@ export const afterTerminal: {
     yield* promoteHead(hub, run.address, run.sessionId)
   }),
 )
-
-export const hasUnsettledChild = (runId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<{ child_run_id: string }>`
-      SELECT l.child_run_id FROM baton_run_links l
-      JOIN baton_runs r ON r.run_id = l.child_run_id
-      WHERE l.parent_run_id = ${runId}
-        AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
-      LIMIT 1
-    `
-    return rows.length > 0
-  })
 
 export const completeRun: {
   (run: DecodedRun, result: ExecutionResult): (hub: EventHub) => CompleteRunEffect
@@ -477,20 +462,6 @@ export const enqueueLane: {
   }),
 )
 
-export const toOperationRecord = (row: OperationRow): OperationRecord => ({
-  runId: row.run_id,
-  operationId: row.operation_id,
-  operationKey: row.operation_key,
-  kind: row.kind,
-  status: row.status,
-  inputDigest: row.input_digest,
-  input: decodeJsonValue(row.input_json),
-  replayPolicy: row.replay_policy,
-  attempt: Number(row.attempt),
-  ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
-  ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
-  ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-  ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
-})
+export { toOperationRecord } from "../operations.js"
 
 export { decodeMessage, encodeQueue, decodeQueue }
