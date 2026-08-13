@@ -124,6 +124,46 @@ for (const backend of ["memory", "sqlite"] as const) {
 
   {
     const options = {
+      resolver: makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+      addresses: [
+        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+      ],
+      scheduler: { pollInterval: "1 day" as const },
+    }
+    const runtimeLayer =
+      backend === "memory"
+        ? Runtime.layerMemory(options)
+        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-external-claim") })
+
+    layer(runtimeLayer)(`${backend} local scheduler preserves an external execution claim`, (it) => {
+      it.effect("does not fence an external execution claim", () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const scheduler = yield* LocalScheduler.LocalScheduler
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: `scheduler-external-claim:${backend}`,
+            idempotencyKey: "run",
+            prompt: "run",
+          })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "external" })
+
+          yield* scheduler.tick
+
+          expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
+            ownerId: claim.ownerId,
+            attemptFence: claim.attemptFence,
+          })
+          yield* store.complete({ ...claim, result: completedResult("done") })
+          expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "succeeded" })
+        }),
+      )
+    })
+  }
+
+  {
+    const options = {
       resolver: makeStatic([
         { executable: assistantRef, agent: closedTestAgent(assistant) },
         { executable: researcherRef, agent: closedTestAgent(researcher) },
