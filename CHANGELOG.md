@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep cancelled child settlements durably observable while excluding cancellation from parent model delivery and later-Run forwarding; successful and failed settlement delivery is unchanged.
+
 ## 0.25.0
 
 - Guarantee that every durable framework tool call reaches exactly one terminal Session outcome before its context can be reused, including truthful completed, unknown, failed, and cancelled results across memory, SQLite, PostgreSQL, and MySQL.

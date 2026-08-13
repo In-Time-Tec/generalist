@@ -46,7 +46,9 @@ Approval suspensions are typed waits containing a stable approval ID and the exa
 
 ## Child settlement notifications
 
-Every child terminal transition atomically writes one deduplicated record to the parent's existing `baton_messages` inbox. The stable notification ID is `child-settled:<childRunId>`. Notifications contain the exact parent and child Run IDs, terminal event ID, `succeeded`, `failed`, or `cancelled` status, and result text. Result text is limited to 16 KiB; an oversized value is replaced by a marker that names `Runtime.snapshot(childRunId)` as the full-result recovery path.
+Every child terminal transition atomically writes one deduplicated observation record to the parent's existing `baton_messages` settlement channel. The stable notification ID is `child-settled:<childRunId>`. Notifications contain the exact parent and child Run IDs, terminal event ID, `succeeded`, `failed`, or `cancelled` status, and result text. Result text is limited to 16 KiB; an oversized value is replaced by a marker that directs the host child-settlement result-handoff adapter to recover the full result.
+
+Observation and model delivery are separate contracts. Successful and failed observations retain the existing model-facing settlement message. A cancelled observation is never projected into user or steering content and is never carried into a later Run: cancellation records user intent, not child output. The durable notification, change stream, await result, and parent `ChildSettled` lifecycle projection remain available for every cancelled child.
 
 The next consumer should use only these exported Runtime operations:
 
