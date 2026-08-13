@@ -1,6 +1,8 @@
 import { DurableDriver } from "@batonfx/core"
 import { Schema } from "effect"
-import type { OperationResolution } from "../operation-resolution.js"
+import { OperationResolution } from "../operation-resolution.js"
+import { decodeJson, decodeJsonValue } from "./codecs.js"
+import type { OperationRow } from "./rows.js"
 
 export const OperationKind = Schema.Literals([
   "model",
@@ -37,5 +39,21 @@ export interface OperationRecord {
   readonly resolutionIdempotencyKey?: string
   readonly resolution?: OperationResolution
 }
+
+export const toOperationRecord = (row: OperationRow): OperationRecord => ({
+  runId: row.run_id,
+  operationId: row.operation_id,
+  operationKey: row.operation_key,
+  kind: row.kind,
+  status: row.status,
+  inputDigest: row.input_digest,
+  input: decodeJsonValue(row.input_json),
+  replayPolicy: row.replay_policy,
+  attempt: Number(row.attempt),
+  ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
+  ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
+  ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
+  ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
+})
 
 export const canBlindRetry = (policy: ReplayPolicy): boolean => policy === "pure" || policy === "provider-idempotent"

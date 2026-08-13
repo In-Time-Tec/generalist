@@ -592,6 +592,38 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     expect(error.cause).toBeUndefined()
   })
 
+  ItLayer.make(it, "rejects unresolved framework tool history before calling the model", () => {
+    let modelCalls = 0
+    const call = Prompt.makePart("tool-call", {
+      id: "call-unresolved",
+      name: "run_child",
+      params: { prompt: "inspect" },
+      providerExecuted: false,
+    })
+    return [
+      modelLayer(() => {
+        modelCalls += 1
+        return Stream.make(textDelta("unexpected"))
+      }),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "invalid-context-agent" })
+        const failure = yield* Agent.stream(agent, {
+          prompt: "continue",
+          history: Prompt.fromMessages([Prompt.makeMessage("assistant", { content: [call] })]),
+        }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(failure).toMatchObject({
+          _tag: "@batonfx/core/AgentError",
+          cause: {
+            _tag: "@batonfx/core/ContextInvalid",
+            issues: [{ toolCallId: call.id, reason: "unresolved" }],
+          },
+        })
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "rejects duplicate static tool names before the model is called", () => {
     let modelCalls = 0
     const duplicateEcho = Tool.make("echo", {

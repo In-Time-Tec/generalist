@@ -1,6 +1,63 @@
+import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { projectTranscript } from "./memory.js"
 import type { Entry, SkillEntry } from "./session.js"
+
+/** @experimental Model context cannot be admitted while framework tool calls lack outcomes. */
+export class ContextInvalid extends Schema.TaggedErrorClass<ContextInvalid>()("@batonfx/core/ContextInvalid", {
+  issues: Schema.Array(
+    Schema.Struct({
+      toolCallId: Schema.String,
+      reason: Schema.Literals(["unresolved", "duplicate-call", "duplicate-result", "name-mismatch"]),
+    }),
+  ),
+}) {}
+
+interface ToolCallState {
+  readonly call: Prompt.ToolCallPart
+  resultCount: number
+}
+
+const inspectToolContext = (prompt: Prompt.Prompt) => {
+  const calls = new Map<string, ToolCallState>()
+  const issues: Array<ContextInvalid["issues"][number]> = []
+  for (const message of prompt.content) {
+    if (typeof message.content === "string") continue
+    for (const part of message.content) {
+      if (part.type === "tool-call" && part.providerExecuted !== true) {
+        const state = calls.get(part.id)
+        if (state !== undefined && state.resultCount === 0) {
+          issues.push({ toolCallId: part.id, reason: "duplicate-call" })
+        } else {
+          calls.set(part.id, { call: part, resultCount: 0 })
+        }
+      }
+      if (part.type === "tool-result") {
+        const state = calls.get(part.id)
+        if (state === undefined) continue
+        if (state.call.name !== part.name) {
+          issues.push({ toolCallId: part.id, reason: "name-mismatch" })
+          continue
+        }
+        state.resultCount += 1
+        if (state.resultCount > 1) issues.push({ toolCallId: part.id, reason: "duplicate-result" })
+      }
+    }
+  }
+  const unresolved = [...calls.values()].filter((state) => state.resultCount === 0).map((state) => state.call)
+  issues.push(...unresolved.map((call) => ({ toolCallId: call.id, reason: "unresolved" as const })))
+  return { unresolved, issues }
+}
+
+/** @experimental Framework tool calls in model context that do not yet have a corresponding result. */
+export const unresolvedToolCalls = (prompt: Prompt.Prompt): ReadonlyArray<Prompt.ToolCallPart> =>
+  inspectToolContext(prompt).unresolved
+
+/** @experimental Reject model context unless every framework tool call has exactly one matching result. */
+export const validateContext = (prompt: Prompt.Prompt): Effect.Effect<void, ContextInvalid> => {
+  const inspection = inspectToolContext(prompt)
+  return inspection.issues.length === 0 ? Effect.void : Effect.fail(ContextInvalid.make({ issues: inspection.issues }))
+}
 
 const messageFromText = (role: "user" | "system", text: string): Prompt.Message =>
   role === "system"

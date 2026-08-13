@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.25.0
+
+- Guarantee that every durable framework tool call reaches exactly one terminal Session outcome before its context can be reused, including truthful completed, unknown, failed, and cancelled results across memory, SQLite, PostgreSQL, and MySQL.
+- Reject unresolved, duplicate, and mismatched framework tool history before provider invocation, and reject successful Run settlement while a tool call remains unresolved.
+
 ## 0.24.0
 
 - Redefine root-pinned `TreePolicy.maxSubagents` as each parent's active direct-child capacity: exact groups may exceed it, persist excess members as queued, and promote them automatically as ready children settle without changing ordered all-settled results.

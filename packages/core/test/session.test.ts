@@ -326,6 +326,80 @@ describe("Session", () => {
       ] as const,
   )
 
+  it.effect("rejects unresolved tool calls before model context reuse", () =>
+    Effect.gen(function* () {
+      const call = Prompt.makePart("tool-call", {
+        id: "call-child",
+        name: "run_child",
+        params: { prompt: "inspect" },
+        providerExecuted: false,
+      })
+      const prompt = Prompt.fromMessages([Prompt.makeMessage("assistant", { content: [call] })])
+      const invalid = yield* Effect.flip(Session.validateContext(prompt))
+      expect(invalid.issues).toEqual([{ toolCallId: "call-child", reason: "unresolved" }])
+      expect(Session.unresolvedToolCalls(prompt)).toEqual([call])
+    }),
+  )
+
+  it.effect("rejects duplicate and mismatched framework tool outcomes", () =>
+    Effect.gen(function* () {
+      const call = Prompt.makePart("tool-call", {
+        id: "call-child",
+        name: "run_child",
+        params: { prompt: "inspect" },
+        providerExecuted: false,
+      })
+      const mismatched = Prompt.makePart("tool-result", {
+        id: call.id,
+        name: "other_tool",
+        isFailure: false,
+        result: "wrong",
+      })
+      const result = Prompt.makePart("tool-result", {
+        id: call.id,
+        name: call.name,
+        isFailure: false,
+        result: "done",
+      })
+      const prompt = Prompt.fromMessages([
+        Prompt.makeMessage("assistant", { content: [call] }),
+        Prompt.makeMessage("tool", { content: [mismatched, result, result] }),
+      ])
+
+      const invalid = yield* Effect.flip(Session.validateContext(prompt))
+      expect(invalid.issues).toEqual([
+        { toolCallId: call.id, reason: "name-mismatch" },
+        { toolCallId: call.id, reason: "duplicate-result" },
+      ])
+    }),
+  )
+
+  it.effect("allows a completed framework tool call id to be reused in a later exchange", () =>
+    Effect.gen(function* () {
+      const call = Prompt.makePart("tool-call", {
+        id: "reused-call",
+        name: "run_child",
+        params: { prompt: "inspect" },
+        providerExecuted: false,
+      })
+      const result = Prompt.makePart("tool-result", {
+        id: call.id,
+        name: call.name,
+        isFailure: false,
+        result: "done",
+      })
+      const prompt = Prompt.fromMessages([
+        Prompt.makeMessage("assistant", { content: [call] }),
+        Prompt.makeMessage("tool", { content: [result] }),
+        Prompt.makeMessage("assistant", { content: [call] }),
+        Prompt.makeMessage("tool", { content: [result] }),
+      ])
+
+      yield* Session.validateContext(prompt)
+      expect(Session.unresolvedToolCalls(prompt)).toEqual([])
+    }),
+  )
+
   ItLayer.make(
     it,
     "treats the latest handoff or compaction as a self-contained conversation boundary",

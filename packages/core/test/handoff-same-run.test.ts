@@ -256,13 +256,17 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "rejects projection that would leave unresolved tool calls", () => {
+  ItLayer.make(it, "rejects unresolved history before invoking the handoff model", () => {
     const mathTarget = Handoff.target(Agent.make({ name: "math" }) as never, undefined)
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
+    let modelCalls = 0
     return [
       Layer.mergeAll(
         unusedToolHandlerLayer,
-        modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))
+        }),
         ToolExecutor.layerToolkit(supervisorSetup.toolkit),
         supervisorSetup.catalog,
         Approvals.layerAutoApprove,
@@ -288,7 +292,11 @@ layer(Layer.empty)("Handoff same-run", (it) => {
             }),
           ),
         )
-        expect(failure._tag).toBe("@batonfx/core/HandoffRejected")
+        expect(failure).toMatchObject({
+          _tag: "@batonfx/core/AgentError",
+          message: "Invalid framework tool history",
+        })
+        expect(modelCalls).toBe(0)
       }),
     ] as const
   })
