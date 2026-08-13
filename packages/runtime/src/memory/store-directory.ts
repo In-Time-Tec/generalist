@@ -17,16 +17,16 @@ import {
   RunNotFound,
   RuntimeUnavailable,
 } from "../errors.js"
-import { steeringKey, type MailboxEntry } from "../mailbox.js"
+import { deliveryPrompt, promptBytes, steeringKey, type MailboxEntry } from "../mailbox.js"
 import type { AdmitMessageInput } from "../run-store.js"
-import { deliveryPrompt } from "../mailbox.js"
 import { digest as steeringDigest } from "../steering.js"
 import { isTerminal } from "../run.js"
 import { agentNameKey, type MemoryState, type StoredRun } from "./state.js"
 import {
   fromMailboxEntry,
-  mailboxEntry,
+  modelPrompt,
   notificationIdFor,
+  observationEntry,
   payloadFromEvent,
   type Notification,
 } from "../child-settlement.js"
@@ -276,7 +276,7 @@ export const admitChildSettlement: {
       const forSession = [...state.messages.values()].filter(
         (entry) => entry.targetSessionId === input.parent.message.sessionId,
       )
-      const entry = mailboxEntry({
+      const entry = observationEntry({
         payload,
         parentSessionId: input.parent.message.sessionId,
         sequence: forSession.reduce((highest, item) => Math.max(highest, item.sequence + 1), 0),
@@ -400,18 +400,19 @@ export const deliverPendingMessages: {
       runId: run.runId,
       limit: Number.MAX_SAFE_INTEGER,
     })
-    // Child settlements are deliberately excluded from pendingMessages (the messages channel), but
-    // a notification whose addressed parent Run is terminal was never seen by any model, so it is
-    // still owed to the session and the session's next Run takes it, exactly like any other
-    // message that outlives its bound Run. Deliver owed settlements into the same steering inbox so
-    // the settlement reaches the model exactly once.
-    const settlements = [...state.messages.values()].filter(
-      (entry) =>
-        entry.targetSessionId === run.message.sessionId &&
-        entry.entryId.startsWith("child-settled:") &&
-        owed(state, entry) &&
-        !settlementDeliverable(state, entry),
-    )
+    const settlements = [...state.messages.values()].flatMap((entry) => {
+      if (
+        entry.targetSessionId !== run.message.sessionId ||
+        !entry.entryId.startsWith("child-settled:") ||
+        !owed(state, entry) ||
+        settlementDeliverable(state, entry)
+      ) {
+        return []
+      }
+      const notification = fromMailboxEntry(entry)
+      const prompt = notification === undefined ? undefined : modelPrompt(notification)
+      return prompt === undefined ? [] : [{ ...entry, bytes: promptBytes(prompt), prompt }]
+    })
     if (pending.length === 0 && settlements.length === 0) return [[], state] as const
     const messages = new Map(state.messages)
     const steering = [...run.steering]

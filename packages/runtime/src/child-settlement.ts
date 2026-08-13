@@ -86,16 +86,18 @@ export const payloadFromEvent = (input: {
   }
 }
 
-/** @experimental Encode one settlement payload into the existing durable mailbox representation. */
-export const mailboxEntry = (input: {
+/**
+ * @experimental Encode one settlement payload as a durable observation.
+ *
+ * The persistence representation carries no model-facing content. `modelPrompt` separately
+ * projects observations that are eligible for parent model delivery.
+ */
+export const observationEntry = (input: {
   readonly payload: Payload
   readonly parentSessionId: string
   readonly sequence: number
   readonly admittedAtMillis: number
 }): MailboxEntry => {
-  const prompt = Prompt.make(
-    `Child run ${input.payload.childRunId} settled with status ${input.payload.status}.\n\n${input.payload.resultText}`,
-  )
   const metadata: Metadata = { [metadataKey]: input.payload }
   return {
     entryId: input.payload.notificationId,
@@ -107,9 +109,9 @@ export const mailboxEntry = (input: {
     messageId: input.payload.notificationId,
     idempotencyKey: input.payload.notificationId,
     digest: input.payload.notificationId,
-    bytes: promptBytes(prompt),
+    bytes: promptBytes(Prompt.empty),
     admittedAtMillis: input.admittedAtMillis,
-    prompt,
+    prompt: Prompt.empty,
     correlationId: input.payload.notificationId,
     metadata,
   }
@@ -129,3 +131,14 @@ export const fromMetadata = (input: {
 /** @experimental Decode a typed settlement notification from a mailbox row. */
 export const fromMailboxEntry = (entry: MailboxEntry): Notification | undefined =>
   fromMetadata({ metadata: entry.metadata, sequence: entry.sequence, admittedAtMillis: entry.admittedAtMillis })
+
+/**
+ * @experimental Project a settlement payload into optional parent model content.
+ *
+ * Cancelled payloads are observation-only. Successful and failed payloads retain the existing
+ * model-facing settlement message.
+ */
+export const modelPrompt = (payload: Payload): Prompt.Prompt | undefined => {
+  if (payload.status === "cancelled") return undefined
+  return Prompt.make(`Child run ${payload.childRunId} settled with status ${payload.status}.\n\n${payload.resultText}`)
+}

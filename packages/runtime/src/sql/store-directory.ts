@@ -19,7 +19,8 @@ import {
   RunNotFound,
   RuntimeUnavailable,
 } from "../errors.js"
-import { deliveryPrompt, steeringKey, type MailboxEntry, type MessageReceipt } from "../mailbox.js"
+import { fromMailboxEntry, modelPrompt } from "../child-settlement.js"
+import { deliveryPrompt, promptBytes, steeringKey, type MailboxEntry, type MessageReceipt } from "../mailbox.js"
 import { Metadata } from "../message.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import type { AdmitMessageInput } from "../run-store.js"
@@ -392,11 +393,6 @@ export const deliverPendingMessages: {
       runId: run.runId,
       limit: Number.MAX_SAFE_INTEGER,
     })
-    // Child settlements are deliberately excluded from pendingMessages (the messages channel), but
-    // a notification whose addressed parent Run is terminal was never seen by any model, so it is
-    // still owed to the session and the session's next Run takes it, exactly like any other
-    // message that outlives its bound Run. Deliver owed settlements into the same steering inbox so
-    // the settlement reaches the model exactly once.
     const settlements = yield* sql<MessageRow>`
       SELECT * FROM baton_messages m
       WHERE m.target_session_id = ${run.message.sessionId}
@@ -424,7 +420,13 @@ export const deliverPendingMessages: {
       ORDER BY m.sequence
     `
     const delivered: Array<MailboxEntry> = []
-    for (const entry of [...pending, ...settlements.map(decodeEntry)]) {
+    const settlementDeliveries = settlements.flatMap((row) => {
+      const entry = decodeEntry(row)
+      const notification = fromMailboxEntry(entry)
+      const prompt = notification === undefined ? undefined : modelPrompt(notification)
+      return prompt === undefined ? [] : [{ ...entry, bytes: promptBytes(prompt), prompt }]
+    })
+    for (const entry of [...pending, ...settlementDeliveries]) {
       const idempotencyKey = steeringKey(entry.entryId)
       const rows = yield* sql<{ next_sequence: number | string }>`
         SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence

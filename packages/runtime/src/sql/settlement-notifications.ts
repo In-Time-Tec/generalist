@@ -3,8 +3,8 @@ import { SqlClient } from "effect/unstable/sql"
 import { Prompt } from "effect/unstable/ai"
 import {
   fromMetadata,
-  mailboxEntry,
   notificationIdFor,
+  observationEntry,
   payloadFromEvent,
   type Notification,
 } from "../child-settlement.js"
@@ -72,7 +72,7 @@ export const admitChildSettlement = (input: {
       SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence FROM baton_messages
       WHERE target_session_id = ${input.parent.message.sessionId}
     `
-    const entry = mailboxEntry({
+    const entry = observationEntry({
       payload,
       parentSessionId: input.parent.message.sessionId,
       sequence: Number(highest[0]?.next_sequence ?? 0),
