@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.25.1
+
 - Keep cancelled child settlements durably observable while excluding cancellation from parent model delivery and later-Run forwarding; successful and failed settlement delivery is unchanged.
 
 ## 0.25.0
