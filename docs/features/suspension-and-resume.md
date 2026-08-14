@@ -7,3 +7,5 @@ Baton stores the suspension token and authorization snapshot on the unresolved t
 Authorization resume replays the same linear authorization pass. A client resolution is consumed only when the current pass still reaches `Approvals.resolve` for the checkpointed call; if current Permissions now allows a call that does not require approval, that current policy decision supersedes the stale out-of-band answer.
 
 This is process-local checkpoint validation. Cross-process locking and durable exactly-once execution belong to a durable host.
+
+Runtime retains the persisted suspension while binding a resume because resumed tool work has not yet committed. A crash after binding therefore reconstructs the same suspension instead of losing the continuation. Suspension is removed only in the same durable transition that commits terminal completion, failure, or cancellation, a pending steering continuation, or another pending terminal outcome; generic responses and child reconciliation do not clear it early.

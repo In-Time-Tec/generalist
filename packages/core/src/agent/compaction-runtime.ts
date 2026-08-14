@@ -52,7 +52,6 @@ type CompactionContext = {
   readonly compactionError: (turn: number, error: CompactionError) => AgentError
   readonly sessionError: (turn: number, error: SessionStoreError | SessionConflict) => AgentError
 }
-
 export const makeCompactionRuntime = (context: CompactionContext) => {
   const {
     activeSession,
@@ -134,6 +133,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       {
         kind: "memory",
         key: operationKey(logicalId, "memory", "sync", turn, transcript.content.length),
+        turn,
         input: { turn, messageCount: transcript.content.length },
         replayPolicy: "pure",
       },
@@ -373,6 +373,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       {
         kind: "compaction",
         key: operationKey(logicalId, "compaction", "apply", turn, applicationIdentity),
+        turn,
         input: {
           turn,
           tag: result._tag,
@@ -433,6 +434,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                 {
                   kind: "compaction",
                   key: operationKey(logicalId, "compaction", turn, compactionId),
+                  turn,
                   input: { turn, compactionId, agentName: agent.name, sessionId },
                   replayPolicy: "pure",
                 },

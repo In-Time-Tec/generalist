@@ -7973,58 +7973,119 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     }),
   ])
 
-  ItLayer.make(it, "reconciles a journaled pending model operation with the same identity after restart", () => [
-    Layer.mergeAll(
-      modelLayer(() => Stream.make(textDelta("done"), finishPart("stop", usage({ total: 2 }, { total: 1 })))),
-      ModelMiddleware.layerIdentity,
-    ),
-    Effect.gen(function* () {
-      const agent = Agent.make({ name: "journal-restart-agent" })
-      const executable = ExecutableManifest.makeTest("journal-restart-agent", undefined)
-      let pending: DurableDriver.DriverCheckpoint | undefined
-      const crashingJournal: DurableDriver.DriverJournal = {
-        onScheduled: (operation, checkpoint) =>
-          operation.kind !== "model"
-            ? Effect.void
-            : Effect.sync(() => {
-                pending = checkpoint
-              }).pipe(Effect.andThen(Effect.interrupt)),
-        onCompleted: () => Effect.void,
-        onCheckpoint: () => Effect.void,
-      }
-      yield* Agent.stream(agent, {
-        prompt: "continue",
-        logicalOperationId: "journal-restart",
-        executableRef: executable.ref,
-      }).pipe(Stream.runDrain, Effect.provideService(DurableDriver.DriverJournalService, crashingJournal), Effect.exit)
-      expect(pending).toBeDefined()
+  ItLayer.make(it, "reconciles a turn-12 pending model operation with the same identity after restart", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          const turn = modelCalls++
+          return turn < 12
+            ? Stream.make(
+                toolCallPart(`journal-echo-${turn}`, "echo", { text: String(turn) }),
+                finishPart("tool-calls", usage({ total: 2 }, { total: 1 })),
+              )
+            : Stream.make(textDelta("done"), finishPart("stop", usage({ total: 2 }, { total: 1 })))
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "journal-restart-agent", toolkit: Toolkit.make(echoTool) })
+        const executable = ExecutableManifest.makeTest("journal-restart-agent", undefined)
+        const pendingKey = "journal-restart:model:12:52:conversation"
+        let pending: DurableDriver.DriverCheckpoint | undefined
+        const crashingJournal: DurableDriver.DriverJournal = {
+          onScheduled: (operation, checkpoint) =>
+            operation.key !== pendingKey
+              ? Effect.void
+              : Effect.sync(() => {
+                  pending = checkpoint
+                }).pipe(Effect.andThen(Effect.interrupt)),
+          onCompleted: () => Effect.void,
+          onCheckpoint: () => Effect.void,
+        }
+        yield* Agent.stream(agent, {
+          prompt: "continue",
+          logicalOperationId: "journal-restart",
+          executableRef: executable.ref,
+          modelCallOrdinalStart: 40,
+        }).pipe(
+          Stream.runDrain,
+          Effect.provideService(DurableDriver.DriverJournalService, crashingJournal),
+          Effect.exit,
+        )
+        expect(modelCalls).toBe(12)
+        expect(pending).toBeDefined()
+        expect(pending?.turn).toBe(12)
+        expect(pending?.state).toMatchObject({
+          modelCallOrdinal: 53,
+          pending: { key: pendingKey, input: { turn: 12, modelCallOrdinal: 52 } },
+        })
 
-      const scheduled: Array<string> = []
-      const resumedJournal: DurableDriver.DriverJournal = {
-        onScheduled: (operation) =>
-          Effect.sync(() => {
-            scheduled.push(operation.key)
-          }).pipe(Effect.as(undefined)),
-        onCompleted: () => Effect.void,
-        onCheckpoint: () => Effect.void,
-      }
-      const events = yield* Agent.stream(agent, {
-        prompt: "continue",
-        logicalOperationId: "journal-restart",
-        executableRef: executable.ref,
-        driverCheckpoint: pending!,
-      }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
-      expect(scheduled.find((key) => key.includes(":model:"))).toContain(":model:0:0:conversation")
-      const call = events.find((event) => event._tag === "ModelCallStarted")
-      const attempt = events.find((event) => event._tag === "ModelAttemptStarted")
-      expect(call?._tag === "ModelCallStarted" ? call.modelCallId : undefined).toBe(
-        "journal-restart:model-call:0:conversation",
-      )
-      expect(attempt?._tag === "ModelAttemptStarted" ? attempt.modelAttemptId : undefined).toBe(
-        "journal-restart:model-call:0:conversation:attempt:0",
-      )
-    }),
-  ])
+        const scheduled: Array<string> = []
+        let safeCheckpoint: DurableDriver.DriverCheckpoint | undefined
+        const resumedJournal: DurableDriver.DriverJournal = {
+          onScheduled: (operation) =>
+            Effect.sync(() => {
+              scheduled.push(operation.key)
+            }).pipe(Effect.as(undefined)),
+          onCompleted: () => Effect.void,
+          onCheckpoint: (checkpoint) =>
+            Effect.sync(() => {
+              safeCheckpoint = checkpoint
+            }),
+        }
+        const events = yield* Agent.stream(agent, {
+          prompt: "",
+          logicalOperationId: "journal-restart",
+          executableRef: executable.ref,
+          driverCheckpoint: pending!,
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
+        expect(scheduled.find((key) => key.includes(":model:"))).toBe(pendingKey)
+        const turnStarted = events.find((event) => event._tag === "TurnStarted")
+        const call = events.find((event) => event._tag === "ModelCallStarted")
+        const attempt = events.find((event) => event._tag === "ModelAttemptStarted")
+        expect(turnStarted?._tag === "TurnStarted" ? turnStarted.turn : undefined).toBe(12)
+        expect(call?._tag === "ModelCallStarted" ? call.turn : undefined).toBe(12)
+        expect(call?._tag === "ModelCallStarted" ? call.modelCallId : undefined).toBe(
+          "journal-restart:model-call:52:conversation",
+        )
+        expect(attempt?._tag === "ModelAttemptStarted" ? attempt.modelAttemptId : undefined).toBe(
+          "journal-restart:model-call:52:conversation:attempt:0",
+        )
+        expect(modelCalls).toBe(13)
+        expect(safeCheckpoint?.turn).toBe(12)
+        expect((safeCheckpoint?.state as { readonly pending?: unknown } | undefined)?.pending).toBeUndefined()
+
+        const overrideScheduled: Array<{ readonly key: string; readonly turn: number }> = []
+        const overrideJournal: DurableDriver.DriverJournal = {
+          onScheduled: (operation, checkpoint) =>
+            Effect.sync(() => {
+              overrideScheduled.push({ key: operation.key, turn: checkpoint.turn })
+            }).pipe(Effect.as(undefined)),
+          onCompleted: () => Effect.void,
+          onCheckpoint: () => Effect.void,
+        }
+        const overrideEvents = yield* Agent.stream(agent, {
+          prompt: "",
+          logicalOperationId: "journal-restart",
+          executableRef: executable.ref,
+          driverCheckpoint: safeCheckpoint!,
+          turnStart: 13,
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, overrideJournal))
+        expect(overrideScheduled.every(({ turn }) => turn >= 12)).toBe(true)
+        expect(overrideScheduled.find(({ key }) => key.includes(":model:"))?.key).toBe(
+          "journal-restart:model:13:53:conversation",
+        )
+        const overrideTurnStarted = overrideEvents.find((event) => event._tag === "TurnStarted")
+        const overrideCall = overrideEvents.find((event) => event._tag === "ModelCallStarted")
+        expect(overrideTurnStarted?._tag === "TurnStarted" ? overrideTurnStarted.turn : undefined).toBe(13)
+        expect(overrideCall?._tag === "ModelCallStarted" ? overrideCall.turn : undefined).toBe(13)
+        expect(modelCalls).toBe(14)
+      }),
+    ]
+  })
 
   ItLayer.make(it, "joins model telemetry and ModelPart identity across a tool-call run", () => {
     let calls = 0

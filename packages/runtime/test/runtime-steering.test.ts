@@ -524,7 +524,7 @@ it.live("atomically persists steering consumption and model scheduling before SQ
         expect(serviceAcquisitions).toBe(1)
         expect(requests[1]).toContain("new direction")
         expect(inspection.status).toBe("succeeded")
-        expect(yield* store.readSteering(claim)).toEqual([])
+        expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
         const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
         const drained = history.filter((event) => event._tag === "SteeringDrained")
         const modelAttempts = history

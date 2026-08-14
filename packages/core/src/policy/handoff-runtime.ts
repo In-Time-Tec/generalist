@@ -58,6 +58,7 @@ const recordRejected = (
     {
       kind: "handoff",
       key: operationKey(logicalId, "handoff", "rejected", turn, handoffId),
+      turn,
       input: { handoffId, turn, reason },
       replayPolicy: "pure",
     },
@@ -157,6 +158,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
       {
         kind: "handoff",
         key: handoffId,
+        turn: input.turn,
         input: {
           handoffId,
           turn: input.turn,

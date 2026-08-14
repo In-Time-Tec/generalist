@@ -284,6 +284,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             {
               kind: "tool",
               key: durableOperationKey,
+              turn,
               input: { turn, callId: call.id, name: call.name },
               replayPolicy: "never",
             },

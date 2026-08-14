@@ -59,6 +59,21 @@ export const requireExecutionClaim: {
     : StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence })
 })
 
+export const releaseExecution: {
+  (input: ExecutionClaim): (state: MemoryState) => Effect.Effect<readonly [void, MemoryState], RuntimeUnavailable>
+  (state: MemoryState, input: ExecutionClaim): Effect.Effect<readonly [void, MemoryState], RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: ExecutionClaim) => {
+  if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
+  const run = state.runs.get(input.runId)
+  if (run === undefined || run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+    return Effect.succeed([undefined, state] as const)
+  }
+  const { ownerId: _, ...released } = run
+  const runs = new Map(state.runs)
+  runs.set(run.runId, released)
+  return Effect.succeed([undefined, { ...state, runs }] as const)
+})
+
 export const claimExecution: {
   (input: {
     readonly runId: string

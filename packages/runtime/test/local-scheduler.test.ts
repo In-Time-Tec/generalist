@@ -123,8 +123,19 @@ for (const backend of ["memory", "sqlite"] as const) {
   }
 
   {
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "answer", delta: "done" }),
+            finish,
+          ]),
+      }),
+    )
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -155,8 +166,22 @@ for (const backend of ["memory", "sqlite"] as const) {
             ownerId: claim.ownerId,
             attemptFence: claim.attemptFence,
           })
-          yield* store.complete({ ...claim, result: completedResult("done") })
+          yield* store.releaseExecution(claim)
+          expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
+          const replacement = yield* store.claimExecution({ runId: receipt.runId, ownerId: "replacement" })
+          yield* store.releaseExecution(claim)
+          expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
+            ownerId: replacement.ownerId,
+            attemptFence: replacement.attemptFence,
+          })
+          yield* store.releaseExecution(replacement)
+          yield* scheduler.tick
+          yield* scheduler.idle
           expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "succeeded" })
+          expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
+            attemptFence: replacement.attemptFence + 1,
+          })
+          expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
         }),
       )
     })

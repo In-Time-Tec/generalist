@@ -21,6 +21,7 @@ import {
   type RunBudgetGrantWidened,
 } from "./run-budget.js"
 import { CurrentModelCallOrdinal } from "./operation-context.js"
+import { OperationTurn } from "./operation-turn.js"
 import { LoopDriverState } from "./loop-driver-state.js"
 import {
   chargeScheduled,
@@ -39,6 +40,7 @@ export interface OperationSpec {
   readonly key: string
   readonly input: unknown
   readonly replayPolicy: ReplayPolicy
+  readonly turn?: number
 }
 /** @experimental Recorded operation for tests and future runtime journaling. */
 export interface RecordedOperation {
@@ -110,18 +112,15 @@ export class DriverUnknownReplay extends Schema.TaggedErrorClass<DriverUnknownRe
     operationId: Schema.String,
   },
 ) {}
-
 /** @experimental */
 export class DriverInterpreter extends Context.Service<DriverInterpreter, Interface>()(
   "@batonfx/core/durable/driver-interpreter/DriverInterpreter",
 ) {}
-
 const noopJournal: DriverJournal = {
   onScheduled: () => Effect.void,
   onCompleted: () => Effect.void,
   onCheckpoint: () => Effect.void,
 }
-
 const outcomeFromExit = <E>(operation: DriverOperation, exit: Exit.Exit<unknown, E>): OperationOutcome | undefined => {
   if (Exit.isSuccess(exit)) return { _tag: "Succeeded", value: exit.value }
   if (exit.cause.reasons.length === 1 && Cause.isFailReason(exit.cause.reasons[0]!)) {
@@ -190,8 +189,10 @@ export const makeInline = (input: {
         const nowIso = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
         yield* assertNotExpired(before.budget, nowIso)
         before = yield* chargeScheduled(before, spec.kind)
+        const operationTurn = yield* OperationTurn.resolve(before.turn, spec.turn)
         yield* Ref.set(checkpointRef, before)
-        const scheduled = withPending(before, spec)
+        const { turn: _turn, ...pending } = spec
+        const scheduled = withPending(before, pending, operationTurn)
         yield* Ref.set(checkpointRef, scheduled)
         const decision = yield* input.driver.decide(scheduled)
         if (decision._tag !== "Execute") {

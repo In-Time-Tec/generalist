@@ -148,7 +148,7 @@ export const appendEvent: {
       }
       const runs = new Map(terminalState.runs)
       if (event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed") {
-        const { continuation: _, pendingOutcome: __, ...withoutTerminalState } = updated
+        const { continuation: _, pendingOutcome: __, suspension: ___, ...withoutTerminalState } = updated
         runs.set(runId, withoutTerminalState)
       } else {
         runs.set(runId, updated)
