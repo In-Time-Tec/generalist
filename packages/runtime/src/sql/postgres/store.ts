@@ -22,6 +22,7 @@ import { makePostgresClaims } from "./store-claims.js"
 import { postgresOperations, type RunFn } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
 import { retryExecution } from "../store-execution.js"
+import { releaseLeasedExecution as releaseExecution } from "../store-release-leased.js"
 import { hasAdmission, loadRunWait } from "../store-helpers.js"
 import { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
@@ -416,6 +417,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             if (runningFanOut.length > 0) {
               yield* sql`
                 UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
+                  suspension_json = NULL,
                   pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
                 WHERE run_id = ${loaded.runId}
               `
@@ -485,6 +487,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       emitAgentEvent: (input) => run(emitAgentEvent(transactionHub, input)),
       claimExecution: (input) => run(claimExecution(transactionHub, input)),
       loadExecution: (runId) => run(loadExecution(runId)),
+      releaseExecution: (input) => run(releaseExecution(input)),
       saveExecution: (input) => run(saveExecution(input)),
       retryExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(retryExecution(transactionHub, input)))),
       ...fanOutStoreMethods({ sql, pg, hub: transactionHub, run, runNoTxn }),

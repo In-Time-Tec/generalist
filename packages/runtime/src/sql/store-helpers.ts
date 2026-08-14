@@ -284,6 +284,7 @@ export const appendEvent: {
            attempt = ${attempt},
            continuation_json = NULL,
            pending_outcome_json = NULL,
+           suspension_json = NULL,
            updated_at = ${updated}
         WHERE run_id = ${run.runId}
           AND last_sequence = ${run.lastSequence}

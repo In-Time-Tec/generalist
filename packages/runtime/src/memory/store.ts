@@ -33,6 +33,7 @@ import { cancelSession } from "./store-session.js"
 import {
   claimExecution,
   loadExecution,
+  releaseExecution,
   requireExecutionClaim,
   retryExecution,
   saveExecution,
@@ -358,7 +359,8 @@ export const makeRunStore = (options: LayerOptions) =>
                       steeringEntryIds: pending.map((entry) => entry.entryId),
                     }
                     const runs = new Map(state.runs)
-                    runs.set(run.runId, { ...run, continuation })
+                    const { suspension: _, ...withoutSuspension } = run
+                    runs.set(run.runId, { ...withoutSuspension, continuation })
                     const outcome: CompletionOutcome = { _tag: "SteeringPending", continuation }
                     return [outcome, { ...state, runs }] as const
                   }
@@ -407,6 +409,7 @@ export const makeRunStore = (options: LayerOptions) =>
       claimExecution: (input) => modifyState((state) => claimExecution(state, input)),
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),
+      releaseExecution: (input) => modifyState((state) => releaseExecution(state, input)),
       saveExecution: (input) => update((state) => saveExecution(state, input)),
       retryExecution: (input) => modifyState((state) => retryExecution(state, input)),
       admitFanOut: (input) => modifyState((state) => admitFanOut(state, input)),

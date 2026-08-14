@@ -18,6 +18,7 @@ import {
 } from "../store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, retryExecution } from "../store-execution.js"
 import { appendEvent, hasAdmission, loadEventsAfter, loadRun, loadRunWait, nowIso } from "../store-helpers.js"
+import { releaseLeasedExecution as releaseExecution } from "../store-release-leased.js"
 import { makeEventHub } from "../subscribers.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
 import {
@@ -426,6 +427,7 @@ export const makeMysqlServices = (
         ),
       claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(transactionHub, input)))),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
+      releaseExecution: (input) => run(releaseExecution(input)),
       saveExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(saveExecution(input)))),
       retryExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(retryExecution(transactionHub, input)))),
       admitFanOut: (input) =>

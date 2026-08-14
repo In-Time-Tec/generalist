@@ -159,6 +159,7 @@ export const wrapDriverAttempt =
           {
             kind: "model",
             key: operationId,
+            turn: input.turn,
             input: { turn: input.turn, modelCallOrdinal: ordinal, purpose: "conversation" },
             replayPolicy: "never",
           },

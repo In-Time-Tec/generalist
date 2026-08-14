@@ -286,7 +286,7 @@ export const complete: {
     }
     if (hasRunningOwnedFanOut(state, run.runId)) {
       const runs = new Map(state.runs)
-      const { ownerId: _, ...released } = run
+      const { ownerId: _, suspension: __, ...released } = run
       runs.set(run.runId, {
         ...released,
         status: "waiting",
@@ -338,7 +338,7 @@ export const fail: {
     }
     if (hasRunningOwnedFanOut(state, run.runId)) {
       const runs = new Map(state.runs)
-      const { ownerId: _, continuation: __, ...released } = run
+      const { ownerId: _, continuation: __, suspension: ___, ...released } = run
       runs.set(run.runId, { ...released, status: "waiting", pendingOutcome: { _tag: "Failed", error: input.error } })
       return { ...state, runs }
     }

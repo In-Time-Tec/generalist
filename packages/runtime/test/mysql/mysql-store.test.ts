@@ -391,6 +391,88 @@ describeMysql("mysql run store", () => {
     ),
   )
 
+  it.live("releases only the exact execution claim and permits immediate replacement", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("release-execution"),
+          idempotencyKey: "release-execution",
+          prompt: textPrompt("release-execution"),
+        })
+        const [claimedA] = yield* claims.claimReadyRuns({ workerId: "owner-a", limit: 1, lease: "10 seconds" })
+        if (claimedA === undefined) return yield* Effect.die("initial execution claim is missing")
+        const claimA = {
+          runId: receipt.runId,
+          ownerId: claimedA.workerId,
+          attemptFence: claimedA.attemptFence,
+        }
+        yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`
+            UPDATE baton_runs SET updated_at = '2000-01-01 00:00:00.000'
+            WHERE run_id = ${receipt.runId}
+          `
+        }).pipe(scopedWith(mysqlClient(url)))
+        const readClaim = () =>
+          Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient
+            const [row] = yield* sql<{
+              readonly owner_worker_id: string | null
+              readonly lease_expires_at: string | null
+              readonly attempt_fence: number
+              readonly updated_at: string
+            }>`
+              SELECT owner_worker_id, lease_expires_at, attempt_fence, updated_at
+              FROM baton_runs WHERE run_id = ${receipt.runId}
+            `
+            return row!
+          }).pipe(scopedWith(mysqlClient(url)))
+
+        yield* store.releaseExecution(claimA)
+        const released = yield* readClaim()
+        expect(released).toMatchObject({
+          owner_worker_id: null,
+          lease_expires_at: null,
+          attempt_fence: claimA.attemptFence,
+        })
+        expect(released.updated_at).not.toBe("2000-01-01 00:00:00.000")
+
+        yield* store.releaseExecution(claimA)
+        expect(yield* readClaim()).toEqual(released)
+
+        const [claimedB] = yield* claims.claimReadyRuns({ workerId: "owner-b", limit: 1, lease: "10 seconds" })
+        if (claimedB === undefined) return yield* Effect.die("replacement execution claim is missing")
+        expect(claimedB.run.runId).toBe(receipt.runId)
+        expect(claimedB.attemptFence).toBeGreaterThan(claimA.attemptFence)
+        const claimB = {
+          runId: receipt.runId,
+          ownerId: claimedB.workerId,
+          attemptFence: claimedB.attemptFence,
+        }
+        const replacement = yield* readClaim()
+        expect(replacement).toMatchObject({
+          owner_worker_id: claimB.ownerId,
+          attempt_fence: claimB.attemptFence,
+        })
+        expect(replacement.lease_expires_at).not.toBeNull()
+
+        yield* store.releaseExecution(claimA)
+        expect(yield* readClaim()).toEqual(replacement)
+
+        yield* store.releaseExecution(claimB)
+        expect(yield* readClaim()).toMatchObject({
+          owner_worker_id: null,
+          lease_expires_at: null,
+          attempt_fence: claimB.attemptFence,
+        })
+      }).pipe(scopedWith(mysqlLayer(url))),
+    ),
+  )
+
   it.live("serializes concurrent duplicate admission", () =>
     withSchema(
       Effect.gen(function* () {

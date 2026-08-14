@@ -132,7 +132,9 @@ export const saveCompletionContinuation: {
             steeringEntryIds: entries.map((entry) => entry.entryId),
           }
     yield* sql`
-      UPDATE baton_runs SET continuation_json = ${continuation === undefined ? null : encodeContinuation(continuation)}
+      UPDATE baton_runs SET
+        continuation_json = ${continuation === undefined ? null : encodeContinuation(continuation)},
+        suspension_json = NULL
       WHERE run_id = ${runId}
     `
     return continuation

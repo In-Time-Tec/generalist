@@ -3,17 +3,11 @@ import { Prompt, type Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, DurableDriver, Steering } from "@batonfx/core"
 import { RunStore, type ExecutionClaim } from "./run-store.js"
 import { ActiveExecutions } from "./active-executions.js"
-import { compactionOptionsMismatch, ExecutableIdentityMismatch, RunTerminal, undecodableSuspension } from "./errors.js"
-import {
-  makeAttestation,
-  makeInput,
-  matchesActiveRunOptions,
-  type Interface as ExecutableResolverInterface,
-} from "./executable-resolver.js"
-import { decodePinned, equals } from "./executable-manifest.js"
+import { compactionOptionsMismatch, RunTerminal, undecodableSuspension } from "./errors.js"
+import { matchesActiveRunOptions, type Interface as ExecutableResolverInterface } from "./executable-resolver.js"
 import type { ExecutionContinuation } from "./steering.js"
 import type { DurableAgentLoopEvent } from "./agent-event.js"
-import { commitDeferredProgramChildTerminal, makeDeferredProgramChildTerminal } from "./program-child-terminal.js"
+import { makeDeferredProgramChildTerminal, ProgramChildTerminal } from "./program-child-terminal.js"
 import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
 import { hostContext, sessionContext } from "./execution-context.js"
@@ -23,6 +17,8 @@ import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "./run-wait.js"
 import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
 import { make as makeExecutionRetry } from "./execution-retry.js"
+import { ExecutionClaimLifecycle } from "./execution-claim-lifecycle.js"
+import { ExecutionResolution } from "./execution-resolution.js"
 import { make as makeAgentRunOptions } from "./agent-run-options.js"
 import { ModelPreviewLane, open as openModelPreview } from "./model-preview.js"
 import { clearDriverOperation, commitDriverOperation, verifyCommittedModelEvent } from "./execution-model-response.js"
@@ -54,7 +50,13 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
         const activeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
         const completingRetrySafeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
         const deferredProgramChildTerminal = yield* makeDeferredProgramChildTerminal
-        const isProgramChild = claimed.message.metadata?.programOperation !== undefined
+        const isProgramChild = yield* ProgramChildTerminal.owns(store, claimed)
+        const deferProgramChildFailure = ProgramChildTerminal.makeFailure(
+          store,
+          claim,
+          deferredProgramChildTerminal,
+          isProgramChild,
+        )
         const interruption = makeExecutionInterruption({
           store,
           claim,
@@ -64,37 +66,8 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
         })
         const scopedExecution = Effect.scoped(
           Effect.gen(function* () {
-            const resolution = yield* options.resolver
-              .resolve(
-                makeInput({
-                  runId,
-                  ref: claimed.executableRef,
-                  manifest: claimed.executableManifest,
-                  registrations: claimed.registrations,
-                }),
-              )
-              .pipe(Effect.catch((error) => store.fail({ ...claim, error }).pipe(Effect.as(undefined))))
-            if (resolution === undefined) return
-            const resolved = resolution
-            const identityMatches = yield* Effect.try({
-              try: () =>
-                equals(
-                  decodePinned({ ref: claimed.executableRef, manifest: claimed.executableManifest }),
-                  makeAttestation(resolved.attestation),
-                ),
-              catch: () => false,
-            })
-            if (!identityMatches) {
-              yield* store.fail({
-                ...claim,
-                error: ExecutableIdentityMismatch.make({
-                  runId,
-                  expectedRef: claimed.executableRef,
-                  actualRef: resolved.attestation.ref,
-                }),
-              })
-              return
-            }
+            const resolved = yield* ExecutionResolution.resolve(options.resolver, claimed, deferProgramChildFailure)
+            if (resolved === undefined) return
             if (resolved._tag === "Program") {
               yield* executeProgram({ claim, claimed, store, resolution: resolved })
               return
@@ -317,7 +290,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       if (
                         !matchesActiveRunOptions(claimed.executableRef, claimed.executableManifest, resolved.runOptions)
                       ) {
-                        return yield* store.fail({ ...claim, error: compactionOptionsMismatch })
+                        return yield* deferProgramChildFailure(compactionOptionsMismatch)
                       }
                       const runOptions = makeAgentRunOptions({
                         claim,
@@ -335,7 +308,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           : { compaction: resolved.runOptions.compaction }),
                       })
                       if (runOptions === undefined) {
-                        return yield* store.fail({ ...claim, error: undecodableSuspension })
+                        return yield* deferProgramChildFailure(undecodableSuspension)
                       }
                       const exit = yield* Agent.stream(hostedAgent, runOptions).pipe(
                         Stream.runForEach((event) =>
@@ -480,7 +453,11 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
           }),
         )
         const execution = scopedExecution.pipe(
-          Effect.andThen(commitDeferredProgramChildTerminal(store, claim, deferredProgramChildTerminal)),
+          Effect.andThen(
+            ProgramChildTerminal.commit(store, claim, deferredProgramChildTerminal, (error) =>
+              interruption.settle({ reason: "failure", error }),
+            ),
+          ),
           Effect.onInterrupt(() =>
             active
               .cancellationRequested(runId)
@@ -493,7 +470,8 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
         )
         yield* execution
       }).pipe(Effect.orDie)
-    const execute = (claim: ExecutionClaim): Effect.Effect<void> => active.run(claim.runId, executeClaim(claim))
+    const execute = (claim: ExecutionClaim): Effect.Effect<void> =>
+      active.run(claim.runId, ExecutionClaimLifecycle.releaseAfter(store, claim, executeClaim(claim)))
     return ExecutionHost.of({ execute, interrupt: (runId) => active.interrupt(runId) })
   })
 export const layer = (options: Options): Layer.Layer<ExecutionHost, never, RunStore | ActiveExecutions> =>

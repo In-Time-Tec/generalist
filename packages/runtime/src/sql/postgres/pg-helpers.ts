@@ -187,6 +187,7 @@ export const appendEvent: {
            lease_expires_at = NULL,
            continuation_json = NULL,
            pending_outcome_json = NULL,
+           suspension_json = NULL,
           updated_at = NOW()
         WHERE run_id = ${run.runId}
           AND status NOT IN ('succeeded', 'failed', 'cancelled')
@@ -306,6 +307,7 @@ export const completeRun: {
     if (runningFanOut.length > 0) {
       yield* sql`
         UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
+          suspension_json = NULL,
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result })}
         WHERE run_id = ${run.runId}
       `

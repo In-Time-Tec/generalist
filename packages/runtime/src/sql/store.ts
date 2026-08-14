@@ -42,6 +42,7 @@ import { commitInterruptedModelResponse } from "./interrupted-model-response.js"
 import {
   claimExecution,
   loadExecution,
+  releaseExecution,
   requireExecutionClaim,
   retryExecution,
   saveExecution,
@@ -257,6 +258,7 @@ export const makeSqliteRunStore = (
         ),
       claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input)),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
+      releaseExecution: (input) => run(releaseExecution(input)),
       saveExecution: (input) => run(saveExecution(input)),
       retryExecution: (input) => runBuffered((transactionHub) => retryExecution(transactionHub, input)),
       admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),

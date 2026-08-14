@@ -6,9 +6,13 @@ import {
   Agent,
   AgentEvent,
   AgentManifest,
+  AgentProgram,
   Compaction,
   ExecutableManifest,
   Pins,
+  ProgramBindings,
+  ProgramCapabilities,
+  SandboxExecutor,
   Session,
   Handoff,
   ToolContext,
@@ -19,6 +23,7 @@ import {
   Address,
   ChildRuns,
   ExecutionHost,
+  LocalScheduler,
   Cursor,
   Errors,
   ExecutableRegistration,
@@ -623,31 +628,46 @@ describe("ExecutionHost", () => {
     }),
   )
 
-  it.effect("interrupts and finalizes a blocked resolver before model execution", () =>
+  it.effect("releases an abandoned claim only after resolver finalization", () =>
     Effect.gen(function* () {
       const resolving = yield* Deferred.make<void>()
+      const finalizing = yield* Deferred.make<void>()
+      const finishFinalizer = yield* Deferred.make<void>()
       const finalized = yield* Deferred.make<void>()
       const modelCalls = yield* Ref.make(0)
+      const resolverCalls = yield* Ref.make(0)
       const agent = Agent.make({ name: "blocked-resolver" })
       const executable = testExecutable(agent, "blocked-v1")
       const address = Address.make("agent:blocked-resolver")
       const model = Layer.effect(
         LanguageModel.LanguageModel,
-        Ref.update(modelCalls, (count) => count + 1).pipe(
-          Effect.andThen(
-            LanguageModel.make({
-              generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-              streamText: () => Stream.fromIterable<Response.StreamPartEncoded>([finish]),
-            }),
-          ),
-        ),
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: () =>
+            Stream.fromEffect(Ref.update(modelCalls, (count) => count + 1)).pipe(
+              Stream.drain,
+              Stream.concat(
+                Stream.fromIterable<Response.StreamPartEncoded>([
+                  Response.makePart("text-delta", { id: "answer", delta: "done" }),
+                  finish,
+                ]),
+              ),
+            ),
+        }),
       )
       const resolution = { _tag: "Agent" as const, agent: Agent.close(agent, model), attestation: executable }
       const resolver = ExecutableResolver.ExecutableResolver.of({
         resolve: (input) =>
           Effect.gen(function* () {
             if (isAdmission(input)) return resolution
-            yield* Effect.addFinalizer(() => Deferred.succeed(finalized, undefined))
+            const call = yield* Ref.getAndUpdate(resolverCalls, (count) => count + 1)
+            if (call > 0) return resolution
+            yield* Effect.addFinalizer(() =>
+              Deferred.succeed(finalizing, undefined).pipe(
+                Effect.andThen(Deferred.await(finishFinalizer)),
+                Effect.andThen(Deferred.succeed(finalized, undefined)),
+              ),
+            )
             yield* Deferred.succeed(resolving, undefined)
             return yield* Effect.never
           }),
@@ -655,28 +675,55 @@ describe("ExecutionHost", () => {
       const runtimeLayer = Runtime.layerMemory({
         resolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        scheduler: { pollInterval: "1 day" },
       })
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const host = yield* ExecutionHost.ExecutionHost
+          const scheduler = yield* LocalScheduler.LocalScheduler
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: address,
             sessionId: "session:blocked-resolver",
             idempotencyKey: "blocked-resolver:1",
-            prompt: "never resolve",
+            prompt: "resolve after recovery",
           })
-          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "blocked-resolver" })
-          const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+          const abandoned = yield* store.claimExecution({ runId: receipt.runId, ownerId: "blocked-resolver" })
+          const execution = yield* host.execute(abandoned).pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(resolving)
-          yield* runtime.cancel({ runId: receipt.runId, reason: "stop resolving" })
-
-          expect((yield* Fiber.await(execution))._tag).toBe("Success")
+          yield* Effect.sync(() => execution.interruptUnsafe())
+          yield* Deferred.await(finalizing)
+          expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
+            ownerId: abandoned.ownerId,
+            attemptFence: abandoned.attemptFence,
+          })
+          yield* Deferred.succeed(finishFinalizer, undefined)
+          yield* Fiber.await(execution)
           yield* Deferred.await(finalized)
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("running")
+          expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
           expect(yield* Ref.get(modelCalls)).toBe(0)
+
+          const replacement = yield* store.claimExecution({ runId: receipt.runId, ownerId: "replacement" })
+          yield* store.releaseExecution(abandoned)
+          expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
+            ownerId: replacement.ownerId,
+            attemptFence: replacement.attemptFence,
+          })
+          yield* store.releaseExecution(replacement)
+          yield* scheduler.tick
+          yield* scheduler.idle
+
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+          expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
+            attemptFence: replacement.attemptFence + 1,
+          })
+          expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
+          expect(yield* Ref.get(resolverCalls)).toBe(2)
+          expect(yield* Ref.get(modelCalls)).toBe(1)
         }),
       )
     }),
@@ -835,6 +882,8 @@ describe("ExecutionHost", () => {
   it.effect("persists operations and resumes a suspended Agent in the same Run", () => {
     let phase: "suspend" | "resume" = "suspend"
     let modelCalls = 0
+    let suspensionAtFinalModel: unknown
+    let inspectFinalModel: Effect.Effect<void> = Effect.void
     const lifecycle: Array<string> = []
     const agent = Agent.make({ name: "durable-assistant", toolkit: Toolkit.make(waitTool) })
     const ref = testExecutable(agent, "2026-08-03")
@@ -845,27 +894,41 @@ describe("ExecutionHost", () => {
         generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
         streamText: () => {
           modelCalls += 1
-          return Stream.fromIterable<Response.StreamPartEncoded>(
-            modelCalls === 1
+          const response = Stream.fromIterable<Response.StreamPartEncoded>(
+            modelCalls <= 9
               ? [
                   Response.makePart("tool-call", {
-                    id: "wait-call-1",
+                    id: `advance-call-${modelCalls}`,
                     name: "wait_for_human",
-                    params: { question: "Continue?" },
+                    params: { question: `Advance ${modelCalls}` },
                     providerExecuted: false,
                   }),
                   finish,
                 ]
-              : [Response.makePart("text-delta", { id: "answer", delta: "continued" }), finish],
+              : modelCalls === 10
+                ? [
+                    Response.makePart("tool-call", {
+                      id: "wait-call-10",
+                      name: "wait_for_human",
+                      params: { question: "Continue?" },
+                      providerExecuted: false,
+                    }),
+                    finish,
+                  ]
+                : [Response.makePart("text-delta", { id: "answer", delta: "continued" }), finish],
           )
+          return modelCalls === 11
+            ? Stream.fromEffect(inspectFinalModel).pipe(Stream.drain, Stream.concat(response))
+            : response
         },
       }),
     )
     const executor = ToolExecutor.layerTest({
-      execute: () =>
-        phase === "suspend"
-          ? Effect.succeed({ _tag: "Suspend", token: "approval-token" })
-          : Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" }),
+      execute: (request) =>
+        String((request.call.params as { readonly question?: string }).question).startsWith("Advance ") ||
+        phase === "resume"
+          ? Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" })
+          : Effect.succeed({ _tag: "Suspend", token: "approval-token" }),
     })
     const handlers = Toolkit.make(waitTool).toLayer({
       wait_for_human: () => Effect.die("ToolExecutor test layer owns execution"),
@@ -905,6 +968,15 @@ describe("ExecutionHost", () => {
           idempotencyKey: "message:1",
           prompt: "Wait and then continue.",
         })
+        inspectFinalModel = store.loadExecution(receipt.runId).pipe(
+          Effect.tap((execution) =>
+            Effect.sync(() => {
+              suspensionAtFinalModel = execution.suspension
+            }),
+          ),
+          Effect.asVoid,
+          Effect.orDie,
+        )
         expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
 
         const firstClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
@@ -919,11 +991,12 @@ describe("ExecutionHost", () => {
           throw new Error(failed?._tag === "RunFailed" ? failed.error.message : "run failed")
         }
         expect(waiting.status).toBe("waiting")
-        expect(waiting.wait?.waitId).toBe("wait-call-1")
+        expect(waiting.wait?.waitId).toBe("wait-call-10")
         const persisted = yield* store.loadExecution(receipt.runId)
         expect(persisted.checkpoint !== undefined && "driverVersion" in persisted.checkpoint).toBe(true)
         if (persisted.checkpoint === undefined || !("driverVersion" in persisted.checkpoint)) return
         expect(persisted.checkpoint.driverVersion).toBe("1")
+        expect(persisted.checkpoint.turn).toBe(9)
         expect(persisted.checkpoint.executable).toEqual(ref.ref)
         expect(persisted.transcript).toBeUndefined()
         const durableSession = yield* store.sessionStore("session:durable")
@@ -945,14 +1018,17 @@ describe("ExecutionHost", () => {
         lifecycle.length = 0
         yield* runtime.respond({
           runId: receipt.runId,
-          waitId: "wait-call-1",
+          waitId: "wait-call-10",
           idempotencyKey: "response:1",
           resolution: { _tag: "ToolResult", result: "approved", encodedResult: "approved" },
         })
+        expect((yield* store.loadExecution(receipt.runId)).suspension).toBeDefined()
         const resumeClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
         yield* host.execute(resumeClaim)
 
         const completed = yield* runtime.inspect(receipt.runId)
+        expect((yield* store.loadExecution(receipt.runId)).suspension).toBeUndefined()
+        expect(suspensionAtFinalModel).toMatchObject({ token: "approval-token", tool_call_id: "wait-call-10" })
         if (completed.status === "failed") {
           const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
           const failure = history.find((event) => event._tag === "RunFailed")
@@ -968,7 +1044,18 @@ describe("ExecutionHost", () => {
         expect(replay.filter((event) => event._tag === "RunCompleted")).toHaveLength(1)
         expect(replay.map((event) => event.sequence)).toEqual(replay.map((_, index) => index))
         expect(new Set(replay.map((event) => event.runId))).toEqual(new Set([receipt.runId]))
-        expect(modelCalls).toBe(2)
+        expect(
+          replay
+            .filter((event) => event._tag === "TurnStarted")
+            .map((event) => (event._tag === "TurnStarted" ? event.turn : -1)),
+        ).toEqual(Array.from({ length: 11 }, (_, turn) => turn))
+        const resumedTool = replay.find(
+          (event) => event._tag === "ToolExecutionCompleted" && event.call.id === "wait-call-10",
+        )
+        expect(resumedTool?._tag === "ToolExecutionCompleted" ? resumedTool.turn : undefined).toBe(9)
+        const nextCall = replay.find((event) => event._tag === "ModelCallStarted" && event.turn === 10)
+        expect(nextCall?._tag === "ModelCallStarted" ? nextCall.turn : undefined).toBe(10)
+        expect(modelCalls).toBe(11)
         expect(lifecycle).toEqual([
           "execution resolver acquired",
           "service acquired",
@@ -1097,8 +1184,10 @@ describe("ExecutionHost", () => {
             result: { text: "first child complete", turns: 1, transcript: Prompt.make("first child complete") },
           })
           expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("running")
+          expect((yield* store.loadExecution(admitted.parentRunId)).suspension).toBeDefined()
           yield* host.execute(yield* store.claimExecution({ runId: admitted.parentRunId, ownerId: "parent:resumed" }))
           expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("succeeded")
+          expect((yield* store.loadExecution(admitted.parentRunId)).suspension).toBeUndefined()
           expect((yield* store.snapshot(admitted.parentRunId)).outcome).toMatchObject({
             _tag: "Succeeded",
             result: { text: "parent resumed" },
@@ -2081,51 +2170,343 @@ describe("ExecutionHost", () => {
     ),
   )
 
-  for (const backend of ["memory", "sqlite"] as const) {
-    it.effect(`${backend} does not recontact a failed never-replay model after a durable child checkpoint`, () => {
+  for (const earlyFailure of [
+    {
+      name: "resolver failure",
+      expectedTag: "@batonfx/runtime/ExecutablePinMissing",
+      expectedMessage: undefined,
+      opensService: false,
+    },
+    {
+      name: "executable identity mismatch",
+      expectedTag: "@batonfx/runtime/ExecutableIdentityMismatch",
+      expectedMessage: undefined,
+      opensService: false,
+    },
+    {
+      name: "compaction-options mismatch",
+      expectedTag: "@batonfx/runtime/AgentExecutionFailure",
+      expectedMessage: "Resolved compaction options do not match Agent manifest",
+      opensService: true,
+    },
+    {
+      name: "undecodable persisted resume suspension",
+      expectedTag: "@batonfx/runtime/AgentExecutionFailure",
+      expectedMessage: "Persisted suspension could not be decoded",
+      opensService: true,
+    },
+  ] as const) {
+    it.effect(`defers Program map child ${earlyFailure.name} until scoped finalizers close`, () => {
+      let childRunId = ""
+      let store: RunStore.Interface
+      let bindingDispatches = 0
       let modelCalls = 0
-      let childDispatches = 0
-      const prompts: Array<string> = []
-      const childWork = Tool.make("child_work", { parameters: Schema.Struct({}), success: Schema.String })
-      const toolkit = Toolkit.make(childWork)
-      const agent = Agent.make({ name: "parent-resume", toolkit })
-      const executable = testExecutable(agent, "parent-resume-v1")
-      const address = Address.make("agent:parent-resume")
-      const escaped = AiError.make({
-        module: "ParentResumeModel",
-        method: "streamText",
-        reason: AiError.RateLimitError.make({}),
+      let serviceAcquisitions = 0
+      const finalizerObservations: Array<{
+        readonly name: "service" | "resolver"
+        readonly status: string
+        readonly eventTags: ReadonlyArray<string>
+      }> = []
+      const observeFinalizer = (name: "service" | "resolver") =>
+        Effect.gen(function* () {
+          const inspection = yield* store.inspect(childRunId)
+          const history = yield* store.history({ runId: childRunId, cursor: Cursor.origin, limit: 100 })
+          finalizerObservations.push({
+            name,
+            status: inspection.status,
+            eventTags: history.map((event) => event._tag),
+          })
+        }).pipe(Effect.orDie)
+
+      const child = Agent.make({ name: `early-failure-child:${earlyFailure.name}` })
+      const pinnedChild = pinnedTestAgent(child, `early-failure-child:${earlyFailure.name}:v1`)
+      const modelService = LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          modelCalls += 1
+          return Stream.fromIterable<Response.StreamPartEncoded>([finish])
+        },
       })
       const model = Layer.effect(
         LanguageModel.LanguageModel,
-        LanguageModel.make({
-          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-          streamText: (request) => {
-            modelCalls += 1
-            prompts.push(JSON.stringify(request.prompt.content))
-            if (modelCalls === 1) {
-              return Stream.fromIterable<Response.StreamPartEncoded>([
-                Response.makePart("tool-call", {
-                  id: "child-work-1",
-                  name: "child_work",
-                  params: {},
-                  providerExecuted: false,
-                }),
-                finish,
-              ])
-            }
-            if (modelCalls === 2) {
-              const partial: Stream.Stream<Response.StreamPartEncoded, AiError.AiError> = Stream.make(
-                Response.makePart("text-delta", { id: "failed-parent", delta: "discard me" }),
-              )
-              return partial.pipe(Stream.concat(Stream.fail(escaped)))
-            }
+        Effect.acquireRelease(
+          Effect.sync(() => {
+            serviceAcquisitions += 1
+          }).pipe(Effect.andThen(modelService)),
+          () => observeFinalizer("service"),
+        ),
+      )
+      const closedChild = Agent.close(child, model)
+      const program = AgentProgram.make({
+        name: `early-failure-map:${earlyFailure.name}`,
+        source: "return await agent.map('workers')",
+        sandbox: Pins.makeCapability({ sandbox: `early-failure-map:${earlyFailure.name}:v1` }),
+        input: Prompt.Prompt,
+        inputPin: Pins.makeCapability({ codec: "prompt-v1" }),
+        output: Schema.Array(Schema.String),
+        outputPin: Pins.makeCapability({ codec: "strings-v1" }),
+        tools: [],
+        agents: [
+          {
+            selection: "worker",
+            agent: pinnedChild.pin,
+            input: Pins.makeCapability({ codec: "string-v1" }),
+          },
+        ],
+        steps: [],
+        budget: {
+          agentRuns: 1,
+          concurrency: 1,
+          toolCalls: 0,
+          tokens: 100,
+          wallClockMillis: 10_000,
+          logBytes: 100,
+          outputBytes: 1_000,
+        },
+      })
+      const executable = ExecutableManifest.make({
+        root: program.pinned.pin,
+        entries: [
+          { _tag: "Program", ...program.pinned },
+          { _tag: "Agent", ...pinnedChild },
+        ],
+      })
+      const childExecutable = {
+        ref: { executable: executable.ref.executable, active: pinnedChild.pin },
+        manifest: executable.manifest,
+      }
+      const mismatchedExecutable = testExecutable(
+        Agent.make({ name: `wrong-child:${earlyFailure.name}` }),
+        `wrong-child:${earlyFailure.name}:v1`,
+      )
+      const bindings = ProgramBindings.make({
+        tools: [],
+        steps: [],
+        agents: [
+          ProgramBindings.agent({
+            selection: "worker",
+            agent: pinnedChild.pin,
+            inputPin: program.pinned.manifest.capabilities.agents[0]!.input,
+            input: Schema.String,
+            replay: "non-idempotent",
+            authorize: () => Effect.succeed(true),
+            execute: () =>
+              Effect.sync(() => {
+                bindingDispatches += 1
+                return { text: "binding must not execute", turns: 0, tokenUsage: { input: 0, output: 0 } }
+              }),
+          }),
+        ],
+      })
+      const sandbox = SandboxExecutor.makeTest(
+        () =>
+          Effect.gen(function* () {
+            const capabilities = yield* ProgramCapabilities.ProgramCapabilities
+            const results = yield* capabilities.mapAgents({
+              operation: "workers",
+              selection: "worker",
+              members: [{ member: "only", input: "perform child work" }],
+            })
+            return results.map((member) => member.result.text)
+          }),
+        { ...SandboxExecutor.testIdentity, fixture: `early-failure-map:${earlyFailure.name}` },
+      )
+      const staticResolver = ExecutableResolver.makeStatic([
+        { _tag: "Program", executable, program, sandbox, bindings },
+        { _tag: "Agent", executable: childExecutable, agent: closedChild },
+      ])
+      const resolver = ExecutableResolver.ExecutableResolver.of({
+        resolve: (input) => {
+          const resolution = staticResolver.resolve(input)
+          if (input.runId === "pending" || input.ref.active !== pinnedChild.pin) return resolution
+          const finalized = Effect.addFinalizer(() => observeFinalizer("resolver"))
+          if (earlyFailure.name === "resolver failure") {
+            return finalized.pipe(
+              Effect.andThen(Errors.ExecutablePinMissing.make({ runId: input.runId, ref: input.ref })),
+            )
+          }
+          if (earlyFailure.name === "executable identity mismatch") {
+            return finalized.pipe(
+              Effect.andThen(resolution),
+              Effect.map((resolved) => ({ ...resolved, attestation: mismatchedExecutable })),
+            )
+          }
+          if (earlyFailure.name === "compaction-options mismatch") {
+            return finalized.pipe(
+              Effect.andThen(resolution),
+              Effect.map((resolved) =>
+                resolved._tag === "Agent"
+                  ? {
+                      ...resolved,
+                      runOptions: { compaction: { contextWindow: 32_768, reserveTokens: 2_048 } },
+                    }
+                  : resolved,
+              ),
+            )
+          }
+          return finalized.pipe(Effect.andThen(resolution))
+        },
+      })
+      const address = Address.make(`program:early-failure-map:${earlyFailure.name}`)
+
+      return scopedWith(
+        Runtime.layerMemory({
+          resolver,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 day" },
+        }),
+      )(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          store = yield* RunStore.RunStore
+          const parent = yield* runtime.send({
+            to: address,
+            sessionId: `session:early-failure-map:${earlyFailure.name}`,
+            idempotencyKey: `early-failure-map:${earlyFailure.name}`,
+            prompt: "run the worker map",
+          })
+          yield* host.execute(yield* store.claimExecution({ runId: parent.runId, ownerId: "program-parent" }))
+
+          const operation = yield* store.getProgramOperation({ runId: parent.runId, operation: "workers" })
+          expect(operation).toMatchObject({
+            kind: "agent-map",
+            status: "waiting",
+            childRunIds: [expect.any(String)],
+          })
+          if (operation === undefined || operation.childRunIds.length !== 1) {
+            return yield* Effect.die("ProgramHost did not admit exactly one owned Agent child")
+          }
+          childRunId = operation.childRunIds[0]!
+          const childExecution = yield* store.loadExecution(childRunId)
+          expect(childExecution).toMatchObject({
+            parentRunId: parent.runId,
+            message: { metadata: { programOperation: "workers" } },
+          })
+          expect((yield* runtime.inspect(childRunId)).status).toBe("queued")
+          expect(operation.childRunIds).toContain(childRunId)
+
+          if (earlyFailure.name === "undecodable persisted resume suspension") {
+            const preparationClaim = yield* store.claimExecution({ runId: childRunId, ownerId: "suspension-preparer" })
+            yield* store.suspend({
+              ...preparationClaim,
+              suspension: { malformed: true } as never,
+              wait: {
+                waitId: "malformed-resume",
+                reason: { _tag: "ToolWait" },
+                status: "open",
+                openedAt: "2026-08-05T00:00:00.000Z",
+              },
+            })
+            expect((yield* store.loadExecution(childRunId)).suspension).toEqual({ malformed: true })
+            yield* runtime.respond({
+              runId: childRunId,
+              waitId: "malformed-resume",
+              idempotencyKey: "malformed-resume",
+              resolution: { _tag: "ToolResult", result: "unused", encodedResult: "unused" },
+            })
+            expect((yield* runtime.inspect(childRunId)).status).toBe("running")
+          }
+
+          yield* host.execute(yield* store.claimExecution({ runId: childRunId, ownerId: "program-child" }))
+
+          expect(finalizerObservations.map((observation) => observation.name)).toEqual(
+            earlyFailure.opensService ? ["service", "resolver"] : ["resolver"],
+          )
+          for (const observation of finalizerObservations) {
+            expect(observation.status).toBe("running")
+            expect(observation.eventTags).not.toContain("RunFailed")
+            expect(observation.eventTags).not.toContain("RunCompleted")
+            expect(observation.eventTags).not.toContain("RunCancelled")
+          }
+          expect(serviceAcquisitions).toBe(earlyFailure.opensService ? 1 : 0)
+          expect(modelCalls).toBe(0)
+          expect(bindingDispatches).toBe(0)
+
+          expect((yield* runtime.inspect(childRunId)).status).toBe("failed")
+          const history = yield* runtime.history({ runId: childRunId, limit: 100 })
+          const terminalEvents = history.filter(
+            (event) => event._tag === "RunFailed" || event._tag === "RunCompleted" || event._tag === "RunCancelled",
+          )
+          expect(terminalEvents).toHaveLength(1)
+          const failed = terminalEvents[0]
+          expect(failed?._tag).toBe("RunFailed")
+          if (failed?._tag !== "RunFailed") return yield* Effect.die("Program Agent child did not fail")
+          expect(failed.error._tag).toBe(earlyFailure.expectedTag)
+          if (earlyFailure.expectedMessage !== undefined) {
+            expect(failed.error.message).toBe(earlyFailure.expectedMessage)
+          }
+        }),
+      )
+    })
+  }
+
+  for (const backend of ["memory", "sqlite"] as const) {
+    it.effect(`${backend} finalizes a real Program map child before its RunFailed commit`, () => {
+      let modelCalls = 0
+      let childDispatches = 0
+      let bindingDispatches = 0
+      let sandboxCalls = 0
+      let childRunId = ""
+      let store: RunStore.Interface
+      const providerRequests: Array<string> = []
+      const finalizerObservations: Array<{
+        readonly name: "service" | "resolver"
+        readonly runStatus: string
+        readonly operationStatus: string | undefined
+        readonly eventTags: ReadonlyArray<string>
+      }> = []
+      const failedOperationKey = (runId: string) => `${runId}:model:1:1:conversation`
+      const observeFinalizer = (name: "service" | "resolver", runId: string) =>
+        Effect.gen(function* () {
+          const inspection = yield* store.inspect(runId)
+          const operation = yield* store.getOperationByKey({
+            runId,
+            operationKey: failedOperationKey(runId),
+          })
+          const history = yield* store.history({ runId, cursor: Cursor.origin, limit: 200 })
+          finalizerObservations.push({
+            name,
+            runStatus: inspection.status,
+            operationStatus: operation?.status,
+            eventTags: history.map((event) => event._tag),
+          })
+        }).pipe(Effect.orDie)
+
+      const childWork = Tool.make("child_work", { parameters: Schema.Struct({}), success: Schema.String })
+      const toolkit = Toolkit.make(childWork)
+      const child = Agent.make({ name: "failed-program-child", toolkit })
+      const pinnedChild = pinnedTestAgent(child, "failed-program-child-v1")
+      const escaped = AiError.make({
+        module: "FailedProgramChildModel",
+        method: "streamText",
+        reason: AiError.RateLimitError.make({}),
+      })
+      const modelService = LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: (request) => {
+          modelCalls += 1
+          providerRequests.push(JSON.stringify(request.prompt.content))
+          if (modelCalls === 1) {
             return Stream.fromIterable<Response.StreamPartEncoded>([
-              Response.makePart("text-delta", { id: "resumed-parent", delta: "resumed once" }),
+              Response.makePart("tool-call", {
+                id: "child-work-1",
+                name: "child_work",
+                params: {},
+                providerExecuted: false,
+              }),
               finish,
             ])
-          },
-        }),
+          }
+          const partial: Stream.Stream<Response.StreamPartEncoded, AiError.AiError> = Stream.make(
+            Response.makePart("text-delta", { id: "failed-child", delta: "discard me" }),
+          )
+          return partial.pipe(Stream.concat(Stream.fail(escaped)))
+        },
+      })
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(modelService, () => observeFinalizer("service", childRunId)),
       )
       const executor = ToolExecutor.layerTest({
         execute: () =>
@@ -2135,51 +2516,237 @@ describe("ExecutionHost", () => {
           }),
       })
       const handlers = toolkit.toLayer({ child_work: () => Effect.die("ToolExecutor owns child work") })
-      const resolver = ExecutableResolver.makeStatic([
-        { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-      ])
+      const closedChild = Agent.close(child, Layer.mergeAll(model, executor, handlers))
 
+      const program = AgentProgram.make({
+        name: "failed-agent-map",
+        source: "return await agent.map('workers')",
+        sandbox: Pins.makeCapability({ sandbox: "failed-agent-map-v1" }),
+        input: Prompt.Prompt,
+        inputPin: Pins.makeCapability({ codec: "prompt-v1" }),
+        output: Schema.Array(Schema.String),
+        outputPin: Pins.makeCapability({ codec: "strings-v1" }),
+        tools: [],
+        agents: [
+          {
+            selection: "worker",
+            agent: pinnedChild.pin,
+            input: Pins.makeCapability({ codec: "string-v1" }),
+          },
+        ],
+        steps: [],
+        budget: {
+          agentRuns: 1,
+          concurrency: 1,
+          toolCalls: 0,
+          tokens: 100,
+          wallClockMillis: 10_000,
+          logBytes: 100,
+          outputBytes: 1_000,
+        },
+      })
+      const executable = ExecutableManifest.make({
+        root: program.pinned.pin,
+        entries: [
+          { _tag: "Program", ...program.pinned },
+          { _tag: "Agent", ...pinnedChild },
+        ],
+      })
+      const childExecutable = {
+        ref: { executable: executable.ref.executable, active: pinnedChild.pin },
+        manifest: executable.manifest,
+      }
+      const bindings = ProgramBindings.make({
+        tools: [],
+        steps: [],
+        agents: [
+          ProgramBindings.agent({
+            selection: "worker",
+            agent: pinnedChild.pin,
+            inputPin: program.pinned.manifest.capabilities.agents[0]!.input,
+            input: Schema.String,
+            replay: "non-idempotent",
+            authorize: () => Effect.succeed(true),
+            execute: () =>
+              Effect.sync(() => {
+                bindingDispatches += 1
+                return { text: "wrong", turns: 0, tokenUsage: { input: 0, output: 0 } }
+              }),
+          }),
+        ],
+      })
+      const sandbox = SandboxExecutor.makeTest(
+        () =>
+          Effect.gen(function* () {
+            yield* Effect.sync(() => void ++sandboxCalls)
+            const host = yield* ProgramCapabilities.ProgramCapabilities
+            const results = yield* host.mapAgents({
+              operation: "workers",
+              selection: "worker",
+              members: [{ member: "only", input: "perform child work" }],
+            })
+            return results.map((member) => `${member.member}:${member.result.text}`)
+          }),
+        { ...SandboxExecutor.testIdentity, fixture: "failed-agent-map" },
+      )
+      const staticResolver = ExecutableResolver.makeStatic([
+        { _tag: "Program", executable, program, sandbox, bindings },
+        { _tag: "Agent", executable: childExecutable, agent: closedChild },
+      ])
+      const resolver = ExecutableResolver.ExecutableResolver.of({
+        resolve: (input) =>
+          staticResolver
+            .resolve(input)
+            .pipe(
+              Effect.tap(() =>
+                input.ref.active === pinnedChild.pin
+                  ? Effect.addFinalizer(() => observeFinalizer("resolver", input.runId))
+                  : Effect.void,
+              ),
+            ),
+      })
+      const address = Address.make("program:failed-agent-map")
       const options = {
         resolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        scheduler: { pollInterval: "1 day" as const },
       }
+
       return scopedWith(
         backend === "memory"
           ? Runtime.layerMemory(options)
-          : Runtime.layerSqlite({ ...options, filename: tempDbPath("parent-resume") }),
+          : Runtime.layerSqlite({ ...options, filename: tempDbPath(`failed-agent-map-${backend}`) }),
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const host = yield* ExecutionHost.ExecutionHost
-          const store = yield* RunStore.RunStore
+          store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: address,
-            sessionId: "session:parent-resume",
-            idempotencyKey: "parent-resume",
-            prompt: "delegate then answer",
+            sessionId: `session:failed-agent-map:${backend}`,
+            idempotencyKey: "failed-agent-map",
+            prompt: "run the worker map",
           })
-          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "parent-resume" }))
+          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "program-parent" }))
 
-          const history = yield* runtime.history({ runId: receipt.runId, limit: 200 })
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
+          const admitted = yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("waiting")
+          expect(admitted).toMatchObject({
+            kind: "agent-map",
+            status: "waiting",
+            childRunIds: [expect.any(String)],
+          })
+          if (admitted?.fanOutId === undefined || admitted.childRunIds.length !== 1) {
+            return yield* Effect.die("ProgramHost did not admit exactly one map child")
+          }
+          childRunId = admitted.childRunIds[0]!
+          const fanOutId = admitted.fanOutId
+          expect(yield* runtime.inspectFanOut(fanOutId)).toMatchObject({
+            status: "running",
+            members: [{ key: "only", childRunId, status: "running" }],
+          })
+
+          yield* host.execute(yield* store.claimExecution({ runId: childRunId, ownerId: "program-child" }))
+
+          expect(finalizerObservations.map((observation) => observation.name)).toEqual(["service", "resolver"])
+          for (const observation of finalizerObservations) {
+            expect(observation.runStatus).toBe("running")
+            expect(observation.operationStatus).toBe("running")
+            expect(observation.eventTags).not.toContain("ModelResponseInterrupted")
+            expect(observation.eventTags).not.toContain("RunFailed")
+          }
+          expect((yield* runtime.inspect(childRunId)).status).toBe("failed")
           expect(childDispatches).toBe(1)
           expect(modelCalls).toBe(2)
-          expect(prompts[1]).toContain("child complete")
-          expect(history.filter((event) => event._tag === "RunAttemptStarted").map((event) => event.attempt)).toEqual([
-            1,
-          ])
-          const interruptedIndex = history.findIndex((event) => event._tag === "ModelResponseInterrupted")
-          const failedIndex = history.findIndex((event) => event._tag === "RunFailed")
+          expect(providerRequests.filter((request) => request.includes("child complete"))).toHaveLength(1)
+          expect(providerRequests[1]).toContain("child complete")
+
+          const childHistory = yield* runtime.history({ runId: childRunId, limit: 200 })
+          expect(
+            childHistory.filter((event) => event._tag === "RunAttemptStarted").map((event) => event.attempt),
+          ).toEqual([1])
+          const interruptedIndex = childHistory.findIndex((event) => event._tag === "ModelResponseInterrupted")
+          const failedIndex = childHistory.findIndex((event) => event._tag === "RunFailed")
           expect(interruptedIndex).toBeGreaterThan(-1)
           expect(interruptedIndex).toBeLessThan(failedIndex)
-          const failed = history[failedIndex]
-          expect(failed?._tag).toBe("RunFailed")
-          if (failed?._tag === "RunFailed") {
-            expect(failed.error).toBeInstanceOf(Errors.AgentExecutionFailure)
-            expect(failed.error.message).not.toBe("")
+          expect(childHistory[interruptedIndex]).toMatchObject({
+            operationKey: failedOperationKey(childRunId),
+            reason: "failure",
+            response: { content: [{ type: "text", text: "discard me" }] },
+          })
+          const childFailed = childHistory[failedIndex]
+          expect(childFailed?._tag).toBe("RunFailed")
+          if (childFailed?._tag !== "RunFailed") return yield* Effect.die("Program child did not fail")
+          expect(childFailed.error).toBeInstanceOf(Errors.AgentExecutionFailure)
+          expect(childFailed.error.message).not.toBe("")
+          expect(childHistory.filter((event) => event._tag === "RunCompleted")).toHaveLength(0)
+          expect(new Set(childHistory.map((event) => event.runId))).toEqual(new Set([childRunId]))
+
+          const failedOperation = yield* store.getOperationByKey({
+            runId: childRunId,
+            operationKey: failedOperationKey(childRunId),
+          })
+          expect(failedOperation).toMatchObject({
+            operationKey: failedOperationKey(childRunId),
+            kind: "model",
+            replayPolicy: "never",
+            input: { turn: 1, modelCallOrdinal: 1, purpose: "conversation" },
+            status: "failed",
+            error: { _tag: "@batonfx/runtime/AgentExecutionFailure" },
+          })
+
+          const joined = yield* runtime.inspectFanOut(fanOutId)
+          expect(joined).toMatchObject({
+            status: "failed",
+            members: [
+              {
+                key: "only",
+                childRunId,
+                readiness: "settled",
+                status: "failed",
+                terminalEventId: childFailed.eventId,
+                error: {
+                  _tag: "@batonfx/runtime/AgentExecutionFailure",
+                  message: childFailed.error.message,
+                },
+              },
+            ],
+          })
+          expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
+            status: "running",
+            wait: { status: "signaled" },
+          })
+          expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })).toMatchObject({
+            status: "running",
+            fanOutId,
+            childRunIds: [childRunId],
+          })
+
+          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "program-parent-resumed" }))
+
+          expect(sandboxCalls).toBe(2)
+          expect(bindingDispatches).toBe(0)
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
+          const programOperation = yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })
+          expect(programOperation).toMatchObject({
+            status: "failed",
+            fanOutId,
+            childRunIds: [childRunId],
+            error: { _tag: "@batonfx/core/ProgramAgentFailure", operation: "workers", selection: "worker" },
+          })
+          expect((yield* store.loadProgramState(receipt.runId))?.activeSlots).toBe(0)
+          expect(yield* runtime.inspectFanOut(fanOutId)).toEqual(joined)
+          const parentHistory = yield* runtime.history({ runId: receipt.runId, limit: 200 })
+          const parentFailed = parentHistory.find((event) => event._tag === "RunFailed")
+          expect(parentFailed?._tag).toBe("RunFailed")
+          if (parentFailed?._tag === "RunFailed") {
+            expect(parentFailed.error).toMatchObject({
+              _tag: "@batonfx/core/ProgramAgentFailure",
+              operation: "workers",
+              selection: "worker",
+            })
           }
-          expect(history.filter((event) => event._tag === "RunCompleted")).toHaveLength(0)
-          expect(new Set(history.map((event) => event.runId))).toEqual(new Set([receipt.runId]))
+          expect(parentHistory.filter((event) => event._tag === "RunCompleted")).toHaveLength(0)
         }),
       )
     })

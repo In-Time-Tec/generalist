@@ -339,6 +339,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
             {
               kind: "memory",
               key: operationKey(logicalId, "memory", "remember", turn, terminal ? 1 : 0),
+              turn,
               input: { turn, terminal, ...(memoryRuntime === undefined ? {} : { key: memoryRuntime.key }) },
               replayPolicy: "pure",
             },

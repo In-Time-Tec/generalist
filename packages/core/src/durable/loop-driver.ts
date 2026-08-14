@@ -228,9 +228,9 @@ export const makeLoopDriver = (options: LoopDriverOptions): DurableAgentDriver =
 
 /** @experimental Attach the next pending operation before interpreter decide. */
 export const withPending: {
-  (pending: PendingOperation): (checkpoint: DriverCheckpoint) => DriverCheckpoint
-  (checkpoint: DriverCheckpoint, pending: PendingOperation): DriverCheckpoint
-} = Function.dual(2, (checkpoint: DriverCheckpoint, pending: PendingOperation): DriverCheckpoint => {
+  (pending: PendingOperation, turn: number): (checkpoint: DriverCheckpoint) => DriverCheckpoint
+  (checkpoint: DriverCheckpoint, pending: PendingOperation, turn: number): DriverCheckpoint
+} = Function.dual(3, (checkpoint: DriverCheckpoint, pending: PendingOperation, turn: number): DriverCheckpoint => {
   const state = Schema.decodeUnknownSync(LoopDriverState)(checkpoint.state)
-  return { ...checkpoint, state: { ...state, pending } }
+  return { ...checkpoint, turn, state: { ...state, pending } }
 })
