@@ -363,6 +363,7 @@ export interface Interface {
     RunNotFound | RunTerminal | RuntimeUnavailable | import("./sql/errors.js").StaleClaim
   >
   readonly loadExecution: (runId: string) => Effect.Effect<ExecutionRecord, RunNotFound | RuntimeUnavailable>
+  readonly releaseExecution: (input: ExecutionClaim) => Effect.Effect<void, RuntimeUnavailable>
   readonly saveExecution: (
     input: ExecutionClaim & {
       readonly checkpoint?: ExecutionCheckpoint

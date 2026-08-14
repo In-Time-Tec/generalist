@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.25.2
+
+- Restore the persisted semantic turn and model-call ordinal when resuming an Agent, so suspended tool work finishes its original turn and the next provider operation advances without regenerating a conflicting durable key.
+- Retain suspension through resume binding and clear it only with a durable continuation or terminal transition, preventing a crash between binding and resumed tool completion from losing the restart checkpoint.
+- Settle an active failed operation before terminalizing every Run, including deferred Program children after resolver finalizers, so completed `never` operations are never re-dispatched and failures cannot leave a Run permanently active.
+- Release ExecutionHost claims on every exit only after scoped resources finalize, fenced by exact owner and attempt across memory, SQLite, PostgreSQL, and MySQL; interrupted Runs become reclaimable while stale cleanup cannot clear a replacement owner.
+
 ## 0.25.1
 
 - Keep cancelled child settlements durably observable while excluding cancellation from parent model delivery and later-Run forwarding; successful and failed settlement delivery is unchanged.

@@ -282,7 +282,7 @@ export const complete: {
     `
     if (running.length > 0) {
       yield* sql`
-        UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL,
+        UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, suspension_json = NULL,
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result: input.result })}
         WHERE run_id = ${run.runId}
       `
@@ -329,7 +329,7 @@ export const fail: {
     `
     if (running.length > 0) {
       yield* sql`
-        UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL,
+        UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, suspension_json = NULL,
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
         WHERE run_id = ${run.runId}
       `

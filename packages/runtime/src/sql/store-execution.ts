@@ -60,6 +60,17 @@ export const loadExecution = (runId: string) =>
     return executionRecord(run, yield* activeChildCount(runId), registrations, wait?.resolution)
   })
 
+export const releaseExecution = (input: ExecutionClaim) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`
+      UPDATE baton_runs SET owner_worker_id = NULL
+      WHERE run_id = ${input.runId}
+        AND owner_worker_id = ${input.ownerId}
+        AND attempt_fence = ${input.attemptFence}
+    `
+  })
+
 export const claimExecution: {
   (input: { readonly runId: string; readonly ownerId: string }): (hub: EventHub) => ReturnType<typeof claimExecution>
   (

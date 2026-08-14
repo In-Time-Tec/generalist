@@ -79,7 +79,7 @@ export type WaitDefinition = typeof WaitDefinition.Type
 export const DriverCheckpoint = Schema.Struct({
   driverVersion: DriverVersion,
   executable: Schema.optionalKey(ExecutableRef),
-  turn: Schema.Finite,
+  turn: Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
   budget: RunBudget,
   state: Schema.Unknown,
 })

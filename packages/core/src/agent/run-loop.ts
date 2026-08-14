@@ -109,6 +109,7 @@ export const makeRunLoop = <
           {
             kind: "structured-output",
             key: operationKey(logicalId, "structured-output", structuredTurn, ordinal),
+            turn: structuredTurn,
             input: { turn: structuredTurn, modelCallOrdinal: ordinal },
             replayPolicy: "provider-idempotent",
           },
@@ -360,16 +361,14 @@ export const makeRunLoop = <
       }),
     )
   }
-  const resumeStream = (
-    checkpoint: SuspensionCheckpoint,
-  ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
+  const resumeStream = (checkpoint: SuspensionCheckpoint, turn: number) => {
     let next:
       | {
           readonly prompt: Prompt.RawInput
           readonly overrides?: TurnOverrides
         }
       | undefined
-    const currentTurn = resetTurnState(0).pipe(
+    const currentTurn = resetTurnState(turn).pipe(
       Stream.concat(
         Stream.unwrap(
           Effect.all({ tools: Ref.get(toolState), activeAgent: policyAgent() }).pipe(
@@ -390,7 +389,7 @@ export const makeRunLoop = <
               const suspendedIndex = suspension.tool_call_index ?? 0
               if (calls[suspendedIndex] === undefined) {
                 return Stream.fail(
-                  AgentError.make({ message: "Suspension tool call index is outside its batch", turn: 0 }),
+                  AgentError.make({ message: "Suspension tool call index is outside its batch", turn }),
                 )
               }
               const executions = checkpoint.unresolvedToolCallIndexes.map((toolCallIndex) => ({
@@ -406,7 +405,7 @@ export const makeRunLoop = <
               }): ReturnType<typeof toolCallEvents> => {
                 const resolution = options.resume?.resolution
                 return toolCallIndex === suspendedIndex && resolution?._tag === "Approved"
-                  ? resumeApproved(0, toolCallBatch, toolCallIndex, call, registry)
+                  ? resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
                   : toolCallIndex === suspendedIndex && resolution !== undefined
                     ? (Stream.fromEffect(
                         Effect.sync(() => {
@@ -415,10 +414,10 @@ export const makeRunLoop = <
                             resolution as Exclude<ResumeResolution, { readonly _tag: "Approved" }>,
                           )
                           state.pending.set(toolCallIndex, result)
-                          return { _tag: "ToolExecutionCompleted" as const, turn: 0, call, result }
+                          return { _tag: "ToolExecutionCompleted" as const, turn, call, result }
                         }),
                       ) as ReturnType<typeof toolCallEvents>)
-                    : toolCallEvents(0, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
+                    : toolCallEvents(turn, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
               }
               return scheduleTools(executions, activeAgent.toolScheduling, execute)
             }),
@@ -427,7 +426,7 @@ export const makeRunLoop = <
       ),
       Stream.concat(
         Stream.unwrap(
-          afterTurn(0).pipe(
+          afterTurn(turn).pipe(
             Effect.map((result) => {
               next = result.next
               return result.events
@@ -435,15 +434,16 @@ export const makeRunLoop = <
           ),
         ),
       ),
-      Stream.withSpan("Baton.Agent.turn", { attributes: { "baton.turn": 0 } }),
+      Stream.withSpan("Baton.Agent.turn", { attributes: { "baton.turn": turn } }),
     )
     return Stream.concat(
       currentTurn,
-      Stream.suspend(() => (next === undefined ? Stream.empty : runTurn(1, next.prompt, next.overrides))),
+      Stream.suspend(() => (next === undefined ? Stream.empty : runTurn(turn + 1, next.prompt, next.overrides))),
     )
   }
+  const startTurn = options.turnStart ?? options.driverCheckpoint?.turn ?? 0
   const runStream =
-    validatedResume === undefined ? runTurn(options.turnStart ?? 0, initialPrompt) : resumeStream(validatedResume)
+    validatedResume === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(validatedResume, startTurn)
   const guardedStream = runStream.pipe(
     Stream.catchCause((cause) => {
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
