@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Schema } from "effect"
+import { Redacted, Schema } from "effect"
 import { Response, Tool } from "effect/unstable/ai"
 import { make, text } from "../src/model/model-response-builder.js"
 
@@ -179,6 +179,52 @@ describe("model response builder", () => {
     expect(() => builder.accept(Response.makePart("text-delta", { id: "answer", delta: "!" }))).toThrow(
       "Cannot accept a model response part after completion",
     )
+  })
+
+  it("removes provider HTTP envelopes from snapshots and completed responses", () => {
+    const builder = make<Tools>()
+    builder.accept(
+      Response.makePart("response-metadata", {
+        id: "safe-id",
+        modelId: "safe-model",
+        timestamp: undefined,
+        request: {
+          method: "POST",
+          url: "https://provider.invalid/secret-path",
+          urlParams: [["secret", "request-canary"]],
+          hash: undefined,
+          headers: { authorization: Redacted.make("Bearer request-canary"), "x-plain": "plain-canary" },
+        },
+      }),
+    )
+    builder.accept(Response.makePart("text-delta", { id: "answer", delta: "safe answer" }))
+    builder.accept(
+      Response.makePart("finish", {
+        reason: "stop",
+        usage,
+        response: {
+          status: 200,
+          headers: { "set-cookie": Redacted.make("session=response-canary"), "x-plain": "plain-canary" },
+        },
+      }),
+    )
+
+    const snapshot = builder.snapshot()
+    expect(snapshot.content).toEqual([
+      Response.makePart("response-metadata", {
+        id: "safe-id",
+        modelId: "safe-model",
+        timestamp: undefined,
+        request: undefined,
+      }),
+      Response.makePart("text", { text: "safe answer" }),
+      Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+    ])
+    expect(snapshot.usage).toBe(usage)
+    expect(snapshot.finishReason).toBe("stop")
+    expect(builder.complete()).toEqual(snapshot)
+    expect(JSON.stringify(snapshot)).not.toContain("canary")
+    expect(JSON.stringify(snapshot)).not.toContain("secret-path")
   })
 
   it("snapshots 10,000 fragments and continues accumulating", () => {
