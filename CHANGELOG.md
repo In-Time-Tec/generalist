@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.26.2
+
+- Compare durable Session retries by stable semantic value across persistence transformations, preserving real provider response timestamps while rejecting changed or colliding authored payloads across SQLite, PostgreSQL, and MySQL.
+
 ## 0.26.1
 
 - Exclude provider HTTP request and response envelopes from canonical model responses, and safely hydrate v0.26 Session rows whose redacted header values were stored as empty objects without changing their durable digests.

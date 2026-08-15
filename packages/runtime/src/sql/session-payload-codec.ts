@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Equal, Function, Schema } from "effect"
 import { Session } from "@batonfx/core"
 
 const decodeEntry = Schema.decodeUnknownSync(Session.EntryPayload)
@@ -63,6 +63,79 @@ const restoreV026RedactedHeaders = (value: unknown): unknown => {
     }),
   }
 }
+
+type PayloadIdentity = ReadonlyArray<unknown>
+
+const payloadIdentity = (value: unknown, seen: Set<object>): PayloadIdentity => {
+  if (value === null) return ["Null"]
+  if (typeof value === "boolean") return ["Boolean", value]
+  if (typeof value === "string") return ["String", value]
+  if (typeof value === "number") return ["Number", Object.is(value, -0) ? "-0" : String(value)]
+  if (typeof value === "bigint") return ["BigInt", value.toString()]
+  if (typeof value === "undefined") return ["Undefined"]
+  if (typeof value === "symbol") return ["Symbol", String(value.description ?? "")]
+  if (typeof value === "function") return ["Function", value.name]
+  if (seen.has(value)) return ["Cycle"]
+  seen.add(value)
+  if (Array.isArray(value)) {
+    const items = value.map((item) => payloadIdentity(item, seen))
+    seen.delete(value)
+    return ["Array", items]
+  }
+  if (value instanceof Date) {
+    seen.delete(value)
+    return ["Date", value.toISOString()]
+  }
+  if (value instanceof Map) {
+    const entries = [...value.entries()]
+      .map(([key, item]) => [payloadIdentity(key, seen), payloadIdentity(item, seen)] as const)
+      .toSorted((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+    seen.delete(value)
+    return ["Map", entries]
+  }
+  if (value instanceof Set) {
+    const entries = [...value]
+      .map((item) => payloadIdentity(item, seen))
+      .toSorted((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+    seen.delete(value)
+    return ["Set", entries]
+  }
+  const entries = Reflect.ownKeys(value)
+    .filter((key) => Object.prototype.propertyIsEnumerable.call(value, key))
+    .map(
+      (key) =>
+        [
+          typeof key === "symbol"
+            ? (["SymbolKey", String(key.description ?? "")] as const)
+            : (["StringKey", key] as const),
+          key,
+        ] as const,
+    )
+    .toSorted(([left], [right]) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+    .map(([key, original]) => [key, payloadIdentity(value[original as keyof typeof value], seen)] as const)
+  seen.delete(value)
+  return ["Object", entries]
+}
+
+const payloadOnly = (value: Session.EntryPayload): Session.EntryPayload => {
+  const {
+    id: _id,
+    parentId: _parentId,
+    ...payload
+  } = value as Session.EntryPayload & {
+    readonly id?: string
+    readonly parentId?: string | null
+  }
+  return payload as Session.EntryPayload
+}
+
+const sessionPayloadEquivalenceImpl = (self: Session.EntryPayload, that: Session.EntryPayload): boolean =>
+  Equal.equals(payloadIdentity(payloadOnly(self), new Set()), payloadIdentity(payloadOnly(that), new Set()))
+
+export const sessionPayloadEquivalence: {
+  (that: Session.EntryPayload): (self: Session.EntryPayload) => boolean
+  (self: Session.EntryPayload, that: Session.EntryPayload): boolean
+} = Function.dual(2, sessionPayloadEquivalenceImpl)
 
 export const decodeSessionPayload = (text: string): Session.EntryPayload =>
   decodeEntry(restoreV026RedactedHeaders(withoutUndefinedMarkers(JSON.parse(text) as unknown)))
