@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@batonfx/skills",
-  "version": "0.26.1",
+  "version": "0.26.2",
   "private": false,
   "type": "module",
   "exports": {
