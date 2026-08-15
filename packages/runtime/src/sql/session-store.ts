@@ -1,7 +1,7 @@
 import { DateTime, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Session } from "@batonfx/core"
-import { decodeSessionPayload, encodeSessionPayload } from "./session-payload-codec.js"
+import { decodeSessionPayload, encodeSessionPayload, sessionPayloadEquivalence } from "./session-payload-codec.js"
 type Entry = Session.Entry
 type EntryId = Session.EntryId
 type AppendInput = Session.AppendInput
@@ -9,7 +9,7 @@ type AppendOptions = Session.AppendOptions
 type CheckpointAppend = Session.CheckpointAppend
 type CompactionEntry = Session.CompactionEntry
 type PreparedCheckpoint = Session.PreparedCheckpoint
-const entryPayloadEquivalence = Schema.toEquivalence(Session.EntryPayload)
+const entryPayloadEquivalence = sessionPayloadEquivalence
 const appendMatches = (entry: Entry, input: AppendInput, parentId: EntryId | null): boolean =>
   entry.parentId === parentId && entryPayloadEquivalence(entry as Session.EntryPayload, input as Session.EntryPayload)
 export interface EntryRow {

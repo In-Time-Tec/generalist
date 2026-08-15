@@ -1,10 +1,11 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
-import { Effect, Layer, Redacted, Schema, Scope, Stream } from "effect"
+import { DateTime, Effect, Layer, Redacted, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Session } from "@batonfx/core"
 import { Address, ExecutableResolver, ExecutionHost, Runtime, RunStore } from "../src/index.js"
 import { decodeSessionPayload, encodeSessionPayload } from "../src/sql/session-payload-codec.js"
+import { SessionStorage } from "../src/sql/session-store.js"
 import { registrationsFor } from "./helpers.js"
 import { testExecutable } from "./identity.js"
 import { tempDbPath } from "./sqlite-helpers.js"
@@ -61,12 +62,96 @@ it("repairs v0.26 redacted HTTP headers without changing unrelated empty objects
   ])
 })
 
+it("compares transformed Session payloads through their durable representation", () => {
+  const finish = Response.makePart("finish", { reason: "stop", usage, response: undefined })
+  const payload = {
+    _tag: "ModelResponse",
+    content: [
+      Response.makePart("response-metadata", {
+        id: "response-equivalence",
+        modelId: "model-equivalence",
+        timestamp: DateTime.makeUnsafe("2026-08-15T05:48:09.000Z"),
+        request: undefined,
+        metadata: { provider: { first: 1, second: 2 } },
+      }),
+      finish,
+    ],
+  } as Session.EntryPayload
+  const reopened = decodeSessionPayload(encodeSessionPayload(payload))
+  expect(SessionStorage.entryPayloadEquivalence(payload, reopened)).toBe(true)
+
+  const reordered = {
+    ...reopened,
+    content:
+      reopened._tag === "ModelResponse"
+        ? reopened.content.map((part) =>
+            part.type === "response-metadata" ? { ...part, metadata: { provider: { second: 2, first: 1 } } } : part,
+          )
+        : [],
+  } as Session.EntryPayload
+  expect(SessionStorage.entryPayloadEquivalence(payload, reordered)).toBe(true)
+
+  const changed = {
+    ...payload,
+    content: [
+      Response.makePart("response-metadata", {
+        id: "response-equivalence",
+        modelId: "model-equivalence",
+        timestamp: DateTime.makeUnsafe("2026-08-15T05:48:10.000Z"),
+        request: undefined,
+        metadata: { provider: { first: 1, second: 2 } },
+      }),
+      finish,
+    ],
+  } as Session.EntryPayload
+  expect(SessionStorage.entryPayloadEquivalence(payload, changed)).toBe(false)
+
+  const authoredMap = {
+    _tag: "Memory",
+    items: ["value"],
+    metadata: { value: new Map([["key", "value"]]) },
+  } as Session.EntryPayload
+  const authoredEmpty = {
+    _tag: "Memory",
+    items: ["value"],
+    metadata: { value: {} },
+  } as Session.EntryPayload
+  const authoredMapLookalike = {
+    _tag: "Memory",
+    items: ["value"],
+    metadata: { value: { $map: [["key", "value"]] } },
+  } as Session.EntryPayload
+  const authoredUndefined = {
+    _tag: "Memory",
+    items: ["value"],
+    metadata: { value: undefined },
+  } as Session.EntryPayload
+  const authoredUndefinedLookalike = {
+    _tag: "Memory",
+    items: ["value"],
+    metadata: { value: { $undefined: "" } },
+  } as Session.EntryPayload
+  expect(SessionStorage.entryPayloadEquivalence(authoredMap, authoredEmpty)).toBe(false)
+  expect(SessionStorage.entryPayloadEquivalence(authoredMap, authoredMapLookalike)).toBe(false)
+  const shared = { nested: true }
+  const aliased = {
+    _tag: "Memory",
+    items: ["value"],
+    metadata: { first: shared, second: shared },
+  } as Session.EntryPayload
+  expect(SessionStorage.entryPayloadEquivalence(aliased, decodeSessionPayload(encodeSessionPayload(aliased)))).toBe(
+    true,
+  )
+  expect(SessionStorage.entryPayloadEquivalence(authoredUndefined, authoredUndefinedLookalike)).toBe(false)
+})
+
 it.effect("reopens and hydrates a model response without persisting provider transport secrets", () => {
   const filename = tempDbPath("model-response-redaction")
   const agent = Agent.make({ name: "model-response-redaction" })
   const executable = testExecutable(agent, "model-response-redaction")
   const address = Address.make("agent:model-response-redaction")
   let modelCalls = 0
+  const responseTimestamp = DateTime.makeUnsafe("2026-08-15T05:48:09.000Z")
   const model = Layer.effect(
     LanguageModel.LanguageModel,
     LanguageModel.make({
@@ -78,7 +163,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
             Response.makePart("response-metadata", {
               id: "response-redaction",
               modelId: "model-redaction",
-              timestamp: undefined,
+              timestamp: responseTimestamp,
               request: {
                 method: "POST",
                 url: "https://provider.invalid/model",
@@ -150,7 +235,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
           Response.makePart("response-metadata", {
             id: "response-redaction",
             modelId: "model-redaction",
-            timestamp: undefined,
+            timestamp: responseTimestamp,
             request: undefined,
           }),
           Response.makePart("text", { text: "safe answer" }),
