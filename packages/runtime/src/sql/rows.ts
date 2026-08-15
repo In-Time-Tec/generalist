@@ -110,7 +110,6 @@ export interface DecodedRun {
   readonly attemptFenceEpoch?: number
   readonly driverCheckpoint?: import("../execution-state.js").ExecutionCheckpoint
   readonly suspension?: import("../execution-state.js").ExecutionSuspension
-  readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
   readonly continuation?: import("../steering.js").ExecutionContinuation
   readonly pendingOutcome?: import("../run-store.js").PendingRunOutcome
 }

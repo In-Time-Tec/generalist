@@ -47,7 +47,6 @@ const executionRecord = (
   ...(run.driverCheckpoint === undefined ? {} : { checkpoint: run.driverCheckpoint }),
   ...(run.suspension === undefined ? {} : { suspension: run.suspension }),
   ...(resolution === undefined ? {} : { resolution }),
-  ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
   ...(run.continuation === undefined ? {} : { continuation: run.continuation }),
   registrations,
 })
@@ -162,7 +161,6 @@ export const saveExecution = (
   input: ExecutionClaim & {
     readonly checkpoint?: ExecutionRecord["checkpoint"]
     readonly suspension?: ExecutionRecord["suspension"]
-    readonly transcript?: ExecutionRecord["transcript"]
   },
 ) =>
   Effect.gen(function* () {

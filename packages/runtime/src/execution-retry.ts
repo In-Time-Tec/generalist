@@ -1,6 +1,5 @@
 import { Effect, Ref } from "effect"
 import { AgentEvent, DurableDriver, ModelTelemetry } from "@batonfx/core"
-import type { Prompt } from "effect/unstable/ai"
 import type { ExecutionContinuation } from "./steering.js"
 import type { ExecutionClaim, Interface as RunStore } from "./run-store.js"
 
@@ -14,7 +13,6 @@ type EscapedFailure = {
 export type Retry = {
   readonly attempt: number
   readonly checkpoint: DurableDriver.DriverCheckpoint
-  readonly transcript: Prompt.Prompt
   readonly continuation?: ExecutionContinuation
   readonly turn: number
 }
@@ -43,15 +41,12 @@ export const make = (initialAttempt: number) =>
         const latest = yield* store.loadExecution(claim.runId)
         const checkpoint =
           latest.checkpoint !== undefined && "driverVersion" in latest.checkpoint ? latest.checkpoint : undefined
-        if (latest.attempt >= maxExecutionAttempts || checkpoint === undefined || latest.transcript === undefined) {
-          return undefined
-        }
+        if (latest.attempt >= maxExecutionAttempts || checkpoint === undefined) return undefined
         const retried = yield* store.retryExecution(claim)
         yield* Ref.set(attempt, retried.attempt)
         return {
           attempt: retried.attempt,
           checkpoint,
-          transcript: retried.transcript ?? latest.transcript,
           ...(retried.continuation === undefined ? {} : { continuation: retried.continuation }),
           turn: failure.turn,
         }

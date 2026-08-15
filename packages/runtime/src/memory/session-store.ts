@@ -84,8 +84,8 @@ const append = (
 }
 
 const completedPayload = (input: CompletedSessionEntry): Session.AppendInput => ({
-  _tag: "Message",
-  message: input.message,
+  _tag: "ModelResponse",
+  content: input.content,
   metadata: { modelResponseDigest: input.digest },
 })
 
@@ -184,8 +184,8 @@ export const appendHandoffSessionEntry = (input: {
   })
 
 const interruptedPayload = (input: InterruptedSessionEntry): Session.AppendInput => ({
-  _tag: "Message",
-  message: input.message,
+  _tag: "ModelResponse",
+  content: input.content,
   metadata: { interruptionDigest: input.digest },
 })
 
@@ -196,7 +196,11 @@ export const verifyInterruptedSessionEntry = (input: {
   const { state, entry: interrupted } = input
   const session = state.sessions.get(interrupted.sessionId) ?? emptySession()
   const existing = session.entries.get(interrupted.entryId)
-  if (existing === undefined || !samePayload(existing, interruptedPayload(interrupted))) {
+  if (
+    existing === undefined ||
+    existing.parentId !== interrupted.parentId ||
+    !samePayload(existing, interruptedPayload(interrupted))
+  ) {
     return Effect.fail(
       conflict("entry-id-reused", `Session entry id ${interrupted.entryId} does not match the interrupted response`),
     )
@@ -207,7 +211,6 @@ export const verifyInterruptedSessionEntry = (input: {
   return Effect.void
 }
 
-/** Append or verify the stable interrupted assistant projection at the Session's current leaf. */
 export const appendInterruptedSessionEntry = (input: {
   readonly state: MemoryState
   readonly entry: InterruptedSessionEntry
@@ -219,7 +222,7 @@ export const appendInterruptedSessionEntry = (input: {
     const existing = session.entries.get(interrupted.entryId)
     let nextSession: MemorySession
     if (existing !== undefined) {
-      if (!samePayload(existing, payload)) {
+      if (existing.parentId !== interrupted.parentId || !samePayload(existing, payload)) {
         return yield* conflict(
           "entry-id-reused",
           `Session entry id ${interrupted.entryId} was reused with different interrupted response content`,
@@ -230,7 +233,7 @@ export const appendInterruptedSessionEntry = (input: {
       }
       nextSession = session
     } else {
-      const result = append(session, payload, { id: interrupted.entryId, expectedLeafId: session.leaf })
+      const result = append(session, payload, { id: interrupted.entryId, expectedLeafId: interrupted.parentId })
       if (!isAppendSuccess(result)) return yield* result
       nextSession = result[1]
     }

@@ -87,11 +87,9 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     skillError,
   } = inputContext
   const boundedSuccessResult = (call: AnyToolCall, outcome: Success): Effect.Effect<PendingToolResult> =>
-    options.toolOutputMaxBytes === undefined
-      ? Effect.succeed(successResult(call, outcome))
-      : bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes }).pipe(
-          Effect.map((bounded) => successResult(call, bounded)),
-        )
+    bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes ?? 50 * 1024 }).pipe(
+      Effect.map((bounded) => successResult(call, bounded)),
+    )
 
   const outcomeEvent = (
     turn: number,

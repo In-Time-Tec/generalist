@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { projectTranscript } from "./memory.js"
 import type { Entry, SkillEntry } from "./session.js"
 
@@ -87,6 +87,9 @@ const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Mes
       case "Message":
         messages.push(entry.message)
         break
+      case "ModelResponse":
+        messages.push(...Prompt.fromResponseParts(entry.content as ReadonlyArray<Response.AnyPart>).content)
+        break
       case "ToolCall":
         messages.push(Prompt.makeMessage("assistant", { content: [entry.part] }))
         break
@@ -124,6 +127,8 @@ export const buildMemoryContext = (path: ReadonlyArray<Entry>): Prompt.Prompt =>
     switch (entry._tag) {
       case "Message":
         return [entry.message]
+      case "ModelResponse":
+        return Prompt.fromResponseParts(entry.content as ReadonlyArray<Response.AnyPart>).content
       case "ToolCall":
         return [Prompt.makeMessage("assistant", { content: [entry.part] })]
       case "ToolResult":

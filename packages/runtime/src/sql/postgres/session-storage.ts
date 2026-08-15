@@ -29,7 +29,7 @@ const loadEntries = (sessionId: string): Effect.Effect<ReadonlyArray<EntryRow>, 
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     return yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${sessionId} ORDER BY seq
     `
   })

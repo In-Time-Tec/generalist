@@ -48,7 +48,6 @@ import type { ResolveOperationInput } from "./operation-resolution.js"
 import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { OperationRecord, OperationStatus } from "./sql/operations.js"
 import type { ExecutionContinuation, SteeringEntry, SteeringReceipt } from "./steering.js"
-import type { Prompt } from "effect/unstable/ai"
 import type { AdmitFanOutInput, FanOutInspection, FanOutReceipt } from "./fan-out.js"
 import type { Notification as ChildSettlementNotification } from "./child-settlement.js"
 import type {
@@ -298,7 +297,6 @@ export interface Interface {
       readonly wait: RunWait
       readonly suspension: ExecutionSuspension
       readonly checkpoint?: ExecutionCheckpoint
-      readonly transcript?: Prompt.Prompt
       readonly continuation?: ExecutionContinuation | null
     },
   ) => Effect.Effect<void, WorkerMutationError>
@@ -326,7 +324,6 @@ export interface Interface {
       readonly operationId: string
       readonly outcome: OperationCompletionOutcome
       readonly checkpoint?: ExecutionCheckpoint
-      readonly transcript?: Prompt.Prompt
       readonly continuation?: ExecutionContinuation | null
       readonly steeringEntryIds?: ReadonlyArray<string>
     },
@@ -368,7 +365,6 @@ export interface Interface {
     input: ExecutionClaim & {
       readonly checkpoint?: ExecutionCheckpoint
       readonly suspension?: ExecutionSuspension
-      readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     },
   ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | import("./sql/errors.js").StaleClaim>
   readonly retryExecution: (input: ExecutionClaim) => Effect.Effect<ExecutionRecord, WorkerMutationError>

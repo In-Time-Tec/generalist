@@ -28,7 +28,7 @@ type ModelResponseEvent = Extract<
   RunEvent.RunEvent,
   { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }
 >
-type SemanticPart = ModelResponseEvent["response"]["content"][number]
+type SemanticPart = RunEvent.CompletedModelResponse["content"][number]
 
 const messageId = (event: ModelResponseEvent, part: SemanticPart, index: number): string =>
   `${event.eventId}:${part.type}:${index}`
@@ -85,12 +85,19 @@ const projectSemanticPart = (
   }
 }
 
-const projectModelResponse = (
-  event: ModelResponseEvent,
-): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable> =>
-  Effect.forEach(event.response.content, (part, index) => projectSemanticPart(event, part, index)).pipe(
+export const projectModelResponse: {
+  (
+    event: ModelResponseEvent,
+    content: RunEvent.CompletedModelResponse["content"],
+  ): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable>
+  (
+    content: RunEvent.CompletedModelResponse["content"],
+  ): (event: ModelResponseEvent) => Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable>
+} = Function.dual(2, (event: ModelResponseEvent, content: RunEvent.CompletedModelResponse["content"]) =>
+  Effect.forEach(content, (part, index) => projectSemanticPart(event, part, index)).pipe(
     Effect.map((batches) => batches.flat()),
-  )
+  ),
+)
 
 /** @experimental */
 export const project: {
@@ -107,7 +114,7 @@ export const project: {
       switch (event._tag) {
         case "ModelResponseCommitted":
         case "ModelResponseInterrupted":
-          return projectModelResponse(event)
+          return Effect.succeed([])
         case "RunAccepted":
           return emitAll([
             {

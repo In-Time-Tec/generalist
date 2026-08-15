@@ -35,6 +35,7 @@ import { decodePinned, equals, resolveChild, type PinnedExecutable } from "../ex
 import { makeInput as makeResolverInput } from "../executable-resolver.js"
 import type { ExecutableRegistration } from "../executable-registration.js"
 import { ModelPreviewLane, layer as modelPreviewLayer, previews as modelPreviews } from "../model-preview.js"
+import { makeModelResponseResolver, makeSessionEntry } from "../runtime-session.js"
 
 type Registrations = ReadonlyArray<ExecutableRegistration>
 import { validate as validateRegistrations } from "../executable-registration.js"
@@ -384,6 +385,8 @@ export const makeRuntime = (
       snapshot: (runId) => store.snapshot(runId),
       history: (input) =>
         store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
+      sessionEntry: makeSessionEntry(store),
+      resolveModelResponse: makeModelResponseResolver(store),
       treeHistory: (input) =>
         Effect.gen(function* () {
           const position = yield* parseCursor(input.rootRunId, input.cursor)

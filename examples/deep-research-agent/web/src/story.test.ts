@@ -2,8 +2,7 @@
 
 import { Response } from "@batonfx/core"
 import { Chat, Connection } from "@batonfx/foldkit"
-import { ExecutableManifest, RunEvent } from "@batonfx/runtime"
-import { Prompt } from "effect/unstable/ai"
+import { ExecutableManifest } from "@batonfx/runtime"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
 import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } from "./main"
@@ -11,7 +10,7 @@ import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } 
 const sessionId = "deep-research-story"
 
 const agent = ExecutableManifest.makeTest("deep-research", "1").ref
-const eventFrame = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
+const eventFrame = (sequence: number, fields: Record<string, unknown>): Connection.Incoming =>
   ({
     specVersion: "1",
     eventId: `${sessionId}:${sequence}`,
@@ -21,7 +20,7 @@ const eventFrame = (sequence: number, fields: Record<string, unknown>): RunEvent
     rootRunId: sessionId,
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,
-  }) as RunEvent.RunEvent
+  }) as Connection.Incoming
 
 const agentAction = (incoming: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedAgent({ incoming }) })
 
@@ -72,12 +71,15 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     modelCallId: "model-call-0",
     modelAttemptId: "model-attempt-0",
     attempt: 0,
+    sessionId,
+    sessionParentId: null,
+    sessionEntryId: "model-response-entry-0",
     response: { content: [toolCall], finishReason: "tool-calls" },
     digest: "model-response-0",
   }),
   eventFrame(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall }),
   eventFrame(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
-  eventFrame(4, { _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty }),
+  eventFrame(4, { _tag: "TurnCompleted", turn: 0 }),
   eventFrame(5, { _tag: "TurnStarted", turn: 1 }),
   eventFrame(6, {
     _tag: "ModelResponseCommitted",
@@ -86,6 +88,9 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     modelCallId: "model-call-1",
     modelAttemptId: "model-attempt-1",
     attempt: 0,
+    sessionId,
+    sessionParentId: "model-response-entry-0",
+    sessionEntryId: "model-response-entry-1",
     response: {
       content: [
         Response.makePart("reasoning", { text: "Compare transport frames." }),
@@ -95,10 +100,14 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     },
     digest: "model-response-1",
   }),
-  eventFrame(7, { _tag: "TurnCompleted", turn: 1, transcript: Prompt.empty }),
+  eventFrame(7, { _tag: "TurnCompleted", turn: 1 }),
   eventFrame(8, {
     _tag: "RunCompleted",
-    result: { turns: 2, text: "Final cited answer\n\nSources:\n[1] Baton docs", transcript: Prompt.empty },
+    result: {
+      turns: 2,
+      text: "Final cited answer\n\nSources:\n[1] Baton docs",
+      session: { sessionId, leafId: "model-response-entry-1" },
+    },
   }),
 ]
 

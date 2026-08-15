@@ -1,6 +1,6 @@
 import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
 import { dual } from "effect/Function"
-import { Prompt } from "effect/unstable/ai"
+import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { CompactionCommit, Event as ModelTelemetryEvent } from "../model/model-telemetry.js"
 /** @experimental Opaque session entry id. */
 export type EntryId = string
@@ -10,6 +10,61 @@ export type Metadata = Readonly<Record<string, unknown>>
 export type BaseEntry = { readonly id: EntryId; readonly parentId: EntryId | null; readonly metadata?: Metadata }
 /** @experimental A verbatim conversation message. */
 export type MessageEntry = BaseEntry & { readonly _tag: "Message"; readonly message: Prompt.Message }
+const ModelToolCall = Schema.Struct({
+  type: Schema.Literal("tool-call"),
+  id: Schema.String,
+  name: Schema.String,
+  params: Schema.Unknown,
+  providerExecuted: Schema.Boolean,
+  metadata: Response.ProviderMetadata,
+})
+const ModelUsage = Schema.Struct({
+  inputTokens: Schema.Struct({
+    uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    cacheRead: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    cacheWrite: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+  }),
+  outputTokens: Schema.Struct({
+    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    text: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    reasoning: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+  }),
+})
+const ModelFinishPart = Schema.Struct({
+  ...Response.FinishPart.fields,
+  usage: ModelUsage,
+  response: Schema.optionalKey(Schema.UndefinedOr(Response.HttpResponseDetails)),
+})
+const ModelToolResult = Schema.Struct({
+  type: Schema.Literal("tool-result"),
+  id: Schema.String,
+  name: Schema.String,
+  isFailure: Schema.Boolean,
+  result: Schema.Unknown,
+  encodedResult: Schema.Unknown,
+  providerExecuted: Schema.Boolean,
+  preliminary: Schema.Boolean,
+  metadata: Response.ProviderMetadata,
+})
+export const ModelResponseContent = Schema.Array(
+  Schema.Union([
+    Response.TextPart,
+    Response.ReasoningPart,
+    Response.ToolApprovalRequestPart,
+    Response.FilePart,
+    Response.DocumentSourcePart,
+    Response.UrlSourcePart,
+    Response.ResponseMetadataPart,
+    ModelFinishPart,
+    ModelToolCall,
+    ModelToolResult,
+  ]),
+)
+export type ModelResponseEntry = BaseEntry & {
+  readonly _tag: "ModelResponse"
+  readonly content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>
+}
 /** @experimental A model-requested tool call. */
 export type ToolCallEntry = BaseEntry & { readonly _tag: "ToolCall"; readonly part: Prompt.ToolCallPart }
 /** @experimental A tool execution result. */
@@ -40,6 +95,7 @@ export type BranchSummaryEntry = BaseEntry & { readonly _tag: "BranchSummary"; r
 /** @experimental Closed union of session entries. */
 export type Entry =
   | MessageEntry
+  | ModelResponseEntry
   | ToolCallEntry
   | ToolResultEntry
   | MemoryEntry
@@ -63,6 +119,7 @@ const payloadMetadata = {
  */
 export const EntryPayload = Schema.Union([
   Schema.TaggedStruct("Message", { message: Prompt.Message, ...payloadMetadata }),
+  Schema.TaggedStruct("ModelResponse", { content: ModelResponseContent, ...payloadMetadata }),
   Schema.TaggedStruct("ToolCall", { part: Prompt.ToolCallPart, ...payloadMetadata }),
   Schema.TaggedStruct("ToolResult", { part: Prompt.ToolResultPart, ...payloadMetadata }),
   Schema.TaggedStruct("Memory", { items: Schema.Array(Schema.String), ...payloadMetadata }),
@@ -186,6 +243,8 @@ const entryFromInput = (input: AppendInput, id: EntryId, parentId: EntryId | nul
   switch (input._tag) {
     case "Message":
       return { ...base, _tag: "Message", message: input.message }
+    case "ModelResponse":
+      return { ...base, _tag: "ModelResponse", content: input.content }
     case "ToolCall":
       return { ...base, _tag: "ToolCall", part: input.part }
     case "ToolResult":

@@ -160,7 +160,6 @@ export const saveExecution: {
     input: ExecutionClaim & {
       readonly checkpoint?: ExecutionRecord["checkpoint"]
       readonly suspension?: ExecutionRecord["suspension"]
-      readonly transcript?: ExecutionRecord["transcript"]
     },
   ): (state: MemoryState) => Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable | StaleClaim>
   (
@@ -168,7 +167,6 @@ export const saveExecution: {
     input: ExecutionClaim & {
       readonly checkpoint?: ExecutionRecord["checkpoint"]
       readonly suspension?: ExecutionRecord["suspension"]
-      readonly transcript?: ExecutionRecord["transcript"]
     },
   ): Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable | StaleClaim>
 } = Function.dual(
@@ -178,7 +176,6 @@ export const saveExecution: {
     input: ExecutionClaim & {
       readonly checkpoint?: ExecutionRecord["checkpoint"]
       readonly suspension?: ExecutionRecord["suspension"]
-      readonly transcript?: ExecutionRecord["transcript"]
     },
   ) =>
     Effect.gen(function* () {

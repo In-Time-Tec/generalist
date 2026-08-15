@@ -1,5 +1,6 @@
 import { Cause, Context, Effect, Function, HashMap, Layer, Option, Ref, Schema } from "effect"
 import { type Success } from "./tool-executor.js"
+import { sha256Text } from "../durable/canonical-json.js"
 /** @experimental A bounded tool result: inline content plus optional spilled overflow references. */
 export interface ToolOutput {
   readonly inline: unknown
@@ -75,6 +76,7 @@ interface BoundedInline {
   readonly truncated: true
   readonly bytes: number
   readonly maxBytes: number
+  readonly digest: string
   readonly preview: string
 }
 
@@ -96,6 +98,9 @@ const isBoundedInline = (value: unknown): value is BoundedInline =>
   typeof value.maxBytes === "number" &&
   Number.isFinite(value.maxBytes) &&
   value.maxBytes >= 0 &&
+  "digest" in value &&
+  typeof value.digest === "string" &&
+  /^[0-9a-f]{64}$/.test(value.digest) &&
   "preview" in value &&
   typeof value.preview === "string" &&
   encoder.encode(value.preview).byteLength <= value.maxBytes
@@ -118,7 +123,11 @@ const boundedFromOriginal = (
   bytes: number,
   maxBytes: number,
   outputPaths: ReadonlyArray<string>,
-): BoundedSuccess => bounded({ truncated: true, bytes, maxBytes, preview: preview(encoded, maxBytes) }, outputPaths)
+): BoundedSuccess =>
+  bounded(
+    { truncated: true, bytes, maxBytes, digest: sha256Text(encoded), preview: preview(encoded, maxBytes) },
+    outputPaths,
+  )
 
 const optionalStore = (
   store: StoreInterface,

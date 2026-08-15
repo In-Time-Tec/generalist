@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { Option, Schema } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Response } from "effect/unstable/ai"
 import { Errors, ExecutableManifest, RunEvent } from "@batonfx/runtime"
+import { Wire } from "@batonfx/transport"
 import { Chat, Connection } from "../src/index.js"
 
 const agent = ExecutableManifest.makeTest("assistant", "1").ref
-const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
+const runEvent = (sequence: number, fields: Record<string, unknown>): Wire.ResolvedRunEvent =>
   ({
     specVersion: "1",
     eventId: `run-1:${sequence}`,
@@ -16,13 +17,13 @@ const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.R
     depth: 0,
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,
-  }) as RunEvent.RunEvent
+  }) as Wire.ResolvedRunEvent
 
 const modelResponse = (
   sequence: number,
   tag: "ModelResponseCommitted" | "ModelResponseInterrupted",
   content: ReadonlyArray<Response.AnyPart>,
-): RunEvent.RunEvent =>
+): Wire.ResolvedRunEvent =>
   runEvent(sequence, {
     _tag: tag,
     turn: 0,
@@ -31,7 +32,9 @@ const modelResponse = (
     modelAttemptId: "attempt-0",
     attempt: 0,
     response: { content },
-    ...(tag === "ModelResponseCommitted" ? {} : { reason: "failure" }),
+    sessionId: "session-1",
+    sessionEntryId: `entry-${sequence}`,
+    ...(tag === "ModelResponseCommitted" ? { sessionParentId: "entry-input" } : { reason: "failure" }),
     digest: `${tag}-digest`,
   })
 
@@ -66,7 +69,7 @@ describe("Chat RunEvent projection", () => {
       Response.makePart("text", { text: "world" }),
       Response.makePart("reasoning", { text: "carefully" }),
     ])
-    expect(Schema.is(RunEvent.RunEvent)(committed)).toBe(true)
+    expect(Schema.is(Connection.Incoming)(committed)).toBe(true)
     ;[model] = updateWith(model, runEvent(0, { _tag: "TurnStarted", turn: 0 }))
     ;[model] = updateWith(model, committed)
 
@@ -103,12 +106,12 @@ describe("Chat RunEvent projection", () => {
       phase: "executing",
       outcome: { _tag: "Completed", isFailure: false, result: ["found"] },
     })
-    ;[model] = updateWith(model, runEvent(4, { _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty }))
+    ;[model] = updateWith(model, runEvent(4, { _tag: "TurnCompleted", turn: 0 }))
     ;[model, , output] = updateWith(
       model,
       runEvent(5, {
         _tag: "RunCompleted",
-        result: { text: "Hello world", turns: 1, transcript: Prompt.empty },
+        result: { text: "Hello world", turns: 1, session: { sessionId: "session-1", leafId: "entry-1" } },
       }),
     )
 
@@ -127,7 +130,7 @@ describe("Chat RunEvent projection", () => {
       Response.makePart("text", { text: "retained partial" }),
       { ...searchCall, providerExecuted: false },
     ])
-    expect(Schema.is(RunEvent.RunEvent)(interrupted)).toBe(true)
+    expect(Schema.is(Connection.Incoming)(interrupted)).toBe(true)
     ;[model] = updateWith(model, runEvent(0, { _tag: "TurnStarted", turn: 0 }))
     ;[model] = updateWith(model, interrupted)
     ;[model] = updateWith(

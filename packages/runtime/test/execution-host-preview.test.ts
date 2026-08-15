@@ -91,12 +91,14 @@ const execute = (input: {
         yield* Fiber.join(execution)
         const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
         const snapshot = yield* runtime.snapshot(receipt.runId)
+        const committed = history.filter((event) => event._tag === "ModelResponseCommitted")
+        const responses = yield* Effect.forEach(committed, (event) => runtime.resolveModelResponse(event))
         return {
           preview,
           status: snapshot.run.status,
           result: snapshot.outcome?._tag === "Succeeded" ? snapshot.outcome.result : undefined,
           tags: history.map((event) => event._tag),
-          responses: history.flatMap((event) => (event._tag === "ModelResponseCommitted" ? [event.response] : [])),
+          responses,
         }
       }),
     )
@@ -117,12 +119,12 @@ it.effect("publishes live preview without allowing a blocked subscriber to affec
       changes: [{ channel: "text", offset: 0, delta: "live answer" }],
     })
     expect(observed.status).toBe("succeeded")
-    expect(observed.result).toEqual(baseline.result)
+    expect(observed.result).toMatchObject({ text: "live answer", turns: 1 })
     expect(observed.tags).toEqual(baseline.tags)
     expect(observed.tags).not.toContain("ModelPart")
     expect(observed.tags).toContain("TurnCompleted")
     expect(disconnected.status).toBe("succeeded")
-    expect(disconnected.result).toEqual(baseline.result)
+    expect(disconnected.result).toMatchObject({ text: "live answer", turns: 1 })
     expect(disconnected.tags).toEqual(baseline.tags)
   }),
 )

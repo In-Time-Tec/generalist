@@ -1,8 +1,9 @@
-import { Option } from "effect"
-import { Response, Tool } from "effect/unstable/ai"
+import { Effect, Option, Ref } from "effect"
+import { Chat, Prompt, Response, Tool } from "effect/unstable/ai"
 import { controller, type Controller, type Interface } from "../model/active-model-response.js"
 import { make as makeModelResponse, type CompletedModelResponse } from "../model/model-response-builder.js"
 import type { AttemptCompleted } from "../model/model-operation.js"
+import { coalesceAdjacentText } from "../context/session-sync.js"
 
 type PartIdentity = Pick<AttemptCompleted, "modelCallId" | "modelAttemptId" | "attempt">
 type Authority = ReturnType<Controller["begin"]>
@@ -20,6 +21,7 @@ export const makeAttemptResponse = (input: {
 }) => {
   const control = Option.isSome(input.service) ? controller(input.service.value) : undefined
   let active: ActiveAttempt | undefined
+  let sessionParentId: string | null | undefined
   const responseFor = (identity: PartIdentity): ActiveAttempt => {
     if (
       active !== undefined &&
@@ -33,6 +35,7 @@ export const makeAttemptResponse = (input: {
       ...(input.operationKey === undefined ? {} : { operationKey: input.operationKey }),
       turn: input.turn,
       ...identity,
+      ...(sessionParentId === undefined ? {} : { sessionParentId }),
     })
     active = {
       ...identity,
@@ -42,6 +45,7 @@ export const makeAttemptResponse = (input: {
     return active
   }
   return {
+    setSessionParentId: (value: string | null): string | null => (sessionParentId = value),
     accept: (identity: PartIdentity, part: Response.StreamPart<Record<string, Tool.Any>>): void => {
       const response = responseFor(identity)
       response.builder.accept(part)
@@ -56,7 +60,19 @@ export const makeAttemptResponse = (input: {
   }
 }
 
-/** @internal Clear only the exact attempt whose semantic operation committed. */
+export const replayMessages = (input: {
+  readonly chat: Chat.Service
+  readonly activePrompt: Prompt.Prompt
+  readonly replayFromHistory: boolean
+}): Effect.Effect<ReadonlyArray<Prompt.Message>> =>
+  Ref.get(input.chat.history).pipe(
+    Effect.map((history) =>
+      input.replayFromHistory
+        ? history.content
+        : Prompt.concat(history, Prompt.fromMessages(input.activePrompt.content.map(coalesceAdjacentText))).content,
+    ),
+  )
+
 export const clearCommittedResponse = (input: {
   readonly service: Option.Option<Interface>
   readonly authority: Authority | undefined

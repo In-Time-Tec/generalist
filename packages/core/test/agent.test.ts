@@ -17,6 +17,7 @@ import {
 } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, Chat, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
+import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
   AgentEvent,
@@ -5074,11 +5075,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "spills large successful tool results before re-feeding them", () => {
+  ItLayer.make(it, "spills large successful tool results by default before re-feeding them", () => {
     let calls = 0
     let stored: { readonly toolCallId: string; readonly content: unknown } | undefined
     let secondPrompt = ""
-    const largeOutput = "x".repeat(256)
+    const largeOutput = "x".repeat(60 * 1024)
     return [
       Layer.mergeAll(
         modelLayer((options) => {
@@ -5105,7 +5106,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const agent = Agent.make({ name: "spill-agent", toolkit: Toolkit.make(echoTool) })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "use big tool", sessionId: "spill-session", toolOutputMaxBytes: 48 }),
+          Agent.stream(agent, { prompt: "use big tool", sessionId: "spill-session" }),
         )
 
         const completed = events.find((event) => event._tag === "ToolExecutionCompleted")
@@ -5115,7 +5116,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         })
         if (completed?._tag === "ToolExecutionCompleted") {
           expect(completed.result.encodedResult).toMatchObject({
-            inline: { truncated: true, maxBytes: 48 },
+            inline: { truncated: true, maxBytes: 50 * 1024 },
             outputPaths: ["mem:tool-call-spill"],
           })
           expect(Json.stringify(completed.result.encodedResult)).not.toContain(largeOutput)
@@ -7989,6 +7990,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         echoExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        Chat.layerPersisted({ storeId: "journal-restart" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "journal-restart-agent", toolkit: Toolkit.make(echoTool) })
@@ -8010,6 +8012,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           modelCallOrdinalStart: 40,
+          persistence: { chatId: "journal-restart" },
         }).pipe(
           Stream.runDrain,
           Effect.provideService(DurableDriver.DriverJournalService, crashingJournal),
@@ -8037,10 +8040,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             }),
         }
         const events = yield* Agent.stream(agent, {
-          prompt: "",
+          prompt: Prompt.empty,
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           driverCheckpoint: pending!,
+          persistence: { chatId: "journal-restart" },
         }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
         expect(scheduled.find((key) => key.includes(":model:"))).toBe(pendingKey)
         const turnStarted = events.find((event) => event._tag === "TurnStarted")
@@ -8068,10 +8072,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           onCheckpoint: () => Effect.void,
         }
         const overrideEvents = yield* Agent.stream(agent, {
-          prompt: "",
+          prompt: Prompt.empty,
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           driverCheckpoint: safeCheckpoint!,
+          persistence: { chatId: "journal-restart" },
           turnStart: 13,
         }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, overrideJournal))
         expect(overrideScheduled.every(({ turn }) => turn >= 12)).toBe(true)

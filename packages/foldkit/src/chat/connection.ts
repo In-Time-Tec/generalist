@@ -2,7 +2,6 @@ import { Cause, Context, Effect, Layer, Option, Ref, Result, Schema, Scope, Stre
 import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { RunEvent } from "@batonfx/runtime"
 import { Client, Errors, Wire } from "@batonfx/transport"
 
 /** @experimental */
@@ -21,7 +20,7 @@ export const ConnectionFailed: CallableTaggedStruct<
 
 /** @experimental */
 export type Incoming =
-  | RunEvent.RunEvent
+  | Wire.ResolvedRunEvent
   | typeof ConnectionOpened.Type
   | typeof ConnectionLost.Type
   | typeof ConnectionFailed.Type

@@ -1,14 +1,16 @@
 import { DurableDriver } from "@batonfx/core"
-import { Effect, Ref, Schema } from "effect"
-import type { Prompt } from "effect/unstable/ai"
+import { Effect, Option, Ref, Schema } from "effect"
 import { RuntimeUnavailable } from "./errors.js"
-import type { ModelResponseCommitted } from "./agent-event.js"
+import type { LiveModelResponseCommitted } from "./model-response-commit.js"
 import type { ExecutionClaim, Interface as RunStoreInterface } from "./run-store.js"
 import type { ExecutionContinuation } from "./steering.js"
-import { modelResponseEvent } from "./model-response-commit.js"
+import {
+  completedOperationRefValue,
+  hydrateCompletedOperation,
+  liveModelResponseEvent,
+} from "./model-response-commit.js"
 
 interface PreparedCompletion {
-  readonly transcript?: Prompt.Prompt
   readonly continuation?: ExecutionContinuation | null
   readonly steeringEntryIds?: ReadonlyArray<string>
 }
@@ -25,7 +27,7 @@ export const commitDriverOperation = (input: {
 }) => {
   const { store, claim, operation, operationId, outcome, checkpoint, prepared } = input
   if (operation.kind === "model" && outcome._tag === "Succeeded") {
-    const event = modelResponseEvent(outcome.value)
+    const event = liveModelResponseEvent(outcome.value)
     if (Schema.is(RuntimeUnavailable)(event)) return event
     return store.commitModelResponse({ ...claim, operationId, outcome, checkpoint, ...prepared, event })
   }
@@ -43,11 +45,35 @@ export const commitDriverOperation = (input: {
   })
 }
 
+export const hydratePersistedModelOperation = (input: {
+  readonly store: RunStoreInterface
+  readonly value: unknown
+}): Effect.Effect<unknown, RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const reference = completedOperationRefValue(input.value)
+    if (reference === undefined)
+      return yield* RuntimeUnavailable.make({ message: "persisted model result is not a reference" })
+    const session = yield* input.store.sessionStore(reference.sessionId)
+    if (Option.isNone(session)) {
+      return yield* RuntimeUnavailable.make({ message: `Session ${reference.sessionId} is unavailable` })
+    }
+    return yield* hydrateCompletedOperation({ session: session.value, reference }).pipe(
+      Effect.mapError((error) =>
+        RuntimeUnavailable.make({
+          message:
+            error._tag === "@batonfx/runtime/SessionEntryCorrupt"
+              ? error.message
+              : `Session entry ${error.entryId} is missing from ${error.sessionId}`,
+        }),
+      ),
+    )
+  })
+
 /** Verify Core's later live semantic event against the already committed transactional outbox. */
 export const verifyCommittedModelEvent = (input: {
   readonly store: RunStoreInterface
   readonly claim: ExecutionClaim
-  readonly event: ModelResponseCommitted
+  readonly event: LiveModelResponseCommitted
 }): Effect.Effect<
   void,
   | RuntimeUnavailable

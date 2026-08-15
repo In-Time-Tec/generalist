@@ -4,7 +4,7 @@ import { Headers, HttpServerRequest, HttpServerResponse } from "effect/unstable/
 import { HttpApiSchema } from "effect/unstable/httpapi"
 import { Cursor, Errors, RunEvent, Runtime } from "@batonfx/runtime"
 import { InvalidCursor, WireEncodeFailed } from "./errors.js"
-import { CursorFromString, ObserverRunEvent, producerCodec } from "./wire.js"
+import { CursorFromString, ObserverRunEvent, observerCodec } from "./wire.js"
 
 /** @experimental Typed errors that can terminate an SSE RunEvent stream. */
 export type StreamError = Runtime.EventsError | WireEncodeFailed
@@ -63,7 +63,11 @@ export const respond = (options: {
     const cursor = Option.getOrUndefined(parsed)
     const events = runtime.events({ runId: options.runId, ...(cursor === undefined ? {} : { cursor }) }).pipe(
       Stream.mapEffect((event) =>
-        producerCodec.encode(event).pipe(
+        (event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted"
+          ? runtime.resolveModelResponse(event).pipe(Effect.map((response) => ({ ...event, response })))
+          : Effect.succeed(event)
+        ).pipe(
+          Effect.flatMap(observerCodec.encode),
           Effect.map((data) =>
             Sse.encoder.write({
               _tag: "Event",
@@ -90,11 +94,13 @@ export const respond = (options: {
   })
 
 /** @experimental Decodes one canonical SSE event and verifies its cursor identity. */
-export const decodeEvent = (event: Sse.Event): Effect.Effect<RunEvent.RunEvent, InvalidCursor | WireEncodeFailed> =>
+export const decodeEvent = (
+  event: Sse.Event,
+): Effect.Effect<import("./wire.js").ResolvedRunEvent, InvalidCursor | WireEncodeFailed> =>
   event._tag === "Event" && event.id !== undefined
     ? decodeCursor(event.id).pipe(
         Effect.flatMap((cursor) =>
-          producerCodec
+          observerCodec
             .decode(event.data)
             .pipe(
               Effect.flatMap((runEvent) =>

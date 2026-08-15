@@ -215,7 +215,6 @@ export interface Interface {
     readonly suspension: AgentEvent.AgentSuspended
     readonly openedAt: string
     readonly checkpoint?: ExecutionCheckpoint
-    readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     readonly continuation?: ExecutionContinuation | null
   }) => Effect.Effect<void, ProgramAdmissionFailed>
 }

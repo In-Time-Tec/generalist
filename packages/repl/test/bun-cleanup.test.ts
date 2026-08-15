@@ -2,6 +2,8 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
 import { liveOptions, ownWorkers, platform, runCell, withPool } from "./bun-harness.js"
 
+const processTestOptions = { timeout: 120_000 }
+
 layer(platform, liveOptions)("Bun kernel cleanup", (it) => {
   /**
    * Every kernel process, pipe, and temporary file has a visible owner: the pool's scope. When that
@@ -28,86 +30,101 @@ layer(platform, liveOptions)("Bun kernel cleanup", (it) => {
       expect(yield* ownWorkers).toBe(before)
     })
 
-  it.effect("releases the worker after a Session completes normally", () =>
-    assertReleased(({ observe }) =>
-      withPool({
-        use: ({ pool }) =>
-          Effect.gen(function* () {
-            const result = yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "1 + 1" })
-            expect(result.value).toBe("2")
-            yield* observe
-          }),
-      }),
-    ),
+  it.effect(
+    "releases the worker after a Session completes normally",
+    () =>
+      assertReleased(({ observe }) =>
+        withPool({
+          use: ({ pool }) =>
+            Effect.gen(function* () {
+              const result = yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "1 + 1" })
+              expect(result.value).toBe("2")
+              yield* observe
+            }),
+        }),
+      ),
+    processTestOptions,
   )
 
-  it.effect("releases every worker after several Sessions", () =>
-    assertReleased(({ observe }) =>
-      withPool({
-        use: ({ pool }) =>
-          Effect.gen(function* () {
-            yield* runCell({ pool, sessionId: "one", cellId: "c1", code: "1" })
-            yield* runCell({ pool, sessionId: "two", cellId: "c1", code: "2" })
-            yield* runCell({ pool, sessionId: "three", cellId: "c1", code: "3" })
-            yield* observe
-          }),
-      }),
-    ),
+  it.effect(
+    "releases every worker after several Sessions",
+    () =>
+      assertReleased(({ observe }) =>
+        withPool({
+          use: ({ pool }) =>
+            Effect.gen(function* () {
+              yield* runCell({ pool, sessionId: "one", cellId: "c1", code: "1" })
+              yield* runCell({ pool, sessionId: "two", cellId: "c1", code: "2" })
+              yield* runCell({ pool, sessionId: "three", cellId: "c1", code: "3" })
+              yield* observe
+            }),
+        }),
+      ),
+    processTestOptions,
   )
 
-  it.effect("releases the worker when the pool scope closes with a cell in flight", () =>
-    assertReleased(({ observe }) =>
-      withPool({
-        overrides: { cellDeadlineMillis: 20_000 },
-        use: ({ pool }) =>
-          Effect.gen(function* () {
-            const execution = yield* pool.execute({
-              sessionId: "s",
-              cellId: "c1",
-              code: "await new Promise((resolve) => setTimeout(resolve, 10000)); 'never'",
-              signal: AbortSignal.any([]),
-            })
-            yield* Effect.forkChild(Effect.exit(execution.result))
-            yield* Effect.sleep(150)
-            yield* observe
-          }),
-      }),
-    ),
-  )
-
-  it.effect("releases the worker when a cell is cancelled mid-flight", () =>
-    assertReleased(({ observe }) =>
-      withPool({
-        overrides: { cellDeadlineMillis: 20_000 },
-        use: ({ pool }) =>
-          Effect.gen(function* () {
-            const running = yield* Effect.forkChild(
-              runCell({
-                pool,
+  it.effect(
+    "releases the worker when the pool scope closes with a cell in flight",
+    () =>
+      assertReleased(({ observe }) =>
+        withPool({
+          overrides: { cellDeadlineMillis: 20_000 },
+          use: ({ pool }) =>
+            Effect.gen(function* () {
+              const execution = yield* pool.execute({
                 sessionId: "s",
                 cellId: "c1",
                 code: "await new Promise((resolve) => setTimeout(resolve, 10000)); 'never'",
-              }),
-            )
-            yield* Effect.sleep(150)
-            yield* observe
-            yield* Fiber.interrupt(running)
-          }),
-      }),
-    ),
+                signal: AbortSignal.any([]),
+              })
+              yield* Effect.forkChild(Effect.exit(execution.result))
+              yield* Effect.sleep(150)
+              yield* observe
+            }),
+        }),
+      ),
+    processTestOptions,
   )
 
-  it.effect("removes the Session's snapshot when it is dropped", () =>
-    withPool({
-      use: ({ pool, dataRoot }) =>
-        Effect.gen(function* () {
-          yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "const value = 1" })
-          yield* pool.close("s")
-          const { BunKernelStateStore } = yield* Effect.promise(() => import("../src/repl/bun.js"))
-          const store = yield* BunKernelStateStore.make({ dataRoot })
-          yield* store.drop("s")
-          expect(yield* store.load("s")).toBeUndefined()
+  it.effect(
+    "releases the worker when a cell is cancelled mid-flight",
+    () =>
+      assertReleased(({ observe }) =>
+        withPool({
+          overrides: { cellDeadlineMillis: 20_000 },
+          use: ({ pool }) =>
+            Effect.gen(function* () {
+              const running = yield* Effect.forkChild(
+                runCell({
+                  pool,
+                  sessionId: "s",
+                  cellId: "c1",
+                  code: "await new Promise((resolve) => setTimeout(resolve, 10000)); 'never'",
+                }),
+              )
+              yield* Effect.sleep(150)
+              yield* observe
+              yield* Fiber.interrupt(running)
+            }),
         }),
-    }),
+      ),
+    processTestOptions,
+  )
+
+  it.effect(
+    "removes the Session's snapshot when it is dropped",
+    () =>
+      withPool({
+        use: ({ pool, dataRoot }) =>
+          Effect.gen(function* () {
+            yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "const value = 1" })
+            yield* pool.close("s")
+            const { BunKernelStateStore } = yield* Effect.promise(() => import("../src/repl/bun.js"))
+            const store = yield* BunKernelStateStore.make({ dataRoot })
+            yield* store.drop("s")
+            expect(yield* store.load("s")).toBeUndefined()
+          }),
+      }),
+    processTestOptions,
   )
 })

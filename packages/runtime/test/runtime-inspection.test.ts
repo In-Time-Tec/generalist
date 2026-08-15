@@ -2,15 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Errors, Run, RunEvent, Runtime, RunStore } from "../src/index.js"
-import {
-  alternateAssistantRef,
-  assistantAddress,
-  emptyTranscript,
-  memoryLayer,
-  openWait,
-  suspension,
-  textPrompt,
-} from "./helpers.js"
+import { alternateAssistantRef, assistantAddress, memoryLayer, openWait, suspension, textPrompt } from "./helpers.js"
 
 layer(memoryLayer)("Runtime inspection contracts", (it) => {
   it.effect("exposes canonical snapshot, finite history, list, and structured wait resolution", () =>
@@ -137,7 +129,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       })
       yield* store.emitAgentEvent({
         ...claim,
-        event: { _tag: "TurnCompleted", turn: 0, transcript: emptyTranscript, usage },
+        event: { _tag: "TurnCompleted", turn: 0, usage },
       })
       const snapshot = yield* runtime.snapshot(receipt.runId)
       expect(snapshot.usage.map((fact) => fact._tag)).toEqual(["Completed", "Failed"])

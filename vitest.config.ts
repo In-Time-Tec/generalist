@@ -15,7 +15,7 @@ export default defineConfig({
     },
   ],
   test: {
-    maxWorkers: 4,
+    maxWorkers: 2,
     testTimeout: 60_000,
     hookTimeout: 60_000,
     environmentMatchGlobs: [["apps/docs/**", "happy-dom"]],

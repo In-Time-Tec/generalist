@@ -21,6 +21,37 @@ const sessionStore = (sessionId: string) =>
     return Option.getOrThrow(yield* runStore.sessionStore(sessionId))
   })
 
+it.live("round-trips undefined fields without colliding with authored Session values", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("session-undefined-codec")
+    const sessionId = "sqlite:session-undefined-codec"
+    const metadata = {
+      oldSentinel: "@batonfx/runtime/undefined",
+      exactMarker: { "@batonfx/runtime/session-codec": "undefined" },
+      escapedMarker: { "@batonfx/runtime/session-codec": "escaped", value: { nested: true } },
+      missing: undefined,
+    }
+
+    yield* withDb(filename)(
+      Effect.gen(function* () {
+        const store = yield* sessionStore(sessionId)
+        yield* store.append({ _tag: "Message", message: user("@batonfx/runtime/undefined"), metadata })
+      }),
+    )
+
+    yield* withDb(filename)(
+      Effect.gen(function* () {
+        const store = yield* sessionStore(sessionId)
+        const entry = (yield* store.path())[0]
+        expect(entry?._tag).toBe("Message")
+        if (entry?._tag !== "Message") return
+        expect(entry.message.content[0]).toMatchObject({ text: "@batonfx/runtime/undefined" })
+        expect(entry.metadata).toEqual(metadata)
+      }),
+    )
+  }),
+)
+
 it.live("retries an ambiguously committed stable Session append across SQLite reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("stable-session-append")

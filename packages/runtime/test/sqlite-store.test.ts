@@ -716,7 +716,6 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
     yield* Fiber.interrupt(committedResult.fiber)
     expect(committedResult.operation?.status).toBe("succeeded")
     expect(committedResult.execution.executableRef).toEqual(activeRef.ref)
-    expect(committedResult.execution.transcript).toBeUndefined()
     expect(committedResult.sessionPath.at(-1)).toMatchObject({
       _tag: "Handoff",
       target: childAgent.name,

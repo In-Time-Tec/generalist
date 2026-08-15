@@ -1,12 +1,12 @@
 import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { DriverInterpreter } from "../durable/driver-interpreter.js"
-import { AgentError, type Event } from "./agent-event.js"
+import { AgentError, DuplicateToolCallId, MiddlewareViolation, type Event } from "./agent-event.js"
 import { coalesceAdjacentText } from "../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "./agent-message.js"
 import { type Registry, select } from "../tools/tool-registry.js"
 import { type Request } from "../tools/tool-executor.js"
-import { classifyFailure as classifyModelFailure, type LanguageModelNotRegistered } from "../model/model-registry.js"
+import { classifyFailure as classifyModelFailure } from "../model/model-registry.js"
 import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model/model-telemetry.js"
 import { type AnyToolCall, type ToolCallIdState } from "./agent-tool-result.js"
 import type { RuntimeContext, StaticToolServices } from "./model-turn-context.js"
@@ -17,7 +17,6 @@ import {
   ToolJsonSchemaCompilerMissing,
   validateDecodedToolCall,
 } from "../model/model-tool-call-validation.js"
-import { DuplicateToolCallId, MiddlewareViolation } from "./agent-event.js"
 import type { RunError, ToolSchedulingPolicy } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import { wrapDriverAttempt } from "./model-turn-driver.js"
@@ -27,7 +26,7 @@ import { schedule as scheduleTools } from "./tool-scheduler.js"
 import { classifyOtherFailure, isToolNameCollision, makeRetryableOverflow, singleFailure } from "./model-turn-parts.js"
 import { committedEvent } from "./model-turn-commit.js"
 import { text as modelResponseText } from "../model/model-response-builder.js"
-import { clearCommittedResponse, makeAttemptResponse } from "./model-turn-response.js"
+import { clearCommittedResponse, makeAttemptResponse, replayMessages } from "./model-turn-response.js"
 import { makeActiveTurn } from "./model-turn-active.js"
 import { validateContext } from "../context/session.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
@@ -71,9 +70,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
           Effect.provideService(CurrentPurpose, purpose),
         ),
       )
-  const withAgentModel = <A, E, R2>(
-    effect: Effect.Effect<A, E, R2>,
-  ): Effect.Effect<A, E | LanguageModelNotRegistered, R2> =>
+  const withAgentModel = <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
     agentModelRegistry === undefined || agentModel === undefined
       ? effect
       : agentModelRegistry.operate(agentModel, effect)
@@ -289,7 +286,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                       ),
                     )
                     const sessionPath = yield* syncSession(turn, responsePrompt)
-                    const sessionParentId = sessionPath.at(-1)?.id ?? null
+                    const sessionParentId = attemptResponse.setSessionParentId(sessionPath.at(-1)?.id ?? null)
                     if (Option.isSome(compactionService)) {
                       state.currentContext = responsePrompt
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
@@ -372,6 +369,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                               modelAttemptId: identity.modelAttemptId,
                               attempt: identity.attempt,
                               sessionParentId,
+                              replayFromHistory:
+                                sessionParentId === null && preparedState?.preparedPrompt.content.length === 0,
                               response,
                             }
                           }),
@@ -413,6 +412,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       turn,
       toolkit: activeRegistry.toolkit,
       attemptBody,
+      replayMessages: context.replayMessages,
+      fallbackMessages: (active, replay) => replayMessages({ chat, activePrompt: active, replayFromHistory: replay }),
       completed: (operation, attempt) => {
         completedOperation = operation
         completedAttempt = attempt
