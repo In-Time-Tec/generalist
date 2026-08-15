@@ -143,15 +143,17 @@ export const make = <Tools extends Record<string, Tool.Any>>(): Builder<Tools> =
       case "finish":
         usage = part.usage
         finishReason = part.reason
-        entries.push({ kind: "part", part })
+        entries.push({ kind: "part", part: { ...part, response: undefined } })
         return
       case "tool-call":
       case "tool-result":
       case "tool-approval-request":
       case "file":
       case "source":
-      case "response-metadata":
         entries.push({ kind: "part", part })
+        return
+      case "response-metadata":
+        entries.push({ kind: "part", part: { ...part, request: undefined } })
         return
     }
   }

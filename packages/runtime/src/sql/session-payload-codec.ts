@@ -35,8 +35,37 @@ const withoutUndefinedMarkers = (value: unknown): unknown => {
   return decodeObject(encoded)
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const restoreHeaders = (details: unknown): unknown => {
+  if (!isRecord(details) || !isRecord(details.headers)) return details
+  return {
+    ...details,
+    headers: Object.fromEntries(
+      Object.entries(details.headers).map(([key, value]) => [
+        key,
+        isRecord(value) && Object.keys(value).length === 0 ? "<redacted>" : value,
+      ]),
+    ),
+  }
+}
+
+const restoreV026RedactedHeaders = (value: unknown): unknown => {
+  if (!isRecord(value) || value._tag !== "ModelResponse" || !Array.isArray(value.content)) return value
+  return {
+    ...value,
+    content: value.content.map((part) => {
+      if (!isRecord(part)) return part
+      if (part.type === "response-metadata") return { ...part, request: restoreHeaders(part.request) }
+      if (part.type === "finish") return { ...part, response: restoreHeaders(part.response) }
+      return part
+    }),
+  }
+}
+
 export const decodeSessionPayload = (text: string): Session.EntryPayload =>
-  decodeEntry(withoutUndefinedMarkers(JSON.parse(text) as unknown))
+  decodeEntry(restoreV026RedactedHeaders(withoutUndefinedMarkers(JSON.parse(text) as unknown)))
 
 export const encodeSessionPayload = (payload: Session.EntryPayload): string =>
   JSON.stringify(withUndefinedMarkers(encodeEntry(payload))) ?? "null"

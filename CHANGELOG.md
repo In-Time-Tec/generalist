@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.26.1
+
+- Exclude provider HTTP request and response envelopes from canonical model responses, and safely hydrate v0.26 Session rows whose redacted header values were stored as empty objects without changing their durable digests.
+
 ## 0.26.0
 
 - Store each durable model response once as canonical Session content while operations, events, checkpoints, transports, and projections carry compact verified references; consumers hydrate content through public Runtime APIs.
