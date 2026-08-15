@@ -42,7 +42,7 @@ const completion = (operationKey: string, sessionParentId: string | null, text =
     modelAttemptId: "model-attempt:postgres",
     attempt: 0,
     sessionParentId,
-    messages: [],
+    replayFromHistory: false,
     content: Schema.encodeSync(Schema.Array(Response.TextPart))(response.content),
     finishReason: "stop" as const,
   }
@@ -62,7 +62,7 @@ const completion = (operationKey: string, sessionParentId: string | null, text =
   }
 }
 
-const interrupted = (operationKey: string, text = "retained partial") => {
+const interrupted = (operationKey: string, sessionParentId: string | null, text = "retained partial") => {
   const response = { content: text.length === 0 ? [] : [Response.makePart("text", { text })] }
   const identity = {
     turn: 0,
@@ -70,6 +70,7 @@ const interrupted = (operationKey: string, text = "retained partial") => {
     modelCallId: "model-call:postgres",
     modelAttemptId: "model-attempt:postgres",
     attempt: 0,
+    sessionParentId,
     reason: "failure" as const,
   }
   const digest = Pins.digest(jsonValue({ ...identity, response: Schema.encodeSync(CompletedModelResponse)(response) }))
@@ -347,7 +348,7 @@ describePostgres("postgres Session authority", () => {
         expect(yield* noOutput.session.path()).toHaveLength(1)
 
         const state = yield* scheduleModel(uniqueSession("interrupted-rollback"), "interrupted-rollback")
-        const empty = interrupted(state.operationKey, "")
+        const empty = interrupted(state.operationKey, state.prefix.id, "")
         expect(
           (yield* Effect.exit(
             state.store.commitInterruptedModelResponse({
@@ -359,7 +360,7 @@ describePostgres("postgres Session authority", () => {
           ))._tag,
         ).toBe("Failure")
         expect(yield* state.session.path()).toHaveLength(1)
-        const exact = interrupted(state.operationKey)
+        const exact = interrupted(state.operationKey, state.prefix.id)
         const outcome = {
           _tag: "Failed" as const,
           error: Errors.AgentExecutionFailure.make({ message: "model terminated" }),
@@ -404,7 +405,7 @@ describePostgres("postgres Session authority", () => {
           outcome,
           event: exact,
         })
-        const divergent = interrupted(state.operationKey, "different partial")
+        const divergent = interrupted(state.operationKey, state.prefix.id, "different partial")
         expect(
           (yield* Effect.exit(
             state.store.commitInterruptedModelResponse({

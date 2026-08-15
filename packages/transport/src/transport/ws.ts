@@ -4,7 +4,7 @@ import { Socket } from "effect/unstable/socket"
 import { Runtime } from "@batonfx/runtime"
 import type { RunEvent } from "@batonfx/runtime"
 import { NotAttached, RunMismatch } from "./errors.js"
-import { decodeCommand, producerCodec } from "./wire.js"
+import { decodeCommand, observerCodec } from "./wire.js"
 import type { ClientCommand } from "./wire.js"
 
 type Handle = Effect.Effect<
@@ -54,7 +54,11 @@ export const handle: Handle = Effect.gen(function* () {
     }).pipe(Effect.flatMap((shouldClose) => (shouldClose ? writer(new Socket.CloseEvent(code, reason)) : Effect.void)))
 
   const writeEvent = (event: RunEvent.RunEvent) =>
-    producerCodec.encode(event).pipe(
+    (event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted"
+      ? runtime.resolveModelResponse(event).pipe(Effect.map((response) => ({ ...event, response })))
+      : Effect.succeed(event)
+    ).pipe(
+      Effect.flatMap(observerCodec.encode),
       Effect.flatMap(writer),
       Effect.catchTag("@batonfx/transport/WireEncodeFailed", (error) =>
         close(1011, "wire encoding failed").pipe(Effect.andThen(Effect.fail(error))),

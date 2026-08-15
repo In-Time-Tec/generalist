@@ -5,6 +5,7 @@ import {
   checkpointMatches as Session_checkpointMatches,
   ContextInvalid as Session_ContextInvalid,
   EntryPayload as Session_EntryPayload,
+  ModelResponseContent as Session_ModelResponseContent,
   buildContext as Session_buildContext,
   buildMemoryContext as Session_buildMemoryContext,
   unresolvedToolCalls as Session_unresolvedToolCalls,
@@ -19,6 +20,7 @@ export const Session = {
   checkpointMatches: Session_checkpointMatches,
   ContextInvalid: Session_ContextInvalid,
   EntryPayload: Session_EntryPayload,
+  ModelResponseContent: Session_ModelResponseContent,
   buildContext: Session_buildContext,
   buildMemoryContext: Session_buildMemoryContext,
   unresolvedToolCalls: Session_unresolvedToolCalls,
@@ -33,6 +35,7 @@ export namespace Session {
   export type checkpointMatches = typeof import("./session.js").checkpointMatches
   export type ContextInvalid = import("./session.js").ContextInvalid
   export type EntryPayload = import("./session.js").EntryPayload
+  export type ModelResponseContent = typeof import("./session.js").ModelResponseContent
   export type buildContext = typeof import("./session.js").buildContext
   export type buildMemoryContext = typeof import("./session.js").buildMemoryContext
   export type unresolvedToolCalls = typeof import("./session.js").unresolvedToolCalls
@@ -51,6 +54,7 @@ export namespace Session {
   export type Interface = import("./session.js").Interface
   export type MemoryEntry = import("./session.js").MemoryEntry
   export type MessageEntry = import("./session.js").MessageEntry
+  export type ModelResponseEntry = import("./session.js").ModelResponseEntry
   export type Metadata = import("./session.js").Metadata
   export type PreparedCheckpoint = import("./session.js").PreparedCheckpoint
   export type SkillEntry = import("./session.js").SkillEntry

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Function, Layer, Queue, Ref, Scope, Stream } from "effect"
 import { Headers, HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
+import { Response } from "effect/unstable/ai"
 import { Errors as RuntimeErrors } from "@batonfx/runtime"
 import { Wire, Ws } from "../src/index.js"
 import { event, runtimeLayer } from "./helpers.js"
@@ -85,6 +86,42 @@ describe("Ws", () => {
 
       yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
       expect(yield* Ref.get(cancelled)).toEqual(["run-1"])
+      void fiber
+    }),
+  )
+
+  it.live("resolves compact model response references before writing observer frames", () =>
+    Effect.gen(function* () {
+      const compact = {
+        ...event(1),
+        _tag: "ModelResponseInterrupted" as const,
+        turn: 0,
+        operationKey: "run-1:model:0",
+        modelCallId: "model-call-1",
+        modelAttemptId: "model-attempt-1",
+        attempt: 0,
+        sessionId: "session-1",
+        sessionParentId: "entry:input",
+        sessionEntryId: "entry-1",
+        reason: "failure" as const,
+        digest: "digest-1",
+      }
+      const response = { content: [Response.makePart("text", { text: "retained" })] }
+      const fake = yield* makeFakeSocket()
+      const fiber = yield* run(
+        fake,
+        runtimeLayer({
+          events: () => Stream.succeed(compact),
+          resolveModelResponse: (received) =>
+            received === compact ? Effect.succeed(response) : Effect.die("unexpected reference"),
+        }),
+      )
+      yield* Queue.offer(fake.inbound, yield* Wire.encodeCommand({ _tag: "Attach", runId: "run-1" }))
+      const output = yield* Queue.take(fake.outbound)
+      if (typeof output !== "string") return yield* Effect.die("expected text frame")
+      const resolved = yield* Wire.observerCodec.decode(output)
+      expect(resolved).toEqual({ ...compact, response })
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
       void fiber
     }),
   )

@@ -273,7 +273,6 @@ export interface RunOptions {
   readonly executableManifest?: import("../durable/executable-manifest.js").ExecutableManifest
   /** @experimental Opaque host-assigned write-ownership token, forwarded on every Session append and checkpoint so durable hosts can fence stale writers. */
   readonly sessionOwnerToken?: string
-  /** @experimental Spill successful tool outputs whose encoded size exceeds this byte limit. */
   readonly toolOutputMaxBytes?: number
   /** @experimental Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64. */
   readonly toolProgress?: ProgressOverflowPolicy

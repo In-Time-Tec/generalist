@@ -66,12 +66,12 @@ export class DriverJournalService extends Context.Service<DriverJournalService, 
   "@batonfx/core/durable/driver-interpreter/DriverJournalService",
 ) {}
 /** @experimental Caller-owned successful stream result and replay codec. */
-export interface StreamSuccessCodec<A, Success> {
+export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServices = never> {
   readonly observe: (value: A) => void
   /** Whether the source reached its authored semantic terminal value rather than a downstream consumer stopping early. */
   readonly isComplete?: () => boolean
   readonly complete: () => Success
-  readonly replay: (success: Success) => ReadonlyArray<A>
+  readonly replay: (success: Success) => Stream.Stream<A, ReplayError, ReplayServices>
 }
 type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted
 /** @experimental Inline interpreter executing driver operations through Effect services. */
@@ -80,13 +80,13 @@ export interface Interface {
   readonly run: <A, E, R>(spec: OperationSpec, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, OperationError<E>, R>
   readonly runStream: {
     <A, E, R>(spec: OperationSpec, stream: Stream.Stream<A, E, R>): Stream.Stream<A, OperationError<E>, R>
-    <A, E, R, Success>(
+    <A, E, R, Success, ReplayError, ReplayServices>(
       spec: OperationSpec,
       stream: Stream.Stream<A, E, R>,
       options: {
-        readonly successCodec: StreamSuccessCodec<A, Success>
+        readonly successCodec: StreamSuccessCodec<A, Success, ReplayError, ReplayServices>
       },
-    ): Stream.Stream<A, OperationError<E>, R>
+    ): Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices>
   }
   readonly recordSuspension: (input: {
     readonly waitId: string
@@ -128,7 +128,6 @@ const outcomeFromExit = <E>(operation: DriverOperation, exit: Exit.Exit<unknown,
   }
   return operation.replayPolicy === "never" ? { _tag: "Unknown", operationId: operation.key } : undefined
 }
-
 /** @experimental */
 export const guardUnknownNeverReplay: {
   (outcome: OperationOutcome): (operation: DriverOperation) => Effect.Effect<void, DriverUnknownReplay>
@@ -140,7 +139,6 @@ export const guardUnknownNeverReplay: {
       ? DriverUnknownReplay.make({ operationKey: operation.key, operationId: outcome.operationId })
       : Effect.void,
 )
-
 /** @experimental */
 export const makeInline = (input: {
   readonly driver: DurableAgentDriver
@@ -231,6 +229,19 @@ export const makeInline = (input: {
         yield* journal.onCompleted(operation, outcome, after)
         yield* Ref.set(activePendingRef, undefined)
       })
+    const applyReplay = (
+      operation: DriverOperation,
+      replay: OperationOutcome,
+      nested: boolean,
+    ): Effect.Effect<void, DriverError | DriverStateInvalid> =>
+      Effect.gen(function* () {
+        const before = yield* Ref.get(checkpointRef)
+        if (nested && replay._tag === "Succeeded" && operation.kind === "handoff") {
+          yield* Ref.set(checkpointRef, yield* applyHandoffCommit(before, replay.value))
+        } else if (!nested) {
+          yield* Ref.set(checkpointRef, yield* input.driver.apply(before, replay))
+        }
+      })
     const run = <A, E, R>(
       spec: OperationSpec,
       effect: Effect.Effect<A, E, R>,
@@ -239,12 +250,7 @@ export const makeInline = (input: {
         const { operation, replay, nested } = yield* schedule(spec)
         if (replay !== undefined) {
           yield* guardUnknownNeverReplay(operation, replay)
-          const before = yield* Ref.get(checkpointRef)
-          if (nested && replay._tag === "Succeeded" && operation.kind === "handoff") {
-            yield* Ref.set(checkpointRef, yield* applyHandoffCommit(before, replay.value))
-          } else if (!nested) {
-            yield* Ref.set(checkpointRef, yield* input.driver.apply(before, replay))
-          }
+          yield* applyReplay(operation, replay, nested)
           return yield* replay._tag === "Succeeded"
             ? Effect.succeed(replay.value as A)
             : replay._tag === "Failed"
@@ -271,30 +277,27 @@ export const makeInline = (input: {
     const interpreter: Interface = {
       checkpoint: Ref.get(checkpointRef),
       run,
-      runStream: <A, E, R, Success>(
+      runStream: <A, E, R, Success, ReplayError, ReplayServices>(
         spec: OperationSpec,
         stream: Stream.Stream<A, E, R>,
-        options?: { readonly successCodec: StreamSuccessCodec<A, Success> },
-      ) =>
-        Stream.unwrap(
+        options?: { readonly successCodec: StreamSuccessCodec<A, Success, ReplayError, ReplayServices> },
+      ): Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices> =>
+        Stream.unwrap<A, E | DriverUnknownReplay | ReplayError, R | ReplayServices, OperationError<E>, never>(
           Effect.gen(function* () {
             const { operation, replay, nested } = yield* schedule(spec)
             const codec = options?.successCodec
             if (replay !== undefined) {
               yield* guardUnknownNeverReplay(operation, replay)
-              return (
-                replay._tag === "Succeeded"
-                  ? Stream.fromIterable(
-                      codec === undefined
-                        ? ((Array.isArray(replay.value) ? replay.value : []) as ReadonlyArray<A>)
-                        : codec.replay(replay.value as Success),
+              yield* applyReplay(operation, replay, nested)
+              return replay._tag === "Succeeded"
+                ? codec === undefined
+                  ? Stream.fromIterable((Array.isArray(replay.value) ? replay.value : []) as ReadonlyArray<A>)
+                  : codec.replay(replay.value as Success)
+                : replay._tag === "Failed"
+                  ? Stream.fail(replay.error as E)
+                  : Stream.fail(
+                      DriverUnknownReplay.make({ operationKey: operation.key, operationId: replay.operationId }),
                     )
-                  : replay._tag === "Failed"
-                    ? Stream.fail(replay.error as E)
-                    : Stream.fail(
-                        DriverUnknownReplay.make({ operationKey: operation.key, operationId: replay.operationId }),
-                      )
-              ) as Stream.Stream<A, E | DriverUnknownReplay, R>
             }
             const ordinal =
               (spec.kind === "model" || spec.kind === "structured-output") &&
@@ -325,7 +328,7 @@ export const makeInline = (input: {
               ),
             )
           }),
-        ) as Stream.Stream<A, OperationError<E>, R>,
+        ) as Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices>,
       recordSuspension: (suspension) =>
         run(
           {
@@ -406,7 +409,6 @@ export const makeInline = (input: {
     }
     return interpreter
   })
-
 /** @experimental */
 export const layerInline = (input: {
   readonly driver: DurableAgentDriver
@@ -421,7 +423,6 @@ export const layerInline = (input: {
       return yield* makeInline({ ...input, journal })
     }),
   )
-
 /** @experimental */
 export const layerForRun: {
   <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
@@ -487,7 +488,6 @@ export const layerForRun: {
     )
   },
 )
-
 /** @experimental */
 export const layerTest = (input: {
   readonly driver: DurableAgentDriver

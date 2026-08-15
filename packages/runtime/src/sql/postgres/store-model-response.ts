@@ -12,11 +12,7 @@ import { encodeExecutableRef, encodeJson, encodeJsonValue } from "../codecs.js"
 import { ExecutionCheckpoint } from "../../execution-state.js"
 import { encodeContinuation } from "../../steering.js"
 import { checkpointRef } from "../../executable-manifest.js"
-import {
-  completedSessionEntry,
-  sameModelResponseEvent,
-  validateModelResponseCommit,
-} from "../../model-response-commit.js"
+import { sameModelResponseEvent, validateModelResponseCommit } from "../../model-response-commit.js"
 import {
   sameInterruptedModelOutcome,
   sameInterruptedModelResponse,
@@ -62,14 +58,15 @@ export const postgresModelResponseOperations = (input: {
           const row = rows[0]
           if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
           const current = toOperationRecord(row)
-          const sessionEntry = validateInterruptedModelResponse({
+          const validated = validateInterruptedModelResponse({
             runId: op.runId,
             sessionId: loaded.message.sessionId,
             record: current,
             outcome: op.outcome,
             event: op.event,
           })
-          if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
+          if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+          const sessionEntry = validated.entry
           if (current.status === "failed") {
             if (!sameInterruptedModelOutcome({ left: { _tag: "Failed", error: current.error }, right: op.outcome })) {
               return yield* RuntimeUnavailable.make({
@@ -82,7 +79,7 @@ export const postgresModelResponseOperations = (input: {
             if (
               prior.length !== 1 ||
               prior[0]?._tag !== "ModelResponseInterrupted" ||
-              !sameInterruptedModelResponse({ left: prior[0], right: op.event })
+              !sameInterruptedModelResponse({ left: prior[0], right: validated.event })
             ) {
               return yield* RuntimeUnavailable.make({
                 message: `model operation ${op.operationId} has a divergent interrupted outbox retry`,
@@ -109,7 +106,7 @@ export const postgresModelResponseOperations = (input: {
           yield* appendEvent(
             hub,
             yield* requireRun(op.runId),
-            op.event as unknown as { readonly _tag: string } & Record<string, unknown>,
+            validated.event as unknown as { readonly _tag: string } & Record<string, unknown>,
           )
           const completed = yield* sql<OperationRow>`
             SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
@@ -130,15 +127,13 @@ export const postgresModelResponseOperations = (input: {
           const row = existing[0]
           if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
           const current = toOperationRecord(row)
-          const validated = validateModelResponseCommit({ record: current, input: op })
-          if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
-          const sessionEntry = completedSessionEntry({
-            runId: op.runId,
+          const validated = validateModelResponseCommit({
+            record: current,
+            input: op,
             sessionId: loaded.message.sessionId,
-            operation: validated,
-            event: op.event,
           })
-          if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
+          if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+          const sessionEntry = validated.entry
           if (current.status === "succeeded") {
             const priorValidation = validateModelResponseCommit({
               record: current,
@@ -146,6 +141,7 @@ export const postgresModelResponseOperations = (input: {
                 ...op,
                 outcome: { _tag: "Succeeded", value: current.result },
               },
+              sessionId: loaded.message.sessionId,
             })
             if (Schema.is(RuntimeUnavailable)(priorValidation)) return yield* priorValidation
             const prior = (yield* loadEventsAfter(op.runId, -1)).filter(
@@ -154,7 +150,7 @@ export const postgresModelResponseOperations = (input: {
             if (
               prior.length !== 1 ||
               prior[0]?._tag !== "ModelResponseCommitted" ||
-              !sameModelResponseEvent({ left: prior[0], right: op.event })
+              !sameModelResponseEvent({ left: prior[0], right: validated.event })
             ) {
               return yield* RuntimeUnavailable.make({
                 message: `model operation ${op.operationId} has a divergent outbox retry`,
@@ -190,7 +186,7 @@ export const postgresModelResponseOperations = (input: {
           )
           yield* sql`
             UPDATE baton_run_operations
-            SET status = 'succeeded', result_json = ${encodeJsonValue(op.outcome.value)}, finished_at = NOW()
+            SET status = 'succeeded', result_json = ${encodeJsonValue(validated.reference)}, finished_at = NOW()
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
               AND status IN ('requested', 'running')
           `
@@ -207,7 +203,7 @@ export const postgresModelResponseOperations = (input: {
           yield* appendEvent(
             hub,
             yield* requireRun(op.runId),
-            op.event as unknown as { readonly _tag: string } & Record<string, unknown>,
+            validated.event as unknown as { readonly _tag: string } & Record<string, unknown>,
           )
           const rows = yield* sql<OperationRow>`
             SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}

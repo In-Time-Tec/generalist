@@ -348,7 +348,7 @@ export const makeRunStore = (options: LayerOptions) =>
                   const pending = run.steering.filter(
                     (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
                   )
-                  if (!run.cancellationRequested && pending.length > 0 && "transcript" in input.result) {
+                  if (!run.cancellationRequested && pending.length > 0 && "session" in input.result) {
                     const continuation = {
                       schemaVersion: 1 as const,
                       prompt: pending.reduce<Prompt.Prompt>(

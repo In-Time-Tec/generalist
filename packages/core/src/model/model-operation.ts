@@ -1,41 +1,9 @@
 import { Schema } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { ModelResponseContent } from "../context/session.js"
 import type { CompletedModelResponse } from "./model-response-builder.js"
 
-const ToolCall = Schema.Struct({
-  type: Schema.Literal("tool-call"),
-  id: Schema.String,
-  name: Schema.String,
-  params: Schema.Unknown,
-  providerExecuted: Schema.Boolean,
-  metadata: Response.ProviderMetadata,
-})
-const ToolResult = Schema.Struct({
-  type: Schema.Literal("tool-result"),
-  id: Schema.String,
-  name: Schema.String,
-  isFailure: Schema.Boolean,
-  result: Schema.Unknown,
-  encodedResult: Schema.Unknown,
-  providerExecuted: Schema.Boolean,
-  preliminary: Schema.Boolean,
-  metadata: Response.ProviderMetadata,
-})
-const ModelResponsePart = Schema.Union([
-  Response.TextPart,
-  Response.ReasoningPart,
-  Response.ToolApprovalRequestPart,
-  Response.FilePart,
-  Response.DocumentSourcePart,
-  Response.UrlSourcePart,
-  Response.ResponseMetadataPart,
-  Response.FinishPart,
-  ToolCall,
-  ToolResult,
-])
-
-/** @experimental Provider-agnostic semantic response content with no tool-specific Schema services. */
-export const ModelResponseContent = Schema.Array(ModelResponsePart)
+export { ModelResponseContent }
 
 /** @experimental A completed model response encoded as one durable operation result. */
 export interface CompletedModelOperation {
@@ -45,7 +13,7 @@ export interface CompletedModelOperation {
   readonly modelAttemptId: string
   readonly attempt: number
   readonly sessionParentId: string | null
-  readonly messages: ReadonlyArray<Prompt.MessageEncoded>
+  readonly replayFromHistory: boolean
   readonly content: typeof ModelResponseContent.Encoded
   readonly usage?: typeof Response.Usage.Encoded
   readonly finishReason?: Response.FinishReason
@@ -59,7 +27,7 @@ const CompletedModelOperationFields = Schema.Struct({
   modelAttemptId: Schema.String,
   attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   sessionParentId: Schema.NullOr(Schema.String),
-  messages: Schema.Array(Schema.toEncoded(Prompt.Message)),
+  replayFromHistory: Schema.Boolean,
   content: Schema.toEncoded(ModelResponseContent),
   usage: Schema.optionalKey(Schema.toEncoded(Response.Usage)),
   finishReason: Schema.optionalKey(Response.FinishReason),
@@ -90,6 +58,7 @@ export interface AttemptCompleted {
   readonly modelAttemptId: string
   readonly attempt: number
   readonly sessionParentId: string | null
+  readonly replayFromHistory: boolean
   readonly response: CompletedModelResponse<Record<string, Tool.Any>>
 }
 

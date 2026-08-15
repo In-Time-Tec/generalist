@@ -179,6 +179,7 @@ import {
   Sequence as RunEvent_Sequence,
   RunEventBase as RunEvent_RunEventBase,
   ExecutionResultSchema as RunEvent_ExecutionResultSchema,
+  CompletedModelResponse as RunEvent_CompletedModelResponse,
   RunFailure as RunEvent_RunFailure,
   RunEvent as RunEvent_RunEvent,
   LifecycleTag as RunEvent_LifecycleTag,
@@ -190,6 +191,7 @@ export const RunEvent = {
   Sequence: RunEvent_Sequence,
   RunEventBase: RunEvent_RunEventBase,
   ExecutionResultSchema: RunEvent_ExecutionResultSchema,
+  CompletedModelResponse: RunEvent_CompletedModelResponse,
   RunFailure: RunEvent_RunFailure,
   RunEvent: RunEvent_RunEvent,
   LifecycleTag: RunEvent_LifecycleTag,
@@ -202,6 +204,7 @@ export namespace RunEvent {
   export type RunEventBase = import("./run-event.js").RunEventBase
   export type AgentLoopEvent = import("./agent-event.js").AgentLoopEvent
   export type ExecutionResult = import("./execution-state.js").ExecutionResult
+  export type CompletedModelResponse = import("./run-event.js").CompletedModelResponse
   export type RunFailure = import("./run-event.js").RunFailure
   export type RunAccepted = import("./run-event.js").RunAccepted
   export type RunAttemptStarted = import("./run-event.js").RunAttemptStarted
@@ -275,6 +278,10 @@ export namespace Runtime {
   export type SpawnInput = import("./runtime.js").SpawnInput
   export type EventsInput = import("./runtime.js").EventsInput
   export type HistoryInput = import("./runtime.js").HistoryInput
+  export type SessionEntryInput = import("./runtime.js").SessionEntryInput
+  export type SessionEntryError = import("./runtime.js").SessionEntryError
+  export type ResolveModelResponseError = import("./runtime.js").ResolveModelResponseError
+  export type ModelResponseEvent = import("./runtime.js").ModelResponseEvent
   export type PreviewsInput = import("./runtime.js").PreviewsInput
   export type ModelPreviewChange = import("./model-preview.js").ModelPreviewChange
   export type ModelPreviewFrame = import("./model-preview.js").ModelPreviewFrame

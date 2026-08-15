@@ -35,27 +35,28 @@ export const commitInterruptedModelResponse: {
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     const current = toOperationRecord(row)
-    const sessionEntry = validateInterruptedModelResponse({
+    const validated = validateInterruptedModelResponse({
       runId: input.runId,
       sessionId: run.message.sessionId,
       record: current,
       outcome: input.outcome,
       event: input.event,
     })
-    if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
+    if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+    const sessionEntry = validated.entry
     if (current.status === "failed") {
       if (!sameInterruptedModelOutcome({ left: { _tag: "Failed", error: current.error }, right: input.outcome })) {
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent interrupted outcome retry`,
         })
       }
-      const prior = (yield* loadEventsAfter(input.runId, -1)).find(
+      const prior = (yield* loadEventsAfter(input.runId, -1)).filter(
         (event) => event._tag === "ModelResponseInterrupted" && event.operationKey === input.event.operationKey,
       )
       if (
-        prior === undefined ||
-        prior._tag !== "ModelResponseInterrupted" ||
-        !sameInterruptedModelResponse({ left: prior, right: input.event })
+        prior.length !== 1 ||
+        prior[0]?._tag !== "ModelResponseInterrupted" ||
+        !sameInterruptedModelResponse({ left: prior[0], right: validated.event })
       ) {
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent interrupted outbox retry`,
@@ -84,7 +85,7 @@ export const commitInterruptedModelResponse: {
     yield* appendEvent(
       hub,
       yield* requireRun(input.runId),
-      input.event as unknown as { readonly _tag: string } & Record<string, unknown>,
+      validated.event as unknown as { readonly _tag: string } & Record<string, unknown>,
     )
     const completed = yield* sql<OperationRow>`
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}

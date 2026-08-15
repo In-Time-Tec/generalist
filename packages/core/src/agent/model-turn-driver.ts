@@ -12,6 +12,7 @@ import {
   type AttemptEvent,
 } from "../model/model-operation.js"
 import type { RunError } from "./agent.js"
+import { promptDigest } from "./prompt-identity.js"
 
 export type AttemptBody = (
   activePrompt: Prompt.Prompt,
@@ -20,22 +21,6 @@ export type AttemptBody = (
   overflowCause?: Cause.Cause<RunError>,
   operationKey?: string,
 ) => Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter>
-
-const encodeMessages = Schema.encodeUnknownSync(Schema.Array(Prompt.Message))
-
-const BigIntTag = "@batonfx/core/BigInt"
-const closeBigInts = (value: unknown): unknown => {
-  if (typeof value === "bigint") return { [BigIntTag]: value.toString() }
-  if (Array.isArray(value)) return value.map(closeBigInts)
-  if (value === null || typeof value !== "object" || value instanceof Uint8Array || value instanceof URL) return value
-  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, closeBigInts(nested)]))
-}
-const openBigInts = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(openBigInts)
-  if (value === null || typeof value !== "object") return value
-  if (BigIntTag in value && typeof value[BigIntTag] === "string") return BigInt(value[BigIntTag])
-  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, openBigInts(nested)]))
-}
 
 const operationDigest = (value: unknown): string =>
   canonicalDigest(JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value)))
@@ -67,8 +52,10 @@ const successCodec = (input: {
   readonly operationId: string
   readonly turn: number
   readonly toolkit: Toolkit.Toolkit<Record<string, Tool.Any>>
+  readonly replayMessages: (sessionParentId: string) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
+  readonly fallbackMessages: (replayFromHistory: boolean) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
   readonly completed: (operation: CompletedModelOperation, attempt: AttemptCompleted) => void
-}): StreamSuccessCodec<AttemptEvent, CompletedModelOperation> => {
+}): StreamSuccessCodec<AttemptEvent, CompletedModelOperation, RunError> => {
   const contentSchema = Schema.Array(Response.Part(input.toolkit)) as unknown as Schema.Codec<
     ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
     typeof ModelResponseContent.Encoded,
@@ -77,7 +64,6 @@ const successCodec = (input: {
   >
   const encodeContent = Schema.encodeUnknownSync(contentSchema)
   const decodeContent = Schema.decodeUnknownSync(contentSchema)
-  const decodeMessages = Schema.decodeUnknownSync(Schema.Array(Prompt.Message))
   let terminal: AttemptCompleted | undefined
   return {
     observe: (event) => {
@@ -96,7 +82,7 @@ const successCodec = (input: {
         modelAttemptId: terminal.modelAttemptId,
         attempt: terminal.attempt,
         sessionParentId: terminal.sessionParentId,
-        messages: encodeMessages(closeBigInts(terminal.messages)),
+        replayFromHistory: terminal.replayFromHistory,
         content: encodeContent(terminal.response.content),
         ...(terminal.response.usage === undefined
           ? {}
@@ -110,30 +96,44 @@ const successCodec = (input: {
       input.completed(operation, terminal)
       return operation
     },
-    replay: (success) => {
-      const operation = Schema.decodeUnknownSync(CompletedModelOperation)(success)
-      const { digest, ...value } = operation
-      if (operationDigest(value) !== digest)
-        throw new Error(`Model operation ${input.operationId} replay digest does not match its recorded result`)
-      const content = decodeContent(operation.content) as unknown as ReadonlyArray<
-        Response.Part<Record<string, Tool.Any>>
-      >
-      const attempt: AttemptCompleted = {
-        _tag: "Completed",
-        messages: openBigInts(decodeMessages(operation.messages)) as ReadonlyArray<Prompt.Message>,
-        modelCallId: operation.modelCallId,
-        modelAttemptId: operation.modelAttemptId,
-        attempt: operation.attempt,
-        sessionParentId: operation.sessionParentId,
-        response: {
-          content,
-          ...(operation.usage === undefined ? {} : { usage: Schema.decodeSync(Response.Usage)(operation.usage) }),
-          ...(operation.finishReason === undefined ? {} : { finishReason: operation.finishReason }),
-        },
-      }
-      input.completed(operation, attempt)
-      return replayParts(input.operationId, attempt)
-    },
+    replay: (success) =>
+      Stream.fromEffect(
+        Effect.gen(function* () {
+          const operation = yield* Schema.decodeUnknownEffect(CompletedModelOperation)(success).pipe(Effect.orDie)
+          const { digest, ...value } = operation
+          if (operationDigest(value) !== digest)
+            return yield* Effect.die(
+              new Error(`Model operation ${input.operationId} replay digest does not match its recorded result`),
+            )
+          const content = decodeContent(operation.content) as unknown as ReadonlyArray<
+            Response.Part<Record<string, Tool.Any>>
+          >
+          const messages =
+            operation.sessionParentId === null
+              ? yield* input.fallbackMessages(operation.replayFromHistory)
+              : yield* input.replayMessages(operation.sessionParentId)
+          const usage =
+            operation.usage === undefined
+              ? undefined
+              : yield* Schema.decodeEffect(Response.Usage)(operation.usage).pipe(Effect.orDie)
+          const attempt: AttemptCompleted = {
+            _tag: "Completed",
+            messages,
+            modelCallId: operation.modelCallId,
+            modelAttemptId: operation.modelAttemptId,
+            attempt: operation.attempt,
+            sessionParentId: operation.sessionParentId,
+            replayFromHistory: operation.replayFromHistory,
+            response: {
+              content,
+              ...(usage === undefined ? {} : { usage }),
+              ...(operation.finishReason === undefined ? {} : { finishReason: operation.finishReason }),
+            },
+          }
+          input.completed(operation, attempt)
+          return replayParts(input.operationId, attempt)
+        }),
+      ).pipe(Stream.flatMap(Stream.fromIterable)),
   }
 }
 
@@ -142,6 +142,11 @@ export const wrapDriverAttempt =
     readonly turn: number
     readonly toolkit: Toolkit.Toolkit<Record<string, Tool.Any>>
     readonly attemptBody: AttemptBody
+    readonly replayMessages: (sessionParentId: string) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
+    readonly fallbackMessages: (
+      activePrompt: Prompt.Prompt,
+      replayFromHistory: boolean,
+    ) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
     readonly completed: (operation: CompletedModelOperation, attempt: AttemptCompleted) => void
   }): AttemptBody =>
   (activePrompt, retryOverflow, compactOverflow = false, overflowCause) =>
@@ -154,13 +159,27 @@ export const wrapDriverAttempt =
         )
         const ordinal = modelCallOrdinal(driverState)
         const operationId = operationKey(logicalId, "model", input.turn, ordinal, "conversation")
+        const requestMessages = yield* input.fallbackMessages(activePrompt, false)
+        const pendingInput = driverState.pending?.key === operationId ? driverState.pending.input : undefined
+        const persistedPromptDigest =
+          typeof pendingInput === "object" &&
+          pendingInput !== null &&
+          "promptDigest" in pendingInput &&
+          typeof pendingInput.promptDigest === "string"
+            ? pendingInput.promptDigest
+            : undefined
         const interpreter = yield* DriverInterpreter
         return interpreter.runStream(
           {
             kind: "model",
             key: operationId,
             turn: input.turn,
-            input: { turn: input.turn, modelCallOrdinal: ordinal, purpose: "conversation" },
+            input: {
+              turn: input.turn,
+              modelCallOrdinal: ordinal,
+              purpose: "conversation",
+              promptDigest: persistedPromptDigest ?? promptDigest(requestMessages),
+            },
             replayPolicy: "never",
           },
           input.attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause, operationId),
@@ -169,6 +188,8 @@ export const wrapDriverAttempt =
               operationId,
               turn: input.turn,
               toolkit: input.toolkit,
+              replayMessages: input.replayMessages,
+              fallbackMessages: (replayFromHistory) => input.fallbackMessages(activePrompt, replayFromHistory),
               completed: input.completed,
             }),
           },

@@ -15,7 +15,7 @@ import { checkpointRef } from "../executable-manifest.js"
 
 import { OperationResolution, digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { completedSessionEntry, sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
+import { sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
 import {
   appendCompletedSessionEntry,
   appendHandoffSessionEntry,
@@ -48,7 +48,6 @@ type CompleteOperationInput = {
   readonly operationId: string
   readonly outcome: import("../run-store.js").OperationCompletionOutcome
   readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
-  readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
   readonly continuation?: import("../steering.js").ExecutionContinuation | null
   readonly steeringEntryIds?: ReadonlyArray<string>
 }
@@ -123,7 +122,7 @@ export const recordOperation: {
         ${input.attempt}, NULL, NULL
       )
     `
-    if (input.checkpoint !== undefined || input.transcript !== undefined || input.continuation !== undefined) {
+    if (input.checkpoint !== undefined || input.continuation !== undefined) {
       yield* sql`
         UPDATE baton_runs SET
           driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
@@ -297,15 +296,9 @@ export const commitModelResponse: {
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     const current = toOperationRecord(row)
-    const validated = validateModelResponseCommit({ record: current, input })
+    const validated = validateModelResponseCommit({ record: current, input, sessionId: run.message.sessionId })
     if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
-    const sessionEntry = completedSessionEntry({
-      runId: input.runId,
-      sessionId: run.message.sessionId,
-      operation: validated,
-      event: input.event,
-    })
-    if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
+    const sessionEntry = validated.entry
     if (current.status === "succeeded") {
       const priorValidation = validateModelResponseCommit({
         record: current,
@@ -313,15 +306,16 @@ export const commitModelResponse: {
           ...input,
           outcome: { _tag: "Succeeded", value: current.result },
         },
+        sessionId: run.message.sessionId,
       })
       if (Schema.is(RuntimeUnavailable)(priorValidation)) return yield* priorValidation
-      const prior = (yield* loadEventsAfter(input.runId, -1)).find(
+      const prior = (yield* loadEventsAfter(input.runId, -1)).filter(
         (event) => event._tag === "ModelResponseCommitted" && event.operationKey === input.event.operationKey,
       )
       if (
-        prior === undefined ||
-        prior._tag !== "ModelResponseCommitted" ||
-        !sameModelResponseEvent({ left: prior, right: input.event })
+        prior.length !== 1 ||
+        prior[0]?._tag !== "ModelResponseCommitted" ||
+        !sameModelResponseEvent({ left: prior[0], right: validated.event })
       )
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent outbox retry`,
@@ -338,11 +332,14 @@ export const commitModelResponse: {
     yield* appendCompletedSessionEntry(sessionEntry).pipe(
       Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
     )
-    const completed = yield* completeOperation(hub, input)
+    const completed = yield* completeOperation(hub, {
+      ...input,
+      outcome: { _tag: "Succeeded", value: validated.reference },
+    })
     yield* appendEvent(
       hub,
       yield* requireRun(input.runId),
-      input.event as unknown as { readonly _tag: string } & Record<string, unknown>,
+      validated.event as unknown as { readonly _tag: string } & Record<string, unknown>,
     )
     return completed
   }),

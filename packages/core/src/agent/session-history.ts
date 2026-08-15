@@ -2,7 +2,7 @@ import { Effect, Option, Ref } from "effect"
 import { Chat, Prompt } from "effect/unstable/ai"
 import { SessionStore, buildContext } from "../context/session.js"
 import type { Event as ModelTelemetryEvent } from "../model/model-telemetry.js"
-import { ResumeMismatch } from "./agent-event.js"
+import { AgentError, ResumeMismatch } from "./agent-event.js"
 import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
 import { withSystem } from "./agent-message.js"
 
@@ -24,10 +24,7 @@ export const conversationOnly = (prompt: Prompt.Prompt): Prompt.Prompt =>
 export const withDerivedSystem = (input: {
   readonly system: string | undefined
   readonly projection: Prompt.Prompt
-}): Prompt.Prompt =>
-  input.system === undefined || input.projection.content.some((message) => message.role === "system")
-    ? input.projection
-    : withSystem(input.system, input.projection)
+}): Prompt.Prompt => (input.system === undefined ? input.projection : withSystem(input.system, input.projection))
 
 /**
  * @experimental Seed a new Chat from the active Session path.
@@ -71,6 +68,28 @@ const validateResume = (
 
 /** @internal Helpers shared by Session-backed setup without widening the public package facade. */
 export const SessionHistoryInternal = { validateResume }
+
+export const replayModelMessages = (input: {
+  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly sessionParentId: string
+  readonly system: string | undefined
+  readonly turn: number
+  readonly sessionError: (turn: number, error: import("../context/session.js").SessionStoreError) => AgentError
+}): Effect.Effect<ReadonlyArray<Prompt.Message>, AgentError> =>
+  Option.match(input.activeSession, {
+    onNone: () =>
+      Effect.fail(
+        AgentError.make({
+          message: `Recorded model operation references Session entry ${input.sessionParentId} without a Session store`,
+          turn: input.turn,
+        }),
+      ),
+    onSome: (session) =>
+      session.path(input.sessionParentId).pipe(
+        Effect.map((path) => withDerivedSystem({ system: input.system, projection: buildContext(path) }).content),
+        Effect.mapError((error) => input.sessionError(input.turn, error)),
+      ),
+  })
 
 /** @internal Rebuild a resume Chat from Session when no persisted Chat owns the live view. */
 export const resumeChat = (input: {

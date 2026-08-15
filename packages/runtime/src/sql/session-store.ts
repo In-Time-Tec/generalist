@@ -1,6 +1,7 @@
 import { DateTime, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Session } from "@batonfx/core"
+import { decodeSessionPayload, encodeSessionPayload } from "./session-payload-codec.js"
 type Entry = Session.Entry
 type EntryId = Session.EntryId
 type AppendInput = Session.AppendInput
@@ -8,63 +9,30 @@ type AppendOptions = Session.AppendOptions
 type CheckpointAppend = Session.CheckpointAppend
 type CompactionEntry = Session.CompactionEntry
 type PreparedCheckpoint = Session.PreparedCheckpoint
-
 const entryPayloadEquivalence = Schema.toEquivalence(Session.EntryPayload)
-
 const appendMatches = (entry: Entry, input: AppendInput, parentId: EntryId | null): boolean =>
   entry.parentId === parentId && entryPayloadEquivalence(entry as Session.EntryPayload, input as Session.EntryPayload)
-
 export interface EntryRow {
   readonly entry_id: string
   readonly parent_id: string | null
   readonly seq: number
+  readonly tag: string
   readonly payload_json: string
 }
-
 export interface SessionRow {
   readonly leaf_id: string | null
   readonly next_seq: number
   readonly owner_token: string | null
 }
-
 const storeError = (message: string) => Session.SessionStoreError.make({ message })
+const decodePayload = decodeSessionPayload
+const encodePayload = encodeSessionPayload
 
-const decodeEntry = Schema.decodeUnknownSync(Session.EntryPayload)
-const encodeEntry = Schema.encodeSync(Session.EntryPayload)
-
-/**
- * Effect AI usage fields are `UndefinedOr`: decoding requires the key even when its value is
- * undefined, but both `JSON.stringify` and the schema's own JSON codec drop it. A durable store
- * must return exactly what it was given, so undefined is persisted explicitly and restored on read.
- */
-const UNDEFINED = "@batonfx/runtime/undefined"
-
-const withUndefinedMarkers = (value: unknown): unknown => {
-  if (value === undefined) return UNDEFINED
-  if (Array.isArray(value)) return value.map(withUndefinedMarkers)
-  if (typeof value !== "object" || value === null) return value
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, withUndefinedMarkers(item)]))
+const toEntry = (row: EntryRow): Entry => {
+  const payload = decodePayload(row.payload_json)
+  if (payload._tag !== row.tag) throw new Error(`Session entry ${row.entry_id} tag is corrupt`)
+  return { ...payload, id: row.entry_id, parentId: row.parent_id } as Entry
 }
-
-const withoutUndefinedMarkers = (value: unknown): unknown => {
-  if (value === UNDEFINED) return undefined
-  if (Array.isArray(value)) return value.map(withoutUndefinedMarkers)
-  if (typeof value !== "object" || value === null) return value
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, withoutUndefinedMarkers(item)]))
-}
-
-const decodePayload = (text: string): Session.EntryPayload =>
-  decodeEntry(withoutUndefinedMarkers(JSON.parse(text) as unknown))
-
-const encodePayload = (payload: Session.EntryPayload): string =>
-  JSON.stringify(withUndefinedMarkers(encodeEntry(payload))) ?? "null"
-
-const toEntry = (row: EntryRow): Entry =>
-  ({
-    ...decodePayload(row.payload_json),
-    id: row.entry_id,
-    parentId: row.parent_id,
-  }) as Entry
 
 const pathFromRows = (
   rows: ReadonlyArray<EntryRow>,
@@ -138,25 +106,28 @@ export const appendInterruptedSessionEntry = (
     const session = sessionRows[0]
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
     const payload: Session.AppendInput = {
-      _tag: "Message",
-      message: input.message,
+      _tag: "ModelResponse",
+      content: input.content,
       metadata: { interruptionDigest: input.digest },
     }
     const existingRows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = existingRows[0]
     if (existing !== undefined) {
       const entry = toEntry(existing)
-      if (!entryPayloadEquivalence(entry as Session.EntryPayload, payload as Session.EntryPayload)) {
+      if (
+        existing.parent_id !== input.parentId ||
+        !entryPayloadEquivalence(entry as Session.EntryPayload, payload as Session.EntryPayload)
+      ) {
         return yield* Session.SessionConflict.make({
           reason: "entry-id-reused",
           message: `Session entry id ${input.entryId} was reused with different interrupted response content`,
         })
       }
       const all = yield* sql<EntryRow>`
-        SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+        SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
         WHERE session_id = ${input.sessionId} ORDER BY seq
       `
       const byId = new Map(all.map((row) => [row.entry_id, row] as const))
@@ -174,16 +145,22 @@ export const appendInterruptedSessionEntry = (
       }
       return entry
     }
+    if (session.leaf_id !== input.parentId) {
+      return yield* Session.SessionConflict.make({
+        reason: "stale-leaf",
+        message: `Expected Session leaf ${String(input.parentId)} but found ${String(session.leaf_id)}`,
+      })
+    }
     yield* sql`
       INSERT INTO baton_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
-      VALUES (${input.sessionId}, ${input.entryId}, ${session.leaf_id}, ${session.next_seq}, 'Message',
+      VALUES (${input.sessionId}, ${input.entryId}, ${input.parentId}, ${session.next_seq}, 'ModelResponse',
         ${encodePayload(payload as Session.EntryPayload)}, ${created})
     `
     yield* sql`
       UPDATE baton_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
       WHERE session_id = ${input.sessionId}
     `
-    return { ...payload, id: input.entryId, parentId: session.leaf_id } as Session.MessageEntry
+    return { ...payload, id: input.entryId, parentId: input.parentId } as Session.ModelResponseEntry
   })
 
 export const verifyInterruptedSessionEntry = (
@@ -200,18 +177,19 @@ export const verifyInterruptedSessionEntry = (
     `
     const session = sessionRows[0]
     const existingRows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = existingRows[0]
     const payload: Session.AppendInput = {
-      _tag: "Message",
-      message: input.message,
+      _tag: "ModelResponse",
+      content: input.content,
       metadata: { interruptionDigest: input.digest },
     }
     if (
       session === undefined ||
       existing === undefined ||
+      existing.parent_id !== input.parentId ||
       !entryPayloadEquivalence(toEntry(existing) as Session.EntryPayload, payload as Session.EntryPayload)
     ) {
       return yield* Session.SessionConflict.make({
@@ -220,7 +198,7 @@ export const verifyInterruptedSessionEntry = (
       })
     }
     const all = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} ORDER BY seq
     `
     const byId = new Map(all.map((row) => [row.entry_id, row] as const))
@@ -271,7 +249,7 @@ export const makeSqliteSessionStore = (options: {
 
     const entriesFor = Effect.gen(function* () {
       const rows = yield* sql<EntryRow>`
-        SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+        SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
         WHERE session_id = ${options.sessionId} ORDER BY seq
       `
       return rows
@@ -341,7 +319,7 @@ export const makeSqliteSessionStore = (options: {
           const session = yield* ensureSession
           if (appendOptions?.id !== undefined) {
             const rows = yield* sql<EntryRow>`
-              SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+              SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
               WHERE session_id = ${options.sessionId} AND entry_id = ${appendOptions.id}
             `
             const existing = rows[0]
@@ -395,7 +373,7 @@ export const makeSqliteSessionStore = (options: {
         Effect.gen(function* () {
           const session = yield* ensureSession
           const rows = yield* sql<EntryRow>`
-            SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+            SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
             WHERE session_id = ${options.sessionId} AND entry_id = ${prepared.id}
           `
           const existing = rows[0]

@@ -152,7 +152,7 @@ export const emptyTranscript = Prompt.fromMessages([])
 export const completedResult = (text: string) => ({
   text,
   turns: 1,
-  transcript: emptyTranscript,
+  session: { sessionId: "test-session", leafId: null },
 })
 
 type OpenWait = RunWait.RunWait

@@ -1,8 +1,19 @@
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Cause, Effect, Function, Layer, Schema, Scope, Stream } from "effect"
+import { Cause, Effect, Function, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, AgentManifest, DurableDriver, ExecutableManifest, Pins, RunBudget, ToolExecutor } from "../src/index"
+import {
+  Agent,
+  AgentManifest,
+  Compaction,
+  DurableDriver,
+  ExecutableManifest,
+  Memory,
+  Pins,
+  RunBudget,
+  Session,
+  ToolExecutor,
+} from "../src/index"
 
 import { Json } from "./json.js"
 import { withProviderFinish } from "./provider-finish.js"
@@ -11,6 +22,7 @@ import { sha256Text } from "../src/durable/canonical-json.js"
 import { edgeCount, incrementEdge } from "../src/agent/handoff-state.js"
 import { applyHandoffCommit } from "../src/durable/loop-driver.js"
 import { makeAgent, makeExecutable } from "../src/durable/pin.js"
+import { withDerivedSystem } from "../src/agent/session-history.js"
 
 const persistenceLayer = Chat.layerPersisted({ storeId: "durable-driver-test" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
@@ -668,6 +680,17 @@ const captureJournal = () => {
 }
 
 describe("DurableDriver Agent.stream integration", () => {
+  it("restores Agent instructions ahead of derived Session system context", () => {
+    const projection = Prompt.fromMessages([
+      Prompt.makeMessage("system", { content: "derived memory and branch context" }),
+    ])
+    const replay = withDerivedSystem({ system: "current Agent instructions", projection })
+
+    expect(replay.content.map((message) => message.role)).toEqual(["system", "system"])
+    expect(JSON.stringify(replay.content[0])).toContain("current Agent instructions")
+    expect(JSON.stringify(replay.content[1])).toContain("derived memory and branch context")
+  })
+
   layer(makeToolCallModelLayer())(
     "rejects a checkpoint with no executable identity for another standalone Agent",
     (suite) => {
@@ -840,6 +863,205 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
+  it.effect("records bounded Session sync cursors as the path grows", () => {
+    const outcomes = new Array<DurableDriver.OperationOutcome>()
+    const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+      onScheduled: () => Effect.void,
+      onCompleted: (operation, outcome) =>
+        Effect.sync(() => {
+          if (operation.kind === "memory" && operation.key.includes(":memory:sync:")) outcomes.push(outcome)
+        }),
+      onCheckpoint: () => Effect.void,
+    })
+    const modelLayer = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "text", delta: "done" }))),
+      }),
+    )
+    const agent = Agent.make({ name: "bounded-session-sync-agent" })
+
+    return provideScoped(
+      Layer.mergeAll(Session.layerMemory, modelLayer, journalLayer),
+      Effect.gen(function* () {
+        const store = yield* Session.SessionStore
+        for (let index = 0; index < 256; index += 1) {
+          yield* store.append({
+            _tag: "Message",
+            message: Prompt.makeMessage("user", {
+              content: [Prompt.makePart("text", { text: `history-${index}-${"x".repeat(32)}` })],
+            }),
+          })
+        }
+        const before = yield* store.path()
+
+        yield* Agent.stream(agent, {
+          prompt: "continue",
+          logicalOperationId: "bounded-session-sync",
+          sessionId: "bounded-session-sync",
+        }).pipe(Stream.runDrain)
+
+        const path = yield* store.path()
+        const succeeded = outcomes.flatMap((outcome) => (outcome._tag === "Succeeded" ? [outcome.value] : []))
+        expect(path).toHaveLength(before.length + 2)
+        expect(Json.stringify(path).length).toBeGreaterThan(10_000)
+        expect(succeeded.length).toBeGreaterThanOrEqual(2)
+        for (const value of succeeded) {
+          expect(value).toEqual({ leafId: expect.any(String) })
+          expect(Json.stringify(value).length).toBeLessThanOrEqual(100)
+        }
+      }),
+    )
+  })
+
+  it.effect("replays the exact Session path from its cursor without re-appending", () => {
+    const recorded = new Map<string, DurableDriver.OperationOutcome>()
+    const recordedOperations = new Map<string, DurableDriver.DriverOperation>()
+    const modelParents = new Array<string | null>()
+    const remembered = new Array<Prompt.Prompt>()
+    let replayMemory = false
+    let appendCalls = 0
+    const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+      onScheduled: (operation) =>
+        Effect.sync(() =>
+          replayMemory && operation.kind === "memory" && operation.key.includes(":memory:sync:")
+            ? recorded.get(operation.key)
+            : undefined,
+        ),
+      onCompleted: (operation, outcome) =>
+        Effect.sync(() => {
+          if (operation.kind === "memory" && operation.key.includes(":memory:sync:")) {
+            recorded.set(operation.key, outcome)
+            recordedOperations.set(operation.key, operation)
+          }
+          if (
+            operation.kind === "model" &&
+            outcome._tag === "Succeeded" &&
+            typeof outcome.value === "object" &&
+            outcome.value !== null &&
+            "sessionParentId" in outcome.value &&
+            (typeof outcome.value.sessionParentId === "string" || outcome.value.sessionParentId === null)
+          ) {
+            modelParents.push(outcome.value.sessionParentId)
+          }
+        }),
+      onCheckpoint: () => Effect.void,
+    })
+    const countedSessionLayer = Layer.effect(
+      Session.SessionStore,
+      Effect.gen(function* () {
+        const inner = yield* Session.SessionStore
+        return Session.SessionStore.of({
+          ...inner,
+          append: (entry, options) =>
+            Effect.sync(() => {
+              appendCalls += 1
+            }).pipe(Effect.andThen(inner.append(entry, options))),
+        })
+      }),
+    ).pipe(Layer.provide(Session.layerMemory))
+    const memoryLayer = Memory.layerTest({
+      recall: () => Effect.succeed([]),
+      remember: (input) =>
+        Effect.sync(() => {
+          remembered.push(input.transcript)
+        }),
+      forget: () => Effect.void,
+    })
+    const modelLayer = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "text", delta: "done" }))),
+      }),
+    )
+    const agent = Agent.make({ name: "session-sync-replay-agent" })
+    const run = (prompt = "reply") =>
+      Agent.stream(agent, {
+        prompt,
+        history: Prompt.empty,
+        logicalOperationId: "session-sync-replay",
+        sessionId: "session-sync-replay",
+        memory: { key: { agent: "session-sync-replay-agent", subject: "session-sync-replay" } },
+      }).pipe(Stream.runDrain)
+
+    return provideScoped(
+      Layer.mergeAll(countedSessionLayer, memoryLayer, modelLayer, journalLayer),
+      Effect.gen(function* () {
+        const store = yield* Session.SessionStore
+        const compactionId = yield* store.reserveEntryId
+        yield* store.appendCheckpoint({
+          id: compactionId,
+          parentId: null,
+          projectedHistory: Prompt.empty,
+          telemetry: [],
+          summary: "prior summary",
+        })
+        yield* run()
+        const completedPath = yield* store.path()
+        expect(completedPath[0]?._tag).toBe("Compaction")
+        const completedLeaf = completedPath.at(-1)?.id ?? null
+        const expectedReplayPath = Session.buildMemoryContext(completedPath)
+        expect(remembered).toEqual([expectedReplayPath])
+        yield* store.append({
+          _tag: "Message",
+          message: Prompt.makeMessage("user", {
+            content: [Prompt.makePart("text", { text: "newer unrelated continuation" })],
+          }),
+        })
+        const advancedPath = yield* store.path()
+        const firstSyncEntry = [...recorded.entries()].find(
+          ([, outcome]) =>
+            outcome._tag === "Succeeded" &&
+            typeof outcome.value === "object" &&
+            outcome.value !== null &&
+            "leafId" in outcome.value &&
+            outcome.value.leafId === modelParents[0],
+        )
+        const firstSync = firstSyncEntry?.[1]
+        expect(
+          firstSyncEntry === undefined ? undefined : recordedOperations.get(firstSyncEntry[0])?.input,
+        ).toMatchObject({
+          transcriptDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+        })
+        expect(firstSync?._tag).toBe("Succeeded")
+        if (firstSync?._tag !== "Succeeded" || firstSyncEntry === undefined) return
+        expect(firstSync.value).toEqual({ leafId: expect.any(String) })
+        const cursorLeaf = (firstSync.value as { readonly leafId: string }).leafId
+        expect(cursorLeaf).not.toBe(completedLeaf)
+        expect(modelParents).toEqual([cursorLeaf])
+        const appendsBeforeReplay = appendCalls
+
+        replayMemory = true
+        yield* run()
+
+        expect(appendCalls).toBe(appendsBeforeReplay)
+        expect(yield* store.path()).toEqual(advancedPath)
+        expect(modelParents).toEqual([cursorLeaf, cursorLeaf])
+        expect(remembered).toEqual([expectedReplayPath, expectedReplayPath])
+
+        recorded.set(firstSyncEntry[0], { ...firstSync, value: { leafId: "missing-session-cursor" } })
+        const missingCursor = yield* run().pipe(Effect.flip)
+        expect(missingCursor).toMatchObject({
+          _tag: "@batonfx/core/AgentError",
+          turn: 0,
+        })
+        expect(appendCalls).toBe(appendsBeforeReplay)
+        expect(modelParents).toEqual([cursorLeaf, cursorLeaf])
+        for (const malformed of [{}, [], "cursor", 1, { leafId: undefined }]) {
+          recorded.set(firstSyncEntry[0], { ...firstSync, value: malformed })
+          const invalidCursor = yield* run().pipe(Effect.flip)
+          expect(invalidCursor).toMatchObject({ _tag: "@batonfx/core/AgentError", turn: 0 })
+          expect(appendCalls).toBe(appendsBeforeReplay)
+          expect(modelParents).toEqual([cursorLeaf, cursorLeaf])
+        }
+      }),
+    )
+  })
+
   it.effect("replays one semantic model result without contacting the provider", () =>
     Effect.gen(function* () {
       const recorded = new Map<string, DurableDriver.OperationOutcome>()
@@ -864,18 +1086,19 @@ describe("DurableDriver Agent.stream integration", () => {
         }),
       )
       const agent = Agent.make({ name: "semantic-replay-agent" })
-      const run = provideScoped(
-        Layer.mergeAll(modelLayer, journalLayer),
-        Agent.stream(agent, {
-          prompt: "reply",
-          logicalOperationId: "semantic-replay",
-          sessionId: "semantic-replay",
-        }).pipe(Stream.runCollect),
-      )
+      const run = (prompt: string) =>
+        provideScoped(
+          Layer.mergeAll(modelLayer, journalLayer),
+          Agent.stream(agent, {
+            prompt,
+            logicalOperationId: "semantic-replay",
+            sessionId: "semantic-replay",
+          }).pipe(Stream.runCollect),
+        )
 
-      const live = yield* run
+      const live = yield* run("reply")
       replay = true
-      const replayed = yield* run
+      const replayed = yield* run("reply")
 
       expect(providerCalls).toBe(1)
       expect(live.at(-1)).toEqual(replayed.at(-1))
@@ -885,7 +1108,164 @@ describe("DurableDriver Agent.stream integration", () => {
         expect(outcome.value).toMatchObject({ turn: 0 })
         expect(outcome.value).toHaveProperty("content.0", expect.objectContaining({ type: "text", text: "durable" }))
         expect(outcome.value).not.toHaveProperty("values")
+        expect(outcome.value).not.toHaveProperty("messages")
       }
+    }),
+  )
+
+  it.effect("replays a settled compacted no-Session model request after outcome-before-checkpoint interruption", () =>
+    Effect.gen(function* () {
+      const rawPrompt = Prompt.fromMessages([
+        Prompt.makeMessage("user", {
+          content: [Prompt.makePart("text", { text: "raw " }), Prompt.makePart("text", { text: "provider request" })],
+        }),
+      ])
+      const compactedRequest = Prompt.make("exact compacted provider request")
+      const normalizedCompactionInputs = new Array<Prompt.Prompt>()
+      const providerPrompts = {
+        baseline: new Array<Prompt.Prompt>(),
+        recovery: new Array<Prompt.Prompt>(),
+      }
+      let activeRun: keyof typeof providerPrompts = "baseline"
+      const compactionLayer = Compaction.layerTest({
+        maybeCompact: (request) =>
+          Effect.sync(() => {
+            const context = Prompt.concat(request.history, request.prompt)
+            if (Json.stringify(context.content).includes("exact compacted provider request")) return Option.none()
+            normalizedCompactionInputs.push(request.prompt)
+            return Option.some({
+              _tag: "Microcompact" as const,
+              history: Prompt.empty,
+              prompt: compactedRequest,
+            })
+          }),
+      })
+      const modelLayer = Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: (options) => {
+            const prompt = Prompt.fromMessages(options.prompt.content)
+            providerPrompts[activeRun].push(prompt)
+            const isDownstream = Json.stringify(prompt.content).includes('"type":"tool-result"')
+            return withProviderFinish(
+              isDownstream
+                ? Stream.make(Response.makePart("text-delta", { id: "final", delta: "final answer" }))
+                : Stream.make(
+                    Response.makePart("tool-call", {
+                      id: "durable-echo",
+                      name: "echo",
+                      params: { text: "replayed" },
+                      providerExecuted: false,
+                    }),
+                  ),
+            )
+          },
+        }),
+      )
+      const targetOperation = "compacted-recovery:model:0:0:conversation"
+      let pendingCheckpoint: DurableDriver.DriverCheckpoint | undefined
+      let settledOutcome: DurableDriver.OperationOutcome | undefined
+      let replaySettled = false
+      const journal: DurableDriver.DriverJournal = {
+        onScheduled: (operation, checkpoint) =>
+          Effect.sync(() => {
+            if (operation.key !== targetOperation) return undefined
+            if (replaySettled) return settledOutcome
+            pendingCheckpoint = checkpoint
+            return undefined
+          }),
+        onCompleted: (operation, outcome) => {
+          if (operation.key !== targetOperation || replaySettled) return Effect.void
+          return Effect.sync(() => {
+            settledOutcome = outcome
+          }).pipe(Effect.andThen(Effect.interrupt))
+        },
+        onCheckpoint: () => Effect.void,
+      }
+      const agent = Agent.make({
+        name: "compacted-recovery-agent",
+        toolkit: Toolkit.make(echoTool),
+      })
+      const executable = ExecutableManifest.makeTest(agent.name, undefined)
+
+      yield* provideScoped(
+        Layer.mergeAll(
+          modelLayer,
+          compactionLayer,
+          ToolExecutor.layerTest({
+            execute: () => Effect.succeed({ _tag: "Success", result: "echoed", encodedResult: "echoed" }),
+          }),
+          Layer.succeed(DurableDriver.DriverJournalService, journal),
+          unusedToolHandlerLayer,
+          Agent.layerRuntime,
+          persistenceLayer,
+        ),
+        Effect.gen(function* () {
+          const baseline = yield* Agent.stream(agent, {
+            prompt: rawPrompt,
+            logicalOperationId: "compacted-baseline",
+            executableRef: executable.ref,
+            persistence: { chatId: "compacted-baseline" },
+            compaction: { contextWindow: 1 },
+          }).pipe(Stream.runCollect)
+          const persistence = yield* Chat.Persistence
+          const baselineChat = yield* persistence.get("compacted-baseline")
+          const baselineFinal = yield* Ref.get(baselineChat.history)
+
+          activeRun = "recovery"
+          const interrupted = yield* Agent.stream(agent, {
+            prompt: rawPrompt,
+            logicalOperationId: "compacted-recovery",
+            executableRef: executable.ref,
+            persistence: { chatId: "compacted-recovery" },
+            compaction: { contextWindow: 1 },
+          }).pipe(Stream.runDrain, Effect.exit)
+          expect(interrupted._tag).toBe("Failure")
+          expect(providerPrompts.recovery).toHaveLength(1)
+          expect(pendingCheckpoint).toBeDefined()
+          expect(settledOutcome?._tag).toBe("Succeeded")
+          expect(pendingCheckpoint?.state).toMatchObject({
+            pending: {
+              key: targetOperation,
+              input: { promptDigest: expect.stringMatching(/^[0-9a-f]{64}$/) },
+            },
+          })
+          if (settledOutcome?._tag === "Succeeded") {
+            expect(settledOutcome.value).toMatchObject({ replayFromHistory: true })
+          }
+          const recoveryChat = yield* persistence.get("compacted-recovery")
+          expect((yield* Ref.get(recoveryChat.history)).content).toEqual(compactedRequest.content)
+
+          replaySettled = true
+          const recovered = yield* Agent.stream(agent, {
+            prompt: Prompt.empty,
+            logicalOperationId: "compacted-recovery",
+            executableRef: executable.ref,
+            driverCheckpoint: pendingCheckpoint!,
+            persistence: { chatId: "compacted-recovery" },
+            compaction: { contextWindow: 1 },
+          }).pipe(Stream.runCollect)
+          const recoveredChat = yield* persistence.get("compacted-recovery")
+          const recoveredFinal = yield* Ref.get(recoveredChat.history)
+
+          expect(normalizedCompactionInputs).toHaveLength(2)
+          for (const input of normalizedCompactionInputs) {
+            const message = input.content[0]
+            expect(message?.role).toBe("user")
+            expect(Array.isArray(message?.content) ? message.content : []).toEqual([
+              expect.objectContaining({ type: "text", text: "raw provider request" }),
+            ])
+          }
+          expect(providerPrompts.baseline).toHaveLength(2)
+          expect(providerPrompts.recovery).toHaveLength(2)
+          expect(providerPrompts.baseline[0]?.content).toEqual(compactedRequest.content)
+          expect(providerPrompts.recovery[0]?.content).toEqual(compactedRequest.content)
+          expect(providerPrompts.recovery[1]?.content).toEqual(providerPrompts.baseline[1]?.content)
+          expect(recoveredFinal.content).toEqual(baselineFinal.content)
+          expect(recovered.at(-1)).toEqual(baseline.at(-1))
+        }),
+      )
     }),
   )
 
@@ -1084,40 +1464,78 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
-  it.effect("replays journaled stream values without executing the source again", () =>
+  it.effect("replays a pending journaled stream without recharging or redispatching the provider", () =>
     Effect.gen(function* () {
-      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream-replay", sessionId: "stream-replay" })
-      const initial = yield* driver.initial({ prompt: Prompt.make("stream-replay"), budget: RunBudget.allocate({}) })
-      const outcomes = new Map<string, DurableDriver.OperationOutcome>()
-      let replay = false
-      let sourceRuns = 0
-      const journal: DurableDriver.DriverJournal = {
-        onScheduled: (operation) => Effect.succeed(replay ? outcomes.get(operation.key) : undefined),
-        onCompleted: (operation, outcome) =>
-          Effect.sync(() => {
-            outcomes.set(operation.key, outcome)
-          }),
-        onCheckpoint: () => Effect.void,
+      const logicalOperationId = "stream-replay"
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
+      const allocated = RunBudget.allocate({ modelCalls: 3 })
+      const charged = yield* RunBudget.charge(allocated, { modelCalls: 1 })
+      const pendingSpec = {
+        kind: "model" as const,
+        key: `${logicalOperationId}:model:0:0`,
+        input: { turn: 0, modelCallOrdinal: 0 },
+        replayPolicy: "provider-idempotent" as const,
       }
-      const makeInterpreter = DurableDriver.makeInline({ driver, initial, journal })
-      const spec = { kind: "tool" as const, key: "stream-replay:tool", input: {}, replayPolicy: "never" as const }
-      const source = Stream.unwrap(
-        Effect.sync(() => {
-          sourceRuns += 1
-          return Stream.fromIterable(["first", "second", "third"])
-        }),
-      )
+      const initial: DurableDriver.DriverCheckpoint = {
+        driverVersion: DurableDriver.currentDriverVersion,
+        turn: 0,
+        budget: charged,
+        state: {
+          logicalOperationId,
+          sessionId: logicalOperationId,
+          modelCallOrdinal: 1,
+          modelCallOrdinalStart: 0,
+          pending: pendingSpec,
+        },
+      }
+      const scheduled = new Array<string>()
+      let providerDispatches = 0
+      const interpreter = yield* DurableDriver.makeInline({
+        driver,
+        initial,
+        journal: {
+          onScheduled: (operation) =>
+            Effect.sync(() => {
+              scheduled.push(operation.key)
+              return operation.key === pendingSpec.key
+                ? ({ _tag: "Succeeded", value: ["first", "second", "third"] } as const)
+                : undefined
+            }),
+          onCompleted: () => Effect.void,
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const providerStream = (values: ReadonlyArray<string>) =>
+        Stream.unwrap(
+          Effect.sync(() => {
+            providerDispatches += 1
+            return Stream.fromIterable(values)
+          }),
+        )
 
-      const first = yield* Stream.runCollect((yield* makeInterpreter).runStream(spec, source))
-      replay = true
-      const second = yield* Stream.runCollect(
-        (yield* makeInterpreter).runStream(spec, Stream.die("replayed stream source must not execute")),
-      )
+      expect(yield* Stream.runCollect(interpreter.runStream(pendingSpec, providerStream(["redispatched"])))).toEqual([
+        "first",
+        "second",
+        "third",
+      ])
+      const replayedCheckpoint = yield* interpreter.checkpoint
+      expect(replayedCheckpoint.state).not.toHaveProperty("pending")
+      expect(replayedCheckpoint.state).toMatchObject({ modelCallOrdinal: 1 })
+      expect(replayedCheckpoint.budget.remaining.modelCalls).toBe(2)
+      expect(providerDispatches).toBe(0)
 
-      expect(first).toEqual(["first", "second", "third"])
-      expect(second).toEqual(first)
-      expect(sourceRuns).toBe(1)
-      expect(outcomes.get(spec.key)).toEqual({ _tag: "Succeeded", value: ["first", "second", "third"] })
+      const nextSpec = {
+        ...pendingSpec,
+        key: `${logicalOperationId}:model:0:1`,
+        input: { turn: 0, modelCallOrdinal: 1 },
+      }
+      expect(yield* Stream.runCollect(interpreter.runStream(nextSpec, providerStream(["next"])))).toEqual(["next"])
+      const nextCheckpoint = yield* interpreter.checkpoint
+      expect(nextCheckpoint.state).not.toHaveProperty("pending")
+      expect(nextCheckpoint.state).toMatchObject({ modelCallOrdinal: 2 })
+      expect(nextCheckpoint.budget.remaining.modelCalls).toBe(1)
+      expect(scheduled).toEqual([pendingSpec.key, nextSpec.key])
+      expect(providerDispatches).toBe(1)
     }),
   )
 
@@ -1141,7 +1559,7 @@ describe("DurableDriver Agent.stream integration", () => {
             completions += 1
             return { total, count }
           },
-          replay: (success) => [success.total, success.count],
+          replay: (success) => Stream.fromIterable([success.total, success.count]),
         }
       const makeInterpreter = DurableDriver.makeInline({
         driver,

@@ -20,6 +20,8 @@ import {
   TreeCursorExpired as Errors_TreeCursorExpired,
   SubscriberLagged as Errors_SubscriberLagged,
   RuntimeUnavailable as Errors_RuntimeUnavailable,
+  SessionEntryNotFound as Errors_SessionEntryNotFound,
+  SessionEntryCorrupt as Errors_SessionEntryCorrupt,
   FanOutConflict as Errors_FanOutConflict,
   FanOutNotFound as Errors_FanOutNotFound,
   FanOutInvalid as Errors_FanOutInvalid,
@@ -68,6 +70,8 @@ export const Errors = {
   TreeCursorExpired: Errors_TreeCursorExpired,
   SubscriberLagged: Errors_SubscriberLagged,
   RuntimeUnavailable: Errors_RuntimeUnavailable,
+  SessionEntryNotFound: Errors_SessionEntryNotFound,
+  SessionEntryCorrupt: Errors_SessionEntryCorrupt,
   FanOutConflict: Errors_FanOutConflict,
   FanOutNotFound: Errors_FanOutNotFound,
   FanOutInvalid: Errors_FanOutInvalid,
@@ -114,6 +118,8 @@ export namespace Errors {
   export type TreeCursorExpired = import("../errors.js").TreeCursorExpired
   export type SubscriberLagged = import("../errors.js").SubscriberLagged
   export type RuntimeUnavailable = import("../errors.js").RuntimeUnavailable
+  export type SessionEntryNotFound = import("../errors.js").SessionEntryNotFound
+  export type SessionEntryCorrupt = import("../errors.js").SessionEntryCorrupt
   export type FanOutConflict = import("../errors.js").FanOutConflict
   export type FanOutNotFound = import("../errors.js").FanOutNotFound
   export type FanOutInvalid = import("../errors.js").FanOutInvalid

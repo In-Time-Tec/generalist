@@ -117,7 +117,7 @@ export const saveCompletionContinuation: {
   (result: ExecutionResult): (runId: string) => ContinuationEffect
 } = Function.dual(2, (runId: string, result: ExecutionResult) =>
   Effect.gen(function* () {
-    if (!("transcript" in result)) return undefined
+    if (!("session" in result)) return undefined
     const run = yield* loadRun(runId)
     if (run?.cancellationRequested === true) return undefined
     const sql = yield* SqlClient.SqlClient

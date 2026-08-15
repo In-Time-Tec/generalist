@@ -16,10 +16,10 @@ import {
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { Cursor, RunEvent } from "@batonfx/runtime"
+import { Cursor } from "@batonfx/runtime"
 import { ReconnectExhausted, TransportError } from "./errors.js"
 import { encodeCommand, ObserverRunEvent, observerCodec } from "./wire.js"
-import type { ClientCommand } from "./wire.js"
+import type { ClientCommand, ResolvedRunEvent } from "./wire.js"
 
 /** @experimental */
 export type ConnectionStatus =
@@ -45,7 +45,7 @@ export interface ConnectOptions {
 
 /** @experimental */
 export interface Connection {
-  readonly events: Stream.Stream<RunEvent.RunEvent, TransportError>
+  readonly events: Stream.Stream<ResolvedRunEvent, TransportError>
   readonly cancel: (reason?: string) => Effect.Effect<void, TransportError>
   readonly status: Stream.Stream<ConnectionStatus>
   readonly exhausted: Effect.Effect<never, ReconnectExhausted>
@@ -80,7 +80,7 @@ const urlWithCursor = (url: string, cursor: Cursor.Cursor | undefined): string =
 export const sseEvents = (options: {
   readonly url: string
   readonly cursor?: Cursor.Cursor
-}): Stream.Stream<RunEvent.RunEvent, TransportError, HttpClient.HttpClient> =>
+}): Stream.Stream<ResolvedRunEvent, TransportError, HttpClient.HttpClient> =>
   HttpClientResponse.stream(HttpClient.get(urlWithCursor(options.url, options.cursor))).pipe(
     Stream.decodeText,
     Stream.pipeThroughChannel(Sse.decodeDataSchema(ObserverRunEvent)),
@@ -125,7 +125,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
           }
           const reconnect = options.reconnect ?? defaultReconnectPolicy
           const scope = yield* Effect.scope
-          const eventQueue = yield* Queue.bounded<RunEvent.RunEvent, TransportError>(capacity)
+          const eventQueue = yield* Queue.bounded<ResolvedRunEvent, TransportError>(capacity)
           const statusQueue = yield* Queue.sliding<ConnectionStatus>(8)
           const writerRef = yield* Ref.make<Option.Option<(chunk: string) => Effect.Effect<void, TransportError>>>(
             Option.none(),

@@ -60,7 +60,6 @@ export interface AdmitProgramChildAndSuspendInput extends AdmitProgramChildInput
   readonly wait: RunWait
   readonly suspension: ExecutionSuspension
   readonly checkpoint?: ExecutionCheckpoint
-  readonly transcript?: Prompt.Prompt
   readonly continuation?: ExecutionContinuation | null
 }
 
@@ -79,7 +78,6 @@ export interface RecordOperationInput extends ExecutionClaim {
   readonly replayPolicy: ReplayPolicy
   readonly attempt: number
   readonly checkpoint?: ExecutionCheckpoint
-  readonly transcript?: Prompt.Prompt
   readonly continuation?: ExecutionContinuation | null
   readonly steeringEntryIds?: ReadonlyArray<string>
   readonly steeringEvents?: ReadonlyArray<DurableAgentLoopEvent>
@@ -146,7 +144,6 @@ export interface ExecutionRecord {
   readonly checkpoint?: ExecutionCheckpoint
   readonly suspension?: ExecutionSuspension
   readonly resolution?: WaitResolution
-  readonly transcript?: Prompt.Prompt
   readonly continuation?: ExecutionContinuation
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }

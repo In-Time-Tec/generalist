@@ -9,6 +9,7 @@ export interface AttemptIdentity {
   readonly modelCallId: string
   readonly modelAttemptId: string
   readonly attempt: number
+  readonly sessionParentId?: string | null
 }
 
 /** @experimental A normalized response that was interrupted after producing semantic content. */
