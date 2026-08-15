@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { EventSchemas } from "@ag-ui/core"
 import { Effect, Schema } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Response } from "effect/unstable/ai"
 import { Errors, ExecutableManifest, RunEvent } from "@batonfx/runtime"
-import { project, stateSnapshot } from "../src/projection.js"
+import { project, projectModelResponse, stateSnapshot } from "../src/projection.js"
 
 const executableRef = ExecutableManifest.makeTest("assistant", "1").ref
 
@@ -18,31 +18,42 @@ const base = {
   occurredAt: "2026-08-03T00:00:00.000Z",
 }
 
-const committed = (content: ReadonlyArray<Response.AnyPart>) => ({
-  ...base,
-  _tag: "ModelResponseCommitted" as const,
-  turn: 0,
-  operationKey: "run-1:model:0",
-  modelCallId: "model-1",
-  modelAttemptId: "attempt-1",
-  attempt: 0,
-  response: { content, finishReason: "tool-calls" as const },
-  digest: "committed-digest",
+const committed = (content: RunEvent.CompletedModelResponse["content"]) => ({
+  event: {
+    ...base,
+    _tag: "ModelResponseCommitted" as const,
+    turn: 0,
+    operationKey: "run-1:model:0",
+    modelCallId: "model-1",
+    modelAttemptId: "attempt-1",
+    attempt: 0,
+    sessionId: "thread-1",
+    sessionParentId: "entry:input",
+    sessionEntryId: "entry:committed",
+    finishReason: "tool-calls" as const,
+    digest: "committed-digest",
+  },
+  content,
 })
 
-const interrupted = (content: ReadonlyArray<Response.AnyPart>) => ({
-  ...base,
-  eventId: "run-1:2",
-  sequence: 2,
-  _tag: "ModelResponseInterrupted" as const,
-  turn: 0,
-  operationKey: "run-1:model:0",
-  modelCallId: "model-1",
-  modelAttemptId: "attempt-1",
-  attempt: 0,
-  response: { content },
-  reason: "failure" as const,
-  digest: "interrupted-digest",
+const interrupted = (content: RunEvent.CompletedModelResponse["content"]) => ({
+  event: {
+    ...base,
+    eventId: "run-1:2",
+    sequence: 2,
+    _tag: "ModelResponseInterrupted" as const,
+    turn: 0,
+    operationKey: "run-1:model:0",
+    modelCallId: "model-1",
+    modelAttemptId: "attempt-1",
+    attempt: 0,
+    sessionId: "thread-1",
+    sessionParentId: "entry:input",
+    sessionEntryId: "entry:interrupted",
+    reason: "failure" as const,
+    digest: "interrupted-digest",
+  },
+  content,
 })
 
 describe("AG-UI event projection", () => {
@@ -59,9 +70,9 @@ describe("AG-UI event projection", () => {
         }),
         Response.makePart("text", { text: "after the tool" }),
       ])
-      expect(Schema.is(RunEvent.RunEvent)(response)).toBe(true)
+      expect(Schema.is(RunEvent.RunEvent)(response.event)).toBe(true)
 
-      const events = yield* project(response, "thread-1")
+      const events = yield* projectModelResponse(response.event, response.content)
 
       expect(events).toEqual([
         { type: "TEXT_MESSAGE_START", messageId: "run-1:1:text:0", role: "assistant" },
@@ -97,10 +108,13 @@ describe("AG-UI event projection", () => {
         _tag: "RunFailed" as const,
         error: Errors.AgentExecutionFailure.make({ message: "model terminated" }),
       }
-      expect(Schema.is(RunEvent.RunEvent)(partial)).toBe(true)
+      expect(Schema.is(RunEvent.RunEvent)(partial.event)).toBe(true)
       expect(Schema.is(RunEvent.RunEvent)(failed)).toBe(true)
 
-      const events = [...(yield* project(partial, "thread-1")), ...(yield* project(failed, "thread-1"))]
+      const events = [
+        ...(yield* projectModelResponse(partial.event, partial.content)),
+        ...(yield* project(failed, "thread-1")),
+      ]
 
       expect(events).toEqual([
         { type: "TEXT_MESSAGE_START", messageId: "run-1:2:text:0", role: "assistant" },
@@ -142,8 +156,12 @@ describe("AG-UI event projection", () => {
             metadata: {},
           },
         },
-        { ...base, _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty },
-        { ...base, _tag: "RunCompleted", result: { text: "hello", turns: 1, transcript: Prompt.empty } },
+        { ...base, _tag: "TurnCompleted", turn: 0 },
+        {
+          ...base,
+          _tag: "RunCompleted",
+          result: { text: "hello", turns: 1, session: { sessionId: "thread-1", leafId: null } },
+        },
         { ...base, _tag: "ToolProgress", turn: 0, toolCallId: "tool-1", message: "working", data: { percent: 50 } },
         {
           ...base,

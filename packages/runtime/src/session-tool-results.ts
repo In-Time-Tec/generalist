@@ -1,6 +1,6 @@
 import { DurableDriver, Pins, Session } from "@batonfx/core"
 import { Effect, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { RuntimeUnavailable } from "./errors.js"
 import { RunFailure, type RunEvent } from "./run-event.js"
 
@@ -90,7 +90,7 @@ const callIdentity = (call: { readonly id: string; readonly name: string }) => `
 const entryDigest = (
   entry: Session.Entry,
 ): { readonly tag: ModelResponseEvent["_tag"]; readonly value: string } | undefined => {
-  if (entry._tag !== "Message") return undefined
+  if (entry._tag !== "ModelResponse") return undefined
   const completed = entry.metadata?.modelResponseDigest
   if (typeof completed === "string") return { tag: "ModelResponseCommitted", value: completed }
   const interrupted = entry.metadata?.interruptionDigest
@@ -115,7 +115,15 @@ const ownedCalls = (input: {
     )
     const calls = new Map<string, Array<OwnedCall>>()
     for (const entry of input.path) {
-      if (entry._tag !== "Message" || entry.message.role !== "assistant") continue
+      const message =
+        entry._tag === "ModelResponse"
+          ? Prompt.fromResponseParts(entry.content as ReadonlyArray<Response.AnyPart>).content.find(
+              (candidate) => candidate.role === "assistant",
+            )
+          : entry._tag === "Message" && entry.message.role === "assistant"
+            ? entry.message
+            : undefined
+      if (message === undefined || typeof message.content === "string") continue
       const digest = entryDigest(entry)
       if (digest === undefined) continue
       const matching = responseEvents.filter((event) => event._tag === digest.tag && event.digest === digest.value)
@@ -124,9 +132,14 @@ const ownedCalls = (input: {
         return yield* unavailable(`Session entry ${entry.id} matches multiple model response events`)
       }
       const response = matching[0]!
-      for (const call of entry.message.content) {
+      if (response.sessionEntryId !== entry.id) {
+        return yield* unavailable(`Session entry ${entry.id} diverges from model response ${response.eventId}`)
+      }
+      const responseContent: ReadonlyArray<Response.AnyPart> =
+        entry._tag === "ModelResponse" ? (entry.content as ReadonlyArray<Response.AnyPart>) : []
+      for (const call of message.content) {
         if (call.type !== "tool-call" || call.providerExecuted === true) continue
-        const committed = response.response.content.some(
+        const committed = responseContent.some(
           (part) =>
             part.type === "tool-call" &&
             part.providerExecuted !== true &&

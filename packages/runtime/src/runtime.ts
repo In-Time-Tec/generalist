@@ -1,4 +1,5 @@
 import { Context, Effect, Stream } from "effect"
+import type { Session } from "@batonfx/core"
 import { Prompt } from "effect/unstable/ai"
 import type { TreePolicy } from "./tree-policy.js"
 import type { Address } from "./address.js"
@@ -41,13 +42,15 @@ import type {
   ExecutableRegistrationInvalid,
   ExecutableRegistrationMissing,
   StartInvalid,
+  SessionEntryNotFound,
+  SessionEntryCorrupt,
 } from "./errors.js"
 import type { Metadata } from "./message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./agent-directory.js"
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { Interface as MessagingPolicyInterface } from "./messaging.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
-import type { RunEvent } from "./run-event.js"
+import type { CompletedModelResponse, RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
 import type { FanOutInput, FanOutInspection, FanOutMemberOrigin, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
 import type { ResolveOperationInput } from "./operation-resolution.js"
@@ -148,6 +151,15 @@ export interface EventsInput {
 export interface HistoryInput extends EventsInput {
   readonly limit: number
 }
+
+export interface SessionEntryInput {
+  readonly sessionId: string
+  readonly entryId: string
+}
+export type ModelResponseEvent = Extract<
+  RunEvent,
+  { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }
+>
 
 /** @experimental Select the memory-only live preview lane for one Run. */
 export interface PreviewsInput {
@@ -299,6 +311,8 @@ export type CancelError = RunNotFound | RuntimeUnavailable
 export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
+export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable
+export type ResolveModelResponseError = SessionEntryError
 export type FanOutError =
   | ChildDepthExceeded
   | ChildLimitExceeded
@@ -327,6 +341,10 @@ export interface Interface {
   readonly previews: (input: PreviewsInput) => Stream.Stream<ModelPreviewEvent>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, InspectError>
   readonly history: (input: HistoryInput) => Effect.Effect<ReadonlyArray<RunEvent>, EventsError>
+  readonly sessionEntry: (input: SessionEntryInput) => Effect.Effect<Session.Entry, SessionEntryError>
+  readonly resolveModelResponse: (
+    event: ModelResponseEvent,
+  ) => Effect.Effect<CompletedModelResponse, ResolveModelResponseError>
   readonly treeHistory: (
     input: import("./tree.js").HistoryInput,
   ) => Effect.Effect<import("./tree.js").TreePage, TreeEventsError>

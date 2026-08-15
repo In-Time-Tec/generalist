@@ -998,7 +998,6 @@ describe("ExecutionHost", () => {
         expect(persisted.checkpoint.driverVersion).toBe("1")
         expect(persisted.checkpoint.turn).toBe(9)
         expect(persisted.checkpoint.executable).toEqual(ref.ref)
-        expect(persisted.transcript).toBeUndefined()
         const durableSession = yield* store.sessionStore("session:durable")
         expect(Option.isSome(durableSession)).toBe(true)
         if (Option.isSome(durableSession)) {
@@ -1042,6 +1041,29 @@ describe("ExecutionHost", () => {
         )
         const replay = [...events]
         expect(replay.filter((event) => event._tag === "RunCompleted")).toHaveLength(1)
+        for (const event of replay.filter((candidate) => candidate._tag === "TurnCompleted"))
+          expect(event).not.toHaveProperty("transcript")
+        const terminal = replay.find((event) => event._tag === "RunCompleted")
+        expect(terminal?._tag === "RunCompleted" ? terminal.result : undefined).toMatchObject({
+          session: { sessionId: "session:durable" },
+        })
+        expect(terminal?._tag === "RunCompleted" ? terminal.result : undefined).not.toHaveProperty("transcript")
+        const inlineMessageCounts: Array<number> = []
+        for (const event of replay.filter((candidate) => candidate._tag === "ModelResponseCommitted")) {
+          if (event._tag !== "ModelResponseCommitted") continue
+          const operation = yield* store.getOperationByKey({
+            runId: receipt.runId,
+            operationKey: event.operationKey,
+          })
+          if (
+            typeof operation?.result === "object" &&
+            operation.result !== null &&
+            "messages" in operation.result &&
+            Array.isArray(operation.result.messages)
+          )
+            inlineMessageCounts.push(operation.result.messages.length)
+        }
+        expect(inlineMessageCounts).toEqual([])
         expect(replay.map((event) => event.sequence)).toEqual(replay.map((_, index) => index))
         expect(new Set(replay.map((event) => event.runId))).toEqual(new Set([receipt.runId]))
         expect(
@@ -1181,7 +1203,11 @@ describe("ExecutionHost", () => {
           expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("waiting")
           yield* store.complete({
             ...(yield* store.claimExecution({ runId: group.members[0]!.childRunId, ownerId: "child:research" })),
-            result: { text: "first child complete", turns: 1, transcript: Prompt.make("first child complete") },
+            result: {
+              text: "first child complete",
+              turns: 1,
+              session: { sessionId: "first-child", leafId: null },
+            },
           })
           expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("running")
           expect((yield* store.loadExecution(admitted.parentRunId)).suspension).toBeDefined()
@@ -2136,7 +2162,6 @@ describe("ExecutionHost", () => {
         ...claim,
         suspension,
         checkpoint,
-        transcript: Prompt.make("saved transcript"),
         wait: {
           waitId: "approval",
           reason: {
@@ -2151,7 +2176,6 @@ describe("ExecutionHost", () => {
       const inspection = yield* runtime.inspect(receipt.runId)
       expect(execution.suspension).toEqual(suspension)
       expect(execution.checkpoint).toEqual(checkpoint)
-      expect(execution.transcript).toBeUndefined()
       expect(inspection.status).toBe("waiting")
       expect(inspection.wait?.waitId).toBe("approval")
     }).pipe(
@@ -2672,8 +2696,19 @@ describe("ExecutionHost", () => {
           expect(childHistory[interruptedIndex]).toMatchObject({
             operationKey: failedOperationKey(childRunId),
             reason: "failure",
-            response: { content: [{ type: "text", text: "discard me" }] },
           })
+          const interruptedEvent = childHistory[interruptedIndex]
+          if (interruptedEvent?._tag !== "ModelResponseInterrupted") {
+            return yield* Effect.die("Program child did not persist its interrupted response")
+          }
+          const interruptedEntry = yield* runtime.sessionEntry({
+            sessionId: interruptedEvent.sessionId,
+            entryId: interruptedEvent.sessionEntryId,
+          })
+          expect(
+            interruptedEntry._tag === "ModelResponse" &&
+              interruptedEntry.content.some((part) => part.type === "text" && part.text === "discard me"),
+          ).toBe(true)
           const childFailed = childHistory[failedIndex]
           expect(childFailed?._tag).toBe("RunFailed")
           if (childFailed?._tag !== "RunFailed") return yield* Effect.die("Program child did not fail")

@@ -9,7 +9,7 @@ import { makeUnknown, appendAgentEvent, appendLifecycle, rejectIfTerminal } from
 import { Option } from "effect"
 import { operationKeyMapKey, operationMapKey, type MemoryState } from "./state.js"
 import { checkpointRef } from "../executable-manifest.js"
-import { completedSessionEntry, sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
+import { sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
 import {
   sameInterruptedModelOutcome,
   sameInterruptedModelResponse,
@@ -161,7 +161,6 @@ export const completeOperation: {
     readonly operationId: string
     readonly outcome: OperationCompletionOutcome
     readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
-    readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     readonly continuation?: import("../steering.js").ExecutionContinuation | null
     readonly steeringEntryIds?: ReadonlyArray<string>
   }): (
@@ -176,7 +175,6 @@ export const completeOperation: {
       readonly operationId: string
       readonly outcome: OperationCompletionOutcome
       readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
-      readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
       readonly continuation?: import("../steering.js").ExecutionContinuation | null
       readonly steeringEntryIds?: ReadonlyArray<string>
     },
@@ -192,7 +190,6 @@ export const completeOperation: {
       readonly operationId: string
       readonly outcome: OperationCompletionOutcome
       readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
-      readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
       readonly continuation?: import("../steering.js").ExecutionContinuation | null
       readonly steeringEntryIds?: ReadonlyArray<string>
     },
@@ -295,26 +292,24 @@ export const commitModelResponse: {
     const run = yield* getRun(state, input.runId)
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-    const validated = validateModelResponseCommit({ record: current, input })
+    const validated = validateModelResponseCommit({ record: current, input, sessionId: run.message.sessionId })
     if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
-    const sessionEntry = completedSessionEntry({
-      runId: input.runId,
-      sessionId: run.message.sessionId,
-      operation: validated,
-      event: input.event,
-    })
-    if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
+    const sessionEntry = validated.entry
     if (current.status === "succeeded") {
       const priorInput = { ...input, outcome: { _tag: "Succeeded" as const, value: current.result } }
-      const priorValidation = validateModelResponseCommit({ record: current, input: priorInput })
+      const priorValidation = validateModelResponseCommit({
+        record: current,
+        input: priorInput,
+        sessionId: run.message.sessionId,
+      })
       if (Schema.is(RuntimeUnavailable)(priorValidation)) return yield* priorValidation
-      const prior = run.events.find(
+      const prior = run.events.filter(
         (event) => event._tag === "ModelResponseCommitted" && event.operationKey === input.event.operationKey,
       )
       if (
-        prior === undefined ||
-        prior._tag !== "ModelResponseCommitted" ||
-        !sameModelResponseEvent({ left: prior, right: input.event })
+        prior.length !== 1 ||
+        prior[0]?._tag !== "ModelResponseCommitted" ||
+        !sameModelResponseEvent({ left: prior[0], right: validated.event })
       )
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent outbox retry`,
@@ -331,8 +326,11 @@ export const commitModelResponse: {
     const withSession = yield* appendCompletedSessionEntry({ state, entry: sessionEntry }).pipe(
       Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
     )
-    const [record, completed] = yield* completeOperation(withSession, input)
-    const [, appended] = yield* appendAgentEvent(completed, input.runId, input.event)
+    const [record, completed] = yield* completeOperation(withSession, {
+      ...input,
+      outcome: { _tag: "Succeeded", value: validated.reference },
+    })
+    const [, appended] = yield* appendAgentEvent(completed, input.runId, validated.event)
     return [record, appended] as const
   }),
 )
@@ -352,27 +350,28 @@ export const commitInterruptedModelResponse: {
     const run = yield* getRun(state, input.runId)
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-    const sessionEntry = validateInterruptedModelResponse({
+    const validated = validateInterruptedModelResponse({
       runId: input.runId,
       sessionId: run.message.sessionId,
       record: current,
       outcome: input.outcome,
       event: input.event,
     })
-    if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
+    if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+    const sessionEntry = validated.entry
     if (current.status === "failed") {
       if (!sameInterruptedModelOutcome({ left: { _tag: "Failed", error: current.error }, right: input.outcome })) {
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent interrupted outcome retry`,
         })
       }
-      const prior = run.events.find(
+      const prior = run.events.filter(
         (event) => event._tag === "ModelResponseInterrupted" && event.operationKey === input.event.operationKey,
       )
       if (
-        prior === undefined ||
-        prior._tag !== "ModelResponseInterrupted" ||
-        !sameInterruptedModelResponse({ left: prior, right: input.event })
+        prior.length !== 1 ||
+        prior[0]?._tag !== "ModelResponseInterrupted" ||
+        !sameInterruptedModelResponse({ left: prior[0], right: validated.event })
       ) {
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent interrupted outbox retry`,
@@ -395,7 +394,7 @@ export const commitInterruptedModelResponse: {
     const operations = new Map(withSession.operations)
     operations.set(operationMapKey(input.runId, input.operationId), record)
     operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
-    const [, appended] = yield* appendAgentEvent({ ...withSession, operations }, input.runId, input.event)
+    const [, appended] = yield* appendAgentEvent({ ...withSession, operations }, input.runId, validated.event)
     return [record, appended] as const
   }),
 )

@@ -21,7 +21,6 @@ import {
   assistantAddress,
   assistantRef,
   completedResult,
-  emptyTranscript,
   openWait,
   suspension,
   researcherRef,
@@ -763,7 +762,6 @@ describePostgres("postgres run store", () => {
             event: {
               _tag: "TurnCompleted",
               turn: 0,
-              transcript: emptyTranscript,
               usage: {
                 inputTokens: { total: 0, uncached: 0, cacheRead: undefined, cacheWrite: undefined },
                 outputTokens: { total: 0, text: 0, reasoning: 0 },

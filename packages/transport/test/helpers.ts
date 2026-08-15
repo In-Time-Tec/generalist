@@ -53,6 +53,8 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
         }),
       history: ({ cursor }) =>
         Effect.succeed([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
+      sessionEntry: () => Effect.die("unused sessionEntry"),
+      resolveModelResponse: () => Effect.die("unused resolveModelResponse"),
       treeHistory: () => Effect.die("unused treeHistory"),
       treeChanges: () => Stream.empty,
       inspectTree: () => Effect.die("unused inspectTree"),

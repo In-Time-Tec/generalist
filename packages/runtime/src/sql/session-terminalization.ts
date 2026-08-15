@@ -39,7 +39,7 @@ export const appendTerminalToolResults = (input: {
     if (session === undefined) return
     const id = `${input.run.runId}:terminal-tool-results`
     const entries = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.run.sessionId} ORDER BY seq
     `
     const existing = entries.find((entry) => entry.entry_id === id)

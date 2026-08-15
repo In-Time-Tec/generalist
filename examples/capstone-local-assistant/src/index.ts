@@ -15,8 +15,7 @@ import { Chat, Connection } from "@batonfx/foldkit"
 import { WorkingMemory } from "@batonfx/memory"
 import { Deterministic } from "@batonfx/providers"
 import { SkillLoader } from "@batonfx/skills"
-import { ExecutableManifest, RunEvent } from "@batonfx/runtime"
-import { Prompt } from "effect/unstable/ai"
+import { ExecutableManifest } from "@batonfx/runtime"
 
 const researchFrontmatter: SkillSource.Frontmatter = {
   name: "research",
@@ -55,7 +54,7 @@ const filesystemSkillLayer = SkillLoader.layer({ cwd: ".", roots: ["fixtures/.ag
 const compactionLayer = Compaction.layer({ contextWindow: 64_000, reserveTokens: 1_024, keepRecentTokens: 8_000 })
 
 const chatAgent = ExecutableManifest.makeTest("capstone-assistant", "1").ref
-const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
+const runEvent = (sequence: number, fields: Record<string, unknown>): Connection.Incoming =>
   ({
     specVersion: "1",
     eventId: `capstone-run:${sequence}`,
@@ -65,25 +64,30 @@ const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.R
     rootRunId: "capstone-run",
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,
-  }) as RunEvent.RunEvent
+  }) as Connection.Incoming
 
 const chatFrames: ReadonlyArray<Connection.Incoming> = [
   runEvent(0, { _tag: "TurnStarted", turn: 0 }),
   runEvent(1, {
-    _tag: "ModelPart",
+    _tag: "ModelResponseCommitted",
     turn: 0,
+    operationKey: "capstone-run:model:0",
     modelCallId: "model-call-0",
     modelAttemptId: "model-attempt-0",
     attempt: 0,
-    part: Response.makePart("text-delta", { id: "assistant", delta: "deterministic response" }),
+    sessionId: "capstone-session",
+    sessionParentId: null,
+    sessionEntryId: "entry-response-0",
+    digest: "response-digest-0",
+    response: { content: [Response.makePart("text", { text: "deterministic response" })] },
   }),
-  runEvent(2, { _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty }),
+  runEvent(2, { _tag: "TurnCompleted", turn: 0 }),
   runEvent(3, {
     _tag: "RunCompleted",
     result: {
       text: "deterministic response",
       turns: 1,
-      transcript: Prompt.empty,
+      session: { sessionId: "capstone-session", leafId: "entry-response-0" },
     },
   }),
 ]

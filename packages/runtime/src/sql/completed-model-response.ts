@@ -8,8 +8,8 @@ import { type EntryRow, type SessionRow, SessionStorage } from "./session-store.
 const { encodePayload, entryPayloadEquivalence, storeError, toEntry } = SessionStorage
 
 const completedPayload = (input: CompletedSessionEntry): Session.AppendInput => ({
-  _tag: "Message",
-  message: input.message,
+  _tag: "ModelResponse",
+  content: input.content,
   metadata: { modelResponseDigest: input.digest },
 })
 
@@ -26,7 +26,7 @@ export const verifyCompletedSessionEntry = (
       SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${input.sessionId}
     `
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
@@ -45,7 +45,7 @@ export const verifyCompletedSessionEntry = (
       })
     }
     const all = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} ORDER BY seq
     `
     const byId = new Map(all.map((row) => [row.entry_id, row] as const))
@@ -81,7 +81,7 @@ export const appendCompletedSessionEntry = (
     const session = sessionRows[0]
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
     const existingRows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = existingRows[0]
@@ -98,14 +98,14 @@ export const appendCompletedSessionEntry = (
     const payload = completedPayload(input)
     yield* sql`
       INSERT INTO baton_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
-      VALUES (${input.sessionId}, ${input.entryId}, ${input.parentId}, ${session.next_seq}, 'Message',
+      VALUES (${input.sessionId}, ${input.entryId}, ${input.parentId}, ${session.next_seq}, 'ModelResponse',
         ${encodePayload(payload as Session.EntryPayload)}, ${created})
     `
     yield* sql`
       UPDATE baton_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
       WHERE session_id = ${input.sessionId}
     `
-    return { ...payload, id: input.entryId, parentId: input.parentId } as Session.MessageEntry
+    return { ...payload, id: input.entryId, parentId: input.parentId } as Session.ModelResponseEntry
   })
 
 export const verifyHandoffSessionEntry = (
@@ -121,7 +121,7 @@ export const verifyHandoffSessionEntry = (
       SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${input.sessionId}
     `
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
@@ -137,7 +137,7 @@ export const verifyHandoffSessionEntry = (
       })
     }
     const all = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} ORDER BY seq
     `
     const byId = new Map(all.map((row) => [row.entry_id, row] as const))
@@ -173,7 +173,7 @@ export const appendHandoffSessionEntry = (
     const session = sessionRows[0]
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
     const existingRows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = existingRows[0]

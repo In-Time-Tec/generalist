@@ -1,4 +1,4 @@
-import { Cause, Context, DateTime, Effect, Layer, Ref, Schema, type Scope, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, DurableDriver, Steering } from "@batonfx/core"
 import { RunStore, type ExecutionClaim } from "./run-store.js"
@@ -6,7 +6,7 @@ import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, RunTerminal, undecodableSuspension } from "./errors.js"
 import { matchesActiveRunOptions, type Interface as ExecutableResolverInterface } from "./executable-resolver.js"
 import type { ExecutionContinuation } from "./steering.js"
-import type { DurableAgentLoopEvent } from "./agent-event.js"
+import { durableEvent, type DurableAgentLoopEvent, type EmittableAgentLoopEvent } from "./agent-event.js"
 import { makeDeferredProgramChildTerminal, ProgramChildTerminal } from "./program-child-terminal.js"
 import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
@@ -21,7 +21,12 @@ import { ExecutionClaimLifecycle } from "./execution-claim-lifecycle.js"
 import { ExecutionResolution } from "./execution-resolution.js"
 import { make as makeAgentRunOptions } from "./agent-run-options.js"
 import { ModelPreviewLane, open as openModelPreview } from "./model-preview.js"
-import { clearDriverOperation, commitDriverOperation, verifyCommittedModelEvent } from "./execution-model-response.js"
+import {
+  clearDriverOperation,
+  commitDriverOperation,
+  hydratePersistedModelOperation,
+  verifyCommittedModelEvent,
+} from "./execution-model-response.js"
 import { makeTools as makeChildRunTools } from "./child-runs.js"
 export interface Options {
   readonly workerId: string
@@ -155,7 +160,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         new Map<
                           string,
                           {
-                            readonly transcript?: Prompt.Prompt
                             readonly continuation?: ExecutionContinuation | null
                             readonly steeringEntryIds?: ReadonlyArray<string>
                           }
@@ -193,7 +197,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                               replayPolicy: operation.replayPolicy,
                               attempt,
                               checkpoint,
-                              ...(completed?._tag === "TurnCompleted" ? { transcript: completed.transcript } : {}),
                               ...(scheduledContinuation === undefined ? {} : { continuation: scheduledContinuation }),
                               steeringEntryIds,
                               steeringEvents,
@@ -201,7 +204,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                             yield* Ref.update(preparedCompletions, (current) => {
                               const next = new Map(current)
                               next.set(operation.key, {
-                                ...(completed?._tag === "TurnCompleted" ? { transcript: completed.transcript } : {}),
                                 ...(scheduledContinuation === undefined ? {} : { continuation: scheduledContinuation }),
                                 ...(steeringEntryIds.length === 0 ? {} : { steeringEntryIds }),
                               })
@@ -227,8 +229,13 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                                 ),
                               )
                             }
-                            if (record.status === "succeeded")
-                              return { _tag: "Succeeded" as const, value: record.result }
+                            if (record.status === "succeeded") {
+                              const value =
+                                operation.kind === "model"
+                                  ? yield* hydratePersistedModelOperation({ store, value: record.result })
+                                  : record.result
+                              return { _tag: "Succeeded" as const, value }
+                            }
                             if (record.status === "failed") return { _tag: "Failed" as const, error: record.error }
                             if (record.status === "unknown")
                               return { _tag: "Unknown" as const, operationId: record.operationId }
@@ -323,10 +330,15 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                               return
                             }
                             if (event._tag === "Completed") {
+                              const session = yield* store.sessionStore(claimed.message.sessionId)
+                              const leafId = yield* Option.match(session, {
+                                onNone: () => Effect.succeed(null),
+                                onSome: (service) => service.leaf.pipe(Effect.orDie),
+                              })
                               const result = {
                                 text: event.text,
                                 turns: event.turns,
-                                transcript: event.transcript,
+                                session: { sessionId: claimed.message.sessionId, leafId },
                               }
                               if (isProgramChild) {
                                 yield* Ref.set(deferredProgramChildTerminal, { _tag: "Complete", result })
@@ -338,11 +350,12 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                               }
                               return
                             }
+                            const persistedEvent = durableEvent(event) as EmittableAgentLoopEvent
                             if ((yield* Ref.get(observed)).length > 0) {
-                              yield* Ref.update(bufferedEvents, (events) => [...events, event])
+                              yield* Ref.update(bufferedEvents, (events) => [...events, persistedEvent])
                               return
                             }
-                            yield* store.emitAgentEvent({ ...claim, event })
+                            yield* store.emitAgentEvent({ ...claim, event: persistedEvent })
                           }),
                         ),
                         Effect.provideContext(context),
@@ -378,7 +391,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                             suspension,
                             openedAt,
                             ...(latest.checkpoint === undefined ? {} : { checkpoint: latest.checkpoint }),
-                            ...(latest.transcript === undefined ? {} : { transcript: latest.transcript }),
                             ...(latest.continuation === undefined ? {} : { continuation: latest.continuation }),
                           })
                           return
@@ -388,7 +400,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           ...claim,
                           suspension,
                           ...(latest.checkpoint === undefined ? {} : { checkpoint: latest.checkpoint }),
-                          ...(latest.transcript === undefined ? {} : { transcript: latest.transcript }),
                           ...(latest.continuation === undefined ? {} : { continuation: latest.continuation }),
                           wait: {
                             ...(nestedWait ?? {

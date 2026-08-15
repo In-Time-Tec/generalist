@@ -35,6 +35,7 @@ const settleRunningModels = (input: {
             modelCallId: snapshot.value.modelCallId,
             modelAttemptId: snapshot.value.modelAttemptId,
             attempt: snapshot.value.attempt,
+            sessionParentId: snapshot.value.sessionParentId ?? null,
             response: snapshot.value.response,
             reason: input.reason,
           }),

@@ -20,7 +20,13 @@ describe("ToolOutput", () => {
       expect(bounded.outputPaths).toEqual([])
       expect(bounded.result).toEqual(bounded.encodedResult)
       expect(bounded.encodedResult).toEqual({
-        inline: { truncated: true, bytes: 102, maxBytes: 8, preview: '"xxxxxxx' },
+        inline: {
+          truncated: true,
+          bytes: 102,
+          maxBytes: 8,
+          digest: "10a9270a01f7334f95712ee341cefe458d56e59e817f4f15f4e3e4834d4b42a9",
+          preview: '"xxxxxxx',
+        },
         outputPaths: [],
       })
     }),
@@ -39,7 +45,13 @@ describe("ToolOutput", () => {
 
           expect(bounded.outputPaths).toEqual([])
           expect(bounded.encodedResult).toMatchObject({
-            inline: { truncated: true, bytes: 102, maxBytes: 8, preview: '"xxxxxxx' },
+            inline: {
+              truncated: true,
+              bytes: 102,
+              maxBytes: 8,
+              digest: "10a9270a01f7334f95712ee341cefe458d56e59e817f4f15f4e3e4834d4b42a9",
+              preview: '"xxxxxxx',
+            },
             outputPaths: [],
           })
         }),
@@ -58,7 +70,13 @@ describe("ToolOutput", () => {
 
       expect(bounded.outputPaths).toEqual([])
       expect(bounded.encodedResult).toEqual({
-        inline: { truncated: true, bytes: 82, maxBytes: 6, preview: '"😀' },
+        inline: {
+          truncated: true,
+          bytes: 82,
+          maxBytes: 6,
+          digest: "894b8ac90b489dbfead5391ee0fa71b3a903c3051e194fd7ef84df89d6d00d21",
+          preview: '"😀',
+        },
         outputPaths: [],
       })
     }),
@@ -109,15 +127,33 @@ describe("ToolOutput", () => {
 
       expect(bounded.outputPaths).toEqual([])
       expect(bounded.encodedResult).toEqual({
-        inline: { truncated: true, bytes: 6, maxBytes: 2, preview: '"' },
+        inline: {
+          truncated: true,
+          bytes: 6,
+          maxBytes: 2,
+          digest: "7a0c50b92434b015545fe93ab723db2d4b2cdd14a441405624a9ce8be29f1d5a",
+          preview: '"',
+        },
         outputPaths: [],
       })
       expect(empty.encodedResult).toEqual({
-        inline: { truncated: true, bytes: 6, maxBytes: 0, preview: "" },
+        inline: {
+          truncated: true,
+          bytes: 6,
+          maxBytes: 0,
+          digest: "7a0c50b92434b015545fe93ab723db2d4b2cdd14a441405624a9ce8be29f1d5a",
+          preview: "",
+        },
         outputPaths: [],
       })
       expect(fractional.encodedResult).toEqual({
-        inline: { truncated: true, bytes: 6, maxBytes: 2.5, preview: '"' },
+        inline: {
+          truncated: true,
+          bytes: 6,
+          maxBytes: 2.5,
+          digest: "7a0c50b92434b015545fe93ab723db2d4b2cdd14a441405624a9ce8be29f1d5a",
+          preview: '"',
+        },
         outputPaths: [],
       })
     }),
@@ -169,7 +205,13 @@ describe("ToolOutput", () => {
         expect(rebound.encodedResult).toEqual(bounded.encodedResult)
         expect(bounded.result).toEqual(bounded.encodedResult)
         expect(bounded.encodedResult).toMatchObject({
-          inline: { truncated: true, bytes: expect.any(Number), maxBytes: 12, preview: expect.any(String) },
+          inline: {
+            truncated: true,
+            bytes: expect.any(Number),
+            maxBytes: 12,
+            digest: "c9079fae035831639214ac3d4700622ed3b69714baa15d4952d945c676ef8579",
+            preview: expect.any(String),
+          },
           outputPaths: ["mem:tool-call-large"],
         })
         expect(Json.stringify(bounded.encodedResult)).not.toContain(full)
@@ -188,7 +230,7 @@ describe("ToolOutput", () => {
       }),
       Effect.gen(function* () {
         const value: ToolOutput.ToolOutput = {
-          inline: { truncated: true, bytes: 100, maxBytes: 8, preview: '"xxxxxxx' },
+          inline: { truncated: true, bytes: 100, maxBytes: 8, digest: "a".repeat(64), preview: '"xxxxxxx' },
           outputPaths: ["mem:original", "s3:original"],
         }
 
@@ -198,7 +240,7 @@ describe("ToolOutput", () => {
         expect(bounded.outputPaths).toEqual(["mem:original", "s3:original"])
         expect(bounded.result).toEqual(bounded.encodedResult)
         expect(bounded.encodedResult).toEqual({
-          inline: { truncated: true, bytes: 100, maxBytes: 1, preview: '"' },
+          inline: { truncated: true, bytes: 100, maxBytes: 1, digest: "a".repeat(64), preview: '"' },
           outputPaths: ["mem:original", "s3:original"],
         })
       }),
@@ -236,7 +278,7 @@ describe("ToolOutput", () => {
       }),
       Effect.gen(function* () {
         const value: ToolOutput.ToolOutput = {
-          inline: { truncated: true, bytes: 100, maxBytes: 8, preview: '"xxxxxxx' },
+          inline: { truncated: true, bytes: 100, maxBytes: 8, digest: "a".repeat(64), preview: '"xxxxxxx' },
         }
 
         const bounded = yield* ToolOutput.bound(success(value), { toolCallId: "tool-call-no-paths", maxBytes: 8 })

@@ -1,18 +1,14 @@
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
 import { Chat, Prompt, Tokenizer } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./agent-event.js"
-import {
-  Compaction,
-  DEFAULT_RESERVE_TOKENS,
-  type CompactionError,
-  type Result as CompactionResult,
-  type Usage,
-} from "../turn/compaction.js"
+import { Compaction, DEFAULT_RESERVE_TOKENS, type Result as CompactionResult, type Usage } from "../turn/compaction.js"
 import { diagnose as diagnoseSessionSync } from "../context/session-sync.js"
 import { SessionSyncInternals } from "./session-sync.js"
 import { checkpointMatches, buildContext } from "../context/session.js"
 import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./agent-message.js"
 import { conversationOnly, withDerivedSystem } from "./session-history.js"
+import { promptDigest } from "./prompt-identity.js"
+import { cursorFromPath, pathFromCursor, type SessionCursor } from "./session-cursor.js"
 import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model/model-telemetry.js"
 import type { RunError, RunOptions } from "./agent.js"
 import type { AgentRunState } from "./agent-run-state.js"
@@ -49,7 +45,7 @@ type CompactionContext = {
   readonly memoryRuntime: unknown | undefined
   readonly memoryError: (turn: number, error: MemoryError) => AgentError
   readonly skillError: (turn: number, error: SkillSourceError) => AgentError
-  readonly compactionError: (turn: number, error: CompactionError) => AgentError
+  readonly compactionError: (turn: number, error: import("../turn/compaction.js").CompactionError) => AgentError
   readonly sessionError: (turn: number, error: SessionStoreError | SessionConflict) => AgentError
 }
 export const makeCompactionRuntime = (context: CompactionContext) => {
@@ -77,10 +73,11 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
   } = context
   const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
   const { isAppendOnlyDescendant, sessionTranscriptCursor } = SessionSyncInternals
-
-  const syncSessionBody = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
+  const resolveCursor = (turn: number, cursor: unknown) =>
+    pathFromCursor({ turn, cursor, session: activeSession, sessionError })
+  const syncSessionBody = (turn: number, transcript: Prompt.Prompt): Effect.Effect<SessionCursor, AgentError> =>
     Option.match(activeSession, {
-      onNone: () => Effect.succeed([]),
+      onNone: () => Effect.succeed({ leafId: null }),
       onSome: (session) =>
         Effect.gen(function* () {
           let path = yield* session.path()
@@ -92,7 +89,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             if (checkpoint?._tag === "Compaction" && promptEquivalence(before, transcript)) {
               yield* Ref.set(chat.history, withDerivedSystem({ system, projection }))
               yield* savePersisted(turn)
-              return path
+              return cursorFromPath(path)
             }
             return yield* AgentError.make({
               message: "Session projection is not a prefix of authoritative Chat history",
@@ -120,27 +117,30 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             expectedLeafId = appended.id
           }
           if (expectedLeafId !== (path.at(-1)?.id ?? null)) path = yield* session.path()
-          return path
+          return cursorFromPath(path)
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
-
   const syncSession = (
     turn: number,
     transcript: Prompt.Prompt,
   ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+    const durableTranscript = conversationOnly(transcript)
     return intercept(
       {
         kind: "memory",
         key: operationKey(logicalId, "memory", "sync", turn, transcript.content.length),
         turn,
-        input: { turn, messageCount: transcript.content.length },
+        input: {
+          turn,
+          messageCount: transcript.content.length,
+          transcriptDigest: promptDigest(durableTranscript.content),
+        },
         replayPolicy: "pure",
       },
       syncSessionBody(turn, transcript),
-    )
+    ).pipe(Effect.flatMap((cursor) => resolveCursor(turn, cursor)))
   }
-
   const sessionPathForCompaction = (
     turn: number,
     history: Prompt.Prompt,
@@ -160,7 +160,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           return yield* syncSession(turn, history)
         }),
     })
-
   const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> =>
     Option.match(tokenizerService, {
       onNone: () => Effect.succeed(estimatePromptTokens(prompt)),
@@ -170,7 +169,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn, cause: error })),
         ),
     })
-
   const compactionUsage = (
     turn: number,
     history: Prompt.Prompt,
@@ -196,7 +194,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       }),
     )
   }
-
   const validateCompactionProjection = (turn: number, result: CompactionResult): Effect.Effect<void, AgentError> => {
     const pending = new Set<string>()
     const optional = new Set<string>()
@@ -253,7 +250,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       onNone: () => {
         const checkpointId = commitData?.compactionId ?? "compaction"
         const commit = commitData === undefined ? undefined : { ...commitData, checkpointId }
-        return Ref.set(chat.history, result.history).pipe(
+        return Ref.set(chat.history, Prompt.concat(result.history, result.prompt)).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
               state.reportedContextUsage = undefined
@@ -274,7 +271,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                   }),
                 ),
           ),
-          Effect.andThen(deliverPending),
+          Effect.andThen(deliverPending.pipe(Effect.andThen(savePersisted(turn)))),
         )
       },
       onSome: (session) =>
@@ -484,7 +481,10 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                 applicationCommitted = true
               },
             )
-            return { prompt: compacted.value.prompt, changed: true }
+            return {
+              prompt: Option.isNone(activeSession) ? Prompt.fromMessages([]) : compacted.value.prompt,
+              changed: true,
+            }
           }).pipe(
             Effect.onExit((exit) =>
               Exit.isSuccess(exit) || applicationCommitted

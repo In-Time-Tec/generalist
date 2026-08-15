@@ -196,6 +196,16 @@ export class RuntimeUnavailable extends Schema.TaggedErrorClass<RuntimeUnavailab
   },
 ) {}
 
+export class SessionEntryNotFound extends Schema.TaggedErrorClass<SessionEntryNotFound>()(
+  "@batonfx/runtime/SessionEntryNotFound",
+  { sessionId: Schema.String, entryId: Schema.String },
+) {}
+
+export class SessionEntryCorrupt extends Schema.TaggedErrorClass<SessionEntryCorrupt>()(
+  "@batonfx/runtime/SessionEntryCorrupt",
+  { sessionId: Schema.String, entryId: Schema.String, message: Schema.String },
+) {}
+
 export class FanOutConflict extends Schema.TaggedErrorClass<FanOutConflict>()("@batonfx/runtime/FanOutConflict", {
   parentRunId: Schema.String,
   idempotencyKey: Schema.String,

@@ -90,6 +90,7 @@ export namespace Wire {
   export type ClientCommand = import("./transport/wire.js").ClientCommand
   export type EventCodec<Decoded = import("@batonfx/runtime").RunEvent.RunEvent> =
     import("./transport/wire.js").EventCodec<Decoded>
+  export type ResolvedRunEvent = import("./transport/wire.js").ResolvedRunEvent
 }
 
 import { handle as Ws_handle } from "./transport/ws.js"

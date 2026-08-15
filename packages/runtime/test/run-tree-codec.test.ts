@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Prompt } from "effect/unstable/ai"
 import { RunEvent, RunTree } from "../src/index.js"
 import { makeCursor } from "../src/tree-cursor.js"
 import { assistantRef } from "./helpers.js"
@@ -32,10 +32,10 @@ const representativeEvents: ReadonlyArray<RunTree.TreeEvent> = [
       modelCallId: "model-call:1",
       modelAttemptId: "model-attempt:1",
       attempt: 0,
-      response: {
-        content: [Response.makePart("text", { text: "hello" })],
-        finishReason: "stop",
-      },
+      sessionId: "session:tree-codec",
+      sessionParentId: "entry:input",
+      sessionEntryId: "entry:model:1",
+      finishReason: "stop",
       digest: "digest:model:1",
     },
     cursor: makeCursor(rootRunId, 0),

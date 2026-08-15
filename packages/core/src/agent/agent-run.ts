@@ -1,6 +1,6 @@
 import { Effect, Equal, Function, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
-import { AgentError, AgentSuspended, type Event } from "./agent-event.js"
+import { AgentError, AgentSuspended, type Event, type SteeringDrained } from "./agent-event.js"
 import { type Item, type MemoryError, messageFromRecall, projectTranscript } from "../context/memory.js"
 import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext } from "../context/session.js"
 import { type Candidate, assemble, get, type Registry } from "../tools/tool-registry.js"
@@ -13,10 +13,10 @@ import { suspensionCheckpointOption, unresolvedToolCall } from "./agent-suspensi
 import type { AnyToolCall, PendingToolResult } from "./agent-tool-result.js"
 import type { Input } from "../turn/steering.js"
 import { type Decision, StopReason } from "../turn/turn-policy.js"
-import type { SteeringDrained } from "./agent-event.js"
 import { ToolNameCollision } from "./agent-event.js"
 import { makeProviderOutputState, type AgentRunState } from "./agent-run-state.js"
 import { makeModelTurn } from "./model-turn.js"
+import { replayModelMessages } from "./session-history.js"
 import { AgentPin } from "../durable/pin.js"
 import { makeToolExecution } from "./tool-execution.js"
 import { makeCompactionRuntime } from "./compaction-runtime.js"
@@ -406,6 +406,8 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         preparePrompt,
         countTokens,
         syncSession,
+        replayMessages: (sessionParentId) =>
+          replayModelMessages({ activeSession, sessionParentId, system, turn: state.turn, sessionError }),
         emitTelemetry,
         chat,
         compactionService,

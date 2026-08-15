@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0
+
+- Store each durable model response once as canonical Session content while operations, events, checkpoints, transports, and projections carry compact verified references; consumers hydrate content through public Runtime APIs.
+- Recover Session-backed and compacted no-Session model work from exact cursors and semantic request identities, preserving settled `never` outcomes, stream checkpoint advancement, current Agent instructions, and restart-safe child execution.
+- Commit Session response entries, compact outcomes, semantic events, checkpoints, and notifications atomically across memory, SQLite, PostgreSQL, and MySQL, with corruption checks for reference identity, parentage, digests, payloads, and denormalized tags.
+- Bound tool output inline by default with SHA-256 identity and optional immutable overflow references so large results cannot amplify durable context.
+
 ## 0.25.2
 
 - Restore the persisted semantic turn and model-call ordinal when resuming an Agent, so suspended tool work finishes its original turn and the next provider operation advances without regenerating a conflicting durable key.

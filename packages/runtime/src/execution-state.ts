@@ -1,12 +1,17 @@
 import { Schema } from "effect"
 import { AgentEvent, DurableDriver, ProgramCapabilities } from "@batonfx/core"
-import { Prompt } from "effect/unstable/ai"
+
+export const SessionCursor = Schema.Struct({
+  sessionId: Schema.String,
+  leafId: Schema.NullOr(Schema.String),
+})
+export type SessionCursor = typeof SessionCursor.Type
 
 /** @experimental Terminal value produced by an Agent execution. */
 export const AgentExecutionResult = Schema.Struct({
   text: Schema.String,
   turns: Schema.Finite,
-  transcript: Prompt.Prompt,
+  session: SessionCursor,
 })
 /** @experimental */
 export type AgentExecutionResult = typeof AgentExecutionResult.Type

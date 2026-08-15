@@ -2,7 +2,7 @@ import { RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { Cursor, type Address, Errors, Runtime } from "@batonfx/runtime"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
-import { project, stateSnapshot } from "./projection.js"
+import { project, projectModelResponse, stateSnapshot } from "./projection.js"
 
 const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
@@ -23,6 +23,7 @@ export type RunError =
   | Runtime.RespondError
   | Runtime.RespondApprovalError
   | Runtime.InspectError
+  | Runtime.SessionEntryError
 
 /** @experimental */
 export interface Interface {
@@ -78,7 +79,13 @@ const recover = (
   cursor: Cursor.Cursor,
 ): Stream.Stream<AGUIEvent, RunError> =>
   runtime.events({ runId, cursor }).pipe(
-    Stream.mapEffect((event) => project(event, threadId)),
+    Stream.mapEffect((event) =>
+      event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted"
+        ? runtime
+            .resolveModelResponse(event)
+            .pipe(Effect.flatMap((response) => projectModelResponse(event, response.content)))
+        : project(event, threadId),
+    ),
     Stream.flattenIterable,
     Stream.catchIf(
       (error): error is Errors.SubscriberLagged | Errors.CursorExpired =>

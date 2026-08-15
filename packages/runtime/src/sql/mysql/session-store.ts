@@ -32,14 +32,14 @@ const appendMatches = (entry: Entry, input: AppendInput, parentId: EntryId | nul
   entry.parentId === parentId && entryPayloadEquivalence(entry as Session.EntryPayload, input as Session.EntryPayload)
 
 const completedPayload = (input: CompletedSessionEntry): Session.AppendInput => ({
-  _tag: "Message",
-  message: input.message,
+  _tag: "ModelResponse",
+  content: input.content,
   metadata: { modelResponseDigest: input.digest },
 })
 
 const interruptedPayload = (input: InterruptedSessionEntry): Session.AppendInput => ({
-  _tag: "Message",
-  message: input.message,
+  _tag: "ModelResponse",
+  content: input.content,
   metadata: { interruptionDigest: input.digest },
 })
 
@@ -51,7 +51,7 @@ export const appendCompletedSessionEntry = (
     const sql = yield* SqlClient.SqlClient
     const session = yield* lockSession(input.sessionId)
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
@@ -81,7 +81,7 @@ export const appendCompletedSessionEntry = (
       id: input.entryId,
       parentId: input.parentId,
       seq: Number(session.next_seq),
-      tag: "Message",
+      tag: "ModelResponse",
       payload: payload as Session.EntryPayload,
     })
     yield* advanceSession({
@@ -89,7 +89,7 @@ export const appendCompletedSessionEntry = (
       leafId: input.entryId,
       nextSeq: Number(session.next_seq) + 1,
     })
-    return { ...payload, id: input.entryId, parentId: input.parentId } as Session.MessageEntry
+    return { ...payload, id: input.entryId, parentId: input.parentId } as Session.ModelResponseEntry
   })
 
 /** Verify an exact completed assistant projection in the caller's MySQL transaction. */
@@ -100,7 +100,7 @@ export const verifyCompletedSessionEntry = (
     const sql = yield* SqlClient.SqlClient
     const session = yield* lockSession(input.sessionId)
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
@@ -129,13 +129,16 @@ export const appendInterruptedSessionEntry = (
     const sql = yield* SqlClient.SqlClient
     const session = yield* lockSession(input.sessionId)
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
     const payload = interruptedPayload(input)
     if (existing !== undefined) {
-      if (!entryPayloadEquivalence(toEntry(existing) as Session.EntryPayload, payload as Session.EntryPayload)) {
+      if (
+        existing.parent_id !== input.parentId ||
+        !entryPayloadEquivalence(toEntry(existing) as Session.EntryPayload, payload as Session.EntryPayload)
+      ) {
         return yield* Session.SessionConflict.make({
           reason: "entry-id-reused",
           message: `Session entry id ${input.entryId} was reused with different interrupted response content`,
@@ -145,12 +148,18 @@ export const appendInterruptedSessionEntry = (
       if (conflict !== undefined) return yield* conflict
       return toEntry(existing)
     }
+    if (session.leaf_id !== input.parentId) {
+      return yield* Session.SessionConflict.make({
+        reason: "stale-leaf",
+        message: `Expected Session leaf ${String(input.parentId)} but found ${String(session.leaf_id)}`,
+      })
+    }
     yield* insertEntry({
       sessionId: input.sessionId,
       id: input.entryId,
-      parentId: session.leaf_id,
+      parentId: input.parentId,
       seq: Number(session.next_seq),
-      tag: "Message",
+      tag: "ModelResponse",
       payload: payload as Session.EntryPayload,
     })
     yield* advanceSession({
@@ -158,7 +167,7 @@ export const appendInterruptedSessionEntry = (
       leafId: input.entryId,
       nextSeq: Number(session.next_seq) + 1,
     })
-    return { ...payload, id: input.entryId, parentId: session.leaf_id } as Session.MessageEntry
+    return { ...payload, id: input.entryId, parentId: input.parentId } as Session.ModelResponseEntry
   })
 
 export const verifyInterruptedSessionEntry = (
@@ -168,12 +177,13 @@ export const verifyInterruptedSessionEntry = (
     const sql = yield* SqlClient.SqlClient
     const session = yield* lockSession(input.sessionId)
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
     if (
       existing === undefined ||
+      existing.parent_id !== input.parentId ||
       !entryPayloadEquivalence(
         toEntry(existing) as Session.EntryPayload,
         interruptedPayload(input) as Session.EntryPayload,
@@ -200,7 +210,7 @@ export const appendHandoffSessionEntry = (
     const sql = yield* SqlClient.SqlClient
     const session = yield* lockSession(input.sessionId)
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
@@ -248,7 +258,7 @@ export const verifyHandoffSessionEntry = (
     const sql = yield* SqlClient.SqlClient
     const session = yield* lockSession(input.sessionId)
     const rows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = rows[0]
@@ -290,7 +300,7 @@ export const makeMysqlSessionStore = (options: {
       const session = yield* lockSession(sessionId)
       if (appendOptions?.id !== undefined) {
         const rows = yield* sql<EntryRow>`
-          SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+          SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
           WHERE session_id = ${sessionId} AND entry_id = ${appendOptions.id}
         `
         const existing = rows[0]
@@ -347,7 +357,7 @@ export const makeMysqlSessionStore = (options: {
       const sql = yield* SqlClient.SqlClient
       const session = yield* lockSession(sessionId)
       const rows = yield* sql<EntryRow>`
-        SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+        SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
         WHERE session_id = ${sessionId} AND entry_id = ${prepared.id}
       `
       const existing = rows[0]

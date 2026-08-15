@@ -36,7 +36,6 @@ type SuspendInput = import("../run-store.js").ExecutionClaim & {
   readonly wait: RunWait
   readonly suspension: import("../execution-state.js").ExecutionSuspension
   readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
-  readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
   readonly continuation?: import("../steering.js").ExecutionContinuation | null
 }
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }

@@ -4,7 +4,6 @@ import { ServerCallContext } from "@a2a-js/sdk/server"
 import { Address, ExecutableManifest, TreePolicy, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Stream } from "effect"
-import { Prompt } from "effect/unstable/ai"
 import { makeHandler } from "../src/adapter.js"
 
 const address = Address.make("agent:test")
@@ -56,7 +55,7 @@ const attempt = (runId: string): RunEvent.RunAttemptStarted => ({
 const completed = (runId: string, sequence: number): RunEvent.RunCompleted => ({
   ...base(runId, sequence),
   _tag: "RunCompleted",
-  result: { text: "complete", turns: 1, transcript: Prompt.empty },
+  result: { text: "complete", turns: 1, session: { sessionId: `session:${runId}`, leafId: null } },
 })
 
 const completedProgram = (runId: string, sequence: number): RunEvent.RunCompleted => ({
@@ -152,6 +151,8 @@ const makeRuntime = (acceptedSequence = 0) => {
         compactions: [],
       })
     },
+    sessionEntry: () => Effect.die("not used"),
+    resolveModelResponse: () => Effect.die("not used"),
     history: ({ runId, cursor = -1, limit }) => {
       const run = runs.get(runId)!
       return Effect.succeed(run.events.filter((event) => event.sequence > cursor).slice(0, limit))
