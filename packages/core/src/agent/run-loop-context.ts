@@ -1,8 +1,9 @@
-import { type Effect, type Option, type Ref, type Schema, type Stream } from "effect"
+import { type Clock, type Effect, type Option, type Ref, type Schema, type Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import type { AgentError, AgentSuspended, Event, SteeringDrained } from "./agent-event.js"
 import type { DriverInterpreter } from "../durable/driver-interpreter.js"
 import type { Agent, RunError } from "./agent.js"
+import type { ModelTurnServices } from "./model-turn-context.js"
 import type { PendingToolResult, AnyToolCall } from "./agent-tool-result.js"
 import type { Result as CompactionResult } from "../turn/compaction.js"
 import type { LanguageModelNotRegistered } from "../model/model-registry.js"
@@ -35,13 +36,18 @@ export type StaticToolServices<T extends Record<string, Tool.Any>> =
 /** @experimental Every service one run loop turn requires. */
 export type LoopServices<Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema> =
   | R
+  | Clock.Clock
   | LanguageModel.LanguageModel
   | StaticToolServices<Tools>
   | SchemaServicesD<S>
   | DriverInterpreter
 
 /** @experimental Every service one model turn requires. */
-export type TurnServices<S extends ObjectSchema> = LanguageModel.LanguageModel | SchemaServicesD<S> | DriverInterpreter
+export type TurnServices<S extends ObjectSchema> =
+  | LanguageModel.LanguageModel
+  | Clock.Clock
+  | SchemaServicesD<S>
+  | DriverInterpreter
 
 export type ToolState = {
   readonly registry: Registry
@@ -68,7 +74,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     prompt: Prompt.RawInput,
     registry: Registry,
     overrides?: TurnOverrides,
-  ) => Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<Tools> | DriverInterpreter>
+  ) => Stream.Stream<Event, RunError, ModelTurnServices<Tools, R>>
   readonly captureStructuredUsage: (
     content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
   ) => Effect.Effect<void>

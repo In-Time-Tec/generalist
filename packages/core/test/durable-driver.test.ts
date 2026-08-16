@@ -1260,7 +1260,7 @@ describe("DurableDriver Agent.stream integration", () => {
           }
           expect(providerPrompts.baseline).toHaveLength(2)
           expect(providerPrompts.recovery).toHaveLength(2)
-          const expectedRequest = withCacheBreakpoints(compactedRequest, "conversation")
+          const expectedRequest = withCacheBreakpoints(compactedRequest, "conversation", undefined)
           expect(providerPrompts.baseline[0]?.content).toEqual(expectedRequest.content)
           expect(providerPrompts.recovery[0]?.content).toEqual(expectedRequest.content)
           expect(providerPrompts.recovery[1]?.content).toEqual(providerPrompts.baseline[1]?.content)

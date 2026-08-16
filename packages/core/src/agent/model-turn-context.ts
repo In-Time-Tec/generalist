@@ -1,4 +1,4 @@
-import type { Effect, Option, Stream } from "effect"
+import type { Clock, Effect, Option, Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import type { AgentRunState } from "./agent-run-state.js"
 import type { AgentError, Event } from "./agent-event.js"
@@ -17,6 +17,14 @@ import type { ToolContext } from "../tools/tool-context.js"
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
+
+/** @experimental Every service one model turn requires, including the send-time clock. */
+export type ModelTurnServices<T extends Record<string, Tool.Any>, R> =
+  | LanguageModel.LanguageModel
+  | Clock.Clock
+  | R
+  | StaticToolServices<T>
+  | DriverInterpreter
 
 export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly agent: {

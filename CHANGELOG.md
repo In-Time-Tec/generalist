@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.27.1
+
+- Escalate the conversation cache boundary to the one-hour bucket when a run idles past the five-minute cache lifetime between sends, so long tool executions and user pauses keep reading the warm prefix instead of rewriting it.
+
+
 ## 0.27.0
 
 - Mark provider cache breakpoints on every conversation send: the first system message carries an Anthropic one-hour and a Bedrock cache point, later system messages the five-minute variants, and the last user or tool message its last part, capped at four breakpoints and never persisted. Callers may opt into the Anthropic top-level automatic caching field through provider config, verified against the wire before it becomes a default.
