@@ -19,7 +19,12 @@ describe("Anthropic automatic prompt caching opt-in", () => {
     expect(resolvedConfig({ model: "claude-test" })).toEqual({})
   })
   it("keeps an explicit cache_control opt-in", () => {
-    expect(resolvedConfig({ model: "claude-test", config: decodeConfig({ cache_control: { type: "ephemeral", ttl: "1h" } }) })).toEqual({
+    expect(
+      resolvedConfig({
+        model: "claude-test",
+        config: decodeConfig({ cache_control: { type: "ephemeral", ttl: "1h" } }),
+      }),
+    ).toEqual({
       cache_control: { type: "ephemeral", ttl: "1h" },
     })
   })
