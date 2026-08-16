@@ -11,6 +11,20 @@ export const providerOutputState = () => ({ textCharacters: 0, reasoningCharacte
 export const errorMessage = (error: unknown) =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
+export const systemPrompt: {
+  (system: string): (supplemental: string | undefined) => Prompt.Prompt
+  (supplemental: string | undefined, system: string): Prompt.Prompt
+} = Function.dual(
+  2,
+  (supplemental: string | undefined, system: string): Prompt.Prompt =>
+    supplemental === undefined || supplemental.length === 0
+      ? Prompt.fromMessages([Prompt.makeMessage("system", { content: system })])
+      : Prompt.fromMessages([
+          Prompt.makeMessage("system", { content: system }),
+          Prompt.makeMessage("system", { content: supplemental }),
+        ]),
+)
+
 export const withSystem: {
   (instructions: string): (prompt: Prompt.Prompt) => Prompt.Prompt
   (instructions: string, prompt: Prompt.Prompt): Prompt.Prompt

@@ -266,8 +266,9 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       baseSystem,
       derivesCurrentSystem && skillListings.length > 0 ? skillListingsInstructions(skillListings) : undefined,
     )
+    const supplemental = agent.supplemental === undefined || agent.supplemental === "" ? undefined : agent.supplemental
 
-    yield* refreshResumeSystem({ chat: resumeChat, activeSession, system }).pipe(
+    yield* refreshResumeSystem({ chat: resumeChat, activeSession, system, supplemental }).pipe(
       Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
     )
 
@@ -406,15 +407,20 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     // Seed an empty persisted chat; a non-empty history already stores the system message.
     const seedSystem =
       persisted !== undefined && system !== undefined && (yield* Ref.get(persisted.history)).content.length === 0
-        ? system
+        ? supplemental === undefined
+          ? system
+          : `${system}\n\n${supplemental}`
         : undefined
 
     const sessionHistory = yield* seedFromSession({ activeSession, suppliedHistory: options.history }).pipe(
       Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
     )
-    const freshChat = initialChat({ sessionHistory, suppliedHistory: options.history, system })
+    const freshChat = initialChat({ sessionHistory, suppliedHistory: options.history, system, supplemental })
     if (persisted !== undefined && Option.isSome(sessionHistory)) {
-      yield* Ref.set(persisted.history, withDerivedSystem({ system, projection: sessionHistory.value })).pipe(
+      yield* Ref.set(
+        persisted.history,
+        withDerivedSystem({ system, supplemental, projection: sessionHistory.value }),
+      ).pipe(
         Effect.andThen(persisted.save),
         Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
       )
@@ -453,6 +459,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       instructionsEpoch,
       baseSystem,
       system,
+      supplemental,
       resilienceService,
       deliveryService,
       invocationCoordinator,

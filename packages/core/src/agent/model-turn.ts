@@ -8,6 +8,7 @@ import { type Registry, select } from "../tools/tool-registry.js"
 import { type Request } from "../tools/tool-executor.js"
 import { classifyFailure as classifyModelFailure } from "../model/model-registry.js"
 import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model/model-telemetry.js"
+import { withCacheBreakpoints } from "../model/prompt-cache.js"
 import { type AnyToolCall, type ToolCallIdState } from "./agent-tool-result.js"
 import type { RuntimeContext, StaticToolServices } from "./model-turn-context.js"
 import {
@@ -291,9 +292,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                       state.currentContext = responsePrompt
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     }
-                    const messages = responsePrompt.content
                     const rawParts = LanguageModel.streamText({
-                      prompt: responsePrompt,
+                      prompt: withCacheBreakpoints(responsePrompt, yield* CurrentPurpose),
                       toolkit: activeRegistry.toolkit,
                       disableToolCallResolution: true,
                     }).pipe(
@@ -345,7 +345,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                               return {
                                 _tag: "Part",
                                 part,
-                                messages,
+                                messages: responsePrompt.content,
                                 modelCallId: identity.modelCallId,
                                 modelAttemptId: identity.modelAttemptId,
                                 attempt: identity.attempt,
@@ -364,7 +364,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                             completedResponseAuthority = attemptResponse.authority()
                             return {
                               _tag: "Completed",
-                              messages,
+                              messages: responsePrompt.content,
                               modelCallId: identity.modelCallId,
                               modelAttemptId: identity.modelAttemptId,
                               attempt: identity.attempt,

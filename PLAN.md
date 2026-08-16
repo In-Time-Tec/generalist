@@ -187,3 +187,38 @@ Rika
 - Weakening mismatch or cursor guards: converts visible divergence into duplicate execution.
 - Sending only provider deltas as the general model protocol: most providers still require effective context, and transport caching is not durable state.
 - Another Rika batching layer: Baton would still pay the storage and encoding cost before batching.
+
+# Prompt Cache Plan (provider cache_control breakpoints)
+
+Shipped in 0.27.0: core policy, adapter automatic caching default, supplemental system block, and tests.
+Open follow-ups: prompt-prefix diagnostics events, adaptive TTL policy input, and per-purpose policy inputs from Rika.
+
+## Problem
+
+Production telemetry (Rika, Aug 3-15): 30.9% aggregate input cache hit, 3.1% on Anthropic
+(37.5M uncached input tokens, cacheWrite median 0). Baton never placed `cache_control` breakpoints,
+so Anthropic re-processed and re-billed the entire conversation on every model call.
+
+## Ownership
+
+- Core owns cache breakpoint placement (it owns the model call) and prompt-prefix diagnostics.
+- Rika owns the policy inputs (system split, TTL choices, adaptive TTL) and the % cached display.
+
+## Work
+
+1. `packages/core/src/model/prompt-cache.ts`: provider-aware policy marking the first system message
+   `options.anthropic.cacheControl = { type: "ephemeral", ttl: "1h" }` plus
+   `options.amazonBedrock.cachePoint = true`, later system messages the five-minute variant, and the
+   last user or tool message its last part. Anthropic/Bedrock-keyed options are inert on
+   OpenAI/OpenRouter adapters. Four-breakpoint cap. Applied in `model-turn.ts` only on the prompt
+   passed to `LanguageModel.streamText`; derived at send time, never persisted.
+2. Anthropic adapter default: top-level `cache_control` automatic caching field via the adapter's
+   request config default (it spreads straight into the request body), so tools get cached even
+   though beta.98 cannot mark them per-message. Explicit per-block markers take precedence.
+3. `Agent.make` `supplemental` instructions emitted as a second system message after the primary
+   block, preserved through Session rebuilds, resume seeding, and durable manifests.
+4. Tests: marker placement, gap filling, budget cap, purpose gating, wire-prompt integration,
+   supplemental ordering, adapter default config.
+
+Release: published as v0.27.0; Rika pins it. Full plan, provider matrix, and verification gates
+live in the Rika repo PLAN.md.

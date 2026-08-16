@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
-import { Agent, ExecutableManifest, Handoff, Session, ToolExecutor } from "@batonfx/core"
+import { Agent, ExecutableManifest, Handoff, Session, ToolExecutor, withCacheBreakpoints } from "@batonfx/core"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
 import { layer as activeExecutionsLayer } from "../src/active-executions.js"
 import { make as makeExecutionHost } from "../src/execution-host.js"
@@ -793,7 +793,7 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       const expectedSpecialistInput = Prompt.concat(Prompt.make("projected-for-specialist"), continuation)
       expect(conversationBeforeContinuation).toEqual(Prompt.make("projected-for-specialist"))
       expect(receivedByChild?.content.filter((message) => message.role !== "system")).toEqual(
-        expectedSpecialistInput.content,
+        withCacheBreakpoints(expectedSpecialistInput, "conversation").content,
       )
       const receivedJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(receivedByChild)
       expect(receivedJson).not.toContain("start with the supervisor")

@@ -328,6 +328,8 @@ export namespace ExecutableManifest {
   export type ExecutableTarget = import("./durable/executable-manifest.js").ExecutableTarget
 }
 
+export { withCacheBreakpoints } from "./model/prompt-cache.js"
+
 export {
   ActiveModelResponse,
   Agent,

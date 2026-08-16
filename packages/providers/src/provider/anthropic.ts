@@ -95,6 +95,9 @@ const resolveAnthropicFailure = ({ error, metadata: partMetadata, method }: Fail
   return make(AiError.UnknownError.make({ description: message, metadata }))
 }
 
+/** @experimental Effective Anthropic request config; callers opt into top-level automatic caching. */
+export const resolvedConfig = (input: AnthropicInput): Config => input.config ?? decodeConfig({})
+
 const anthropicLanguageModelLayer = (input: AnthropicInput) =>
   layerModelFailures(
     layerImageSources(

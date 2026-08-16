@@ -89,6 +89,7 @@ describe("@batonfx/core public surface", () => {
         "ToolPlacement",
         "Toolkit",
         "TurnPolicy",
+        "withCacheBreakpoints",
       ])
     }),
   )

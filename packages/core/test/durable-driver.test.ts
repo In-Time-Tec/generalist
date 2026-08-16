@@ -14,6 +14,7 @@ import {
   Session,
   ToolExecutor,
 } from "../src/index"
+import { withCacheBreakpoints } from "../src/model/prompt-cache"
 
 import { Json } from "./json.js"
 import { withProviderFinish } from "./provider-finish.js"
@@ -1259,8 +1260,9 @@ describe("DurableDriver Agent.stream integration", () => {
           }
           expect(providerPrompts.baseline).toHaveLength(2)
           expect(providerPrompts.recovery).toHaveLength(2)
-          expect(providerPrompts.baseline[0]?.content).toEqual(compactedRequest.content)
-          expect(providerPrompts.recovery[0]?.content).toEqual(compactedRequest.content)
+          const expectedRequest = withCacheBreakpoints(compactedRequest, "conversation")
+          expect(providerPrompts.baseline[0]?.content).toEqual(expectedRequest.content)
+          expect(providerPrompts.recovery[0]?.content).toEqual(expectedRequest.content)
           expect(providerPrompts.recovery[1]?.content).toEqual(providerPrompts.baseline[1]?.content)
           expect(recoveredFinal.content).toEqual(baselineFinal.content)
           expect(recovered.at(-1)).toEqual(baseline.at(-1))

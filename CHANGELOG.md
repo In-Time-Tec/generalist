@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.27.0
+
+- Mark provider cache breakpoints on every conversation send: the first system message carries an Anthropic one-hour and a Bedrock cache point, later system messages the five-minute variants, and the last user or tool message its last part, capped at four breakpoints and never persisted. Callers may opt into the Anthropic top-level automatic caching field through provider config, verified against the wire before it becomes a default.
+- Add `Agent.make` supplemental instructions emitted as a second system message after the primary block, preserved through Session rebuilds, resume seeding, and durable manifests.
+
 ## 0.26.2
 
 - Compare durable Session retries by stable semantic value across persistence transformations, preserving real provider response timestamps while rejecting changed or colliding authored payloads across SQLite, PostgreSQL, and MySQL.

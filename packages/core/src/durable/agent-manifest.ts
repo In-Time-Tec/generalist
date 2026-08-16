@@ -58,6 +58,7 @@ export interface AgentManifest {
   readonly version: "2"
   readonly name: string
   readonly instructions?: string
+  readonly supplemental?: string
   readonly model: ModelPin
   readonly tools: ReadonlyArray<NamedCapability>
   readonly skills: ReadonlyArray<NamedCapability>
@@ -161,6 +162,7 @@ export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = 
   version: Schema.Literal("2"),
   name: Schema.String,
   instructions: Schema.optionalKey(Schema.String),
+  supplemental: Schema.optionalKey(Schema.String),
   model: ModelPin,
   tools: Schema.Array(NamedCapability),
   skills: Schema.Array(NamedCapability),
@@ -306,6 +308,7 @@ export const fromLiveAgent: {
     return make({
       name: agent.name,
       ...(agent.instructions === undefined ? {} : { instructions: agent.instructions }),
+      ...(agent.supplemental === undefined ? {} : { supplemental: agent.supplemental }),
       ...identity,
       toolScheduling: agent.toolScheduling,
     })
