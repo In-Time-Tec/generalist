@@ -327,6 +327,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                             }
                             if (event._tag === "ModelResponseCommitted") {
                               yield* verifyCommittedModelEvent({ store, claim, event }).pipe(Effect.orDie)
+                              yield* preview.discard
                               return
                             }
                             if (event._tag === "Completed") {

@@ -58,6 +58,8 @@ export const MaxCadenceMillis = 50
 
 export interface Sink {
   readonly offer: (part: ModelPart) => Effect.Effect<boolean>
+  /** @experimental Retire the current frame for subscribers without closing the sink for later attempts. */
+  readonly discard: Effect.Effect<void>
   readonly clear: Effect.Effect<void>
 }
 
@@ -255,6 +257,23 @@ export const make: Effect.Effect<Interface, never, Scope.Scope> = Effect.gen(fun
       ),
       Effect.asVoid,
     )
+  const discardLane = (runId: string, attemptFence: number, expectedGeneration: number): Effect.Effect<void> =>
+    SynchronizedRef.modify(lanes, (current): readonly [ReadonlyArray<Publication>, ReadonlyMap<string, LaneState>] => {
+      const lane = current.get(runId)
+      if (lane === undefined || lane.generation !== expectedGeneration) return [[], current] as const
+      const discarded: ModelPreviewCleared = { _tag: "ModelPreviewCleared", runId, attemptFence, generation: 0 }
+      const next = new Map(current).set(runId, { ...lane, retained: undefined })
+      return [[[discarded, [...lane.subscribers.values()]]], next]
+    }).pipe(
+      Effect.flatMap((publications) =>
+        Effect.forEach(publications, ([event, subscribers]) =>
+          Effect.forEach(subscribers, (queue) => Queue.offer(queue, event), {
+            discard: true,
+          }),
+        ),
+      ),
+      Effect.asVoid,
+    )
   const clearLane = (runId: string, attemptFence: number, expectedGeneration: number): Effect.Effect<void> =>
     SynchronizedRef.modify(lanes, (current): readonly [ReadonlyArray<Publication>, ReadonlyMap<string, LaneState>] => {
       const lane = current.get(runId)
@@ -329,6 +348,14 @@ export const make: Effect.Effect<Interface, never, Scope.Scope> = Effect.gen(fun
         ),
       )
       yield* Effect.addFinalizer(() => cleanup)
+      const discard = Effect.uninterruptible(
+        serializer.withPermits(1)(
+          Effect.gen(function* () {
+            if (yield* Ref.get(cleaned)) return
+            yield* discardLane(runId, attemptFence, generation)
+          }),
+        ),
+      )
       return {
         offer: (part) =>
           serializer.withPermits(1)(
@@ -354,6 +381,7 @@ export const make: Effect.Effect<Interface, never, Scope.Scope> = Effect.gen(fun
             }),
           ),
         clear: cleanup,
+        discard,
       }
     })
   const previews = (runId: string): Stream.Stream<ModelPreviewEvent> =>
@@ -388,7 +416,7 @@ export const open =
   (lane: Option.Option<Interface>) =>
   (runId: string, attemptFence: number): Effect.Effect<Sink, never, Scope.Scope> =>
     Option.match(lane, {
-      onNone: () => Effect.succeed({ offer: () => Effect.succeed(false), clear: Effect.void }),
+      onNone: () => Effect.succeed({ offer: () => Effect.succeed(false), clear: Effect.void, discard: Effect.void }),
       onSome: (service) => service.open(runId, attemptFence),
     })
 

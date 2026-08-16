@@ -191,7 +191,9 @@ Rika
 # Prompt Cache Plan (provider cache_control breakpoints)
 
 Shipped in 0.27.0: core policy, adapter automatic caching default, supplemental system block, and tests.
-Open follow-ups: prompt-prefix diagnostics events, adaptive TTL policy input, and per-purpose policy inputs from Rika.
+Open follow-ups: prompt-prefix diagnostics events and per-purpose policy inputs from Rika.
+Adaptive idle-gap escalation shipped in 0.27.1: the conversation boundary takes the one-hour TTL
+once a run idles past the five-minute cache lifetime.
 
 Live verification through the switchboard (2026-08-16): the shipped explicit-marker policy reads
 99.5% of a continuation prompt (3597 of 3613 tokens; only the new tail written). A top-level
