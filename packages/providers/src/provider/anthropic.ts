@@ -95,12 +95,20 @@ const resolveAnthropicFailure = ({ error, metadata: partMetadata, method }: Fail
   return make(AiError.UnknownError.make({ description: message, metadata }))
 }
 
+const defaultConfig = decodeConfig({ cache_control: { type: "ephemeral" } })
+
+/** @experimental Effective Anthropic request config with automatic prompt caching enabled unless the caller set it. */
+export const resolvedConfig = (input: AnthropicInput): Config =>
+  input.config === undefined || input.config.cache_control === undefined
+    ? decodeConfig({ ...(input.config ?? {}), cache_control: { type: "ephemeral" } })
+    : input.config
+
 const anthropicLanguageModelLayer = (input: AnthropicInput) =>
   layerModelFailures(
     layerImageSources(
       AnthropicLanguageModel.layer({
         model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
+        ...(input.config === undefined ? { config: defaultConfig } : { config: resolvedConfig(input) }),
       }),
     ),
     resolveAnthropicFailure,

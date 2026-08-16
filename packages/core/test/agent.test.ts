@@ -1829,7 +1829,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(result.text).toBe("done")
         expect(capturedPrompt).toBe(
-          `[{"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","options":{},"role":"system","content":"plain instructions"},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{}}],"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user","options":{}}]`,
+          `[{"content":"plain instructions","options":{"anthropic":{"cacheControl":{"type":"ephemeral","ttl":"1h"}},"amazonBedrock":{"cachePoint":true}},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"system"},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{"anthropic":{"cacheControl":{"type":"ephemeral"}},"amazonBedrock":{"cachePoint":true}}}],"options":{},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user"}]`,
         )
         expect(capturedTools).toEqual([])
       }),
@@ -1855,7 +1855,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(result.text).toBe("done")
         expect(capturedPrompt).toBe(
-          `[{"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","options":{},"role":"system","content":""},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{}}],"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user","options":{}}]`,
+          `[{"content":"","options":{"anthropic":{"cacheControl":{"type":"ephemeral","ttl":"1h"}},"amazonBedrock":{"cachePoint":true}},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"system"},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{"anthropic":{"cacheControl":{"type":"ephemeral"}},"amazonBedrock":{"cachePoint":true}}}],"options":{},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user"}]`,
         )
       }),
     ] as const

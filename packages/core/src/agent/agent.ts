@@ -62,6 +62,7 @@ export interface Agent<
   }
   readonly name: string
   readonly instructions?: string
+  readonly supplemental?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
   readonly policy: TurnPolicy<PolicyServices>
   readonly model?: ModelSelection
@@ -104,6 +105,7 @@ export interface MakeOptions<
 > {
   readonly name: string
   readonly instructions?: string
+  readonly supplemental?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
   readonly tools?: never
   readonly policy?: TurnPolicy<PolicyServices>
@@ -183,6 +185,7 @@ export function make<
   const definition = {
     name: options.name,
     ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
+    ...(options.supplemental === undefined ? {} : { supplemental: options.supplemental }),
     toolkit,
     policy: options.policy ?? defaultPolicy,
     ...(options.model === undefined ? {} : { model: options.model }),

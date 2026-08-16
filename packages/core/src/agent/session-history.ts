@@ -4,7 +4,7 @@ import { SessionStore, buildContext } from "../context/session.js"
 import type { Event as ModelTelemetryEvent } from "../model/model-telemetry.js"
 import { AgentError, ResumeMismatch } from "./agent-event.js"
 import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
-import { withSystem } from "./agent-message.js"
+import { systemPrompt } from "./agent-message.js"
 
 /**
  * @experimental Session owns model-facing history; a Chat is its live view.
@@ -23,8 +23,12 @@ export const conversationOnly = (prompt: Prompt.Prompt): Prompt.Prompt =>
 /** @experimental Restore a Session projection into a Chat by prepending the derived system message. */
 export const withDerivedSystem = (input: {
   readonly system: string | undefined
+  readonly supplemental?: string | undefined
   readonly projection: Prompt.Prompt
-}): Prompt.Prompt => (input.system === undefined ? input.projection : withSystem(input.system, input.projection))
+}): Prompt.Prompt =>
+  input.system === undefined
+    ? input.projection
+    : Prompt.concat(systemPrompt(input.supplemental, input.system), input.projection)
 
 /**
  * @experimental Seed a new Chat from the active Session path.
@@ -45,13 +49,18 @@ export const initialChat = (input: {
   readonly sessionHistory: Option.Option<Prompt.Prompt>
   readonly suppliedHistory: Prompt.RawInput | undefined
   readonly system: string | undefined
+  readonly supplemental?: string | undefined
 }): Effect.Effect<Chat.Service> => {
   if (Option.isSome(input.sessionHistory))
-    return Chat.fromPrompt(withDerivedSystem({ system: input.system, projection: input.sessionHistory.value }))
+    return Chat.fromPrompt(
+      withDerivedSystem({
+        system: input.system,
+        supplemental: input.supplemental,
+        projection: input.sessionHistory.value,
+      }),
+    )
   if (input.suppliedHistory !== undefined) return Chat.fromPrompt(input.suppliedHistory)
-  return input.system === undefined
-    ? Chat.empty
-    : Chat.fromPrompt([Prompt.makeMessage("system", { content: input.system })])
+  return input.system === undefined ? Chat.empty : Chat.fromPrompt(systemPrompt(input.supplemental, input.system))
 }
 
 /** @internal Validate one resume request against the authoritative Session projection. */
@@ -116,12 +125,16 @@ export const refreshResumeSystem = (input: {
   readonly chat: Chat.Service | undefined
   readonly activeSession: Option.Option<typeof SessionStore.Service>
   readonly system: string | undefined
+  readonly supplemental?: string | undefined
 }): Effect.Effect<void, import("../context/session.js").SessionStoreError> => {
   if (input.chat === undefined || Option.isNone(input.activeSession)) return Effect.void
   return input.activeSession.value.path().pipe(
     Effect.map(buildContext),
     Effect.flatMap((projection) =>
-      Ref.set(input.chat!.history, withDerivedSystem({ system: input.system, projection })),
+      Ref.set(
+        input.chat!.history,
+        withDerivedSystem({ system: input.system, supplemental: input.supplemental, projection }),
+      ),
     ),
   )
 }
