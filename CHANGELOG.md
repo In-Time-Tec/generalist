@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.27.3
+
 - Include the transcript digest in the durable `memory:sync` operation key so a resumed run whose compacted transcript coincidentally matches an earlier turn's message count schedules a new operation instead of dying on a persisted-operation mismatch.
 
 ## 0.27.2
