@@ -1,5 +1,5 @@
 import { Cause, Effect, Schema, Stream } from "effect"
-import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { checkpoint, logicalOperationId } from "../durable/driver-run.js"
 import { digest as canonicalDigest } from "../durable/canonical-json.js"
 import { DriverInterpreter, operationKey, type StreamSuccessCodec } from "../durable/driver-interpreter.js"
@@ -12,6 +12,7 @@ import {
   type AttemptEvent,
 } from "../model/model-operation.js"
 import type { RunError } from "./agent.js"
+import type { ModelTurnServices } from "./model-turn-context.js"
 import { promptDigest } from "./prompt-identity.js"
 
 export type AttemptBody = (
@@ -20,7 +21,7 @@ export type AttemptBody = (
   compactOverflow?: boolean,
   overflowCause?: Cause.Cause<RunError>,
   operationKey?: string,
-) => Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter>
+) => Stream.Stream<AttemptEvent, RunError, ModelTurnServices<Record<string, Tool.Any>, never>>
 
 const operationDigest = (value: unknown): string =>
   canonicalDigest(JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value)))

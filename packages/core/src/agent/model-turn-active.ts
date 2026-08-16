@@ -1,4 +1,5 @@
 import { Effect, Ref } from "effect"
+import { makeSendClock } from "../model/prompt-cache.js"
 import type { ModelSelection } from "../model/model-registry.js"
 import type { ToolSchedulingPolicy } from "./agent.js"
 import type { HandoffRunState } from "./handoff-state.js"
@@ -30,4 +31,5 @@ export const makeActiveTurn = (input: {
           Effect.map((handoffRun) => handoffRun.active.agent.toolScheduling),
           Effect.orElseSucceed(() => input.agent.toolScheduling),
         ),
+  sendClock: makeSendClock(),
 })

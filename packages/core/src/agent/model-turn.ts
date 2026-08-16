@@ -8,9 +8,9 @@ import { type Registry, select } from "../tools/tool-registry.js"
 import { type Request } from "../tools/tool-executor.js"
 import { classifyFailure as classifyModelFailure } from "../model/model-registry.js"
 import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model/model-telemetry.js"
-import { withCacheBreakpoints } from "../model/prompt-cache.js"
+import { withWireCache } from "../model/prompt-cache.js"
 import { type AnyToolCall, type ToolCallIdState } from "./agent-tool-result.js"
-import type { RuntimeContext, StaticToolServices } from "./model-turn-context.js"
+import type { ModelTurnServices, RuntimeContext } from "./model-turn-context.js"
 import {
   InvalidToolCallParameters,
   isInvalidToolCallParameters,
@@ -52,7 +52,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     persisted,
     toolCallEvents,
   } = context
-  const { activeAgentName, activeModelSelection, activeToolScheduling } = makeActiveTurn({
+  const { activeAgentName, activeModelSelection, activeToolScheduling, sendClock } = makeActiveTurn({
     agent,
     ...(handoffStateRef === undefined ? {} : { handoffStateRef }),
     agentModel,
@@ -197,13 +197,13 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     overrides: TurnOverrides | undefined,
     agentName: string,
     toolScheduling: ToolSchedulingPolicy,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T> | DriverInterpreter> => {
+  ): Stream.Stream<Event, RunError, ModelTurnServices<T, R>> => {
     const instrumentTurnStream = <A, E>(
-      stream: Stream.Stream<A, E, LanguageModel.LanguageModel | DriverInterpreter>,
+      stream: Stream.Stream<A, E, ModelTurnServices<Record<string, Tool.Any>, never>>,
     ): Stream.Stream<
       A,
       E | InvalidToolCallParameters | ToolJsonSchemaCompilerMissing | AiError.AiError,
-      LanguageModel.LanguageModel | DriverInterpreter
+      ModelTurnServices<Record<string, Tool.Any>, never>
     > =>
       Stream.unwrap(
         LanguageModel.LanguageModel.pipe(
@@ -235,7 +235,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       compactOverflow = false,
       overflowCause?: Cause.Cause<RunError>,
       operationKey?: string,
-    ): Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter> => {
+    ): Stream.Stream<AttemptEvent, RunError, ModelTurnServices<Record<string, Tool.Any>, never>> => {
       let emitted = false
       let classifyFailure = classifyOtherFailure
       const attemptResponse = makeAttemptResponse({
@@ -293,7 +293,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     }
                     const rawParts = LanguageModel.streamText({
-                      prompt: withCacheBreakpoints(responsePrompt, yield* CurrentPurpose),
+                      prompt: yield* withWireCache(responsePrompt, yield* CurrentPurpose, sendClock),
                       toolkit: activeRegistry.toolkit,
                       disableToolCallResolution: true,
                     }).pipe(

@@ -193,6 +193,11 @@ Rika
 Shipped in 0.27.0: core policy, adapter automatic caching default, supplemental system block, and tests.
 Open follow-ups: prompt-prefix diagnostics events, adaptive TTL policy input, and per-purpose policy inputs from Rika.
 
+Live verification through the switchboard (2026-08-16): the shipped explicit-marker policy reads
+99.5% of a continuation prompt (3597 of 3613 tokens; only the new tail written). A top-level
+automatic cache_control field overrides explicit per-block markers (the explicit 1h system marker
+was ignored and the prefix landed in the 5m bucket), so automatic caching remains caller opt-in.
+
 ## Problem
 
 Production telemetry (Rika, Aug 3-15): 30.9% aggregate input cache hit, 3.1% on Anthropic

@@ -53,7 +53,7 @@ describe("prompt-cache", () => {
         Prompt.makeMessage("assistant", { content: [Prompt.makePart("text", { text: "inspecting" })] }),
         ...toolResultMessage().content,
       ])
-      const marked = withCacheBreakpoints(prompt, "conversation")
+      const marked = withCacheBreakpoints(prompt, "conversation", undefined)
       expect(cacheControlOf(marked.content[0]!.options)).toEqual({ type: "ephemeral", ttl: "1h" })
       expect(cachePointOf(marked.content[0]!.options)).toEqual(true)
       expect(cacheControlOf(marked.content[1]!.options)).toEqual({ type: "ephemeral" })
@@ -73,7 +73,7 @@ describe("prompt-cache", () => {
         ...conversationPrompt.content,
         Prompt.makeMessage("assistant", { content: [Prompt.makePart("text", { text: "done" })] }),
       ])
-      const marked = withCacheBreakpoints(prompt, "conversation")
+      const marked = withCacheBreakpoints(prompt, "conversation", undefined)
       const markedTail = lastUserLikeMessage(marked)!
       expect(markedTail.role).toEqual("tool")
       expect(cacheControlOf(lastPartOf(markedTail).options)).toEqual({ type: "ephemeral" })
@@ -88,7 +88,7 @@ describe("prompt-cache", () => {
         Prompt.makeMessage("system", { content: "primary instructions" }),
         Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "fix the bug" })] }),
       ])
-      const marked = withCacheBreakpoints(prompt, "conversation")
+      const marked = withCacheBreakpoints(prompt, "conversation", undefined)
       const tail = lastUserLikeMessage(marked)!
       expect(tail.role).toEqual("user")
       expect(cacheControlOf(lastPartOf(tail).options)).toEqual({ type: "ephemeral" })
@@ -107,7 +107,7 @@ describe("prompt-cache", () => {
           content: [Prompt.makePart("text", { text: "fix the bug", options: { amazonBedrock: { cachePoint: true } } })],
         }),
       ])
-      const marked = withCacheBreakpoints(prompt, "conversation")
+      const marked = withCacheBreakpoints(prompt, "conversation", undefined)
       expect(marked.content[0]!.options.anthropic).toEqual({ cacheControl: { type: "ephemeral", ttl: "1h" } })
       expect(marked.content[0]!.options.amazonBedrock).toEqual({ cachePoint: true })
       const tail = lastUserLikeMessage(marked)!
@@ -119,7 +119,7 @@ describe("prompt-cache", () => {
   it.effect("leaves non-conversation purposes untouched", () =>
     Effect.sync(() => {
       for (const purpose of ["structured-output", "compaction-summary"] as const) {
-        expect(withCacheBreakpoints(conversationPrompt, purpose)).toBe(conversationPrompt)
+        expect(withCacheBreakpoints(conversationPrompt, purpose, undefined)).toBe(conversationPrompt)
       }
     }),
   )
@@ -143,7 +143,22 @@ describe("prompt-cache", () => {
           ],
         }),
       ])
-      expect(withCacheBreakpoints(prompt, "conversation")).toBe(prompt)
+      expect(withCacheBreakpoints(prompt, "conversation", undefined)).toBe(prompt)
+    }),
+  )
+
+  it.effect("escalates the conversation boundary to one hour after an idle gap", () =>
+    Effect.sync(() => {
+      const escalated = withCacheBreakpoints(conversationPrompt, "conversation", 5 * 60 * 1_000 + 1)
+      expect(cacheControlOf(lastPartOf(lastUserLikeMessage(escalated)!).options)).toEqual({
+        type: "ephemeral",
+        ttl: "1h",
+      })
+      const fresh = withCacheBreakpoints(conversationPrompt, "conversation", 5 * 60 * 1_000 - 1)
+      expect(cacheControlOf(lastPartOf(lastUserLikeMessage(fresh)!).options)).toEqual({ type: "ephemeral" })
+      expect(withCacheBreakpoints(conversationPrompt, "conversation", 0)).toEqual(
+        withCacheBreakpoints(conversationPrompt, "conversation", undefined),
+      )
     }),
   )
 
@@ -157,7 +172,7 @@ describe("prompt-cache", () => {
         Prompt.makeMessage("system", { content: "five" }),
         Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "fix the bug" })] }),
       ])
-      const marked = withCacheBreakpoints(prompt, "conversation")
+      const marked = withCacheBreakpoints(prompt, "conversation", undefined)
       const markedCount = marked.content.filter((message) => {
         if (message.role === "system") return cacheControlOf(message.options) !== undefined
         return cacheControlOf(lastPartOf(message).options) !== undefined

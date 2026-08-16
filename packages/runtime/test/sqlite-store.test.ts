@@ -793,7 +793,7 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       const expectedSpecialistInput = Prompt.concat(Prompt.make("projected-for-specialist"), continuation)
       expect(conversationBeforeContinuation).toEqual(Prompt.make("projected-for-specialist"))
       expect(receivedByChild?.content.filter((message) => message.role !== "system")).toEqual(
-        withCacheBreakpoints(expectedSpecialistInput, "conversation").content,
+        withCacheBreakpoints(expectedSpecialistInput, "conversation", undefined).content,
       )
       const receivedJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(receivedByChild)
       expect(receivedJson).not.toContain("start with the supervisor")

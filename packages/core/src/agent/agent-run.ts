@@ -1,4 +1,4 @@
-import { Effect, Equal, Function, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Clock, Effect, Equal, Function, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event, type SteeringDrained } from "./agent-event.js"
 import { type Item, type MemoryError, messageFromRecall, projectTranscript } from "../context/memory.js"
@@ -38,7 +38,7 @@ import { LoopDriverState } from "../durable/loop-driver-state.js"
 type RunStream<Tools extends Record<string, Tool.Any>, S extends ObjectSchema, R> = Stream.Stream<
   Event,
   RunError,
-  R | LanguageModel.LanguageModel | StaticToolServices<Tools> | SchemaServicesD<S>
+  R | Clock.Clock | LanguageModel.LanguageModel | StaticToolServices<Tools> | SchemaServicesD<S>
 >
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 const isToolNameCollision = Schema.is(ToolNameCollision)
