@@ -14,23 +14,12 @@ describe("Anthropic request configuration", () => {
   })
 })
 
-describe("Anthropic automatic prompt caching", () => {
-  it("enables top-level cache_control by default", () => {
-    expect(resolvedConfig({ model: "claude-test" })).toEqual({ cache_control: { type: "ephemeral" } })
+describe("Anthropic automatic prompt caching opt-in", () => {
+  it("leaves the request config untouched when the caller set none", () => {
+    expect(resolvedConfig({ model: "claude-test" })).toEqual({})
   })
-  it("adds the default when the caller config omitted it", () => {
-    expect(resolvedConfig({ model: "claude-test", config: decodeConfig({ max_tokens: 1_024 }) })).toEqual({
-      cache_control: { type: "ephemeral" },
-      max_tokens: 1_024,
-    })
-  })
-  it("keeps an explicit cache_control override", () => {
-    expect(
-      resolvedConfig({
-        model: "claude-test",
-        config: decodeConfig({ cache_control: { type: "ephemeral", ttl: "1h" } }),
-      }),
-    ).toEqual({
+  it("keeps an explicit cache_control opt-in", () => {
+    expect(resolvedConfig({ model: "claude-test", config: decodeConfig({ cache_control: { type: "ephemeral", ttl: "1h" } }) })).toEqual({
       cache_control: { type: "ephemeral", ttl: "1h" },
     })
   })
