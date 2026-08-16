@@ -2,10 +2,13 @@
 
 ## Unreleased
 
+## 0.27.3
+
+- Include the transcript digest in the durable `memory:sync` operation key so a resumed run whose compacted transcript coincidentally matches an earlier turn's message count schedules a new operation instead of dying on a persisted-operation mismatch.
+
 ## 0.27.2
 
 - Retire a Run's published model preview frame the moment its response commits, so a committed message stops rendering twice in the TUI while the sink stays open for later attempts in the same Run.
-
 
 ## 0.27.1
 

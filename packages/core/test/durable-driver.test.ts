@@ -917,6 +917,66 @@ describe("DurableDriver Agent.stream integration", () => {
     )
   })
 
+  it.effect("gives same-turn same-count syncs with different transcripts distinct durable keys", () => {
+    const recorded = new Map<
+      string,
+      { operation: DurableDriver.DriverOperation; outcome: DurableDriver.OperationOutcome }
+    >()
+    const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+      onScheduled: (operation) =>
+        Effect.gen(function* () {
+          if (operation.kind !== "memory" || !operation.key.includes(":memory:sync:")) return undefined
+          const existing = recorded.get(operation.key)
+          if (existing === undefined) return undefined
+          if (existing.operation.inputDigest !== operation.inputDigest) {
+            return yield* Effect.die(
+              new Error(`Persisted operation ${operation.key} does not match the scheduled operation`),
+            )
+          }
+          return existing.outcome
+        }),
+      onCompleted: (operation, outcome) =>
+        Effect.sync(() => {
+          if (operation.kind === "memory" && operation.key.includes(":memory:sync:")) {
+            recorded.set(operation.key, { operation, outcome })
+          }
+        }),
+      onCheckpoint: () => Effect.void,
+    })
+    const modelLayer = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "text", delta: "done" }))),
+      }),
+    )
+    const agent = Agent.make({ name: "sync-key-collision-agent" })
+    const run = (prompt: string) =>
+      provideScoped(
+        Layer.mergeAll(Session.layerMemory, modelLayer, journalLayer),
+        Agent.stream(agent, {
+          prompt,
+          history: Prompt.empty,
+          logicalOperationId: "sync-key-collision",
+          sessionId: "sync-key-collision",
+        }).pipe(Stream.runDrain),
+      )
+
+    return Effect.gen(function* () {
+      yield* run("first transcript")
+      const firstKeys = new Set(recorded.keys())
+      yield* run("other transcript")
+      const secondKeys = [...recorded.keys()].filter((key) => !firstKeys.has(key))
+      expect(firstKeys.size).toBeGreaterThan(0)
+      expect(secondKeys.length).toBe(firstKeys.size)
+      for (const { operation } of recorded.values()) {
+        const input = operation.input as { readonly transcriptDigest: string }
+        expect(operation.key.endsWith(`:${input.transcriptDigest}`)).toBe(true)
+      }
+    })
+  })
+
   it.effect("replays the exact Session path from its cursor without re-appending", () => {
     const recorded = new Map<string, DurableDriver.OperationOutcome>()
     const recordedOperations = new Map<string, DurableDriver.DriverOperation>()
