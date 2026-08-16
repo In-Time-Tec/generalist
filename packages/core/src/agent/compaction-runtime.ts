@@ -125,16 +125,16 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     transcript: Prompt.Prompt,
   ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-    const durableTranscript = conversationOnly(transcript)
+    const transcriptDigest = promptDigest(conversationOnly(transcript).content)
     return intercept(
       {
         kind: "memory",
-        key: operationKey(logicalId, "memory", "sync", turn, transcript.content.length),
+        key: operationKey(logicalId, "memory", "sync", turn, transcript.content.length, transcriptDigest),
         turn,
         input: {
           turn,
           messageCount: transcript.content.length,
-          transcriptDigest: promptDigest(durableTranscript.content),
+          transcriptDigest,
         },
         replayPolicy: "pure",
       },
