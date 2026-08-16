@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+## 0.27.2
+
+- Retire a Run's published model preview frame the moment its response commits, so a committed message stops rendering twice in the TUI while the sink stays open for later attempts in the same Run.
+
+
 ## 0.27.1
 
 - Escalate the conversation cache boundary to the one-hour bucket when a run idles past the five-minute cache lifetime between sends, so long tool executions and user pauses keep reading the warm prefix instead of rewriting it.
-
 
 ## 0.27.0
 
