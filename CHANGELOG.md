@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Scale the test suite to the machine's own parallelism instead of the two workers a kernel scope-close hang once forced, and drop the two-minute cleanup ceilings that tolerated it. The suite runs in about half the time and a cleanup regression now fails fast instead of stalling. The cancellation test watches for the suppressed side effect throughout the window rather than sleeping once past it, which is both quicker and stricter.
+
 ## 0.27.4
 
 - Spawn the Bun REPL kernel through `Bun.spawn` instead of the `node:child_process` compatibility layer. Bun's Node shim closes an extra-descriptor pipe twice when a kernel is killed while its readers are attached, which killed the host with `EXC_GUARD` on macOS and, on Linux, closed whichever descriptor number had since been reused — a live SQLite handle in practice, surfacing as `disk I/O error` and stalled turns. The kernel now owns its descriptors for the process lifetime, drops Bun's subprocess reference so an idle kernel never holds a host open, and polls the control channel on the real clock so a test clock cannot stall the handshake.

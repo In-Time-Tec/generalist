@@ -2,7 +2,12 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
 import { liveOptions, ownWorkers, platform, runCell, withPool } from "./bun-harness.js"
 
-const processTestOptions = { timeout: 120_000 }
+/**
+ * Releasing a kernel is a process kill and a reap, which is fast; the old two-minute ceiling
+ * existed only to tolerate a scope-close hang that is now fixed in the session itself. A generous
+ * but bounded ceiling keeps a regression a failure rather than a stalled suite.
+ */
+const processTestOptions = { timeout: 20_000 }
 
 layer(platform, liveOptions)("Bun kernel cleanup", (it) => {
   /**

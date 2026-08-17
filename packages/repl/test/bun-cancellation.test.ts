@@ -26,7 +26,17 @@ layer(platform, liveOptions)("Bun kernel cancellation", (it) => {
           )
           yield* Effect.sleep(250)
           yield* Fiber.interrupt(running)
-          yield* Effect.sleep(4000)
+          /**
+           * Watching for the marker past the moment the cell would have written it is stronger than
+           * sleeping once and looking afterwards: a surviving cell fails the assertion as soon as
+           * its write lands, rather than only if it happens to land inside a fixed window.
+           */
+          const deadline = 3_000
+          const step = 50
+          for (let waited = 0; waited < deadline; waited += step) {
+            expect(yield* fileSystem.exists(marker)).toBe(false)
+            yield* Effect.sleep(step)
+          }
           expect(yield* fileSystem.exists(marker)).toBe(false)
         }),
     }),
