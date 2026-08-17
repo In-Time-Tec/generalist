@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Spawn the Bun REPL kernel through `Bun.spawn` instead of the `node:child_process` compatibility layer. Bun's Node shim closes an extra-descriptor pipe twice when a kernel is killed while its readers are attached, which killed the host with `EXC_GUARD` on macOS and, on Linux, closed whichever descriptor number had since been reused — a live SQLite handle in practice, surfacing as `disk I/O error` and stalled turns. The kernel now owns its descriptors for the process lifetime, drops Bun's subprocess reference so an idle kernel never holds a host open, and polls the control channel on the real clock so a test clock cannot stall the handshake.
+
 ## 0.27.3
 
 - Include the transcript digest in the durable `memory:sync` operation key so a resumed run whose compacted transcript coincidentally matches an earlier turn's message count schedules a new operation instead of dying on a persisted-operation mismatch.

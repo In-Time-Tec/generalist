@@ -1,5 +1,4 @@
 import { Clock, Duration, Effect, Exit, Fiber, Layer, RcMap, Ref, Scope, Semaphore, Stream } from "effect"
-import { ChildProcessSpawner } from "effect/unstable/process"
 import {
   type CellEvent,
   type CellFailure,
@@ -58,15 +57,8 @@ const initialState: SessionState = { epoch: 0, lease: undefined }
  * kernel's reference is held for exactly the duration of a cell, and idle eviction is the map's
  * reference-count expiry rather than a sweep.
  */
-export const make = (
-  options: Options,
-): Effect.Effect<
-  KernelPoolInterface,
-  never,
-  ChildProcessSpawner.ChildProcessSpawner | KernelStateStore | Scope.Scope
-> =>
+export const make = (options: Options): Effect.Effect<KernelPoolInterface, never, KernelStateStore | Scope.Scope> =>
   Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const store = yield* KernelStateStore
     const mounted = yield* Effect.serviceOption(HostBindingRegistry)
     const bindings: HostBindings | undefined = mounted._tag === "Some" ? mounted.value : undefined
@@ -84,61 +76,59 @@ export const make = (
       Ref.update(states, (all) => new Map(all).set(sessionId, next))
 
     const boot = (sessionId: SessionId): Effect.Effect<Lease, KernelUnavailable, Scope.Scope> =>
-      boots
-        .withPermits(1)(
-          Effect.gen(function* () {
-            const state = yield* stateOf(sessionId)
-            const generation = yield* Ref.updateAndGet(generations, (value) => value + 1)
-            const kernel = yield* makeKernel({
-              sessionId,
-              epoch: state.epoch,
-              workspaceRoot: workspace.root,
-              runtimeCommand: options.runtimeCommand,
-              workerModule: options.workerModule,
-              startTimeoutMillis: options.startTimeoutMillis,
-              environment: options.environment,
-              registry: bindings,
-              controlTimeoutMillis: captureTimeoutMillis,
+      boots.withPermits(1)(
+        Effect.gen(function* () {
+          const state = yield* stateOf(sessionId)
+          const generation = yield* Ref.updateAndGet(generations, (value) => value + 1)
+          const kernel = yield* makeKernel({
+            sessionId,
+            epoch: state.epoch,
+            workspaceRoot: workspace.root,
+            runtimeCommand: options.runtimeCommand,
+            workerModule: options.workerModule,
+            startTimeoutMillis: options.startTimeoutMillis,
+            environment: options.environment,
+            registry: bindings,
+            controlTimeoutMillis: captureTimeoutMillis,
+          })
+          yield* kernel.mount
+          const snapshot = yield* store.load(sessionId).pipe(Effect.orElseSucceed(() => undefined))
+          if (snapshot !== undefined) {
+            yield* kernel.restore(new TextDecoder().decode(snapshot.payload)).pipe(Effect.ignore)
+          }
+          /**
+           * A host assembles the mounted surface into whatever shape its cells are written
+           * against, and does it here: after restore, so the bootstrap always describes the
+           * worker that actually exists, and before any model cell, so the first cell sees the
+           * same surface as the last. It is deliberately not snapshot-restored — a restored
+           * binding would close over a dead worker's handles.
+           */
+          if (options.bootstrap !== undefined) {
+            const bootstrapped = yield* kernel.execute({
+              cellId: `bootstrap-${generation}`,
+              code: options.bootstrap,
+              deadlineMillis: options.profile.limits.cellDeadlineMillis,
+              channelBytes: options.profile.limits.channelBytes,
+              sequenceStart: 0,
             })
-            yield* kernel.mount
-            const snapshot = yield* store.load(sessionId).pipe(Effect.orElseSucceed(() => undefined))
-            if (snapshot !== undefined) {
-              yield* kernel.restore(new TextDecoder().decode(snapshot.payload)).pipe(Effect.ignore)
-            }
-            /**
-             * A host assembles the mounted surface into whatever shape its cells are written
-             * against, and does it here: after restore, so the bootstrap always describes the
-             * worker that actually exists, and before any model cell, so the first cell sees the
-             * same surface as the last. It is deliberately not snapshot-restored — a restored
-             * binding would close over a dead worker's handles.
-             */
-            if (options.bootstrap !== undefined) {
-              const bootstrapped = yield* kernel.execute({
-                cellId: `bootstrap-${generation}`,
-                code: options.bootstrap,
-                deadlineMillis: options.profile.limits.cellDeadlineMillis,
-                channelBytes: options.profile.limits.channelBytes,
-                sequenceStart: 0,
-              })
-              const drained = yield* Effect.forkChild(
-                Stream.runDrain(Stream.fromQueue(bootstrapped.events)).pipe(Effect.ignore),
-              )
-              yield* bootstrapped.outcome.pipe(Effect.ignore)
-              yield* Fiber.await(drained).pipe(Effect.ignore)
-            }
-            const lease: Lease = { kernel, generation }
-            yield* putState(sessionId, { ...state, lease })
-            yield* Effect.addFinalizer(() =>
-              Effect.flatMap(stateOf(sessionId), (current) =>
-                current.lease?.generation === generation
-                  ? putState(sessionId, { ...current, lease: undefined })
-                  : Effect.void,
-              ),
+            const drained = yield* Effect.forkChild(
+              Stream.runDrain(Stream.fromQueue(bootstrapped.events)).pipe(Effect.ignore),
             )
-            return lease
-          }),
-        )
-        .pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner))
+            yield* bootstrapped.outcome.pipe(Effect.ignore)
+            yield* Fiber.await(drained).pipe(Effect.ignore)
+          }
+          const lease: Lease = { kernel, generation }
+          yield* putState(sessionId, { ...state, lease })
+          yield* Effect.addFinalizer(() =>
+            Effect.flatMap(stateOf(sessionId), (current) =>
+              current.lease?.generation === generation
+                ? putState(sessionId, { ...current, lease: undefined })
+                : Effect.void,
+            ),
+          )
+          return lease
+        }),
+      )
 
     const kernels = yield* RcMap.make({
       lookup: boot,
@@ -315,7 +305,5 @@ export const make = (
   })
 
 /** @experimental One Server-scoped pool of live Bun kernels, one per Session. */
-export const layer = (
-  options: Options,
-): Layer.Layer<KernelPool, never, ChildProcessSpawner.ChildProcessSpawner | KernelStateStore> =>
+export const layer = (options: Options): Layer.Layer<KernelPool, never, KernelStateStore> =>
   Layer.effect(KernelPool, make(options).pipe(Effect.map(KernelPool.of)))
