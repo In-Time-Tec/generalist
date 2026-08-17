@@ -8,7 +8,6 @@ import { matchesActiveRunOptions, type Interface as ExecutableResolverInterface 
 import type { ExecutionContinuation } from "./steering.js"
 import { durableEvent, type DurableAgentLoopEvent, type EmittableAgentLoopEvent } from "./agent-event.js"
 import { makeDeferredProgramChildTerminal, ProgramChildTerminal } from "./program-child-terminal.js"
-import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
 import { hostContext, sessionContext } from "./execution-context.js"
 import { make as makeNestedOperations } from "./nested-operations.js"
@@ -309,7 +308,14 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         ...(continuation === undefined ? {} : { continuation }),
                         ...(turnStart === undefined ? {} : { turnStart }),
                         resume,
-                        budget: resolved.agent.budget ?? agentBudget,
+                        /**
+                         * An unspecified budget is unbounded. `Agent.make` omits the property when
+                         * no budget option is given, so substituting a ceiling here would turn
+                         * "the caller expressed no limit" into a silent cap. An empty allocation
+                         * charges nothing: every dimension is undefined and `charge` short-circuits.
+                         * Recursive admission stays with TreePolicy.
+                         */
+                        budget: resolved.agent.budget ?? {},
                         ...(resolved.runOptions?.compaction === undefined
                           ? {}
                           : { compaction: resolved.runOptions.compaction }),
