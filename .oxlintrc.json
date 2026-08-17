@@ -116,10 +116,11 @@
   },
   "overrides": [
     {
-      "files": ["packages/repl/src/repl/bun-worker.ts"],
+      "files": ["packages/repl/src/repl/bun-worker.ts", "packages/repl/src/repl/bun-session.ts"],
       "rules": {
         "effecttsgo/async-function": "off",
         "effecttsgo/global-timers": "off",
+        "effecttsgo/global-timers-in-effect": "off",
         "effecttsgo/new-promise": "off",
         "effecttsgo/node-builtin-import": "off"
       }
