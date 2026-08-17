@@ -504,3 +504,28 @@ describe("RunBudget Agent.stream integration", () => {
     })
   }
 })
+
+standalone.effect("charging an unbounded dimension leaves it absent so the checkpoint still decodes", () =>
+  Effect.gen(function* () {
+    const unbounded = RunBudget.make({})
+
+    const charged = yield* RunBudget.charge(unbounded, { modelCalls: 4, toolCalls: 9, totalTokens: 11_000_000 })
+
+    // An unbounded dimension must stay absent. Writing an explicit undefined would satisfy the
+    // in-memory type while failing the next `optionalKey` decode, terminating the run with
+    // "Expected number, got undefined" instead of leaving it uncharged.
+    expect(Object.keys(charged.remaining)).toEqual([])
+    expect(yield* RunBudget.decode(yield* RunBudget.encode(charged))).toEqual(charged)
+  }),
+)
+
+standalone.effect("charging a bounded dimension still exhausts it exactly", () =>
+  Effect.gen(function* () {
+    const bounded = RunBudget.make({ totalTokens: 100 })
+    const exhausted = yield* Effect.exit(RunBudget.charge(bounded, { totalTokens: 250 }))
+    expect(exhausted._tag).toBe("Failure")
+
+    const partial = yield* RunBudget.charge(RunBudget.make({ totalTokens: 100 }), { totalTokens: 40 })
+    expect(partial.remaining.totalTokens).toBe(60)
+  }),
+)

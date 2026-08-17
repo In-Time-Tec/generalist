@@ -11,8 +11,17 @@ export const TreePolicy = Schema.Struct({ maxDepth: Bound, maxSubagents: Bound }
 /** @experimental */
 export type TreePolicy = typeof TreePolicy.Type
 
-/** @experimental Bounded policy used when a root admission does not specify one. */
-export const defaultTreePolicy: TreePolicy = Object.freeze({ maxDepth: 64, maxSubagents: 64 })
+/**
+ * @experimental Policy used when a root admission does not specify one: unbounded within the
+ * schema's fixed ceiling. A host that wants recursion limits pins them explicitly; an unspecified
+ * policy must not invent one. `TREE_POLICY_MAX` is the representation because tree policy is
+ * durable — it is stored in integer columns and feeds the root digest, so a non-finite sentinel
+ * would not survive serialization or keep idempotency stable.
+ */
+export const defaultTreePolicy: TreePolicy = Object.freeze({
+  maxDepth: TREE_POLICY_MAX,
+  maxSubagents: TREE_POLICY_MAX,
+})
 
 /** @experimental Decode and detach one root policy before its authoritative admission. */
 export const normalize = (policy: unknown = defaultTreePolicy): Effect.Effect<TreePolicy, TreePolicyInvalid> =>
