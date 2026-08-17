@@ -1,3 +1,6 @@
+/* oxlint-disable effecttsgo/node-builtin-import -- counting live workers must not depend on the
+   async child-process path this harness is verifying; a synchronous `ps` cannot lose its own completion. */
+import { execFileSync } from "node:child_process"
 import { Context, Duration, Effect, FileSystem, Layer, Path, Scope, Stream } from "effect"
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 import type { BunServices } from "@effect/platform-bun/BunServices"
@@ -64,9 +67,14 @@ const ownWorkerCount = (listing: string): number =>
  * process table also sees workers from other suites, from an unrelated leak, or from a developer's
  * own Rika, and would fail for reasons that have nothing to do with the code under test.
  */
-export const ownWorkers: Effect.Effect<number> = Effect.promise(() =>
-  Bun.$`ps -eo pid=,ppid=,command=`.nothrow().text(),
-).pipe(Effect.map(ownWorkerCount))
+export const ownWorkers: Effect.Effect<number> = Effect.sync(() =>
+  ownWorkerCount(
+    execFileSync("ps", ["-eo", "pid=,ppid=,command="], {
+      maxBuffer: 64 * 1024 * 1024,
+      encoding: "utf8",
+    }),
+  ),
+)
 
 const registryContext = (
   modules: ReadonlyArray<HostBindingRegistry.Module> | undefined,

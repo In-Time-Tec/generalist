@@ -1,5 +1,4 @@
 import { type Cause, Deferred, Effect, Fiber, Queue, Ref, Scope } from "effect"
-import type { ChildProcessSpawner } from "effect/unstable/process"
 import {
   type CellEvent,
   type CellFailure,
@@ -74,9 +73,7 @@ const controlReply = (frame: WorkerFrame): string | undefined =>
  * queue for the process lifetime: it never blocks on an executing cell, so a host reply always
  * reaches the cell awaiting it, and control replies never race a cell's own frames.
  */
-export const make = (
-  options: KernelOptions,
-): Effect.Effect<Kernel, KernelUnavailable, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
+export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavailable, Scope.Scope> =>
   Effect.gen(function* () {
     const worker = yield* start(options)
     const active = yield* Ref.make<ActiveCell | undefined>(undefined)
