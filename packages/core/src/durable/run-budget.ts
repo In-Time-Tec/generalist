@@ -174,6 +174,13 @@ export const make: {
   },
 )
 
+/**
+ * @experimental The allocation that charges nothing. Every dimension is undefined, so `charge`
+ * short-circuits on an undefined remaining and no usage can exhaust it. Naming it keeps an
+ * unbounded run from reading like a forgotten argument.
+ */
+export const unbounded: BudgetLimits = {}
+
 /** @experimental */
 export const allocate = make
 
@@ -191,22 +198,24 @@ export const charge: {
         ),
       )
       const remaining: Record<string, number | string | undefined> = { ...budget.remaining }
+      /**
+       * An unbounded dimension has no key at all. `subtractFinite` returns undefined for it, and
+       * assigning that back would create a key present with an undefined value — which
+       * `optionalKey` rejects on the next checkpoint decode, failing the run instead of leaving it
+       * uncharged. Only write a dimension that actually carries a remaining amount.
+       */
+      const chargeDimension = function* (dimension: ChargeDimension | "handoffs", amount: number) {
+        if (amount === 0) return
+        const next = yield* subtractFinite(limitValue(remaining as BudgetLimits, dimension), amount, dimension)
+        if (next === undefined) return
+        remaining[dimension] = next
+      }
       for (const dimension of chargeDimensions) {
         const amount = validUsage[dimension]
-        if (amount === undefined || amount === 0) continue
-        remaining[dimension] = yield* subtractFinite(
-          limitValue(remaining as BudgetLimits, dimension),
-          amount,
-          dimension,
-        )
+        if (amount === undefined) continue
+        yield* chargeDimension(dimension, amount)
       }
-      if (validUsage.handoffs !== undefined && validUsage.handoffs !== 0) {
-        remaining.handoffs = yield* subtractFinite(
-          limitValue(remaining as BudgetLimits, "handoffs"),
-          validUsage.handoffs,
-          "handoffs",
-        )
-      }
+      if (validUsage.handoffs !== undefined) yield* chargeDimension("handoffs", validUsage.handoffs)
       return { ...budget, remaining: remaining as BudgetLimits }
     }),
 )
