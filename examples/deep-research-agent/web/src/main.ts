@@ -1,4 +1,4 @@
-import { Chat, Connection } from "@batonfx/foldkit"
+import { Chat, Connection } from "tenetkit/foldkit"
 import { Cause, Effect, Function, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import { define, mapMessage, mapMessages, type Command } from "foldkit/command"
@@ -83,7 +83,7 @@ export const init: ApplicationInit<Model, Message, void, Connection.AgentConnect
 
 // COMMAND
 
-/** Opens a Baton session on the server before the WebSocket attaches to it. */
+/** Opens a TenetKit session on the server before the WebSocket attaches to it. */
 export const OpenSession = define(
   "OpenSession",
   OpenedSession,
@@ -191,7 +191,7 @@ const headerView = (model: Model): Html => {
           h.h1([h.Class("text-lg font-semibold")], ["Deep Research Agent"]),
           h.p(
             [h.Class("text-xs text-muted-foreground")],
-            ["A Baton agent: plans, calls web_search, and synthesizes a cited answer — streamed live."],
+            ["A TenetKit agent: plans, calls web_search, and synthesizes a cited answer — streamed live."],
           ),
         ],
       ),

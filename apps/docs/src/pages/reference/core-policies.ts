@@ -7,9 +7,9 @@ export const corePoliciesReference = definePage({
   description: "TurnPolicy, Approvals, and Permissions: every decision union and layer constructor.",
   content: [
     lead(
-      "Three namespaces of @batonfx/core gate what a run may do next: TurnPolicy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
+      "Three namespaces of tenetkit gate what a run may do next: TurnPolicy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
     ),
-    command("Install", "bun add @batonfx/core"),
+    command("Install", "bun add tenetkit"),
     h2("turn-policy", "TurnPolicy"),
     p(
       "A policy is ",

@@ -1,7 +1,7 @@
 import { Console, Effect, ManagedRuntime, Schema } from "effect"
-import { HostBindingRegistry } from "@batonfx/repl"
+import { HostBindingRegistry } from "tenetkit/repl"
 
-class WorkspaceDenied extends Schema.TaggedErrorClass<WorkspaceDenied>()("@batonfx/docs/WorkspaceDenied", {
+class WorkspaceDenied extends Schema.TaggedErrorClass<WorkspaceDenied>()("@tenetkit/docs/WorkspaceDenied", {
   path: Schema.String,
 }) {}
 

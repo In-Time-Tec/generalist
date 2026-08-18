@@ -1,4 +1,4 @@
-import { Agent, TurnPolicy } from "@batonfx/core"
+import { Agent, TurnPolicy } from "tenetkit"
 import type { LanguageModel, Tool } from "effect/unstable/ai"
 import { Service } from "./search-provider"
 import { toolkit, type webSearchTool } from "./tools"

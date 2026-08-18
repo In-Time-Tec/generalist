@@ -13,7 +13,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@batonfx/docs/snippets/research-agent/search-provider/Service",
+  "@tenetkit/docs/snippets/research-agent/search-provider/Service",
 ) {}
 
 const cannedResults: ReadonlyArray<SearchResult> = [

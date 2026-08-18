@@ -7,9 +7,9 @@ export const coreModelsReference = definePage({
   description: "ModelRegistry, ModelMiddleware, ModelResilience, and the Guardrail middleware combinators.",
   content: [
     lead(
-      "Four namespaces of @batonfx/core cover the model side of a run: ModelRegistry selects models per run, ModelMiddleware transforms prompts and stream parts, ModelResilience retries transient failures, and Guardrail builds common middleware.",
+      "Four namespaces of tenetkit cover the model side of a run: ModelRegistry selects models per run, ModelMiddleware transforms prompts and stream parts, ModelResilience retries transient failures, and Guardrail builds common middleware.",
     ),
-    command("Install", "bun add @batonfx/core"),
+    command("Install", "bun add tenetkit"),
     h2("model-registry", "ModelRegistry"),
     p(
       "A registry of named model registrations. ",
@@ -74,7 +74,7 @@ export const coreModelsReference = definePage({
     p(
       "Optional prompt/stream interceptor: a ",
       code("ReadonlyArray<Middleware>"),
-      " applied in array order. When no layer is provided, Baton uses the empty identity chain. Both hooks are optional; omitted hooks are identity.",
+      " applied in array order. When no layer is provided, TenetKit uses the empty identity chain. Both hooks are optional; omitted hooks are identity.",
     ),
     table(
       ["Hook", "Signature", "Contract"],

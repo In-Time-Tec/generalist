@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Chat } from "@batonfx/core"
-import { TestModel } from "@batonfx/test"
+import { Agent, Chat } from "tenetkit"
+import { TestModel } from "tenetkit/test"
 
 const applicationLayer = Layer.mergeAll(
   Agent.layerRuntime,

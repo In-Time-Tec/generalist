@@ -1,16 +1,16 @@
 import { callout, code, command, definePage, h2, lead, link, p, table } from "../../prose"
 export const providersReference = definePage({
   path: "/docs/reference/providers",
-  title: "@batonfx/providers",
+  title: "tenetkit/ai",
   navTitle: "providers",
   group: "Reference",
   description: "Provider registrations, deterministic fallback, OpenAI-compatible presets, catalog, and embeddings.",
   content: [
     lead(
-      "@batonfx/providers binds real model providers to the ModelRegistry: registration helpers per provider, a deterministic model for tests, seven OpenAI-compatible presets, a static model catalog, and embedding layers.",
+      "tenetkit/ai binds real model providers to the ModelRegistry: registration helpers per provider, a deterministic model for tests, seven OpenAI-compatible presets, a static model catalog, and embedding layers.",
     ),
-    command("Install", "bun add @batonfx/core @batonfx/providers"),
-    p("Published on npm. Requires ", code("@batonfx/core"), " and the pinned effect version."),
+    command("Install", "bun add tenetkit tenetkit/ai"),
+    p("Published on npm. Requires ", code("tenetkit"), " and the pinned effect version."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

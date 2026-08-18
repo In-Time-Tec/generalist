@@ -10,8 +10,8 @@ import {
   Pins,
   Response,
   ToolExecutor,
-} from "@batonfx/core"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "@batonfx/runtime"
+} from "tenetkit"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
@@ -44,7 +44,7 @@ const modelLayer = Layer.effect(
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () =>
       Stream.make(
-        Response.makePart("text-delta", { id: "assistant", delta: "Hello from Baton." }),
+        Response.makePart("text-delta", { id: "assistant", delta: "Hello from TenetKit." }),
         Response.makePart("finish", { reason: "stop", usage, response: { status: 200, headers: {} } }),
       ),
   }),

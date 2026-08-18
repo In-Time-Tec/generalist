@@ -2,7 +2,7 @@ import { Effect, FileSystem, ManagedRuntime, Path, Schema } from "effect"
 import { layer } from "@effect/platform-bun/BunServices"
 
 class InstallPreflightFailed extends Schema.TaggedErrorClass<InstallPreflightFailed>()(
-  "@batonfx/scripts/InstallPreflightFailed",
+  "@tenetkit/scripts/InstallPreflightFailed",
   { message: Schema.String },
 ) {}
 
@@ -39,12 +39,12 @@ const program = Effect.gen(function* () {
       readonly devDependencies?: Readonly<Record<string, string>>
       readonly peerDependencies?: Readonly<Record<string, string>>
     }
-    if (manifest.name !== `@batonfx/${packageName}`) {
+    if (manifest.name !== `@tenetkit/${packageName}`) {
       return yield* preflightError(`${manifestPath} has a non-canonical package name`)
     }
     for (const dependencies of [manifest.dependencies, manifest.devDependencies, manifest.peerDependencies]) {
       for (const [dependency, version] of Object.entries(dependencies ?? {})) {
-        if (dependency.startsWith("@batonfx/") && version !== "workspace:*") {
+        if (dependency.startsWith("@tenetkit/") && version !== "workspace:*") {
           return yield* preflightError(`${manifestPath} must use workspace:* for ${dependency}`)
         }
       }

@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Permissions } from "@batonfx/core"
+import { Permissions } from "tenetkit"
 
 const ruleset: Permissions.Ruleset = {
   rules: [

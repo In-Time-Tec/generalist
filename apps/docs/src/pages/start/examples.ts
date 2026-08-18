@@ -1,6 +1,6 @@
 import { code, codeBlock, definePage, h2, lead, link, p, table } from "../../prose"
-const cloneSource = `git clone https://github.com/In-Time-Tec/batonfx
-cd batonfx
+const cloneSource = `git clone https://github.com/In-Time-Tec/tenetkit
+cd tenetkit
 bun install`
 
 export const examples = definePage({
@@ -9,7 +9,7 @@ export const examples = definePage({
   navTitle: "Examples",
   group: "Start",
   description:
-    "The nine runnable examples in the Batonfx repository: what each one shows and the one command that runs it.",
+    "The nine runnable examples in the TenetKit repository: what each one shows and the one command that runs it.",
   content: [
     lead(
       "The repository ships nine runnable examples, typechecked in CI. All but one run offline with scripted models, no API keys.",
@@ -57,7 +57,7 @@ export const examples = definePage({
           [code("mcp-agent")],
           [
             "An agent over a fake in-memory MCP source using the ",
-            code("@batonfx/mcp/baton"),
+            code("tenetkit/mcp/tools"),
             " adapter shape of a real connection",
           ],
           [code("bun --cwd examples/mcp-agent start")],

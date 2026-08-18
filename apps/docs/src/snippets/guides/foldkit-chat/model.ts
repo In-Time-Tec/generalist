@@ -1,4 +1,4 @@
-import { Chat, Connection } from "@batonfx/foldkit"
+import { Chat, Connection } from "tenetkit/foldkit"
 import { Cause, Effect, Layer, Schema } from "effect"
 import { dual } from "effect/Function"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"

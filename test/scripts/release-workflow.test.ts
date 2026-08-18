@@ -78,16 +78,15 @@ layer(bunLayer)("release workflows", (it) => {
       expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
       expect(source.match(new RegExp(`\\(\\.packages \\| length\\) == ${packageNames.length}`, "g"))).toHaveLength(2)
       expect(source.match(/\(\.packages \| length\) == \d+/g)).toHaveLength(2)
-      expect(source.match(/printf '@batonfx\/%s\\n' (.+)\)/g)).toHaveLength(2)
-      for (const roster of source.matchAll(/printf '@batonfx\/%s\\n' (.+?)\)/g)) {
-        expect(roster[1]!.trim().split(/\s+/)).toEqual(packageNames)
-      }
+      expect(source.match(/printf '%s\\n' tenetkit @tenetkit\/pg @tenetkit\/mysql/g)).toHaveLength(2)
       for (const manifests of source.matchAll(/for manifest in package\.json packages\/\{(.+?)\}/g)) {
-        expect(manifests[1]!.split(",")).toEqual(packageNames)
+        expect(manifests[1]!.split(",").toSorted()).toEqual(packageNames)
       }
       expect(source.match(/for manifest in package\.json packages\/\{/g)).toHaveLength(1)
       for (const packageName of packageNames) {
-        expect(source).toContain(`batonfx-${packageName}-\${VERSION}.tgz`)
+        expect(source).toContain(
+          packageName === "tenetkit" ? `tenetkit-\${VERSION}.tgz` : `tenetkit-${packageName}-\${VERSION}.tgz`,
+        )
       }
       expect(source).not.toMatch(/bun publish|Rewrite package manifests/)
       for (const workflowFile of [".github/workflows/ci.yml", ".github/workflows/publish.yml"]) {

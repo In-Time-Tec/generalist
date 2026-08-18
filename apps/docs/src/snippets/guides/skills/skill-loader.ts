@@ -1,6 +1,6 @@
 import { FileSystem, Layer, Path } from "effect"
-import { SkillSource } from "@batonfx/core"
-import { SkillLoader } from "@batonfx/skills"
+import { SkillSource } from "tenetkit"
+import { SkillLoader } from "tenetkit/skills"
 
 export const filesystemSkills: Layer.Layer<
   SkillSource.SkillSource,

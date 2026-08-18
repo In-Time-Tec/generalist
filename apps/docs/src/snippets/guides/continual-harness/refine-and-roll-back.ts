@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime, Result } from "effect"
-import { Authorship, HarnessOverview, HarnessState, HarnessStore, Refinement } from "@batonfx/harness"
+import { Authorship, HarnessOverview, HarnessState, HarnessStore, Refinement } from "tenetkit/harness"
 
 const scope = "thread:demo"
 

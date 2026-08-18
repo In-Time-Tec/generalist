@@ -1,7 +1,7 @@
 import { Config, Layer } from "effect"
-import { Memory } from "@batonfx/core"
-import { SemanticRecall, VectorStore, WorkingMemory } from "@batonfx/memory"
-import { Embedding } from "@batonfx/providers"
+import { Memory } from "tenetkit"
+import { SemanticRecall, VectorStore, WorkingMemory } from "tenetkit/memory"
+import { Embedding } from "tenetkit/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const embeddingLayer = Embedding.layer({

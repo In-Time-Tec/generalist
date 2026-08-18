@@ -6,13 +6,13 @@ export const nativeRuntime = definePage({
   navTitle: "Core and Runtime",
   group: "Learn",
   description:
-    "How the process-local @batonfx/core agent loop composes with the native @batonfx/runtime for durable, addressable runs.",
+    "How the process-local tenetkit agent loop composes with the native tenetkit/runtime for durable, addressable runs.",
   content: [
     p(
-      code("@batonfx/core"),
+      code("tenetkit"),
       " owns the agent loop: model turns, tool execution, policies, approvals, and typed AgentEvents. It can run by itself and keeps no durable execution state. ",
-      code("@batonfx/runtime"),
-      " is Baton's optional native durable host. It persists a constructor-verified executable manifest and exact active reference with each finite, addressable Run, alongside one canonical RunEvent stream.",
+      code("tenetkit/runtime"),
+      " is TenetKit's optional native durable host. It persists a constructor-verified executable manifest and exact active reference with each finite, addressable Run, alongside one canonical RunEvent stream.",
     ),
     h2("runtime-owns", "What Runtime owns"),
     bullets(
@@ -65,7 +65,7 @@ export const nativeRuntime = definePage({
     ),
     p(
       "See ",
-      link("/docs/reference/runtime", "the @batonfx/runtime reference"),
+      link("/docs/reference/runtime", "the tenetkit/runtime reference"),
       " for the public namespaces and ",
       link("/docs/guides/serve-transport", "Serve over SSE and WebSocket"),
       " for a complete projection flow.",

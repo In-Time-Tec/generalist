@@ -1,18 +1,18 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
 export const mcpReference = definePage({
   path: "/docs/reference/mcp",
-  title: "@batonfx/mcp",
+  title: "tenetkit/mcp",
   navTitle: "mcp",
   group: "Reference",
-  description: "McpToolSource for discovering and calling MCP tools, plus the Batonfx toolkit and executor adapters.",
+  description: "McpToolSource for discovering and calling MCP tools, plus the TenetKit toolkit and executor adapters.",
   content: [
     lead(
-      "@batonfx/mcp connects Model Context Protocol servers to Batonfx: McpToolSource discovers and calls MCP tools, and the baton subpath adapts them into a toolkit and a ToolExecutor.",
+      "tenetkit/mcp connects Model Context Protocol servers to TenetKit: McpToolSource discovers and calls MCP tools, and the baton subpath adapts them into a toolkit and a ToolExecutor.",
     ),
-    command("Install", "bun add @batonfx/core @batonfx/mcp"),
+    command("Install", "bun add tenetkit tenetkit/mcp"),
     p(
       "Published on npm at 0.14.0. Requires ",
-      code("@batonfx/core"),
+      code("tenetkit"),
       " and depends on ",
       code("@modelcontextprotocol/sdk"),
       ".",
@@ -82,7 +82,7 @@ export const mcpReference = definePage({
           [code("route({ name, transport, callTimeout? })")],
           [
             "Scoped acquisition returning ",
-            code("BatonTools { toolkit, executorLayer }"),
+            code("McpTools { toolkit, executorLayer }"),
             ". The executor layer installs both handlers and ",
             code("ToolExecutor"),
           ],

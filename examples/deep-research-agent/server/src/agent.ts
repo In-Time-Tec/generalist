@@ -1,4 +1,4 @@
-import { Agent, TurnPolicy } from "@batonfx/core"
+import { Agent, TurnPolicy } from "tenetkit"
 import { toolkit, webSearchTool } from "./tools"
 
 /** @experimental The bounded research policy used by the demo agent. */

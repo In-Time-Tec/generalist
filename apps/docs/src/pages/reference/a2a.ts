@@ -2,13 +2,13 @@ import { code, command, definePage, h2, lead, link, p } from "../../prose"
 
 export const a2aReference = definePage({
   path: "/docs/reference/a2a",
-  title: "@batonfx/a2a",
+  title: "tenetkit/a2a",
   navTitle: "a2a",
   group: "Reference",
   description: "A2A v1 server projection over the authoritative Runtime lifecycle.",
   content: [
-    lead("@batonfx/a2a maps A2A v1 tasks onto Runtime runs without storing a second lifecycle."),
-    command("Install", "bun add @a2a-js/sdk@1.0.1 @batonfx/runtime @batonfx/a2a"),
+    lead("tenetkit/a2a maps A2A v1 tasks onto Runtime runs without storing a second lifecycle."),
+    command("Install", "bun add @a2a-js/sdk@1.0.1 tenetkit/runtime tenetkit/a2a"),
     p("Published on npm at 0.14.0. A2A task IDs are caller-selected Runtime Run IDs."),
     h2("service", "Service"),
     p(
@@ -19,6 +19,6 @@ export const a2aReference = definePage({
     p(
       "Only user text/plain text parts and application/json data parts are admitted. Files, URLs, authority-bearing roles, and mismatched media are rejected before Runtime admission.",
     ),
-    p("See ", link("/docs/reference/runtime", "@batonfx/runtime"), "."),
+    p("See ", link("/docs/reference/runtime", "tenetkit/runtime"), "."),
   ],
 })

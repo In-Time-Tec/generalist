@@ -1,6 +1,6 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Agent } from "@batonfx/core"
-import { TestModel } from "@batonfx/test"
+import { Agent } from "tenetkit"
+import { TestModel } from "tenetkit/test"
 
 const modelLayer = TestModel.layer([TestModel.text("A deterministic answer.")])
 const agent = Agent.make({ name: "tested-agent" })

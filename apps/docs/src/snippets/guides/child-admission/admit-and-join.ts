@@ -1,6 +1,6 @@
 import { Effect } from "effect"
-import { ToolContext } from "@batonfx/core"
-import { ChildAdmission } from "@batonfx/runtime"
+import { ToolContext } from "tenetkit"
+import { ChildAdmission } from "tenetkit/runtime"
 
 type InExecution = ChildAdmission.AgentChildren | ToolContext.ToolContext
 

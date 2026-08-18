@@ -12,8 +12,8 @@ import {
   Tool,
   ToolExecutor,
   Toolkit,
-} from "@batonfx/core"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "@batonfx/runtime"
+} from "tenetkit"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service",

@@ -9,7 +9,7 @@ export const coreEventsReference = definePage({
     lead(
       "AgentEvent is the process-local observation surface of the core loop. Runtime keeps the semantic execution facts from that stream, adds durable lifecycle facts, and deliberately excludes raw provider fragments.",
     ),
-    command("Install", "bun add @batonfx/core"),
+    command("Install", "bun add tenetkit"),
     h2("model-output", "Model output has two observation levels"),
     table(
       ["Event", "Fields", "Contract"],
@@ -49,7 +49,7 @@ export const coreEventsReference = definePage({
     callout(
       "info",
       "Runtime persists semantics, not provider fragments",
-      code("@batonfx/runtime"),
+      code("tenetkit/runtime"),
       " excludes ",
       code("ModelPart"),
       " from RunEvent history. Successful model operations publish ",
@@ -118,11 +118,7 @@ export const coreEventsReference = definePage({
       " when neither side reports a field.",
     ),
     h2("error-classes", "Error classes"),
-    p(
-      "Expected failures are Schema tagged error classes under ",
-      code("@batonfx/core/"),
-      ". Key loop failures include:",
-    ),
+    p("Expected failures are Schema tagged error classes under ", code("tenetkit/"), ". Key loop failures include:"),
     table(
       ["Error", "Raised when"],
       [
@@ -142,13 +138,13 @@ export const coreEventsReference = definePage({
       "AgentSuspended is a contract, not a failure",
       "The host resolves the token out of band and re-enters through ",
       code("RunOptions.resume"),
-      " with the exact suspension. Baton verifies it before any resumed side effect.",
+      " with the exact suspension. TenetKit verifies it before any resumed side effect.",
     ),
     p(
       "For the loop that emits these events, see ",
       link("/docs/learn/agent-loop", "The agent loop"),
       ". For durable RunEvents and live previews, see ",
-      link("/docs/reference/runtime", "@batonfx/runtime"),
+      link("/docs/reference/runtime", "tenetkit/runtime"),
       ".",
     ),
   ],

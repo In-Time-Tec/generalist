@@ -1,16 +1,16 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
 export const memoryReference = definePage({
   path: "/docs/reference/memory",
-  title: "@batonfx/memory",
+  title: "tenetkit/memory",
   navTitle: "memory",
   group: "Reference",
   description: "WorkingMemory, SemanticRecall, the VectorStore seam, and the combined layer.",
   content: [
     lead(
-      "@batonfx/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
+      "tenetkit/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
     ),
-    command("Install", "bun add @batonfx/core @batonfx/memory"),
-    p("Published on npm at 0.14.0. Requires ", code("@batonfx/core"), "."),
+    command("Install", "bun add tenetkit tenetkit/memory"),
+    p("Published on npm at 0.14.0. Requires ", code("tenetkit"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -119,7 +119,7 @@ export const memoryReference = definePage({
     ),
     p(
       "Embedding layers live in ",
-      link("/docs/reference/providers", "@batonfx/providers"),
+      link("/docs/reference/providers", "tenetkit/ai"),
       ". See ",
       link("/docs/guides/memory", "How to add memory"),
       ".",

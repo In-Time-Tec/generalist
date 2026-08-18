@@ -1,14 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Response,
-  Tool,
-  Toolkit,
-  type AgentEvent,
-} from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit, type AgentEvent } from "tenetkit"
 
 const searchTool = Tool.make("search_docs", {
   description: "Search the project docs",

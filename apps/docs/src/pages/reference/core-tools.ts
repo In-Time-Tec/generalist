@@ -7,9 +7,9 @@ export const coreToolsReference = definePage({
   description: "ToolExecutor, ToolContext, ToolOutput and its store, and AgentTool for agents-as-tools.",
   content: [
     lead(
-      "Four namespaces of @batonfx/core cover tool execution: ToolExecutor optionally overrides where calls run, ToolContext is the ambient per-call context, ToolOutput bounds large results, and AgentTool wraps an agent as a tool.",
+      "Four namespaces of tenetkit cover tool execution: ToolExecutor optionally overrides where calls run, ToolContext is the ambient per-call context, ToolOutput bounds large results, and AgentTool wraps an agent as a tool.",
     ),
-    command("Install", "bun add @batonfx/core"),
+    command("Install", "bun add tenetkit"),
     h2("tool-executor", "ToolExecutor"),
     p(
       "Optional override seam for durable hosts, client-executed tools, remote workers, MCP, sandboxing, and suspension. Ordinary in-process tools use the active Effect AI ",
@@ -75,7 +75,7 @@ export const coreToolsReference = definePage({
       code("Tool"),
       " value, and successful placement results are decoded and encoded against that tool's ",
       code("success"),
-      " schema before Baton re-feeds the result to the model. Placement domain failures are decoded and encoded against the tool's failure schema. Framework failures remain in the Effect error channel and use stage evidence; they are never emitted as tool-schema output.",
+      " schema before TenetKit re-feeds the result to the model. Placement domain failures are decoded and encoded against the tool's failure schema. Framework failures remain in the Effect error channel and use stage evidence; they are never emitted as tool-schema output.",
     ),
     p(
       "Migration: replace exhaustive ",
@@ -89,7 +89,7 @@ export const coreToolsReference = definePage({
       ". Handle ",
       code("FrameworkFailure"),
       " with ",
-      code('Effect.catchTag("@batonfx/core/FrameworkFailure", ...)'),
+      code('Effect.catchTag("tenetkit/core/FrameworkFailure", ...)'),
       ". Remote placement codecs replace message-only Failure with DomainFailure carrying the declared schema value.",
     ),
     p(

@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { ModelMiddleware, Prompt } from "@batonfx/core"
+import { ModelMiddleware, Prompt } from "tenetkit"
 
 const maxUserChars = 8_000
 

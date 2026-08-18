@@ -2,15 +2,15 @@ import { code, command, definePage, h2, lead, link, p, table } from "../../prose
 
 export const testReference = definePage({
   path: "/docs/reference/test",
-  title: "@batonfx/test",
+  title: "tenetkit/test",
   navTitle: "test",
   group: "Reference",
   description: "Scripted Effect AI model fixtures and normalized request capture for deterministic agent tests.",
   content: [
     lead(
-      "@batonfx/test runs the real Baton loop against scripted Effect AI responses, captures normalized provider requests, and needs no provider credentials or test-runner dependency.",
+      "tenetkit/test runs the real TenetKit loop against scripted Effect AI responses, captures normalized provider requests, and needs no provider credentials or test-runner dependency.",
     ),
-    command("Install", "bun add -d @batonfx/test @effect/vitest"),
+    command("Install", "bun add -d tenetkit/test @effect/vitest"),
     h2("script", "Script responses"),
     table(
       ["API", "Purpose"],

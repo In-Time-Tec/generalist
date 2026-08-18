@@ -7,9 +7,9 @@ export const coreAgentReference = definePage({
   description: "Agent.make, stream and generate run functions, truthful requirements, RunError, Resume, and Result.",
   content: [
     lead(
-      "The Agent namespace of @batonfx/core defines an opaque agent value, the stream and generate run functions, and every option and service a run consumes.",
+      "The Agent namespace of tenetkit defines an opaque agent value, the stream and generate run functions, and every option and service a run consumes.",
     ),
-    command("Install", "bun add @batonfx/core"),
+    command("Install", "bun add tenetkit"),
     h2("agent-make", "Agent.make"),
     p(
       "An ",

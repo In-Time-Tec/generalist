@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
 
 const dropReasoning: ModelMiddleware.Middleware = {
   transformPart: (part) => Effect.succeed(part.type === "reasoning-delta" ? Option.none() : Option.some(part)),

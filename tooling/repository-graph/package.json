@@ -1,5 +1,5 @@
 {
-  "name": "@batonfx/repository-graph",
+  "name": "@tenetkit/repository-graph",
   "private": true,
   "type": "module",
   "scripts": {

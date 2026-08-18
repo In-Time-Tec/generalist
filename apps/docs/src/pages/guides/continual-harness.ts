@@ -6,7 +6,7 @@ import { callout, code, codeBlock, definePage, h2, link, p, table } from "../../
 
 const durableStore = `import { layer as bunServices } from "@effect/platform-bun/BunServices"
 import { Layer } from "effect"
-import { FileSystemHarnessStore } from "@batonfx/harness"
+import { FileSystemHarnessStore } from "tenetkit/harness"
 
 const storeLayer = FileSystemHarnessStore.layer({
   path: (scope) => \`\${process.env.HOME}/.baton/harness/\${encodeURIComponent(scope)}.json\`,
@@ -21,7 +21,7 @@ export const continualHarness = definePage({
     "Accept a model-authored refinement, apply it atomically, roll it back exactly, persist it durably, and pin one exact state into a durable Execution.",
   content: [
     p(
-      code("@batonfx/harness"),
+      code("tenetkit/harness"),
       " is the engine for agent guidance an agent may refine and a host may pin: prompt notes, memories, skills, and subagent specs, each versioned and audited. Store locations, scope policy, and the refine flow itself stay host-owned.",
     ),
     h2("accept-a-refinement", "1. Accept a refinement from the model"),
@@ -115,7 +115,7 @@ export const continualHarness = definePage({
     codeBlock({ label: "pin-a-snapshot.ts", source: pinSnapshot, expectedOutput: pinSnapshotExpected }),
     p(
       "The capability carries pinned content, so the executable digest changes when the state changes and Runtime's registration validation requires the supplied payload to match the declared codec, version, and digest. Refinement history is audit data and stays outside the pinned identity, so recording an event does not change what a snapshot means. See ",
-      link("/docs/reference/harness", "the @batonfx/harness reference"),
+      link("/docs/reference/harness", "the tenetkit/harness reference"),
       " for the full rejection taxonomy, scope merge, and bounded overview contracts.",
     ),
   ],

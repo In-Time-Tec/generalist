@@ -1,6 +1,6 @@
 # Tool-Calling Chatbot
 
-Run a local offline agent that emits a tool call, executes it through a Baton `ToolExecutor`, and returns a final assistant answer.
+Run a local offline agent that emits a tool call, executes it through a TenetKit `ToolExecutor`, and returns a final assistant answer.
 
 ```bash
 bun --cwd examples/tool-calling-chatbot start

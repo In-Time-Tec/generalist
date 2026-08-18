@@ -8,17 +8,17 @@ export const mcp = definePage({
   navTitle: "Use MCP tool sources",
   group: "Guides",
   description:
-    "Connect to an MCP server with McpToolSource, expose its discovered tools as a Baton toolkit, and proxy tool calls through the MCP executor.",
+    "Connect to an MCP server with McpToolSource, expose its discovered tools as a TenetKit toolkit, and proxy tool calls through the MCP executor.",
   content: [
     p(
-      code("@batonfx/mcp"),
+      code("tenetkit/mcp"),
       " connects to an MCP server, discovers its tools, and exposes one scoped ",
       code("route"),
       " containing the toolkit the model sees and the executor layer that proxies calls to the same connection. The bridge keeps MCP SDK dependencies out of ",
-      code("@batonfx/core"),
+      code("tenetkit"),
       ".",
     ),
-    command("Terminal", "bun add @batonfx/mcp"),
+    command("Terminal", "bun add tenetkit/mcp"),
     h2("connect-to-a-server", "1. Connect to a server"),
     p(
       code("McpToolSource.layer"),
@@ -48,7 +48,7 @@ export const mcp = definePage({
     h2("how-calls-behave", "2. How calls behave"),
     bullets(
       [
-        "MCP tool failures become Baton tool ",
+        "MCP tool failures become TenetKit tool ",
         code("Failure"),
         " outcomes, so the model sees a failed tool result and can react. MCP tools never ",
         code("Suspend"),
@@ -59,7 +59,7 @@ export const mcp = definePage({
         code("tools/call"),
         " passes the running fiber's ",
         code("AbortSignal"),
-        " to the SDK, so interrupting a Baton run cancels the in-flight MCP request on the server.",
+        " to the SDK, so interrupting a TenetKit run cancels the in-flight MCP request on the server.",
       ],
       [
         "An optional ",
@@ -73,7 +73,7 @@ export const mcp = definePage({
     p(
       code("McpToolSource.Interface"),
       " is plain data plus effects, so tests hand the adapter an in-memory source instead of a connection. This is the ",
-      link("https://github.com/In-Time-Tec/batonfx/tree/main/examples/mcp-agent", "examples/mcp-agent"),
+      link("https://github.com/In-Time-Tec/tenetkit/tree/main/examples/mcp-agent", "examples/mcp-agent"),
       " program, runnable with zero credentials.",
     ),
     codeBlock({ label: "scripted-source.ts", source: scriptedSource, expectedOutput: scriptedSourceExpected }),
@@ -81,7 +81,7 @@ export const mcp = definePage({
       "Local tools and MCP tools use the same executor seam, so start with ",
       link("/docs/guides/define-tools", "How to define tools and toolkits"),
       " if you have not built a toolkit before. The full interface is in ",
-      link("/docs/reference/mcp", "the @batonfx/mcp reference"),
+      link("/docs/reference/mcp", "the tenetkit/mcp reference"),
       ".",
     ),
   ],

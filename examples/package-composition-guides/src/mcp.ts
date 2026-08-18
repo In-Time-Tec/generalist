@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { McpToolSource } from "@batonfx/mcp"
+import { McpToolSource } from "tenetkit/mcp"
 
 const source: McpToolSource.Interface = {
   server: "local-docs",

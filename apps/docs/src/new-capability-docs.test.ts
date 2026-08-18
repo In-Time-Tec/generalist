@@ -98,10 +98,10 @@ test("the cell guide keeps the exclusive-barrier, idle-TTL, and failure-taxonomy
 test("the cell tutorial walks a beginner from an epoch to the real kernel", () => {
   for (const marker of [
     "KernelProfile",
-    "bun add effect @batonfx/core @batonfx/repl",
+    "bun add effect tenetkit tenetkit/repl",
     "TestKernel.layerTestPool",
     "HostBindingRegistry",
-    "@batonfx/repl/bun",
+    "tenetkit/repl/bun",
     "bindingsDigest",
     "sequence",
   ]) {

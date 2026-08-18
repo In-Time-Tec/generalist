@@ -1,6 +1,6 @@
 # Addressed messaging
 
-`@batonfx/runtime` owns durable agent-to-agent messaging: a directory of addressable Runs, a per-target durable inbox, safe-boundary delivery, and one durable `send` operation. Applications supply only the policy for addressing beyond Baton's derived relationships.
+`tenetkit/runtime` owns durable agent-to-agent messaging: a directory of addressable Runs, a per-target durable inbox, safe-boundary delivery, and one durable `send` operation. Applications supply only the policy for addressing beyond TenetKit's derived relationships.
 
 ## Directory
 
@@ -18,7 +18,7 @@ An Address states which directory table to read. It never carries authority. `Ru
 
 ### Enabling cross-session addressing
 
-Cross-session messaging is off by default and is enabled by one host-supplied policy, passed as `messagingPolicy` in the Runtime layer options. `allow` receives both resolved directory entries plus the derived `relationship` and a `crossSession` flag, and returns whether that one direction is permitted; `discover` returns addresses the host wants to advertise to a sender, and each one is still put through `allow` before it is listed. Baton's four relationships are checked first, so a policy only ever widens.
+Cross-session messaging is off by default and is enabled by one host-supplied policy, passed as `messagingPolicy` in the Runtime layer options. `allow` receives both resolved directory entries plus the derived `relationship` and a `crossSession` flag, and returns whether that one direction is permitted; `discover` returns addresses the host wants to advertise to a sender, and each one is still put through `allow` before it is listed. TenetKit's four relationships are checked first, so a policy only ever widens.
 
 ```ts
 Runtime.layerSqlite({
@@ -36,7 +36,7 @@ Policy is directional: allowing A→B does not allow B→A. Both callbacks are E
 
 ## Durable mailbox
 
-`Runtime.sendMessage` takes `fromRunId`, not a sender Address: Baton resolves the sender from its Run record, so cell code cannot forge `from`. Admission is idempotent on `(target session, messageId, idempotencyKey)`; a replay returns the original receipt with `duplicate: true`, and the same identity carrying a different payload fails `MessageConflict`.
+`Runtime.sendMessage` takes `fromRunId`, not a sender Address: TenetKit resolves the sender from its Run record, so cell code cannot forge `from`. Admission is idempotent on `(target session, messageId, idempotencyKey)`; a replay returns the original receipt with `duplicate: true`, and the same identity carrying a different payload fails `MessageConflict`.
 
 Each target has one total order (`sequence`), which preserves per-sender FIFO within it. Bounds are enforced at admission so a sender learns immediately rather than discovering silent loss: `MailboxFull` for the pending-count and pending-byte limits, `MailboxRateLimited` for the per-window limit. Bounds are configured with `mailboxBounds`. A message to a terminal target fails `RunTerminal`.
 

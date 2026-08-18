@@ -2,15 +2,15 @@ import { code, command, definePage, h2, lead, link, p, table } from "../../prose
 
 export const foldkitReference = definePage({
   path: "/docs/reference/foldkit",
-  title: "@batonfx/foldkit",
+  title: "tenetkit/foldkit",
   navTitle: "foldkit",
   group: "Reference",
   description: "FoldKit connection and headless Chat projections over Runtime RunEvents.",
   content: [
     lead(
-      "@batonfx/foldkit adapts Runtime RunEvents and explicit commands to FoldKit's Elm architecture without owning run lifecycle state.",
+      "tenetkit/foldkit adapts Runtime RunEvents and explicit commands to FoldKit's Elm architecture without owning run lifecycle state.",
     ),
-    command("Install", "bun add foldkit@0.122.0 @batonfx/runtime @batonfx/transport @batonfx/foldkit"),
+    command("Install", "bun add foldkit@0.122.0 tenetkit/runtime tenetkit/transport tenetkit/foldkit"),
     p("Published on npm at 0.14.0. Depends on Runtime and transport; foldkit is a peer dependency."),
     h2("exports", "Exports"),
     table(
@@ -44,9 +44,9 @@ export const foldkitReference = definePage({
     ),
     p(
       "See ",
-      link("/docs/reference/runtime", "@batonfx/runtime"),
+      link("/docs/reference/runtime", "tenetkit/runtime"),
       " and ",
-      link("/docs/reference/transport", "@batonfx/transport"),
+      link("/docs/reference/transport", "tenetkit/transport"),
       ".",
     ),
   ],

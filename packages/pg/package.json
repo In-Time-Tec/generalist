@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "version": "0.27.7",
+  "private": false,
+  "type": "module",
+  "sideEffects": false,
+  "peerDependencies": {
+    "effect": "catalog:"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@tenetkit/pg",
+  "description": "PostgreSQL runtime driver for TenetKit",
+  "exports": {
+    ".": {
+      "types": "./dist/postgres/index.d.ts",
+      "import": "./dist/postgres/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
+    "typecheck": "bun tsc --noEmit",
+    "test": "bun --bun --cwd ../.. vitest run packages/pg/test --no-file-parallelism --maxWorkers=1"
+  },
+  "dependencies": {
+    "@effect/sql-pg": "catalog:",
+    "tenetkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "effect": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "directory": "packages/pg"
+  }
+}

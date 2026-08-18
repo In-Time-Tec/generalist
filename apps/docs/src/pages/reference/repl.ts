@@ -1,16 +1,16 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
 export const replReference = definePage({
   path: "/docs/reference/repl",
-  title: "@batonfx/repl",
+  title: "tenetkit/repl",
   navTitle: "repl",
   group: "Reference",
   description: "The one typescript cell tool, cell result and failure schemas, KernelProfile, and the kernel ports.",
   content: [
     lead(
-      "@batonfx/repl gives an agent one persistent TypeScript cell per Session. The root export is contracts only, so projections, decoders, and test hosts import it without any worker code; @batonfx/repl/bun carries the Bun kernel and is the only module with process dependencies.",
+      "tenetkit/repl gives an agent one persistent TypeScript cell per Session. The root export is contracts only, so projections, decoders, and test hosts import it without any worker code; tenetkit/repl/bun carries the Bun kernel and is the only module with process dependencies.",
     ),
-    command("Install", "bun add @batonfx/core @batonfx/repl"),
-    p("Requires ", code("@batonfx/core"), "."),
+    command("Install", "bun add tenetkit tenetkit/repl"),
+    p("Requires ", code("tenetkit"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -141,7 +141,7 @@ export const replReference = definePage({
     ),
     h2("state", "State is working memory"),
     p(
-      "Kernel variables are never durable authority. Baton operations, events, Session entries, and children remain the only truth; a restart reports exactly which bindings were restored and which were lost; and an uncertain cell is never replayed. ",
+      "Kernel variables are never durable authority. TenetKit operations, events, Session entries, and children remain the only truth; a restart reports exactly which bindings were restored and which were lost; and an uncertain cell is never replayed. ",
       code("KernelStateStore"),
       " snapshots are best effort, and their manifest names every restored and every dropped binding.",
     ),
@@ -151,7 +151,7 @@ export const replReference = definePage({
       " and ",
       code("TestKernel.layerMemoryStore"),
       " evaluate nothing but enforce the observable contract, so hosts and projections are tested without a worker process. See ",
-      link("/docs/reference/core-tools", "@batonfx/core tools"),
+      link("/docs/reference/core-tools", "tenetkit tools"),
       " for the executor and progress seams they compose with.",
     ),
   ],

@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Prompt, Session } from "@batonfx/core"
+import { Prompt, Session } from "tenetkit"
 
 const message = (entry: Prompt.Message): Session.AppendInput => ({ _tag: "Message", message: entry })
 

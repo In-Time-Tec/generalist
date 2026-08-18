@@ -11,7 +11,7 @@
 
 `ChildOrigin { operationKey, ordinal }` names the operation that ran the code and the host-assigned ordinal within it, so a presentation layer can group children under their originating cell in source order.
 
-Origin travels inside the invocation id — `child-admit:<toolCallId>:<operationKey>#<ordinal>:<key>`, with each segment percent-encoded — because `invocationId` is the one admission field Baton already carries into `ChildLinked` and every canonical child-tree event. Correlation therefore survives replay, restart, and reload with no event-schema change. `ChildAdmission.invocationIdFor` builds it, `admissionOf` reads the whole admission identity back, and `originOf` reads just the origin; an invocation id that carries no origin, or one Baton did not mint, reads back as `undefined`.
+Origin travels inside the invocation id — `child-admit:<toolCallId>:<operationKey>#<ordinal>:<key>`, with each segment percent-encoded — because `invocationId` is the one admission field TenetKit already carries into `ChildLinked` and every canonical child-tree event. Correlation therefore survives replay, restart, and reload with no event-schema change. `ChildAdmission.invocationIdFor` builds it, `admissionOf` reads the whole admission identity back, and `originOf` reads just the origin; an invocation id that carries no origin, or one TenetKit did not mint, reads back as `undefined`.
 
 The ordinal is derived from the parent's own durable children:
 

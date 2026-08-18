@@ -13,9 +13,9 @@ import {
   Tool,
   ToolExecutor,
   Toolkit,
-} from "@batonfx/core"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
-import { Sse, Ws } from "@batonfx/transport"
+} from "tenetkit"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { Sse, Ws } from "tenetkit/transport"
 
 const searchTool = Tool.make("web_search", {
   description: "Search the web",
@@ -102,7 +102,7 @@ const routesLayer = HttpRouter.use((router) =>
             return yield* Sse.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
-        Effect.catchTag("@batonfx/transport/InvalidCursor", errorResponse(400)),
+        Effect.catchTag("tenetkit/transport/InvalidCursor", errorResponse(400)),
       ),
     )
 

@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "tenetkit"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 

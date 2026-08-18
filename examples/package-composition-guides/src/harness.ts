@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime, Result } from "effect"
-import { Authorship, HarnessOverview, HarnessStore, Refinement } from "@batonfx/harness"
+import { Authorship, HarnessOverview, HarnessStore, Refinement } from "tenetkit/harness"
 
 const program = HarnessStore.HarnessStore.use((store) =>
   Effect.gen(function* () {

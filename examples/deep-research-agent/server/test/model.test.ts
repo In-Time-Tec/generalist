@@ -1,6 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Prompt } from "@batonfx/core"
+import { LanguageModel, Prompt } from "tenetkit"
 import { layerOrDeterministic } from "../src/model"
 import { testLayer } from "../src/search-provider"
 import { toolkit, toolkitLayer } from "../src/tools"
@@ -28,14 +28,14 @@ describe("DeepResearchAgent model", () => {
   layer(Layer.mergeAll(deterministicModel, toolkitServices))("streams tool calls and cited answers", (it) => {
     it.effect("streams a web_search tool call before any tool result exists", () =>
       Effect.gen(function* () {
-        const parts = yield* collectStreamText("What makes Baton standalone?")
+        const parts = yield* collectStreamText("What makes TenetKit standalone?")
 
         expect(parts).toMatchObject([
           {
             type: "tool-call",
             id: "search-1",
             name: "web_search",
-            params: { query: "What makes Baton standalone?" },
+            params: { query: "What makes TenetKit standalone?" },
             providerExecuted: false,
           },
           { type: "finish", reason: "tool-calls" },
@@ -65,7 +65,7 @@ describe("DeepResearchAgent model", () => {
         const parts = yield* collectStreamText([
           {
             role: "user",
-            content: [{ type: "text", text: "What makes Baton standalone?" }],
+            content: [{ type: "text", text: "What makes TenetKit standalone?" }],
           },
           {
             role: "tool",
@@ -78,13 +78,13 @@ describe("DeepResearchAgent model", () => {
                 result: {
                   results: [
                     {
-                      title: "Baton transport",
-                      url: "https://baton.test/transport",
-                      snippet: "Baton streams same-process sessions over transport frames.",
+                      title: "TenetKit transport",
+                      url: "https://tenetkit.test/transport",
+                      snippet: "TenetKit streams same-process sessions over transport frames.",
                     },
                     {
-                      title: "Baton agent loop",
-                      url: "https://baton.test/agent",
+                      title: "TenetKit agent loop",
+                      url: "https://tenetkit.test/agent",
                       snippet: "The agent loop plans, calls tools, and synthesizes answers.",
                     },
                   ],
@@ -99,8 +99,8 @@ describe("DeepResearchAgent model", () => {
         expect(parts[0]?.type).toBe("text-delta")
         if (parts[0]?.type === "text-delta") {
           expect(parts[0].delta).toContain("Based on 2 sources")
-          expect(parts[0].delta).toContain("Baton transport")
-          expect(parts[0].delta).toContain("https://baton.test/agent")
+          expect(parts[0].delta).toContain("TenetKit transport")
+          expect(parts[0].delta).toContain("https://tenetkit.test/agent")
         }
       }),
     )
@@ -110,7 +110,7 @@ describe("DeepResearchAgent model", () => {
         const parts = yield* collectStreamText([
           {
             role: "user",
-            content: [{ type: "text", text: "What makes Baton standalone?" }],
+            content: [{ type: "text", text: "What makes TenetKit standalone?" }],
           },
           {
             role: "tool",

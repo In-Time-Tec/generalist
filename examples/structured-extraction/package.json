@@ -1,5 +1,5 @@
 {
-  "name": "@batonfx/example-structured-extraction",
+  "name": "@tenetkit/example-structured-extraction",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "@batonfx/core": "workspace:*",
+    "tenetkit": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

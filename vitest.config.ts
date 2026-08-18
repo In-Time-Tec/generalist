@@ -1,6 +1,37 @@
+import { readFileSync } from "node:fs"
 import { availableParallelism } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
+
+const repositoryRoot = dirname(fileURLToPath(import.meta.url))
+const tenetkitRoot = join(repositoryRoot, "packages/tenetkit")
+
+/**
+ * `@tenetkit/pg` and `@tenetkit/mysql` import the published `tenetkit` entrypoints while the shared
+ * test helpers import `packages/tenetkit/src`. Left alone the suite loads two copies of every
+ * service and error class, so `instanceof` assertions fail against structurally identical values.
+ * The `exports` map is the only place that knows how a specifier maps onto a file, so the alias
+ * table is derived from it rather than restated.
+ */
+const tenetkitSourceAliases = Object.entries(
+  (
+    JSON.parse(readFileSync(join(tenetkitRoot, "package.json"), "utf8")) as {
+      readonly exports: Readonly<Record<string, { readonly import: string }>>
+    }
+  ).exports,
+)
+  .map(([specifier, target]) => {
+    const source = target.import.replace(/^\.\/dist\//, "src/").replace(/\.js$/, ".ts")
+    const pattern = `tenetkit${specifier === "." ? "" : specifier.slice(1)}`
+    return specifier.includes("*")
+      ? {
+          find: new RegExp(`^${pattern.replace("*", "(.*)")}$`),
+          replacement: join(tenetkitRoot, source.replace("*", "$1")),
+        }
+      : { find: new RegExp(`^${pattern}$`), replacement: join(tenetkitRoot, source) }
+  })
+  .toSorted((left, right) => Number(left.find.source.includes("(")) - Number(right.find.source.includes("(")))
 
 /**
  * Each worker runs real Bun kernel processes, so the useful ceiling is the machine's own
@@ -11,6 +42,14 @@ import { defineConfig } from "vitest/config"
 const workers = Math.max(2, Math.min(6, availableParallelism()))
 
 export default defineConfig({
+  resolve: {
+    /**
+     * `@tenetkit/pg` and `@tenetkit/mysql` import the published `tenetkit` entrypoints, while the
+     * shared test helpers import `packages/tenetkit/src`. Without this the suite loads two copies
+     * of every service and error class, and `instanceof` assertions fail against identical values.
+     */
+    alias: tenetkitSourceAliases,
+  },
   plugins: [
     {
       name: "workspace-at-alias",

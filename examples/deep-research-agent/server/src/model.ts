@@ -1,6 +1,6 @@
-import { OpenRouter } from "@batonfx/providers"
+import { OpenRouter } from "tenetkit/ai"
 import { Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, ModelRegistry, Prompt, Response } from "@batonfx/core"
+import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
 import { FetchHttpClient } from "effect/unstable/http"
 
 type StreamText = Parameters<typeof LanguageModel.make>[0]["streamText"]

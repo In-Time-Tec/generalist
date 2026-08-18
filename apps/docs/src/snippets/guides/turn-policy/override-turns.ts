@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { TurnPolicy } from "@batonfx/core"
+import { TurnPolicy } from "tenetkit"
 
 export const focusLateTurns: TurnPolicy.TurnPolicy = TurnPolicy.make((info) =>
   Effect.succeed(

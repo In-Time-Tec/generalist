@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@batonfx/docs",
+  "name": "@tenetkit/docs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,19 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@batonfx/a2a": "workspace:*",
-    "@batonfx/ag-ui": "workspace:*",
-    "@batonfx/core": "workspace:*",
-    "@batonfx/foldkit": "workspace:*",
-    "@batonfx/harness": "workspace:*",
-    "@batonfx/mcp": "workspace:*",
-    "@batonfx/memory": "workspace:*",
-    "@batonfx/providers": "workspace:*",
-    "@batonfx/repl": "workspace:*",
-    "@batonfx/runtime": "workspace:*",
-    "@batonfx/skills": "workspace:*",
-    "@batonfx/test": "workspace:*",
-    "@batonfx/transport": "workspace:*",
+    "tenetkit": "workspace:*",
     "@foldkit/ui": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",

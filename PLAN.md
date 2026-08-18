@@ -1,8 +1,8 @@
-# Baton And Rika Linear Durable History Plan
+# TenetKit And Rika Linear Durable History Plan
 
 ## Purpose
 
-Replace growing durable state copies with one canonical Session message log, small execution references, bounded semantic events, and incremental Rika views. Baton releases first. Rika then pins the published Baton release and publishes through its canonical workflow.
+Replace growing durable state copies with one canonical Session message log, small execution references, bounded semantic events, and incremental Rika views. TenetKit releases first. Rika then pins the published TenetKit release and publishes through its canonical workflow.
 
 This is a clean break. Do not preserve transcript-bearing Runtime events, transcript-bearing Runtime results, full-path operation outcomes, or full-view patch application.
 
@@ -10,7 +10,7 @@ This is a clean break. Do not preserve transcript-bearing Runtime events, transc
 
 ```text
 Rika prompt
-  -> Baton Run
+  -> TenetKit Run
   -> Session path loaded in memory
   -> provider receives the effective prompt
   -> new response stored once in Session
@@ -60,7 +60,7 @@ Direct `Agent.stream` and `Agent.generate` may return rich `Prompt` values. Runt
 
 ### Views are disposable
 
-Rika projection tables and interactive ThreadView state can be deleted and rebuilt from Baton events plus referenced Session entries. A patch validates its own revision and changed keys; it does not revalidate, copy, map, and sort the full view.
+Rika projection tables and interactive ThreadView state can be deleted and rebuilt from TenetKit events plus referenced Session entries. A patch validates its own revision and changed keys; it does not revalidate, copy, map, and sort the full view.
 
 ## Target Contracts
 
@@ -145,8 +145,8 @@ Rika
 
 ## Migration And Deletion
 
-- Bump every Runtime store schema version. Old compact-incompatible execution databases fail the existing checksum gate; Rika archives its rebuildable Baton database through the existing recovery path.
-- Keep Rika product Threads, Turns, and transcript projections. They rebuild when Baton execution state is replaced.
+- Bump every Runtime store schema version. Old compact-incompatible execution databases fail the existing checksum gate; Rika archives its rebuildable TenetKit database through the existing recovery path.
+- Keep Rika product Threads, Turns, and transcript projections. They rebuild when TenetKit execution state is replaced.
 - Delete `CompletedModelOperation.messages` from persisted results.
 - Delete full Session paths from `memory:sync` results.
 - Delete `Prompt.Prompt` from durable `TurnCompleted`.
@@ -162,8 +162,8 @@ Rika
 4. Replace transcript-bearing Runtime turn/terminal results with Session cursors; load recovery history from Session.
 5. Bound/externalize large tool outputs through the existing `ToolOutputStore` seam.
 6. Update SQLite, PostgreSQL, MySQL, and memory stores with identical atomic and idempotent behavior.
-7. Release Baton and verify packages, checksums, isolated Bun/npm installs, restart, child resume, failure settlement, and linear byte growth.
-8. Pin the published Baton train in Rika. Resolve response references in the Baton adapter.
+7. Release TenetKit and verify packages, checksums, isolated Bun/npm installs, restart, child resume, failure settlement, and linear byte growth.
+8. Pin the published TenetKit train in Rika. Resolve response references in the TenetKit adapter.
 9. Replace repeated `ThreadView.apply(snapshot, patch)` work with a private indexed accumulator that materializes a snapshot only at wire/render boundaries.
 10. Run the four-child forty-turn product proof, package native targets, verify isolated installation, and publish Rika.
 
@@ -176,7 +176,7 @@ Rika
 - Child recovery: reopen after two of four children settle; remaining children finish and parent resumes once in authored order.
 - Linear storage: fresh 1/5/10/20-turn runs satisfy `increment(20) <= 2.2 * increment(10)` for parsed operation, event, Session, and projection bytes after fixed baseline subtraction.
 - Payload shape: no durable lifecycle row contains a complete earlier transcript; maximum lifecycle row size does not grow with turn ordinal.
-- Rika cursor: terminal product state is published only after matching Baton terminal status and exact cursor.
+- Rika cursor: terminal product state is published only after matching TenetKit terminal status and exact cursor.
 - Incremental view: one-unit patch performs work proportional to changed turns/units, while snapshot/resync remains byte-equivalent.
 - Packaging: canonical checks, package smoke, local-tarball Rika integration, release smoke, checksums, and isolated installs pass from exact release commits.
 
@@ -186,7 +186,7 @@ Rika
 - Periodic database deletion or process restart: hides amplification and weakens audit/recovery.
 - Weakening mismatch or cursor guards: converts visible divergence into duplicate execution.
 - Sending only provider deltas as the general model protocol: most providers still require effective context, and transport caching is not durable state.
-- Another Rika batching layer: Baton would still pay the storage and encoding cost before batching.
+- Another Rika batching layer: TenetKit would still pay the storage and encoding cost before batching.
 
 # Prompt Cache Plan (provider cache_control breakpoints)
 
@@ -203,7 +203,7 @@ was ignored and the prefix landed in the 5m bucket), so automatic caching remain
 ## Problem
 
 Production telemetry (Rika, Aug 3-15): 30.9% aggregate input cache hit, 3.1% on Anthropic
-(37.5M uncached input tokens, cacheWrite median 0). Baton never placed `cache_control` breakpoints,
+(37.5M uncached input tokens, cacheWrite median 0). TenetKit never placed `cache_control` breakpoints,
 so Anthropic re-processed and re-billed the entire conversation on every model call.
 
 ## Ownership

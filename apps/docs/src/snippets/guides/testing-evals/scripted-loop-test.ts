@@ -1,6 +1,6 @@
 import { Console, Effect, Equal, Layer, Schema } from "effect"
-import { Agent, Tool, Toolkit } from "@batonfx/core"
-import { TestModel } from "@batonfx/test"
+import { Agent, Tool, Toolkit } from "tenetkit"
+import { TestModel } from "tenetkit/test"
 
 const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 

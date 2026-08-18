@@ -12,7 +12,7 @@ export const testingEvals = definePage({
     "Pin loop behavior with scripted models and layerTests, then gate CI on a deterministic eval, with no API keys anywhere.",
   content: [
     p(
-      "Every behavior-bearing seam in Baton is an Effect service with an in-memory ",
+      "Every behavior-bearing seam in TenetKit is an Effect service with an in-memory ",
       code("layerTest"),
       ", so a full tool-calling loop runs in CI with zero credentials (",
       link("/docs/learn/seams-as-services", "Seams as services"),
@@ -74,7 +74,7 @@ export const testingEvals = definePage({
       " pattern used for real providers. Swapping in OpenRouter later changes the selection and the layer, nothing else (",
       link("/docs/guides/providers", "How to register real model providers"),
       "). This is ",
-      link("https://github.com/In-Time-Tec/batonfx/tree/main/examples/eval-in-ci", "examples/eval-in-ci"),
+      link("https://github.com/In-Time-Tec/tenetkit/tree/main/examples/eval-in-ci", "examples/eval-in-ci"),
       " verbatim.",
     ),
     codeBlock({ label: "eval.ts", source: evalInCi, expectedOutput: evalInCiExpected }),

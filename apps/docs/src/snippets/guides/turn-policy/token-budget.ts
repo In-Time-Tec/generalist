@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { Agent, Prompt, TurnPolicy } from "@batonfx/core"
+import { Agent, Prompt, TurnPolicy } from "tenetkit"
 
 const approximateTokens = (history: Prompt.Prompt): number => Math.ceil(JSON.stringify(history.content).length / 4)
 

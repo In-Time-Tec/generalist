@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Steering } from "@batonfx/core"
+import { Steering } from "tenetkit"
 
 const program = Effect.gen(function* () {
   const steering = yield* Steering.Steering

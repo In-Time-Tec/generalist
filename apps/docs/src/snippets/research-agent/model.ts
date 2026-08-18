@@ -1,6 +1,6 @@
-import { OpenRouter } from "@batonfx/providers"
+import { OpenRouter } from "tenetkit/ai"
 import { Config, Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, ModelRegistry, Prompt, Response } from "@batonfx/core"
+import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
 import { FetchHttpClient } from "effect/unstable/http"
 
 interface WebSearchSuccess {

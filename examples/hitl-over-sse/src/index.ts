@@ -12,9 +12,9 @@ import {
   Tool,
   ToolExecutor,
   Toolkit,
-} from "@batonfx/core"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
-import { Sse } from "@batonfx/transport"
+} from "tenetkit"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { Sse } from "tenetkit/transport"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 

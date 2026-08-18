@@ -1,3 +1,3 @@
-mkdir baton-quickstart && cd baton-quickstart
+mkdir tenetkit-quickstart && cd tenetkit-quickstart
 bun init -y
-bun add @batonfx/core @batonfx/providers
+bun add tenetkit tenetkit/ai

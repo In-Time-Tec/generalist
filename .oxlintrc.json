@@ -116,7 +116,7 @@
   },
   "overrides": [
     {
-      "files": ["packages/repl/src/repl/bun-worker.ts", "packages/repl/src/repl/bun-session.ts"],
+      "files": ["packages/tenetkit/src/repl/repl/bun-worker.ts", "packages/tenetkit/src/repl/repl/bun-session.ts"],
       "rules": {
         "effecttsgo/async-function": "off",
         "effecttsgo/global-timers": "off",

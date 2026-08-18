@@ -1,16 +1,16 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
 export const skillsReference = definePage({
   path: "/docs/reference/skills",
-  title: "@batonfx/skills",
+  title: "tenetkit/skills",
   navTitle: "skills",
   group: "Reference",
   description: "Filesystem and manifest-backed HTTP, S3, and GitHub SKILL.md sources plus AGENTS.md/CLAUDE.md loading.",
   content: [
     lead(
-      "@batonfx/skills implements the core SkillSource seam through filesystem and manifest-backed HTTP, S3, and GitHub adapters. InstructionFiles loads AGENTS.md/CLAUDE.md instruction files.",
+      "tenetkit/skills implements the core SkillSource seam through filesystem and manifest-backed HTTP, S3, and GitHub adapters. InstructionFiles loads AGENTS.md/CLAUDE.md instruction files.",
     ),
-    command("Install", "bun add @batonfx/core @batonfx/skills"),
-    p("Published on npm at 0.14.0. Requires ", code("@batonfx/core"), "."),
+    command("Install", "bun add tenetkit tenetkit/skills"),
+    p("Published on npm at 0.14.0. Requires ", code("tenetkit"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -91,7 +91,7 @@ export const skillsReference = definePage({
     table(
       ["Provider", "Contract"],
       [
-        [[code("HttpCatalog")], "Same-origin paths relative to one versioned Baton manifest URL"],
+        [[code("HttpCatalog")], "Same-origin paths relative to one versioned TenetKit manifest URL"],
         [[code("S3Catalog")], "Virtual-hosted HTTPS manifest object; caller HttpClient owns signing"],
         [[code("GitHubCatalog")], "GitHub Contents API raw reads pinned to a 40/64-hex commit id"],
       ],
@@ -101,7 +101,7 @@ export const skillsReference = definePage({
       code("skillPath"),
       ", and the lowercase SHA-256 of the full ",
       code("SKILL.md"),
-      ". Metadata loads at source construction; bodies stay lazy and are verified on activation. The manifest is a Baton adapter contract, not part of the Agent Skills standard.",
+      ". Metadata loads at source construction; bodies stay lazy and are verified on activation. The manifest is a TenetKit adapter contract, not part of the Agent Skills standard.",
     ),
     h2("skill-md", "The SKILL.md contract"),
     p(

@@ -1,3 +1,3 @@
 mkdir research-agent && cd research-agent
 bun init -y
-bun add @batonfx/core @batonfx/providers @batonfx/transport @effect/platform-bun
+bun add tenetkit tenetkit/ai tenetkit/transport @effect/platform-bun

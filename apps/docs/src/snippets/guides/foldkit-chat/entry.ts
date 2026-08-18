@@ -1,4 +1,4 @@
-import { Connection } from "@batonfx/foldkit"
+import { Connection } from "tenetkit/foldkit"
 import { Layer } from "effect"
 import { Socket } from "effect/unstable/socket"
 import { makeApplication, run } from "foldkit/runtime"

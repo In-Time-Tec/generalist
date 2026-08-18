@@ -1,4 +1,4 @@
-# Baton, Rika, And Relay Execution Waves
+# TenetKit, Rika, And Relay Execution Waves
 
 ## Authority
 
@@ -18,18 +18,18 @@
 
 ## Execution Status
 
-| Wave | State    | Evidence                                                                                                                                                                                                     |
-| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0    | Complete | All six reports returned. The missing-root-row diagnosis was false. Rika truncated replay on a descendant terminal event. Baton now provides page-draining `RunTree.watch`; all ten Rika adapter tests pass. |
-| 1    | Complete | Cancellation admission, shutdown recovery, tree watching, response races, scheduler fairness, and resolution projection are closed.                                                                          |
-| 2    | Complete | Exact Rika Program admission, QuickJS capability isolation, registration and credential payload proofs, restart, and cancellation pass.                                                                      |
-| 3    | Complete | Production review admission uses atomic root `initialFanOuts`: correctness, security, and quality; concurrency 3; `AllSettled`; `await`; no Rika ledger. Projection closure passes.                          |
-| 4    | Complete | Central boundaries are typed, Server composition passes, unreachable cross-Thread coordination is deleted, and policy and graph checks pass.                                                                 |
-| 5-7  | Complete | Baton local gates, publication workflow `31014573121`, 13 public assets, and all 11 npm packages at `0.15.0` are verified.                                                                                   |
-| 8    | Complete | Rika pins published Baton `0.15.0`; frozen install, 20 canonical check tasks, 1,787 unit tests, the process gate, and 19 bounded TUI tests pass.                                                             |
-| 9    | Complete | Darwin local packaging and 22 release contract tests pass. Publish workflow `31031284335` packages and smokes all three native targets.                                                                      |
-| 10   | Complete | Rika `0.2.0` is public with five verified assets and four npm packages. A clean registry install reports `rika v0.2.0`.                                                                                      |
-| 11   | Complete | PR `384` merged archive commit `5b1a1868`; the temporary branch is deleted, zero pull requests remain open, and `In-Time-Tec/relayfx` reports `isArchived: true`.                                            |
+| Wave | State    | Evidence                                                                                                                                                                                                        |
+| ---- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Complete | All six reports returned. The missing-root-row diagnosis was false. Rika truncated replay on a descendant terminal event. TenetKit now provides page-draining `RunTree.watch`; all ten Rika adapter tests pass. |
+| 1    | Complete | Cancellation admission, shutdown recovery, tree watching, response races, scheduler fairness, and resolution projection are closed.                                                                             |
+| 2    | Complete | Exact Rika Program admission, QuickJS capability isolation, registration and credential payload proofs, restart, and cancellation pass.                                                                         |
+| 3    | Complete | Production review admission uses atomic root `initialFanOuts`: correctness, security, and quality; concurrency 3; `AllSettled`; `await`; no Rika ledger. Projection closure passes.                             |
+| 4    | Complete | Central boundaries are typed, Server composition passes, unreachable cross-Thread coordination is deleted, and policy and graph checks pass.                                                                    |
+| 5-7  | Complete | TenetKit local gates, publication workflow `31014573121`, 13 public assets, and all 11 npm packages at `0.15.0` are verified.                                                                                   |
+| 8    | Complete | Rika pins published TenetKit `0.15.0`; frozen install, 20 canonical check tasks, 1,787 unit tests, the process gate, and 19 bounded TUI tests pass.                                                             |
+| 9    | Complete | Darwin local packaging and 22 release contract tests pass. Publish workflow `31031284335` packages and smokes all three native targets.                                                                         |
+| 10   | Complete | Rika `0.2.0` is public with five verified assets and four npm packages. A clean registry install reports `rika v0.2.0`.                                                                                         |
+| 11   | Complete | PR `384` merged archive commit `5b1a1868`; the temporary branch is deleted, zero pull requests remain open, and `In-Time-Tec/relayfx` reports `isArchived: true`.                                               |
 
 Wave 0F confirmed these additional release gaps:
 
@@ -43,14 +43,14 @@ Wave 0F confirmed these additional release gaps:
 
 Subagents: six read-only agents.
 
-| Agent | Type      | Assignment                                             | Required output                                                        |
-| ----- | --------- | ------------------------------------------------------ | ---------------------------------------------------------------------- |
-| 0A    | `explore` | Trace root cancellation from Rika through Baton SQLite | Exact call path, database operations, likely owner, and relevant tests |
-| 0B    | `oracle`  | Independently analyze the missing root Run claim       | Ranked hypotheses and the smallest correct fix                         |
-| 0C    | `explore` | Map QuickJS Program admission and recovery             | Files, interfaces, missing registrations, and test seams               |
-| 0D    | `explore` | Map review fan-out and root-tree projection            | Production gaps, obsolete paths, and file ownership                    |
-| 0E    | `explore` | Reproduce Server Layer and central `any` debt          | Exact type errors grouped by owning boundary                           |
-| 0F    | `explore` | Audit both repositories against `PLAN.md`              | Deletion list, evidence gaps, and release-gate commands                |
+| Agent | Type      | Assignment                                                | Required output                                                        |
+| ----- | --------- | --------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 0A    | `explore` | Trace root cancellation from Rika through TenetKit SQLite | Exact call path, database operations, likely owner, and relevant tests |
+| 0B    | `oracle`  | Independently analyze the missing root Run claim          | Ranked hypotheses and the smallest correct fix                         |
+| 0C    | `explore` | Map QuickJS Program admission and recovery                | Files, interfaces, missing registrations, and test seams               |
+| 0D    | `explore` | Map review fan-out and root-tree projection               | Production gaps, obsolete paths, and file ownership                    |
+| 0E    | `explore` | Reproduce Server Layer and central `any` debt             | Exact type errors grouped by owning boundary                           |
+| 0F    | `explore` | Audit both repositories against `PLAN.md`                 | Deletion list, evidence gaps, and release-gate commands                |
 
 Main-session work:
 
@@ -66,16 +66,16 @@ Exit:
 - No two editing agents will modify the same file.
 - Root cancellation has a ranked, testable diagnosis.
 
-## Wave 1: Baton Cancellation Closure
+## Wave 1: TenetKit Cancellation Closure
 
 Subagents: four.
 
-| Agent | Type             | Assignment                                                 | File ownership                                                                 |
-| ----- | ---------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| 1A    | `sol`            | Fix root and child cancellation settlement                 | Baton cancellation, scheduler, active-execution, and settlement implementation |
-| 1B    | `executor-terra` | Add PostgreSQL active model and tool cancellation evidence | PostgreSQL runtime tests only                                                  |
-| 1C    | `executor-terra` | Add MySQL active model and tool cancellation evidence      | MySQL runtime tests only                                                       |
-| 1D    | `oracle`         | Review the cancellation invariant and race behavior        | Read-only                                                                      |
+| Agent | Type             | Assignment                                                 | File ownership                                                                    |
+| ----- | ---------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 1A    | `sol`            | Fix root and child cancellation settlement                 | TenetKit cancellation, scheduler, active-execution, and settlement implementation |
+| 1B    | `executor-terra` | Add PostgreSQL active model and tool cancellation evidence | PostgreSQL runtime tests only                                                     |
+| 1C    | `executor-terra` | Add MySQL active model and tool cancellation evidence      | MySQL runtime tests only                                                          |
+| 1D    | `oracle`         | Review the cancellation invariant and race behavior        | Read-only                                                                         |
 
 Agent 1A must prove:
 
@@ -99,7 +99,7 @@ Main-session work:
 
 - Review all changes against the cancellation contract.
 - Add the Rika source-aliased root cancellation regression if needed.
-- Run Baton runtime tests.
+- Run TenetKit runtime tests.
 - Run the complete Rika `baton-execution` suite.
 - Run fresh PostgreSQL and MySQL suites.
 - Commit the coherent cancellation change after all focused tests pass.
@@ -107,7 +107,7 @@ Main-session work:
 Exit:
 
 - All ten Rika `baton-execution` tests pass.
-- Baton main, PostgreSQL, and MySQL cancellation tests pass.
+- TenetKit main, PostgreSQL, and MySQL cancellation tests pass.
 - The `PLAN.md` cancellation acceptance is closed.
 
 ## Wave 2: Durable Program And QuickJS
@@ -124,10 +124,10 @@ Subagents: six.
 | Agent | Type             | Assignment                                              | File ownership                                    |
 | ----- | ---------------- | ------------------------------------------------------- | ------------------------------------------------- |
 | 2A    | `opus-5`         | Implement exact Rika Program construction and admission | Rika Program executable and configuration modules |
-| 2B    | `deepseek-flash` | Connect QuickJS to Baton `SandboxExecutor`              | QuickJS sandbox package and composition files     |
+| 2B    | `deepseek-flash` | Connect QuickJS to TenetKit `SandboxExecutor`           | QuickJS sandbox package and composition files     |
 | 2C    | `executor-terra` | Implement persisted Program registration codecs         | Registration codec modules and codec tests        |
 | 2D    | `executor-terra` | Add Rika Program admission and restart tests            | Rika Program tests only                           |
-| 2E    | `sol`            | Extend cross-store Program evidence where missing       | Baton Program tests only                          |
+| 2E    | `sol`            | Extend cross-store Program evidence where missing       | TenetKit Program tests only                       |
 | 2F    | `oracle`         | Review Program security and durability                  | Read-only                                         |
 
 Required implementation and proof:
@@ -178,7 +178,7 @@ Required implementation and proof:
 - Use immutable review lanes, stable member keys, explicit concurrency, a join mode, and a remainder policy.
 - Use parent-relative child selections and restart-safe admission.
 - Keep no Rika-owned fan-out ledger.
-- Keep one opaque Baton tree cursor.
+- Keep one opaque TenetKit tree cursor.
 - Preserve explicit root, parent, invocation, call, and attempt identities.
 - Retain root completion after nested traversal.
 - Project child-attributed cancellation, Program logs, and unknown operations.
@@ -187,14 +187,14 @@ Required implementation and proof:
 
 Main-session work:
 
-- Resolve overlap in the Baton execution adapter.
+- Resolve overlap in the TenetKit execution adapter.
 - Run focused review and projection suites.
 - Run the complete Rika execution suite.
 - Commit review and projection as separate units when boundaries permit.
 
 Exit:
 
-- Reviews use real Baton fan-out.
+- Reviews use real TenetKit fan-out.
 - Projection-only tests are not the sole evidence.
 - Root-tree streaming satisfies release acceptance.
 
@@ -221,12 +221,12 @@ Required implementation and deletion:
 
 - Build product repositories before product operations.
 - Give product operations only `ExecutionGateway.Service`.
-- Keep parsing and queries from initializing Baton.
+- Keep parsing and queries from initializing TenetKit.
 - Gate start, cancellation, and steering during Server replacement.
 - Keep watch and inspection available during replacement.
 - Resolve workspace capabilities from admitted metadata.
 - Remove central `any` and unsafe schema-bypassing casts.
-- Remove the debug child-request test, predefined workflows, Relay imports, broad Runtime mirrors, duplicate protocols, Rika recovery authority, stop intent, recursive child following, direct Baton table access, production fallbacks, Resident aliases, hardcoded paths, and unreachable cross-Thread coordination.
+- Remove the debug child-request test, predefined workflows, Relay imports, broad Runtime mirrors, duplicate protocols, Rika recovery authority, stop intent, recursive child following, direct TenetKit table access, production fallbacks, Resident aliases, hardcoded paths, and unreachable cross-Thread coordination.
 
 Main-session work:
 
@@ -247,14 +247,14 @@ Subagents: four read-only agents.
 
 | Agent | Type        | Assignment                                                     |
 | ----- | ----------- | -------------------------------------------------------------- |
-| 5A    | `general`   | Audit Baton behavior against `PLAN.md`                         |
+| 5A    | `general`   | Audit TenetKit behavior against `PLAN.md`                      |
 | 5B    | `general`   | Audit Rika behavior against `PLAN.md`                          |
 | 5C    | `librarian` | Verify package and framework claims against installed versions |
 | 5D    | `oracle`    | Perform the final architecture and durability review           |
 
 Main-session work:
 
-- Correct stale Baton and Rika documentation.
+- Correct stale TenetKit and Rika documentation.
 - Update `CONTEXT.md`, package docs, and `PLAN.md` from executable evidence.
 - Search for obsolete Relay, workflow, Resident, fallback, local-link, and table-access vocabulary.
 - Reject documentation claims without executable proof.
@@ -265,7 +265,7 @@ Exit:
 - The acceptance checklist matches tests and source.
 - No obsolete vocabulary remains.
 
-## Wave 6: Baton Release Gates
+## Wave 6: TenetKit Release Gates
 
 Subagents: six verification agents.
 
@@ -274,7 +274,7 @@ Subagents: six verification agents.
 | 6A    | `executor-terra` | Run `bun run check` and the full deterministic suite           |
 | 6B    | `executor-terra` | Run fresh PostgreSQL contracts and crash takeover tests        |
 | 6C    | `executor-terra` | Run fresh MySQL contracts and restart tests                    |
-| 6D    | `executor-terra` | Build and pack every Baton package                             |
+| 6D    | `executor-terra` | Build and pack every TenetKit package                          |
 | 6E    | `executor-terra` | Test packed declarations and exports under Node and Bun        |
 | 6F    | `general`        | Audit tarballs, checksums, exports, docs, and package metadata |
 
@@ -290,15 +290,15 @@ Main-session work:
 - Review the complete evidence matrix.
 - Verify the 500-line source limit.
 - Verify no diagnostic or release artifact is included.
-- Create final Baton commits and push the release branch.
+- Create final TenetKit commits and push the release branch.
 
 Exit:
 
-- Every Baton release criterion passes.
-- The Baton worktree contains only intended changes.
-- Baton `0.15.0` is ready for publication.
+- Every TenetKit release criterion passes.
+- The TenetKit worktree contains only intended changes.
+- TenetKit `0.15.0` is ready for publication.
 
-## Wave 7: Baton Publication
+## Wave 7: TenetKit Publication
 
 Subagents: three after workflow dispatch.
 
@@ -327,7 +327,7 @@ Subagents: five.
 
 | Agent | Type             | Assignment                                                     |
 | ----- | ---------------- | -------------------------------------------------------------- |
-| 8A    | `executor-terra` | Pin published Baton packages and remove source aliases         |
+| 8A    | `executor-terra` | Pin published TenetKit packages and remove source aliases      |
 | 8B    | `executor-terra` | Run normal Rika typecheck, lint, and unit tests                |
 | 8C    | `executor-terra` | Run process, Server replacement, and recovery suites           |
 | 8D    | `executor-terra` | Run TUI and deterministic provider suites                      |
@@ -338,12 +338,12 @@ Main-session work:
 - Integrate the dependency pin first.
 - Remove `vitest.baton-source.config.ts`.
 - Regenerate lockfiles through canonical package commands.
-- Verify all tests use published Baton.
+- Verify all tests use published TenetKit.
 - Fix version-sensitive defects without compatibility code.
 
 Exit:
 
-- Rika uses published Baton `0.15.0` only.
+- Rika uses published TenetKit `0.15.0` only.
 - Normal checks pass without source aliases.
 - No local link or Relay dependency remains.
 
@@ -388,7 +388,7 @@ Main-session work:
 
 - Publish through the canonical GitHub workflow.
 - Verify public version `0.2.0`.
-- Test a clean installation against published Baton.
+- Test a clean installation against published TenetKit.
 - Record final release evidence.
 
 Exit:
@@ -422,19 +422,19 @@ Exit:
 
 ## Concurrency Summary
 
-| Wave | Subagents | Purpose                        |
-| ---- | --------: | ------------------------------ |
-| 0    |         6 | Diagnosis and ownership        |
-| 1    |         4 | Cancellation closure           |
-| 2    |         6 | Program and QuickJS            |
-| 3    |         5 | Review and projection          |
-| 4    |         6 | Server, typing, and deletion   |
-| 5    |         4 | Documentation audit            |
-| 6    |         6 | Baton release gates            |
-| 7    |         3 | Baton publication verification |
-| 8    |         5 | Published Baton integration    |
-| 9    |         6 | Rika packaging and smoke       |
-| 10   |         3 | Rika publication verification  |
-| 11   |         3 | Relay archive                  |
+| Wave | Subagents | Purpose                           |
+| ---- | --------: | --------------------------------- |
+| 0    |         6 | Diagnosis and ownership           |
+| 1    |         4 | Cancellation closure              |
+| 2    |         6 | Program and QuickJS               |
+| 3    |         5 | Review and projection             |
+| 4    |         6 | Server, typing, and deletion      |
+| 5    |         4 | Documentation audit               |
+| 6    |         6 | TenetKit release gates            |
+| 7    |         3 | TenetKit publication verification |
+| 8    |         5 | Published TenetKit integration    |
+| 9    |         6 | Rika packaging and smoke          |
+| 10   |         3 | Rika publication verification     |
+| 11   |         3 | Relay archive                     |
 
-The schedule contains 54 bounded subagent assignments. The critical path is root cancellation, Program and review integration, Baton release, Rika release, and Relay archive.
+The schedule contains 54 bounded subagent assignments. The critical path is root cancellation, Program and review integration, TenetKit release, Rika release, and Relay archive.

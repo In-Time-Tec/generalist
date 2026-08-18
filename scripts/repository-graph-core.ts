@@ -31,7 +31,7 @@ type Graph = {
 }
 
 class RepositoryGraphFailed extends Schema.TaggedErrorClass<RepositoryGraphFailed>()(
-  "@batonfx/scripts/RepositoryGraphFailed",
+  "@tenetkit/scripts/RepositoryGraphFailed",
   { message: Schema.String },
 ) {}
 
@@ -128,7 +128,10 @@ const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem
     const publicSpecifier = (specifier: string, packageNode: PackageNode): boolean => {
       const suffix = specifier.slice(packageNode.name.length)
       const subpath = suffix.length === 0 ? "." : `.${suffix}`
-      return packageNode.exports.includes(subpath)
+      return (
+        packageNode.exports.includes(subpath) ||
+        packageNode.exports.some((entry) => entry.endsWith("/*") && subpath.startsWith(entry.slice(0, -1)))
+      )
     }
 
     const importNodes: Array<ImportNode> = []

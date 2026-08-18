@@ -1,1 +1,1 @@
-Summary ready: Baton runs agent loops on Effect.
+Summary ready: TenetKit runs agent loops on Effect.

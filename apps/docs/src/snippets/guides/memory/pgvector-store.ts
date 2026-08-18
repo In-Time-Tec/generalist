@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect"
-import { VectorStore } from "@batonfx/memory"
+import { VectorStore } from "tenetkit/memory"
 
 interface PgClientInterface {
   readonly run: (
@@ -9,7 +9,7 @@ interface PgClientInterface {
 }
 
 class PgClient extends Context.Service<PgClient, PgClientInterface>()(
-  "@batonfx/docs/snippets/guides/memory/pgvector-store/PgClient",
+  "@tenetkit/docs/snippets/guides/memory/pgvector-store/PgClient",
 ) {}
 
 const storeError = (error: Error) => VectorStore.VectorStoreError.make({ message: error.message })

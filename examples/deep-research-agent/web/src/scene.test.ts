@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { Chat } from "@batonfx/foldkit"
+import { Chat } from "tenetkit/foldkit"
 import { Option } from "effect"
 import { Scene } from "foldkit"
 import { describe, expect, test } from "vitest"
@@ -49,7 +49,7 @@ describe("deep-research-agent web view", () => {
       Scene.expect(Scene.text("Ask a research question")).toExist(),
       Scene.expect(Scene.placeholder("Ask a research question…")).toExist(),
       Scene.expect(Scene.role("button", { name: "Submit" })).toBeDisabled(),
-      Scene.type(Scene.placeholder("Ask a research question…"), "baton agents"),
+      Scene.type(Scene.placeholder("Ask a research question…"), "tenetkit agents"),
       Scene.expect(Scene.role("button", { name: "Submit" })).toBeEnabled(),
     )
   })
@@ -63,11 +63,11 @@ describe("deep-research-agent web view", () => {
           ...baseModel().chat,
           run: Chat.Running({ turn: 0 }),
           entries: [
-            Chat.UserEntry({ text: "What makes Baton standalone?" }),
+            Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
             Chat.ToolEntry({
               callId: "search-1",
               name: "web_search",
-              params: { query: "baton standalone" },
+              params: { query: "tenetkit standalone" },
               phase: "executing",
               outcome: { _tag: "Pending" },
               progress: [],
@@ -82,7 +82,7 @@ describe("deep-research-agent web view", () => {
       Scene.expect(Scene.text("Running")).toExist(),
       Scene.expect(Scene.text("Parameters")).toExist(),
       Scene.tap(({ html }) => {
-        expect(renderedText(html)).toContain('"query": "baton standalone"')
+        expect(renderedText(html)).toContain('"query": "tenetkit standalone"')
       }),
       Scene.expect(Scene.text("Thinking…")).toExist(),
     )
@@ -96,7 +96,7 @@ describe("deep-research-agent web view", () => {
         chat: {
           ...baseModel().chat,
           run: Chat.Running({ turn: 0 }),
-          entries: [Chat.UserEntry({ text: "What makes Baton standalone?" })],
+          entries: [Chat.UserEntry({ text: "What makes TenetKit standalone?" })],
         },
       }),
       resolveScrollerMounts,
@@ -119,11 +119,11 @@ describe("deep-research-agent web view", () => {
           ...baseModel().chat,
           run: Chat.Idle(),
           entries: [
-            Chat.UserEntry({ text: "What makes Baton standalone?" }),
+            Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
             Chat.ToolEntry({
               callId: "search-1",
               name: "web_search",
-              params: { query: "baton standalone" },
+              params: { query: "tenetkit standalone" },
               phase: "executing",
               outcome: {
                 _tag: "Completed",
@@ -131,9 +131,9 @@ describe("deep-research-agent web view", () => {
                 result: {
                   results: [
                     {
-                      title: "Baton docs",
-                      url: "https://baton.test/docs",
-                      snippet: "Baton streams transport frames.",
+                      title: "TenetKit docs",
+                      url: "https://tenetkit.test/docs",
+                      snippet: "TenetKit streams transport frames.",
                     },
                     {
                       title: "Effect runtime",
@@ -145,7 +145,7 @@ describe("deep-research-agent web view", () => {
               },
               progress: [],
             }),
-            Chat.AssistantEntry({ text: "Final cited answer\n\nSources:\n[1] Baton docs", reasoning: null }),
+            Chat.AssistantEntry({ text: "Final cited answer\n\nSources:\n[1] TenetKit docs", reasoning: null }),
           ],
         },
         expandedToolCallIds: ["search-1-sources"],
@@ -155,10 +155,10 @@ describe("deep-research-agent web view", () => {
       Scene.tap(({ html }) => {
         expect(renderedText(html)).toContain("Final cited answer")
       }),
-      Scene.expect(Scene.role("link", { name: "[1] Baton docs" })).toExist(),
+      Scene.expect(Scene.role("link", { name: "[1] TenetKit docs" })).toExist(),
       Scene.expect(Scene.role("link", { name: "[2] Effect runtime" })).toExist(),
       Scene.expect(Scene.text("Used 2 sources")).toExist(),
-      Scene.expect(Scene.role("link", { name: /Baton docs/ })).toExist(),
+      Scene.expect(Scene.role("link", { name: /TenetKit docs/ })).toExist(),
       Scene.expect(Scene.role("link", { name: /Effect runtime/ })).toExist(),
     )
   })
@@ -172,9 +172,9 @@ describe("deep-research-agent web view", () => {
           ...baseModel().chat,
           run: Chat.Idle(),
           entries: [
-            Chat.UserEntry({ text: "What makes Baton standalone?" }),
+            Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
             Chat.AssistantEntry({
-              text: "Baton runs a non-durable Effect agent loop.",
+              text: "TenetKit runs a non-durable Effect agent loop.",
               reasoning: "Compare transport frames. Check the loop state.",
             }),
           ],
@@ -200,13 +200,13 @@ describe("deep-research-agent web view", () => {
             Chat.ToolEntry({
               callId: "search-1",
               name: "web_search",
-              params: { query: "baton standalone" },
+              params: { query: "tenetkit standalone" },
               phase: "executing",
               outcome: {
                 _tag: "Completed",
                 isFailure: false,
                 result: {
-                  results: [{ title: "Baton docs", url: "https://baton.test/docs", snippet: "x".repeat(400) }],
+                  results: [{ title: "TenetKit docs", url: "https://tenetkit.test/docs", snippet: "x".repeat(400) }],
                 },
               },
               progress: [],

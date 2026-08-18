@@ -1,5 +1,5 @@
 {
-  "name": "@batonfx/example-multi-agent",
+  "name": "@tenetkit/example-multi-agent",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "@batonfx/core": "workspace:*",
+    "tenetkit": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

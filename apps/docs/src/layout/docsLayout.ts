@@ -105,7 +105,7 @@ const sidebar = (path: string, openSidebarGroups: Model["openSidebarGroups"]): H
 const breadcrumbs = (title: string): Html =>
   breadcrumb({}, [
     breadcrumbList({}, [
-      breadcrumbItem({}, [breadcrumbLink({ href: "/" }, ["Batonfx"])]),
+      breadcrumbItem({}, [breadcrumbLink({ href: "/" }, ["TenetKit"])]),
       breadcrumbSeparator({}),
       breadcrumbItem({}, [breadcrumbLink({ href: defaultDocsPath }, ["Docs"])]),
       breadcrumbSeparator({}),

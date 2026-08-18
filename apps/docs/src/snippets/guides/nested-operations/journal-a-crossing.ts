@@ -1,12 +1,12 @@
 import { Effect, Schema } from "effect"
-import { NestedOperation, ToolContext, ToolExecutor } from "@batonfx/core"
+import { NestedOperation, ToolContext, ToolExecutor } from "tenetkit"
 
 interface Written {
   readonly path: string
   readonly patch: string
 }
 
-class WriteFailed extends Schema.TaggedErrorClass<WriteFailed>()("@batonfx/docs/WriteFailed", {
+class WriteFailed extends Schema.TaggedErrorClass<WriteFailed>()("@tenetkit/docs/WriteFailed", {
   path: Schema.String,
 }) {}
 
@@ -60,7 +60,7 @@ export const route: ToolExecutor.Route<InExecution> = ToolExecutor.route<InExecu
             encodedResult: { path: written.path, patch: written.patch },
           }),
         ),
-        Effect.catchTag("@batonfx/docs/WriteFailed", (failure) =>
+        Effect.catchTag("@tenetkit/docs/WriteFailed", (failure) =>
           Effect.succeed<ToolExecutor.Outcome>({
             _tag: "DomainFailure",
             failure,
@@ -70,10 +70,10 @@ export const route: ToolExecutor.Route<InExecution> = ToolExecutor.route<InExecu
         // Divergence, an unobserved outcome, and a denial are decisions the model should read, so
         // they come back as schema-valid failed tool results rather than failing the run.
         Effect.catchTags({
-          "@batonfx/core/NestedOperationDenied": (failure) => returned(failure._tag, failure.reason),
-          "@batonfx/core/NestedOperationDivergence": (failure) =>
+          "tenetkit/core/NestedOperationDenied": (failure) => returned(failure._tag, failure.reason),
+          "tenetkit/core/NestedOperationDivergence": (failure) =>
             returned(failure._tag, `recorded ${failure.recordedKind}, requested ${failure.requestedKind}`),
-          "@batonfx/core/NestedOperationUnknown": (failure) => returned(failure._tag, failure.operationId),
+          "tenetkit/core/NestedOperationUnknown": (failure) => returned(failure._tag, failure.operationId),
         }),
       ),
     ),
