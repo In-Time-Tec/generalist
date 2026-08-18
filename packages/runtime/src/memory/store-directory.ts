@@ -267,10 +267,16 @@ export const admitChildSettlement: {
         key: notificationId,
       })
       if (state.messages.has(key)) return state
+      const joined = [...state.fanOuts.values()].some(
+        (fanOut) =>
+          fanOut.parentRunId === input.parent.runId &&
+          fanOut.members.some((member) => member.childRunId === input.child.runId),
+      )
       const payload = payloadFromEvent({
         parentRunId: input.parent.runId,
         childRunId: input.child.runId,
         event: input.event,
+        ...(joined ? { joined: true } : {}),
       })
       if (payload === undefined) return state
       const forSession = [...state.messages.values()].filter(
