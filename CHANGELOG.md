@@ -4,6 +4,10 @@
 
 - Scale the test suite to the machine's own parallelism instead of the two workers a kernel scope-close hang once forced, and drop the two-minute cleanup ceilings that tolerated it. The suite runs in about half the time and a cleanup regression now fails fast instead of stalling. The cancellation test watches for the suppressed side effect throughout the window rather than sleeping once past it, which is both quicker and stricter.
 
+## 0.27.7
+
+- Stop repeating a joined fan-out result in each member's settlement notification. The join already hands the parent every member outcome as the result of the call that started the group, so the notification delivered the same bytes a second time on a 16KB channel and arrived as a truncation notice for content the parent already held. A member of a joined fan-out now reports its status and nothing else, and a truncated standalone result names its child's terminal event — where the full result actually is — instead of a "result-handoff adapter" that exists nowhere in Baton.
+
 ## 0.27.6
 
 - State what actually failed when a run ends on `DuplicateToolCallId`, `RunEndedWithoutOutput`, `MiddlewareViolation`, `TurnLimitExceeded`, `TurnPolicyStopped`, `ProgressOverflow`, or `ToolNameCollision`. Those errors carry no `message` field, so squashing their cause produced an empty string that the fallback replaced with `Agent execution failed` — every distinct defect reached the host as the same unactionable sentence and the real cause was unrecoverable from durable state. A cause carrying more than one reason now renders all of them instead of discarding its typed failures, and a bare defect reports the pretty-printed cause rather than a generic phrase.
