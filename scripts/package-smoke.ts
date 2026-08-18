@@ -285,6 +285,14 @@ const program = Effect.gen(function* () {
         foldkit: "0.122.0",
         typescript: rootManifest.workspaces.catalog.typescript,
       },
+      /**
+       * The driver packages depend on an exact `tenetkit` version that only exists once this
+       * release is published, and an unscoped name cannot be pointed at the local registry the way
+       * `@tenetkit:registry` can. Overriding it to the packed tarball resolves the transitive
+       * dependency without redirecting every unrelated package through a stub server.
+       */
+      overrides: { tenetkit: tarballs["tenetkit"] },
+      resolutions: { tenetkit: tarballs["tenetkit"] },
     }),
   )
   const registryDirectory = path.join(directory, "registry")
@@ -310,7 +318,7 @@ const server = createServer((request, response) => {
   const name = pathname.slice(1)
   const manifest = manifests[name]
   if (manifest === undefined) {
-    response.writeHead(302, { location: \`https://registry.npmjs.org\${pathname}\` }).end()
+    response.writeHead(404).end("not found")
     return
   }
   const packagePart = name === "tenetkit" ? "tenetkit" : name.slice("@tenetkit/".length)
@@ -335,10 +343,7 @@ server.listen(0, "127.0.0.1", () => {
   const registryOrigin = yield* Stream.runHead(Stream.splitLines(Stream.decodeText(registry.stdout))).pipe(
     Effect.flatMap(Option.match({ onNone: () => smokeError("local registry did not start"), onSome: Effect.succeed })),
   )
-  yield* fileSystem.writeFileString(
-    path.join(consumerDirectory, ".npmrc"),
-    `@tenetkit:registry=${registryOrigin}\nregistry=${registryOrigin}\n`,
-  )
+  yield* fileSystem.writeFileString(path.join(consumerDirectory, ".npmrc"), `@tenetkit:registry=${registryOrigin}\n`)
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "tsconfig.json"),
     encodeJson({
