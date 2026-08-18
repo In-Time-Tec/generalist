@@ -18,6 +18,13 @@ export const Payload = Schema.TaggedStruct("ChildSettlement", {
   resultText: Schema.String,
   resultBytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   resultTruncated: Schema.Boolean,
+  /**
+   * A member of a joined fan-out. The join hands the parent every member outcome as the result of
+   * the call that started the group, so repeating that result here delivered the same bytes twice
+   * on a channel with a smaller budget: it truncated, and then apologised for truncating. A member
+   * notification therefore states the settlement and nothing else.
+   */
+  joined: Schema.optionalKey(Schema.Boolean),
 })
 /** @experimental */
 export type Payload = typeof Payload.Type
@@ -44,11 +51,19 @@ const stringify = (value: unknown): string => {
   }
 }
 
+/**
+ * Bound one inline result.
+ *
+ * A truncated result used to instruct the reader to "ask the host child-settlement result-handoff
+ * adapter" for the rest. No such adapter exists anywhere in Baton, so the instruction could only be
+ * obeyed by inventing one. What is true is where the result already is: the terminal event of the
+ * child, which the host reads by run id.
+ */
 const boundedResult = (childRunId: string, text: string) => {
   const resultBytes = encoder.encode(text).length
   if (resultBytes <= maxResultBytes) return { resultText: text, resultBytes, resultTruncated: false } as const
   return {
-    resultText: `[Result omitted: ${resultBytes} UTF-8 bytes exceeds the ${maxResultBytes}-byte notification limit. Ask the host child-settlement result-handoff adapter for the full result of child ${childRunId}.]`,
+    resultText: `[Result truncated: ${resultBytes} UTF-8 bytes exceeds the ${maxResultBytes}-byte notification limit. The full result is the terminal event of child ${childRunId}.]`,
     resultBytes,
     resultTruncated: true,
   } as const
@@ -62,6 +77,7 @@ export const payloadFromEvent = (input: {
   readonly parentRunId: string
   readonly childRunId: string
   readonly event: RunEvent
+  readonly joined?: boolean
 }): Payload | undefined => {
   let status: Payload["status"]
   let text: string
@@ -83,6 +99,7 @@ export const payloadFromEvent = (input: {
     terminalEventId: input.event.eventId,
     status,
     ...boundedResult(input.childRunId, text),
+    ...(input.joined === true ? { joined: true } : {}),
   }
 }
 
@@ -140,5 +157,7 @@ export const fromMailboxEntry = (entry: MailboxEntry): Notification | undefined 
  */
 export const modelPrompt = (payload: Payload): Prompt.Prompt | undefined => {
   if (payload.status === "cancelled") return undefined
+  if (payload.joined === true)
+    return Prompt.make(`Child run ${payload.childRunId} settled with status ${payload.status}.`)
   return Prompt.make(`Child run ${payload.childRunId} settled with status ${payload.status}.\n\n${payload.resultText}`)
 }

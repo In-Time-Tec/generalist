@@ -271,7 +271,13 @@ for (const [backend, runtimeLayer] of layers) {
         expect(new TextEncoder().encode(notification!.resultText).length).toBeLessThanOrEqual(
           ChildSettlement.maxResultBytes,
         )
-        expect(notification!.resultText).toContain("host child-settlement result-handoff adapter")
+        /**
+         * A truncated result names where the full one already is. It used to name a
+         * "result-handoff adapter" that exists nowhere in Baton, which a reader could only act on
+         * by inventing it.
+         */
+        expect(notification!.resultText).toContain("the terminal event of child")
+        expect(notification!.resultText).not.toContain("result-handoff adapter")
         expect(notification!.resultText).toContain(child.runId)
         expect(notification!.resultText).not.toContain("Runtime.snapshot")
         expect(notification!.resultText).not.toContain("x".repeat(1000))
@@ -331,3 +337,54 @@ it.effect("SQLite preserves exactly one notification across close and reopen", (
     )
   })
 })
+
+/**
+ * A joined fan-out hands the parent every member outcome as the result of the call that started the
+ * group. Repeating that result in each member's settlement notification delivered the same bytes
+ * twice on a channel with a smaller budget, so three members of one group arrived as three
+ * truncation notices for content the parent already held.
+ */
+for (const [backend, runtimeLayer] of layers) {
+  layer(runtimeLayer)(`${backend} joined fan-out settlement`, (suite) => {
+    suite.effect("tells the parent a member settled without repeating the joined result", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: `joined-settlement:${yield* Random.nextInt}`,
+          idempotencyKey: `joined:${backend}`,
+          prompt: textPrompt("parent"),
+        })
+        const receipt = yield* runtime.fanOut({
+          parentRunId: parent.runId,
+          idempotencyKey: `group:${backend}`,
+          members: [{ key: "member-0", selection: "researcher", prompt: "member-0" }],
+          concurrency: 1,
+          join: { _tag: "AllSuccess" },
+          remainder: "await",
+        })
+        const member = receipt.childRunIds[0]!
+        yield* store.complete({
+          ...(yield* store.claimExecution({ runId: member, ownerId: "test" })),
+          result: completedResult("MEMBER_RESULT_BODY"),
+        })
+
+        const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
+        expect(notification).toBeDefined()
+        expect(notification!.joined).toBe(true)
+        const prompt = ChildSettlement.modelPrompt(notification!)
+        expect(prompt).toBeDefined()
+        const rendered = prompt!.content
+          .flatMap((message) =>
+            typeof message.content === "string"
+              ? [message.content]
+              : message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])),
+          )
+          .join("\n")
+        expect(rendered).toContain("settled with status succeeded")
+        expect(rendered).not.toContain("MEMBER_RESULT_BODY")
+      }),
+    )
+  })
+}

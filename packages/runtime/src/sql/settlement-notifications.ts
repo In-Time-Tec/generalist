@@ -62,10 +62,16 @@ export const admitChildSettlement = (input: {
       SELECT entry_id FROM baton_messages WHERE entry_id = ${notificationId}
     `
     if (existing.length > 0) return
+    const member = yield* sql<{ child_run_id: string }>`
+      SELECT m.child_run_id FROM baton_fan_out_members m
+      JOIN baton_fan_outs f ON f.fan_out_id = m.fan_out_id
+      WHERE f.parent_run_id = ${input.parent.runId} AND m.child_run_id = ${input.child.runId}
+    `
     const payload = payloadFromEvent({
       parentRunId: input.parent.runId,
       childRunId: input.child.runId,
       event: input.event,
+      ...(member.length > 0 ? { joined: true } : {}),
     })
     if (payload === undefined) return
     const highest = yield* sql<{ next_sequence: number | string }>`
