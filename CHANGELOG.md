@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.28.0
+
+Baton is now TenetKit. This release renames the project and replaces thirteen scoped packages with one package and two drivers. Every import changes.
+
+- Ship `tenetkit` as a single package with subpath exports in place of `@batonfx/core`, `@batonfx/runtime`, `@batonfx/providers`, and the ten other scoped packages. `tenetkit/ai`, `tenetkit/runtime`, `tenetkit/mcp`, and the rest are subpaths of one package rather than separate installs, so importing the model providers no longer pulls the durable runtime into a bundle that never asked for it. The SQL drivers stay separate as `@tenetkit/pg` and `@tenetkit/mysql` because each carries its own database client dependency.
+- Rename every brand-bearing surface a consumer can observe: error tags, service keys, telemetry span attributes, the `tenetkit-run-event-version` SSE header, the `tenetkit-tree:` cursor prefix, and the `TENETKIT_DATABASE_URL` and `TENETKIT_MYSQL_URL` environment variables. SQL table names keep their `baton_` prefix; they are persisted schema, and renaming them would strand every existing database.
+- Rename the MCP tool subpath to `tenetkit/mcp/tools` and its `BatonTools` interface to `McpTools`.
+- Move the dialect-agnostic runtime worker to `tenetkit/runtime/driver/sql/worker`. It had lived inside the PostgreSQL package, which left `@tenetkit/mysql` unable to export a `RuntimeWorker` at all.
+- Stop re-exporting Bun-only SQLite modules from `tenetkit/runtime/driver/sql`. The barrel pulled `bun:sqlite` through its migrator and store, so importing it under Node failed outright rather than at the point of use.
+- Resolve `RunClaims` in both SQL drivers. Each package re-exported a local module under that name, shadowing the runtime service it was supposed to provide.
+- Exclude `packages/**/test` from the root `tsconfig.json` no longer. The exclusion silently disabled type-aware linting across every test file and hid 242 errors behind a passing gate.
+- Name the root release tarball `tenetkit-<version>.tgz`. It packed as `tenetkit-tenetkit-<version>.tgz`, which no publish assertion matched.
+
 - Scale the test suite to the machine's own parallelism instead of the two workers a kernel scope-close hang once forced, and drop the two-minute cleanup ceilings that tolerated it. The suite runs in about half the time and a cleanup regression now fails fast instead of stalling. The cancellation test watches for the suppressed side effect throughout the window rather than sleeping once past it, which is both quicker and stricter.
 
 ## 0.27.7
