@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-staging_url="https://batonfx-docs-staging.up.railway.app"
-production_url="https://batonfx-docs.up.railway.app"
+staging_url="https://tenetkit-docs-staging.up.railway.app"
+production_url="https://tenetkit-docs.up.railway.app"
 deep_link="/docs/start/quickstart"
 failures=0
 
@@ -28,10 +28,10 @@ check "production llms" "$production_url/llms.txt" 200
 for env in staging production; do
   url_var="${env}_url"
   title=$(curl -s "${!url_var}/" | grep -o "<title>[^<]*</title>" | head -1)
-  if [ "$title" = "<title>Batonfx</title>" ]; then
+  if [ "$title" = "<title>TenetKit</title>" ]; then
     echo "ok   $env title $title"
   else
-    echo "FAIL $env title $title (expected <title>Batonfx</title>)"
+    echo "FAIL $env title $title (expected <title>TenetKit</title>)"
     failures=$((failures + 1))
   fi
 done

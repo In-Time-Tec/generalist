@@ -1,5 +1,5 @@
 {
-  "name": "@batonfx/example-deep-research-agent-server",
+  "name": "@tenetkit/example-deep-research-agent-server",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,10 +8,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "@batonfx/core": "workspace:*",
-    "@batonfx/providers": "workspace:*",
-    "@batonfx/runtime": "workspace:*",
-    "@batonfx/transport": "workspace:*",
+    "tenetkit": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"
   },

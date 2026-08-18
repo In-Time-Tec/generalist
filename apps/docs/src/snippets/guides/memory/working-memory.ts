@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
-import { WorkingMemory } from "@batonfx/memory"
+import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
+import { WorkingMemory } from "tenetkit/memory"
 
 const key: Memory.Key = { agent: "support-agent", subject: "user-ada" }
 

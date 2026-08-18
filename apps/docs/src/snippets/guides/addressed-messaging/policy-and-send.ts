@@ -1,9 +1,9 @@
 import { Effect, Layer } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { AgentDirectory, ExecutableResolver, Mailbox, Messaging, Runtime } from "@batonfx/runtime"
+import { AgentDirectory, ExecutableResolver, Mailbox, Messaging, Runtime } from "tenetkit/runtime"
 
 /**
- * Cross-session addressing is off by default. Baton always allows self, parent, direct child, and
+ * Cross-session addressing is off by default. TenetKit always allows self, parent, direct child, and
  * sibling-under-one-parent from durable parentage; everything else is this one host decision.
  */
 const linkedThreads = new Map<string, ReadonlySet<string>>([["session:planner", new Set(["session:reviewer"])]])
@@ -29,7 +29,7 @@ export const runtimeLayer = (resolver: ExecutableResolver.Interface): Layer.Laye
 const text = (value: string) =>
   Prompt.fromMessages([Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: value })] })])
 
-/** `fromRunId`, not a sender Address: Baton resolves the sender from its Run record. */
+/** `fromRunId`, not a sender Address: TenetKit resolves the sender from its Run record. */
 export const ping = (input: {
   readonly fromRunId: string
   readonly targetSessionId: string

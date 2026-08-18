@@ -9,27 +9,27 @@ export const versioningReference = definePage({
   group: "Reference",
   description: "The published 0.14.0 set, experimental policy, Effect compatibility, and release train.",
   content: [
-    lead("All eleven @batonfx packages publish to npm as a coordinated train at the same version."),
+    lead("All eleven @tenetkit packages publish to npm as a coordinated train at the same version."),
     h2("published-set", "Published packages"),
     table(
       ["Package", "Version", "Subpath exports"],
       [
-        [[code("@batonfx/a2a")], [code(version)], [code(".")]],
-        [[code("@batonfx/ag-ui")], [code(version)], [code(".")]],
-        [[code("@batonfx/core")], [code(version)], [code(".")]],
-        [[code("@batonfx/foldkit")], [code(version)], [code(".")]],
-        [[code("@batonfx/mcp")], [code(version)], [code("."), ", ", code("./baton")]],
-        [[code("@batonfx/memory")], [code(version)], [code(".")]],
+        [[code("tenetkit/a2a")], [code(version)], [code(".")]],
+        [[code("tenetkit/ag-ui")], [code(version)], [code(".")]],
+        [[code("tenetkit")], [code(version)], [code(".")]],
+        [[code("tenetkit/foldkit")], [code(version)], [code(".")]],
+        [[code("tenetkit/mcp")], [code(version)], [code("."), ", ", code("./baton")]],
+        [[code("tenetkit/memory")], [code(version)], [code(".")]],
         [
-          [code("@batonfx/providers")],
+          [code("tenetkit/ai")],
           [code(version)],
           [code("."), ", ", code("./catalog"), ", provider, authentication, preset, and embedding subpaths"],
         ],
-        [[code("@batonfx/runtime")], [code(version)], [code(".")]],
-        [[code("@batonfx/skills")], [code(version)], [code(".")]],
-        [[code("@batonfx/test")], [code(version)], [code(".")]],
+        [[code("tenetkit/runtime")], [code(version)], [code(".")]],
+        [[code("tenetkit/skills")], [code(version)], [code(".")]],
+        [[code("tenetkit/test")], [code(version)], [code(".")]],
         [
-          [code("@batonfx/transport")],
+          [code("tenetkit/transport")],
           [code(version)],
           [
             code("."),
@@ -59,7 +59,7 @@ export const versioningReference = definePage({
     ),
     h2("effect-compat", "Effect compatibility"),
     table(
-      ["Batonfx", "effect", "Notes"],
+      ["TenetKit", "effect", "Notes"],
       [[[code("0.14.x")], [code("4.0.0-beta.98")], "The exact peer and tested workspace catalog version"]],
     ),
     h2("release-train", "The release train"),

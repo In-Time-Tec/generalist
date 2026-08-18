@@ -14,16 +14,16 @@ export const serveTransport = definePage({
   description: "Admit exact Runtime runs and expose their canonical RunEvents through SSE and WebSocket.",
   content: [
     p(
-      code("@batonfx/runtime"),
+      code("tenetkit/runtime"),
       " owns run admission, execution, replay, waits, and cancellation. ",
-      code("@batonfx/transport"),
+      code("tenetkit/transport"),
       " only projects those Runtime-owned RunEvents through ",
       code("Sse.respond"),
       " and ",
       code("Ws.handle"),
       ".",
     ),
-    command("Terminal", "bun add @batonfx/runtime @batonfx/transport"),
+    command("Terminal", "bun add tenetkit/runtime tenetkit/transport"),
     h2("run-in-memory", "1. Run an agent in memory"),
     p(
       code("Runtime.layerMemory"),
@@ -117,9 +117,9 @@ export const serveTransport = definePage({
     ),
     p(
       "The wire contract is in ",
-      link("/docs/reference/transport", "the @batonfx/transport reference"),
+      link("/docs/reference/transport", "the tenetkit/transport reference"),
       ", and Runtime ownership is documented in ",
-      link("/docs/reference/runtime", "the @batonfx/runtime reference"),
+      link("/docs/reference/runtime", "the tenetkit/runtime reference"),
       ".",
     ),
   ],

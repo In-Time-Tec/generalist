@@ -1,6 +1,6 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Agent, ModelRegistry } from "@batonfx/core"
-import { Deterministic } from "@batonfx/providers"
+import { Agent, ModelRegistry } from "tenetkit"
+import { Deterministic } from "tenetkit/ai"
 
 const agent = Agent.make({ name: "local-assistant" })
 const selection = { provider: "deterministic", model: "local" }

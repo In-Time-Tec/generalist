@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { Approvals } from "@batonfx/core"
+import { Approvals } from "tenetkit"
 
 export const suspendForHumans: Layer.Layer<Approvals.Approvals> = Approvals.layerTest({
   resolve: (request) =>

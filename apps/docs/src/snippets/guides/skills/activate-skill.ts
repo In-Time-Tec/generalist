@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillSource, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillSource, ToolExecutor } from "tenetkit"
 
 const frontmatter: SkillSource.Frontmatter = {
   name: "release-notes",

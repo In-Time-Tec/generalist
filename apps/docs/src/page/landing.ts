@@ -23,7 +23,7 @@ const h = html<Message>()
 
 const quickstartPath = "/docs/start/quickstart"
 const agentLoopPath = "/docs/learn/agent-loop"
-const installCommand = "bun add @batonfx/core @batonfx/providers"
+const installCommand = "bun add tenetkit tenetkit/ai"
 
 const glyph = (symbol: string, offsetY?: string): Html =>
   h.div(
@@ -88,7 +88,7 @@ const heroSection = (model: Model): Html =>
               mark("size-12 md:size-14"),
               h.h1(
                 [h.Class("text-5xl font-light tracking-tight text-gray-900 md:text-6xl lg:text-7xl dark:text-white")],
-                ["Batonfx"],
+                ["TenetKit"],
               ),
               betaBadge("px-2 py-1 text-xs"),
             ],
@@ -124,14 +124,14 @@ const pairSection = (): Html =>
               h.p(
                 [h.Class("mt-2 text-gray-600 dark:text-gray-400")],
                 [
-                  h.strong([h.Class("text-gray-900 dark:text-white")], ["@batonfx/core"]),
+                  h.strong([h.Class("text-gray-900 dark:text-white")], ["tenetkit"]),
                   " defines the agent loop and its Effect services. Run it directly for process-local work, or add ",
                   h.a(
                     [
                       h.Href("/docs/learn/native-runtime"),
                       h.Class("font-medium text-accent-600 underline underline-offset-4 dark:text-accent-400"),
                     ],
-                    ["@batonfx/runtime"],
+                    ["tenetkit/runtime"],
                   ),
                   " for addressable runs, canonical event replay, durable waits, and memory, SQLite, PostgreSQL, or MySQL storage.",
                 ],
@@ -179,7 +179,7 @@ const promiseSection = (): Html =>
               ),
               pillarCard(
                 "Native durability",
-                "@batonfx/runtime persists addressable runs and their canonical event streams in the store you choose.",
+                "tenetkit/runtime persists addressable runs and their canonical event streams in the store you choose.",
               ),
             ],
           ),
@@ -405,7 +405,7 @@ const honestySection = (): Html =>
               h.p(
                 [h.Class("mt-4 text-gray-600 dark:text-gray-400")],
                 [
-                  "The @batonfx/core agent loop is process-local. Durable execution is explicit rather than hidden: add @batonfx/runtime and choose SQLite for one process or PostgreSQL/MySQL for multi-worker execution.",
+                  "The tenetkit agent loop is process-local. Durable execution is explicit rather than hidden: add tenetkit/runtime and choose SQLite for one process or PostgreSQL/MySQL for multi-worker execution.",
                 ],
               ),
               h.p(

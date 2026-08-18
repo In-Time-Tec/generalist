@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { Agent, Tool, Toolkit } from "@batonfx/core"
+import { Agent, Tool, Toolkit } from "tenetkit"
 
 export const deployTool = Tool.make("deploy_service", {
   description: "Deploy a service to production",

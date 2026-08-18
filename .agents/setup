@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-time orb setup for BatonFX: pinned Bun, Node 22, submodules, dependencies.
+# One-time orb setup for TenetKit: pinned Bun, Node 22, submodules, dependencies.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"

@@ -12,7 +12,7 @@ import { toPath, type Route } from "../route/route"
 import type { Message } from "./message"
 import type { Model } from "./model"
 
-const site = "Batonfx"
+const site = "TenetKit"
 
 const h = html<Message>()
 

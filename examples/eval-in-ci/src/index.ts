@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
-import { Deterministic } from "@batonfx/providers"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
+import { Deterministic } from "tenetkit/ai"
 
 const agent = Agent.make({ name: "eval-agent" })
 

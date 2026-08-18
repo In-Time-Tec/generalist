@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { HarnessEntry, HarnessRegistration, HarnessSnapshot, HarnessState } from "@batonfx/harness"
+import { HarnessEntry, HarnessRegistration, HarnessSnapshot, HarnessState } from "tenetkit/harness"
 
 const scope = "thread:demo"
 const at = "2024-01-01T00:00:00.000Z"
@@ -23,7 +23,7 @@ const program = Effect.gen(function* () {
   yield* Console.log(`capability: ${pinned.capability.name}`)
   yield* Console.log(`codec: ${pinned.capability.content?.codec} version: ${pinned.capability.content?.version}`)
 
-  // The durable host records { pin, codec, version, payload } and Baton reconstructs the exact state.
+  // The durable host records { pin, codec, version, payload } and TenetKit reconstructs the exact state.
   const restored = yield* HarnessSnapshot.decode(pinned.id, pinned.payload)
   yield* Console.log(
     `restored entries: ${HarnessState.allEntries(restored)

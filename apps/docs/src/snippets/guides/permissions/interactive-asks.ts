@@ -1,5 +1,5 @@
 import { Console, Effect, Layer } from "effect"
-import { Approvals, Permissions } from "@batonfx/core"
+import { Approvals, Permissions } from "tenetkit"
 
 export const policyLayer = Layer.mergeAll(
   Permissions.layerRuleset({

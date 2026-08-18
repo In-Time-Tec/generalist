@@ -5,7 +5,7 @@ const ignored = new Set(["node_modules", "dist", "coverage", ".turbo", "repos", 
 const roots = ["apps", "examples", "packages", "scripts", "tooling"]
 
 class RepositoryPolicyFailed extends Schema.TaggedErrorClass<RepositoryPolicyFailed>()(
-  "@batonfx/scripts/RepositoryPolicyFailed",
+  "@tenetkit/scripts/RepositoryPolicyFailed",
   { message: Schema.String },
 ) {}
 

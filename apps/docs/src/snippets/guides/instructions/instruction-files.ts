@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Path, PlatformError } from "effect"
-import { Instructions } from "@batonfx/core"
-import { InstructionFiles } from "@batonfx/skills"
+import { Instructions } from "tenetkit"
+import { InstructionFiles } from "tenetkit/skills"
 
 export const repoSources: Effect.Effect<
   ReadonlyArray<Instructions.ContextSource>,

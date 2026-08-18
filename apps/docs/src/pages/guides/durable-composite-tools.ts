@@ -2,7 +2,7 @@ import admitAndJoin from "../../snippets/guides/child-admission/admit-and-join.t
 import journalACrossing from "../../snippets/guides/nested-operations/journal-a-crossing.ts?raw"
 import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../prose"
 
-const paging = `import { SessionHistory } from "@batonfx/core"
+const paging = `import { SessionHistory } from "tenetkit"
 
 // The newest page, then walk backwards until the log runs out.
 let page = SessionHistory.pageHistory(path, { limit: 50 })
@@ -23,7 +23,7 @@ export const durableCompositeTools = definePage({
     "Journal each boundary a composite tool crosses, spawn children that return at admission, and page the exact entry log a compaction rewrote.",
   content: [
     p(
-      "A composite tool call — a cell, an agent program step — is not one boundary crossing. It writes files, spawns children, and calls out, and a crash can land between any two of them. Baton journals each crossing under the outer operation's identity so the run recovers without repeating side effects.",
+      "A composite tool call — a cell, an agent program step — is not one boundary crossing. It writes files, spawns children, and calls out, and a crash can land between any two of them. TenetKit journals each crossing under the outer operation's identity so the run recovers without repeating side effects.",
     ),
     h2("journal-each-crossing", "1. Journal each crossing"),
     p(

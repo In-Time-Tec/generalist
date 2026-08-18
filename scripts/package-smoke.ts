@@ -8,10 +8,12 @@ import {
   packedEffectDependencies,
   packedProviderDependencies,
   packages,
+  packageNames,
   sortRecord,
+  tarballName,
 } from "./package-smoke-config.js"
 
-class PackageSmokeFailed extends Schema.TaggedErrorClass<PackageSmokeFailed>()("@batonfx/scripts/PackageSmokeFailed", {
+class PackageSmokeFailed extends Schema.TaggedErrorClass<PackageSmokeFailed>()("@tenetkit/scripts/PackageSmokeFailed", {
   message: Schema.String,
 }) {}
 
@@ -23,38 +25,40 @@ const parseJson = (text: string): Record<string, any> =>
 const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const exports = [
-  "@batonfx/a2a",
-  "@batonfx/ag-ui",
-  "@batonfx/core",
-  "@batonfx/test",
-  "@batonfx/skills",
-  "@batonfx/harness",
-  "@batonfx/memory",
-  "@batonfx/providers",
-  "@batonfx/providers/catalog",
-  "@batonfx/providers/openai",
-  "@batonfx/providers/openai-account-auth",
-  "@batonfx/providers/openai-account-auth-http",
-  "@batonfx/providers/anthropic",
-  "@batonfx/providers/amazon-bedrock",
-  "@batonfx/providers/openrouter",
-  "@batonfx/providers/openai-compat",
-  "@batonfx/providers/deterministic",
-  "@batonfx/providers/presets",
-  "@batonfx/providers/embedding",
-  "@batonfx/mcp",
-  "@batonfx/mcp/baton",
-  "@batonfx/repl",
-  "@batonfx/repl/bun",
-  "@batonfx/runtime",
-  "@batonfx/transport",
-  "@batonfx/transport/client",
-  "@batonfx/transport/errors",
-  "@batonfx/transport/sse",
-  "@batonfx/transport/ws",
-  "@batonfx/transport/wire",
-  "@batonfx/transport/snapshot",
-  "@batonfx/foldkit",
+  "tenetkit",
+  "tenetkit/runtime",
+  "tenetkit/ai",
+  "tenetkit/mcp",
+  "tenetkit/skills",
+  "tenetkit/memory",
+  "tenetkit/harness",
+  "tenetkit/transport",
+  "tenetkit/foldkit",
+  "tenetkit/test",
+  "tenetkit/a2a",
+  "tenetkit/ag-ui",
+  "tenetkit/repl",
+  "tenetkit/ai/catalog",
+  "tenetkit/ai/openai",
+  "tenetkit/ai/openai-account-auth",
+  "tenetkit/ai/openai-account-auth-http",
+  "tenetkit/ai/anthropic",
+  "tenetkit/ai/amazon-bedrock",
+  "tenetkit/ai/openrouter",
+  "tenetkit/ai/openai-compat",
+  "tenetkit/ai/deterministic",
+  "tenetkit/ai/presets",
+  "tenetkit/ai/embedding",
+  "tenetkit/mcp/tools",
+  "tenetkit/repl/bun",
+  "tenetkit/transport/client",
+  "tenetkit/transport/errors",
+  "tenetkit/transport/sse",
+  "tenetkit/transport/ws",
+  "tenetkit/transport/wire",
+  "tenetkit/transport/snapshot",
+  "tenetkit/runtime/driver",
+  "tenetkit/runtime/driver/sql",
 ] as const
 
 const run = Effect.fn("PackageSmoke.run")(function* (
@@ -103,7 +107,7 @@ const program = Effect.gen(function* () {
     const manifestPath = path.join(root, "packages", packageName, "package.json")
     const source = yield* fileSystem.readFileString(manifestPath)
     const manifest = parseJson(source)
-    if (manifest.name !== `@batonfx/${packageName}` || manifest.version !== version) {
+    if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
       return yield* smokeError(`${manifestPath} does not match canonical name/version`)
     }
     if (
@@ -116,7 +120,7 @@ const program = Effect.gen(function* () {
     }
     sourceManifests.set(manifestPath, source)
   }
-  const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "baton-package-smoke-" })
+  const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-package-smoke-" })
   const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
   const tarballDirectory = Option.match(configuredArtifactDirectory, {
     onNone: () => path.join(directory, "packages"),
@@ -132,12 +136,12 @@ const program = Effect.gen(function* () {
   const packedManifests: Record<string, Record<string, unknown>> = {}
   for (const packageName of packages) {
     const packageDirectory = path.join(root, "packages", packageName)
-    const tarball = path.join(tarballDirectory, `batonfx-${packageName}-${version}.tgz`)
+    const tarball = path.join(tarballDirectory, tarballName({ packageName, version }))
     yield* run("bun", ["pm", "pack", "--filename", tarball, "--quiet"], packageDirectory)
     const archive = yield* fileSystem.readFile(tarball)
     if (archive.byteLength > compressedSizeLimits[packageName]) {
       return yield* smokeError(
-        `@batonfx/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
+        `@tenetkit/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
       )
     }
     const listing = yield* run("tar", ["-tzf", tarball], root)
@@ -151,55 +155,63 @@ const program = Effect.gen(function* () {
         !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
     )
     if (unexpected.length > 0) {
-      return yield* smokeError(`@batonfx/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
+      return yield* smokeError(`@tenetkit/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
     }
     if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
-      return yield* smokeError(`@batonfx/${packageName} contains an unsafe path`)
+      return yield* smokeError(`@tenetkit/${packageName} contains an unsafe path`)
     }
     const verboseListing = yield* run("tar", ["-tvzf", tarball], root)
     const unsafeTypes = verboseListing
       .split("\n")
       .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
     if (unsafeTypes.length > 0) {
-      return yield* smokeError(`@batonfx/${packageName} contains a non-regular entry`)
+      return yield* smokeError(`@tenetkit/${packageName} contains a non-regular entry`)
     }
     const manifest = parseJson(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
-    if (manifest.name !== `@batonfx/${packageName}` || manifest.version !== version) {
+    if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
       return yield* smokeError(`packed identity mismatch for ${packageName}`)
     }
     if (manifest.peerDependencies?.effect !== effectVersion || manifest.dependencies?.effect !== undefined) {
-      return yield* smokeError(`@batonfx/${packageName} must expose Effect only as exact peer`)
+      return yield* smokeError(`@tenetkit/${packageName} must expose Effect only as exact peer`)
     }
     if (/workspace:|catalog:/.test(encodeJson(manifest))) {
-      return yield* smokeError(`@batonfx/${packageName} contains an unresolved protocol`)
+      return yield* smokeError(`@tenetkit/${packageName} contains an unresolved protocol`)
     }
     for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
       if (manifest.scripts?.[lifecycle] !== undefined) {
-        return yield* smokeError(`@batonfx/${packageName} contains the ${lifecycle} lifecycle hook`)
+        return yield* smokeError(`@tenetkit/${packageName} contains the ${lifecycle} lifecycle hook`)
       }
     }
     const sourceManifest = parseJson(sourceManifests.get(path.join(packageDirectory, "package.json"))!)
     for (const field of ["description", "type", "sideEffects", "files", "engines", "repository", "homepage", "bugs"]) {
       if (!Equal.equals(manifest[field], sourceManifest[field])) {
-        return yield* smokeError(`@batonfx/${packageName} changed its packed ${field} metadata`)
+        return yield* smokeError(`@tenetkit/${packageName} changed its packed ${field} metadata`)
       }
     }
     if (!Equal.equals(manifest.exports, sourceManifest.exports)) {
-      return yield* smokeError(`@batonfx/${packageName} changed its public exports`)
+      return yield* smokeError(`@tenetkit/${packageName} changed its public exports`)
     }
     for (const [specifier, target] of Object.entries(manifest.exports) as ReadonlyArray<
       readonly [string, { readonly types?: string; readonly import?: string }]
     >) {
       if (!Equal.equals(Object.keys(target), ["types", "import"])) {
-        return yield* smokeError(`@batonfx/${packageName}${specifier} must list types before import`)
+        return yield* smokeError(`@tenetkit/${packageName}${specifier} must list types before import`)
       }
       for (const [condition, value] of Object.entries(target)) {
         const expectedExtension = condition === "types" ? ".d.ts" : ".js"
         if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
-          return yield* smokeError(`@batonfx/${packageName}${specifier} has invalid ${condition} target`)
+          return yield* smokeError(`@tenetkit/${packageName}${specifier} has invalid ${condition} target`)
         }
-        if (!entries.includes(`package/${value.slice(2)}`)) {
-          return yield* smokeError(`@batonfx/${packageName}${specifier} is missing ${value}`)
+        if (specifier.includes("*")) {
+          const [prefix, suffix] = value.split("*") as [string, string]
+          const matches = entries.filter(
+            (entry) => entry.startsWith(`package/${prefix.slice(2)}`) && entry.endsWith(suffix),
+          )
+          if (matches.length === 0) {
+            return yield* smokeError(`@tenetkit/${packageName}${specifier} resolves to no ${condition} target`)
+          }
+        } else if (!entries.includes(`package/${value.slice(2)}`)) {
+          return yield* smokeError(`@tenetkit/${packageName}${specifier} is missing ${value}`)
         }
       }
     }
@@ -219,40 +231,40 @@ const program = Effect.gen(function* () {
         }),
       )
       if (!Equal.equals(sortRecord(manifest[section]), sortRecord(expected))) {
-        return yield* smokeError(`@batonfx/${packageName} changed its packed ${section}`)
+        return yield* smokeError(`@tenetkit/${packageName} changed its packed ${section}`)
       }
       for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
-        if (dependency.startsWith("@batonfx/") && dependencyVersion !== version) {
+        if ((dependency === "tenetkit" || dependency.startsWith("@tenetkit/")) && dependencyVersion !== version) {
           return yield* smokeError(
-            `@batonfx/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
+            `@tenetkit/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
           )
         }
       }
     }
     if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
-      return yield* smokeError(`@batonfx/${packageName} must not bundle dependencies`)
+      return yield* smokeError(`@tenetkit/${packageName} must not bundle dependencies`)
     }
     for (const dependency of packedEffectDependencies[packageName]) {
       if (manifest.dependencies?.[dependency] !== effectVersion) {
         return yield* smokeError(
-          `@batonfx/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
+          `@tenetkit/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
         )
       }
     }
-    if (packageName === "providers") {
+    if (packageName === "tenetkit") {
       for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
         if (manifest.dependencies?.[dependency] !== dependencyVersion) {
           return yield* smokeError(
-            `@batonfx/providers must pin ${dependency}@${dependencyVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
+            `tenetkit must pin ${dependency}@${dependencyVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
           )
         }
       }
     }
     if (encodeJson(manifest).includes("4.0.0-beta.93")) {
-      return yield* smokeError(`@batonfx/${packageName} packed manifest contains Effect beta.93`)
+      return yield* smokeError(`@tenetkit/${packageName} packed manifest contains Effect beta.93`)
     }
     packedManifests[manifest.name] = manifest
-    tarballs[`@batonfx/${packageName}`] = `file:${tarball}`
+    tarballs[packageNames[packageName]] = `file:${tarball}`
   }
 
   for (const [manifestPath, source] of sourceManifests) {
@@ -264,7 +276,7 @@ const program = Effect.gen(function* () {
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "package.json"),
     encodeJson({
-      name: "baton-package-consumer",
+      name: "tenetkit-package-consumer",
       private: true,
       type: "module",
       dependencies: {
@@ -298,10 +310,11 @@ const server = createServer((request, response) => {
   const name = pathname.slice(1)
   const manifest = manifests[name]
   if (manifest === undefined) {
-    response.writeHead(404).end("not found")
+    response.writeHead(302, { location: \`https://registry.npmjs.org\${pathname}\` }).end()
     return
   }
-  const filename = \`batonfx-\${name.slice("@batonfx/".length)}-\${version}.tgz\`
+  const packagePart = name === "tenetkit" ? "tenetkit" : name.slice("@tenetkit/".length)
+  const filename = packagePart === "tenetkit" ? \`tenetkit-\${version}.tgz\` : \`tenetkit-\${packagePart}-\${version}.tgz\`
   const body = JSON.stringify({
     name,
     "dist-tags": { latest: version },
@@ -322,7 +335,10 @@ server.listen(0, "127.0.0.1", () => {
   const registryOrigin = yield* Stream.runHead(Stream.splitLines(Stream.decodeText(registry.stdout))).pipe(
     Effect.flatMap(Option.match({ onNone: () => smokeError("local registry did not start"), onSome: Effect.succeed })),
   )
-  yield* fileSystem.writeFileString(path.join(consumerDirectory, ".npmrc"), `@batonfx:registry=${registryOrigin}\n`)
+  yield* fileSystem.writeFileString(
+    path.join(consumerDirectory, ".npmrc"),
+    `@tenetkit:registry=${registryOrigin}\nregistry=${registryOrigin}\n`,
+  )
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "tsconfig.json"),
     encodeJson({
@@ -342,17 +358,17 @@ server.listen(0, "127.0.0.1", () => {
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${encodeJson(exports)}
 for (const specifier of specifiers) await import(specifier)
-const { A2A } = await import("@batonfx/a2a")
-const { AgUi } = await import("@batonfx/ag-ui")
-const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("@batonfx/core")
-const { VectorStore } = await import("@batonfx/memory")
-const { HarnessState, HarnessStore } = await import("@batonfx/harness")
-const { McpToolSource } = await import("@batonfx/mcp")
-const { Catalog, OpenAi } = await import("@batonfx/providers")
-const skills = await import("@batonfx/skills")
-const { TestModel } = await import("@batonfx/test")
-const { Runtime, RunEvent } = await import("@batonfx/runtime")
-const { Snapshot, Wire } = await import("@batonfx/transport")
+const { A2A } = await import("tenetkit/a2a")
+const { AgUi } = await import("tenetkit/ag-ui")
+const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("tenetkit")
+const { VectorStore } = await import("tenetkit/memory")
+const { HarnessState, HarnessStore } = await import("tenetkit/harness")
+const { McpToolSource } = await import("tenetkit/mcp")
+const { Catalog, OpenAi } = await import("tenetkit/ai")
+const skills = await import("tenetkit/skills")
+const { TestModel } = await import("tenetkit/test")
+const { Runtime, RunEvent } = await import("tenetkit/runtime")
+const { Snapshot, Wire } = await import("tenetkit/transport")
 const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
@@ -368,14 +384,14 @@ const layers = [
   TestModel.layer([TestModel.text("identity")]),
   McpToolSource.layer({ name: "identity", transport: { kind: "http", url: "https://mcp.example/rpc" } }),
 ]
-if (layers.some((value) => !Layer.isLayer(value))) throw new Error("Baton layer does not use the root Effect identity")
+if (layers.some((value) => !Layer.isLayer(value))) throw new Error("TenetKit layer does not use the root Effect identity")
 if (!Layer.isLayer(OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
   throw new Error("provider constructor does not use the root Layer identity")
 }
 if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {
   throw new Error("TestModel does not use the root Effect identity")
 }
-console.log(\`imported \${specifiers.length} Baton exports\`)
+console.log(\`imported \${specifiers.length} TenetKit exports\`)
 `,
   )
 
@@ -398,8 +414,8 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], consumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "bun", "runtime.mjs"], consumerDirectory)
-  if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@batonfx")) {
-    return yield* smokeError("Bun consumer resolved a Baton package from npm")
+  if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@tenetkit")) {
+    return yield* smokeError("Bun consumer resolved a TenetKit package from npm")
   }
 
   const npmConsumerDirectory = path.join(directory, "npm-consumer")
@@ -423,15 +439,15 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
   if (
     (yield* fileSystem.readFileString(path.join(npmConsumerDirectory, "package-lock.json"))).includes(
-      "npmjs.org/@batonfx",
+      "npmjs.org/@tenetkit",
     )
   ) {
-    return yield* smokeError("npm consumer resolved a Baton package from npm")
+    return yield* smokeError("npm consumer resolved a TenetKit package from npm")
   }
 
   const evidencePackages = []
   for (const packageName of packages) {
-    const filename = `batonfx-${packageName}-${version}.tgz`
+    const filename = tarballName({ packageName, version })
     const archive = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
     const manifest = parseJson(
       yield* run("tar", ["-xOzf", path.join(tarballDirectory, filename), "package/package.json"], root),

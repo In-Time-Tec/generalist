@@ -1,6 +1,6 @@
-import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "@batonfx/core"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
-import { Sse, Ws } from "@batonfx/transport"
+import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { Sse, Ws } from "tenetkit/transport"
 import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
@@ -77,7 +77,7 @@ const routesLayer = HttpRouter.use((router) =>
             return yield* Sse.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
-        Effect.catchTag("@batonfx/transport/InvalidCursor", errorResponse(400)),
+        Effect.catchTag("tenetkit/transport/InvalidCursor", errorResponse(400)),
       ),
     )
 

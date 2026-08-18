@@ -1,14 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  Guardrail,
-  LanguageModel,
-  ModelMiddleware,
-  Prompt,
-  Response,
-  ToolExecutor,
-} from "@batonfx/core"
+import { Agent, Approvals, Guardrail, LanguageModel, ModelMiddleware, Prompt, Response, ToolExecutor } from "tenetkit"
 
 const lastUserText = (prompt: Prompt.Prompt): string => {
   const userMessages = prompt.content.filter((message) => message.role === "user")

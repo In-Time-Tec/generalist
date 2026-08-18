@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
 
 let supervisorCalls = 0
 

@@ -1,6 +1,6 @@
 # Durable agent driver
 
-Core exposes a versioned durable agent driver contract, pinned `ExecutableRef` identity, and portable `RunBudget` limits shared by `@batonfx/runtime` and inline `Agent.stream` without importing SQL or runtime types into `@batonfx/core`.
+Core exposes a versioned durable agent driver contract, pinned `ExecutableRef` identity, and portable `RunBudget` limits shared by `tenetkit/runtime` and inline `Agent.stream` without importing SQL or runtime types into `tenetkit`.
 
 ## Executable identity
 
@@ -46,13 +46,13 @@ Inline runs interpret operations immediately through existing Effect services. T
 
 ## Runtime seam
 
-`DriverInterpreter` is the single interpreter service agents use at effect boundaries. Optional `DriverJournalService` merges a host journal (`onScheduled`, `onCompleted`) into the run layer so `@batonfx/runtime` can intercept or persist operations without importing runtime concepts into core. `DurableDriver.recorded` exposes the in-run operation log for tests.
+`DriverInterpreter` is the single interpreter service agents use at effect boundaries. Optional `DriverJournalService` merges a host journal (`onScheduled`, `onCompleted`) into the run layer so `tenetkit/runtime` can intercept or persist operations without importing runtime concepts into core. `DurableDriver.recorded` exposes the in-run operation log for tests.
 
 `DurableDriver.guardUnknownNeverReplay` rejects `Unknown` outcomes for operations with `never` replay policy before re-execution, failing typed as `DriverUnknownReplay`.
 
-Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. Core restores both the semantic turn and instrumentation's next model-call ordinal from that checkpoint's durable loop state, so a resumed suspension finishes its original turn, the following model call advances to the next turn, and operation, call, and attempt identities remain stable across restart and replay. An explicit `turnStart` may advance a safe checkpoint but turnless setup work cannot reset it. The journal also receives checkpoint-only budget mutations so every safe boundary is persisted. Durable persistence, Agent event projection, waits, same-Run resume, and worker orchestration live in `@batonfx/runtime`, not core.
+Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. Core restores both the semantic turn and instrumentation's next model-call ordinal from that checkpoint's durable loop state, so a resumed suspension finishes its original turn, the following model call advances to the next turn, and operation, call, and attempt identities remain stable across restart and replay. An explicit `turnStart` may advance a safe checkpoint but turnless setup work cannot reset it. The journal also receives checkpoint-only budget mutations so every safe boundary is persisted. Durable persistence, Agent event projection, waits, same-Run resume, and worker orchestration live in `tenetkit/runtime`, not core.
 
-`send` is intercepted by `@batonfx/runtime`'s addressed messaging (`Messaging.make`) rather than by the core loop: one send from inside an execution is scheduled as a `send` operation with `never` replay policy, so a crash between the journal record and the mailbox insert settles as `Unknown` for explicit resolution instead of duplicating or losing a delivered message. A replayed success returns the recorded receipt without crossing the boundary again. See `docs/features/addressed-messaging.md`.
+`send` is intercepted by `tenetkit/runtime`'s addressed messaging (`Messaging.make`) rather than by the core loop: one send from inside an execution is scheduled as a `send` operation with `never` replay policy, so a crash between the journal record and the mailbox insert settles as `Unknown` for explicit resolution instead of duplicating or losing a delivered message. A replayed success returns the recorded receipt without crossing the boundary again. See `docs/features/addressed-messaging.md`.
 
 ## Not yet intercepted
 

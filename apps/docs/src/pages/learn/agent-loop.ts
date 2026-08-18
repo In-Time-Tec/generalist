@@ -7,7 +7,7 @@ export const agentLoop = definePage({
   navTitle: "The agent loop",
   group: "Learn",
   description:
-    "What a turn is, when follow-up turns run, and why the AgentEvent stream is the whole observable surface of a Batonfx run.",
+    "What a turn is, when follow-up turns run, and why the AgentEvent stream is the whole observable surface of a TenetKit run.",
   content: [
     p(
       "An ",
@@ -22,7 +22,7 @@ export const agentLoop = definePage({
     ),
     h2("what-a-turn-is", "What a turn is"),
     p(
-      "A turn is one model call plus the sequential execution of every tool call that model call emits. Turn 0 always runs. When the model responds with tool calls, Batonfx executes them in order through the ",
+      "A turn is one model call plus the sequential execution of every tool call that model call emits. Turn 0 always runs. When the model responds with tool calls, TenetKit executes them in order through the ",
       code("ToolExecutor"),
       " service, collects the results, and feeds them back to the model via ",
       code("Ai.Prompt.fromResponseParts(...)"),
@@ -30,7 +30,7 @@ export const agentLoop = definePage({
       code("Ai.Chat"),
       " with ",
       code("disableToolCallResolution: true"),
-      ", so Batonfx, not the model client, owns tool execution, gating, and re-feeding.",
+      ", so TenetKit, not the model client, owns tool execution, gating, and re-feeding.",
     ),
     p(
       "Pending tool results are never silently dropped. If the policy stops the loop while results are still waiting to be re-fed, the run fails with ",

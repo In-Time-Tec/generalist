@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
 
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,

@@ -50,7 +50,7 @@ export const instructions = definePage({
     p(
       code("InstructionFiles.loadInstructionFiles"),
       " from ",
-      code("@batonfx/skills"),
+      code("tenetkit/skills"),
       " walks ancestor directories for ",
       code("AGENTS.md"),
       " or ",

@@ -10,12 +10,12 @@ import {
   SkillSource,
   Tool,
   Toolkit,
-} from "@batonfx/core"
-import { Chat, Connection } from "@batonfx/foldkit"
-import { WorkingMemory } from "@batonfx/memory"
-import { Deterministic } from "@batonfx/providers"
-import { SkillLoader } from "@batonfx/skills"
-import { ExecutableManifest } from "@batonfx/runtime"
+} from "tenetkit"
+import { Chat, Connection } from "tenetkit/foldkit"
+import { WorkingMemory } from "tenetkit/memory"
+import { Deterministic } from "tenetkit/ai"
+import { SkillLoader } from "tenetkit/skills"
+import { ExecutableManifest } from "tenetkit/runtime"
 
 const researchFrontmatter: SkillSource.Frontmatter = {
   name: "research",

@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
-import { ToolContext, ToolExecutor } from "@batonfx/core"
+import { ToolContext, ToolExecutor } from "tenetkit"
 import { Response } from "effect/unstable/ai"
-import { Cell, CellTool, KernelProfile, TestKernel } from "@batonfx/repl"
+import { Cell, CellTool, KernelProfile, TestKernel } from "tenetkit/repl"
 
 const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },

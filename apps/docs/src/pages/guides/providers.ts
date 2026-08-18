@@ -11,10 +11,10 @@ export const providers = definePage({
   navTitle: "Register model providers",
   group: "Guides",
   description:
-    "Bind provider and model pairs to language-model layers with @batonfx/providers, combine registries, and keep a deterministic fallback for keyless environments.",
+    "Bind provider and model pairs to language-model layers with tenetkit/ai, combine registries, and keep a deterministic fallback for keyless environments.",
   content: [
     p(
-      code("@batonfx/core"),
+      code("tenetkit"),
       " is provider-agnostic: ",
       code("ModelRegistry"),
       " maps a ",
@@ -24,12 +24,12 @@ export const providers = definePage({
       " layer and fails with a typed ",
       code("LanguageModelNotRegistered"),
       " when the selection is missing. ",
-      code("@batonfx/providers"),
+      code("tenetkit/ai"),
       " adds registration helpers over the upstream ",
       code("@effect/ai-*"),
       " packages.",
     ),
-    command("Terminal", "bun add @batonfx/core @batonfx/providers"),
+    command("Terminal", "bun add tenetkit tenetkit/ai"),
     h2("register-one-provider", "1. Register a provider"),
     p(
       "Each provider module ships one ",
@@ -90,7 +90,7 @@ export const providers = definePage({
       code("LanguageModel"),
       " layer rather than a registry, the deep-research example builds the same fallback at the model-layer level; see ",
       link(
-        "https://github.com/In-Time-Tec/batonfx/blob/main/examples/deep-research-agent/server/src/model.ts",
+        "https://github.com/In-Time-Tec/tenetkit/blob/main/examples/deep-research-agent/server/src/model.ts",
         "layerOrDeterministic in examples/deep-research-agent",
       ),
       ".",
@@ -119,7 +119,7 @@ export const providers = definePage({
     ),
     h2("recipe-gemini", "Recipe: Gemini via the OpenAI-compatible preset"),
     p(
-      "Baton has no first-party Google helper yet because the upstream Effect AI Google provider is not compatible with the pinned beta, but Google AI Studio speaks the OpenAI protocol. Register it with the ",
+      "TenetKit has no first-party Google helper yet because the upstream Effect AI Google provider is not compatible with the pinned beta, but Google AI Studio speaks the OpenAI protocol. Register it with the ",
       code("layerGoogleAiStudio"),
       " preset and select ",
       code('{ provider: "google", model: "gemini-2.0-flash" }'),
@@ -130,7 +130,7 @@ export const providers = definePage({
       "For context windows and pricing of models reached through presets, pass overrides to the offline ",
       code("Catalog.layer"),
       ". The full export map is in ",
-      link("/docs/reference/providers", "the @batonfx/providers reference"),
+      link("/docs/reference/providers", "the tenetkit/ai reference"),
       ". To pin loop behavior without any provider at all, see ",
       link("/docs/guides/testing-evals", "How to test agents and run evals in CI"),
       ".",

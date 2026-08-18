@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "@batonfx/core"
-import { McpToolSource } from "@batonfx/mcp"
-import { layerToolkit, toolkit } from "@batonfx/mcp/baton"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "tenetkit"
+import { McpToolSource } from "tenetkit/mcp"
+import { layerToolkit, toolkit } from "tenetkit/mcp/tools"
 const source: McpToolSource.Interface = {
   server: "local",
   tools: Effect.succeed([

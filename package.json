@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "batonfx",
-  "version": "0.27.7",
+  "name": "tenetkit-workspace",
+  "version": "0.28.0",
   "description": "Effect-native agent framework with an optional durable Runtime",
   "private": true,
   "type": "module",
@@ -73,19 +73,9 @@
     }
   },
   "dependencies": {
-    "@batonfx/a2a": "workspace:*",
-    "@batonfx/ag-ui": "workspace:*",
-    "@batonfx/core": "workspace:*",
-    "@batonfx/foldkit": "workspace:*",
-    "@batonfx/harness": "workspace:*",
-    "@batonfx/memory": "workspace:*",
-    "@batonfx/mcp": "workspace:*",
-    "@batonfx/providers": "workspace:*",
-    "@batonfx/repl": "workspace:*",
-    "@batonfx/runtime": "workspace:*",
-    "@batonfx/skills": "workspace:*",
-    "@batonfx/test": "workspace:*",
-    "@batonfx/transport": "workspace:*",
+    "@tenetkit/mysql": "workspace:*",
+    "@tenetkit/pg": "workspace:*",
+    "tenetkit": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

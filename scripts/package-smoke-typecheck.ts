@@ -13,17 +13,17 @@ import {
   ModelResilience,
   Session,
   ToolOutput,
-} from "@batonfx/core"
-import { A2A } from "@batonfx/a2a"
-import { AgUi } from "@batonfx/ag-ui"
-import { VectorStore } from "@batonfx/memory"
-import { OAuth, McpToolSource } from "@batonfx/mcp"
-import { route as mcpRoute, type BatonTools, type Options as McpRouteOptions } from "@batonfx/mcp/baton"
-import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
-import { AmazonBedrock, Catalog, OpenAi } from "@batonfx/providers"
-import { TestModel } from "@batonfx/test"
-import { Cursor, Runtime, RunEvent } from "@batonfx/runtime"
-import { Client, Snapshot, Sse, Wire, Ws } from "@batonfx/transport"
+} from "tenetkit"
+import { A2A } from "tenetkit/a2a"
+import { AgUi } from "tenetkit/ag-ui"
+import { VectorStore } from "tenetkit/memory"
+import { OAuth, McpToolSource } from "tenetkit/mcp"
+import { route as mcpRoute, type McpTools, type Options as McpRouteOptions } from "tenetkit/mcp/tools"
+import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
+import { AmazonBedrock, Catalog, OpenAi } from "tenetkit/ai"
+import { TestModel } from "tenetkit/test"
+import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
+import { Client, Snapshot, Sse, Wire, Ws } from "tenetkit/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
@@ -35,7 +35,7 @@ type Equal<Left, Right> =
     : false
 type Assert<Value extends true> = Value
 type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
-type SkillsRoot = typeof import("@batonfx/skills")
+type SkillsRoot = typeof import("tenetkit/skills")
 type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRoot ? true : false, false>>
 type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
 type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>
@@ -46,9 +46,9 @@ type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonl
 type MiddlewareCanonical = Assert<
   Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>
 >
-type ModelResilienceFailureInput = Assert<Equal<ModelResilience.FailureInput, import("@batonfx/core").ModelResilience.FailureInput>>
+type ModelResilienceFailureInput = Assert<Equal<ModelResilience.FailureInput, import("tenetkit").ModelResilience.FailureInput>>
 type ModelResilienceFailureResolver = Assert<
-  Equal<ModelResilience.FailureResolver, import("@batonfx/core").ModelResilience.FailureResolver>
+  Equal<ModelResilience.FailureResolver, import("tenetkit").ModelResilience.FailureResolver>
 >
 type SessionCanonical = Assert<
   Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionStore, never, never]>
@@ -77,42 +77,42 @@ type PersistedRunRequirements = Assert<
   >
 >
 void Handoff
-type ProviderRoot = typeof import("@batonfx/providers")
-type TransportRoot = typeof import("@batonfx/transport")
-type RuntimeRoot = typeof import("@batonfx/runtime")
-type A2ARoot = typeof import("@batonfx/a2a")
-type AgUiRoot = typeof import("@batonfx/ag-ui")
+type ProviderRoot = typeof import("tenetkit/ai")
+type TransportRoot = typeof import("tenetkit/transport")
+type RuntimeRoot = typeof import("tenetkit/runtime")
+type A2ARoot = typeof import("tenetkit/a2a")
+type AgUiRoot = typeof import("tenetkit/ag-ui")
 type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
 type AgUiCanonical = Assert<Equal<AgUiRoot["AgUi"], typeof AgUi>>
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
 type RunEventCanonical = Assert<Equal<RuntimeRoot["RunEvent"], typeof RunEvent>>
-type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("@batonfx/providers/catalog")>>
-type ProviderOpenAiSubpath = Assert<Equal<ProviderRoot["OpenAi"], typeof import("@batonfx/providers/openai")>>
+type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("tenetkit/ai/catalog")>>
+type ProviderOpenAiSubpath = Assert<Equal<ProviderRoot["OpenAi"], typeof import("tenetkit/ai/openai")>>
 type ProviderOpenAiAccountAuthSubpath = Assert<
-  Equal<ProviderRoot["OpenAiAccountAuth"], typeof import("@batonfx/providers/openai-account-auth")>
+  Equal<ProviderRoot["OpenAiAccountAuth"], typeof import("tenetkit/ai/openai-account-auth")>
 >
 type ProviderOpenAiAccountAuthHttpSubpath = Assert<
-  Equal<ProviderRoot["OpenAiAccountAuthHttp"], typeof import("@batonfx/providers/openai-account-auth-http")>
+  Equal<ProviderRoot["OpenAiAccountAuthHttp"], typeof import("tenetkit/ai/openai-account-auth-http")>
 >
-type ProviderAnthropicSubpath = Assert<Equal<ProviderRoot["Anthropic"], typeof import("@batonfx/providers/anthropic")>>
+type ProviderAnthropicSubpath = Assert<Equal<ProviderRoot["Anthropic"], typeof import("tenetkit/ai/anthropic")>>
 type ProviderAmazonBedrockSubpath = Assert<
-  Equal<ProviderRoot["AmazonBedrock"], typeof import("@batonfx/providers/amazon-bedrock")>
+  Equal<ProviderRoot["AmazonBedrock"], typeof import("tenetkit/ai/amazon-bedrock")>
 >
-type ProviderOpenRouterSubpath = Assert<Equal<ProviderRoot["OpenRouter"], typeof import("@batonfx/providers/openrouter")>>
+type ProviderOpenRouterSubpath = Assert<Equal<ProviderRoot["OpenRouter"], typeof import("tenetkit/ai/openrouter")>>
 type ProviderOpenAiCompatibleSubpath = Assert<
-  Equal<ProviderRoot["OpenAiCompatible"], typeof import("@batonfx/providers/openai-compat")>
+  Equal<ProviderRoot["OpenAiCompatible"], typeof import("tenetkit/ai/openai-compat")>
 >
 type ProviderDeterministicSubpath = Assert<
-  Equal<ProviderRoot["Deterministic"], typeof import("@batonfx/providers/deterministic")>
+  Equal<ProviderRoot["Deterministic"], typeof import("tenetkit/ai/deterministic")>
 >
-type ProviderPresetsSubpath = Assert<Equal<ProviderRoot["Presets"], typeof import("@batonfx/providers/presets")>>
-type ProviderEmbeddingSubpath = Assert<Equal<ProviderRoot["Embedding"], typeof import("@batonfx/providers/embedding")>>
-type TransportClientSubpath = Assert<Equal<TransportRoot["Client"], typeof import("@batonfx/transport/client")>>
-type TransportErrorsSubpath = Assert<Equal<TransportRoot["Errors"], typeof import("@batonfx/transport/errors")>>
-type TransportSseSubpath = Assert<Equal<TransportRoot["Sse"], typeof import("@batonfx/transport/sse")>>
-type TransportWsSubpath = Assert<Equal<TransportRoot["Ws"], typeof import("@batonfx/transport/ws")>>
-type TransportWireSubpath = Assert<Equal<TransportRoot["Wire"], typeof import("@batonfx/transport/wire")>>
-type TransportSnapshotSubpath = Assert<Equal<TransportRoot["Snapshot"], typeof import("@batonfx/transport/snapshot")>>
+type ProviderPresetsSubpath = Assert<Equal<ProviderRoot["Presets"], typeof import("tenetkit/ai/presets")>>
+type ProviderEmbeddingSubpath = Assert<Equal<ProviderRoot["Embedding"], typeof import("tenetkit/ai/embedding")>>
+type TransportClientSubpath = Assert<Equal<TransportRoot["Client"], typeof import("tenetkit/transport/client")>>
+type TransportErrorsSubpath = Assert<Equal<TransportRoot["Errors"], typeof import("tenetkit/transport/errors")>>
+type TransportSseSubpath = Assert<Equal<TransportRoot["Sse"], typeof import("tenetkit/transport/sse")>>
+type TransportWsSubpath = Assert<Equal<TransportRoot["Ws"], typeof import("tenetkit/transport/ws")>>
+type TransportWireSubpath = Assert<Equal<TransportRoot["Wire"], typeof import("tenetkit/transport/wire")>>
+type TransportSnapshotSubpath = Assert<Equal<TransportRoot["Snapshot"], typeof import("tenetkit/transport/snapshot")>>
 const cursor: Cursor.Cursor = Cursor.origin
 const snapshot = Snapshot.get("run:package-smoke")
 const producerCodec = Wire.producerCodec
@@ -158,7 +158,7 @@ const routeOptions: McpRouteOptions = {
   transport: { kind: "http", url: "https://mcp.example/rpc" },
 }
 const routed: Effect.Effect<
-  BatonTools,
+  McpTools,
   McpToolSource.McpConnectionFailed | OAuth.OAuthPending | OAuth.OAuthProviderError,
   Scope.Scope
 > = mcpRoute(routeOptions)

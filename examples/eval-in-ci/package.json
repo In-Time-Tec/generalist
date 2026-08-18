@@ -1,5 +1,5 @@
 {
-  "name": "@batonfx/example-eval-in-ci",
+  "name": "@tenetkit/example-eval-in-ci",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,8 +7,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "@batonfx/core": "workspace:*",
-    "@batonfx/providers": "workspace:*",
+    "tenetkit": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

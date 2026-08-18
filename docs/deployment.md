@@ -1,9 +1,9 @@
 # Deployment
 
-The docs site (`apps/docs`) deploys through Railway project `batonfx` with two GitHub-triggered environments, both gated on green CI:
+The docs site (`apps/docs`) deploys through Railway project `tenetkit` with two GitHub-triggered environments, both gated on green CI:
 
-- Staging https://batonfx-docs-staging.up.railway.app — auto-deploys every push to `main`.
-- Production https://batonfx-docs.up.railway.app — auto-deploys every push to `release`.
+- Staging https://tenetkit-docs-staging.up.railway.app — auto-deploys every push to `main`.
+- Production https://tenetkit-docs.up.railway.app — auto-deploys every push to `release`.
 
 Promote staging to production:
 

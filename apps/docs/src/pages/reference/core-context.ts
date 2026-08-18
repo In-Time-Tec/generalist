@@ -7,9 +7,9 @@ export const coreContextReference = definePage({
   description: "Instructions, SkillSource, Memory, Session, Compaction, Steering, and Handoff.",
   content: [
     lead(
-      "Seven namespaces of @batonfx/core shape what the model sees and how a conversation persists. All are optional seams discovered per run; absent means default behavior.",
+      "Seven namespaces of tenetkit shape what the model sees and how a conversation persists. All are optional seams discovered per run; absent means default behavior.",
     ),
-    command("Install", "bun add @batonfx/core"),
+    command("Install", "bun add tenetkit"),
     h2("instructions", "Instructions"),
     p(
       "An ordered registry of ",
@@ -110,7 +110,7 @@ export const coreContextReference = definePage({
         [[code("MemoryError")], [code("{ message }")]],
       ],
     ),
-    p("Implementations live in ", link("/docs/reference/memory", "@batonfx/memory"), "."),
+    p("Implementations live in ", link("/docs/reference/memory", "tenetkit/memory"), "."),
     h2("session", "Session"),
     p(
       "An append-only entry log with a leaf pointer. ",
@@ -189,7 +189,7 @@ export const coreContextReference = definePage({
         ],
         [
           [code("keepRecent({ tokens })")],
-          "Token-denominated recent suffix target; Baton does not infer turns from message roles",
+          "Token-denominated recent suffix target; TenetKit does not infer turns from message roles",
         ],
         [
           [code("layer(options?, strategy?)")],

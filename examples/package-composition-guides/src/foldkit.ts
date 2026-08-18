@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
-import { Connection } from "@batonfx/foldkit"
+import { Connection } from "tenetkit/foldkit"
 
 const connectionLayer = Connection.layerTest({
   frames: () => Stream.make(Connection.ConnectionOpened()),

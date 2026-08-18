@@ -1,4 +1,4 @@
-# BatonFX Effect v4 Lint Conformance — Final State
+# TenetKit Effect v4 Lint Conformance — Final State
 
 Branch: `lint/conformance` (71 commits on top of `main` @ ce1f6e4)
 

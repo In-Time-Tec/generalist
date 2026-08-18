@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime, Schedule } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ModelResilience, ToolExecutor } from "@batonfx/core"
-import { OpenRouter } from "@batonfx/providers"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ModelResilience, ToolExecutor } from "tenetkit"
+import { OpenRouter } from "tenetkit/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "assistant" })

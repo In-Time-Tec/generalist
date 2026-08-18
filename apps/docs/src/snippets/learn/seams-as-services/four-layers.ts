@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, LanguageModel, Response } from "@batonfx/core"
+import { Agent, LanguageModel, Response } from "tenetkit"
 
 const agent = Agent.make({
   name: "minimal-agent",

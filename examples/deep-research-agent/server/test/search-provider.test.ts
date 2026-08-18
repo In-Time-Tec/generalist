@@ -47,8 +47,8 @@ describe("SearchProvider", () => {
         new Response(
           encodeJson({
             results: [
-              { title: "Baton transport", url: "https://baton.test/transport", text: "Exa text result" },
-              { title: null, url: "https://baton.test/snippet", snippet: "Exa snippet result" },
+              { title: "TenetKit transport", url: "https://tenetkit.test/transport", text: "Exa text result" },
+              { title: null, url: "https://tenetkit.test/snippet", snippet: "Exa snippet result" },
               { title: null, url: null, highlights: ["first highlight", "second highlight"] },
             ],
           }),
@@ -65,8 +65,12 @@ describe("SearchProvider", () => {
           const results = yield* search("baton transport")
 
           expect(results).toEqual([
-            { title: "Baton transport", url: "https://baton.test/transport", snippet: "Exa text result" },
-            { title: "https://baton.test/snippet", url: "https://baton.test/snippet", snippet: "Exa snippet result" },
+            { title: "TenetKit transport", url: "https://tenetkit.test/transport", snippet: "Exa text result" },
+            {
+              title: "https://tenetkit.test/snippet",
+              url: "https://tenetkit.test/snippet",
+              snippet: "Exa snippet result",
+            },
             { title: "Untitled", url: "", snippet: "first highlight\nsecond highlight" },
           ])
           expect(captured).toEqual([

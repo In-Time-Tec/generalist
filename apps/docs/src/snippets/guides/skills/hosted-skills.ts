@@ -1,7 +1,7 @@
 import { Crypto, FileSystem, Layer, Path } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { SkillSource } from "@batonfx/core"
-import { GitHubCatalog, HttpCatalog, S3Catalog, SkillLoader } from "@batonfx/skills"
+import { SkillSource } from "tenetkit"
+import { GitHubCatalog, HttpCatalog, S3Catalog, SkillLoader } from "tenetkit/skills"
 
 export const skills: Layer.Layer<
   SkillSource.SkillSource,

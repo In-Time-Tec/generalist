@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "tenetkit"
 
 const dropTableTool = Tool.make("drop_table", {
   description: "Drop a database table",
@@ -35,7 +35,7 @@ const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, { prompt: "Drop the users table." })
   yield* Console.log(result.text)
 }).pipe(
-  Effect.catchTag("@batonfx/core/FrameworkFailure", (failure) =>
+  Effect.catchTag("tenetkit/core/FrameworkFailure", (failure) =>
     Console.log(`${failure.tool} ${failure.stage}: ${failure.message}`),
   ),
 )

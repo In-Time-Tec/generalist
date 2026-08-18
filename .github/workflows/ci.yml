@@ -47,8 +47,8 @@ jobs:
           --health-timeout 3s
           --health-retries 60
     env:
-      BATON_DATABASE_URL: postgres://baton:baton@127.0.0.1:55432/baton
-      BATON_MYSQL_URL: mysql://baton:baton@127.0.0.1:33306/baton
+      TENETKIT_DATABASE_URL: postgres://baton:baton@127.0.0.1:55432/baton
+      TENETKIT_MYSQL_URL: mysql://baton:baton@127.0.0.1:33306/baton
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

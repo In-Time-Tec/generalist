@@ -5,100 +5,100 @@ message: Provider construction is Layer-only; use the provider module's layer co
 rule:
   any:
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers"
+        context: import { $API as $LOCAL } from "tenetkit/ai"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers"
+        context: import { $API } from "tenetkit/ai"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers"
+        context: export { $API as $LOCAL } from "tenetkit/ai"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers"
+        context: export { $API } from "tenetkit/ai"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers/anthropic"
+        context: import { $API as $LOCAL } from "tenetkit/ai/anthropic"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers/anthropic"
+        context: import { $API } from "tenetkit/ai/anthropic"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers/anthropic"
+        context: export { $API as $LOCAL } from "tenetkit/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers/anthropic"
+        context: export { $API } from "tenetkit/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers/openai"
+        context: import { $API as $LOCAL } from "tenetkit/ai/openai"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers/openai"
+        context: import { $API } from "tenetkit/ai/openai"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers/openai"
+        context: export { $API as $LOCAL } from "tenetkit/ai/openai"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers/openai"
+        context: export { $API } from "tenetkit/ai/openai"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers/openai-compat"
+        context: import { $API as $LOCAL } from "tenetkit/ai/openai-compat"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers/openai-compat"
+        context: import { $API } from "tenetkit/ai/openai-compat"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers/openai-compat"
+        context: export { $API as $LOCAL } from "tenetkit/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers/openai-compat"
+        context: export { $API } from "tenetkit/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers/openrouter"
+        context: import { $API as $LOCAL } from "tenetkit/ai/openrouter"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers/openrouter"
+        context: import { $API } from "tenetkit/ai/openrouter"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers/openrouter"
+        context: export { $API as $LOCAL } from "tenetkit/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers/openrouter"
+        context: export { $API } from "tenetkit/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers/deterministic"
+        context: import { $API as $LOCAL } from "tenetkit/ai/deterministic"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers/deterministic"
+        context: import { $API } from "tenetkit/ai/deterministic"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers/deterministic"
+        context: export { $API as $LOCAL } from "tenetkit/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers/deterministic"
+        context: export { $API } from "tenetkit/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers/embedding"
+        context: import { $API as $LOCAL } from "tenetkit/ai/embedding"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers/embedding"
+        context: import { $API } from "tenetkit/ai/embedding"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers/embedding"
+        context: export { $API as $LOCAL } from "tenetkit/ai/embedding"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers/embedding"
+        context: export { $API } from "tenetkit/ai/embedding"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "@batonfx/providers/presets"
+        context: import { $API as $LOCAL } from "tenetkit/ai/presets"
         selector: import_statement
     - pattern:
-        context: import { $API } from "@batonfx/providers/presets"
+        context: import { $API } from "tenetkit/ai/presets"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "@batonfx/providers/presets"
+        context: export { $API as $LOCAL } from "tenetkit/ai/presets"
         selector: export_statement
     - pattern:
-        context: export { $API } from "@batonfx/providers/presets"
+        context: export { $API } from "tenetkit/ai/presets"
         selector: export_statement
 constraints:
   API:

@@ -2,16 +2,16 @@ import { code, command, definePage, h2, lead, link, p, table } from "../../prose
 
 export const transportReference = definePage({
   path: "/docs/reference/transport",
-  title: "@batonfx/transport",
+  title: "tenetkit/transport",
   navTitle: "transport",
   group: "Reference",
   description: "Runtime RunEvent wire codecs, SSE and WebSocket handlers, snapshots, and reconnecting clients.",
   content: [
     lead(
-      "@batonfx/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
+      "tenetkit/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
     ),
-    command("Install", "bun add @batonfx/runtime @batonfx/transport"),
-    p("Published on npm at 0.14.0. Requires ", code("@batonfx/runtime"), "."),
+    command("Install", "bun add tenetkit/runtime tenetkit/transport"),
+    p("Published on npm at 0.14.0. Requires ", code("tenetkit/runtime"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -56,9 +56,9 @@ export const transportReference = definePage({
     ),
     p(
       "See ",
-      link("/docs/reference/runtime", "@batonfx/runtime"),
+      link("/docs/reference/runtime", "tenetkit/runtime"),
       " for Run ownership and ",
-      link("/docs/reference/foldkit", "@batonfx/foldkit"),
+      link("/docs/reference/foldkit", "tenetkit/foldkit"),
       " for the UI projection.",
     ),
   ],

@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
-import { KernelPool, KernelProfile, CellTool, TestKernel } from "@batonfx/repl"
+import { KernelPool, KernelProfile, CellTool, TestKernel } from "tenetkit/repl"
 
 const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },

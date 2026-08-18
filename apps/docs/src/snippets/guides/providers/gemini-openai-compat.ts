@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
-import { Presets } from "@batonfx/providers"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
+import { Presets } from "tenetkit/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "gemini-agent" })

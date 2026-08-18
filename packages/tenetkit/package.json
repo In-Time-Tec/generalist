@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "version": "0.28.0",
+  "private": false,
+  "type": "module",
+  "sideEffects": false,
+  "peerDependencies": {
+    "effect": "catalog:",
+    "foldkit": "catalog:peer"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "tenetkit",
+  "description": "Effect-native agent framework with an optional durable runtime",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js"
+    },
+    "./ai": {
+      "types": "./dist/ai/index.d.ts",
+      "import": "./dist/ai/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
+    },
+    "./skills": {
+      "types": "./dist/skills/index.d.ts",
+      "import": "./dist/skills/index.js"
+    },
+    "./memory": {
+      "types": "./dist/memory/index.d.ts",
+      "import": "./dist/memory/index.js"
+    },
+    "./harness": {
+      "types": "./dist/harness/index.d.ts",
+      "import": "./dist/harness/index.js"
+    },
+    "./transport": {
+      "types": "./dist/transport/index.d.ts",
+      "import": "./dist/transport/index.js"
+    },
+    "./foldkit": {
+      "types": "./dist/foldkit/index.d.ts",
+      "import": "./dist/foldkit/index.js"
+    },
+    "./test": {
+      "types": "./dist/test/index.d.ts",
+      "import": "./dist/test/index.js"
+    },
+    "./a2a": {
+      "types": "./dist/a2a/index.d.ts",
+      "import": "./dist/a2a/index.js"
+    },
+    "./ag-ui": {
+      "types": "./dist/ag-ui/index.d.ts",
+      "import": "./dist/ag-ui/index.js"
+    },
+    "./repl": {
+      "types": "./dist/repl/index.d.ts",
+      "import": "./dist/repl/index.js"
+    },
+    "./ai/catalog": {
+      "types": "./dist/ai/catalog/catalog.d.ts",
+      "import": "./dist/ai/catalog/catalog.js"
+    },
+    "./ai/openai": {
+      "types": "./dist/ai/provider/openai.d.ts",
+      "import": "./dist/ai/provider/openai.js"
+    },
+    "./ai/openai-account-auth": {
+      "types": "./dist/ai/provider/openai-account-auth.d.ts",
+      "import": "./dist/ai/provider/openai-account-auth.js"
+    },
+    "./ai/openai-account-auth-http": {
+      "types": "./dist/ai/provider/openai-account-auth-http.d.ts",
+      "import": "./dist/ai/provider/openai-account-auth-http.js"
+    },
+    "./ai/anthropic": {
+      "types": "./dist/ai/provider/anthropic.d.ts",
+      "import": "./dist/ai/provider/anthropic.js"
+    },
+    "./ai/amazon-bedrock": {
+      "types": "./dist/ai/provider/amazon-bedrock.d.ts",
+      "import": "./dist/ai/provider/amazon-bedrock.js"
+    },
+    "./ai/openrouter": {
+      "types": "./dist/ai/provider/openrouter.d.ts",
+      "import": "./dist/ai/provider/openrouter.js"
+    },
+    "./ai/openai-compat": {
+      "types": "./dist/ai/provider/openai-compat.d.ts",
+      "import": "./dist/ai/provider/openai-compat.js"
+    },
+    "./ai/deterministic": {
+      "types": "./dist/ai/provider/deterministic.d.ts",
+      "import": "./dist/ai/provider/deterministic.js"
+    },
+    "./ai/presets": {
+      "types": "./dist/ai/catalog/presets.d.ts",
+      "import": "./dist/ai/catalog/presets.js"
+    },
+    "./ai/embedding": {
+      "types": "./dist/ai/model/embedding.d.ts",
+      "import": "./dist/ai/model/embedding.js"
+    },
+    "./mcp/tools": {
+      "types": "./dist/mcp/mcp/tools.d.ts",
+      "import": "./dist/mcp/mcp/tools.js"
+    },
+    "./repl/bun": {
+      "types": "./dist/repl/repl/bun.d.ts",
+      "import": "./dist/repl/repl/bun.js"
+    },
+    "./transport/client": {
+      "types": "./dist/transport/transport/client.d.ts",
+      "import": "./dist/transport/transport/client.js"
+    },
+    "./transport/errors": {
+      "types": "./dist/transport/transport/errors.d.ts",
+      "import": "./dist/transport/transport/errors.js"
+    },
+    "./transport/sse": {
+      "types": "./dist/transport/transport/sse.d.ts",
+      "import": "./dist/transport/transport/sse.js"
+    },
+    "./transport/ws": {
+      "types": "./dist/transport/transport/ws.d.ts",
+      "import": "./dist/transport/transport/ws.js"
+    },
+    "./transport/wire": {
+      "types": "./dist/transport/transport/wire.d.ts",
+      "import": "./dist/transport/transport/wire.js"
+    },
+    "./transport/snapshot": {
+      "types": "./dist/transport/transport/snapshot.d.ts",
+      "import": "./dist/transport/transport/snapshot.js"
+    },
+    "./runtime/driver": {
+      "types": "./dist/runtime/driver/index.d.ts",
+      "import": "./dist/runtime/driver/index.js"
+    },
+    "./runtime/driver/sql": {
+      "types": "./dist/runtime/driver/sql.d.ts",
+      "import": "./dist/runtime/driver/sql.js"
+    },
+    "./runtime/driver/*": {
+      "types": "./dist/runtime/*.d.ts",
+      "import": "./dist/runtime/*.js"
+    },
+    "./runtime/driver/sql/*": {
+      "types": "./dist/runtime/sql/*.d.ts",
+      "import": "./dist/runtime/sql/*.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
+    "lint": "bun --cwd ../.. oxlint packages/tenetkit/src packages/tenetkit/test",
+    "test": "bun --bun --cwd ../.. vitest run packages/tenetkit/test --no-file-parallelism",
+    "typecheck": "bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": "catalog:",
+    "@ag-ui/core": "catalog:",
+    "@aws-sdk/client-bedrock-runtime": "catalog:",
+    "@aws-sdk/credential-provider-node": "catalog:",
+    "@effect/ai-anthropic": "catalog:",
+    "@effect/ai-openai": "catalog:",
+    "@effect/ai-openai-compat": "catalog:",
+    "@effect/ai-openrouter": "catalog:",
+    "@effect/sql-sqlite-bun": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@smithy/types": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-bun": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "effect": "catalog:",
+    "foldkit": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "directory": "packages/tenetkit"
+  },
+  "peerDependenciesMeta": {
+    "foldkit": {
+      "optional": true
+    }
+  }
+}

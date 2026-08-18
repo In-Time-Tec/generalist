@@ -87,42 +87,42 @@ it.effect("landing renders the shell", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
-    expect(document.body.textContent).toContain("Batonfx")
+    expect(document.body.textContent).toContain("TenetKit")
   }),
 )
 
-it.effect("landing h1 is exactly Batonfx", () =>
+it.effect("landing h1 is exactly TenetKit", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
-    expect(document.querySelector("h1")?.textContent).toBe("Batonfx")
+    expect(document.querySelector("h1")?.textContent).toBe("TenetKit")
   }),
 )
 
-it.effect("no rendered string says BatonFX", () =>
+it.effect("no rendered string says Baton", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
-    expect(document.body.textContent).not.toContain("BatonFX")
+    expect(document.body.textContent).not.toContain("Baton")
     expect(document.body.textContent).not.toContain("Baton Docs")
   }),
 )
 
 test("index.html declares the brand shell", () => {
-  expect(indexHtml).toContain("<title>Batonfx</title>")
-  expect(indexHtml).not.toContain("BatonFX")
+  expect(indexHtml).toContain("<title>TenetKit</title>")
+  expect(indexHtml).not.toContain("Baton")
   expect(indexHtml).toContain('href="/favicon.svg"')
   expect(indexHtml.indexOf("theme-init.js")).toBeGreaterThan(-1)
   expect(indexHtml.indexOf("theme-init.js")).toBeLessThan(indexHtml.indexOf("styles.css"))
 })
 
-it.effect("github links point at In-Time-Tec/batonfx", () =>
+it.effect("github links point at In-Time-Tec/tenetkit", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
     const links = Array.from(document.querySelectorAll('a[href*="github.com"]'))
     expect(links.length).toBeGreaterThan(0)
-    for (const link of links) expect(link.getAttribute("href")).toContain("In-Time-Tec/batonfx")
+    for (const link of links) expect(link.getAttribute("href")).toContain("In-Time-Tec/tenetkit")
   }),
 )
 
@@ -183,7 +183,7 @@ const assertPagesRender = Effect.fn("DocsSmokeTest.assertPagesRender")(function*
   bootAt(page.path)
   yield* settle
   expect(document.body.textContent).toContain(page.title)
-  expect(document.body.textContent).not.toContain("BatonFX")
+  expect(document.body.textContent).not.toContain("Baton")
   for (const entry of page.toc) expect(document.getElementById(entry.id), `${page.path}#${entry.id}`).not.toBeNull()
   yield* assertPagesRender(rest)
 })

@@ -1,11 +1,11 @@
 import { Context, Effect, Schema } from "effect"
-import { Tool, Toolkit } from "@batonfx/core"
+import { Tool, Toolkit } from "tenetkit"
 export interface DocsIndexInterface {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<string>>
 }
 
 export class DocsIndex extends Context.Service<DocsIndex, DocsIndexInterface>()(
-  "@batonfx/docs/snippets/guides/define-tools/search-tool/DocsIndex",
+  "@tenetkit/docs/snippets/guides/define-tools/search-tool/DocsIndex",
 ) {}
 
 export const searchDocsTool = Tool.make("search_docs", {

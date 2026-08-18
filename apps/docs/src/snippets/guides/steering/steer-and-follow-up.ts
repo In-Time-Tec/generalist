@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Steering, Tool, Toolkit } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Steering, Tool, Toolkit } from "tenetkit"
 
 const statusTool = Tool.make("check_status", {
   description: "Check the deploy status of a service",

@@ -24,7 +24,7 @@ import { themeSelector } from "./themeSelector"
 
 const h = html<Message>()
 
-export const githubUrl = "https://github.com/In-Time-Tec/batonfx"
+export const githubUrl = "https://github.com/In-Time-Tec/tenetkit"
 
 const foldkitUrl = "https://foldkit.dev"
 
@@ -166,7 +166,7 @@ const footer = (): Html =>
               ".",
             ],
           ),
-          h.p([], ["Batonfx"]),
+          h.p([], ["TenetKit"]),
         ],
       ),
     ],
@@ -191,7 +191,7 @@ const mobileNavDrawer = (model: Model): Html => {
             [h.Class("flex items-center gap-2")],
             [
               mark("size-6"),
-              h.span([h.Class("text-lg font-medium tracking-tight text-gray-900 dark:text-white")], ["Batonfx"]),
+              h.span([h.Class("text-lg font-medium tracking-tight text-gray-900 dark:text-white")], ["TenetKit"]),
               betaBadge(),
             ],
           ),

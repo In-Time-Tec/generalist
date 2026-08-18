@@ -9,7 +9,7 @@ import {
   Tool,
   Toolkit,
   TurnPolicy,
-} from "@batonfx/core"
+} from "tenetkit"
 
 const lookupTool = Tool.make("lookup", {
   description: "Look up one fact",

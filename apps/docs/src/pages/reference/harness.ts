@@ -1,17 +1,17 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
 export const harnessReference = definePage({
   path: "/docs/reference/harness",
-  title: "@batonfx/harness",
+  title: "tenetkit/harness",
   navTitle: "harness",
   group: "Reference",
   description:
     "The continual harness engine: versioned entries, audited refinements, rollback, scope merge, bounded overview, and content-addressed snapshots.",
   content: [
     lead(
-      "@batonfx/harness is the generic engine for agent guidance an agent may refine and a host may pin into a later Execution. It owns entry identity, versions, atomic proposals, rollback, scope overlay, bounded prompt overviews, and snapshot identity. Store locations, scope policy, and refine flows stay host-owned.",
+      "tenetkit/harness is the generic engine for agent guidance an agent may refine and a host may pin into a later Execution. It owns entry identity, versions, atomic proposals, rollback, scope overlay, bounded prompt overviews, and snapshot identity. Store locations, scope policy, and refine flows stay host-owned.",
     ),
-    command("Install", "bun add @batonfx/core @batonfx/harness"),
-    p("Requires ", code("@batonfx/core"), "."),
+    command("Install", "bun add tenetkit tenetkit/harness"),
+    p("Requires ", code("tenetkit"), "."),
     h2("entries", "Entry kinds"),
     p(
       "One harness state holds four kinds of entry, each keyed by ",
@@ -178,7 +178,7 @@ export const harnessReference = definePage({
       " over the schema version, scope, and encoded entries. Refinement history is audit data and stays outside the identity, so recording an event does not change what a snapshot means. ",
       code("HarnessSnapshot.encode"),
       " produces the closed-JSON payload a durable host records in an executable registration under codec ",
-      code("@batonfx/harness/snapshot"),
+      code("tenetkit/harness/snapshot"),
       ", version ",
       code("1"),
       ", and ",
@@ -217,7 +217,7 @@ export const harnessReference = definePage({
       " inside the destination directory, creating it at mode ",
       code("0700"),
       " when missing, then renames it over the target. A reader never observes a partial state, a failed write leaves the previous state intact and removes its temporary, saves of one scope are serialized, and a corrupt file fails typed and stays on disk instead of resetting the scope. See ",
-      link("/docs/reference/core-context", "@batonfx/core context"),
+      link("/docs/reference/core-context", "tenetkit context"),
       " for the instruction and skill seams a host composes it with.",
     ),
   ],

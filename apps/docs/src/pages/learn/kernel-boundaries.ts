@@ -116,7 +116,7 @@ export const kernelBoundaries = definePage({
     ),
     h2("not-authority", "Kernel memory is working memory"),
     p(
-      "Baton operations, events, Session entries, and children remain the only durable truth. Nothing in the kernel is consulted to reconstruct a run, and three contracts follow from that.",
+      "TenetKit operations, events, Session entries, and children remain the only durable truth. Nothing in the kernel is consulted to reconstruct a run, and three contracts follow from that.",
     ),
     table(
       ["Contract", "What it means in practice"],

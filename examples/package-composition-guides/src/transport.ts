@@ -1,9 +1,9 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, AgentManifest, Chat, Pins } from "@batonfx/core"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
-import { TestModel } from "@batonfx/test"
-import { Sse } from "@batonfx/transport"
+import { Agent, AgentManifest, Chat, Pins } from "tenetkit"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { TestModel } from "tenetkit/test"
+import { Sse } from "tenetkit/transport"
 
 const agent = Agent.make({ name: "transport-agent" })
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {

@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { ToolContext } from "@batonfx/core"
+import { ToolContext } from "tenetkit"
 
 export const crawlDocsHandler = Effect.fn("Docs.crawlDocs")(function* (params: { readonly startUrl: string }) {
   const context = yield* ToolContext.ToolContext

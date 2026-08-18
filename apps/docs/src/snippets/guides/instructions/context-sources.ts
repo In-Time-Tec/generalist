@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
 
 const persona = Instructions.staticSource("persona", "You are the release-notes assistant.")
 

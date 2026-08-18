@@ -1,7 +1,7 @@
 import { Console, Effect, ManagedRuntime } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Memory } from "@batonfx/core"
-import { WorkingMemory } from "@batonfx/memory"
+import { Memory } from "tenetkit"
+import { WorkingMemory } from "tenetkit/memory"
 
 const key: Memory.Key = { agent: "assistant", subject: "user-42" }
 const text = (value: string) => Prompt.makePart("text", { text: value })

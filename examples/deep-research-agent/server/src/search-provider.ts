@@ -44,14 +44,14 @@ const cannedTopics: ReadonlyArray<CannedTopic> = [
     keywords: ["baton", "agent sdk", "agent framework"],
     results: [
       {
-        title: "Baton: an Effect-native agent framework",
-        url: "https://github.com/batonfx/batonfx",
-        snippet: "Baton combines the process-local @batonfx/core agent loop with an optional native durable Runtime.",
+        title: "TenetKit: an Effect-native agent framework",
+        url: "https://github.com/tenetkit/tenetkit",
+        snippet: "TenetKit combines the process-local tenetkit agent loop with an optional native durable Runtime.",
       },
       {
-        title: "Baton docs - the agent loop",
+        title: "TenetKit docs - the agent loop",
         url: "https://baton.dev/docs/concepts/agent-loop",
-        snippet: "Baton's agent loop plans, calls tools over configurable turns, and synthesizes a final answer.",
+        snippet: "TenetKit's agent loop plans, calls tools over configurable turns, and synthesizes a final answer.",
       },
     ],
   },
@@ -75,12 +75,12 @@ const cannedTopics: ReadonlyArray<CannedTopic> = [
 const defaultResults: ReadonlyArray<SearchResult> = [
   {
     title: "Deep research agent demo corpus",
-    url: "https://github.com/batonfx/batonfx/tree/main/examples/deep-research-agent",
+    url: "https://github.com/tenetkit/tenetkit/tree/main/examples/deep-research-agent",
     snippet: "No EXA_API_KEY was configured, so this canned result stands in for a live web search over this question.",
   },
   {
-    title: "Baton - Runtime transport",
-    url: "https://github.com/batonfx/batonfx/blob/main/docs/features/transport.md",
+    title: "TenetKit - Runtime transport",
+    url: "https://github.com/tenetkit/tenetkit/blob/main/docs/features/transport.md",
     snippet: "SSE and WebSocket adapters project the Runtime-owned RunEvent stream to the browser.",
   },
 ]
@@ -113,7 +113,7 @@ export interface Interface {
 
 /** @experimental */
 export class Service extends Context.Service<Service, Interface>()(
-  "@batonfx/example-deep-research-agent-server/search-provider/Service",
+  "@tenetkit/example-deep-research-agent-server/search-provider/Service",
 ) {}
 
 const exaSearchBody = (query: string) => ({

@@ -2,13 +2,13 @@ import { code, command, definePage, h2, lead, link, p, table } from "../../prose
 
 export const runtimeReference = definePage({
   path: "/docs/reference/runtime",
-  title: "@batonfx/runtime",
+  title: "tenetkit/runtime",
   navTitle: "runtime",
   group: "Reference",
   description: "Addressable Run admission, canonical events, inspection, waits, stores, and workers.",
   content: [
-    lead("@batonfx/runtime owns the authoritative lifecycle for addressable Baton runs."),
-    command("Install", "bun add @batonfx/core @batonfx/runtime"),
+    lead("tenetkit/runtime owns the authoritative lifecycle for addressable TenetKit runs."),
+    command("Install", "bun add tenetkit tenetkit/runtime"),
     p("Published on npm at 0.14.0. All Runtime events and protocol adapters project from this package."),
     h2("surface", "Core surface"),
     table(

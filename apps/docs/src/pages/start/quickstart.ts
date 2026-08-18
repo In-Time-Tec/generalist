@@ -32,9 +32,9 @@ export const quickstart = definePage({
     codeBlock({ label: "Terminal", language: "bash", source: step1 }),
     p(
       "The install summary lists ",
-      code("@batonfx/core@0.14.0"),
+      code("tenetkit@0.14.0"),
       " and ",
-      code("@batonfx/providers@0.14.0"),
+      code("tenetkit/ai@0.14.0"),
       ". npm and pnpm work the same way; ",
       link("/docs/start/installation", "Installation"),
       " has the variants.",
@@ -61,7 +61,7 @@ export const quickstart = definePage({
     callout(
       "info",
       "The base run is small",
-      "A Batonfx run always needs a model. A tool-calling run also needs the Effect AI handler layer for its toolkit. ToolExecutor, approvals, middleware, permissions, memory, skills, compaction, and steering are optional seams: absent means default behavior. ",
+      "A TenetKit run always needs a model. A tool-calling run also needs the Effect AI handler layer for its toolkit. ToolExecutor, approvals, middleware, permissions, memory, skills, compaction, and steering are optional seams: absent means default behavior. ",
       link("/docs/learn/seams-as-services", "Seams as services"),
       " explains the two-tier model.",
     ),

@@ -224,10 +224,10 @@ export const searchDocs: {
 )
 
 const siteTagline =
-  "Batonfx: an Effect-native TypeScript agent framework with plain-value agents, typed event streams, deterministic service seams, and an optional native durable Runtime."
+  "TenetKit: an Effect-native TypeScript agent framework with plain-value agents, typed event streams, deterministic service seams, and an optional native durable Runtime."
 
 export const llmsIndex = (): string => {
-  const header: ReadonlyArray<string> = ["# Batonfx", "", `> ${siteTagline}`, ""]
+  const header: ReadonlyArray<string> = ["# TenetKit", "", `> ${siteTagline}`, ""]
   const sections = navGroups.flatMap((group) =>
     [`## ${group.title}`].concat(
       group.pages.map((page) => `- [${page.title}](${page.path}): ${page.description}`),
@@ -239,7 +239,7 @@ export const llmsIndex = (): string => {
 
 export const llmsFull = (): string =>
   [
-    "# Batonfx",
+    "# TenetKit",
     "",
     `> ${siteTagline}`,
     "",

@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { CellTool, KernelProfile } from "@batonfx/repl"
+import { CellTool, KernelProfile } from "tenetkit/repl"
 
 const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },

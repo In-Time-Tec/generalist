@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "version": "0.28.0",
+  "private": false,
+  "type": "module",
+  "sideEffects": false,
+  "peerDependencies": {
+    "effect": "catalog:"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@tenetkit/mysql",
+  "description": "MySQL runtime driver for TenetKit",
+  "exports": {
+    ".": {
+      "types": "./dist/mysql/index.d.ts",
+      "import": "./dist/mysql/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
+    "typecheck": "bun tsc --noEmit",
+    "test": "bun --bun --cwd ../.. vitest run packages/mysql/test --no-file-parallelism --maxWorkers=1"
+  },
+  "dependencies": {
+    "@effect/sql-mysql2": "catalog:",
+    "tenetkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "effect": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "directory": "packages/mysql"
+  }
+}

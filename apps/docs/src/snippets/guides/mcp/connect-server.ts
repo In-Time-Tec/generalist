@@ -1,7 +1,7 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "@batonfx/core"
-import { route } from "@batonfx/mcp/baton"
-import { OpenRouter } from "@batonfx/providers"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "tenetkit"
+import { route } from "tenetkit/mcp/tools"
+import { OpenRouter } from "tenetkit/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {

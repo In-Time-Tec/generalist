@@ -2,11 +2,24 @@
 
 ## Unreleased
 
+## 0.28.0
+
+Baton is now TenetKit. This release renames the project and replaces thirteen scoped packages with one package and two drivers. Every import changes.
+
+- Ship `tenetkit` as a single package with subpath exports in place of `@batonfx/core`, `@batonfx/runtime`, `@batonfx/providers`, and the ten other scoped packages. `tenetkit/ai`, `tenetkit/runtime`, `tenetkit/mcp`, and the rest are subpaths of one package rather than separate installs, so importing the model providers no longer pulls the durable runtime into a bundle that never asked for it. The SQL drivers stay separate as `@tenetkit/pg` and `@tenetkit/mysql` because each carries its own database client dependency.
+- Rename every brand-bearing surface a consumer can observe: error tags, service keys, telemetry span attributes, the `tenetkit-run-event-version` SSE header, the `tenetkit-tree:` cursor prefix, and the `TENETKIT_DATABASE_URL` and `TENETKIT_MYSQL_URL` environment variables. SQL table names keep their `baton_` prefix; they are persisted schema, and renaming them would strand every existing database.
+- Rename the MCP tool subpath to `tenetkit/mcp/tools` and its `BatonTools` interface to `McpTools`.
+- Move the dialect-agnostic runtime worker to `tenetkit/runtime/driver/sql/worker`. It had lived inside the PostgreSQL package, which left `@tenetkit/mysql` unable to export a `RuntimeWorker` at all.
+- Stop re-exporting Bun-only SQLite modules from `tenetkit/runtime/driver/sql`. The barrel pulled `bun:sqlite` through its migrator and store, so importing it under Node failed outright rather than at the point of use.
+- Resolve `RunClaims` in both SQL drivers. Each package re-exported a local module under that name, shadowing the runtime service it was supposed to provide.
+- Exclude `packages/**/test` from the root `tsconfig.json` no longer. The exclusion silently disabled type-aware linting across every test file and hid 242 errors behind a passing gate.
+- Name the root release tarball `tenetkit-<version>.tgz`. It packed as `tenetkit-tenetkit-<version>.tgz`, which no publish assertion matched.
+
 - Scale the test suite to the machine's own parallelism instead of the two workers a kernel scope-close hang once forced, and drop the two-minute cleanup ceilings that tolerated it. The suite runs in about half the time and a cleanup regression now fails fast instead of stalling. The cancellation test watches for the suppressed side effect throughout the window rather than sleeping once past it, which is both quicker and stricter.
 
 ## 0.27.7
 
-- Stop repeating a joined fan-out result in each member's settlement notification. The join already hands the parent every member outcome as the result of the call that started the group, so the notification delivered the same bytes a second time on a 16KB channel and arrived as a truncation notice for content the parent already held. A member of a joined fan-out now reports its status and nothing else, and a truncated standalone result names its child's terminal event — where the full result actually is — instead of a "result-handoff adapter" that exists nowhere in Baton.
+- Stop repeating a joined fan-out result in each member's settlement notification. The join already hands the parent every member outcome as the result of the call that started the group, so the notification delivered the same bytes a second time on a 16KB channel and arrived as a truncation notice for content the parent already held. A member of a joined fan-out now reports its status and nothing else, and a truncated standalone result names its child's terminal event — where the full result actually is — instead of a "result-handoff adapter" that exists nowhere in TenetKit.
 
 ## 0.27.6
 
@@ -154,8 +167,8 @@
 
 ## 0.14.0
 
-- Add `@batonfx/runtime` as the authoritative addressable Run lifecycle with replay, inspection, waits, cancellation, memory, SQLite, and PostgreSQL stores.
-- Add `@batonfx/a2a` and `@batonfx/ag-ui` as protocol projections over Runtime-owned runs, and move transport and FoldKit onto the same canonical `RunEvent` stream.
+- Add `tenetkit/runtime` as the authoritative addressable Run lifecycle with replay, inspection, waits, cancellation, memory, SQLite, and PostgreSQL stores.
+- Add `tenetkit/a2a` and `tenetkit/ag-ui` as protocol projections over Runtime-owned runs, and move transport and FoldKit onto the same canonical `RunEvent` stream.
 - Add the durable model-turn driver, tree run budgets, and same-run agent handoffs with deterministic operation identities and typed suspension propagation.
 - Expand the lockstep release train from eight to eleven public packages, publishing thirteen checksummed GitHub assets and the exact package tarballs to npm.
 
@@ -176,9 +189,9 @@
 
 - Persist deterministic model-attempt identities before provider construction, settle terminal stream parts even when downstream consumption stops at the boundary, and reject exhausted call ordinals before provider entry.
 - Preserve completed concurrent sibling tool results before propagating suspension or failure, including bounded and unbounded execution modes.
-- Validate model-emitted tool parameters before middleware, events, authorization, execution, or history. Invalid-tool correction now uses only Baton's precise typed signal and the active provider's exact registered tool JSON Schema compiler; generic `InvalidOutputError` values never trigger correction. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support schema-backed correction. OpenRouter rejects that policy before transport because its pinned adapter does not preserve a permissive dynamic tool's compiled request schema.
+- Validate model-emitted tool parameters before middleware, events, authorization, execution, or history. Invalid-tool correction now uses only TenetKit's precise typed signal and the active provider's exact registered tool JSON Schema compiler; generic `InvalidOutputError` values never trigger correction. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support schema-backed correction. OpenRouter rejects that policy before transport because its pinned adapter does not preserve a permissive dynamic tool's compiled request schema.
 - Preserve provider-reported usage from a withheld invalid-tool attempt until its terminal finish, and keep failed-attempt usage separate from the successful terminal attempt.
-- Remove `ResponseIdTracker` from the Baton surface and mask it inside instrumented calls so Effect's hidden incremental fallback cannot issue an uninstrumented second provider request.
+- Remove `ResponseIdTracker` from the TenetKit surface and mask it inside instrumented calls so Effect's hidden incremental fallback cannot issue an uninstrumented second provider request.
 - Make one instrumented model call the sole owner of provider retries and invalid-tool-call correction. Consumer-visible reasoning, text, or tool-call output is an absolute replay barrier; the separate whole-Agent consumed-stream restart path is removed.
 - Replace the hidden model-stream liveness backstop with optional `ModelResilience.streamIdleTimeout`. An explicit idle deadline fails with typed `ModelStreamTimeout`, retries only before output, and reports the `timeout` telemetry category.
 
@@ -241,7 +254,7 @@
 
 ## 0.8.0
 
-- Add the Effect v4 Amazon Bedrock provider with Converse and ConverseStream, tool and structured-output support, signed and redacted reasoning, AWS default-chain and bearer authentication, refreshable per-request credentials, and narrowly gated coalesced expired-credential recovery. Import it as `AmazonBedrock` from `@batonfx/providers` or from `@batonfx/providers/amazon-bedrock`.
+- Add the Effect v4 Amazon Bedrock provider with Converse and ConverseStream, tool and structured-output support, signed and redacted reasoning, AWS default-chain and bearer authentication, refreshable per-request credentials, and narrowly gated coalesced expired-credential recovery. Import it as `AmazonBedrock` from `tenetkit/ai` or from `tenetkit/ai/amazon-bedrock`.
 
 ## 0.7.1
 
@@ -255,8 +268,8 @@
 ## 0.5.0
 
 - Reject ambiguous static, reserved `activate_skill`, activated-skill, and Handoff tool names with schema-backed origin evidence before advertisement or execution. Use `Agent.make({ tools: [...] })` when duplicate static declarations must remain observable; pre-built Effect AI toolkits remain accepted, but `Toolkit.make` has already erased duplicate inputs.
-- Preserve declared tool failures as `DomainFailure { failure, encodedFailure }`, add schema-backed stage-specific `FrameworkFailure` on the executor and run error channels, and transport framework failures through existing failed frames. This breaks exhaustive `Outcome.Failure` matches and message-only placement failure codecs; migrate to `DomainFailure` and `Effect.catchTag("@batonfx/core/FrameworkFailure", ...)`.
-- Add the public Effect-native `@batonfx/mcp` OAuth lifecycle, host-owned redacted token store, typed lifecycle errors, authenticated remote transport integration, and deterministic layers.
-- Add scripted reasoning parts to `@batonfx/test` with deterministic reasoning stream events and transcript projection distinct from assistant text.
+- Preserve declared tool failures as `DomainFailure { failure, encodedFailure }`, add schema-backed stage-specific `FrameworkFailure` on the executor and run error channels, and transport framework failures through existing failed frames. This breaks exhaustive `Outcome.Failure` matches and message-only placement failure codecs; migrate to `DomainFailure` and `Effect.catchTag("tenetkit/core/FrameworkFailure", ...)`.
+- Add the public Effect-native `tenetkit/mcp` OAuth lifecycle, host-owned redacted token store, typed lifecycle errors, authenticated remote transport integration, and deterministic layers.
+- Add scripted reasoning parts to `tenetkit/test` with deterministic reasoning stream events and transcript projection distinct from assistant text.
 - Preserve host `HttpClient` requirements in base provider, preset, fallback, and embedding constructors; use the matching explicitly named `*Fetch` convenience to retain the previous fetch-backed behavior.
 - Preserve typed FoldKit connection and command failures as structured facts while leaving defects and interruption in their Effect causes; `ChatCommand` now exposes its concrete error union instead of `any`.

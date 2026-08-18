@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
 import { BunServices } from "@effect/platform-bun"
-import { SkillSource } from "@batonfx/core"
-import { SkillLoader } from "@batonfx/skills"
+import { SkillSource } from "tenetkit"
+import { SkillLoader } from "tenetkit/skills"
 
 const skillLayer = SkillLoader.layer({ cwd: ".", roots: [] }).pipe(Layer.provide(BunServices.layer))
 

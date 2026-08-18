@@ -1,9 +1,9 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
-import { ToolContext, ToolExecutor } from "@batonfx/core"
+import { ToolContext, ToolExecutor } from "tenetkit"
 import { Response } from "effect/unstable/ai"
-import { Cell, CellTool, HostBindingRegistry, KernelProfile, TestKernel } from "@batonfx/repl"
+import { Cell, CellTool, HostBindingRegistry, KernelProfile, TestKernel } from "tenetkit/repl"
 
-class NotFound extends Schema.TaggedErrorClass<NotFound>()("@batonfx/tutorial/NotFound", {
+class NotFound extends Schema.TaggedErrorClass<NotFound>()("@tenetkit/tutorial/NotFound", {
   path: Schema.String,
 }) {}
 

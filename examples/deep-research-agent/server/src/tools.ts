@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { Tool, Toolkit } from "@batonfx/core"
+import { Tool, Toolkit } from "tenetkit"
 import { SearchResult, Service } from "./search-provider"
 /** @experimental */
 export const webSearchTool = Tool.make("web_search", {

@@ -1,5 +1,5 @@
 {
-  "name": "@batonfx/repository-policy",
+  "name": "@tenetkit/repository-policy",
   "private": true,
   "type": "module",
   "scripts": {

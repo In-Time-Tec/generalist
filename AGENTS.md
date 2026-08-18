@@ -1,13 +1,13 @@
-# BatonFX
+# TenetKit
 
-BatonFX is an Effect-native agent framework over `effect/unstable/ai` with an optional native durable Runtime. Core stays standalone and must never depend on Relay or another durable runtime.
+TenetKit is an Effect-native agent framework over `effect/unstable/ai` with an optional native durable Runtime. Core stays standalone and must never depend on Relay or another durable runtime.
 
 ## Contracts and docs
 
-- Baton is pre-1.0. Keep one current contract; update every caller and delete superseded paths instead of adding compatibility versions unless a staged migration is explicitly required.
+- TenetKit is pre-1.0. Keep one current contract; update every caller and delete superseded paths instead of adding compatibility versions unless a staged migration is explicitly required.
 - `PRODUCT.md` owns product direction, audience, and exclusions. Do not turn it into a feature list.
 - `CONTEXT.md` owns vocabulary, ownership, and system boundaries.
-- `PLAN.md` owns unfinished work, target interface changes, dependency order, deletion scope, and release acceptance for the Baton and Rika clean break. Source and feature docs still own implemented behavior.
+- `PLAN.md` owns unfinished work, target interface changes, dependency order, deletion scope, and release acceptance for the TenetKit and Rika clean break. Source and feature docs still own implemented behavior.
 - `docs/features/` states current behavior and rules code relies on. `docs/decisions/` records an important choice and its reason. `docs/tradeoffs/` records a meaningful gain, cost, and rejected option only when useful.
 - Keep internal docs standalone and minimal. Do not add numbered architecture records, status/date/author metadata, templates, indexes, ledgers, repeated related-doc lists, history, or plans. Do not add Markdown meaning, structure, or snippet validation.
 - Public user guides live in the docs app and package READMEs. README files own use and setup.
@@ -23,7 +23,7 @@ BatonFX is an Effect-native agent framework over `effect/unstable/ai` with an op
 
 ## Code and packages
 
-- Baton core depends on `effect` only. Never import `@relayfx/*`; ast-grep enforces this.
+- TenetKit core depends on `effect` only. Never import `@relayfx/*`; ast-grep enforces this.
 - Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly. Do not add a second payload or tool format.
 - Follow the construction-verb canon: `make` constructs an in-memory value, `register` records it for later lookup, and `start` begins a hosted Runtime `Execution`. Do not use `create` as a synonym for `make` or `register`.
 - Name Layer constructors `layer` or with a noun after `layer` (`layerMemory`, `layerNoop`, `layerIdentity`, `layerConfig`). Put parameters in `layer(options)`; do not add Layer aliases or flag-in-a-name variants.

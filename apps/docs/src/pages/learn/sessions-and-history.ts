@@ -10,7 +10,7 @@ export const sessionsAndHistory = definePage({
     "The append-only session entry log, Effect AI prompt projection, and the three ways a run can carry history.",
   content: [
     p(
-      "Batonfx separates two ideas that most frameworks fuse: the record of a conversation, and the context a model sees. The record is an append-only log; the context is a pure function of a path through it. This page explains the ",
+      "TenetKit separates two ideas that most frameworks fuse: the record of a conversation, and the context a model sees. The record is an append-only log; the context is a pure function of a path through it. This page explains the ",
       code("Session"),
       " seam and the three ways a run can carry history at all.",
     ),
@@ -64,7 +64,7 @@ export const sessionsAndHistory = definePage({
     p(
       "After the compaction entry the projected context shrinks to a checkpoint plus the kept tail, while the log still holds all five entries. Rewinding is moving the leaf; auditing is reading the log; shrinking context is appending an entry. ",
       link("/docs/guides/compaction", "How to stay inside the context window"),
-      " covers the strategy that decides when Batonfx appends one for you.",
+      " covers the strategy that decides when TenetKit appends one for you.",
     ),
     h2("three-ways-to-carry-history", "Three ways a run carries history"),
     p("A run can be given its past in three mutually independent ways, each fitting a different owner:"),
@@ -110,11 +110,11 @@ export const sessionsAndHistory = definePage({
     ),
     h2("where-durable-history-lives", "Where durable history lives"),
     p(
-      "The @batonfx/core layers on this page are non-durable by design: ",
+      "The tenetkit layers on this page are non-durable by design: ",
       code("Session.layerMemory"),
       " is a ",
       code("Ref"),
-      ", and the persisted-chat layer in the examples backs onto memory too. For durable, addressable execution, @batonfx/runtime persists the canonical RunEvent stream and reconstructs the core driver across attempts. Application conversation storage can still implement ",
+      ", and the persisted-chat layer in the examples backs onto memory too. For durable, addressable execution, tenetkit/runtime persists the canonical RunEvent stream and reconstructs the core driver across attempts. Application conversation storage can still implement ",
       code("SessionStore"),
       " over its own database and provide it as a layer. The core/runtime split is covered in ",
       link("/docs/learn/native-runtime", "Core and Runtime: where durability lives"),

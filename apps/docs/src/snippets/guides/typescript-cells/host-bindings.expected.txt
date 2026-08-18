@@ -1,5 +1,5 @@
 mounted: workspace.read
 allowed: Success
-denied: Failure @batonfx/docs/WorkspaceDenied
-@batonfx/repl/HostBindingNotFound module=web
-@batonfx/repl/HostBindingSchemaFailure stage=decode-input
+denied: Failure @tenetkit/docs/WorkspaceDenied
+tenetkit/repl/HostBindingNotFound module=web
+tenetkit/repl/HostBindingSchemaFailure stage=decode-input

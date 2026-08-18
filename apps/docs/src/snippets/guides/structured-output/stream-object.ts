@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
 
 const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
 

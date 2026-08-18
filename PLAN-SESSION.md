@@ -1,8 +1,8 @@
-# Baton Durable Session Plan
+# TenetKit Durable Session Plan
 
 ## Purpose
 
-This file is the sole implementation and acceptance plan for making durable `Session` the authority for model-facing conversation history in Baton, and for making Rika thread continuation work through it.
+This file is the sole implementation and acceptance plan for making durable `Session` the authority for model-facing conversation history in TenetKit, and for making Rika thread continuation work through it.
 
 It supersedes nothing in `PLAN.md`; that file owns the completed native-execution migration. This file owns one new capability and the deletions it forces.
 
@@ -76,11 +76,11 @@ Constraints taken from them:
 
 ## Ownership
 
-Baton owns Session storage, path projection, leaf movement, fencing, compaction checkpoints, and system-prompt derivation.
+TenetKit owns Session storage, path projection, leaf movement, fencing, compaction checkpoints, and system-prompt derivation.
 
 Rika owns thread identity, turn admission, the display transcript, and the decision to continue a thread.
 
-Rika never assembles model history. Rika never reads `baton_sessions` or any Baton table.
+Rika never assembles model history. Rika never reads `baton_sessions` or any TenetKit table.
 
 ## Canonical Interfaces
 
@@ -170,7 +170,7 @@ const messages = compaction?.version === 2 ? [...compaction.projectedHistory.con
 
 Keep this behavior and delete the legacy branch. Then delete `version` itself.
 
-`version` exists only to discriminate `LegacyCompactionEntry` from `CheckpointEntry` inside the `CompactionEntry` union. Once the legacy entry is gone the union collapses to one member, `_tag: "Compaction"` is the whole discriminator, and `version: 2` is a literal that no code can branch on. Baton has never shipped a durable Session, so there is no persisted entry carrying it and nothing to migrate.
+`version` exists only to discriminate `LegacyCompactionEntry` from `CheckpointEntry` inside the `CompactionEntry` union. Once the legacy entry is gone the union collapses to one member, `_tag: "Compaction"` is the whole discriminator, and `version: 2` is a literal that no code can branch on. TenetKit has never shipped a durable Session, so there is no persisted entry carrying it and nothing to migrate.
 
 Target:
 
@@ -234,7 +234,7 @@ The title spawn at `baton-execution.ts:205` and the review fan-out members at `:
 
 `packages/product/src/operation/dispatch/product-operation-execution-context.ts:16` `markdownExport` joins `turn.prompt` only, dropping all assistant output. It is used for `@thread` mention expansion, not continuity, and stays as is. Do not grow it into a history mechanism.
 
-Rika deletes nothing structural. This is deliberate: the missing capability is Baton's.
+Rika deletes nothing structural. This is deliberate: the missing capability is TenetKit's.
 
 ## Implemented boundary
 
@@ -244,7 +244,7 @@ PostgreSQL and MySQL now have dialect-native Session storage and atomic complete
 
 ## Acceptance
 
-Baton:
+TenetKit:
 
 - a second `Runtime.start` on one `sessionId` runs with the first turn's messages in model context
 - a third turn contains turns one and two
@@ -277,7 +277,7 @@ Strict. Each step lands green before the next begins.
 4. Implement `makeSqliteSessionStore` and wire it into `runtime-layer.ts`. Bump `SCHEMA_VERSION`. Prove the memory and SQLite layers are behaviorally identical, and prove fencing.
 5. Derive child Session identity in `Runtime.spawn`. Prove isolation and replay reattachment.
 6. Prove restart, compaction-checkpoint projection, and the record-independence invariant on SQLite.
-7. Run Baton local release gates. Release with explicit authorization.
+7. Run TenetKit local release gates. Release with explicit authorization.
 8. Pin Rika. Move the Rika title spawn to the derived child identity. Prove the Rika acceptance list.
 
 Steps 1 through 3 are the whole behavioral fix and are provable with the in-memory layer. Steps 4 through 6 make it durable. Do not reorder: implementing SQLite before step 2 produces a Session that immediately fails the prefix check.

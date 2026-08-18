@@ -1,6 +1,6 @@
 # Transport
 
-`@batonfx/transport` exposes Runtime lifecycle over SSE and WebSocket. Runtime persists compact canonical `RunEvent` values; the transport host resolves referenced model responses into a transient `ResolvedRunEvent` observer view before encoding. Transport carries exclusive replay cursors, reconnects observers, and dispatches explicit commands. It does not execute Agents, persist events, or own Run state.
+`tenetkit/transport` exposes Runtime lifecycle over SSE and WebSocket. Runtime persists compact canonical `RunEvent` values; the transport host resolves referenced model responses into a transient `ResolvedRunEvent` observer view before encoding. Transport carries exclusive replay cursors, reconnects observers, and dispatches explicit commands. It does not execute Agents, persist events, or own Run state.
 
 - `ResolvedRunEvent` is the streamed observer vocabulary. It has the exact persisted lifecycle identity and sequence, with response content added only for committed or interrupted model-response delivery. SSE event IDs and WebSocket reconnect cursors equal the persisted event `sequence`.
 - Replay is exclusive: a cursor of `n` requests events whose sequence is greater than `n`. `Last-Event-ID` takes precedence over the SSE `cursor` query parameter.

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
-import { AgentManifest, ExecutableManifest, Pins } from "../packages/core/src/index.js"
-import { HarnessEntry, HarnessRegistration, HarnessSnapshot, HarnessState } from "../packages/harness/src/index.js"
-import { ExecutableRegistration } from "../packages/runtime/src/index.js"
+import { AgentManifest, ExecutableManifest, Pins } from "../packages/tenetkit/src/core/index.js"
+import {
+  HarnessEntry,
+  HarnessRegistration,
+  HarnessSnapshot,
+  HarnessState,
+} from "../packages/tenetkit/src/harness/index.js"
+import { ExecutableRegistration } from "../packages/tenetkit/src/runtime/index.js"
 import { Effect } from "effect"
 
 const scope = "thread:alpha"
@@ -79,7 +84,7 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
         executable,
         registrationsFor(executable, harnessRegistration({ payload: mutated })),
       ).pipe(Effect.flip)
-      expect(failure._tag).toBe("@batonfx/runtime/ExecutableRegistrationInvalid")
+      expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),
   )
 
@@ -87,9 +92,9 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
     Effect.gen(function* () {
       const failure = yield* ExecutableRegistration.validate(
         executable,
-        registrationsFor(executable, harnessRegistration({ codec: "@batonfx/other" })),
+        registrationsFor(executable, harnessRegistration({ codec: "@tenetkit/other" })),
       ).pipe(Effect.flip)
-      expect(failure._tag).toBe("@batonfx/runtime/ExecutableRegistrationInvalid")
+      expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),
   )
 
@@ -99,7 +104,7 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
         executable,
         registrationsFor(executable, harnessRegistration({ version: "2" })),
       ).pipe(Effect.flip)
-      expect(failure._tag).toBe("@batonfx/runtime/ExecutableRegistrationInvalid")
+      expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),
   )
 
@@ -112,7 +117,7 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
         ),
       ).pipe(Effect.flip)
       expect(failure).toMatchObject({
-        _tag: "@batonfx/runtime/ExecutableRegistrationMissing",
+        _tag: "tenetkit/runtime/ExecutableRegistrationMissing",
         pin: pinned.capability.pin,
       })
     }),
@@ -139,7 +144,7 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
         other,
         registrationsFor(other, { ...harnessRegistration(), pin: changed.capability.pin }),
       ).pipe(Effect.flip)
-      expect(failure._tag).toBe("@batonfx/runtime/ExecutableRegistrationInvalid")
+      expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),
   )
 })
