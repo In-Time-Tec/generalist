@@ -149,7 +149,7 @@ jobs:
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql)
+          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do
@@ -228,7 +228,7 @@ jobs:
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql)
+          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do
