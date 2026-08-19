@@ -128,7 +128,12 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
         Effect.provideService(ExecutionHost, host),
         Effect.provideService(LocalScheduler, scheduler),
       )
-      expect(result).toEqual({ processed: 1, hasMore: true, nextDueAt: 0 })
+      expect(result).toEqual({
+        processed: 1,
+        hasMore: true,
+        nextDueAt: 0,
+        outcomes: [{ runId: "a", outcome: "executed" }],
+      })
       expect(claimed).toEqual(["a"])
 
       const harmless = RunStore.of({
@@ -140,7 +145,15 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
         Effect.provideService(ExecutionHost, host),
         Effect.provideService(LocalScheduler, scheduler),
       )
-      expect(stale).toEqual({ processed: 2, hasMore: false, nextDueAt: 0 })
+      expect(stale).toEqual({
+        processed: 2,
+        hasMore: false,
+        nextDueAt: 0,
+        outcomes: [
+          { runId: "a", outcome: "stale" },
+          { runId: "b", outcome: "stale" },
+        ],
+      })
     }),
   ),
 )
