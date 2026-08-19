@@ -24,7 +24,7 @@ const ConfigSchema = Schema.Struct({
 })
 
 /** @experimental */
-export type Config = Omit<typeof OpenRouterLanguageModel.Config.Service, "model">
+export type Config = typeof ConfigSchema.Type
 
 /** @experimental */
 export interface OpenRouterInput extends RegistrationOptions {
@@ -44,8 +44,8 @@ const boundedDescription = (value: unknown, fallback: string): string =>
 
 const compilerFailureDescription = (error: unknown): string => {
   const fallback = "OpenRouter tool schema compilation failed"
-  if (!(error instanceof Error)) return fallback
   try {
+    if (!(error instanceof Error)) return fallback
     return boundedDescription(error.message, fallback)
   } catch {
     return fallback
@@ -109,14 +109,16 @@ const resolveOpenRouterFailure = ({ error, metadata: partMetadata, method }: Fai
 }
 
 const openRouterLanguageModelLayer = (input: OpenRouterInput) =>
-  layerModelFailures(
-    layerImageSources(
-      OpenRouterLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
+  Layer.suspend(() =>
+    layerModelFailures(
+      layerImageSources(
+        OpenRouterLanguageModel.layer({
+          model: input.model,
+          config: decodeConfig(input.config),
+        }),
+      ),
+      resolveOpenRouterFailure,
     ),
-    resolveOpenRouterFailure,
   )
 
 /** @experimental */
