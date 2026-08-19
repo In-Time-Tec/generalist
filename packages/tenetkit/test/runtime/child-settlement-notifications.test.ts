@@ -1,6 +1,5 @@
 import { expect, it, layer } from "@effect/vitest"
-import { Effect, Fiber, Layer, Option, Random, Schema, Stream } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Effect, Fiber, Layer, Option, Random, Stream } from "effect"
 import { AgentDirectory, ChildSettlement, Errors, LocalScheduler, Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistantAddress, completedResult, parentRelativeOptions, textPrompt } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
@@ -15,8 +14,6 @@ const layers = [
   ["memory", Runtime.layerMemory(options)],
   ["sqlite", Runtime.layerSqlite({ ...options, filename: tempDbPath("child-settlements") })],
 ] as const
-
-const encodePrompt = (prompt: Prompt.Prompt): string => Schema.encodeSync(Schema.fromJsonString(Prompt.Prompt))(prompt)
 
 it("separates cancelled settlement observation from model delivery", () => {
   const payload: ChildSettlement.Payload = {
@@ -39,7 +36,6 @@ it("separates cancelled settlement observation from model delivery", () => {
 
   expect(observation.prompt.content).toEqual([])
   expect(ChildSettlement.fromMailboxEntry(observation)).toMatchObject(payload)
-  expect(ChildSettlement.modelPrompt(payload)).toBeUndefined()
 })
 
 const admit = Effect.gen(function* () {
@@ -125,7 +121,7 @@ for (const [backend, runtimeLayer] of layers) {
       }),
     )
 
-    suite.effect("delivers a completed settlement owed to the session into the next Run", () =>
+    suite.effect("observes a completed settlement without delivering it into the next Run", () =>
       Effect.gen(function* () {
         const { runtime, parent, child } = yield* admit
         const store = yield* RunStore.RunStore
@@ -143,14 +139,16 @@ for (const [backend, runtimeLayer] of layers) {
           idempotencyKey: "next-run",
           prompt: textPrompt("next"),
         })
-        const delivered = yield* store.deliverPendingMessages({ runId: later.runId })
-        expect(delivered.map((entry) => entry.messageId)).toEqual([`child-settled:${child.runId}`])
-        expect(encodePrompt(delivered[0]!.prompt)).toContain("notes")
         expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
+        const history = yield* runtime.history({ runId: later.runId, cursor: -1, limit: 100 })
+        expect(history.filter((event) => event._tag === "SteeringAccepted")).toEqual([])
+        const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
+        expect(notification).toMatchObject({ childRunId: child.runId, status: "succeeded" })
+        expect(notification!.resultText).toContain("notes")
       }),
     )
 
-    suite.effect("delivers a failed settlement owed to the session into the next Run", () =>
+    suite.effect("observes a failed settlement without delivering it into the next Run", () =>
       Effect.gen(function* () {
         const { runtime, parent, child } = yield* admit
         const store = yield* RunStore.RunStore
@@ -168,13 +166,12 @@ for (const [backend, runtimeLayer] of layers) {
           idempotencyKey: "next-run-after-failure",
           prompt: textPrompt("next"),
         })
-        const delivered = yield* store.deliverPendingMessages({ runId: later.runId })
-        expect(delivered.map((entry) => entry.messageId)).toEqual([`child-settled:${child.runId}`])
-        expect(encodePrompt(delivered[0]!.prompt)).toContain("child provider failed")
+        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
         const history = yield* runtime.history({ runId: later.runId, cursor: -1, limit: 100 })
-        expect(history.filter((event) => event._tag === "SteeringAccepted")).toEqual([
-          expect.objectContaining({ prompt: expect.objectContaining({ content: expect.any(Array) }) }),
-        ])
+        expect(history.filter((event) => event._tag === "SteeringAccepted")).toEqual([])
+        const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
+        expect(notification).toMatchObject({ childRunId: child.runId, status: "failed" })
+        expect(notification!.resultText).toContain("child provider failed")
       }),
     )
 
@@ -339,20 +336,20 @@ it.effect("SQLite preserves exactly one notification across close and reopen", (
 })
 
 /**
- * A joined fan-out hands the parent every member outcome as the result of the call that started the
- * group. Repeating that result in each member's settlement notification delivered the same bytes
- * twice on a channel with a smaller budget, so three members of one group arrived as three
- * truncation notices for content the parent already held.
+ * A settled child is an observation, not model-facing content. The parent already receives the
+ * child's result as the tool result of the call that started it, so projecting the settlement into
+ * steering delivered the same outcome a second time as a user message.
  */
 for (const [backend, runtimeLayer] of layers) {
-  layer(runtimeLayer)(`${backend} joined fan-out settlement`, (suite) => {
-    suite.effect("tells the parent a member settled without repeating the joined result", () =>
+  layer(runtimeLayer)(`${backend} settlement observation`, (suite) => {
+    suite.effect("never binds a settled child into the parent Session's steering inbox", () =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
+        const sessionId = `joined-settlement:${yield* Random.nextInt}`
         const parent = yield* runtime.send({
           to: assistantAddress,
-          sessionId: `joined-settlement:${yield* Random.nextInt}`,
+          sessionId,
           idempotencyKey: `joined:${backend}`,
           prompt: textPrompt("parent"),
         })
@@ -373,17 +370,17 @@ for (const [backend, runtimeLayer] of layers) {
         const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
         expect(notification).toBeDefined()
         expect(notification!.joined).toBe(true)
-        const prompt = ChildSettlement.modelPrompt(notification!)
-        expect(prompt).toBeDefined()
-        const rendered = prompt!.content
-          .flatMap((message) =>
-            typeof message.content === "string"
-              ? [message.content]
-              : message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])),
-          )
-          .join("\n")
-        expect(rendered).toContain("settled with status succeeded")
-        expect(rendered).not.toContain("MEMBER_RESULT_BODY")
+        expect(notification!.resultText).toContain("MEMBER_RESULT_BODY")
+
+        const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "parent done" }) })
+        const later = yield* runtime.send({
+          to: assistantAddress,
+          sessionId,
+          idempotencyKey: `later:${backend}`,
+          prompt: textPrompt("later"),
+        })
+        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
       }),
     )
   })
