@@ -27,7 +27,7 @@ const failures: ReadonlyArray<RunFailureType> = [
   }),
   Errors.ExecutableRegistrationInvalid.make({ message: "invalid registration detail" }),
   Errors.ExecutableRegistrationMissing.make({ pin: "model:test" }),
-  SandboxExecutor.SandboxUnavailable.make({ language: "javascript" }),
+  SandboxExecutor.SandboxUnavailable.make({ message: "Worker Loader unavailable" }),
   SandboxExecutor.SandboxExecutionFailure.make({ message: "sandbox detail" }),
   SandboxExecutor.SandboxProtocolViolation.make({ message: "protocol detail" }),
   ProgramCapabilities.ProgramCapabilityMissing.make({ capability: "tools" }),

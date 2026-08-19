@@ -151,7 +151,7 @@ const provideScoped = Function.dual<
 
 const runWith =
   <E>(
-    fixture: SandboxExecutor.Interface["execute"],
+    fixture: SandboxExecutor.TestExecute,
     live = bindings(),
   ): ((
     effect: Effect.Effect<{ readonly value: number }, E, ProgramHost.ProgramHost | import("effect").Scope.Scope>,
@@ -515,11 +515,17 @@ it.effect("exposes no ambient host authority across the trusted sandbox seam", (
     AgentProgram.run(program("protocol"), { value: 1 }).pipe(
       runWith((request) => {
         expect(Object.keys(request).toSorted()).toEqual([
+          "capabilities",
+          "deadlineMillis",
+          "entrypoint",
           "input",
-          "language",
+          "inputCodec",
           "limits",
+          "modules",
+          "outputCodec",
+          "protocolVersion",
+          "requestId",
           "signal",
-          "source",
           "sourceDigest",
         ])
         expect(request).not.toHaveProperty("bindings")

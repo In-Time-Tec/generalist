@@ -1,3 +1,4 @@
+/* oxlint-disable effecttsgo/async-function, effecttsgo/strict-effect-provide */
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Ref } from "effect"
 import { Wire } from "tenetkit/transport"

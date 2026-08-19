@@ -1,4 +1,4 @@
-import { Context, Effect, Function, Layer, Ref, Schema, SchemaRepresentation, Scope, Semaphore } from "effect"
+import { Clock, Context, Effect, Function, Layer, Ref, Schema, SchemaRepresentation, Scope, Semaphore } from "effect"
 import { digest } from "../durable/canonical-json.js"
 import { make as makeProgramManifest, type PinnedProgram, type ProgramBudget } from "../durable/program-manifest.js"
 import type { Bindings, Invocation } from "./program-bindings.js"
@@ -31,7 +31,11 @@ import {
   type ToolCallInput,
   type ToolSummary,
 } from "./program-capabilities.js"
-import { ExecutionFailure as SandboxFailure, type Interface as Sandbox } from "./sandbox-executor.js"
+import {
+  ExecutionFailure as SandboxFailure,
+  makeRequest as makeSandboxRequest,
+  type Interface as Sandbox,
+} from "./sandbox-executor.js"
 
 const ToolCall = Schema.Struct({ operation: ProgramOperationName, tool: Schema.String, input: Schema.Unknown })
 const StepCall = Schema.Struct({ operation: ProgramOperationName, step: Schema.String, input: Schema.Unknown })
@@ -427,18 +431,27 @@ export const layerDirect = (options: {
           yield* validateBindings(request.program, options.bindings)
           const capabilities = yield* makeCapabilities(options.bindings, request.program.manifest.budget)
           const signal = yield* Effect.abortSignal
+          const now = yield* Clock.currentTimeMillis
+          const budget = request.program.manifest.budget
           const execution = options.sandbox
-            .execute({
-              language: "javascript",
-              source: request.program.manifest.source.text,
-              sourceDigest: digest(request.program.manifest.source.text),
-              input: request.input,
-              signal,
-              limits: {
-                wallTimeMillis: request.program.manifest.budget.wallClockMillis,
-                outputBytes: request.program.manifest.budget.outputBytes,
-              },
-            })
+            .execute(
+              makeSandboxRequest({
+                requestId: digest({ program: request.program.pin, input: request.input }),
+                source: request.program.manifest.source.text,
+                inputCodec: request.program.manifest.input,
+                outputCodec: request.program.manifest.output,
+                encodedInput: request.input,
+                signal,
+                nowMillis: now,
+                wallTimeMillis: budget.wallClockMillis,
+                outputBytes: budget.outputBytes,
+                toolCalls: budget.toolCalls,
+                agentRuns: budget.agentRuns,
+                tools: request.program.manifest.capabilities.tools.map((entry) => entry.name),
+                steps: request.program.manifest.capabilities.steps.map((entry) => entry.name),
+                agents: request.program.manifest.capabilities.agents.map((entry) => entry.selection),
+              }),
+            )
             .pipe(Effect.provideService(ProgramCapabilities, capabilities))
           const output = yield* execution.pipe(
             Effect.timeoutOrElse({
@@ -452,13 +465,14 @@ export const layerDirect = (options: {
                 ),
             }),
           )
-          const bytes = yield* encodedBytes(output)
+          const value = output.output
+          const bytes = yield* encodedBytes(value)
           if (bytes > request.program.manifest.budget.outputBytes)
             return yield* ProgramBudgetExhausted.make({
               dimension: "outputBytes",
               limit: request.program.manifest.budget.outputBytes,
             })
-          return output
+          return value
         }),
     }),
   )

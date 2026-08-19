@@ -28,3 +28,17 @@ Each runtime surface is an independent export so Workers bundle only the capabil
 - `@tenetkit/cloudflare/durable-objects`
 - `@tenetkit/cloudflare/dynamic-workers`
 - `@tenetkit/cloudflare/testing`
+
+## Dynamic Program Workers
+
+`@tenetkit/cloudflare/dynamic-workers` provides `make(options)` and `layer(options)` for a configured Cloudflare
+Worker Loader binding. `make` calls `loader.load()` for every execution, validates the complete module graph and
+content digest before loading, disables global outbound access, and supplies only one request-scoped capability RPC
+binding plus non-secret protocol identity constants. The host must turn the supplied RPC implementation into a
+Cloudflare service binding, normally with a request-scoped `ctx.exports` loopback binding.
+
+The adapter passes `limits.cpuMs` and `limits.subrequests` as the dynamic-worker stage contract. The pinned local
+`workerd` does not currently provide observable enforcement evidence for these two WorkerCode fields, so releases
+that require those resource guarantees must remain disabled until the target Cloudflare environment confirms them.
+Deadline, cancellation, output size, source identity, codec identity, and closed capability authority are enforced by
+the adapter independently.

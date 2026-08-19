@@ -1,3 +1,4 @@
+/* oxlint-disable effecttsgo/async-function, no-await-in-loop */
 import { Effect, Option, Schema } from "effect"
 import { Cursor, Runtime } from "tenetkit/runtime"
 import { Replay, Wire } from "tenetkit/transport"

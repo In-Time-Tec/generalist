@@ -1,3 +1,4 @@
+/* oxlint-disable effecttsgo/strict-effect-provide */
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
