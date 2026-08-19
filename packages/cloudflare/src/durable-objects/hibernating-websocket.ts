@@ -66,7 +66,7 @@ const close = (socket: HibernatingWebSocket, code: number, reason: string): void
 export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) => {
   const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 64), 1), 1_000)
   const fuel = Math.min(Math.max(Math.trunc(options.fuel ?? 4), 1), 32)
-  const flushing = new WeakMap<HibernatingWebSocket, Promise<FlushResult>>()
+  const operations = new WeakMap<HibernatingWebSocket, Promise<unknown>>()
   const runPage = (runId: string, cursor: Cursor) =>
     Effect.runPromise(page({ runId, cursor, limit: pageSize }).pipe(Effect.provideService(Runtime, options.runtime)))
 
@@ -101,18 +101,18 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
     return { sockets: 1, frames, hasMore }
   }
 
-  const flushSocket = (socket: HibernatingWebSocket): Promise<FlushResult> => {
-    const previous = flushing.get(socket)
-    const current = (previous === undefined ? Promise.resolve() : previous.catch(() => undefined)).then(() =>
-      drainSocket(socket),
-    )
-    flushing.set(socket, current)
+  const enqueue = <A>(socket: HibernatingWebSocket, operation: () => Promise<A>): Promise<A> => {
+    const previous = operations.get(socket)
+    const current = (previous === undefined ? Promise.resolve() : previous.catch(() => undefined)).then(operation)
+    operations.set(socket, current)
     const clear = () => {
-      if (flushing.get(socket) === current) flushing.delete(socket)
+      if (operations.get(socket) === current) operations.delete(socket)
     }
     void current.then(clear, clear)
     return current
   }
+
+  const flushSocket = (socket: HibernatingWebSocket): Promise<FlushResult> => enqueue(socket, () => drainSocket(socket))
 
   const flush = async (runId?: string): Promise<FlushResult> => {
     let frames = 0
@@ -143,28 +143,33 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
     },
     async webSocketMessage(socket: HibernatingWebSocket, message: string | ArrayBuffer): Promise<void> {
       if (typeof message !== "string") return close(socket, 1003, "binary-command")
-      const decodedAttachment = decodeAttachment(socket)
-      if (Option.isNone(decodedAttachment)) return close(socket, 1002, "malformed-attachment")
       const command = await Effect.runPromiseExit(decodeCommand(message))
       if (command._tag === "Failure") return close(socket, 1002, "malformed-command")
       if (command.value._tag === "Attach") {
-        if (decodedAttachment.value.state === "attached" && decodedAttachment.value.runId !== command.value.runId) {
-          return close(socket, 1008, "run-mismatch")
-        }
-        const requestedCursor = command.value.cursor ?? origin
-        const attachment: Attachment = {
-          version: 1,
-          state: "attached",
-          runId: command.value.runId,
-          cursor:
-            decodedAttachment.value.state === "attached"
-              ? Math.max(decodedAttachment.value.cursor, requestedCursor)
-              : requestedCursor,
-        }
-        if (!persist(socket, attachment)) return close(socket, 1009, "attachment-too-large")
-        await flushSocket(socket)
+        const attach = command.value
+        await enqueue(socket, async () => {
+          const decodedAttachment = decodeAttachment(socket)
+          if (Option.isNone(decodedAttachment)) return close(socket, 1002, "malformed-attachment")
+          if (decodedAttachment.value.state === "attached" && decodedAttachment.value.runId !== attach.runId) {
+            return close(socket, 1008, "run-mismatch")
+          }
+          const requestedCursor = attach.cursor ?? origin
+          const attachment: Attachment = {
+            version: 1,
+            state: "attached",
+            runId: attach.runId,
+            cursor:
+              decodedAttachment.value.state === "attached"
+                ? Math.max(decodedAttachment.value.cursor, requestedCursor)
+                : requestedCursor,
+          }
+          if (!persist(socket, attachment)) return close(socket, 1009, "attachment-too-large")
+          await drainSocket(socket)
+        })
         return
       }
+      const decodedAttachment = decodeAttachment(socket)
+      if (Option.isNone(decodedAttachment)) return close(socket, 1002, "malformed-attachment")
       if (decodedAttachment.value.state !== "attached") return close(socket, 1008, "not-attached")
       if (decodedAttachment.value.runId !== command.value.runId) return close(socket, 1008, "run-mismatch")
       await Effect.runPromise(
