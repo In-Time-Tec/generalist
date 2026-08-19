@@ -1,18 +1,70 @@
-/* oxlint-disable effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-timers, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen */
+/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-timers-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, no-await-in-loop */
 import { Clock, Effect, Layer, Schema } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
 import { normalize, runner } from "./source.js"
-import type { CapabilityRpcRequest, Options, WorkerCode } from "./types.js"
+import { CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
 
 const runnerName = "__tenetkit_runner.js"
 const maximumDiagnostic = 160
-const safeMessage = (cause: unknown): string =>
-  (cause instanceof Error ? cause.message : String(cause)).replace(/[\r\n\t]+/g, " ").slice(0, maximumDiagnostic)
+const safeMessage = (cause: unknown): string => {
+  try {
+    return (cause instanceof Error ? cause.message : String(cause))
+      .replace(/[\r\n\t]+/g, " ")
+      .slice(0, maximumDiagnostic)
+  } catch {
+    return "uninspectable failure"
+  }
+}
 
 const failExecution = (cause: unknown) =>
   SandboxExecutor.SandboxExecutionFailure.make({ message: `dynamic Worker execution failed: ${safeMessage(cause)}` })
 
-const bytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength
+const encodeJson = (value: unknown): string | undefined => {
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return undefined
+  }
+}
+
+const bytes = (value: unknown): number | undefined => {
+  const encoded = encodeJson(value)
+  return encoded === undefined ? undefined : new TextEncoder().encode(encoded).byteLength
+}
+
+const readBounded = async (response: Response, limit: number): Promise<string | undefined> => {
+  if (response.body === null) return ""
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let size = 0
+  let text = ""
+  while (true) {
+    const next = await reader.read()
+    if (next.done) return text + decoder.decode()
+    size += next.value.byteLength
+    if (size > limit) {
+      await reader.cancel()
+      return undefined
+    }
+    text += decoder.decode(next.value, { stream: true })
+  }
+}
+
+const capabilityName = (request: CapabilityRpcRequest): string | undefined => {
+  switch (request.operation) {
+    case "describeTool":
+      return request.input
+    case "callTool":
+      return request.input.tool
+    case "callStep":
+      return request.input.step
+    case "runAgent":
+    case "mapAgents":
+      return request.input.selection
+    default:
+      return undefined
+  }
+}
 
 /** @experimental Construct a production SandboxExecutor backed by Cloudflare Worker Loader. */
 export const make = (options: Options): SandboxExecutor.Interface =>
@@ -47,9 +99,11 @@ export const make = (options: Options): SandboxExecutor.Interface =>
         } catch (cause) {
           return yield* SandboxExecutor.SandboxSourceInvalid.make({ message: safeMessage(cause) })
         }
+        let encodedInput: string
         try {
           const encoded = JSON.stringify(request.input)
           if (encoded === undefined) throw new TypeError("input is not JSON serializable")
+          encodedInput = encoded
         } catch {
           return yield* SandboxExecutor.SandboxInputInvalid.make({ message: "sandbox input is not JSON serializable" })
         }
@@ -57,34 +111,50 @@ export const make = (options: Options): SandboxExecutor.Interface =>
         const capabilities = yield* ProgramCapabilities.ProgramCapabilities
         const grants = new Map(request.capabilities.map((grant) => [grant.operation, new Set(grant.names)] as const))
         let active = true
+        const invocation = new AbortController()
+        const cancel = () => invocation.abort()
+        let deadlineElapsed = false
         const rpc = {
           call: async (raw: CapabilityRpcRequest): Promise<unknown> => {
             if (!active || request.signal.aborted || Date.now() >= request.deadlineMillis)
               throw new Error("request fence closed")
-            if (raw.protocolVersion !== request.protocolVersion || raw.requestId !== request.requestId)
+            let decoded: CapabilityRpcRequest
+            try {
+              decoded = Schema.decodeUnknownSync(CapabilityRpcRequest, { onExcessProperty: "error" })(raw)
+            } catch {
+              throw new Error("capability request invalid")
+            }
+            if (decoded.protocolVersion !== request.protocolVersion || decoded.requestId !== request.requestId)
               throw new Error("capability protocol identity mismatch")
-            const grant = grants.get(raw.operation)
+            const grant = grants.get(decoded.operation)
             if (grant === undefined) throw new Error("capability operation denied")
-            const named =
-              typeof raw.input === "object" && raw.input !== null
-                ? "tool" in raw.input
-                  ? raw.input.tool
-                  : "step" in raw.input
-                    ? raw.input.step
-                    : "selection" in raw.input
-                      ? raw.input.selection
-                      : undefined
-                : undefined
-            if (typeof named === "string" && !grant.has(named)) throw new Error("capability name denied")
+            const named = capabilityName(decoded)
+            if (named !== undefined && !grant.has(named)) throw new Error("capability name denied")
+            if (decoded.operation === "fanOutAgents") {
+              for (const member of decoded.input.members) {
+                if (!grant.has(member.selection)) throw new Error("capability name denied")
+              }
+            }
+            const inputSize = bytes(decoded.input)
+            if (inputSize === undefined || inputSize > request.limits.outputBytes)
+              throw new Error("capability payload denied")
             const effect =
-              raw.operation === "discoverTools"
+              decoded.operation === "discoverTools"
                 ? capabilities.discoverTools
-                : raw.operation === "describeTool"
-                  ? capabilities.describeTool(String(raw.input))
-                  : capabilities[raw.operation](raw.input as never)
-            const value = await Effect.runPromise(effect)
+                : decoded.operation === "describeTool"
+                  ? capabilities.describeTool(decoded.input)
+                  : capabilities[decoded.operation](decoded.input as never)
+            let value: unknown
+            try {
+              value = await Effect.runPromise(effect, { signal: invocation.signal })
+            } catch {
+              throw new Error("capability invocation failed")
+            }
             if (!active || request.signal.aborted || Date.now() >= request.deadlineMillis)
               throw new Error("request fence closed")
+            const outputSize = bytes(value)
+            if (outputSize === undefined || outputSize > request.limits.outputBytes)
+              throw new Error("capability result denied")
             return value
           },
         }
@@ -103,12 +173,16 @@ export const make = (options: Options): SandboxExecutor.Interface =>
           },
           limits: { cpuMs: request.limits.cpuMillis, subrequests: request.limits.subrequests },
         }
-        const remaining = request.deadlineMillis - now
+        request.signal.addEventListener("abort", cancel, { once: true })
+        const deadlineTimer = setTimeout(
+          () => {
+            deadlineElapsed = true
+            cancel()
+          },
+          Math.min(request.deadlineMillis - now, 2_147_483_647),
+        )
         const abort = new Promise<never>((_, reject) => {
-          request.signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true })
-        })
-        const deadline = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("deadline")), Math.min(remaining, 2_147_483_647))
+          invocation.signal.addEventListener("abort", () => reject(new Error("interrupted")), { once: true })
         })
         try {
           const response = yield* Effect.tryPromise({
@@ -120,20 +194,16 @@ export const make = (options: Options): SandboxExecutor.Interface =>
                   .fetch(
                     new Request("https://sandbox.tenetkit.invalid/execute", {
                       method: "POST",
-                      body: JSON.stringify({
-                        protocolVersion: request.protocolVersion,
-                        requestId: request.requestId,
-                        input: request.input,
-                      }),
+                      signal: invocation.signal,
+                      body: `{"protocolVersion":${JSON.stringify(request.protocolVersion)},"requestId":${JSON.stringify(request.requestId)},"input":${encodedInput}}`,
                     }),
                   ),
                 abort,
-                deadline,
               ]),
             catch: (cause) =>
               request.signal.aborted
                 ? SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-                : Date.now() >= request.deadlineMillis || safeMessage(cause) === "deadline"
+                : deadlineElapsed || Date.now() >= request.deadlineMillis
                   ? SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
                   : /cpu/i.test(safeMessage(cause))
                     ? SandboxExecutor.SandboxResourceExceeded.make({
@@ -150,8 +220,11 @@ export const make = (options: Options): SandboxExecutor.Interface =>
           if (!active || request.signal.aborted)
             return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
           if (!response.ok) return yield* failExecution(`dynamic Worker returned status ${response.status}`)
-          const text = yield* Effect.tryPromise({ try: () => response.text(), catch: failExecution })
-          if (new TextEncoder().encode(text).byteLength > request.limits.outputBytes)
+          const text = yield* Effect.tryPromise({
+            try: () => readBounded(response, request.limits.outputBytes),
+            catch: failExecution,
+          })
+          if (text === undefined)
             return yield* SandboxExecutor.SandboxResourceExceeded.make({
               resource: "output",
               limit: request.limits.outputBytes,
@@ -177,7 +250,12 @@ export const make = (options: Options): SandboxExecutor.Interface =>
             result.outputCodec !== request.outputCodec
           )
             return yield* SandboxExecutor.SandboxProtocolViolation.make({ message: "result identity mismatch" })
-          if (bytes(result.output) > request.limits.outputBytes)
+          const resultBytes = bytes(result.output)
+          if (resultBytes === undefined)
+            return yield* SandboxExecutor.SandboxOutputInvalid.make({
+              message: "sandbox output is not JSON serializable",
+            })
+          if (resultBytes > request.limits.outputBytes)
             return yield* SandboxExecutor.SandboxResourceExceeded.make({
               resource: "output",
               limit: request.limits.outputBytes,
@@ -185,6 +263,9 @@ export const make = (options: Options): SandboxExecutor.Interface =>
           return result
         } finally {
           active = false
+          clearTimeout(deadlineTimer)
+          request.signal.removeEventListener("abort", cancel)
+          invocation.abort()
         }
       }),
   })

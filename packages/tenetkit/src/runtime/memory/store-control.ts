@@ -193,6 +193,13 @@ export const cancel: {
     const terminal = isTerminal(run.status)
     const needsResolution = run.status === "needs-resolution"
     let next = state
+    const externalChildPlacements = new Map(next.externalChildPlacements)
+    for (const [placementId, placement] of externalChildPlacements) {
+      if (placement.parentRunId === run.runId && !placement.settled && !placement.cancelRequested) {
+        externalChildPlacements.set(placementId, { ...placement, cancelRequested: true })
+      }
+    }
+    next = { ...next, externalChildPlacements }
     if (!terminal && !run.cancellationRequested) {
       const [, requested] = yield* appendLifecycle(
         next,

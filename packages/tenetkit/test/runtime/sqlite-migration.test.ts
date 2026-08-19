@@ -9,7 +9,7 @@ import {
 } from "../../src/runtime/sql/errors.js"
 import { layer as sqliteClientLayer } from "../../src/runtime/sql/bun-client.js"
 import { migrate } from "../../src/runtime/sql/migrate.js"
-import { SCHEMA_VERSION, schemaChecksum } from "../../src/runtime/sql/schema.js"
+import { SCHEMA_STATEMENTS, SCHEMA_VERSION, V8_SCHEMA_CHECKSUM, schemaChecksum } from "../../src/runtime/sql/schema.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
 const apply = (filename: string) =>
@@ -43,7 +43,7 @@ const inspect = (filename: string) => {
     .all()
   db.close()
   expect(meta).toEqual({ version: SCHEMA_VERSION, checksum: schemaChecksum() })
-  expect(migrations.map(({ migration_id }) => migration_id)).toEqual([1])
+  expect(migrations.map(({ migration_id }) => migration_id)).toEqual([1, 2])
   expect(runColumns).toEqual([
     "run_id",
     "status",
@@ -83,6 +83,7 @@ const inspect = (filename: string) => {
   expect(tables).toEqual([
     "baton_agent_names",
     "baton_executable_registrations",
+    "baton_external_child_placements",
     "baton_fan_out_members",
     "baton_fan_outs",
     "baton_lanes",
@@ -108,6 +109,31 @@ const inspect = (filename: string) => {
 it.live("creates the current SQLite baseline and applies idempotently", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("sqlite-baseline")
+    yield* apply(filename)
+    yield* apply(filename)
+    inspect(filename)
+  }),
+)
+
+it.live("upgrades a version 8 database and remains compatible after restart", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("sqlite-v8-upgrade")
+    const db = new Database(filename)
+    db.run(`CREATE TABLE baton_sql_migrations (
+      migration_id integer PRIMARY KEY NOT NULL,
+      created_at datetime NOT NULL DEFAULT current_timestamp,
+      name VARCHAR(255) NOT NULL
+    )`)
+    for (const statement of SCHEMA_STATEMENTS) {
+      if (!statement.includes("baton_external_child_placements")) db.run(statement)
+    }
+    db.run("INSERT INTO baton_sql_migrations (migration_id, name) VALUES (1, 'baton_runtime')")
+    db.run("INSERT INTO baton_schema_meta (id, version, checksum, dirty, applied_at) VALUES (1, 8, ?, 0, ?)", [
+      V8_SCHEMA_CHECKSUM,
+      "2026-08-18T00:00:00.000Z",
+    ])
+    db.close()
+
     yield* apply(filename)
     yield* apply(filename)
     inspect(filename)

@@ -34,8 +34,10 @@ export const readinessForAdmission = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<{ count: number | string }>`
-      SELECT COUNT(*) AS count FROM baton_run_links
-      WHERE parent_run_id = ${parent.runId} AND readiness = 'ready'
+      SELECT
+        (SELECT COUNT(*) FROM baton_run_links WHERE parent_run_id = ${parent.runId} AND readiness = 'ready') +
+        (SELECT COUNT(*) FROM baton_external_child_placements
+          WHERE parent_run_id = ${parent.runId} AND settlement_id IS NULL) AS count
     `
     return Number(rows[0]?.count ?? 0) < parent.treePolicy.maxSubagents ? "ready" : "queued"
   })
@@ -44,8 +46,10 @@ export const activeChildCount = (parentRunId: string): Effect.Effect<number, Sql
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<{ count: number | string }>`
-      SELECT COUNT(*) AS count FROM baton_run_links
-      WHERE parent_run_id = ${parentRunId} AND readiness = 'ready'
+      SELECT
+        (SELECT COUNT(*) FROM baton_run_links WHERE parent_run_id = ${parentRunId} AND readiness = 'ready') +
+        (SELECT COUNT(*) FROM baton_external_child_placements
+          WHERE parent_run_id = ${parentRunId} AND settlement_id IS NULL) AS count
     `
     return Number(rows[0]?.count ?? 0)
   })

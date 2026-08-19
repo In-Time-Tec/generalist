@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Queue, Ref, SynchronizedRef } from "effect"
+import { Context, Effect, Layer, Option, Queue, Ref, SynchronizedRef } from "effect"
 import {
   AddressNotFound,
   CursorExpired,
@@ -67,6 +67,8 @@ import {
   startProgramOperation,
 } from "./store-program.js"
 import type { RunActivation } from "../run-activation.js"
+import { externalChildOperations } from "./store-external-child.js"
+import { ExternalChildStore } from "../external-child-store.js"
 
 const activationOf = (run: import("./state.js").StoredRun): RunActivation => {
   const intent: RunActivation["intent"] =
@@ -82,7 +84,7 @@ const activationOf = (run: import("./state.js").StoredRun): RunActivation => {
     : { runId: run.runId, intent, attemptFence: run.attemptFence, runStatus: run.status }
 }
 
-export const makeRunStore = (options: LayerOptions) =>
+const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     const stateRef = yield* SynchronizedRef.make(
@@ -161,7 +163,7 @@ export const makeRunStore = (options: LayerOptions) =>
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
     ) => modifyState((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
 
-    return RunStore.of({
+    const runStore = RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
       sessionStore: (sessionId) => Effect.succeed(Option.some(makeMemorySessionStore({ stateRef, sessionId }))),
       hasAdmission: (input) =>
@@ -464,7 +466,23 @@ export const makeRunStore = (options: LayerOptions) =>
       completeProgram: (input) => fencedModify(input, (state) => completeProgram(state, input)),
       commitProgramLog: (input) => fencedModify(input, (state) => commitProgramLog(state, input)),
     })
+    const externalChildStore = ExternalChildStore.of({
+      reserve: (input) => modifyState((state) => externalChildOperations.reserve(state, input)),
+      acknowledge: (placementId) => modifyState((state) => externalChildOperations.acknowledge(state, placementId)),
+      settle: (input) => modifyState((state) => externalChildOperations.settle(state, input)),
+      cancel: (placementId) => modifyState((state) => externalChildOperations.cancel(state, placementId)),
+    })
+    return { runStore, externalChildStore }
   })
 
-export const layerMemory = (options: LayerOptions): Layer.Layer<RunStore> =>
-  Layer.effect(RunStore, makeRunStore(options))
+export const makeRunStore = (options: LayerOptions) =>
+  makeStoreServices(options).pipe(Effect.map(({ runStore }) => runStore))
+
+export const layerMemory = (options: LayerOptions): Layer.Layer<RunStore | ExternalChildStore> =>
+  Layer.effectContext(
+    makeStoreServices(options).pipe(
+      Effect.map(({ runStore, externalChildStore }) =>
+        Context.make(RunStore, runStore).pipe(Context.add(ExternalChildStore, externalChildStore)),
+      ),
+    ),
+  )

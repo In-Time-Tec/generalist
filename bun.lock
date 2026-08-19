@@ -198,6 +198,7 @@
       "version": "0.31.0",
       "dependencies": {
         "@effect/sql-sqlite-do": "catalog:",
+        "es-module-lexer": "catalog:",
         "tenetkit": "workspace:*",
       },
       "devDependencies": {
@@ -316,6 +317,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "effect": "4.0.0-rc.109",
+    "es-module-lexer": "2.3.2",
     "esbuild": "0.28.2",
     "foldkit": "0.148.0",
     "happy-dom": "20.10.6",

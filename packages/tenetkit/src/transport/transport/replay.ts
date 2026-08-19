@@ -1,32 +1,33 @@
 import { Effect } from "effect"
-import { Cursor, Runtime } from "tenetkit/runtime"
-import type { RunEvent } from "tenetkit/runtime"
+import { type Cursor, origin } from "../../runtime/cursor.js"
+import { Runtime, type EventsError, type Interface, type ResolveModelResponseError } from "../../runtime/runtime.js"
+import type { RunEvent } from "../../runtime/run-event.js"
 import { observerCodec } from "./wire.js"
 
 /** @experimental One observer-encoded durable RunEvent. */
 export interface Frame {
-  readonly sequence: Cursor.Cursor
+  readonly sequence: Cursor
   readonly data: string
 }
 
 /** @experimental A bounded replay result whose cursor advances only through returned frames. */
 export interface Page {
   readonly frames: ReadonlyArray<Frame>
-  readonly cursor: Cursor.Cursor
+  readonly cursor: Cursor
   readonly hasMore: boolean
 }
 
 /** @experimental Input for one bounded durable replay read. */
 export interface PageInput {
   readonly runId: string
-  readonly cursor?: Cursor.Cursor
+  readonly cursor?: Cursor
   readonly limit: number
 }
 
 const resolve = (
-  runtime: Runtime.Interface,
-  event: RunEvent.RunEvent,
-): Effect.Effect<import("./wire.js").ResolvedRunEvent, Runtime.ResolveModelResponseError> =>
+  runtime: Interface,
+  event: RunEvent,
+): Effect.Effect<import("./wire.js").ResolvedRunEvent, ResolveModelResponseError> =>
   event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted"
     ? runtime.resolveModelResponse(event).pipe(Effect.map((response) => ({ ...event, response })))
     : Effect.succeed(event)
@@ -34,14 +35,10 @@ const resolve = (
 /** @experimental Load and observer-encode one bounded page strictly after an exclusive cursor. */
 export const page = (
   input: PageInput,
-): Effect.Effect<
-  Page,
-  Runtime.EventsError | Runtime.ResolveModelResponseError | import("./errors.js").WireEncodeFailed,
-  Runtime.Runtime
-> =>
+): Effect.Effect<Page, EventsError | ResolveModelResponseError | import("./errors.js").WireEncodeFailed, Runtime> =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
-    const cursor = input.cursor ?? Cursor.origin
+    const runtime = yield* Runtime
+    const cursor = input.cursor ?? origin
     const loaded = yield* runtime.history({ runId: input.runId, cursor, limit: input.limit + 1 })
     const events = loaded.slice(0, input.limit)
     const frames = yield* Effect.forEach(events, (event) =>

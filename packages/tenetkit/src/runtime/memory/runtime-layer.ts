@@ -24,7 +24,8 @@ import {
   type SpawnInput,
 } from "../runtime.js"
 import { normalizePrompt } from "./prompt.js"
-import { makeRunStore } from "./store.js"
+import { layerMemory as storeLayer } from "./store.js"
+import { ExternalChildStore } from "../external-child-store.js"
 import { ExecutionHost } from "../execution-host.js"
 import { make as makeExecutionHost } from "../execution-host.js"
 import { ActiveExecutions, layer as activeExecutionsLayer } from "../active-executions.js"
@@ -480,8 +481,10 @@ export const makeRuntime = (
     })
   })
 
-export const layer = (options: LayerOptions): Layer.Layer<Runtime | RunStore | ExecutionHost | LocalScheduler> => {
-  const store = Layer.effect(RunStore, makeRunStore(options))
+export const layer = (
+  options: LayerOptions,
+): Layer.Layer<Runtime | RunStore | ExternalChildStore | ExecutionHost | LocalScheduler> => {
+  const store = storeLayer(options)
   const active = activeExecutionsLayer
   const dependencies = Layer.mergeAll(store, active, modelPreviewLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
