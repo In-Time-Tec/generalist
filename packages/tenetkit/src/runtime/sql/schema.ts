@@ -1,6 +1,7 @@
 import { sha256Text } from "../../core/durable/canonical-json.js"
 
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
+export const V8_SCHEMA_CHECKSUM = "8c4d3189fec1bc044e790db21b499b0ca160743b6e6c64e92de985a26304c7d9"
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 
@@ -107,6 +108,30 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
 )`,
   `CREATE INDEX IF NOT EXISTS baton_run_links_readiness_idx ON baton_run_links(parent_run_id, readiness, created_at, child_run_id)`,
+  `CREATE TABLE IF NOT EXISTS baton_external_child_placements (
+  placement_id TEXT PRIMARY KEY,
+  parent_run_id TEXT NOT NULL,
+  partition TEXT NOT NULL,
+  external_run_id TEXT NOT NULL,
+  invocation_id TEXT NOT NULL,
+  request_digest TEXT NOT NULL,
+  executable_digest TEXT NOT NULL,
+  wait_id TEXT,
+  suspension_identity TEXT,
+  acknowledged INTEGER NOT NULL DEFAULT 0,
+  cancel_requested INTEGER NOT NULL DEFAULT 0,
+  settlement_id TEXT,
+  outcome_json TEXT,
+  outcome_event_id TEXT,
+  created_at TEXT NOT NULL,
+  settled_at TEXT,
+  FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
+  UNIQUE (partition, external_run_id),
+  UNIQUE (parent_run_id, invocation_id),
+  CHECK ((settlement_id IS NULL AND outcome_json IS NULL AND outcome_event_id IS NULL AND settled_at IS NULL)
+    OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
+)`,
+  `CREATE INDEX IF NOT EXISTS baton_external_child_placements_parent_idx ON baton_external_child_placements(parent_run_id, settlement_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS baton_run_steering (
   entry_id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,

@@ -8,7 +8,7 @@ import { registrationsFor } from "./helpers.js"
 
 const makeFixture = (
   name: string,
-  execute: SandboxExecutor.Interface["execute"],
+  execute: SandboxExecutor.TestExecute,
   options?: {
     readonly outputBytes?: number
     readonly wallClockMillis?: number

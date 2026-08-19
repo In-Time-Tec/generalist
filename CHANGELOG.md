@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.32.0
+
+- Add transaction-local Durable Object activation projection, fuel-bounded drain and exclusive-host recovery, hibernating WebSocket replay from authoritative Runtime history, and atomic external-child placement for memory and SQLite stores.
+- Add the experimental Cloudflare Worker Loader sandbox adapter with validated module identity, closed capability authority, deadline, cancellation, and output bounds. CPU and subrequest values are only passed through as the Worker Loader stage contract: local `workerd` does not prove target-environment enforcement, so deployments requiring those guarantees remain disabled pending isolated Cloudflare proof.
+- Decode OpenRouter persisted configuration from the pinned provider schema, preserving exact routing, provider, plugin, and trace fields while rejecting model and transport overrides, and attach the upstream model-family JSON Schema compiler for corrected tool calls.
+- Export `tenetkit/transport/replay` for bounded cursor replay and preserve handler ordering across serialized hibernating WebSocket attachment updates.
+
 ## 0.31.0
 
 - Replace the ambiguous OpenAI-compatible provider with explicit `OpenAiResponses` and `OpenAiChatCompletions` adapters. Both support custom provider identities, model strings, base URLs, credentials, request configuration, and package subpath imports; Chat Completions also decodes arbitrary JSON provider extensions without allowing configuration to override the registered model.

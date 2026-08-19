@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Semaphore } from "effect"
+import { Context, Effect, Layer, Option, Semaphore } from "effect"
 import { listRuns } from "./store-list.js"
 import type { Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
@@ -78,6 +78,14 @@ import { ProgramCapabilities } from "tenetkit"
 import { settlementNotifications } from "./settlement-notifications.js"
 import { reconcileCancellationRequested, sessionRoots } from "./session-lifecycle.js"
 import { loadChildReadiness } from "./store-child-capacity.js"
+import { readRunActivations } from "./run-activation.js"
+import {
+  acknowledge as acknowledgeExternalChild,
+  cancel as cancelExternalChild,
+  reserve as reserveExternalChild,
+  externalChildSettlement,
+} from "./store-external-child.js"
+import { ExternalChildStore } from "../external-child-store.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly source?: string
@@ -92,9 +100,13 @@ export type SqliteStoreError =
   | SchemaMigrationFailed
   | MultiWorkerUnsupported
 
-export const makeSqliteRunStore = (
+const makeSqliteStoreServices = (
   options: SqliteStoreOptions,
-): Effect.Effect<RunStoreInterface, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
+): Effect.Effect<
+  { readonly runStore: RunStoreInterface; readonly externalChildStore: ExternalChildStore["Service"] },
+  SqliteStoreError,
+  SqlClient.SqlClient | Scope.Scope
+> =>
   Effect.gen(function* () {
     if (options.multiWorker === true || (options.workers !== undefined && options.workers > 1)) {
       return yield* MultiWorkerUnsupported.make({
@@ -113,18 +125,43 @@ export const makeSqliteRunStore = (
       Effect.mapError((error) => SchemaMigrationFailed.make({ source, message: error.message })),
     )
     const eventCommit = yield* Semaphore.make(1)
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, sql.withTransaction(effect))
+    const run = <A, E>(
+      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
+      touched: ReadonlyArray<string> | (() => Iterable<string>) = [],
+    ) =>
+      withSql(
+        sql,
+        sql.withTransaction(
+          Effect.gen(function* () {
+            const result = yield* effect
+            if (options.activationProjection !== undefined) {
+              const ids = [...new Set(typeof touched === "function" ? touched() : touched)].sort()
+              const after = yield* readRunActivations(ids)
+              const changes = ids.map((runId) => after.get(runId) ?? { runId, intent: "inactive" as const })
+              if (changes.length > 0) yield* options.activationProjection.applyInTransaction(changes)
+            }
+            return result
+          }),
+        ),
+      )
     const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
-    const runBuffered = <A, E>(makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>) =>
+    const runBuffered = <A, E>(
+      makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
+      touched: ReadonlyArray<string> = [],
+    ) =>
       eventCommit.withPermits(1)(
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
             const events: Array<readonly [string, import("../run-event.js").RunEvent]> = []
+            const touchedRuns = new Set(touched)
             const transactionHub: typeof hub = {
               ...hub,
+              touchRun: (runId) => Effect.sync(() => void touchedRuns.add(runId)),
               publish: (runId, event) => Effect.sync(() => void events.push([runId, event])),
             }
-            const result = yield* restore(run(makeEffect(transactionHub)))
+            const result = yield* restore(
+              run(makeEffect(transactionHub), () => [...touchedRuns, ...events.map(([runId]) => runId)]),
+            )
             yield* Effect.forEach(events, ([runId, event]) => hub.publish(runId, event), { discard: true })
             return result
           }),
@@ -133,9 +170,13 @@ export const makeSqliteRunStore = (
     const fenced = <A, E>(
       input: import("../run-store.js").ExecutionClaim,
       makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
-    ) => runBuffered((transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(makeEffect(transactionHub))))
+    ) =>
+      runBuffered(
+        (transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(makeEffect(transactionHub))),
+        [input.runId],
+      )
 
-    return RunStore.of({
+    const runStore = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
       sessionStore: (sessionId: string) =>
         withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie, Effect.map(Option.some)),
@@ -223,23 +264,28 @@ export const makeSqliteRunStore = (
       treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
       list: (input) => runNoTxn(listRuns(input)),
       complete: (input) =>
-        runBuffered((transactionHub) =>
-          requireExecutionClaim(input).pipe(
-            Effect.andThen(saveCompletionContinuation(input.runId, input.result)),
-            Effect.flatMap((continuation) =>
-              continuation === undefined
-                ? complete(transactionHub, input).pipe(
-                    Effect.as({ _tag: "Completed" } as import("../run-store.js").CompletionOutcome),
-                  )
-                : Effect.succeed({
-                    _tag: "SteeringPending",
-                    continuation,
-                  } as import("../run-store.js").CompletionOutcome),
+        runBuffered(
+          (transactionHub) =>
+            requireExecutionClaim(input).pipe(
+              Effect.andThen(saveCompletionContinuation(input.runId, input.result)),
+              Effect.flatMap((continuation) =>
+                continuation === undefined
+                  ? complete(transactionHub, input).pipe(
+                      Effect.as({ _tag: "Completed" } as import("../run-store.js").CompletionOutcome),
+                    )
+                  : Effect.succeed({
+                      _tag: "SteeringPending",
+                      continuation,
+                    } as import("../run-store.js").CompletionOutcome),
+              ),
             ),
-          ),
+          [input.runId],
         ),
       fail: (input) =>
-        runBuffered((transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(fail(transactionHub, input)))),
+        runBuffered(
+          (transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(fail(transactionHub, input))),
+          [input.runId],
+        ),
       suspend: (input) => fenced(input, (transactionHub) => suspend(transactionHub, input)),
       resume: (input) => runBuffered((transactionHub) => resume(transactionHub, input)),
       emitAgentEvent: (input) => fenced(input, (transactionHub) => emitAgentEvent(transactionHub, input)),
@@ -254,17 +300,19 @@ export const makeSqliteRunStore = (
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
       resolveOperation: (input) =>
-        runBuffered((transactionHub) =>
-          getProgramOperation({ runId: input.runId, operation: input.operationId }).pipe(
-            Effect.flatMap((program) =>
-              program === undefined ? resolveOperation(input, "running") : resolveProgramOperation(input, "running"),
+        runBuffered(
+          (transactionHub) =>
+            getProgramOperation({ runId: input.runId, operation: input.operationId }).pipe(
+              Effect.flatMap((program) =>
+                program === undefined ? resolveOperation(input, "running") : resolveProgramOperation(input, "running"),
+              ),
+              Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
             ),
-            Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
-          ),
+          [input.runId],
         ),
-      claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input)),
+      claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input), [input.runId]),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
-      releaseExecution: (input) => run(releaseExecution(input)),
+      releaseExecution: (input) => run(releaseExecution(input), [input.runId]),
       saveExecution: (input) => run(saveExecution(input)),
       retryExecution: (input) => runBuffered((transactionHub) => retryExecution(transactionHub, input)),
       admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),
@@ -279,8 +327,10 @@ export const makeSqliteRunStore = (
           requireExecutionClaim(input).pipe(Effect.andThen(suspendProgramOperation(transactionHub, input, suspend))),
         ),
       settleProgramOperation: (input) =>
-        runBuffered((transactionHub) =>
-          requireExecutionClaim(input).pipe(Effect.andThen(settleProgramOperation(transactionHub, input))),
+        runBuffered(
+          (transactionHub) =>
+            requireExecutionClaim(input).pipe(Effect.andThen(settleProgramOperation(transactionHub, input))),
+          [input.runId],
         ),
       startProgramOperation: (input) => fenced(input, () => startProgramOperation(input)),
       loadProgramState: (runId) =>
@@ -320,8 +370,27 @@ export const makeSqliteRunStore = (
           requireExecutionClaim(input).pipe(Effect.andThen(commitProgramLog(transactionHub, input))),
         ),
     })
+    const externalChildStore = ExternalChildStore.of({
+      reserve: (input) => runBuffered((transactionHub) => reserveExternalChild(transactionHub, input)),
+      acknowledge: (placementId) => run(acknowledgeExternalChild(placementId)),
+      settle: (input) => runBuffered((transactionHub) => externalChildSettlement.settle(transactionHub, input)),
+      cancel: (placementId) => run(cancelExternalChild(placementId)),
+    })
+    return { runStore, externalChildStore }
   })
+
+export const makeSqliteRunStore = (
+  options: SqliteStoreOptions,
+): Effect.Effect<RunStoreInterface, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
+  makeSqliteStoreServices(options).pipe(Effect.map(({ runStore }) => runStore))
 
 export const layerSqliteStore = (
   options: SqliteStoreOptions,
-): Layer.Layer<RunStore, SqliteStoreError, SqlClient.SqlClient> => Layer.effect(RunStore, makeSqliteRunStore(options))
+): Layer.Layer<RunStore | ExternalChildStore, SqliteStoreError, SqlClient.SqlClient> =>
+  Layer.effectContext(
+    makeSqliteStoreServices(options).pipe(
+      Effect.map(({ runStore, externalChildStore }) =>
+        Context.make(RunStore, runStore).pipe(Context.add(ExternalChildStore, externalChildStore)),
+      ),
+    ),
+  )

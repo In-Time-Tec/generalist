@@ -195,9 +195,10 @@
     },
     "packages/cloudflare": {
       "name": "@tenetkit/cloudflare",
-      "version": "0.31.0",
+      "version": "0.32.0",
       "dependencies": {
         "@effect/sql-sqlite-do": "catalog:",
+        "es-module-lexer": "catalog:",
         "tenetkit": "workspace:*",
       },
       "devDependencies": {
@@ -215,7 +216,7 @@
     },
     "packages/mysql": {
       "name": "@tenetkit/mysql",
-      "version": "0.31.0",
+      "version": "0.32.0",
       "dependencies": {
         "@effect/sql-mysql2": "catalog:",
         "tenetkit": "workspace:*",
@@ -233,7 +234,7 @@
     },
     "packages/pg": {
       "name": "@tenetkit/pg",
-      "version": "0.31.0",
+      "version": "0.32.0",
       "dependencies": {
         "@effect/sql-pg": "catalog:",
         "tenetkit": "workspace:*",
@@ -251,7 +252,7 @@
     },
     "packages/tenetkit": {
       "name": "tenetkit",
-      "version": "0.31.0",
+      "version": "0.32.0",
       "dependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",
@@ -316,6 +317,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "effect": "4.0.0-rc.109",
+    "es-module-lexer": "2.3.2",
     "esbuild": "0.28.2",
     "foldkit": "0.148.0",
     "happy-dom": "20.10.6",

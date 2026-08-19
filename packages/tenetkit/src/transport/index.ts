@@ -68,6 +68,14 @@ export namespace Sse {
   export type StreamError = import("./transport/sse.js").StreamError
 }
 
+import { page as Replay_page } from "./transport/replay.js"
+export const Replay = { page: Replay_page } as typeof import("./transport/replay.js")
+export namespace Replay {
+  export type Frame = import("./transport/replay.js").Frame
+  export type Page = import("./transport/replay.js").Page
+  export type PageInput = import("./transport/replay.js").PageInput
+}
+
 import {
   ClientCommand as Wire_ClientCommand,
   CursorFromString as Wire_CursorFromString,

@@ -1,5 +1,5 @@
 import { Clock, DateTime, Effect, Schema, SchemaRepresentation } from "effect"
-import { ProgramCapabilities, ProgramHost, ProgramManifest, type ProgramBindings, type SandboxExecutor } from "tenetkit"
+import { ProgramCapabilities, ProgramHost, ProgramManifest, SandboxExecutor, type ProgramBindings } from "tenetkit"
 import type { ExecutionClaim, ExecutionRecord, Interface as RunStore } from "./run-store.js"
 import type { ProgramOperationKind, ProgramReservation } from "./program-store.js"
 import { childRunIdFor, fanOutIdFor } from "./fan-out.js"
@@ -21,7 +21,6 @@ import {
 } from "./program-boundary.js"
 import { Prompt } from "effect/unstable/ai"
 import { approvedFor, deniedFor, programWait } from "./program-approval.js"
-
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
@@ -168,7 +167,6 @@ export const make = (input: {
       )
       return yield* failure
     })
-
   const resultFor = (selection: string, operation: string, runId: string) =>
     input.store.snapshot(runId).pipe(
       Effect.flatMap((snapshot) => {
@@ -201,7 +199,6 @@ export const make = (input: {
           : ProgramCapabilities.ProgramAgentFailure.make({ selection, operation, cause }),
       ),
     )
-
   const runAgentMembers = (
     program: ProgramManifest.PinnedProgram,
     request: {
@@ -456,18 +453,27 @@ export const make = (input: {
         yield* ProgramHost.validateBindings(request.program, input.bindings)
         const capabilities = makeCapabilities(request.program)
         const signal = yield* Effect.abortSignal
+        const now = yield* Clock.currentTimeMillis
+        const budget = request.program.manifest.budget
         const execution = input.sandbox
-          .execute({
-            language: "javascript",
-            source: request.program.manifest.source.text,
-            sourceDigest: yield* digest(request.program.manifest.source.text, "program-output", "source"),
-            input: request.input,
-            signal,
-            limits: {
-              wallTimeMillis: request.program.manifest.budget.wallClockMillis,
-              outputBytes: request.program.manifest.budget.outputBytes,
-            },
-          })
+          .execute(
+            SandboxExecutor.makeRequest({
+              requestId: `${input.claim.runId}:${input.claim.attemptFence}`,
+              source: request.program.manifest.source.text,
+              inputCodec: request.program.manifest.input,
+              outputCodec: request.program.manifest.output,
+              encodedInput: request.input,
+              signal,
+              nowMillis: now,
+              wallTimeMillis: budget.wallClockMillis,
+              outputBytes: budget.outputBytes,
+              toolCalls: budget.toolCalls,
+              agentRuns: budget.agentRuns,
+              tools: request.program.manifest.capabilities.tools.map((entry) => entry.name),
+              steps: request.program.manifest.capabilities.steps.map((entry) => entry.name),
+              agents: request.program.manifest.capabilities.agents.map((entry) => entry.selection),
+            }),
+          )
           .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities))
         const output = yield* execution.pipe(
           Effect.timeoutOrElse({
@@ -481,13 +487,14 @@ export const make = (input: {
               ),
           }),
         )
-        const outputBytes = yield* encodedBytes(output)
+        const value = output.output
+        const outputBytes = yield* encodedBytes(value)
         if (outputBytes > request.program.manifest.budget.outputBytes)
           return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
             dimension: "outputBytes",
             limit: request.program.manifest.budget.outputBytes,
           })
-        return output
+        return value
       }),
   })
 }

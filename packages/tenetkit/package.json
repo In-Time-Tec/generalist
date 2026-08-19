@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "private": false,
   "type": "module",
   "sideEffects": false,
@@ -157,6 +157,10 @@
     "./transport/snapshot": {
       "types": "./dist/transport/transport/snapshot.d.ts",
       "import": "./dist/transport/transport/snapshot.js"
+    },
+    "./transport/replay": {
+      "types": "./dist/transport/transport/replay.d.ts",
+      "import": "./dist/transport/transport/replay.js"
     },
     "./runtime/driver": {
       "types": "./dist/runtime/driver/index.d.ts",

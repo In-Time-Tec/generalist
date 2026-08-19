@@ -15,6 +15,8 @@ interface HubState {
 }
 
 export interface EventHub {
+  /** @internal Mark a Run whose activation state changed without publishing an event on that Run. */
+  readonly touchRun: (runId: string) => Effect.Effect<void>
   readonly publish: (runId: string, event: RunEvent) => Effect.Effect<void>
   readonly wakeTree: (rootRunId: string) => Effect.Effect<void>
   readonly subscribe: (input: {
@@ -169,5 +171,5 @@ export const makeEventHub: Effect.Effect<EventHub> = Effect.gen(function* () {
     Effect.asVoid,
   )
 
-  return { publish, wakeTree, subscribe, subscribeTree, shutdown }
+  return { touchRun: () => Effect.void, publish, wakeTree, subscribe, subscribeTree, shutdown }
 })
