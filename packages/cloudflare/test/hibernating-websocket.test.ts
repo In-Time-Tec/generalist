@@ -1,13 +1,13 @@
 /* oxlint-disable effecttsgo/async-function, effecttsgo/strict-effect-provide */
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Ref } from "effect"
+import { Deferred, Effect, Ref } from "effect"
 import { Wire } from "tenetkit/transport"
 import {
   makeHibernatingWebSocket,
   type HibernatingWebSocket,
   type HibernatingWebSocketState,
 } from "../src/durable-objects/index.js"
-import { runtimeLayer } from "../../tenetkit/test/transport/helpers.js"
+import { event, runtimeLayer } from "../../tenetkit/test/transport/helpers.js"
 import { Runtime } from "tenetkit/runtime"
 
 class FakeSocket implements HibernatingWebSocket {
@@ -139,5 +139,54 @@ describe("hibernating WebSocket", () => {
     expect(socket.sent).toHaveLength(2)
     expect(new Set(socket.sent).size).toBe(2)
     expect(socket.attachment).toMatchObject({ cursor: 1 })
+  })
+
+  it("serializes concurrent same-run attachment updates", async () => {
+    const state = new FakeState()
+    const socket = new FakeSocket()
+    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
+    adapter.accept(socket)
+    socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: 2 }
+
+    await Promise.all([
+      adapter.webSocketMessage(
+        socket,
+        await Effect.runPromise(Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 100 })),
+      ),
+      adapter.webSocketMessage(
+        socket,
+        await Effect.runPromise(Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 0 })),
+      ),
+    ])
+
+    expect(socket.attachment).toEqual({ version: 1, state: "attached", runId: "run-1", cursor: 100 })
+  })
+
+  it("serializes attachment advancement with an in-flight flush", async () => {
+    const entered = await Effect.runPromise(Deferred.make<void>())
+    const release = await Effect.runPromise(Deferred.make<void>())
+    const layer = runtimeLayer({
+      history: ({ cursor }) =>
+        Deferred.succeed(entered, undefined).pipe(
+          Effect.andThen(Deferred.await(release)),
+          Effect.as([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
+        ),
+    })
+    const state = new FakeState()
+    const socket = new FakeSocket()
+    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
+    adapter.accept(socket)
+    socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: -1 }
+
+    const flushing = adapter.flushSocket(socket)
+    await Effect.runPromise(Deferred.await(entered))
+    const attaching = adapter.webSocketMessage(
+      socket,
+      await Effect.runPromise(Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 2 })),
+    )
+    await Effect.runPromise(Deferred.succeed(release, undefined))
+    await Promise.all([flushing, attaching])
+
+    expect(socket.attachment).toEqual({ version: 1, state: "attached", runId: "run-1", cursor: 2 })
   })
 })
