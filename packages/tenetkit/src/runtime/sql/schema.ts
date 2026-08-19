@@ -126,6 +126,8 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   created_at TEXT NOT NULL,
   settled_at TEXT,
   FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
+  UNIQUE (partition, external_run_id),
+  UNIQUE (parent_run_id, invocation_id),
   CHECK ((settlement_id IS NULL AND outcome_json IS NULL AND outcome_event_id IS NULL AND settled_at IS NULL)
     OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
 )`,

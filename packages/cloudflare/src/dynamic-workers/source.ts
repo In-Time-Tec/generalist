@@ -2,6 +2,8 @@ import { SandboxExecutor } from "tenetkit"
 import { ImportType, initSync, parse } from "es-module-lexer"
 
 const validName = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+\.js$/
+/** @experimental Host-owned generated entrypoint excluded from user module graphs. */
+export const runnerName = "__tenetkit_runner.js"
 
 const resolve = (from: string, specifier: string): string => {
   const parts = from.split("/")
@@ -28,6 +30,8 @@ export const normalize = (
   for (const module of modules) {
     if (!validName.test(module.name) || module.name.includes("//") || module.name.startsWith("./"))
       throw new TypeError("invalid module name")
+    if (module.name.toLowerCase() === runnerName)
+      throw new TypeError("module name is reserved for the sandbox protocol")
     if (names.has(module.name) || folded.has(module.name.toLowerCase()))
       throw new TypeError("duplicate or case-conflicting module name")
     names.add(module.name)

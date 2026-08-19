@@ -63,6 +63,16 @@ const suite = <E>(
           expect((yield* external.reserve({ ...input, requestDigest: "different" }).pipe(Effect.flip))._tag).toBe(
             "@tenetkit/runtime/ExternalChildPlacementConflict",
           )
+          expect(
+            (yield* external
+              .reserve({ ...placement(claim, "placement:ref-conflict"), ref: input.ref })
+              .pipe(Effect.flip))._tag,
+          ).toBe("@tenetkit/runtime/ExternalChildPlacementConflict")
+          expect(
+            (yield* external
+              .reserve({ ...placement(claim, "placement:invocation-conflict"), invocationId: input.invocationId })
+              .pipe(Effect.flip))._tag,
+          ).toBe("@tenetkit/runtime/ExternalChildPlacementConflict")
           expect((yield* external.reserve(placement(claim, "placement:2")).pipe(Effect.flip))._tag).toBe(
             "@tenetkit/runtime/ExternalChildCapacityUnavailable",
           )
@@ -179,7 +189,7 @@ const suite = <E>(
       ),
     )
 
-    it.live("preserves parent cancellation while accepting authoritative remote settlement", () =>
+    it.live("converges an ownerless cancelling parent after authoritative remote settlement", () =>
       provide(
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
@@ -192,6 +202,8 @@ const suite = <E>(
             cancelRequested: true,
             settled: false,
           })
+          yield* store.releaseExecution(claim)
+          expect(yield* store.inspect(parent.runId)).toMatchObject({ status: "cancelling" })
           yield* external.settle({
             placementId: "placement:parent-cancel",
             settlementId: "settlement:parent-cancel",
@@ -202,7 +214,7 @@ const suite = <E>(
               occurredAt: "2026-08-19T00:00:00.000Z",
             },
           })
-          expect(yield* store.inspect(parent.runId)).toMatchObject({ status: "cancelling" })
+          expect(yield* store.inspect(parent.runId)).toMatchObject({ status: "cancelled" })
         }),
       ),
     )
@@ -233,16 +245,19 @@ const suite = <E>(
 suite("memory", memoryLayer)
 suite("sqlite", sqliteLayer(tempDbPath("external-child-placement")))
 
-it.live("rolls back placement, wait, and activation projection as one SQLite transaction", () => {
+it.live("rolls back reservation and projects settlement-driven cancellation in SQLite transactions", () => {
   let rejectProjection = false
+  const projected: Array<{ readonly runId: string; readonly intent: string }> = []
   const layer = Runtime.layerSqlite({
     filename: tempDbPath("external-child-rollback"),
     resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     subscriberQueueCapacity: 8,
     activationProjection: {
-      applyInTransaction: () =>
-        rejectProjection ? RuntimeUnavailable.make({ message: "forced projection rollback" }) : Effect.void,
+      applyInTransaction: (changes) =>
+        rejectProjection
+          ? RuntimeUnavailable.make({ message: "forced projection rollback" })
+          : Effect.sync(() => void projected.push(...changes)),
     },
   })
   return provideScoped(
@@ -290,6 +305,21 @@ it.live("rolls back placement, wait, and activation projection as one SQLite tra
         placementId: input.placementId,
         waitId: input.parentSuspension.wait.waitId,
       })
+      yield* store.cancel({ runId: parent.runId, reason: "cancel external parent" })
+      yield* store.releaseExecution(claim)
+      projected.length = 0
+      yield* external.settle({
+        placementId: input.placementId,
+        settlementId: "settlement:rollback",
+        outcome: {
+          _tag: "Succeeded",
+          result: completedResult("late authoritative result"),
+          eventId: "remote:event:rollback",
+          occurredAt: "2026-08-19T00:00:00.000Z",
+        },
+      })
+      expect(yield* store.inspect(parent.runId)).toMatchObject({ status: "cancelled" })
+      expect(projected).toContainEqual({ runId: parent.runId, intent: "inactive" })
     }),
   )
 })

@@ -14,7 +14,7 @@ import { RuntimeUnavailable } from "../errors.js"
 import { isTerminal, RunOutcome, type RunOutcome as RunOutcomeType } from "../run.js"
 import { decodeJson, encodeJson } from "./codecs.js"
 import { activeChildCount, promoteChildCapacity } from "./store-child-capacity.js"
-import { respond, suspend } from "./store-control.js"
+import { respond, settleAdmittedCancellation, suspend } from "./store-control.js"
 import { loadRun, loadRunWait, nowIso } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import { appendEvent } from "./store-helpers.js"
@@ -93,6 +93,15 @@ export const reserve: {
         return yield* ExternalChildPlacementConflict.make({ placementId: input.placementId })
       }
       return existing
+    }
+    const conflicting = yield* sql<{ placement_id: string }>`
+      SELECT placement_id FROM baton_external_child_placements
+      WHERE (partition = ${input.ref.partition} AND external_run_id = ${input.ref.runId})
+         OR (parent_run_id = ${input.runId} AND invocation_id = ${input.invocationId})
+      LIMIT 1
+    `
+    if (conflicting.length > 0) {
+      return yield* ExternalChildPlacementConflict.make({ placementId: input.placementId })
     }
     yield* requireExecutionClaim(input)
     const parent = yield* loadRun(input.runId)
@@ -185,6 +194,13 @@ const settle = (
         resolution: { _tag: "ToolResult", result: input.outcome, encodedResult: input.outcome },
       }).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: error._tag })))
     }
+    yield* settleAdmittedCancellation(hub, placement.parentRunId).pipe(
+      Effect.mapError((error) =>
+        error._tag === "tenetkit/runtime/RunNotFound"
+          ? RuntimeUnavailable.make({ message: "external parent cancellation missing" })
+          : error,
+      ),
+    )
     yield* promoteChildCapacity({ hub, parentRunId: placement.parentRunId, append: appendEvent })
     return (yield* load(input.placementId))!
   })

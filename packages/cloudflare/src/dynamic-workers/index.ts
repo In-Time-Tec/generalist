@@ -1,10 +1,9 @@
-/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-timers-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, no-await-in-loop */
-import { Clock, Effect, Layer, Schema } from "effect"
+/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/global-timers-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, effecttsgo/unnecessary-fail-yieldable-error, no-await-in-loop */
+import { Effect, Layer, Result, Schema } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
-import { normalize, runner } from "./source.js"
+import { normalize, runner, runnerName } from "./source.js"
 import { CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
 
-const runnerName = "__tenetkit_runner.js"
 const maximumDiagnostic = 160
 const safeMessage = (cause: unknown): string => {
   try {
@@ -78,7 +77,7 @@ export const make = (options: Options): SandboxExecutor.Interface =>
     }),
     execute: (request) =>
       Effect.gen(function* () {
-        const now = yield* Clock.currentTimeMillis
+        const now = Date.now()
         if (request.signal.aborted)
           return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
         if (now >= request.deadlineMillis)
@@ -111,6 +110,7 @@ export const make = (options: Options): SandboxExecutor.Interface =>
         const capabilities = yield* ProgramCapabilities.ProgramCapabilities
         const grants = new Map(request.capabilities.map((grant) => [grant.operation, new Set(grant.names)] as const))
         let active = true
+        let capabilityFailure: ProgramCapabilities.CapabilityFailure | undefined
         const invocation = new AbortController()
         const cancel = () => invocation.abort()
         let deadlineElapsed = false
@@ -135,18 +135,23 @@ export const make = (options: Options): SandboxExecutor.Interface =>
                 if (!grant.has(member.selection)) throw new Error("capability name denied")
               }
             }
-            const inputSize = bytes(decoded.input)
+            const inputSize = decoded.input === undefined ? 0 : bytes(decoded.input)
             if (inputSize === undefined || inputSize > request.limits.outputBytes)
               throw new Error("capability payload denied")
             const effect =
               decoded.operation === "discoverTools"
-                ? capabilities.discoverTools
+                ? capabilities.discoverTools.pipe(Effect.map((tools) => tools.filter((tool) => grant.has(tool.name))))
                 : decoded.operation === "describeTool"
                   ? capabilities.describeTool(decoded.input)
                   : capabilities[decoded.operation](decoded.input as never)
             let value: unknown
             try {
-              value = await Effect.runPromise(effect, { signal: invocation.signal })
+              const outcome = await Effect.runPromise(Effect.result(effect), { signal: invocation.signal })
+              if (Result.isFailure(outcome)) {
+                capabilityFailure = outcome.failure
+                throw new Error("capability invocation failed")
+              }
+              value = outcome.success
             } catch {
               throw new Error("capability invocation failed")
             }
@@ -219,11 +224,25 @@ export const make = (options: Options): SandboxExecutor.Interface =>
           })
           if (!active || request.signal.aborted)
             return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-          if (!response.ok) return yield* failExecution(`dynamic Worker returned status ${response.status}`)
+          if (deadlineElapsed || Date.now() >= request.deadlineMillis)
+            return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+          if (!response.ok) {
+            if (capabilityFailure !== undefined) return yield* Effect.fail(capabilityFailure)
+            return yield* failExecution(`dynamic Worker returned status ${response.status}`)
+          }
           const text = yield* Effect.tryPromise({
-            try: () => readBounded(response, request.limits.outputBytes),
-            catch: failExecution,
+            try: () => Promise.race([readBounded(response, request.limits.outputBytes), abort]),
+            catch: (cause) =>
+              request.signal.aborted
+                ? SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+                : deadlineElapsed || Date.now() >= request.deadlineMillis
+                  ? SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+                  : failExecution(cause),
           })
+          if (!active || request.signal.aborted)
+            return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+          if (deadlineElapsed || Date.now() >= request.deadlineMillis)
+            return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
           if (text === undefined)
             return yield* SandboxExecutor.SandboxResourceExceeded.make({
               resource: "output",
@@ -260,6 +279,10 @@ export const make = (options: Options): SandboxExecutor.Interface =>
               resource: "output",
               limit: request.limits.outputBytes,
             })
+          if (!active || request.signal.aborted)
+            return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+          if (deadlineElapsed || Date.now() >= request.deadlineMillis)
+            return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
           return result
         } finally {
           active = false
@@ -270,9 +293,24 @@ export const make = (options: Options): SandboxExecutor.Interface =>
       }),
   })
 
+/** @experimental Construct an explicitly disabled Worker Loader boundary. */
+export const makeUnavailable = (message = "Worker Loader is unavailable"): SandboxExecutor.Interface =>
+  SandboxExecutor.SandboxExecutor.of({
+    identity: Object.freeze({
+      implementation: "@tenetkit/cloudflare/dynamic-workers",
+      protocolVersion: SandboxExecutor.protocolVersion,
+      available: false,
+    }),
+    execute: () => SandboxExecutor.SandboxUnavailable.make({ message }),
+  })
+
 /** @experimental Provide the Worker Loader SandboxExecutor. */
 export const layer = (options: Options): Layer.Layer<SandboxExecutor.Service> =>
   Layer.succeed(SandboxExecutor.SandboxExecutor, make(options))
+
+/** @experimental Provide an explicitly disabled Worker Loader boundary. */
+export const layerUnavailable = (message?: string): Layer.Layer<SandboxExecutor.Service> =>
+  Layer.succeed(SandboxExecutor.SandboxExecutor, makeUnavailable(message))
 
 export type {
   CapabilityRpc,

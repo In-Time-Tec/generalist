@@ -31,11 +31,14 @@ export const loadTerminalEvent = (
 export const hasUnsettledChild = (runId: string): Effect.Effect<boolean, SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const pending = yield* sql<{ child_run_id: string }>`
-      SELECT l.child_run_id FROM baton_run_links l
-      JOIN baton_runs r ON r.run_id = l.child_run_id
-      WHERE l.parent_run_id = ${runId}
-        AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
+    const pending = yield* sql<{ present: number }>`
+      SELECT 1 AS present FROM baton_run_links l
+        JOIN baton_runs r ON r.run_id = l.child_run_id
+        WHERE l.parent_run_id = ${runId}
+          AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
+      UNION ALL
+      SELECT 1 AS present FROM baton_external_child_placements
+        WHERE parent_run_id = ${runId} AND settlement_id IS NULL
       LIMIT 1
     `
     return pending.length > 0

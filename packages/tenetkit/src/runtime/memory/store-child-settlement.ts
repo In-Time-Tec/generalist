@@ -18,10 +18,15 @@ export const hasUnsettledChild: {
 } = Function.dual(2, (state: MemoryState, runId: string): boolean => {
   const run = state.runs.get(runId)
   if (run === undefined) return false
-  return run.children.some((childRunId) => {
-    const child = state.runs.get(childRunId)
-    return child !== undefined && !isTerminal(child.status)
-  })
+  return (
+    run.children.some((childRunId) => {
+      const child = state.runs.get(childRunId)
+      return child !== undefined && !isTerminal(child.status)
+    }) ||
+    [...state.externalChildPlacements.values()].some(
+      (placement) => placement.parentRunId === runId && !placement.settled,
+    )
+  )
 })
 
 export const reconcileChildWait: {

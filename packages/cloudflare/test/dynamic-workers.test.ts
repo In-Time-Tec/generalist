@@ -1,8 +1,8 @@
-/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/new-promise */
+/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/new-promise */
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
-import { make, type CapabilityRpc, type WorkerCode } from "@tenetkit/cloudflare/dynamic-workers"
+import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "@tenetkit/cloudflare/dynamic-workers"
 
 const capabilities = ProgramCapabilities.ProgramCapabilities.of({
   discoverTools: Effect.succeed([]),
@@ -128,6 +128,12 @@ it.effect("normalizes the exact module graph and rejects unsupported imports bef
         { name: "Program.js", source: "export default 1" },
       ],
       [{ name: "../program.js", source: "export default () => null" }],
+      [{ name: "__tenetkit_runner.js", source: "export default () => null" }],
+      [{ name: "__TENETKIT_RUNNER.JS", source: "export default () => null" }],
+      [
+        { name: "program.js", source: 'import "./__tenetkit_runner.js"; export default () => null' },
+        { name: "__tenetkit_runner.js", source: "export default 1" },
+      ],
     ]
     for (const modules of invalidModules) {
       const candidate = {
@@ -222,6 +228,96 @@ it.effect("strict-decodes, authorizes, and bounds every capability RPC call", ()
   }),
 )
 
+it.effect("filters tool discovery to the explicit request grant", () =>
+  Effect.gen(function* () {
+    let rpc: CapabilityRpc | undefined
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (value) => {
+        rpc = value
+        return value
+      },
+      loader: {
+        load: (code) => ({
+          getEntrypoint: () => ({
+            fetch: async () => {
+              expect(
+                await rpc!.call({
+                  protocolVersion: "1",
+                  requestId: "run-1:attempt-1",
+                  operation: "discoverTools",
+                }),
+              ).toEqual([{ name: "allowed" }])
+              return Response.json({
+                protocolVersion: "1",
+                requestId: code.env.TENET_REQUEST_ID,
+                sourceDigest: code.env.TENET_SOURCE_DIGEST,
+                inputCodec: code.env.TENET_INPUT_CODEC,
+                outputCodec: code.env.TENET_OUTPUT_CODEC,
+                output: "done",
+              })
+            },
+          }),
+        }),
+      },
+    })
+    const discovered = ProgramCapabilities.ProgramCapabilities.of({
+      ...capabilities,
+      discoverTools: Effect.succeed([{ name: "allowed" }, { name: "hidden" }]),
+    })
+    yield* executor
+      .execute({ ...request(), capabilities: [{ operation: "discoverTools", names: ["allowed"] }] })
+      .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, discovered))
+  }),
+)
+
+it.effect("returns typed host capability failures without exposing them to Worker source", () =>
+  Effect.gen(function* () {
+    const failures: ReadonlyArray<ProgramCapabilities.CapabilityFailure> = [
+      ProgramCapabilities.ProgramSuspended.make({ operation: "echo", reason: "agent", token: "resume" }),
+      ProgramCapabilities.ProgramCancelled.make({ reason: "cancelled" }),
+      ProgramCapabilities.ProgramAuthorizationFailure.make({ capability: "echo", operation: "echo", cause: "denied" }),
+      ProgramCapabilities.ProgramBudgetExhausted.make({ dimension: "toolCalls", limit: 1 }),
+    ]
+    for (const expected of failures) {
+      let rpc: CapabilityRpc | undefined
+      const executor = make({
+        compatibilityDate: "2026-08-19",
+        capabilityBinding: (value) => {
+          rpc = value
+          return value
+        },
+        loader: {
+          load: () => ({
+            getEntrypoint: () => ({
+              fetch: async () => {
+                await expect(
+                  rpc!.call({
+                    protocolVersion: "1",
+                    requestId: "run-1:attempt-1",
+                    operation: "callTool",
+                    input: { operation: "echo", tool: "echo", input: "value" },
+                  }),
+                ).rejects.toThrow("capability invocation failed")
+                return Response.json({ error: "sandbox execution failed" }, { status: 500 })
+              },
+            }),
+          }),
+        },
+      })
+      const failing = ProgramCapabilities.ProgramCapabilities.of({
+        ...capabilities,
+        callTool: () => Effect.fail(expected),
+      })
+      expect(
+        yield* executor
+          .execute(request())
+          .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, failing), Effect.flip),
+      ).toEqual(expected)
+    }
+  }),
+)
+
 it.effect("streams output through the byte bound before decoding", () =>
   Effect.gen(function* () {
     const executor = make({
@@ -263,6 +359,61 @@ it.effect("fences a late Worker response after cancellation", () =>
     const failure = yield* Fiber.join(fiber).pipe(Effect.flip)
     expect(failure).toBeInstanceOf(SandboxExecutor.SandboxCancelled)
     complete(Response.json({ output: "late" }))
+  }),
+)
+
+it.effect("fences cancellation and deadline while reading a delayed response body", () =>
+  Effect.gen(function* () {
+    const execute = (input: SandboxExecutor.Request, reading: () => void) =>
+      make({
+        compatibilityDate: "2026-08-19",
+        capabilityBinding: (rpc) => rpc,
+        loader: {
+          load: () => ({
+            getEntrypoint: () => ({
+              fetch: async () =>
+                new Response(
+                  new ReadableStream<Uint8Array>({
+                    pull: reading,
+                  }),
+                ),
+            }),
+          }),
+        },
+      })
+        .execute(input)
+        .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities))
+
+    const controller = new AbortController()
+    let bodyReading!: () => void
+    const bodyStarted = new Promise<void>((resolve) => (bodyReading = resolve))
+    const cancelled = yield* execute(request(controller.signal), bodyReading).pipe(Effect.forkChild)
+    yield* Effect.promise(() => bodyStarted)
+    controller.abort()
+    expect(yield* Fiber.join(cancelled).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxCancelled)
+
+    let deadlineReading!: () => void
+    const deadlineBodyStarted = new Promise<void>((resolve) => (deadlineReading = resolve))
+    const deadline = yield* execute({ ...request(), deadlineMillis: Date.now() + 50 }, deadlineReading).pipe(
+      Effect.forkChild,
+    )
+    yield* Effect.promise(() => deadlineBodyStarted)
+    expect(yield* Fiber.join(deadline).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxDeadlineExceeded)
+  }),
+)
+
+it.effect("provides an explicit typed unavailable executor", () =>
+  Effect.gen(function* () {
+    const unavailable = makeUnavailable("feature disabled")
+    expect(unavailable.identity).toMatchObject({ available: false })
+    expect(
+      yield* unavailable
+        .execute(request())
+        .pipe(Effect.flip, Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities)),
+    ).toMatchObject({
+      _tag: "@tenetkit/core/SandboxUnavailable",
+      message: "feature disabled",
+    })
   }),
 )
 
