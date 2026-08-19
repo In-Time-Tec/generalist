@@ -96,7 +96,7 @@ export const reserve: {
     }
     const conflicting = yield* sql<{ placement_id: string }>`
       SELECT placement_id FROM baton_external_child_placements
-      WHERE (partition = ${input.ref.partition} AND external_run_id = ${input.ref.runId})
+      WHERE (${sql("partition")} = ${input.ref.partition} AND external_run_id = ${input.ref.runId})
          OR (parent_run_id = ${input.runId} AND invocation_id = ${input.invocationId})
       LIMIT 1
     `
@@ -115,7 +115,7 @@ export const reserve: {
     }
     const createdAt = yield* nowIso
     yield* sql`INSERT INTO baton_external_child_placements
-      (placement_id, parent_run_id, partition, external_run_id, invocation_id, request_digest,
+      (placement_id, parent_run_id, ${sql("partition")}, external_run_id, invocation_id, request_digest,
        executable_digest, wait_id, suspension_identity, cancel_requested, created_at)
       VALUES (${input.placementId}, ${input.runId}, ${input.ref.partition}, ${input.ref.runId},
         ${input.invocationId}, ${input.requestDigest}, ${input.executableDigest},

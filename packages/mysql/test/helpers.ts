@@ -86,6 +86,7 @@ const RUNTIME_TABLES = [
   "baton_run_steering",
   "baton_messages",
   "baton_agent_names",
+  "baton_external_child_placements",
   "baton_run_links",
   "baton_run_waits",
   "baton_run_operations",

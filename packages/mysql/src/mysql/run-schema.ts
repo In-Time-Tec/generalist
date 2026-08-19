@@ -8,11 +8,14 @@ import {
   SchemaVersionUnsupported,
 } from "tenetkit/runtime/driver/sql/errors"
 import {
+  EXTERNAL_CHILD_STATEMENTS,
   MIGRATION_LOCK,
   MIGRATIONS_TABLE,
   SCHEMA_META_TABLE,
   SCHEMA_STATEMENTS,
   SCHEMA_VERSION,
+  V7_SCHEMA_CHECKSUM,
+  V7_SCHEMA_STATEMENTS,
   schemaChecksum,
 } from "./schema.js"
 
@@ -29,6 +32,27 @@ const migrationFailure = (source: string, fallback: string) => (error: unknown) 
     source,
     message: typeof error === "object" && error !== null && "message" in error ? String(error.message) : fallback,
   })
+
+const verifyMigrationIdentity = (
+  source: string,
+  version: 7 | 8,
+  migrations: ReadonlyArray<{ readonly migration_id: number; readonly name: string }>,
+) => {
+  const expected: ReadonlyArray<readonly [number, string]> =
+    version === 7
+      ? [[1, "baton_runtime"]]
+      : [
+          [1, "baton_runtime"],
+          [2, "external_child_placements"],
+        ]
+  return migrations.length === expected.length &&
+    migrations.every(
+      (migration, index) =>
+        Number(migration.migration_id) === expected[index]?.[0] && migration.name === expected[index]?.[1],
+    )
+    ? Effect.void
+    : SchemaMigrationFailed.make({ source, message: `version ${version} migration identity mismatch` })
+}
 
 const readMeta = (source: string) =>
   Effect.gen(function* () {
@@ -58,8 +82,8 @@ export const plan = (source: string): Effect.Effect<SchemaPlan, SchemaMigrationF
     current: meta.version,
     required: SCHEMA_VERSION,
     checksum: schemaChecksum(),
-    statements: meta.present ? [] : SCHEMA_STATEMENTS,
-    upgradeRequired: !meta.present,
+    statements: meta.present ? (meta.version === 7 ? EXTERNAL_CHILD_STATEMENTS : []) : SCHEMA_STATEMENTS,
+    upgradeRequired: meta.version < SCHEMA_VERSION,
   }))
 
 export const check = (source: string) =>
@@ -74,13 +98,20 @@ export const check = (source: string) =>
     if (meta.version !== SCHEMA_VERSION || meta.checksum !== expected) {
       return yield* SchemaChecksumMismatch.make({ source, expected, actual: meta.checksum })
     }
+    const sql = yield* SqlClient.SqlClient
+    const migrations = yield* sql<{ migration_id: number; name: string }>`
+      SELECT migration_id, name FROM ${sql(MIGRATIONS_TABLE)} ORDER BY migration_id
+    `.pipe(Effect.mapError(migrationFailure(source, "migration identity read failed")))
+    yield* verifyMigrationIdentity(source, SCHEMA_VERSION, migrations)
   })
 
 export const apply = (source: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const meta = yield* readMeta(source)
-    if (meta.present) return yield* check(source)
+    if (meta.present && (meta.dirty || meta.version !== 7 || meta.checksum !== V7_SCHEMA_CHECKSUM)) {
+      return yield* check(source)
+    }
 
     return yield* Effect.gen(function* () {
       const connection = yield* sql.reserve
@@ -94,25 +125,49 @@ export const apply = (source: string) =>
       yield* Effect.addFinalizer(() => query("SELECT RELEASE_LOCK(?)", [MIGRATION_LOCK]).pipe(Effect.ignore))
 
       const lockedMeta = yield* readMeta(source)
-      if (lockedMeta.present) return yield* check(source)
-      const existing = yield* query<{ present: number }>(
-        `SELECT COUNT(*) AS present FROM information_schema.tables
-         WHERE table_schema = DATABASE() AND table_name LIKE 'baton@_%' ESCAPE '@'`,
-      )
-      if (Number(existing[0]?.present ?? 0) > 0) {
-        return yield* SchemaMigrationFailed.make({
-          source,
-          message: "cannot create the baseline over an existing TenetKit schema",
-        })
+      if (
+        lockedMeta.present &&
+        (lockedMeta.dirty || lockedMeta.version !== 7 || lockedMeta.checksum !== V7_SCHEMA_CHECKSUM)
+      ) {
+        return yield* check(source)
       }
-      for (const statement of SCHEMA_STATEMENTS) yield* query(statement)
+      if (!lockedMeta.present) {
+        const existing = yield* query<{ present: number }>(
+          `SELECT COUNT(*) AS present FROM information_schema.tables
+           WHERE table_schema = DATABASE() AND table_name LIKE 'baton@_%' ESCAPE '@'`,
+        )
+        if (Number(existing[0]?.present ?? 0) > 0) {
+          return yield* SchemaMigrationFailed.make({
+            source,
+            message: "cannot create the baseline over an existing TenetKit schema",
+          })
+        }
+        for (const statement of V7_SCHEMA_STATEMENTS) yield* query(statement)
+        yield* query(
+          `INSERT INTO ${SCHEMA_META_TABLE} (id, version, checksum, dirty, applied_at) VALUES (1, 7, ?, 0, NOW(3))`,
+          [V7_SCHEMA_CHECKSUM],
+        )
+        yield* query(`INSERT INTO ${MIGRATIONS_TABLE} (migration_id, name, applied_at) VALUES (1, ?, NOW(3))`, [
+          "baton_runtime",
+        ])
+      } else {
+        const migrations = yield* query<{ migration_id: number; name: string }>(
+          `SELECT migration_id, name FROM ${MIGRATIONS_TABLE} ORDER BY migration_id`,
+        )
+        yield* verifyMigrationIdentity(source, 7, migrations)
+      }
+
+      yield* query(`UPDATE ${SCHEMA_META_TABLE} SET dirty = 1 WHERE id = 1`)
+      for (const statement of EXTERNAL_CHILD_STATEMENTS) {
+        yield* query(statement.replaceAll(" IF NOT EXISTS", ""))
+      }
+      yield* query(`INSERT INTO ${MIGRATIONS_TABLE} (migration_id, name, applied_at) VALUES (2, ?, NOW(3))`, [
+        "external_child_placements",
+      ])
       yield* query(
-        `INSERT INTO ${SCHEMA_META_TABLE} (id, version, checksum, dirty, applied_at) VALUES (1, ?, ?, 0, NOW(3))`,
+        `UPDATE ${SCHEMA_META_TABLE} SET version = ?, checksum = ?, dirty = 0, applied_at = NOW(3) WHERE id = 1`,
         [SCHEMA_VERSION, schemaChecksum()],
       )
-      yield* query(`INSERT INTO ${MIGRATIONS_TABLE} (migration_id, name, applied_at) VALUES (1, ?, NOW(3))`, [
-        "baton_runtime",
-      ])
       yield* check(source)
     }).pipe(Effect.mapError(migrationFailure(source, "migration failed")), Effect.scoped)
   })

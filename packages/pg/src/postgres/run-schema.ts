@@ -1,4 +1,4 @@
-import { DateTime, Effect, Layer, Redacted } from "effect"
+import { Cause, DateTime, Effect, Layer, Redacted } from "effect"
 import { Migrator, SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { PgClient } from "@effect/sql-pg"
@@ -10,7 +10,16 @@ import {
   SchemaVersionUnsupported,
 } from "tenetkit/runtime/driver/sql/errors"
 import { mapSqlError } from "tenetkit/runtime/driver/sql/sql-effect"
-import { MIGRATIONS_TABLE, SCHEMA_META_TABLE, SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "./schema.js"
+import {
+  EXTERNAL_CHILD_STATEMENTS,
+  MIGRATIONS_TABLE,
+  SCHEMA_META_TABLE,
+  SCHEMA_STATEMENTS,
+  SCHEMA_VERSION,
+  V7_SCHEMA_CHECKSUM,
+  V7_SCHEMA_STATEMENTS,
+  schemaChecksum,
+} from "./schema.js"
 
 export interface SchemaPlan {
   readonly current: number
@@ -19,6 +28,12 @@ export interface SchemaPlan {
   readonly statements: ReadonlyArray<string>
   readonly upgradeRequired: boolean
 }
+
+const migrationFailure = (source: string, fallback: string) => (error: unknown) =>
+  SchemaMigrationFailed.make({
+    source,
+    message: typeof error === "object" && error !== null && "message" in error ? String(error.message) : fallback,
+  })
 
 const readMeta = (source: string) =>
   mapSqlError(
@@ -47,23 +62,76 @@ const readMeta = (source: string) =>
     ),
   )
 
-const migrationEffect = Effect.gen(function* () {
+const verifyMigrationIdentity = (source: string, version: 7 | 8) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const migrations = yield* sql<{ migration_id: number; name: string }>`
+      SELECT migration_id, name FROM ${sql(MIGRATIONS_TABLE)} ORDER BY migration_id
+    `
+    const expected: ReadonlyArray<readonly [number, string]> =
+      version === 7
+        ? [[1, "baton_runtime"]]
+        : [
+            [1, "baton_runtime"],
+            [2, "external_child_placements"],
+          ]
+    if (
+      migrations.length !== expected.length ||
+      migrations.some(
+        (migration, index) =>
+          Number(migration.migration_id) !== expected[index]?.[0] || migration.name !== expected[index]?.[1],
+      )
+    ) {
+      return yield* SchemaMigrationFailed.make({ source, message: `version ${version} migration identity mismatch` })
+    }
+  }).pipe(Effect.mapError(migrationFailure(source, "migration identity read failed")))
+
+const baselineMigration = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  for (const statement of SCHEMA_STATEMENTS) yield* sql.unsafe(statement)
+  for (const statement of V7_SCHEMA_STATEMENTS) yield* sql.unsafe(statement)
   const now = yield* DateTime.nowAsDate
   yield* sql`
     INSERT INTO ${sql(SCHEMA_META_TABLE)} (id, version, checksum, dirty, applied_at)
-    VALUES (1, ${SCHEMA_VERSION}, ${schemaChecksum()}, FALSE, ${now})
+    VALUES (1, 7, ${V7_SCHEMA_CHECKSUM}, FALSE, ${now})
   `
 })
+
+const externalChildMigration = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  yield* sql`UPDATE ${sql(SCHEMA_META_TABLE)} SET dirty = TRUE WHERE id = 1`
+  for (const statement of EXTERNAL_CHILD_STATEMENTS) {
+    yield* sql.unsafe(statement.replaceAll(" IF NOT EXISTS", ""))
+  }
+  const now = yield* DateTime.nowAsDate
+  yield* sql`UPDATE ${sql(SCHEMA_META_TABLE)}
+    SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE, applied_at = ${now}
+    WHERE id = 1`
+})
+
+const runMigrations = (source: string) => {
+  const migrate = Migrator.make({})
+  return migrate({
+    loader: Migrator.fromRecord({
+      "0001_baton_runtime": baselineMigration,
+      "0002_external_child_placements": externalChildMigration,
+    }),
+    table: MIGRATIONS_TABLE,
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Cause.hasInterrupts(cause)
+        ? Effect.interrupt
+        : SchemaMigrationFailed.make({ source, message: Cause.pretty(cause) || "migration failed" }),
+    ),
+  )
+}
 
 export const plan = (source: string): Effect.Effect<SchemaPlan, SchemaMigrationFailed, SqlClient.SqlClient> =>
   Effect.map(readMeta(source), (meta) => ({
     current: meta.version,
     required: SCHEMA_VERSION,
     checksum: schemaChecksum(),
-    statements: meta.present ? [] : SCHEMA_STATEMENTS,
-    upgradeRequired: !meta.present,
+    statements: meta.present ? (meta.version === 7 ? EXTERNAL_CHILD_STATEMENTS : []) : SCHEMA_STATEMENTS,
+    upgradeRequired: meta.version < SCHEMA_VERSION,
   }))
 
 export const check = (source: string) =>
@@ -78,12 +146,18 @@ export const check = (source: string) =>
     if (meta.version !== SCHEMA_VERSION || meta.checksum !== expected) {
       return yield* SchemaChecksumMismatch.make({ source, expected, actual: meta.checksum })
     }
+    yield* verifyMigrationIdentity(source, SCHEMA_VERSION)
   })
 
 export const apply = (source: string) =>
   Effect.gen(function* () {
     const meta = yield* readMeta(source)
-    if (meta.present) return yield* check(source)
+    if (meta.present) {
+      if (meta.dirty || meta.version !== 7 || meta.checksum !== V7_SCHEMA_CHECKSUM) return yield* check(source)
+      yield* verifyMigrationIdentity(source, 7)
+      yield* runMigrations(source)
+      return yield* check(source)
+    }
     const sql = yield* SqlClient.SqlClient
     const existing = yield* sql<{ present: number }>`
       SELECT COUNT(*) AS present FROM information_schema.tables
@@ -95,18 +169,7 @@ export const apply = (source: string) =>
         message: "cannot create the baseline over an existing TenetKit schema",
       })
     }
-    const runMigrations = Migrator.make({})
-    yield* runMigrations({
-      loader: Migrator.fromRecord({ "0001_baton_runtime": migrationEffect }),
-      table: MIGRATIONS_TABLE,
-    }).pipe(
-      Effect.mapError((error) =>
-        SchemaMigrationFailed.make({
-          source,
-          message: "message" in error ? String(error.message) : "migration failed",
-        }),
-      ),
-    )
+    yield* runMigrations(source)
     yield* check(source).pipe(
       Effect.catchTag("tenetkit/runtime/SchemaUpgradeRequired", (error) =>
         SchemaMigrationFailed.make({ source, message: `schema absent after apply: ${error.current}` }),
