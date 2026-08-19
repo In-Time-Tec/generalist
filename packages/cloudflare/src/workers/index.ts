@@ -1,4 +1,4 @@
-import { ConfigProvider, Context, Effect, Function } from "effect"
+import { ConfigProvider, Context, Effect, Function, type Scope } from "effect"
 
 /** @experimental */
 export interface ExecutionContext {
@@ -42,10 +42,14 @@ export interface Worker<Bindings extends Readonly<Record<string, unknown>>> {
 
 /** @experimental */
 export const make = <Bindings extends Readonly<Record<string, unknown>>, E>(
-  handle: (request: Request) => Effect.Effect<Response, E, WorkerContext>,
+  handle: (request: Request) => Effect.Effect<Response, E, WorkerContext | Scope.Scope>,
 ): Worker<Bindings> => ({
   fetch: (request, bindings, executionContext) =>
     Effect.runPromise(
-      handle(request).pipe(Effect.provideService(WorkerContext, WorkerContext.of({ bindings, executionContext }))),
+      Effect.scoped(
+        Effect.suspend(() => handle(request)).pipe(
+          Effect.provideService(WorkerContext, WorkerContext.of({ bindings, executionContext })),
+        ),
+      ),
     ),
 })

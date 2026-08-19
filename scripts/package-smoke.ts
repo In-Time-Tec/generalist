@@ -5,6 +5,7 @@ import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
   catalogVersion,
   compressedSizeLimits,
+  forbiddenPackageExports,
   packageExports,
   packedEffectDependencies,
   packedProviderDependencies,
@@ -224,9 +225,6 @@ const program = Effect.gen(function* () {
         }
       }
     }
-    if (encodeJson(manifest).includes("4.0.0-beta.93")) {
-      return yield* smokeError(`@tenetkit/${packageName} packed manifest contains Effect beta.93`)
-    }
     packedManifests[manifest.name] = manifest
     tarballs[packageNames[packageName]] = `file:${tarball}`
   }
@@ -246,7 +244,7 @@ const program = Effect.gen(function* () {
       dependencies: {
         ...tarballs,
         effect: effectVersion,
-        foldkit: "0.122.0",
+        foldkit: rootManifest.workspaces.catalog.foldkit,
         typescript: rootManifest.workspaces.catalog.typescript,
       },
       /**
@@ -327,6 +325,16 @@ server.listen(0, "127.0.0.1", () => {
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${encodeJson(packageExports)}
 for (const specifier of specifiers) await import(specifier)
+const forbidden = ${encodeJson(forbiddenPackageExports)}
+for (const specifier of forbidden) {
+  let blocked = false
+  try {
+    await import(specifier)
+  } catch (error) {
+    blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED" || error?.code === "ERR_MODULE_NOT_FOUND"
+  }
+  if (!blocked) throw new Error(\`forbidden package export resolved: \${specifier}\`)
+}
 const { A2A } = await import("tenetkit/a2a")
 const { AgUi } = await import("tenetkit/ag-ui")
 const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("tenetkit")

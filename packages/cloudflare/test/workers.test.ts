@@ -1,6 +1,15 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Config, ConfigProvider, Effect, Option, Redacted } from "effect"
-import { WorkerContext, make, makeConfigProvider } from "../src/workers/index.js"
+import { Config, ConfigProvider, Effect, Option, Redacted, Schema } from "effect"
+import { WorkerContext, make, makeConfigProvider, type ExecutionContext } from "../src/workers/index.js"
+
+class PromiseRejected extends Schema.TaggedError<PromiseRejected>()("@tenetkit/cloudflare/test/PromiseRejected", {
+  cause: Schema.Defect(),
+}) {}
+
+const executionContext: ExecutionContext = {
+  waitUntil: () => undefined,
+  passThroughOnException: () => undefined,
+}
 
 describe("Worker", () => {
   it.effect("provides bindings and lifecycle context per request", () =>
@@ -23,6 +32,55 @@ describe("Worker", () => {
 
       expect(yield* Effect.promise(() => response.text())).toBe("POST:redacted")
       expect(waits).toHaveLength(1)
+    }),
+  )
+
+  it.effect("owns request scopes through finalization", () =>
+    Effect.gen(function* () {
+      let finalized = false
+      const worker = make<Record<string, never>, never>(() =>
+        Effect.acquireRelease(Effect.void, () => Effect.sync(() => void (finalized = true))).pipe(
+          Effect.as(new Response("scoped")),
+        ),
+      )
+
+      const response = yield* Effect.promise(() =>
+        worker.fetch(new Request("https://example.test"), {}, executionContext),
+      )
+      expect(yield* Effect.promise(() => response.text())).toBe("scoped")
+      expect(finalized).toBe(true)
+    }),
+  )
+
+  it.effect("rejects typed failures, defects, and synchronous handler throws", () =>
+    Effect.gen(function* () {
+      const failure = { _tag: "ExpectedFailure" as const }
+      const defect = new Error("effect defect")
+      const synchronous = new Error("synchronous defect")
+      const request = new Request("https://example.test")
+      const rejection = <A>(evaluate: () => Promise<A>) =>
+        Effect.tryPromise({ try: evaluate, catch: (cause) => PromiseRejected.make({ cause }) }).pipe(
+          Effect.flip,
+          Effect.map((error) => error.cause),
+        )
+
+      expect(
+        yield* rejection(() =>
+          make<Record<string, never>, typeof failure>(() => Effect.fail(failure)).fetch(request, {}, executionContext),
+        ),
+      ).toBe(failure)
+      expect(
+        yield* rejection(() =>
+          make<Record<string, never>, never>(() => Effect.die(defect)).fetch(request, {}, executionContext),
+        ),
+      ).toBe(defect)
+      expect(
+        yield* rejection(() =>
+          make<Record<string, never>, never>(() => {
+            throw synchronous
+          }).fetch(request, {}, executionContext),
+        ),
+      ).toBe(synchronous)
     }),
   )
 

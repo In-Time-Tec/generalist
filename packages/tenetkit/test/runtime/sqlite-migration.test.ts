@@ -1,7 +1,12 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { SchemaChecksumMismatch, SchemaDirty, SchemaVersionUnsupported } from "../../src/runtime/sql/errors.js"
+import {
+  SchemaChecksumMismatch,
+  SchemaDirty,
+  SchemaMigrationFailed,
+  SchemaVersionUnsupported,
+} from "../../src/runtime/sql/errors.js"
 import { layer as sqliteClientLayer } from "../../src/runtime/sql/bun-client.js"
 import { migrate } from "../../src/runtime/sql/migrate.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../src/runtime/sql/schema.js"
@@ -18,7 +23,7 @@ const inspect = (filename: string) => {
   const db = new Database(filename)
   const tables = db
     .query<{ name: string }, []>(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'baton_%' ORDER BY name",
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'baton_*' ORDER BY name",
     )
     .all()
     .map((row) => row.name)
@@ -106,6 +111,65 @@ it.live("creates the current SQLite baseline and applies idempotently", () =>
     yield* apply(filename)
     yield* apply(filename)
     inspect(filename)
+  }),
+)
+
+it.live("recovers an empty migration table and ignores unrelated lookalike tables", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("sqlite-interrupted-bootstrap")
+    const db = new Database(filename)
+    db.run(`CREATE TABLE baton_sql_migrations (
+      migration_id integer PRIMARY KEY NOT NULL,
+      created_at datetime NOT NULL DEFAULT current_timestamp,
+      name VARCHAR(255) NOT NULL
+    )`)
+    db.run("CREATE TABLE batonXunrelated (id INTEGER PRIMARY KEY)")
+    db.close()
+
+    yield* apply(filename)
+    inspect(filename)
+  }),
+)
+
+it.live("rejects a partial application schema without metadata", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("sqlite-partial-bootstrap")
+    const db = new Database(filename)
+    db.run("CREATE TABLE baton_runs (run_id TEXT PRIMARY KEY)")
+    db.close()
+
+    expect(yield* apply(filename).pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
+
+    const inspectDb = new Database(filename)
+    const tables = inspectDb
+      .query<{ name: string }, []>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'baton_*' ORDER BY name",
+      )
+      .all()
+      .map((row) => row.name)
+    inspectDb.close()
+    expect(tables).toEqual(["baton_runs"])
+  }),
+)
+
+it.live("rolls back a failed baseline and reports a typed migration failure", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("sqlite-failed-bootstrap")
+    const db = new Database(filename)
+    db.run("CREATE TABLE baton_sql_migrations (migration_id INTEGER PRIMARY KEY)")
+    db.close()
+
+    expect(yield* apply(filename).pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
+
+    const inspectDb = new Database(filename)
+    const tables = inspectDb
+      .query<{ name: string }, []>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'baton_*' ORDER BY name",
+      )
+      .all()
+      .map((row) => row.name)
+    inspectDb.close()
+    expect(tables).toEqual(["baton_sql_migrations"])
   }),
 )
 

@@ -63,11 +63,14 @@ export const packageExports = [
   "tenetkit/transport/snapshot",
   "tenetkit/runtime/driver",
   "tenetkit/runtime/driver/sql",
+  "tenetkit/runtime/driver/run-store",
+  "tenetkit/runtime/driver/sql/store",
   "@tenetkit/cloudflare/workers",
   "@tenetkit/cloudflare/durable-objects",
   "@tenetkit/cloudflare/dynamic-workers",
   "@tenetkit/cloudflare/testing",
 ] as const
+export const forbiddenPackageExports = ["@tenetkit/cloudflare"] as const
 export const sortRecord = (value: Record<string, string> | undefined): Record<string, string> =>
   Object.fromEntries(Object.entries(value ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
 export const catalogVersion = (input: {
