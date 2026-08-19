@@ -13,7 +13,7 @@ import { mapSqlError } from "./sql-effect.js"
 
 const externalChildStatements = SCHEMA_STATEMENTS.filter((statement) =>
   statement.includes("baton_external_child_placements"),
-)
+).map((statement) => statement.replace(" IF NOT EXISTS", ""))
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -138,6 +138,18 @@ export const migrate = (
       `).pipe(Effect.mapError(() => SchemaMigrationFailed.make({ source, message: "schema meta read failed" })))
       const row = meta[0]
       if (Number(row?.version) === 8 && row?.checksum === V8_SCHEMA_CHECKSUM && Number(row?.dirty) === 0) {
+        const migrations = yield* mapSqlError(sql<{ migration_id: number; name: string }>`
+          SELECT migration_id, name FROM ${sql(MIGRATIONS_TABLE)} ORDER BY migration_id
+        `).pipe(
+          Effect.mapError(() => SchemaMigrationFailed.make({ source, message: "migration identity read failed" })),
+        )
+        if (
+          migrations.length !== 1 ||
+          Number(migrations[0]?.migration_id) !== 1 ||
+          migrations[0]?.name !== "baton_runtime"
+        ) {
+          return yield* SchemaMigrationFailed.make({ source, message: "version 8 migration identity mismatch" })
+        }
         yield* mapSqlError(sql.withTransaction(upgradeV8)).pipe(
           Effect.mapError((error) =>
             SchemaMigrationFailed.make({

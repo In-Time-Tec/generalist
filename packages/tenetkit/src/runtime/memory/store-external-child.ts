@@ -11,7 +11,7 @@ import {
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal, type RunOutcome } from "../run.js"
 import { activeChildCount, promoteChildCapacity } from "./store-child-capacity.js"
-import { respond, suspend } from "./store-control.js"
+import { cancel as cancelRun, respond, suspend } from "./store-control.js"
 import { requireExecutionClaim } from "./store-execution.js"
 import type { MemoryState } from "./state.js"
 
@@ -34,6 +34,15 @@ const reserve = (state: MemoryState, input: ReserveInput) =>
         return yield* ExternalChildPlacementConflict.make({ placementId: input.placementId })
       }
       return [existing, state] as const
+    }
+    if (
+      [...state.externalChildPlacements.values()].some(
+        (placement) =>
+          Equal.equals(placement.ref, input.ref) ||
+          (placement.parentRunId === input.runId && placement.invocationId === input.invocationId),
+      )
+    ) {
+      return yield* ExternalChildPlacementConflict.make({ placementId: input.placementId })
     }
     yield* requireExecutionClaim(state, input)
     const parent = state.runs.get(input.runId)
@@ -130,6 +139,12 @@ const settle = (
         waitId: placement.waitId,
         resolution: { _tag: "ToolResult", result: input.outcome, encodedResult: input.outcome },
       }).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })))
+    }
+    if (parent?.cancellationRequested === true) {
+      next = yield* cancelRun(next, {
+        runId: parent.runId,
+        ...(parent.cancelReason === undefined ? {} : { reason: parent.cancelReason }),
+      }).pipe(Effect.mapError(() => RuntimeUnavailable.make({ message: "external parent cancellation missing" })))
     }
     next = yield* promoteChildCapacity(next, placement.parentRunId)
     return [updated, next] as const
