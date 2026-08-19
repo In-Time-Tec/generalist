@@ -53,23 +53,21 @@ export const drain = (
     const outcomes: Array<DrainResult["outcomes"][number]> = []
     for (const candidate of selected) {
       if (candidate.intent === "execute") {
-        const outcome = yield* store
-          .claimExecution({ runId: candidate.run_id, ownerId: options.ownerId })
-          .pipe(
-            Effect.flatMap(host.execute),
-            Effect.as("executed" as const),
-            Effect.catchTag("tenetkit/runtime/StaleClaim", () => Effect.succeed("stale" as const)),
-            Effect.catchTag("tenetkit/runtime/RunNotFound", () =>
-              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
-                Effect.as("inactive" as const),
-              ),
+        const outcome = yield* store.claimExecution({ runId: candidate.run_id, ownerId: options.ownerId }).pipe(
+          Effect.flatMap(host.execute),
+          Effect.as("executed" as const),
+          Effect.catchTag("tenetkit/runtime/StaleClaim", () => Effect.succeed("stale" as const)),
+          Effect.catchTag("tenetkit/runtime/RunNotFound", () =>
+            sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
+              Effect.as("inactive" as const),
             ),
-            Effect.catchTag("tenetkit/runtime/RunTerminal", () =>
-              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
-                Effect.as("inactive" as const),
-              ),
+          ),
+          Effect.catchTag("tenetkit/runtime/RunTerminal", () =>
+            sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
+              Effect.as("inactive" as const),
             ),
-          )
+          ),
+        )
         outcomes.push({ runId: candidate.run_id, outcome })
       } else {
         const reconciliation = yield* scheduler.reconcileCancellation(candidate.run_id)
