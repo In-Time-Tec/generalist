@@ -46,7 +46,7 @@ export type Response =
   | { readonly _tag: "Failure"; readonly failure: unknown }
 
 /** @experimental The cell addressed a module or operation that is not mounted. */
-export class HostBindingNotFound extends Schema.TaggedErrorClass<HostBindingNotFound>()(
+export class HostBindingNotFound extends Schema.TaggedError<HostBindingNotFound>()(
   "tenetkit/repl/HostBindingNotFound",
   {
     module: Schema.String,
@@ -55,7 +55,7 @@ export class HostBindingNotFound extends Schema.TaggedErrorClass<HostBindingNotF
 ) {}
 
 /** @experimental Two modules or two operations claimed the same mounted name. */
-export class HostBindingConflict extends Schema.TaggedErrorClass<HostBindingConflict>()(
+export class HostBindingConflict extends Schema.TaggedError<HostBindingConflict>()(
   "tenetkit/repl/HostBindingConflict",
   {
     module: Schema.String,
@@ -64,7 +64,7 @@ export class HostBindingConflict extends Schema.TaggedErrorClass<HostBindingConf
 ) {}
 
 /** @experimental A host request or reply did not match the operation's declared schema. */
-export class HostBindingSchemaFailure extends Schema.TaggedErrorClass<HostBindingSchemaFailure>()(
+export class HostBindingSchemaFailure extends Schema.TaggedError<HostBindingSchemaFailure>()(
   "tenetkit/repl/HostBindingSchemaFailure",
   {
     module: Schema.String,

@@ -32,7 +32,8 @@ export interface ValidatedInterruptedModelResponse {
   readonly event: ModelResponseInterrupted
 }
 
-const jsonValue = (value: unknown): unknown => JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value))
+const jsonValue = (value: unknown): unknown =>
+  JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
 const sameJson = (left: unknown, right: unknown): boolean =>
   Pins.digest(jsonValue(left)) === Pins.digest(jsonValue(right))
 const fail = (message: string) => RuntimeUnavailable.make({ message })

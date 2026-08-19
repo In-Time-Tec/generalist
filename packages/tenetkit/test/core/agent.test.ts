@@ -3358,6 +3358,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             id: "bigint-result",
             name: "echo",
             isFailure: false,
+            providerExecuted: false,
             result: { value: 1n },
           }),
         ],
@@ -3934,6 +3935,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           id: "orphan",
           name: "echo",
           isFailure: false,
+          providerExecuted: false,
           result: "orphaned",
         }),
       ],
@@ -3988,6 +3990,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           id: "duplicate",
           name: "echo",
           isFailure: false,
+          providerExecuted: false,
           result: "only one result",
         }),
       ],
@@ -4041,6 +4044,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       id: "provider-checkpoint",
       name: "provider-search",
       isFailure: false,
+      providerExecuted: true,
       result: { answer: "found" },
     })
     const projected = Prompt.fromMessages([

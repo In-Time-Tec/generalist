@@ -26,13 +26,13 @@ export const HarnessSnapshot = Schema.Struct({ id: HarnessSnapshotId, payload: S
 export type HarnessSnapshot = typeof HarnessSnapshot.Type
 
 /** @experimental A pinned snapshot payload does not reconstruct the snapshot it claims. */
-export class SnapshotMismatch extends Schema.TaggedErrorClass<SnapshotMismatch>()("tenetkit/harness/SnapshotMismatch", {
+export class SnapshotMismatch extends Schema.TaggedError<SnapshotMismatch>()("tenetkit/harness/SnapshotMismatch", {
   expected: Schema.String,
   actual: Schema.String,
 }) {}
 
 /** @experimental A pinned snapshot payload is not a valid harness state. */
-export class SnapshotInvalid extends Schema.TaggedErrorClass<SnapshotInvalid>()("tenetkit/harness/SnapshotInvalid", {
+export class SnapshotInvalid extends Schema.TaggedError<SnapshotInvalid>()("tenetkit/harness/SnapshotInvalid", {
   message: Schema.String,
 }) {}
 

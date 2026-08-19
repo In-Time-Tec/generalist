@@ -388,7 +388,7 @@ describe("ExecutionHost", () => {
         return Session.buildContext(yield* session.value.path())
       }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped)
       expect(projection.content).toHaveLength(6)
-      const projectionJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(projection.content)
+      const projectionJson = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(projection.content)
       expect(projectionJson).toContain("first question")
       expect(projectionJson).toContain("reply 2")
       expect(projectionJson).toContain("third question")

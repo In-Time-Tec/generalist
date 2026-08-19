@@ -2,7 +2,14 @@ import { Cause, Context, Effect, Layer, Option, Ref, Result, Schema, Scope, Stre
 import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { Client, Errors, Wire } from "tenetkit/transport"
+import {
+  layerWebSocket as runClientLayerWebSocket,
+  RunClient,
+  type Connection,
+  type ConnectionStatus,
+} from "tenetkit/transport/client"
+import { TransportError } from "tenetkit/transport/errors"
+import { ObserverRunEvent, type ResolvedRunEvent } from "tenetkit/transport/wire"
 
 /** @experimental */
 export const ConnectionOpened: CallableTaggedStruct<"ConnectionOpened", {}> = m("ConnectionOpened")
@@ -11,33 +18,33 @@ export const ConnectionLost: CallableTaggedStruct<"ConnectionLost", {}> = m("Con
 /** @experimental */
 export const ConnectionFailed: CallableTaggedStruct<
   "ConnectionFailed",
-  { operation: Schema.Literal<"connect">; error: typeof Errors.TransportError; reason: typeof Schema.String }
+  { operation: Schema.Literal<"connect">; error: typeof TransportError; reason: typeof Schema.String }
 > = m("ConnectionFailed", {
   operation: Schema.Literal("connect"),
-  error: Errors.TransportError,
+  error: TransportError,
   reason: Schema.String,
 })
 
 /** @experimental */
 export type Incoming =
-  | Wire.ResolvedRunEvent
+  | ResolvedRunEvent
   | typeof ConnectionOpened.Type
   | typeof ConnectionLost.Type
   | typeof ConnectionFailed.Type
 /** @experimental */
 export const Incoming: Schema.Schema<Incoming> = Schema.Union([
-  Wire.ObserverRunEvent,
+  ObserverRunEvent,
   ConnectionOpened,
   ConnectionLost,
   ConnectionFailed,
 ])
 
 /** @experimental */
-export class SendFailed extends Schema.TaggedErrorClass<SendFailed>()("tenetkit/foldkit/SendFailed", {
+export class SendFailed extends Schema.TaggedError<SendFailed>()("tenetkit/foldkit/SendFailed", {
   reason: Schema.String,
 }) {}
 /** @experimental */
-export const AgentCommandError = Schema.Union([Errors.TransportError, SendFailed])
+export const AgentCommandError = Schema.Union([TransportError, SendFailed])
 /** @experimental */
 export type AgentCommandError = typeof AgentCommandError.Type
 /** @experimental */
@@ -89,7 +96,7 @@ export class AgentConnection extends Context.Service<AgentConnection, Interface>
 
 interface ActiveConnection {
   readonly runId: string
-  readonly connection: Client.Connection
+  readonly connection: Connection
 }
 type LegacyInterface = Omit<Interface, "session">
 
@@ -101,7 +108,7 @@ const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<ne
   return reasons.length === 0 ? Option.none() : Option.some(Cause.fromReasons(reasons))
 }
 
-const statusIncoming = (status: Client.ConnectionStatus): Option.Option<Incoming> => {
+const statusIncoming = (status: ConnectionStatus): Option.Option<Incoming> => {
   switch (status._tag) {
     case "Connected":
       return Option.some(ConnectionOpened())
@@ -134,7 +141,7 @@ export const layerWebSocket = (options: {
   Layer.effect(
     AgentConnection,
     Effect.gen(function* () {
-      const client = yield* Client.RunClient
+      const client = yield* RunClient
       const active = yield* Ref.make<ReadonlyMap<string, ActiveConnection>>(new Map())
 
       const sendThrough = (owner: ActiveConnection, command: AgentCommand): Effect.Effect<void, AgentCommandError> =>
@@ -203,4 +210,4 @@ export const layerWebSocket = (options: {
           ),
       })
     }),
-  ).pipe(Layer.provide(Client.layerWebSocket))
+  ).pipe(Layer.provide(runClientLayerWebSocket))

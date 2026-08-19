@@ -294,6 +294,7 @@ describe("Session", () => {
             id: "call-search",
             name: "web_search",
             isFailure: false,
+            providerExecuted: false,
             result: { results: ["TenetKit docs"] },
           })
 
@@ -353,12 +354,14 @@ describe("Session", () => {
         id: call.id,
         name: "other_tool",
         isFailure: false,
+        providerExecuted: false,
         result: "wrong",
       })
       const result = Prompt.makePart("tool-result", {
         id: call.id,
         name: call.name,
         isFailure: false,
+        providerExecuted: false,
         result: "done",
       })
       const prompt = Prompt.fromMessages([
@@ -386,6 +389,7 @@ describe("Session", () => {
         id: call.id,
         name: call.name,
         isFailure: false,
+        providerExecuted: false,
         result: "done",
       })
       const prompt = Prompt.fromMessages([

@@ -39,6 +39,7 @@ const resultPart = (
     name: call.name,
     isFailure: input.isFailure,
     result: input.result,
+    providerExecuted: false,
   })
 
 const terminalFailure = (terminal: Exclude<RunTerminalOutcome, { readonly _tag: "RunCompleted" }>): unknown =>

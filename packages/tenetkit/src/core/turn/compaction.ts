@@ -119,7 +119,7 @@ export interface Interface {
 }
 
 /** @experimental Compaction service failure. */
-export class CompactionError extends Schema.TaggedErrorClass<CompactionError>()("tenetkit/core/CompactionError", {
+export class CompactionError extends Schema.TaggedError<CompactionError>()("tenetkit/core/CompactionError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
@@ -201,6 +201,7 @@ const compactToolPart = (
         name: part.name,
         isFailure: false,
         result: bounded.encodedResult,
+        providerExecuted: false,
       }),
       true,
     ] as const

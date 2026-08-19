@@ -60,7 +60,7 @@ export const versioningReference = definePage({
     h2("effect-compat", "Effect compatibility"),
     table(
       ["TenetKit", "effect", "Notes"],
-      [[[code("0.14.x")], [code("4.0.0-beta.98")], "The exact peer and tested workspace catalog version"]],
+      [[[code("0.14.x")], [code("4.0.0-rc.109")], "The exact peer and tested workspace catalog version"]],
     ),
     h2("release-train", "The release train"),
     p("Every release builds and publishes all packages from one committed lockstep version:"),

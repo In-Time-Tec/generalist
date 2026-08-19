@@ -39,7 +39,7 @@ export interface Ask {
 export type Decision = Allow | Deny | Ask
 
 /** @experimental Permission service failure. */
-export class PermissionError extends Schema.TaggedErrorClass<PermissionError>()("tenetkit/core/PermissionError", {
+export class PermissionError extends Schema.TaggedError<PermissionError>()("tenetkit/core/PermissionError", {
   message: Schema.String,
 }) {}
 

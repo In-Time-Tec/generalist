@@ -13,6 +13,7 @@ const toolResultMessage = () =>
       id: "t1",
       name: "read",
       isFailure: false,
+      providerExecuted: false,
       result: "file contents",
     }) as unknown as Response.AnyPart,
   ])

@@ -1,7 +1,7 @@
 import { Effect, Function, Match, Option, Queue, Schema, Stream } from "effect"
 import { define, type Command } from "foldkit/command"
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 import { m } from "foldkit/message"
 import { defineStream, mapMessage } from "foldkit/mount"
 import { evo } from "foldkit/struct"
@@ -104,19 +104,18 @@ export type MessageScrollerMessage = Message
 // COMMAND
 
 /** Scrolls the viewport element to its end: smooth for the button click, instant for follow re-pinning. */
-export const ScrollToBottom = define(
-  "ScrollToBottom",
-  { viewportId: Schema.String, behavior: Schema.Literals(["smooth", "instant"]) },
-  CompletedScrollToBottom,
-)(({ behavior, viewportId: targetId }) =>
-  Effect.sync(() => {
-    Option.match(Option.fromNullishOr(document.getElementById(targetId)), {
-      onNone: Function.constVoid,
-      onSome: (viewport) => viewport.scrollTo({ top: viewport.scrollHeight, behavior }),
-    })
-    return CompletedScrollToBottom()
-  }),
-)
+export const ScrollToBottom = define("ScrollToBottom", {
+  args: { viewportId: Schema.String, behavior: Schema.Literals(["smooth", "instant"]) },
+  messages: [CompletedScrollToBottom],
+  execute: ({ behavior, viewportId: targetId }) =>
+    Effect.sync(() => {
+      Option.match(Option.fromNullishOr(document.getElementById(targetId)), {
+        onNone: Function.constVoid,
+        onSome: (viewport) => viewport.scrollTo({ top: viewport.scrollHeight, behavior }),
+      })
+      return CompletedScrollToBottom()
+    }),
+})
 
 // MOUNT
 

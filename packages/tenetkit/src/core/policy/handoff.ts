@@ -23,7 +23,7 @@ const defaultDelegateParameters = Schema.Struct({ prompt: Schema.String })
 
 type DefaultDelegateParameters = typeof defaultDelegateParameters
 
-export class RegistrationError extends Schema.TaggedErrorClass<RegistrationError>()("tenetkit/core/RegistrationError", {
+export class RegistrationError extends Schema.TaggedError<RegistrationError>()("tenetkit/core/RegistrationError", {
   agent: Schema.String,
   message: Schema.String,
   cause: Schema.Unknown,
@@ -145,7 +145,7 @@ export type FanOutMemberResult =
       readonly cause?: Cause.Cause<RunError | RegistrationError>
     }
 
-export class FanOutUnsatisfied extends Schema.TaggedErrorClass<FanOutUnsatisfied>()("tenetkit/core/FanOutUnsatisfied", {
+export class FanOutUnsatisfied extends Schema.TaggedError<FanOutUnsatisfied>()("tenetkit/core/FanOutUnsatisfied", {
   join: Schema.Literals(["FirstSuccess", "Quorum"]),
   required: Schema.Int.check(Schema.isGreaterThan(0)),
   succeeded: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),

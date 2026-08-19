@@ -2,7 +2,7 @@ import { describe, expect, layer as layerHost } from "@effect/vitest"
 import { ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Service, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/search-provider"
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 

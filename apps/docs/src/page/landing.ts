@@ -1,6 +1,6 @@
 import { Option } from "effect"
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { inertHtml as ih } from "foldkit/html"
 
 import {
   codeBlock,
@@ -13,13 +13,13 @@ import { cn } from "@/lib/utils"
 
 import oneTurn from "../snippets/landing/one-turn.ts?raw"
 
-import { ClickedCopyCode, type Message } from "../app/message"
+import { ClickedCopyCode } from "../app/message"
 import type { Model } from "../app/model"
 import { betaBadge, mark } from "../layout/brand"
 import { check, close, github } from "../layout/icon"
 import { githubUrl } from "../layout/shell"
 
-const h = html<Message>()
+const h = ih
 
 const quickstartPath = "/docs/start/quickstart"
 const agentLoopPath = "/docs/learn/agent-loop"

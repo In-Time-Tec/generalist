@@ -105,7 +105,7 @@ export interface Interface {
   readonly setHandoffState: (state: HandoffControlState) => Effect.Effect<void, DriverStateInvalid>
 }
 /** @experimental */
-export class DriverUnknownReplay extends Schema.TaggedErrorClass<DriverUnknownReplay>()(
+export class DriverUnknownReplay extends Schema.TaggedError<DriverUnknownReplay>()(
   "tenetkit/core/DriverUnknownReplay",
   {
     operationKey: Schema.String,

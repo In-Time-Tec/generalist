@@ -181,12 +181,12 @@ export const incrementEdge: {
   },
 )
 
-export class HandoffTargetMissing extends Schema.TaggedErrorClass<HandoffTargetMissing>()(
+export class HandoffTargetMissing extends Schema.TaggedError<HandoffTargetMissing>()(
   "tenetkit/core/HandoffTargetMissing",
   { target: Schema.String, turn: Schema.Finite },
 ) {}
 
-export class HandoffLimitExceeded extends Schema.TaggedErrorClass<HandoffLimitExceeded>()(
+export class HandoffLimitExceeded extends Schema.TaggedError<HandoffLimitExceeded>()(
   "tenetkit/core/HandoffLimitExceeded",
   {
     kind: Schema.Literals(["total", "edge", "depth"]),
@@ -196,7 +196,7 @@ export class HandoffLimitExceeded extends Schema.TaggedErrorClass<HandoffLimitEx
   },
 ) {}
 
-export class HandoffRequirementsMissing extends Schema.TaggedErrorClass<HandoffRequirementsMissing>()(
+export class HandoffRequirementsMissing extends Schema.TaggedError<HandoffRequirementsMissing>()(
   "tenetkit/core/HandoffRequirementsMissing",
   { target: Schema.String, message: Schema.String, turn: Schema.Finite },
 ) {}

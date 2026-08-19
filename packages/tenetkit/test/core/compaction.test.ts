@@ -7,7 +7,7 @@ import { ItLayer } from "./it-layer"
 import { estimatePromptTokens } from "../../src/core/turn/prompt-token-estimate"
 import { makeThresholdState } from "../../src/core/turn/compaction-threshold-state"
 
-const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -26,7 +26,7 @@ const imageMessage = (data: string): Prompt.Message =>
 
 const toolResult = (id: string, result: unknown): Prompt.Message =>
   Prompt.makeMessage("tool", {
-    content: [Prompt.makePart("tool-result", { id, name: "echo", isFailure: false, result })],
+    content: [Prompt.makePart("tool-result", { id, name: "echo", isFailure: false, providerExecuted: false, result })],
   })
 
 const successfulToolResultValue = (prompt: Prompt.Prompt): unknown => {

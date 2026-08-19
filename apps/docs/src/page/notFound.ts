@@ -1,8 +1,6 @@
-import { html } from "foldkit/html"
+import { inertHtml as ih } from "foldkit/html"
 
-import type { Message } from "../app/message"
-
-const h = html<Message>()
+const h = ih
 
 export const notFound = () =>
   h.main(

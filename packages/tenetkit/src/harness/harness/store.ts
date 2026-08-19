@@ -8,15 +8,12 @@ export const HarnessStoreRejection = Schema.Literals(["corrupt", "encode", "unre
 export type HarnessStoreRejection = typeof HarnessStoreRejection.Type
 
 /** @experimental A harness store operation failed. */
-export class HarnessStoreError extends Schema.TaggedErrorClass<HarnessStoreError>()(
-  "tenetkit/harness/HarnessStoreError",
-  {
-    reason: HarnessStoreRejection,
-    scope: Schema.String,
-    message: Schema.String,
-    cause: Schema.optionalKey(Schema.Defect()),
-  },
-) {}
+export class HarnessStoreError extends Schema.TaggedError<HarnessStoreError>()("tenetkit/harness/HarnessStoreError", {
+  reason: HarnessStoreRejection,
+  scope: Schema.String,
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 /** @experimental Durable continual-harness state seam, keyed by scope. */
 export interface Interface {

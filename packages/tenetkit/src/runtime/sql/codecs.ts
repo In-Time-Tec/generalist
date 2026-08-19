@@ -27,9 +27,10 @@ export const decodeJson: {
 )
 
 export const encodeJsonValue = (value: unknown): string =>
-  value === undefined ? "null" : Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+  value === undefined ? "null" : Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
-export const decodeJsonValue = (text: string): unknown => Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(text)
+export const decodeJsonValue = (text: string): unknown =>
+  Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(text)
 
 export const encodeJsonEffect: {
   <S extends Schema.Codec<any, any, never, never>>(

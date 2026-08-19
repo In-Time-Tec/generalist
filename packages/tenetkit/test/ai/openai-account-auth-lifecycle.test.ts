@@ -158,7 +158,7 @@ describe("OpenAI account authentication lifecycle", () => {
       expect(saved.accessToken).toBe(jwt())
       expect(credential.generation).toBe(saved.generation)
       expect(String(credential.accountId)).not.toContain("account-secret")
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(credential)).not.toMatch(
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(credential)).not.toMatch(
         /refresh-secret|account-secret/,
       )
       const mismatch = OpenAiAccountAuthHost.of({
@@ -171,7 +171,7 @@ describe("OpenAI account authentication lifecycle", () => {
       )
       expect(error.kind).toBe("protocol")
       expect(exchanges).toBe(1)
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)).not.toMatch(
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)).not.toMatch(
         /wrong-secret|code-secret|account-secret/,
       )
     }).pipe(provideLayer(dependencies(store.layer, http, successHost)))
@@ -488,7 +488,9 @@ describe("OpenAI account authentication lifecycle", () => {
       const error = yield* Effect.flip((yield* OpenAiAccountAuth).refreshRejected(original.generation))
       expect(error.kind).toBe("account-mismatch")
       expect(Option.getOrThrow(store.value())).toEqual(original)
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)).not.toMatch(/other-account|other-user/)
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)).not.toMatch(
+        /other-account|other-user/,
+      )
       const other = disk({
         accountId: "other-account",
         fingerprint: fingerprint("other-account", "other-user"),
@@ -501,7 +503,7 @@ describe("OpenAI account authentication lifecycle", () => {
         }).pipe(provideLayer(dependencies(changed.layer))),
       )
       expect(stale.kind).toBe("account-mismatch")
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(stale)).not.toContain("other-account")
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(stale)).not.toContain("other-account")
     }).pipe(provideLayer(dependencies(store.layer, http)))
   })
 
@@ -572,11 +574,11 @@ describe("OpenAI account authentication lifecycle", () => {
     return Effect.gen(function* () {
       const credential = yield* (yield* OpenAiAccountAuth).loginBrowser()
       expect(credential.expiresAt).toBe(1_900_000_000_000)
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(credential)).not.toMatch(
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(credential)).not.toMatch(
         /authorization-secret|refresh-secret|account-secret|user-secret/,
       )
       const error = AuthError.make({ kind: "protocol", message: "safe protocol failure" })
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)).not.toMatch(
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)).not.toMatch(
         /authorization-secret|refresh-secret|account-secret|user-secret/,
       )
     }).pipe(provideLayer(dependencies(store.layer, http, host)))

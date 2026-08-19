@@ -2,12 +2,9 @@ import { Config, Context, Effect, Layer, Option, Redacted, Schema } from "effect
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 
 /** @experimental */
-export class ExaSearchProviderError extends Schema.TaggedErrorClass<ExaSearchProviderError>()(
-  "ExaSearchProviderError",
-  {
-    message: Schema.String,
-  },
-) {}
+export class ExaSearchProviderError extends Schema.TaggedError<ExaSearchProviderError>()("ExaSearchProviderError", {
+  message: Schema.String,
+}) {}
 
 /** @experimental */
 export const SearchResult = Schema.Struct({

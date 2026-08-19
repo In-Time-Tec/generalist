@@ -1,3 +1,5 @@
+import { sha256Text } from "../../core/durable/canonical-json.js"
+
 export const SCHEMA_VERSION = 8
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
@@ -272,9 +274,4 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE INDEX IF NOT EXISTS baton_session_entries_parent_idx ON baton_session_entries(session_id, parent_id)`,
 ]
 
-export const schemaChecksum = (): string => {
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(SCHEMA_STATEMENTS.join("\n"))
-  hasher.update(`\nversion=${SCHEMA_VERSION}`)
-  return hasher.digest("hex")
-}
+export const schemaChecksum = (): string => sha256Text(`${SCHEMA_STATEMENTS.join("\n")}\nversion=${SCHEMA_VERSION}`)

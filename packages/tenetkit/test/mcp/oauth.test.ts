@@ -161,7 +161,7 @@ describe("OAuth", () => {
     expect(OAuth.OAuthPending.make({ authorizationUrl: "https://auth.example" })._tag).toBe("tenetkit/mcp/OAuthPending")
     const provider = OAuth.OAuthProviderError.make({ server: "server", operation: "refresh", message: "failed" })
     expect(provider._tag).toBe("tenetkit/mcp/OAuthProviderError")
-    expect(Schema.encodeSync(Schema.UnknownFromJsonString)(provider)).not.toContain("access_token")
+    expect(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(provider)).not.toContain("access_token")
   })
 
   it.effect("persists and reloads a versioned token document", () =>
@@ -186,7 +186,9 @@ describe("OAuth", () => {
           }),
         )
         const document = Option.getOrThrow(yield* Ref.get(stored))
-        const decoded = yield* Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(Redacted.value(document))
+        const decoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(
+          Redacted.value(document),
+        )
 
         expect(String(document)).not.toContain("secret")
         expect(decoded).toEqual({
@@ -240,7 +242,7 @@ describe("OAuth", () => {
           refresh_token: "legacy-refresh-secret",
         })
         expect(yield* Ref.get(saves)).toBe(1)
-        const decoded = yield* Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(
+        const decoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(
           Redacted.value(yield* Ref.get(stored)),
         )
         expect(decoded).toEqual({
@@ -286,7 +288,7 @@ describe("OAuth", () => {
               OAuth.OAuth,
             )
             const error = yield* oauth.withTransport(sdkCallback(oauth.provider.tokens)).pipe(Effect.flip)
-            const encoded = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)
+            const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)
 
             expect(error).toBeInstanceOf(OAuth.OAuthProviderError)
             expect(encoded).not.toContain("secret")
@@ -324,7 +326,7 @@ describe("OAuth", () => {
           OAuth.OAuth,
         )
         const error = yield* oauth.withTransport(sdkCallback(oauth.provider.tokens)).pipe(Effect.flip)
-        const encoded = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)
+        const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)
 
         expect(error).toEqual(
           OAuth.OAuthProviderError.make({
@@ -501,7 +503,7 @@ describe("OAuth", () => {
       if (oauth.provider.state === undefined) return yield* Effect.die("OAuth provider state is missing")
       const state = yield* sdkCallback(oauth.provider.state)
       yield* sdkCallback(() => oauth.provider.saveCodeVerifier("discovery-verifier"))
-      const tokenResponseBody = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)({
+      const tokenResponseBody = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
         access_token: "discovered-access-token",
         token_type: "Bearer",
       })
@@ -558,7 +560,7 @@ describe("OAuth", () => {
             "@modelcontextprotocol/sdk/client/auth.js",
           ),
         )
-        const storedTokens = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)({
+        const storedTokens = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
           version: 1,
           tokens: {
             access_token: "expired-access-token",
@@ -626,7 +628,7 @@ describe("OAuth", () => {
           }),
         )
         expect(yield* Ref.get(refreshRequests)).toBeGreaterThan(0)
-        expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)).not.toContain("secret")
+        expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)).not.toContain("secret")
       }),
     ),
   )
@@ -749,7 +751,9 @@ describe("OAuth", () => {
         .callback(`https://app.example/oauth/callback?code=fail-secret&state=${failedAuthorization.state}`)
         .pipe(Effect.flip)
       expect(failed).toBeInstanceOf(OAuth.OAuthProviderError)
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(failed)).not.toContain("access-token-secret")
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(failed)).not.toContain(
+        "access-token-secret",
+      )
       const failedReplay = yield* oauth
         .callback(`https://app.example/oauth/callback?code=replayed&state=${failedAuthorization.state}`)
         .pipe(Effect.flip)
@@ -817,7 +821,9 @@ describe("OAuth", () => {
         const error = yield* oauth.authorize.pipe(Effect.flip)
 
         expect(error).toBeInstanceOf(OAuth.OAuthProviderError)
-        expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)).not.toContain("refresh-token-secret")
+        expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)).not.toContain(
+          "refresh-token-secret",
+        )
       }),
     ),
   )

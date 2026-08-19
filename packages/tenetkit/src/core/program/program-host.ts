@@ -62,13 +62,13 @@ const AgentResult = Schema.Struct({
 })
 
 /** @experimental */
-export class ProgramBindingMismatch extends Schema.TaggedErrorClass<ProgramBindingMismatch>()(
+export class ProgramBindingMismatch extends Schema.TaggedError<ProgramBindingMismatch>()(
   "tenetkit/core/ProgramBindingMismatch",
   { kind: Schema.Literals(["tool", "step", "agent"]), name: Schema.String, reason: Schema.String },
 ) {}
 
 /** @experimental */
-export class ProgramIdentityMismatch extends Schema.TaggedErrorClass<ProgramIdentityMismatch>()(
+export class ProgramIdentityMismatch extends Schema.TaggedError<ProgramIdentityMismatch>()(
   "tenetkit/core/ProgramIdentityMismatch",
   { expected: Schema.String, actual: Schema.String },
 ) {}
@@ -95,7 +95,7 @@ export class ProgramHost extends Context.Service<ProgramHost, Interface>()(
 ) {}
 
 const encodedBytes = (value: unknown): Effect.Effect<number, ProgramSchemaFailure> =>
-  Schema.encodeEffect(Schema.UnknownFromJsonString)(value).pipe(
+  Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(value).pipe(
     Effect.map((encoded) => new TextEncoder().encode(encoded).byteLength),
     Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-output", message: error.message })),
   )
@@ -173,7 +173,7 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
     const steps = new Map(bindings.steps.map((binding) => [binding.name, binding] as const))
     const agents = new Map(bindings.agents.map((binding) => [binding.selection, binding] as const))
     const describeSchema = (schema: Schema.Top) =>
-      Schema.encodeSync(SchemaRepresentation.DocumentFromJson)(SchemaRepresentation.fromAST(schema.ast))
+      SchemaRepresentation.toJson(SchemaRepresentation.toRepresentation(schema.ast))
     const discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>> = Effect.succeed(
       bindings.tools.map((binding) => ({ name: binding.name })),
     )

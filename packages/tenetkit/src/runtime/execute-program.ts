@@ -37,7 +37,7 @@ export const executeProgram = (input: {
     Effect.flatMap((value) =>
       (value === undefined
         ? Effect.succeed("undefined")
-        : Schema.encodeEffect(Schema.UnknownFromJsonString)(value)
+        : Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(value)
       ).pipe(
         Effect.map((encoded) => new TextEncoder().encode(encoded).byteLength),
         Effect.mapError((error) => AgentExecutionFailure.make({ message: failureMessage(error.message) })),

@@ -1,12 +1,11 @@
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { inertHtml as ih } from "foldkit/html"
 
-import type { Message } from "../app/message"
 import { navGroups } from "../content/registry"
 import type { DocsPage } from "../prose/page"
 import { arrowLeft, arrowRight } from "./icon"
 
-const h = html<Message>()
+const h = ih
 
 const orderedPages: ReadonlyArray<DocsPage> = navGroups.flatMap((group) => group.pages)
 

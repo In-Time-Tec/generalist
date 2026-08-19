@@ -8,7 +8,8 @@ import { CompletedModelResponse } from "../../src/runtime/run-event.js"
 import { assistantAddress, completedResult, memoryLayer, textPrompt } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
-const jsonValue = (value: unknown): unknown => JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value))
+const jsonValue = (value: unknown): unknown =>
+  JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
 
 const scopedWith =
   <A, E>(layer: Layer.Layer<A, E, never>) =>

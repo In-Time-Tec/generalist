@@ -24,7 +24,7 @@ export type AttemptBody = (
 ) => Stream.Stream<AttemptEvent, RunError, ModelTurnServices<Record<string, Tool.Any>, never>>
 
 const operationDigest = (value: unknown): string =>
-  canonicalDigest(JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value)))
+  canonicalDigest(JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)))
 
 const replayParts = (operationId: string, completed: AttemptCompleted): ReadonlyArray<AttemptEvent> => {
   const events = new Array<AttemptEvent>()

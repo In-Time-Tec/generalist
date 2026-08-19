@@ -1,7 +1,7 @@
 import { Option } from "effect"
 import { dual } from "effect/Function"
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { inertHtml as ih } from "foldkit/html"
 
 import {
   codeBlock,
@@ -11,10 +11,10 @@ import {
   codeBlockTitle,
 } from "@/components/ui/code-block"
 
-import { ClickedCopyCode, type Message } from "../app/message"
+import { ClickedCopyCode } from "../app/message"
 import type { CalloutTone, Inline, Node } from "./node"
 
-const h = html<Message>()
+const h = ih
 
 export type RenderContext = Readonly<{
   copiedSource: Option.Option<string>

@@ -1,19 +1,23 @@
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { SqliteMigrator } from "@effect/sql-sqlite-bun"
 import { SchemaChecksumMismatch, SchemaDirty, SchemaMigrationFailed, SchemaVersionUnsupported } from "./errors.js"
 import { MIGRATIONS_TABLE, SCHEMA_META_TABLE, SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "./schema.js"
 import { mapSqlError } from "./sql-effect.js"
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  yield* sql`PRAGMA foreign_keys = ON`
+  yield* sql`CREATE TABLE IF NOT EXISTS ${sql(MIGRATIONS_TABLE)} (
+    migration_id integer PRIMARY KEY NOT NULL,
+    created_at datetime NOT NULL DEFAULT current_timestamp,
+    name VARCHAR(255) NOT NULL
+  )`
   for (const statement of SCHEMA_STATEMENTS) yield* sql.unsafe(statement)
   const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
   yield* sql`
     INSERT INTO ${sql(SCHEMA_META_TABLE)} (id, version, checksum, dirty, applied_at)
     VALUES (1, ${SCHEMA_VERSION}, ${schemaChecksum()}, 0, ${now})
   `
+  yield* sql`INSERT INTO ${sql(MIGRATIONS_TABLE)} (migration_id, name) VALUES (1, 'baton_runtime')`
 })
 
 export const verifySchema = (
@@ -86,24 +90,21 @@ export const migrate = (
         }),
       ),
     )
-    const existing = yield* mapSqlError(sql<{ meta_present: number; baton_tables: number }>`
+    const existing = yield* mapSqlError(sql<{ meta_present: number; application_tables: number }>`
       SELECT
         SUM(CASE WHEN name = ${SCHEMA_META_TABLE} THEN 1 ELSE 0 END) AS meta_present,
-        COUNT(*) AS baton_tables
-      FROM sqlite_master WHERE type = 'table' AND name LIKE 'baton_%'
+        SUM(CASE WHEN name = ${MIGRATIONS_TABLE} THEN 0 ELSE 1 END) AS application_tables
+      FROM sqlite_master WHERE type = 'table' AND substr(name, 1, 6) = 'baton_'
     `).pipe(Effect.mapError(() => SchemaMigrationFailed.make({ source, message: "schema meta read failed" })))
     if (Number(existing[0]?.meta_present ?? 0) > 0) return yield* verifySchema(source)
-    if (Number(existing[0]?.baton_tables ?? 0) > 0) {
+    if (Number(existing[0]?.application_tables ?? 0) > 0) {
       return yield* SchemaMigrationFailed.make({
         source,
         message: "cannot create the baseline over an existing TenetKit schema",
       })
     }
 
-    yield* SqliteMigrator.run({
-      loader: SqliteMigrator.fromRecord({ "0001_baton_runtime": migrationEffect }),
-      table: MIGRATIONS_TABLE,
-    }).pipe(
+    yield* mapSqlError(sql.withTransaction(migrationEffect)).pipe(
       Effect.mapError((error) =>
         SchemaMigrationFailed.make({
           source,

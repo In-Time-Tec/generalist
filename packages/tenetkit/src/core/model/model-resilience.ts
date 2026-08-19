@@ -33,7 +33,7 @@ export class ModelResilience extends Context.Service<ModelResilience, Interface>
 ) {}
 
 /** @experimental A model resilience policy contains an unsafe correction bound. */
-export class ModelResilienceMisconfigured extends Schema.TaggedErrorClass<ModelResilienceMisconfigured>()(
+export class ModelResilienceMisconfigured extends Schema.TaggedError<ModelResilienceMisconfigured>()(
   "tenetkit/core/ModelResilienceMisconfigured",
   {
     reason: Schema.Literal("invalid-tool-call-correction-limit"),

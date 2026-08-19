@@ -26,7 +26,7 @@ import {
 } from "./message"
 import { ThemePreference, type Model } from "./model"
 import { SearchCommand, initialSearchCommand, itemToPath } from "./searchPalette"
-const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 type Update = readonly [Model, ReadonlyArray<Command.Command<Message>>]
 
@@ -67,7 +67,7 @@ export const update: {
         PressedSearchShortcut: () => {
           if (model.searchDialog.isOpen) {
             const [closedDialog, dialogCommands] = dialogClose(model.searchDialog)
-            const [closedCommand, commandCommands] = SearchCommand.close(model.searchCommand)
+            const [closedCommand, commandCommands] = SearchCommand.close(model.searchCommand, "")
             return [
               evo(model, { searchDialog: () => closedDialog, searchCommand: () => closedCommand }),
               [
@@ -135,7 +135,7 @@ export const update: {
                   ...Command.mapMessages(closeCommands, (childMessage) =>
                     GotSearchDialogMessage({ message: childMessage }),
                   ),
-                  NavigateInternal({ url: itemToPath(outMessage.value) }),
+                  ...(outMessage._tag === "Selected" ? [NavigateInternal({ url: itemToPath(outMessage.value) })] : []),
                 ],
               ]
             },
@@ -189,40 +189,39 @@ export const update: {
     ),
 )
 
-const NavigateInternal = Command.define(
-  "NavigateInternal",
-  { url: Schema.String },
-  CompletedNavigateInternal,
-)(({ url }) => pushUrl(url).pipe(Effect.as(CompletedNavigateInternal())))
+const NavigateInternal = Command.define("NavigateInternal", {
+  args: { url: Schema.String },
+  messages: [CompletedNavigateInternal],
+  execute: ({ url }) => pushUrl(url).pipe(Effect.as(CompletedNavigateInternal())),
+})
 
-const LoadExternal = Command.define(
-  "LoadExternal",
-  { href: Schema.String },
-  CompletedLoadExternal,
-)(({ href }) => load(href).pipe(Effect.as(CompletedLoadExternal())))
+const LoadExternal = Command.define("LoadExternal", {
+  args: { href: Schema.String },
+  messages: [CompletedLoadExternal],
+  execute: ({ href }) => load(href).pipe(Effect.as(CompletedLoadExternal())),
+})
 
-export const RedirectLegacy = Command.define(
-  "RedirectLegacy",
-  { url: Schema.String },
-  CompletedNavigateInternal,
-)(({ url }) => replaceUrl(url).pipe(Effect.as(CompletedNavigateInternal())))
+export const RedirectLegacy = Command.define("RedirectLegacy", {
+  args: { url: Schema.String },
+  messages: [CompletedNavigateInternal],
+  execute: ({ url }) => replaceUrl(url).pipe(Effect.as(CompletedNavigateInternal())),
+})
 
-const CopyCode = Command.define(
-  "CopyCode",
-  { source: Schema.String },
-  CompletedCopyCode,
-)(({ source }) =>
-  Effect.tryPromise(() => navigator.clipboard.writeText(source)).pipe(
-    Effect.ignore,
-    Effect.as(CompletedCopyCode({ source })),
-  ),
-)
+const CopyCode = Command.define("CopyCode", {
+  args: { source: Schema.String },
+  messages: [CompletedCopyCode],
+  execute: ({ source }) =>
+    Effect.tryPromise(() => navigator.clipboard.writeText(source)).pipe(
+      Effect.ignore,
+      Effect.as(CompletedCopyCode({ source })),
+    ),
+})
 
-const ScheduleClearCopiedCode = Command.define(
-  "ScheduleClearCopiedCode",
-  { source: Schema.String },
-  ClearedCopiedCode,
-)(({ source }) => Effect.sleep("2 seconds").pipe(Effect.as(ClearedCopiedCode({ source }))))
+const ScheduleClearCopiedCode = Command.define("ScheduleClearCopiedCode", {
+  args: { source: Schema.String },
+  messages: [ClearedCopiedCode],
+  execute: ({ source }) => Effect.sleep("2 seconds").pipe(Effect.as(ClearedCopiedCode({ source }))),
+})
 
 const THEME_STORAGE_KEY = "theme-preference"
 const ThemePreferenceJson = Schema.fromJsonString(ThemePreference)
@@ -242,46 +241,43 @@ const readThemePreference = (): ThemePreference => {
 const prefersDark = (): boolean =>
   typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
 
-export const LoadThemePreference = Command.define(
-  "LoadThemePreference",
-  GotThemePreference,
-)(Effect.sync(() => GotThemePreference({ preference: readThemePreference() })))
+export const LoadThemePreference = Command.define("LoadThemePreference", {
+  messages: [GotThemePreference],
+  execute: Effect.sync(() => GotThemePreference({ preference: readThemePreference() })),
+})
 
-const ApplyTheme = Command.define(
-  "ApplyTheme",
-  { preference: ThemePreference },
-  CompletedApplyTheme,
-)(({ preference }) =>
-  Effect.sync(() => {
-    const isDark = preference === "Dark" || (preference === "System" && prefersDark())
-    document.documentElement.classList.toggle("dark", isDark)
-    return CompletedApplyTheme()
-  }),
-)
+const ApplyTheme = Command.define("ApplyTheme", {
+  args: { preference: ThemePreference },
+  messages: [CompletedApplyTheme],
+  execute: ({ preference }) =>
+    Effect.sync(() => {
+      const isDark = preference === "Dark" || (preference === "System" && prefersDark())
+      document.documentElement.classList.toggle("dark", isDark)
+      return CompletedApplyTheme()
+    }),
+})
 
-const SaveThemePreference = Command.define(
-  "SaveThemePreference",
-  { preference: ThemePreference },
-  CompletedSaveThemePreference,
-)(({ preference }) =>
-  Effect.sync(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, encodeJsonValue(preference))
-    return CompletedSaveThemePreference()
-  }),
-)
+const SaveThemePreference = Command.define("SaveThemePreference", {
+  args: { preference: ThemePreference },
+  messages: [CompletedSaveThemePreference],
+  execute: ({ preference }) =>
+    Effect.sync(() => {
+      localStorage.setItem(THEME_STORAGE_KEY, encodeJsonValue(preference))
+      return CompletedSaveThemePreference()
+    }),
+})
 
-export const LoadSidebarGroups = Command.define(
-  "LoadSidebarGroups",
-  GotSidebarGroups,
-)(Effect.sync(() => GotSidebarGroups({ open: readSidebarGroups() })))
+export const LoadSidebarGroups = Command.define("LoadSidebarGroups", {
+  messages: [GotSidebarGroups],
+  execute: Effect.sync(() => GotSidebarGroups({ open: readSidebarGroups() })),
+})
 
-const SaveSidebarGroups = Command.define(
-  "SaveSidebarGroups",
-  { open: SidebarGroups },
-  CompletedSaveSidebarGroups,
-)(({ open }) =>
-  Effect.sync(() => {
-    writeSidebarGroups(open)
-    return CompletedSaveSidebarGroups()
-  }),
-)
+const SaveSidebarGroups = Command.define("SaveSidebarGroups", {
+  args: { open: SidebarGroups },
+  messages: [CompletedSaveSidebarGroups],
+  execute: ({ open }) =>
+    Effect.sync(() => {
+      writeSidebarGroups(open)
+      return CompletedSaveSidebarGroups()
+    }),
+})

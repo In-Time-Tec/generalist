@@ -25,8 +25,9 @@ import type { AttemptCompleted, AttemptEvent, CompletedModelOperation } from "..
 import { captureFinishPart, captureStructuredUsage, chargeAttemptUsageWith } from "./model-turn-finish.js"
 import { schedule as scheduleTools } from "./tool-scheduler.js"
 import { classifyOtherFailure, isToolNameCollision, makeRetryableOverflow, singleFailure } from "./model-turn-parts.js"
-import { committedEvent } from "./model-turn-commit.js"
+import { providerOutput } from "./model-turn-parts.js"
 import { text as modelResponseText } from "../model/model-response-builder.js"
+import { committedEvent } from "./model-turn-commit.js"
 import { clearCommittedResponse, makeAttemptResponse, replayMessages } from "./model-turn-response.js"
 import { makeActiveTurn } from "./model-turn-active.js"
 import { validateContext } from "../context/session.js"
@@ -57,11 +58,6 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     ...(handoffStateRef === undefined ? {} : { handoffStateRef }),
     agentModel,
   })
-  const captureProviderOutput = (part: Response.StreamPart<Record<string, Tool.Any>>): void => {
-    if (part.type === "text-delta") state.providerOutput.textCharacters += part.delta.length
-    if (part.type === "reasoning-delta") state.providerOutput.reasoningCharacters += part.delta.length
-    if (part.type === "finish") state.providerOutput.finishReason = part.reason
-  }
   const withModelTelemetry =
     (turn: number, purpose: ModelCallPurpose) =>
     <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
@@ -311,7 +307,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                           ? Effect.void
                           : Effect.sync(() => {
                               emitted = true
-                              captureProviderOutput(part)
+                              providerOutput.capture(state.providerOutput, part)
                             }),
                       ),
                       Stream.catchCause(

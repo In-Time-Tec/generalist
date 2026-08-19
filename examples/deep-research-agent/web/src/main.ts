@@ -2,8 +2,8 @@ import { Chat, Connection } from "tenetkit/foldkit"
 import { Cause, Effect, Function, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import { define, mapMessage, mapMessages, type Command } from "foldkit/command"
-import type { Document, Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import type { Document, Html, HtmlBuilder } from "foldkit/html"
+import { html, htmlScope } from "@/lib/html"
 import { m } from "foldkit/message"
 import type { ApplicationInit } from "foldkit/runtime"
 import { ts } from "foldkit/schema"
@@ -84,12 +84,9 @@ export const init: ApplicationInit<Model, Message, void, Connection.AgentConnect
 // COMMAND
 
 /** Opens a TenetKit session on the server before the WebSocket attaches to it. */
-export const OpenSession = define(
-  "OpenSession",
-  OpenedSession,
-  FailedOpenSession,
-)(
-  Effect.gen(function* () {
+export const OpenSession = define("OpenSession", {
+  messages: [OpenedSession, FailedOpenSession],
+  execute: Effect.gen(function* () {
     const httpClient = yield* Layer.build(FetchHttpClient.layer)
     const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
       body: HttpBody.jsonUnsafe({}),
@@ -100,7 +97,7 @@ export const OpenSession = define(
     Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
   ),
-)
+})
 
 // UPDATE
 
@@ -456,30 +453,37 @@ const footerView = (model: Model): Html => {
   ])
 }
 
-export const view = (model: Model): Document => {
-  const h = html<Message>()
-  return {
-    title: "Deep Research Agent",
-    body: h.div(
-      [h.Class("mx-auto flex h-screen w-full max-w-4xl flex-col bg-background text-foreground")],
-      [
-        headerView(model),
-        sessionBannerView(model.session),
-        conversation({ class: "min-h-0 flex-1" }, [
-          conversationContent(
-            {
-              model: model.scroller,
-              toParentMessage: (scrollerMessage) => GotScrollerMessage({ message: scrollerMessage }),
-            },
-            transcriptView(model),
-          ),
-          conversationScrollButton({
-            model: model.scroller,
-            toParentMessage: (scrollerMessage) => GotScrollerMessage({ message: scrollerMessage }),
-          }),
-        ]),
-        h.div([h.Class("border-t p-4")], [footerView(model)]),
-      ],
-    ),
-  }
-}
+export const view: {
+  (model: Model, builder: HtmlBuilder<Message>): Document
+  (builder: HtmlBuilder<Message>): (model: Model) => Document
+} = Function.dual(
+  2,
+  (model: Model, builder: HtmlBuilder<Message>): Document =>
+    htmlScope.with(builder, () => {
+      const h = html<Message>()
+      return {
+        title: "Deep Research Agent",
+        body: h.div(
+          [h.Class("mx-auto flex h-screen w-full max-w-4xl flex-col bg-background text-foreground")],
+          [
+            headerView(model),
+            sessionBannerView(model.session),
+            conversation({ class: "min-h-0 flex-1" }, [
+              conversationContent(
+                {
+                  model: model.scroller,
+                  toParentMessage: (scrollerMessage) => GotScrollerMessage({ message: scrollerMessage }),
+                },
+                transcriptView(model),
+              ),
+              conversationScrollButton({
+                model: model.scroller,
+                toParentMessage: (scrollerMessage) => GotScrollerMessage({ message: scrollerMessage }),
+              }),
+            ]),
+            h.div([h.Class("border-t p-4")], [footerView(model)]),
+          ],
+        ),
+      }
+    }),
+)

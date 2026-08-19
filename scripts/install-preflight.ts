@@ -1,7 +1,7 @@
 import { Effect, FileSystem, ManagedRuntime, Path, Schema } from "effect"
 import { layer } from "@effect/platform-bun/BunServices"
 
-class InstallPreflightFailed extends Schema.TaggedErrorClass<InstallPreflightFailed>()(
+class InstallPreflightFailed extends Schema.TaggedError<InstallPreflightFailed>()(
   "@tenetkit/scripts/InstallPreflightFailed",
   { message: Schema.String },
 ) {}

@@ -1,8 +1,9 @@
-import { Function } from "effect"
+import { Function, Option } from "effect"
 import { Message, Model, Orientation, OutMessage, Selected, buttonId, create, init } from "@foldkit/ui/listbox"
 import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/listbox"
 import type { Html } from "foldkit/html"
-import { childAttributes, html } from "foldkit/html"
+import { childAttributes } from "foldkit/html"
+import { html } from "@/lib/html"
 
 import { cn } from "@/lib/utils"
 
@@ -137,6 +138,7 @@ export const root = <Item extends string = string>(config: RootConfig<Item>): Vi
   const sizeClass = config.size === "sm" ? triggerSizeSmallClass : triggerSizeDefaultClass
   return {
     items: config.items,
+    maybeSelectedValue: Option.none(),
     itemToConfig: config.itemToConfig,
     itemToValue: (item) => item,
     ...(config.isItemDisabled !== undefined ? { isItemDisabled: config.isItemDisabled } : {}),

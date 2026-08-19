@@ -1,8 +1,8 @@
 import { callout, code, codeBlock, definePage, h2, lead, link, p, table } from "../../prose"
-const bunInstall = `bun add effect@4.0.0-beta.98 tenetkit@0.14.0 tenetkit/ai@0.14.0`
+const bunInstall = `bun add effect@4.0.0-rc.109 tenetkit@0.14.0 tenetkit/ai@0.14.0`
 
-const otherManagers = `npm install effect@4.0.0-beta.98 tenetkit@0.14.0 tenetkit/ai@0.14.0
-pnpm add effect@4.0.0-beta.98 tenetkit@0.14.0 tenetkit/ai@0.14.0`
+const otherManagers = `npm install effect@4.0.0-rc.109 tenetkit@0.14.0 tenetkit/ai@0.14.0
+pnpm add effect@4.0.0-rc.109 tenetkit@0.14.0 tenetkit/ai@0.14.0`
 
 export const installation = definePage({
   path: "/docs/start/installation",
@@ -21,7 +21,7 @@ export const installation = definePage({
       "warning",
       "Pin the Effect beta",
       "TenetKit 0.14.x is built and tested against ",
-      code("effect@4.0.0-beta.98"),
+      code("effect@4.0.0-rc.109"),
       ". The ",
       code("effect/unstable/ai"),
       " modules TenetKit reuses change between betas, so install the pinned version rather than a floating range. That churn is TenetKit's problem, not yours: each release tracks one tested Effect version, and the release train absorbs upstream breaking changes before you see them.",
@@ -57,7 +57,7 @@ export const installation = definePage({
       ],
     ),
     h2("effect-compatibility", "Effect compatibility"),
-    table(["TenetKit release", "Tested Effect version"], [[[code("0.14.x")], [code("effect@4.0.0-beta.98")]]]),
+    table(["TenetKit release", "Tested Effect version"], [[[code("0.14.x")], [code("effect@4.0.0-rc.109")]]]),
     p(
       code("tenetkit/foldkit"),
       " additionally declares peer ranges ",

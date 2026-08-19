@@ -77,11 +77,12 @@ const clientTools = ToolExecutor.layerRouter([
 ])
 ```
 
-## Effect beta compatibility
+## Effect compatibility
 
-| TenetKit release | Tested Effect range                               | Notes                                                                               |
+| TenetKit release | Tested Effect version                             | Notes                                                                               |
 | ---------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `0.14.x`         | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.30.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.29.x`         | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 
@@ -122,9 +123,7 @@ bun run check
 bun run package
 ```
 
-`bun run package` builds once, verifies clean Bun and npm consumers, and writes thirteen tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
-
-The npm smoke uses `--legacy-peer-deps` only because the currently pinned external `foldkit@0.122.0` declares `effect@4.0.0-beta.88` while TenetKit uses beta.98. The installed graph is still checked for one physical Effect package; Bun installation and both runtimes use beta.98.
+`bun run package` builds once, verifies clean Bun and npm consumers, and writes four tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
 
 ## Provenance
 

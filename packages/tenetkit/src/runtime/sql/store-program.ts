@@ -99,7 +99,8 @@ const operationRows = (runId: string, operation: string) =>
   })
 
 const sameJson = (left: unknown, right: unknown) =>
-  Schema.encodeSync(Schema.UnknownFromJsonString)(left) === Schema.encodeSync(Schema.UnknownFromJsonString)(right)
+  Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(left) ===
+  Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(right)
 
 /**
  * A settle whose outcome equals the recorded terminal outcome is an idempotent replay.

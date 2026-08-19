@@ -120,7 +120,7 @@ export interface Request<A = unknown> {
 }
 
 /** @experimental The same nested identity was reused with different content. */
-export class NestedOperationDivergence extends Schema.TaggedErrorClass<NestedOperationDivergence>()(
+export class NestedOperationDivergence extends Schema.TaggedError<NestedOperationDivergence>()(
   "tenetkit/core/NestedOperationDivergence",
   {
     operationKey: Schema.String,
@@ -133,19 +133,19 @@ export class NestedOperationDivergence extends Schema.TaggedErrorClass<NestedOpe
 ) {}
 
 /** @experimental A non-idempotent nested operation crossed its boundary with an unobserved outcome. */
-export class NestedOperationUnknown extends Schema.TaggedErrorClass<NestedOperationUnknown>()(
+export class NestedOperationUnknown extends Schema.TaggedError<NestedOperationUnknown>()(
   "tenetkit/core/NestedOperationUnknown",
   { operationKey: Schema.String, ordinal: Ordinal, operationId: Schema.String },
 ) {}
 
 /** @experimental The host denied the nested operation's approval request. */
-export class NestedOperationDenied extends Schema.TaggedErrorClass<NestedOperationDenied>()(
+export class NestedOperationDenied extends Schema.TaggedError<NestedOperationDenied>()(
   "tenetkit/core/NestedOperationDenied",
   { operationKey: Schema.String, ordinal: Ordinal, capability: Kind, reason: Schema.String },
 ) {}
 
 /** @experimental The run must suspend until the host resolves the nested operation's approval. */
-export class NestedOperationSuspended extends Schema.TaggedErrorClass<NestedOperationSuspended>()(
+export class NestedOperationSuspended extends Schema.TaggedError<NestedOperationSuspended>()(
   "tenetkit/core/NestedOperationSuspended",
   { token: Schema.String, operationKey: Schema.String, ordinal: Ordinal, capability: Kind },
 ) {}

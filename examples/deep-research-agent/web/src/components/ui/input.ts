@@ -1,6 +1,6 @@
 import { view } from "@foldkit/ui/input"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 
 import { cn } from "@/lib/utils"
 
@@ -30,14 +30,17 @@ export const input = <ParentMessage>(config: InputConfig<ParentMessage>): Html =
   const h = html<ParentMessage>()
   const { attributes = [], class: className, ...primitiveConfig } = config
 
-  return view<ParentMessage>({
-    ...primitiveConfig,
-    toView: (inputAttributes) =>
-      h.input([
-        ...inputAttributes.input,
-        ...attributes,
-        h.DataAttribute("slot", "input"),
-        h.Class(cn(inputClass, className)),
-      ]),
-  })
+  return view<ParentMessage>(
+    {
+      ...primitiveConfig,
+      toView: (inputAttributes) =>
+        h.input([
+          ...inputAttributes.input,
+          ...attributes,
+          h.DataAttribute("slot", "input"),
+          h.Class(cn(inputClass, className)),
+        ]),
+    },
+    h,
+  )
 }

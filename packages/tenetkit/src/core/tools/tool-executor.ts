@@ -52,13 +52,13 @@ export const FrameworkStage = Schema.Literals([
 /** @experimental */
 export type FrameworkStage = typeof FrameworkStage.Type
 /** @experimental */
-export class FrameworkFailure extends Schema.TaggedErrorClass<FrameworkFailure>()("tenetkit/core/FrameworkFailure", {
+export class FrameworkFailure extends Schema.TaggedError<FrameworkFailure>()("tenetkit/core/FrameworkFailure", {
   stage: FrameworkStage,
   tool: Schema.String,
   message: Schema.String,
 }) {}
 /** @experimental An idempotent remote route supplied an invalid or unstable operation key or retry bound. */
-export class RemoteRetryMisconfigured extends Schema.TaggedErrorClass<RemoteRetryMisconfigured>()(
+export class RemoteRetryMisconfigured extends Schema.TaggedError<RemoteRetryMisconfigured>()(
   "tenetkit/core/RemoteRetryMisconfigured",
   {
     reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),

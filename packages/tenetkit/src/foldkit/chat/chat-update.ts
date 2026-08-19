@@ -1,7 +1,7 @@
 import { Cause, Effect, Option, Result, Schema } from "effect"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { Wire } from "tenetkit/transport"
+import { ObserverRunEvent, type ResolvedRunEvent } from "tenetkit/transport/wire"
 import {
   AgentCommandError,
   type AgentConnection,
@@ -66,7 +66,7 @@ const catchCommandFailure = <A>(
   )
 
 type ModelResponseEvent = Extract<
-  Wire.ResolvedRunEvent,
+  ResolvedRunEvent,
   { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }
 >
 type SemanticPart = ModelResponseEvent["response"]["content"][number]
@@ -153,7 +153,7 @@ const applyModelResponse = (model: Model, event: ModelResponseEvent): Model => {
   return { ...model, entries }
 }
 
-const applyEvent = (model: Model, event: Wire.ResolvedRunEvent): readonly [Model, Option.Option<Output>] => {
+const applyEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, Option.Option<Output>] => {
   switch (event._tag) {
     case "TurnStarted":
       return [{ ...model, run: Running({ turn: event.turn }) }, Option.none()]
@@ -196,7 +196,7 @@ const applyEvent = (model: Model, event: Wire.ResolvedRunEvent): readonly [Model
   }
 }
 
-const applyRunEvent = (model: Model, event: Wire.ResolvedRunEvent): readonly [Model, Option.Option<Output>] => {
+const applyRunEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, Option.Option<Output>] => {
   if (event.sequence <= model.lastSeq) return [model, Option.none()]
   const withSequence = { ...model, lastSeq: event.sequence }
   switch (event._tag) {
@@ -229,7 +229,7 @@ const applyRunEvent = (model: Model, event: Wire.ResolvedRunEvent): readonly [Mo
   }
 }
 
-const isRunEvent = (incoming: Incoming): incoming is Wire.ResolvedRunEvent => Schema.is(Wire.ObserverRunEvent)(incoming)
+const isRunEvent = (incoming: Incoming): incoming is ResolvedRunEvent => Schema.is(ObserverRunEvent)(incoming)
 
 export const chatUpdateRuntime = {
   Pending,

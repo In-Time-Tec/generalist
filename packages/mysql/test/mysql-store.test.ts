@@ -23,7 +23,7 @@ const scopedWith =
   <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
 const database = mysqlDatabase("store")

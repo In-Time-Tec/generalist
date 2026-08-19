@@ -221,8 +221,8 @@ export const registration = (
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })
 
-const stringifyJson = Schema.encodeSync(Schema.UnknownFromJsonString)
-const parseJsonOption = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)
+const stringifyJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
+const parseJsonOption = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 const dataLinePrefix = /^data: ?/
 const frameSeparator = /(\r?\n\r?\n)/
 const lineSeparator = /(\r?\n)/

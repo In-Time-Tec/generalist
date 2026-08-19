@@ -1,6 +1,6 @@
 import { cva } from "class-variance-authority"
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"

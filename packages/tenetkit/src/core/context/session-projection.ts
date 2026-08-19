@@ -4,7 +4,7 @@ import { projectTranscript } from "./memory.js"
 import type { Entry, SkillEntry } from "./session.js"
 
 /** @experimental Model context cannot be admitted while framework tool calls lack outcomes. */
-export class ContextInvalid extends Schema.TaggedErrorClass<ContextInvalid>()("tenetkit/core/ContextInvalid", {
+export class ContextInvalid extends Schema.TaggedError<ContextInvalid>()("tenetkit/core/ContextInvalid", {
   issues: Schema.Array(
     Schema.Struct({
       toolCallId: Schema.String,

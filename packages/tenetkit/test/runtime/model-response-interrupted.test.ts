@@ -17,8 +17,9 @@ import { assistantAddress, memoryLayer, registrationsFor, textPrompt } from "./h
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 import { CompletedModelResponse } from "../../src/runtime/run-event.js"
 
-const jsonValue = (value: unknown): unknown => JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value))
-const jsonText = Schema.encodeSync(Schema.UnknownFromJsonString)
+const jsonValue = (value: unknown): unknown =>
+  JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
+const jsonText = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const interrupted = (
   operationKey: string,
@@ -641,7 +642,7 @@ it.live("rejects mutated interrupted model response references and Session stora
         .query("UPDATE baton_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.tag, row.session_id, row.entry_id)
 
-      const payload = (yield* Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(row.payload_json)) as {
+      const payload = (yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(row.payload_json)) as {
         readonly _tag: string
         readonly content: ReadonlyArray<unknown>
         readonly metadata?: Readonly<Record<string, unknown>>

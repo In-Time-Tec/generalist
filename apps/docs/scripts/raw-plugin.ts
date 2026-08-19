@@ -18,7 +18,7 @@ const program = Effect.gen(function* () {
           Effect.runPromiseWith(context)(
             fileSystem.readFileString(args.path.slice(0, -"?raw-text".length)).pipe(
               Effect.map((contents) => ({
-                contents: `export default ${Schema.encodeSync(Schema.UnknownFromJsonString)(contents)}`,
+                contents: `export default ${Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(contents)}`,
                 loader: "js" as const,
               })),
             ),

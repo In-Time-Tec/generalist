@@ -34,7 +34,7 @@ export interface OpenAiAccountCredential {
 }
 
 /** @experimental */
-export class OpenAiAccountCredentialError extends Schema.TaggedErrorClass<OpenAiAccountCredentialError>()(
+export class OpenAiAccountCredentialError extends Schema.TaggedError<OpenAiAccountCredentialError>()(
   "tenetkit/ai/OpenAiAccountCredentialError",
   {
     operation: Schema.Literals(["acquire", "refreshRejected"]),
