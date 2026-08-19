@@ -118,6 +118,43 @@ describe("providers", () => {
     })
   })
 
+  it.effect("bounds OpenRouter unsupported-schema descriptions without coercing unknown failures", () => {
+    const oversized = `${"x".repeat(3_000)}SECRET-SUFFIX`
+    const tool = Tool.make("invalid", { parameters: Schema.String })
+    Object.defineProperty(tool, "parametersSchema", {
+      configurable: true,
+      get: () => {
+        throw new Error(oversized)
+      },
+    })
+    const unknownFailure = Tool.make("unknown-failure", { parameters: Schema.String })
+    Object.defineProperty(unknownFailure, "parametersSchema", {
+      configurable: true,
+      get: () => {
+        throw {
+          toString: () => {
+            throw new Error("must not coerce unknown compiler failures")
+          },
+        }
+      },
+    })
+
+    return Effect.gen(function* () {
+      const failure = yield* openRouterToolJsonSchemaCompiler("openai/gpt-5")(tool).pipe(Effect.flip)
+      expect(AiError.isAiError(failure) && failure.reason._tag).toBe("UnsupportedSchemaError")
+      if (AiError.isAiError(failure) && failure.reason._tag === "UnsupportedSchemaError") {
+        expect(failure.reason.description).toHaveLength(2_048)
+        expect(failure.reason.description).not.toContain("SECRET-SUFFIX")
+      }
+
+      const unknown = yield* openRouterToolJsonSchemaCompiler("openai/gpt-5")(unknownFailure).pipe(Effect.flip)
+      expect(AiError.isAiError(unknown) && unknown.reason._tag).toBe("UnsupportedSchemaError")
+      if (AiError.isAiError(unknown) && unknown.reason._tag === "UnsupportedSchemaError") {
+        expect(unknown.reason.description).toBe("OpenRouter tool schema compilation failed")
+      }
+    })
+  })
+
   it("classifies provider context failures from structured metadata and narrow messages", () => {
     const openAiStructured = AiError.make({
       module: "OpenAiClient",

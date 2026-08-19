@@ -8,6 +8,7 @@ import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "..
 import type { RegistrationOptions } from "./openai.js"
 
 const {
+  debug: _debug,
   messages: _messages,
   model: _model,
   response_format: _responseFormat,
@@ -40,6 +41,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const boundedDescription = (value: unknown, fallback: string): string =>
   typeof value === "string" && value.length > 0 ? value.slice(0, 2_048) : fallback
+
+const compilerFailureDescription = (error: unknown): string => {
+  const fallback = "OpenRouter tool schema compilation failed"
+  if (!(error instanceof Error)) return fallback
+  try {
+    return boundedDescription(error.message, fallback)
+  } catch {
+    return fallback
+  }
+}
 
 const boundedMetadata = (value: unknown): string | null => (typeof value === "string" ? value.slice(0, 256) : null)
 
@@ -138,7 +149,7 @@ export const toolJsonSchemaCompiler =
           module: "OpenRouterLanguageModel",
           method: "prepareTools",
           reason: AiError.UnsupportedSchemaError.make({
-            description: error instanceof Error ? error.message : String(error),
+            description: compilerFailureDescription(error),
           }),
         }),
     })

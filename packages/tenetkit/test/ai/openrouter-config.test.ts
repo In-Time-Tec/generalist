@@ -38,6 +38,29 @@ describe("OpenRouter request configuration", () => {
     expect(() => decodeConfig({ provider: { allow_fallbacks: "yes" } })).toThrow()
     expect(() => decodeConfig({ plugins: [{ id: "web", engine: "google" }] })).toThrow()
     expect(() => decodeConfig({ trace: { request_id: "secret" } })).toThrow()
-    expect(() => decodeConfig({ messages: [] })).toThrow()
+  })
+
+  it("rejects transport-owned request fields before transport", () => {
+    let requests = 0
+    const request = (config: unknown) => {
+      const decoded = decodeConfig(config)
+      requests += 1
+      return decoded
+    }
+
+    for (const config of [
+      { debug: {} },
+      { debug: { echo_upstream_body: true } },
+      { model: "secret-model" },
+      { messages: [] },
+      { response_format: { type: "json_object" } },
+      { stream: true },
+      { stream_options: { include_usage: true } },
+      { tool_choice: "auto" },
+      { tools: [] },
+    ]) {
+      expect(() => request(config)).toThrow()
+    }
+    expect(requests).toBe(0)
   })
 })
