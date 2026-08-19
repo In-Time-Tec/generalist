@@ -50,6 +50,7 @@ export interface FlushResult {
 const tag = "tenetkit:replay:v1"
 const maxAttachmentBytes = 2_048
 const textEncoder = new TextEncoder()
+const operations = new WeakMap<HibernatingWebSocket, Promise<unknown>>()
 
 const decodeAttachment = (socket: HibernatingWebSocket): Option.Option<Attachment> =>
   Schema.decodeUnknownOption(Attachment)(socket.deserializeAttachment())
@@ -66,7 +67,6 @@ const close = (socket: HibernatingWebSocket, code: number, reason: string): void
 export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) => {
   const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 64), 1), 1_000)
   const fuel = Math.min(Math.max(Math.trunc(options.fuel ?? 4), 1), 32)
-  const operations = new WeakMap<HibernatingWebSocket, Promise<unknown>>()
   const runPage = (runId: string, cursor: Cursor) =>
     Effect.runPromise(page({ runId, cursor, limit: pageSize }).pipe(Effect.provideService(Runtime, options.runtime)))
 
@@ -143,21 +143,20 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
     },
     async webSocketMessage(socket: HibernatingWebSocket, message: string | ArrayBuffer): Promise<void> {
       if (typeof message !== "string") return close(socket, 1003, "binary-command")
-      const command = await Effect.runPromiseExit(decodeCommand(message))
-      if (command._tag === "Failure") return close(socket, 1002, "malformed-command")
-      if (command.value._tag === "Attach") {
-        const attach = command.value
-        await enqueue(socket, async () => {
-          const decodedAttachment = decodeAttachment(socket)
-          if (Option.isNone(decodedAttachment)) return close(socket, 1002, "malformed-attachment")
-          if (decodedAttachment.value.state === "attached" && decodedAttachment.value.runId !== attach.runId) {
+      await enqueue(socket, async () => {
+        const command = await Effect.runPromiseExit(decodeCommand(message))
+        if (command._tag === "Failure") return close(socket, 1002, "malformed-command")
+        const decodedAttachment = decodeAttachment(socket)
+        if (Option.isNone(decodedAttachment)) return close(socket, 1002, "malformed-attachment")
+        if (command.value._tag === "Attach") {
+          if (decodedAttachment.value.state === "attached" && decodedAttachment.value.runId !== command.value.runId) {
             return close(socket, 1008, "run-mismatch")
           }
-          const requestedCursor = attach.cursor ?? origin
+          const requestedCursor = command.value.cursor ?? origin
           const attachment: Attachment = {
             version: 1,
             state: "attached",
-            runId: attach.runId,
+            runId: command.value.runId,
             cursor:
               decodedAttachment.value.state === "attached"
                 ? Math.max(decodedAttachment.value.cursor, requestedCursor)
@@ -165,19 +164,17 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
           }
           if (!persist(socket, attachment)) return close(socket, 1009, "attachment-too-large")
           await drainSocket(socket)
-        })
-        return
-      }
-      const decodedAttachment = decodeAttachment(socket)
-      if (Option.isNone(decodedAttachment)) return close(socket, 1002, "malformed-attachment")
-      if (decodedAttachment.value.state !== "attached") return close(socket, 1008, "not-attached")
-      if (decodedAttachment.value.runId !== command.value.runId) return close(socket, 1008, "run-mismatch")
-      await Effect.runPromise(
-        options.runtime.cancel({
-          runId: command.value.runId,
-          ...(command.value.reason === undefined ? {} : { reason: command.value.reason }),
-        }),
-      )
+          return
+        }
+        if (decodedAttachment.value.state !== "attached") return close(socket, 1008, "not-attached")
+        if (decodedAttachment.value.runId !== command.value.runId) return close(socket, 1008, "run-mismatch")
+        await Effect.runPromise(
+          options.runtime.cancel({
+            runId: command.value.runId,
+            ...(command.value.reason === undefined ? {} : { reason: command.value.reason }),
+          }),
+        )
+      })
     },
     webSocketClose(_socket: HibernatingWebSocket): void {},
     webSocketError(_socket: HibernatingWebSocket): void {},
