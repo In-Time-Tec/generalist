@@ -8,7 +8,13 @@ import type { RunActivation, RunActivationProjection } from "tenetkit/runtime/dr
 import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import { ExecutableResolver, Runtime } from "../../tenetkit/src/runtime/index.js"
-import { drain, makeExclusiveExecutionRecovery, makeProjection, schema } from "../src/durable-objects/index.js"
+import {
+  drain,
+  makeExclusiveExecutionRecovery,
+  makeProjection,
+  nextDueAt,
+  schema,
+} from "../src/durable-objects/index.js"
 import { assistantAddress, assistantRef, registrationsFor, textPrompt } from "../../tenetkit/test/runtime/helpers.js"
 import { tempDbPath } from "../../tenetkit/test/runtime/sqlite-helpers.js"
 import { closedTestAgent } from "../../tenetkit/test/runtime/identity.js"
@@ -54,9 +60,19 @@ it.live("projects only final transaction state, emits inactive, and rolls author
       expect(changes.at(-1)).toEqual([
         { runId: admitted.runId, intent: "execute", attemptFence: 1, runStatus: "running" },
       ])
+      const untouched = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "projection",
+        idempotencyKey: "untouched",
+        prompt: textPrompt("untouched"),
+      })
+      expect(changes.at(-1)).toEqual([{ runId: untouched.runId, intent: "inactive" }])
       const claim = yield* store.claimExecution({ runId: admitted.runId, ownerId: "owner" })
       expect(changes.at(-1)).toEqual([{ runId: admitted.runId, intent: "inactive" }])
       yield* store.releaseExecution(claim)
+      expect(changes.at(-1)).toEqual([
+        { runId: admitted.runId, intent: "execute", attemptFence: 2, runStatus: "running" },
+      ])
 
       reject = true
       const failed = yield* Effect.exit(
@@ -101,6 +117,41 @@ it.live("deletes inactive projections and rolls candidate writes back with the c
         ),
       )
       expect(yield* sql`SELECT run_id FROM tenetkit_activations WHERE run_id = 'rollback'`).toHaveLength(0)
+    }),
+  ),
+)
+
+it.live("rearms a shared host alarm from final transaction state and lets earlier host work win", () =>
+  withLayer(
+    runtimeLayer(),
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* schema
+      yield* sql`CREATE TABLE host_ready_work (due_at_millis INTEGER NOT NULL)`
+      yield* sql`INSERT INTO host_ready_work VALUES (0)`
+      const observed: Array<{ readonly tenetkit?: number; readonly shared: number }> = []
+      const rearm = Effect.gen(function* () {
+        const tenetkit = yield* nextDueAt
+        const host = yield* sql<{ readonly due_at_millis: number }>`
+          SELECT MIN(due_at_millis) AS due_at_millis FROM host_ready_work
+        `
+        observed.push({
+          ...(tenetkit === undefined ? {} : { tenetkit }),
+          shared: Math.min(tenetkit ?? Number.POSITIVE_INFINITY, Number(host[0]!.due_at_millis)),
+        })
+      }).pipe(
+        Effect.provideService(SqlClient.SqlClient, sql),
+        Effect.mapError(() => RuntimeUnavailable.make({ message: "shared alarm rearm failed" })),
+      )
+      yield* sql.withTransaction(
+        makeProjection(sql, rearm).applyInTransaction([
+          { runId: "tenetkit", intent: "execute", attemptFence: 1, runStatus: "running" },
+        ]),
+      )
+
+      expect(observed).toHaveLength(1)
+      expect(observed[0]!.tenetkit).toBeTypeOf("number")
+      expect(observed[0]!.shared).toBe(0)
     }),
   ),
 )
