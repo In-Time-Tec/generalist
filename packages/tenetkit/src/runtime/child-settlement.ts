@@ -148,16 +148,3 @@ export const fromMetadata = (input: {
 /** @experimental Decode a typed settlement notification from a mailbox row. */
 export const fromMailboxEntry = (entry: MailboxEntry): Notification | undefined =>
   fromMetadata({ metadata: entry.metadata, sequence: entry.sequence, admittedAtMillis: entry.admittedAtMillis })
-
-/**
- * @experimental Project a settlement payload into optional parent model content.
- *
- * Cancelled payloads are observation-only. Successful and failed payloads retain the existing
- * model-facing settlement message.
- */
-export const modelPrompt = (payload: Payload): Prompt.Prompt | undefined => {
-  if (payload.status === "cancelled") return undefined
-  if (payload.joined === true)
-    return Prompt.make(`Child run ${payload.childRunId} settled with status ${payload.status}.`)
-  return Prompt.make(`Child run ${payload.childRunId} settled with status ${payload.status}.\n\n${payload.resultText}`)
-}

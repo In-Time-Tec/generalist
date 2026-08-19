@@ -19,8 +19,7 @@ import {
   RunNotFound,
   RuntimeUnavailable,
 } from "../errors.js"
-import { fromMailboxEntry, modelPrompt } from "../child-settlement.js"
-import { deliveryPrompt, promptBytes, steeringKey, type MailboxEntry, type MessageReceipt } from "../mailbox.js"
+import { deliveryPrompt, steeringKey, type MailboxEntry, type MessageReceipt } from "../mailbox.js"
 import { Metadata } from "../message.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import type { AdmitMessageInput } from "../run-store.js"
@@ -393,40 +392,8 @@ export const deliverPendingMessages: {
       runId: run.runId,
       limit: Number.MAX_SAFE_INTEGER,
     })
-    const settlements = yield* sql<MessageRow>`
-      SELECT * FROM baton_messages m
-      WHERE m.target_session_id = ${run.message.sessionId}
-        AND m.entry_id LIKE 'child-settled:%'
-        AND (
-          m.delivered_run_id IS NULL
-          OR EXISTS (
-            SELECT 1 FROM baton_runs holder
-            WHERE holder.run_id = m.delivered_run_id
-              AND holder.status IN ('succeeded', 'failed', 'cancelled')
-              AND NOT EXISTS (
-                SELECT 1 FROM baton_run_steering s
-                WHERE s.run_id = m.delivered_run_id
-                  AND s.entry_id = m.steering_entry_id
-                  AND s.consumed_operation_id IS NOT NULL
-              )
-          )
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM baton_runs addressed
-          WHERE addressed.session_id = ${run.message.sessionId}
-            AND REPLACE(m.to_address, 'run:', '') = addressed.run_id
-            AND addressed.status NOT IN ('succeeded', 'failed', 'cancelled')
-        )
-      ORDER BY m.sequence
-    `
     const delivered: Array<MailboxEntry> = []
-    const settlementDeliveries = settlements.flatMap((row) => {
-      const entry = decodeEntry(row)
-      const notification = fromMailboxEntry(entry)
-      const prompt = notification === undefined ? undefined : modelPrompt(notification)
-      return prompt === undefined ? [] : [{ ...entry, bytes: promptBytes(prompt), prompt }]
-    })
-    for (const entry of [...pending, ...settlementDeliveries]) {
+    for (const entry of pending) {
       const idempotencyKey = steeringKey(entry.entryId)
       const rows = yield* sql<{ next_sequence: number | string }>`
         SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence
