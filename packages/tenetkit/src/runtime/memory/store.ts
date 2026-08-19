@@ -66,6 +66,21 @@ import {
   settleProgramOperation,
   startProgramOperation,
 } from "./store-program.js"
+import type { RunActivation } from "../run-activation.js"
+
+const activationOf = (run: import("./state.js").StoredRun): RunActivation => {
+  const intent: RunActivation["intent"] =
+    run.status === "cancelling"
+      ? "cancel"
+      : run.ownerId === undefined &&
+          (run.status === "running" ||
+            (run.status === "queued" && run.parentRunId !== undefined && run.childReadiness === "ready"))
+        ? "execute"
+        : "inactive"
+  return intent === "inactive"
+    ? { runId: run.runId, intent }
+    : { runId: run.runId, intent, attemptFence: run.attemptFence, runStatus: run.status }
+}
 
 export const makeRunStore = (options: LayerOptions) =>
   Effect.gen(function* () {
@@ -109,11 +124,21 @@ export const makeRunStore = (options: LayerOptions) =>
 
     const modifyState = <A, E>(
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
-    ): Effect.Effect<A, E> =>
+    ): Effect.Effect<A, E | RuntimeUnavailable> =>
       stateRef.semaphore.withPermit(
         Effect.gen(function* () {
           const state = yield* Ref.get(stateRef.backing)
           const [result, next] = yield* transition(state)
+          if (options.activationProjection !== undefined) {
+            const touched = new Set<string>()
+            for (const [runId, run] of next.runs) if (state.runs.get(runId) !== run) touched.add(runId)
+            for (const runId of state.runs.keys()) if (!next.runs.has(runId)) touched.add(runId)
+            const changes = [...touched].sort().map((runId): RunActivation => {
+              const run = next.runs.get(runId)
+              return run === undefined ? { runId, intent: "inactive" } : activationOf(run)
+            })
+            if (changes.length > 0) yield* options.activationProjection.applyInTransaction(changes)
+          }
           const publications = next.publications
           const committed: MemoryState = { ...next, publications: [] }
           yield* Ref.set(stateRef.backing, committed)

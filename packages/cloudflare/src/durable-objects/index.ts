@@ -4,6 +4,10 @@ import { SqliteClient } from "@effect/sql-sqlite-do"
 import type { RunStore } from "tenetkit/runtime/driver/run-store"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "tenetkit/runtime/driver/sql/store"
 
+export { drain, type DrainOptions, type DrainResult } from "./drain.js"
+export { makeProjection, migrateAndBackfill, nextDueAt, schema, type Rearm } from "./activations.js"
+export { makeExclusiveExecutionRecovery } from "./recovery.js"
+
 /** @experimental */
 export type DurableObjectStorage = NonNullable<Parameters<typeof SqliteClient.make>[0]["storage"]>
 

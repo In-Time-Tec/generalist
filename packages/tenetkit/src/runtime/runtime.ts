@@ -60,6 +60,7 @@ import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Duration } from "effect"
 import type { Notification as ChildSettlementNotification } from "./child-settlement.js"
 import type { ModelPreviewEvent } from "./model-preview.js"
+import type { RunActivationProjection } from "./run-activation.js"
 
 export type { InitialFanOutInput } from "./fan-out.js"
 
@@ -76,6 +77,8 @@ export interface LayerOptions {
   /** Host policy for addressing beyond TenetKit's derived relationships. Absent means relationships only. */
   readonly messagingPolicy?: MessagingPolicyInterface
   readonly mailboxBounds?: Partial<MailboxBounds>
+  /** Final-state callback executed synchronously inside each authoritative store transaction. */
+  readonly activationProjection?: RunActivationProjection
   readonly scheduler?: {
     readonly concurrency?: number
     readonly pollInterval?: Duration.Input
