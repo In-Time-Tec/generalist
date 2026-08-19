@@ -109,4 +109,35 @@ describe("hibernating WebSocket", () => {
     expect(socket.closes).toEqual([[1002, "malformed-command"]])
     expect(socket.attachment).toEqual({ version: 1, state: "unattached" })
   })
+
+  it("never rewinds an attached same-run cursor", async () => {
+    const state = new FakeState()
+    const socket = new FakeSocket()
+    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
+    adapter.accept(socket)
+    socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: 2 }
+
+    await adapter.webSocketMessage(
+      socket,
+      await Effect.runPromise(Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 0 })),
+    )
+
+    expect(socket.attachment).toEqual({ version: 1, state: "attached", runId: "run-1", cursor: 2 })
+    expect(socket.sent).toEqual([])
+  })
+
+  it("serializes concurrent flushes for one socket", async () => {
+    const state = new FakeState()
+    const socket = new FakeSocket()
+    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
+    adapter.accept(socket)
+    socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: -1 }
+
+    const flushed = await Promise.all([adapter.flushSocket(socket), adapter.flushSocket(socket)])
+
+    expect(flushed.map((result) => result.frames)).toEqual([1, 1])
+    expect(socket.sent).toHaveLength(2)
+    expect(new Set(socket.sent).size).toBe(2)
+    expect(socket.attachment).toMatchObject({ cursor: 1 })
+  })
 })

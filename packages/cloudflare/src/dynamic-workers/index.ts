@@ -9,11 +9,20 @@ const CapabilityFailureResponse = Schema.Struct({
   error: Schema.Literal("sandbox execution failed"),
   capabilityFailureId: Schema.String,
 })
+const redactDiagnostic = (message: string): string =>
+  message
+    .replace(/(\bauthorization\s*[:=]\s*)(?:(?:bearer|basic|token)\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1[REDACTED]")
+    .replace(/(\bbearer\s+)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1[REDACTED]")
+    .replace(
+      /((?:["'])?[A-Za-z0-9_.-]*(?:token|secret|password|passwd|credential|key)[A-Za-z0-9_.-]*(?:["'])?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
+      "$1[REDACTED]",
+    )
 const safeMessage = (cause: unknown): string => {
   try {
-    return (cause instanceof Error ? cause.message : String(cause))
-      .replace(/[\r\n\t]+/g, " ")
-      .slice(0, maximumDiagnostic)
+    return redactDiagnostic((cause instanceof Error ? cause.message : String(cause)).replace(/[\r\n\t]+/g, " ")).slice(
+      0,
+      maximumDiagnostic,
+    )
   } catch {
     return "uninspectable failure"
   }
@@ -258,14 +267,16 @@ export const make = (options: Options): SandboxExecutor.Interface =>
             return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON" })
           }
           if (!response.ok) {
-            const envelope = Schema.decodeUnknownOption(CapabilityFailureResponse, { onExcessProperty: "error" })(
-              decoded,
-            )
-            if (Option.isSome(envelope)) {
-              const failure = capabilityFailures.get(envelope.value.capabilityFailureId)
-              if (failure !== undefined) {
-                capabilityFailures.delete(envelope.value.capabilityFailureId)
-                return yield* Effect.fail(failure)
+            if (response.status === 500) {
+              const envelope = Schema.decodeUnknownOption(CapabilityFailureResponse, { onExcessProperty: "error" })(
+                decoded,
+              )
+              if (Option.isSome(envelope)) {
+                const failure = capabilityFailures.get(envelope.value.capabilityFailureId)
+                if (failure !== undefined) {
+                  capabilityFailures.delete(envelope.value.capabilityFailureId)
+                  return yield* Effect.fail(failure)
+                }
               }
             }
             return yield* failExecution(`dynamic Worker returned status ${response.status}`)
