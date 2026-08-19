@@ -111,7 +111,7 @@ export const admitSend: {
       const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
       const digest = rootDigest(input.message, treePolicy)
       const existing = yield* sql<RunRow>`
-      SELECT * FROM baton_runs
+      SELECT * FROM tenetkit_runs
       WHERE address = ${input.message.to}
         AND session_id = ${input.message.sessionId}
         AND idempotency_key = ${input.message.idempotencyKey}
@@ -141,13 +141,13 @@ export const admitSend: {
         }
       }
       if (input.runId !== undefined) {
-        const byId = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${input.runId}`
+        const byId = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE run_id = ${input.runId}`
         if (byId[0] !== undefined)
           return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
       }
       const runId = input.runId ?? (yield* nextId("run"))
       const lanes = yield* sql<{ accepted_sequence: number; queue_json: string }>`
-      SELECT accepted_sequence, queue_json FROM baton_lanes
+      SELECT accepted_sequence, queue_json FROM tenetkit_lanes
       WHERE address = ${input.message.to} AND session_id = ${input.message.sessionId}
     `
       const lane = lanes[0]
@@ -155,12 +155,12 @@ export const admitSend: {
       const queue = lane === undefined ? [runId] : [...decodeQueue(lane.queue_json), runId]
       if (lane === undefined) {
         yield* sql`
-        INSERT INTO baton_lanes (address, session_id, accepted_sequence, queue_json)
+        INSERT INTO tenetkit_lanes (address, session_id, accepted_sequence, queue_json)
         VALUES (${input.message.to}, ${input.message.sessionId}, ${acceptedSequence}, ${encodeQueue(queue)})
       `
       } else {
         yield* sql`
-        UPDATE baton_lanes
+        UPDATE tenetkit_lanes
         SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)}
         WHERE address = ${input.message.to} AND session_id = ${input.message.sessionId}
       `

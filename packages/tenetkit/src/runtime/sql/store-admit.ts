@@ -126,7 +126,7 @@ export const admitStart: {
     yield* persistRegistrations(input.registrations)
     const digest = startDigest(normalizedInput)
     const existing = yield* sql<RunRow>`
-      SELECT * FROM baton_runs
+      SELECT * FROM tenetkit_runs
       WHERE address = ${input.message.to}
         AND session_id = ${input.message.sessionId}
         AND idempotency_key = ${input.message.idempotencyKey}
@@ -155,8 +155,8 @@ export const admitStart: {
         idempotency_key: string
       }>`
         SELECT links.child_run_id, links.invocation_id, runs.session_id, runs.idempotency_key
-        FROM baton_run_links links
-        JOIN baton_runs runs ON runs.run_id = links.child_run_id
+        FROM tenetkit_run_links links
+        JOIN tenetkit_runs runs ON runs.run_id = links.child_run_id
         WHERE links.parent_run_id = ${prior.run_id}
       `
       const childRunIds: Array<string> = []
@@ -175,7 +175,7 @@ export const admitStart: {
       const fanOuts = [] as Array<import("../fan-out.js").FanOutReceipt>
       for (const fanOut of input.initialFanOuts) {
         const rows = yield* sql<{ fan_out_id: string }>`
-          SELECT fan_out_id FROM baton_fan_outs
+          SELECT fan_out_id FROM tenetkit_fan_outs
           WHERE parent_run_id = ${prior.run_id} AND idempotency_key = ${fanOut.idempotencyKey}
         `
         const fanOutId = rows[0]?.fan_out_id
@@ -183,7 +183,7 @@ export const admitStart: {
           return yield* RuntimeUnavailable.make({ message: `initial fan-out ${fanOut.idempotencyKey} is missing` })
         }
         const members = yield* sql<{ child_run_id: string }>`
-          SELECT child_run_id FROM baton_fan_out_members WHERE fan_out_id = ${fanOutId} ORDER BY ordinal ASC
+          SELECT child_run_id FROM tenetkit_fan_out_members WHERE fan_out_id = ${fanOutId} ORDER BY ordinal ASC
         `
         fanOuts.push({
           fanOutId,
@@ -202,7 +202,7 @@ export const admitStart: {
       }
     }
     if (input.runId !== undefined) {
-      const byId = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${input.runId}`
+      const byId = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE run_id = ${input.runId}`
       if (byId[0] !== undefined) return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
     }
     const runId = input.runId ?? (yield* nextId("run"))
@@ -229,7 +229,7 @@ export const admitStart: {
     )
     if (input.initialChildren.length === 0) {
       const accepted = (yield* loadRun(runId))!
-      yield* sql`UPDATE baton_runs SET attempt_fence = 1 WHERE run_id = ${runId}`
+      yield* sql`UPDATE tenetkit_runs SET attempt_fence = 1 WHERE run_id = ${runId}`
       yield* appendEvent(hub, { ...accepted, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
     }
     const childRunIds: Array<string> = []
@@ -288,7 +288,7 @@ export const admitSpawn: {
       Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
     )
     const existing = yield* sql<RunRow>`
-      SELECT * FROM baton_runs
+      SELECT * FROM tenetkit_runs
       WHERE address = ${input.message.to}
         AND session_id = ${input.message.sessionId}
         AND idempotency_key = ${input.message.idempotencyKey}
@@ -335,7 +335,7 @@ export const admitSpawn: {
     yield* associateRegistrations(runId, registrations)
     const created = yield* nowIso
     yield* sql`
-      INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+      INSERT INTO tenetkit_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
       VALUES (${parent.runId}, ${runId}, ${input.invocationId}, ${childReadiness}, NULL, ${created}, NULL)
     `
     yield* appendEvent(hub, parent, {
@@ -384,7 +384,7 @@ export const admitProgramChild: {
     )
     const digest = childDigest(input.message, input.executableRef)
     const existing = yield* sql<RunRow>`
-      SELECT * FROM baton_runs
+      SELECT * FROM tenetkit_runs
       WHERE address = ${input.message.to}
         AND session_id = ${input.message.sessionId}
         AND idempotency_key = ${input.message.idempotencyKey}
@@ -413,7 +413,7 @@ export const admitProgramChild: {
         duplicate: true,
       }
     }
-    const byId = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${input.childRunId}`
+    const byId = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE run_id = ${input.childRunId}`
     if (byId[0] !== undefined) {
       return yield* RunIdConflict.make({ runId: input.childRunId, existingRunId: byId[0].run_id })
     }
@@ -437,7 +437,7 @@ export const admitProgramChild: {
     yield* associateRegistrations(input.childRunId, registrations)
     const created = yield* nowIso
     yield* sql`
-      INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+      INSERT INTO tenetkit_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
       VALUES (${parent.runId}, ${input.childRunId}, ${input.invocationId}, ${childReadiness}, NULL, ${created}, NULL)
     `
     yield* appendEvent(hub, parent, {

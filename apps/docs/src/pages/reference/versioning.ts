@@ -18,7 +18,7 @@ export const versioningReference = definePage({
         [[code("tenetkit/ag-ui")], [code(version)], [code(".")]],
         [[code("tenetkit")], [code(version)], [code(".")]],
         [[code("tenetkit/foldkit")], [code(version)], [code(".")]],
-        [[code("tenetkit/mcp")], [code(version)], [code("."), ", ", code("./baton")]],
+        [[code("tenetkit/mcp")], [code(version)], [code("."), ", ", code("./tools")]],
         [[code("tenetkit/memory")], [code(version)], [code(".")]],
         [
           [code("tenetkit/ai")],

@@ -69,7 +69,7 @@ describeMysql("mysql worker cancellation", () => {
               mysqlClient(url),
               Effect.gen(function* () {
                 const sql = yield* SqlClient.SqlClient
-                yield* sql`UPDATE baton_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${receipt.runId}`
+                yield* sql`UPDATE tenetkit_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${receipt.runId}`
               }),
             )
             const [replacementClaim] = yield* claims.claimReadyRuns({

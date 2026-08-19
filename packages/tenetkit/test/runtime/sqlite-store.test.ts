@@ -830,7 +830,7 @@ it.live("rejects corrupted persisted executable authority with RuntimeUnavailabl
   })
   const corrupt = Effect.sync(() => {
     const db = new Database(filename)
-    db.run("UPDATE baton_runs SET executable_ref_json = ? WHERE run_id = ?", [
+    db.run("UPDATE tenetkit_runs SET executable_ref_json = ? WHERE run_id = ?", [
       encodeJson(alternateAssistantRef.ref),
       runId,
     ])
@@ -1344,7 +1344,7 @@ layer(sqliteLayer(rollbackPublicationFilename))("publishes SQL events only after
       const parentId = parent.runId.replaceAll("'", "''")
       database.exec(`
         CREATE TRIGGER fail_spawn_after_parent_event
-        BEFORE INSERT ON baton_run_events
+        BEFORE INSERT ON tenetkit_run_events
         WHEN NEW.run_id <> '${parentId}'
         BEGIN
           SELECT RAISE(ABORT, 'forced post-append failure');

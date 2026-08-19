@@ -32,10 +32,12 @@ export const withConsistentSnapshot: {
               Effect.asVoid,
             ),
     savepoint: (connection, id) =>
-      connection.executeUnprepared(`SAVEPOINT baton_inspection_${id}`, [], undefined).pipe(Effect.asVoid),
+      connection.executeUnprepared(`SAVEPOINT tenetkit_inspection_${id}`, [], undefined).pipe(Effect.asVoid),
     commit: (connection) => connection.executeUnprepared("COMMIT", [], undefined).pipe(Effect.asVoid),
     rollback: (connection) => connection.executeUnprepared("ROLLBACK", [], undefined).pipe(Effect.asVoid),
     rollbackSavepoint: (connection, id) =>
-      connection.executeUnprepared(`ROLLBACK TO SAVEPOINT baton_inspection_${id}`, [], undefined).pipe(Effect.asVoid),
+      connection
+        .executeUnprepared(`ROLLBACK TO SAVEPOINT tenetkit_inspection_${id}`, [], undefined)
+        .pipe(Effect.asVoid),
   })(effect),
 )

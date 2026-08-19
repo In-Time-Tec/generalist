@@ -139,31 +139,31 @@ const measure = (filename: string, scale: number, markers: ReadonlyArray<string>
   database.exec("PRAGMA wal_checkpoint(TRUNCATE)")
   const operations = readRows(
     database,
-    "SELECT operation_id || ':result' AS rowKey, result_json AS payload FROM baton_run_operations WHERE result_json IS NOT NULL",
+    "SELECT operation_id || ':result' AS rowKey, result_json AS payload FROM tenetkit_run_operations WHERE result_json IS NOT NULL",
   )
   const events = readRows(
     database,
-    "SELECT run_id || ':event:' || sequence AS rowKey, event_json AS payload FROM baton_run_events",
+    "SELECT run_id || ':event:' || sequence AS rowKey, event_json AS payload FROM tenetkit_run_events",
   )
   const checkpoints = readRows(
     database,
-    "SELECT run_id || ':checkpoint' AS rowKey, driver_checkpoint_json AS payload FROM baton_runs WHERE driver_checkpoint_json IS NOT NULL",
+    "SELECT run_id || ':checkpoint' AS rowKey, driver_checkpoint_json AS payload FROM tenetkit_runs WHERE driver_checkpoint_json IS NOT NULL",
   )
   const sessions = readRows(
     database,
-    "SELECT session_id || ':session:' || entry_id AS rowKey, payload_json AS payload FROM baton_session_entries",
+    "SELECT session_id || ':session:' || entry_id AS rowKey, payload_json AS payload FROM tenetkit_session_entries",
   )
   const lifecycle = readRows(
     database,
-    `SELECT operation_id || ':input' AS rowKey, input_json AS payload FROM baton_run_operations
-     UNION ALL SELECT operation_id || ':result', result_json FROM baton_run_operations
-     UNION ALL SELECT operation_id || ':error', error_json FROM baton_run_operations
-     UNION ALL SELECT run_id || ':event:' || sequence, event_json FROM baton_run_events
-     UNION ALL SELECT run_id || ':message', message_json FROM baton_runs
-     UNION ALL SELECT run_id || ':checkpoint', driver_checkpoint_json FROM baton_runs
-     UNION ALL SELECT run_id || ':suspension', suspension_json FROM baton_runs
-     UNION ALL SELECT run_id || ':continuation', continuation_json FROM baton_runs
-     UNION ALL SELECT run_id || ':pending', pending_outcome_json FROM baton_runs`,
+    `SELECT operation_id || ':input' AS rowKey, input_json AS payload FROM tenetkit_run_operations
+     UNION ALL SELECT operation_id || ':result', result_json FROM tenetkit_run_operations
+     UNION ALL SELECT operation_id || ':error', error_json FROM tenetkit_run_operations
+     UNION ALL SELECT run_id || ':event:' || sequence, event_json FROM tenetkit_run_events
+     UNION ALL SELECT run_id || ':message', message_json FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':checkpoint', driver_checkpoint_json FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':suspension', suspension_json FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':continuation', continuation_json FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':pending', pending_outcome_json FROM tenetkit_runs`,
   )
   const sessionJson = sessions.map((row) => JSON.stringify(row.payload))
   for (const marker of markers) expect(sessionJson.some((payload) => payload.includes(marker))).toBe(true)

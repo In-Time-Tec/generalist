@@ -1,26 +1,26 @@
 import { sha256Text } from "../../core/durable/canonical-json.js"
 
-export const SCHEMA_VERSION = 9
-export const V8_SCHEMA_CHECKSUM = "8c4d3189fec1bc044e790db21b499b0ca160743b6e6c64e92de985a26304c7d9"
-export const SCHEMA_META_TABLE = "baton_schema_meta"
-export const MIGRATIONS_TABLE = "baton_sql_migrations"
+export const SCHEMA_VERSION = 1
+export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
+export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
+export const MIGRATION_NAME = "tenetkit_runtime"
 
 export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
-  `CREATE TABLE IF NOT EXISTS baton_schema_meta (
+  `CREATE TABLE IF NOT EXISTS tenetkit_schema_meta (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   version INTEGER NOT NULL,
   checksum TEXT NOT NULL,
   dirty INTEGER NOT NULL DEFAULT 0,
   applied_at TEXT NOT NULL
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_lanes (
+  `CREATE TABLE IF NOT EXISTS tenetkit_lanes (
   address TEXT NOT NULL,
   session_id TEXT NOT NULL,
   accepted_sequence INTEGER NOT NULL,
   queue_json TEXT NOT NULL,
   PRIMARY KEY (address, session_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_runs (
+  `CREATE TABLE IF NOT EXISTS tenetkit_runs (
   run_id TEXT PRIMARY KEY,
   status TEXT NOT NULL,
   address TEXT NOT NULL,
@@ -55,15 +55,15 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   updated_at TEXT NOT NULL,
   UNIQUE (address, session_id, idempotency_key)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_run_events (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_events (
   run_id TEXT NOT NULL,
   sequence INTEGER NOT NULL,
   event_id TEXT NOT NULL UNIQUE,
   event_json TEXT NOT NULL,
   PRIMARY KEY (run_id, sequence),
-  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_run_operations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_operations (
   run_id TEXT NOT NULL,
   operation_id TEXT NOT NULL,
   operation_key TEXT NOT NULL,
@@ -81,9 +81,9 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   resolution_json TEXT,
   PRIMARY KEY (run_id, operation_id),
   UNIQUE (run_id, operation_key),
-  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_run_waits (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_waits (
   run_id TEXT NOT NULL,
   wait_id TEXT NOT NULL,
   reason TEXT NOT NULL,
@@ -92,9 +92,9 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   opened_at TEXT NOT NULL,
   closed_at TEXT,
   PRIMARY KEY (run_id, wait_id),
-  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_run_links (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_links (
   parent_run_id TEXT NOT NULL,
   child_run_id TEXT NOT NULL,
   invocation_id TEXT NOT NULL,
@@ -104,11 +104,11 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   settled_at TEXT,
   PRIMARY KEY (parent_run_id, child_run_id),
   UNIQUE (child_run_id),
-  FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
-  FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (parent_run_id) REFERENCES tenetkit_runs(run_id),
+  FOREIGN KEY (child_run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE INDEX IF NOT EXISTS baton_run_links_readiness_idx ON baton_run_links(parent_run_id, readiness, created_at, child_run_id)`,
-  `CREATE TABLE IF NOT EXISTS baton_external_child_placements (
+  `CREATE INDEX IF NOT EXISTS tenetkit_run_links_readiness_idx ON tenetkit_run_links(parent_run_id, readiness, created_at, child_run_id)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_external_child_placements (
   placement_id TEXT PRIMARY KEY,
   parent_run_id TEXT NOT NULL,
   partition TEXT NOT NULL,
@@ -125,14 +125,14 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   outcome_event_id TEXT,
   created_at TEXT NOT NULL,
   settled_at TEXT,
-  FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
+  FOREIGN KEY (parent_run_id) REFERENCES tenetkit_runs(run_id),
   UNIQUE (partition, external_run_id),
   UNIQUE (parent_run_id, invocation_id),
   CHECK ((settlement_id IS NULL AND outcome_json IS NULL AND outcome_event_id IS NULL AND settled_at IS NULL)
     OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
 )`,
-  `CREATE INDEX IF NOT EXISTS baton_external_child_placements_parent_idx ON baton_external_child_placements(parent_run_id, settlement_id, created_at)`,
-  `CREATE TABLE IF NOT EXISTS baton_run_steering (
+  `CREATE INDEX IF NOT EXISTS tenetkit_external_child_placements_parent_idx ON tenetkit_external_child_placements(parent_run_id, settlement_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_steering (
   entry_id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,
   sequence INTEGER NOT NULL,
@@ -143,18 +143,18 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   discarded_reason TEXT,
   UNIQUE (run_id, sequence),
   UNIQUE (run_id, idempotency_key),
-  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE INDEX IF NOT EXISTS baton_run_steering_pending_idx ON baton_run_steering(run_id, consumed_operation_id, discarded_reason, sequence)`,
-  `CREATE TABLE IF NOT EXISTS baton_agent_names (
+  `CREATE INDEX IF NOT EXISTS tenetkit_run_steering_pending_idx ON tenetkit_run_steering(run_id, consumed_operation_id, discarded_reason, sequence)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_agent_names (
   scope TEXT NOT NULL,
   name TEXT NOT NULL,
   run_id TEXT NOT NULL,
   PRIMARY KEY (scope, name),
-  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE INDEX IF NOT EXISTS baton_agent_names_run_idx ON baton_agent_names(run_id)`,
-  `CREATE TABLE IF NOT EXISTS baton_messages (
+  `CREATE INDEX IF NOT EXISTS tenetkit_agent_names_run_idx ON tenetkit_agent_names(run_id)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_messages (
   entry_id TEXT PRIMARY KEY,
   target_session_id TEXT NOT NULL,
   sequence INTEGER NOT NULL,
@@ -176,11 +176,11 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   UNIQUE (target_session_id, message_id, idempotency_key),
   UNIQUE (target_session_id, sequence)
 )`,
-  `CREATE INDEX IF NOT EXISTS baton_messages_pending_idx ON baton_messages(target_session_id, delivered_run_id, sequence)`,
-  `CREATE INDEX IF NOT EXISTS baton_runs_lane_idx ON baton_runs(address, session_id, status)`,
-  `CREATE INDEX IF NOT EXISTS baton_runs_schedule_idx ON baton_runs(status, created_at, run_id)`,
-  `CREATE INDEX IF NOT EXISTS baton_run_operations_status_idx ON baton_run_operations(status)`,
-  `CREATE TABLE IF NOT EXISTS baton_fan_outs (
+  `CREATE INDEX IF NOT EXISTS tenetkit_messages_pending_idx ON tenetkit_messages(target_session_id, delivered_run_id, sequence)`,
+  `CREATE INDEX IF NOT EXISTS tenetkit_runs_lane_idx ON tenetkit_runs(address, session_id, status)`,
+  `CREATE INDEX IF NOT EXISTS tenetkit_runs_schedule_idx ON tenetkit_runs(status, created_at, run_id)`,
+  `CREATE INDEX IF NOT EXISTS tenetkit_run_operations_status_idx ON tenetkit_run_operations(status)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_fan_outs (
   fan_out_id TEXT PRIMARY KEY,
   parent_run_id TEXT NOT NULL,
   idempotency_key TEXT NOT NULL,
@@ -192,9 +192,9 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (parent_run_id, idempotency_key),
-  FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (parent_run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_fan_out_members (
+  `CREATE TABLE IF NOT EXISTS tenetkit_fan_out_members (
   fan_out_id TEXT NOT NULL,
   ordinal INTEGER NOT NULL,
   member_key TEXT NOT NULL,
@@ -209,17 +209,17 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   outcome_json TEXT,
   PRIMARY KEY (fan_out_id, ordinal),
   UNIQUE (fan_out_id, member_key),
-  FOREIGN KEY (fan_out_id) REFERENCES baton_fan_outs(fan_out_id),
-  FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (fan_out_id) REFERENCES tenetkit_fan_outs(fan_out_id),
+  FOREIGN KEY (child_run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE INDEX IF NOT EXISTS baton_fan_out_members_status_idx ON baton_fan_out_members(fan_out_id, status, ordinal)`,
-  `CREATE TABLE IF NOT EXISTS baton_tree_roots (
+  `CREATE INDEX IF NOT EXISTS tenetkit_fan_out_members_status_idx ON tenetkit_fan_out_members(fan_out_id, status, ordinal)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_tree_roots (
   root_run_id TEXT PRIMARY KEY,
   earliest_position INTEGER NOT NULL DEFAULT 0,
   last_position INTEGER NOT NULL DEFAULT -1,
-  FOREIGN KEY (root_run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (root_run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_tree_event_index (
+  `CREATE TABLE IF NOT EXISTS tenetkit_tree_event_index (
   root_run_id TEXT NOT NULL,
   position INTEGER NOT NULL,
   run_id TEXT NOT NULL,
@@ -228,11 +228,11 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   PRIMARY KEY (root_run_id, position),
   UNIQUE (event_id),
   UNIQUE (run_id, run_sequence),
-  FOREIGN KEY (root_run_id) REFERENCES baton_tree_roots(root_run_id),
-  FOREIGN KEY (run_id, run_sequence) REFERENCES baton_run_events(run_id, sequence),
-  FOREIGN KEY (event_id) REFERENCES baton_run_events(event_id)
+  FOREIGN KEY (root_run_id) REFERENCES tenetkit_tree_roots(root_run_id),
+  FOREIGN KEY (run_id, run_sequence) REFERENCES tenetkit_run_events(run_id, sequence),
+  FOREIGN KEY (event_id) REFERENCES tenetkit_run_events(event_id)
   )`,
-  `CREATE TABLE IF NOT EXISTS baton_program_runs (
+  `CREATE TABLE IF NOT EXISTS tenetkit_program_runs (
   run_id TEXT PRIMARY KEY,
   program_pin TEXT NOT NULL,
   budget_json TEXT NOT NULL,
@@ -242,9 +242,9 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   tokens INTEGER NOT NULL DEFAULT 0,
   log_bytes INTEGER NOT NULL DEFAULT 0,
   active_slots INTEGER NOT NULL DEFAULT 0,
-  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_program_operations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_program_operations (
   run_id TEXT NOT NULL,
   operation_name TEXT NOT NULL,
   kind TEXT NOT NULL,
@@ -261,31 +261,31 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   resolution_idempotency_key TEXT,
   resolution_json TEXT,
   PRIMARY KEY (run_id, operation_name),
-  FOREIGN KEY (run_id) REFERENCES baton_program_runs(run_id)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_program_runs(run_id)
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_executable_registrations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_executable_registrations (
   pin TEXT PRIMARY KEY,
   codec TEXT NOT NULL,
   version TEXT NOT NULL,
   payload_json TEXT NOT NULL,
   registration_digest TEXT NOT NULL
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_run_registrations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_registrations (
   run_id TEXT NOT NULL,
   pin TEXT NOT NULL,
   PRIMARY KEY (run_id, pin),
-  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id),
-  FOREIGN KEY (pin) REFERENCES baton_executable_registrations(pin)
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id),
+  FOREIGN KEY (pin) REFERENCES tenetkit_executable_registrations(pin)
   )`,
-  `CREATE INDEX IF NOT EXISTS baton_run_registrations_pin_idx ON baton_run_registrations(pin)`,
-  `CREATE TABLE IF NOT EXISTS baton_sessions (
+  `CREATE INDEX IF NOT EXISTS tenetkit_run_registrations_pin_idx ON tenetkit_run_registrations(pin)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_sessions (
   session_id TEXT PRIMARY KEY,
   leaf_id TEXT,
   next_seq INTEGER NOT NULL DEFAULT 0,
   owner_token TEXT,
   updated_at TEXT NOT NULL
 )`,
-  `CREATE TABLE IF NOT EXISTS baton_session_entries (
+  `CREATE TABLE IF NOT EXISTS tenetkit_session_entries (
   session_id TEXT NOT NULL,
   entry_id TEXT NOT NULL,
   parent_id TEXT,
@@ -295,8 +295,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   created_at TEXT NOT NULL,
   PRIMARY KEY (session_id, entry_id)
 )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS baton_session_entries_seq_idx ON baton_session_entries(session_id, seq)`,
-  `CREATE INDEX IF NOT EXISTS baton_session_entries_parent_idx ON baton_session_entries(session_id, parent_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS tenetkit_session_entries_seq_idx ON tenetkit_session_entries(session_id, seq)`,
+  `CREATE INDEX IF NOT EXISTS tenetkit_session_entries_parent_idx ON tenetkit_session_entries(session_id, parent_id)`,
 ]
+
+export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(
+  (statement) => statement.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)?.slice(1, 2) ?? [],
+)
 
 export const schemaChecksum = (): string => sha256Text(`${SCHEMA_STATEMENTS.join("\n")}\nversion=${SCHEMA_VERSION}`)

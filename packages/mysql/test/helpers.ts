@@ -73,32 +73,32 @@ export const mysqlMessagingLayer = (database: MysqlDatabase) => (overrides: Mess
   )
 
 const RUNTIME_TABLES = [
-  "baton_session_entries",
-  "baton_sessions",
-  "baton_run_registrations",
-  "baton_executable_registrations",
-  "baton_program_operations",
-  "baton_program_runs",
-  "baton_tree_event_index",
-  "baton_tree_roots",
-  "baton_fan_out_members",
-  "baton_fan_outs",
-  "baton_run_steering",
-  "baton_messages",
-  "baton_agent_names",
-  "baton_external_child_placements",
-  "baton_run_links",
-  "baton_run_waits",
-  "baton_run_operations",
-  "baton_run_events",
-  "baton_runs",
-  "baton_lanes",
+  "tenetkit_session_entries",
+  "tenetkit_sessions",
+  "tenetkit_run_registrations",
+  "tenetkit_executable_registrations",
+  "tenetkit_program_operations",
+  "tenetkit_program_runs",
+  "tenetkit_tree_event_index",
+  "tenetkit_tree_roots",
+  "tenetkit_fan_out_members",
+  "tenetkit_fan_outs",
+  "tenetkit_run_steering",
+  "tenetkit_messages",
+  "tenetkit_agent_names",
+  "tenetkit_external_child_placements",
+  "tenetkit_run_links",
+  "tenetkit_run_waits",
+  "tenetkit_run_operations",
+  "tenetkit_run_events",
+  "tenetkit_runs",
+  "tenetkit_lanes",
 ] as const
 
-const serverUrl = mysqlUrl ?? "mysql://mysql-unavailable/baton"
+const serverUrl = mysqlUrl ?? "mysql://mysql-unavailable/tenetkit"
 
 const databaseName = (label: string) =>
-  `baton_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
+  `tenetkit_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
 
 type MysqlClientError = SqlError | Config.ConfigError
 
@@ -154,7 +154,7 @@ export const mysqlDatabase = (label: string): MysqlDatabase => {
         for (const table of RUNTIME_TABLES) yield* sql.unsafe(`DELETE FROM ${table}`)
         yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=1")
         yield* sql`
-          UPDATE baton_schema_meta
+          UPDATE tenetkit_schema_meta
           SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0
           WHERE id = 1
         `

@@ -23,7 +23,7 @@ export const loadTerminalEvent = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const row = (yield* sql<{ event_json: string }>`
-      SELECT event_json FROM baton_run_events WHERE event_id = ${terminalEventId}
+      SELECT event_json FROM tenetkit_run_events WHERE event_id = ${terminalEventId}
     `)[0]
     return row === undefined ? undefined : decodeEvent(row.event_json)
   })
@@ -32,12 +32,12 @@ export const hasUnsettledChild = (runId: string): Effect.Effect<boolean, SqlErro
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const pending = yield* sql<{ present: number }>`
-      SELECT 1 AS present FROM baton_run_links l
-        JOIN baton_runs r ON r.run_id = l.child_run_id
+      SELECT 1 AS present FROM tenetkit_run_links l
+        JOIN tenetkit_runs r ON r.run_id = l.child_run_id
         WHERE l.parent_run_id = ${runId}
           AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
       UNION ALL
-      SELECT 1 AS present FROM baton_external_child_placements
+      SELECT 1 AS present FROM tenetkit_external_child_placements
         WHERE parent_run_id = ${runId} AND settlement_id IS NULL
       LIMIT 1
     `
@@ -71,7 +71,7 @@ export const reconcileChildWaitWith = <E, R>(input: {
     }
     const sql = yield* SqlClient.SqlClient
     const wait = (yield* sql<{ status: string }>`
-      SELECT status FROM baton_run_waits
+      SELECT status FROM tenetkit_run_waits
       WHERE run_id = ${input.parent.runId} AND wait_id = ${input.parent.activeWaitId}
     `)[0]
     if (wait?.status !== "open") return false
@@ -83,7 +83,7 @@ export const reconcileChildWaitWith = <E, R>(input: {
     const resolution = { _tag: "ToolResult" as const, result, encodedResult: result }
     const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     yield* sql`
-      UPDATE baton_run_waits
+      UPDATE tenetkit_run_waits
       SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
       WHERE run_id = ${input.parent.runId} AND wait_id = ${input.parent.activeWaitId} AND status = 'open'
     `

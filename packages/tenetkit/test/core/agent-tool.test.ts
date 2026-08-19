@@ -814,7 +814,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
-        const mcp = yield* executor.execute(request("github_search", { query: "baton" }))
+        const mcp = yield* executor.execute(request("github_search", { query: "tenetkit" }))
         const sandbox = yield* executor.execute(request("shell", { command: "pwd" }))
 
         expect(mcp).toEqual({ _tag: "Success", result: { source: "mcp" }, encodedResult: { source: "mcp" } })

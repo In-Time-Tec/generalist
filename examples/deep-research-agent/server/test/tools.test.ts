@@ -45,9 +45,9 @@ describe("web_search tool", () => {
     (it) => {
       it.effect("uses the canned search path when no EXA_API_KEY is configured", () =>
         Effect.gen(function* () {
-          const output = yield* runWebSearch("baton agent framework")
+          const output = yield* runWebSearch("tenetkit agent framework")
 
-          expect(output).toEqual({ results: cannedResultsFor("baton agent framework") })
+          expect(output).toEqual({ results: cannedResultsFor("tenetkit agent framework") })
         }),
       )
     },

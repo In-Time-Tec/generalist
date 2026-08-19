@@ -18,13 +18,13 @@ export const claimReadyRuns = (options: ClaimOptions) =>
     const claimed = yield* sql<RunRow>`
       WITH candidates AS (
         SELECT r.run_id
-        FROM baton_runs r
+        FROM tenetkit_runs r
         WHERE r.status IN ('queued', 'running', 'cancelling')
           AND r.cancellation_requested = FALSE
           AND (
-            (r.parent_run_id IS NULL AND EXISTS (SELECT 1 FROM baton_lanes l WHERE l.head_run_id = r.run_id))
+            (r.parent_run_id IS NULL AND EXISTS (SELECT 1 FROM tenetkit_lanes l WHERE l.head_run_id = r.run_id))
             OR EXISTS (
-              SELECT 1 FROM baton_run_links link
+              SELECT 1 FROM tenetkit_run_links link
               WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
             )
           )
@@ -37,7 +37,7 @@ export const claimReadyRuns = (options: ClaimOptions) =>
         FOR UPDATE OF r SKIP LOCKED
         LIMIT ${options.limit}
       )
-      UPDATE baton_runs AS r
+      UPDATE tenetkit_runs AS r
       SET
         owner_worker_id = ${options.workerId},
         lease_expires_at = NOW() + (${leaseMs}::double precision * INTERVAL '1 millisecond'),
@@ -78,7 +78,7 @@ export const refreshLease = (input: {
     const sql = yield* SqlClient.SqlClient
     const leaseMs = Duration.toMillis(input.lease)
     const rows = yield* sql<{ run_id: string }>`
-      UPDATE baton_runs
+      UPDATE tenetkit_runs
       SET
         lease_expires_at = NOW() + (${leaseMs}::double precision * INTERVAL '1 millisecond'),
         updated_at = NOW()
@@ -114,7 +114,7 @@ export const releaseClaim = (input: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE baton_runs
+      UPDATE tenetkit_runs
       SET owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW()
       WHERE run_id = ${input.runId}
         AND owner_worker_id = ${input.workerId}

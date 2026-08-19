@@ -125,9 +125,9 @@ export const makeMysqlServices = (
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires READ COMMITTED" })
     }
     const { run, runNoTxn, runInspection, transactionHub } = makeTransactionRunner({ sql, hub })
-    const lockRun = (runId: string) => sql`SELECT run_id FROM baton_runs WHERE run_id = ${runId} FOR UPDATE`
+    const lockRun = (runId: string) => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
     const lockParent = (runId: string) =>
-      sql<{ parent_run_id: string | null }>`SELECT parent_run_id FROM baton_runs WHERE run_id = ${runId}`.pipe(
+      sql<{ parent_run_id: string | null }>`SELECT parent_run_id FROM tenetkit_runs WHERE run_id = ${runId}`.pipe(
         Effect.flatMap((rows) =>
           rows[0]?.parent_run_id === null || rows[0]?.parent_run_id === undefined
             ? Effect.void
@@ -136,7 +136,7 @@ export const makeMysqlServices = (
       )
     const clearClaim = (runId: string) =>
       sql`
-        UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL
+        UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL
         WHERE run_id = ${runId} AND status IN ('succeeded', 'failed', 'cancelled')
       `.pipe(Effect.asVoid)
     const fenced = <A, E>(
@@ -145,10 +145,10 @@ export const makeMysqlServices = (
     ) => run(lockRun(input.runId).pipe(Effect.andThen(requireExecutionClaim(input)), Effect.andThen(effect)))
     const lockNamed = <A, E>(key: string, effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.gen(function* () {
-        const held = yield* sql`SELECT lock_key FROM baton_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
+        const held = yield* sql`SELECT lock_key FROM tenetkit_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
         if (held.length === 0) {
-          yield* sql`INSERT IGNORE INTO baton_runtime_locks (lock_key) VALUES (${key})`
-          yield* sql`SELECT lock_key FROM baton_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
+          yield* sql`INSERT IGNORE INTO tenetkit_runtime_locks (lock_key) VALUES (${key})`
+          yield* sql`SELECT lock_key FROM tenetkit_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
         }
         return yield* effect
       })
@@ -162,7 +162,7 @@ export const makeMysqlServices = (
           catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
         })
         yield* sql`
-          UPDATE baton_runs SET
+          UPDATE tenetkit_runs SET
             driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
             suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
@@ -173,7 +173,7 @@ export const makeMysqlServices = (
           WHERE run_id = ${input.runId}
         `
         yield* sql`
-          INSERT INTO baton_run_waits (run_id, wait_id, reason, status, response_json, opened_at, closed_at)
+          INSERT INTO tenetkit_run_waits (run_id, wait_id, reason, status, response_json, opened_at, closed_at)
           VALUES (${loaded.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, ${opened}, NULL)
           ON DUPLICATE KEY UPDATE reason = VALUES(reason), status = 'open', response_json = NULL,
             opened_at = VALUES(opened_at), closed_at = NULL
@@ -199,7 +199,7 @@ export const makeMysqlServices = (
         const groupId = groupIdFromSuspension(input.suspension)
         if (groupId !== undefined) {
           const rows = yield* sql<{ parent_run_id: string; status: string }>`
-            SELECT parent_run_id, status FROM baton_fan_outs WHERE fan_out_id = ${groupId}
+            SELECT parent_run_id, status FROM tenetkit_fan_outs WHERE fan_out_id = ${groupId}
           `
           const group = rows[0]
           if (group?.parent_run_id === loaded.runId && group.status !== "running") {
@@ -214,7 +214,7 @@ export const makeMysqlServices = (
             }
             const closed = yield* nowIso
             yield* sql`
-              UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
+              UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
             `
             yield* appendEvent(
@@ -226,7 +226,7 @@ export const makeMysqlServices = (
           }
         }
         yield* sql`
-          UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}
+          UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}
         `
       })
     const saveExecution = (input: Parameters<RunStoreInterface["saveExecution"]>[0]) =>
@@ -239,7 +239,7 @@ export const makeMysqlServices = (
           catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
         })
         yield* sql`
-          UPDATE baton_runs SET
+          UPDATE tenetkit_runs SET
             driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
             suspension_json = COALESCE(${input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)}, suspension_json),

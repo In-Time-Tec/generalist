@@ -42,7 +42,7 @@ export const suspend: {
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
     })
     yield* sql`
-      UPDATE baton_runs SET
+      UPDATE tenetkit_runs SET
         driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
         suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
@@ -53,7 +53,7 @@ export const suspend: {
       WHERE run_id = ${input.runId}
     `
     yield* sql`
-      INSERT INTO baton_run_waits (
+      INSERT INTO tenetkit_run_waits (
         run_id, wait_id, reason, status, response_json, due_at, owner_worker_id, lease_expires_at, opened_at, closed_at
       ) VALUES (
         ${loaded.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, NULL, NULL, NULL, NOW(), NULL
@@ -81,7 +81,7 @@ export const suspend: {
     const groupId = groupIdFromSuspension(input.suspension)
     if (groupId !== undefined) {
       const rows = yield* sql<{ parent_run_id: string; status: string }>`
-        SELECT parent_run_id, status FROM baton_fan_outs WHERE fan_out_id = ${groupId}
+        SELECT parent_run_id, status FROM tenetkit_fan_outs WHERE fan_out_id = ${groupId}
       `
       const group = rows[0]
       if (group?.parent_run_id === loaded.runId && group.status !== "running") {
@@ -95,7 +95,7 @@ export const suspend: {
           ),
         }
         yield* sql`
-          UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
+          UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
           WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
         `
         yield* appendEvent(
@@ -106,6 +106,6 @@ export const suspend: {
         )
       }
     }
-    yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
+    yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
   }),
 )

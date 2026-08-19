@@ -12,12 +12,12 @@ const lockSession = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      INSERT INTO baton_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
+      INSERT INTO tenetkit_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
       VALUES (${sessionId}, NULL, 0, NULL, NOW())
       ON CONFLICT (session_id) DO NOTHING
     `
     const rows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM baton_sessions
+      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions
       WHERE session_id = ${sessionId}
       FOR UPDATE
     `
@@ -29,7 +29,7 @@ const loadEntries = (sessionId: string): Effect.Effect<ReadonlyArray<EntryRow>, 
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     return yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
       WHERE session_id = ${sessionId} ORDER BY seq
     `
   })
@@ -45,7 +45,7 @@ const insertEntry = (input: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      INSERT INTO baton_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
+      INSERT INTO tenetkit_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${input.sessionId}, ${input.id}, ${input.parentId}, ${input.seq}, ${input.tag},
         ${encodePayload(input.payload)}, NOW())
     `
@@ -61,12 +61,12 @@ const advanceSession = (input: {
     const sql = yield* SqlClient.SqlClient
     if (input.ownerToken === undefined) {
       yield* sql`
-        UPDATE baton_sessions SET leaf_id = ${input.leafId}, next_seq = ${input.nextSeq}, updated_at = NOW()
+        UPDATE tenetkit_sessions SET leaf_id = ${input.leafId}, next_seq = ${input.nextSeq}, updated_at = NOW()
         WHERE session_id = ${input.sessionId}
       `
     } else {
       yield* sql`
-        UPDATE baton_sessions SET leaf_id = ${input.leafId}, next_seq = ${input.nextSeq},
+        UPDATE tenetkit_sessions SET leaf_id = ${input.leafId}, next_seq = ${input.nextSeq},
           owner_token = ${input.ownerToken}, updated_at = NOW()
         WHERE session_id = ${input.sessionId}
       `

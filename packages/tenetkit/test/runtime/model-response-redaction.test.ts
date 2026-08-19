@@ -20,20 +20,20 @@ const scopedWith =
   <B, E2, R extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
-it("repairs v0.26 redacted HTTP headers without changing unrelated empty objects", () => {
+it("restores redacted HTTP headers without changing unrelated empty objects", () => {
   const encoded = encodeSessionPayload({
     _tag: "ModelResponse",
     content: [
       Response.makePart("response-metadata", {
-        id: "legacy-response",
-        modelId: "legacy-model",
+        id: "redacted-response",
+        modelId: "redacted-model",
         timestamp: undefined,
         request: {
           method: "POST",
           url: "https://provider.invalid/model",
           urlParams: [],
           hash: undefined,
-          headers: { authorization: Redacted.make("Bearer legacy-canary"), "x-safe": "safe" },
+          headers: { authorization: Redacted.make("Bearer redaction-canary"), "x-safe": "safe" },
         },
         metadata: { provider: { authoredEmpty: {} } },
       }),
@@ -42,13 +42,13 @@ it("repairs v0.26 redacted HTTP headers without changing unrelated empty objects
         usage,
         response: {
           status: 200,
-          headers: { "set-cookie": Redacted.make("session=legacy-canary"), "x-safe": "safe" },
+          headers: { "set-cookie": Redacted.make("session=redaction-canary"), "x-safe": "safe" },
         },
       }),
     ],
   } as Session.EntryPayload)
 
-  expect(encoded).not.toContain("legacy-canary")
+  expect(encoded).not.toContain("redaction-canary")
   expect(encoded).toContain('"authorization":{}')
   const decoded = decodeSessionPayload(encoded)
   if (decoded._tag !== "ModelResponse") throw new Error("expected ModelResponse")
@@ -247,16 +247,19 @@ it.effect("reopens and hydrates a model response without persisting provider tra
 
     const database = new Database(filename, { readonly: true })
     const payloads = database
-      .query<{ payload_json: string }, []>("SELECT payload_json FROM baton_session_entries WHERE tag = 'ModelResponse'")
+      .query<
+        { payload_json: string },
+        []
+      >("SELECT payload_json FROM tenetkit_session_entries WHERE tag = 'ModelResponse'")
       .all()
     const modelOperations = database
-      .query<{ result_json: string | null }, []>("SELECT result_json FROM baton_run_operations WHERE kind = 'model'")
+      .query<{ result_json: string | null }, []>("SELECT result_json FROM tenetkit_run_operations WHERE kind = 'model'")
       .all()
     const committedEvents = database
       .query<
         { event_json: string },
         []
-      >("SELECT event_json FROM baton_run_events WHERE event_json LIKE '%ModelResponseCommitted%'")
+      >("SELECT event_json FROM tenetkit_run_events WHERE event_json LIKE '%ModelResponseCommitted%'")
       .all()
     database.close()
     expect(payloads).toHaveLength(1)

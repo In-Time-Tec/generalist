@@ -50,7 +50,7 @@ export type EventPartial = { readonly _tag: string } & Record<string, unknown>
 export const loadRun = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${runId}`
+    const rows = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE run_id = ${runId}`
     const row = rows[0]
     return row === undefined ? undefined : yield* decodeRunEffect(row)
   })
@@ -68,7 +68,7 @@ export const emitAgentEvent: {
 } = Function.dual(2, (hub: EventHub, input: ExecutionClaim & { readonly event: EmittableAgentLoopEvent }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
+    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${input.runId} FOR UPDATE`
     const loaded = yield* loadRun(input.runId)
     if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
     if (loaded.ownerWorkerId !== input.ownerId || loaded.attemptFence !== input.attemptFence) {
@@ -81,7 +81,7 @@ export const emitAgentEvent: {
     if (isTerminal(loaded.status)) return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
     yield* appendEvent(hub, loaded, input.event as EventPartial)
     if (input.event._tag === "TurnCompleted") {
-      yield* sql`UPDATE baton_runs SET continuation_json = NULL WHERE run_id = ${loaded.runId}`
+      yield* sql`UPDATE tenetkit_runs SET continuation_json = NULL WHERE run_id = ${loaded.runId}`
     }
   }),
 )
@@ -95,7 +95,7 @@ export const loadEventsAfter: {
     const run = yield* loadRun(runId)
     if (run === undefined) return []
     const rows = yield* sql<EventRow>`
-      SELECT * FROM baton_run_events
+      SELECT * FROM tenetkit_run_events
       WHERE run_id = ${runId} AND sequence > ${cursor}
       ORDER BY sequence ASC
     `
@@ -107,7 +107,7 @@ export const allocateSequence = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<{ last_sequence: number }>`
-      UPDATE baton_runs
+      UPDATE tenetkit_runs
       SET last_sequence = last_sequence + 1, updated_at = NOW()
       WHERE run_id = ${runId}
       RETURNING last_sequence
@@ -148,15 +148,15 @@ export const appendEvent: {
         ...partial,
       } as RunEvent
       yield* sql`
-      INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
+      INSERT INTO tenetkit_run_events (run_id, sequence, event_id, event_json)
       VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)})
     `
       const treeRoot = (yield* sql<{ last_position: number }>`
-      UPDATE baton_tree_roots SET last_position = last_position + 1
+      UPDATE tenetkit_tree_roots SET last_position = last_position + 1
       WHERE root_run_id = ${run.rootRunId} RETURNING last_position
     `)[0]!
       yield* sql`
-      INSERT INTO baton_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
+      INSERT INTO tenetkit_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
       VALUES (${run.rootRunId}, ${Number(treeRoot.last_position)}, ${run.runId}, ${sequence}, ${event.eventId})
     `
       const status = nextStatus ?? run.status
@@ -180,7 +180,7 @@ export const appendEvent: {
         event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
       if (terminalPartial) {
         yield* sql`
-        UPDATE baton_runs SET
+        UPDATE tenetkit_runs SET
           status = ${status},
           active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
@@ -198,7 +198,7 @@ export const appendEvent: {
       `
       } else {
         yield* sql`
-        UPDATE baton_runs SET
+        UPDATE tenetkit_runs SET
           status = ${status},
           active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
@@ -221,7 +221,7 @@ export const promoteHead: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ head_run_id: string | null; queue_json: string }>`
-      SELECT head_run_id, queue_json FROM baton_lanes
+      SELECT head_run_id, queue_json FROM tenetkit_lanes
       WHERE address = ${address} AND session_id = ${sessionId}
       FOR UPDATE
     `
@@ -232,7 +232,7 @@ export const promoteHead: {
     if (headId === undefined) return
     if (lane.head_run_id !== headId) {
       yield* sql`
-        UPDATE baton_lanes SET head_run_id = ${headId}
+        UPDATE tenetkit_lanes SET head_run_id = ${headId}
         WHERE address = ${address} AND session_id = ${sessionId}
       `
     }
@@ -248,7 +248,7 @@ export const removeFromLane: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ queue_json: string }>`
-      SELECT queue_json FROM baton_lanes
+      SELECT queue_json FROM tenetkit_lanes
       WHERE address = ${address} AND session_id = ${sessionId}
       FOR UPDATE
     `
@@ -256,10 +256,10 @@ export const removeFromLane: {
     if (lane === undefined) return
     const queue = decodeQueue(lane.queue_json).filter((id) => id !== runId)
     if (queue.length === 0) {
-      yield* sql`DELETE FROM baton_lanes WHERE address = ${address} AND session_id = ${sessionId}`
+      yield* sql`DELETE FROM tenetkit_lanes WHERE address = ${address} AND session_id = ${sessionId}`
     } else {
       yield* sql`
-        UPDATE baton_lanes
+        UPDATE tenetkit_lanes
         SET queue_json = ${encodeQueue(queue)}, head_run_id = ${queue[0]!}
         WHERE address = ${address} AND session_id = ${sessionId}
       `
@@ -286,11 +286,11 @@ export const completeRun: {
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     if (run.cancellationRequested) {
       const runningFanOut = yield* sql<{ fan_out_id: string }>`
-        SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
+        SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
       `
       if (runningFanOut.length > 0 || (yield* hasUnsettledChild(run.runId))) {
         yield* sql`
-          UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${run.runId}
+          UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${run.runId}
         `
         return
       }
@@ -306,11 +306,11 @@ export const completeRun: {
       return
     }
     const runningFanOut = yield* sql<{ fan_out_id: string }>`
-      SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
+      SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
     `
     if (runningFanOut.length > 0) {
       yield* sql`
-        UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
+        UPDATE tenetkit_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
           suspension_json = NULL,
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result })}
         WHERE run_id = ${run.runId}
@@ -331,16 +331,16 @@ export const settleParent: {
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return
     const sql = yield* SqlClient.SqlClient
-    yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${child.parentRunId} FOR UPDATE`
+    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${child.parentRunId} FOR UPDATE`
     const parent = yield* loadRun(child.parentRunId)
     if (parent === undefined) return
     const existing = yield* sql<{ child_run_id: string }>`
-      SELECT child_run_id FROM baton_run_links
+      SELECT child_run_id FROM tenetkit_run_links
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId} AND terminal_event_id IS NOT NULL
     `
     if (existing.length > 0) return
     yield* sql`
-      UPDATE baton_run_links
+      UPDATE tenetkit_run_links
       SET readiness = 'settled', terminal_event_id = ${terminalEventId}, settled_at = NOW()
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId}
     `
@@ -366,22 +366,22 @@ export const settleParent: {
     }
     if (currentParent?.status === "queued") {
       const unsettled = yield* sql<{ child_run_id: string }>`
-        SELECT l.child_run_id FROM baton_run_links l
-        JOIN baton_runs r ON r.run_id = l.child_run_id
+        SELECT l.child_run_id FROM tenetkit_run_links l
+        JOIN tenetkit_runs r ON r.run_id = l.child_run_id
         WHERE l.parent_run_id = ${parent.runId}
           AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
         LIMIT 1
       `
       if (unsettled.length === 0) {
         const attempt = currentParent.attempt + 1
-        yield* sql`UPDATE baton_runs SET attempt_fence = ${attempt} WHERE run_id = ${parent.runId}`
+        yield* sql`UPDATE tenetkit_runs SET attempt_fence = ${attempt} WHERE run_id = ${parent.runId}`
         yield* appendEvent(hub, { ...currentParent, attempt }, { _tag: "RunAttemptStarted", attempt }, "running")
       }
       return
     }
     if (currentParent?.status !== "cancelling" || currentParent.ownerWorkerId !== undefined) return
     const running = yield* sql<{ fan_out_id: string }>`
-      SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
+      SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
     `
     if (running.length > 0) return
     if (yield* hasUnsettledChild(parent.runId)) return
@@ -418,7 +418,7 @@ export const insertRun = (input: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      INSERT INTO baton_runs (
+      INSERT INTO tenetkit_runs (
         run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
         executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
         last_sequence, cancellation_requested, cancel_reason, terminal_event_id, accepted_sequence,
@@ -433,7 +433,7 @@ export const insertRun = (input: {
       )
     `
     if (input.runId === input.rootRunId) {
-      yield* sql`INSERT INTO baton_tree_roots (root_run_id) VALUES (${input.runId})`
+      yield* sql`INSERT INTO tenetkit_tree_roots (root_run_id) VALUES (${input.runId})`
     }
   })
 
@@ -444,14 +444,14 @@ export const enqueueLane: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ accepted_sequence: string | number; queue_json: string; head_run_id: string | null }>`
-      SELECT accepted_sequence, queue_json, head_run_id FROM baton_lanes
+      SELECT accepted_sequence, queue_json, head_run_id FROM tenetkit_lanes
       WHERE address = ${address} AND session_id = ${sessionId}
       FOR UPDATE
     `
     const lane = lanes[0]
     if (lane === undefined) {
       yield* sql`
-        INSERT INTO baton_lanes (address, session_id, accepted_sequence, queue_json, head_run_id)
+        INSERT INTO tenetkit_lanes (address, session_id, accepted_sequence, queue_json, head_run_id)
         VALUES (${address}, ${sessionId}, 0, ${encodeQueue([runId])}, ${runId})
       `
       return { acceptedSequence: 0, isHead: true }
@@ -460,7 +460,7 @@ export const enqueueLane: {
     const queue = [...decodeQueue(lane.queue_json), runId]
     const head = lane.head_run_id ?? queue[0]!
     yield* sql`
-      UPDATE baton_lanes
+      UPDATE tenetkit_lanes
       SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)}, head_run_id = ${head}
       WHERE address = ${address} AND session_id = ${sessionId}
     `

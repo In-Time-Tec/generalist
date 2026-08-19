@@ -59,6 +59,7 @@ if (typeof globalThis.IntersectionObserver === "undefined") {
 }
 
 const settle = TestClock.adjust("80 millis")
+const retiredBrand = ["Bat", "on"].join("")
 
 const bootAt = (path: string): void => {
   document.body.innerHTML = '<div id="root"></div>'
@@ -99,18 +100,17 @@ it.effect("landing h1 is exactly TenetKit", () =>
   }),
 )
 
-it.effect("no rendered string says Baton", () =>
+it.effect("no rendered string says the retired brand", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
-    expect(document.body.textContent).not.toContain("Baton")
-    expect(document.body.textContent).not.toContain("Baton Docs")
+    expect(document.body.textContent).not.toContain(retiredBrand)
   }),
 )
 
 test("index.html declares the brand shell", () => {
   expect(indexHtml).toContain("<title>TenetKit</title>")
-  expect(indexHtml).not.toContain("Baton")
+  expect(indexHtml).not.toContain(retiredBrand)
   expect(indexHtml).toContain('href="/favicon.svg"')
   expect(indexHtml.indexOf("theme-init.js")).toBeGreaterThan(-1)
   expect(indexHtml.indexOf("theme-init.js")).toBeLessThan(indexHtml.indexOf("styles.css"))
@@ -183,7 +183,7 @@ const assertPagesRender = Effect.fn("DocsSmokeTest.assertPagesRender")(function*
   bootAt(page.path)
   yield* settle
   expect(document.body.textContent).toContain(page.title)
-  expect(document.body.textContent).not.toContain("Baton")
+  expect(document.body.textContent).not.toContain(retiredBrand)
   for (const entry of page.toc) expect(document.getElementById(entry.id), `${page.path}#${entry.id}`).not.toBeNull()
   yield* assertPagesRender(rest)
 })
@@ -205,7 +205,7 @@ it.effect(
 
 test("search finds pages by body text with title matches first", () => {
   if (allPages.length === 0) return
-  expect(searchDocs("baton").length).toBeGreaterThan(0)
+  expect(searchDocs("Runtime").length).toBeGreaterThan(0)
   expect(searchDocs("TurnPolicy").length).toBeGreaterThan(0)
 })
 

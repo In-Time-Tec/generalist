@@ -123,7 +123,7 @@ const setLastSequence = (runId: string, sequence: number) =>
   scopedWith(database.client)(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* sql`UPDATE baton_runs SET last_sequence = ${sequence} WHERE run_id = ${runId}`
+      yield* sql`UPDATE tenetkit_runs SET last_sequence = ${sequence} WHERE run_id = ${runId}`
     }),
   )
 
@@ -210,17 +210,17 @@ describeMysql("mysql Session authority", () => {
       yield* scopedWith(database.client)(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`DELETE FROM baton_tree_event_index WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM baton_run_events WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM baton_run_registrations WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM baton_tree_roots WHERE root_run_id = ${runId}`
-          yield* sql`DELETE FROM baton_runs WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_tree_event_index WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_run_events WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_run_registrations WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_tree_roots WHERE root_run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_runs WHERE run_id = ${runId}`
           const foreignKeys = yield* sql<{ count: string }>`
             SELECT COUNT(*) AS count
             FROM information_schema.referential_constraints
             WHERE constraint_schema = DATABASE()
-              AND table_name IN ('baton_sessions', 'baton_session_entries')
-              AND referenced_table_name = 'baton_runs'
+              AND table_name IN ('tenetkit_sessions', 'tenetkit_session_entries')
+              AND referenced_table_name = 'tenetkit_runs'
           `
           expect(Number(foreignKeys[0]!.count)).toBe(0)
         }),

@@ -52,7 +52,7 @@ export const programStoreMethods = (input: {
     effect: Effect.Effect<A, E, SqlR>,
   ) =>
     input.run(
-      input.sql`SELECT run_id FROM baton_runs WHERE run_id = ${claim.runId} FOR UPDATE`.pipe(
+      input.sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${claim.runId} FOR UPDATE`.pipe(
         Effect.andThen(requireExecutionClaim(claim)),
         Effect.andThen(effect),
       ),

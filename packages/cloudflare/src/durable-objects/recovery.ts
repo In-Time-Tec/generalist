@@ -27,7 +27,7 @@ export const makeExclusiveExecutionRecovery: {
             const sql = yield* SqlClient.SqlClient
             const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 100)))
             const rows = yield* sql<ClaimedRow>`
-          SELECT run_id, status, owner_worker_id, attempt_fence FROM baton_runs
+          SELECT run_id, status, owner_worker_id, attempt_fence FROM tenetkit_runs
           WHERE owner_worker_id IS NOT NULL AND owner_worker_id <> ${input.newOwnerId}
             AND status IN ('running', 'cancelling')
             AND run_id > ${input.afterRunId ?? ""}
@@ -45,12 +45,12 @@ export const makeExclusiveExecutionRecovery: {
                   error: AgentExecutionFailure.make({ message: "exclusive host incarnation replaced" }),
                 })
               }
-              yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, attempt_fence = attempt_fence + 1
+              yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL, attempt_fence = attempt_fence + 1
             WHERE run_id = ${row.run_id} AND attempt_fence = ${row.attempt_fence}`
             }
             if (selected.length > 0) {
               const final = yield* sql<{ run_id: string; status: string; attempt_fence: number }>`
-            SELECT run_id, status, attempt_fence FROM baton_runs
+            SELECT run_id, status, attempt_fence FROM tenetkit_runs
             WHERE run_id IN ${sql.in(selected.map((row) => row.run_id))}`
               const finalState = new Map(final.map((row) => [row.run_id, row] as const))
               yield* projection.applyInTransaction(

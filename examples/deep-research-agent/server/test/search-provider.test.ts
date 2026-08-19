@@ -62,7 +62,7 @@ describe("SearchProvider", () => {
     (it) => {
       it.effect("sends Exa search requests with the expected endpoint, header, body, and Schema decode", () =>
         Effect.gen(function* () {
-          const results = yield* search("baton transport")
+          const results = yield* search("tenetkit transport")
 
           expect(results).toEqual([
             { title: "TenetKit transport", url: "https://tenetkit.test/transport", snippet: "Exa text result" },
@@ -80,7 +80,7 @@ describe("SearchProvider", () => {
               apiKey: "exa-test",
               accept: "application/json",
               body: {
-                query: "baton transport",
+                query: "tenetkit transport",
                 numResults: 5,
                 contents: { text: { maxCharacters: 1000 } },
               },
@@ -114,9 +114,9 @@ describe("SearchProvider", () => {
   )("falls back to the canned corpus on Exa failure", (it) => {
     it.effect("falls back to the canned corpus on Exa failure", () =>
       Effect.gen(function* () {
-        const results = yield* search("baton agent framework")
+        const results = yield* search("tenetkit agent framework")
 
-        expect(results).toEqual(cannedResultsFor("baton agent framework"))
+        expect(results).toEqual(cannedResultsFor("tenetkit agent framework"))
       }),
     )
   })

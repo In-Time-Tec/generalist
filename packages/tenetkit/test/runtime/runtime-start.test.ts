@@ -444,7 +444,7 @@ standalone.effect("reloads SQLite registrations without address binding and clos
 
     const database = new Database(filename)
     const rows = database
-      .query<{ payload_json: string }, []>("SELECT payload_json FROM baton_executable_registrations")
+      .query<{ payload_json: string }, []>("SELECT payload_json FROM tenetkit_executable_registrations")
       .all()
     database.close()
     expect(rows.map((row) => row.payload_json).join("\n")).toContain("credential:test")

@@ -23,7 +23,7 @@ export const fanOutStoreMethods = (input: {
   admitFanOut: (fanOut) =>
     input
       .run(
-        input.sql`SELECT run_id FROM baton_runs WHERE run_id = ${fanOut.parentRunId} FOR UPDATE`.pipe(
+        input.sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${fanOut.parentRunId} FOR UPDATE`.pipe(
           Effect.andThen(
             input.sql`SELECT pg_advisory_xact_lock(hashtext(${`fanout:${fanOut.parentRunId}:${fanOut.idempotencyKey}`}))`,
           ),
@@ -50,8 +50,8 @@ export const cancelOwnedFanOuts: {
 } = Function.dual(2, (sql: SqlClient.SqlClient, parentRunId: string) =>
   Effect.gen(function* () {
     const owned = yield* sql<{ child_run_id: string }>`
-      SELECT m.child_run_id FROM baton_fan_outs f
-      JOIN baton_fan_out_members m ON m.fan_out_id = f.fan_out_id
+      SELECT m.child_run_id FROM tenetkit_fan_outs f
+      JOIN tenetkit_fan_out_members m ON m.fan_out_id = f.fan_out_id
       WHERE f.parent_run_id = ${parentRunId} AND f.status = 'running' ORDER BY m.ordinal ASC
     `
     return owned.map((row) => row.child_run_id)

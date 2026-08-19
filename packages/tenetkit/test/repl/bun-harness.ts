@@ -119,7 +119,7 @@ export const withPool = <A, E, R>(
 ): Effect.Effect<A, E | PlatformError.PlatformError, Exclude<R, Scope.Scope> | BunServices | Path.Path> =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem
-    const dataRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "baton-kernel-" })
+    const dataRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-kernel-" })
     const overrides = request.overrides
     const profile = profileFor({ root: overrides?.workspaceRoot ?? workspaceRoot, dataRoot, overrides })
     const store = yield* BunKernelStateStore.make({ dataRoot })

@@ -103,12 +103,15 @@ it.live("retries an ambiguously committed stable Session append across SQLite re
     const database = new Database(filename)
     expect(
       database
-        .query<{ count: number }, [string]>("SELECT COUNT(*) AS count FROM baton_session_entries WHERE session_id = ?")
+        .query<
+          { count: number },
+          [string]
+        >("SELECT COUNT(*) AS count FROM tenetkit_session_entries WHERE session_id = ?")
         .get(sessionId),
     ).toEqual({ count: 1 })
     expect(
       database
-        .query<{ next_seq: number }, [string]>("SELECT next_seq FROM baton_sessions WHERE session_id = ?")
+        .query<{ next_seq: number }, [string]>("SELECT next_seq FROM tenetkit_sessions WHERE session_id = ?")
         .get(sessionId),
     ).toEqual({ next_seq: 1 })
     database.close()

@@ -1,34 +1,34 @@
-export const SCHEMA_VERSION = 8
-export const V7_SCHEMA_CHECKSUM = "6cfa29360d837cbfb4fecedc03fae46ebc0ea0dab4980c424941c56022f2b5b1"
-export const SCHEMA_META_TABLE = "baton_schema_meta"
-export const MIGRATIONS_TABLE = "baton_sql_migrations"
-export const MIGRATION_LOCK = "baton_runtime_schema"
+export const SCHEMA_VERSION = 1
+export const MIGRATION_NAME = "tenetkit_runtime"
+export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
+export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
+export const MIGRATION_LOCK = "tenetkit_runtime_schema"
 
-export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
-  `CREATE TABLE IF NOT EXISTS baton_schema_meta (
+export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
+  `CREATE TABLE IF NOT EXISTS tenetkit_schema_meta (
   id INT PRIMARY KEY,
   version INT NOT NULL,
   checksum VARCHAR(64) NOT NULL,
   dirty TINYINT(1) NOT NULL DEFAULT 0,
   applied_at VARCHAR(30) NOT NULL,
-  CONSTRAINT baton_schema_meta_singleton CHECK (id = 1)
+  CONSTRAINT tenetkit_schema_meta_singleton CHECK (id = 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_sql_migrations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_sql_migrations (
   migration_id INT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   applied_at VARCHAR(30) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_runtime_locks (
+  `CREATE TABLE IF NOT EXISTS tenetkit_runtime_locks (
   lock_key VARCHAR(512) PRIMARY KEY
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_lanes (
+  `CREATE TABLE IF NOT EXISTS tenetkit_lanes (
   address VARCHAR(255) NOT NULL,
   session_id VARCHAR(255) NOT NULL,
   accepted_sequence BIGINT NOT NULL,
   queue_json LONGTEXT NOT NULL,
   PRIMARY KEY (address, session_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_runs (
+  `CREATE TABLE IF NOT EXISTS tenetkit_runs (
   run_id VARCHAR(255) PRIMARY KEY,
   status VARCHAR(32) NOT NULL,
   address VARCHAR(255) NOT NULL,
@@ -62,19 +62,19 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   lease_expires_at VARCHAR(30),
   created_at VARCHAR(30) NOT NULL,
   updated_at VARCHAR(30) NOT NULL,
-  UNIQUE KEY baton_runs_idempotency_key (address, session_id, idempotency_key),
-  KEY baton_runs_claim_idx (status, lease_expires_at, accepted_sequence)
+  UNIQUE KEY tenetkit_runs_idempotency_key (address, session_id, idempotency_key),
+  KEY tenetkit_runs_claim_idx (status, lease_expires_at, accepted_sequence)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_run_events (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_events (
   run_id VARCHAR(255) NOT NULL,
   sequence INT NOT NULL,
   event_id VARCHAR(255) NOT NULL,
   event_json LONGTEXT NOT NULL,
   PRIMARY KEY (run_id, sequence),
-  UNIQUE KEY baton_run_events_event_id_key (event_id),
-  CONSTRAINT baton_run_events_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  UNIQUE KEY tenetkit_run_events_event_id_key (event_id),
+  CONSTRAINT tenetkit_run_events_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_run_operations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_operations (
   run_id VARCHAR(255) NOT NULL,
   operation_id VARCHAR(255) NOT NULL,
   operation_key VARCHAR(255) NOT NULL,
@@ -93,11 +93,11 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   resolution_idempotency_key VARCHAR(255),
   resolution_json LONGTEXT,
   PRIMARY KEY (run_id, operation_id),
-  UNIQUE KEY baton_run_operations_key (run_id, operation_key),
-  KEY baton_run_operations_status_idx (status),
-  CONSTRAINT baton_run_operations_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  UNIQUE KEY tenetkit_run_operations_key (run_id, operation_key),
+  KEY tenetkit_run_operations_status_idx (status),
+  CONSTRAINT tenetkit_run_operations_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_run_waits (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_waits (
   run_id VARCHAR(255) NOT NULL,
   wait_id VARCHAR(255) NOT NULL,
   reason TEXT NOT NULL,
@@ -109,10 +109,10 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   opened_at VARCHAR(30) NOT NULL,
   closed_at VARCHAR(30),
   PRIMARY KEY (run_id, wait_id),
-  KEY baton_run_waits_due_idx (status, due_at),
-  CONSTRAINT baton_run_waits_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  KEY tenetkit_run_waits_due_idx (status, due_at),
+  CONSTRAINT tenetkit_run_waits_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_run_links (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_links (
   parent_run_id VARCHAR(255) NOT NULL,
   child_run_id VARCHAR(255) NOT NULL,
   invocation_id VARCHAR(255) NOT NULL,
@@ -121,12 +121,12 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   created_at VARCHAR(30) NOT NULL,
   settled_at VARCHAR(30),
   PRIMARY KEY (parent_run_id, child_run_id),
-  UNIQUE KEY baton_run_links_child_key (child_run_id),
-  KEY baton_run_links_readiness_idx (parent_run_id, readiness, created_at, child_run_id),
-  CONSTRAINT baton_run_links_parent_fk FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
-  CONSTRAINT baton_run_links_child_fk FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
+  UNIQUE KEY tenetkit_run_links_child_key (child_run_id),
+  KEY tenetkit_run_links_readiness_idx (parent_run_id, readiness, created_at, child_run_id),
+  CONSTRAINT tenetkit_run_links_parent_fk FOREIGN KEY (parent_run_id) REFERENCES tenetkit_runs(run_id),
+  CONSTRAINT tenetkit_run_links_child_fk FOREIGN KEY (child_run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_run_steering (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_steering (
   entry_id VARCHAR(255) PRIMARY KEY,
   run_id VARCHAR(255) NOT NULL,
   sequence BIGINT NOT NULL,
@@ -135,20 +135,20 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   prompt_json LONGTEXT NOT NULL,
   consumed_operation_id VARCHAR(255),
   discarded_reason VARCHAR(32),
-  UNIQUE KEY baton_run_steering_sequence_key (run_id, sequence),
-  UNIQUE KEY baton_run_steering_idempotency_key (run_id, idempotency_key),
-  KEY baton_run_steering_pending_idx (run_id, consumed_operation_id, discarded_reason, sequence),
-  CONSTRAINT baton_run_steering_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  UNIQUE KEY tenetkit_run_steering_sequence_key (run_id, sequence),
+  UNIQUE KEY tenetkit_run_steering_idempotency_key (run_id, idempotency_key),
+  KEY tenetkit_run_steering_pending_idx (run_id, consumed_operation_id, discarded_reason, sequence),
+  CONSTRAINT tenetkit_run_steering_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_agent_names (
+  `CREATE TABLE IF NOT EXISTS tenetkit_agent_names (
   scope VARCHAR(255) NOT NULL,
   name VARCHAR(64) NOT NULL,
   run_id VARCHAR(255) NOT NULL,
   PRIMARY KEY (scope, name),
-  KEY baton_agent_names_run_idx (run_id),
-  CONSTRAINT baton_agent_names_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  KEY tenetkit_agent_names_run_idx (run_id),
+  CONSTRAINT tenetkit_agent_names_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_messages (
+  `CREATE TABLE IF NOT EXISTS tenetkit_messages (
   entry_id VARCHAR(255) PRIMARY KEY,
   target_session_id VARCHAR(255) NOT NULL,
   sequence BIGINT NOT NULL,
@@ -167,11 +167,11 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   metadata_json LONGTEXT NOT NULL,
   delivered_run_id VARCHAR(255),
   steering_entry_id VARCHAR(255),
-  UNIQUE KEY baton_messages_identity_key (target_session_id, message_id, idempotency_key),
-  UNIQUE KEY baton_messages_sequence_key (target_session_id, sequence),
-  KEY baton_messages_pending_idx (target_session_id, delivered_run_id, sequence)
+  UNIQUE KEY tenetkit_messages_identity_key (target_session_id, message_id, idempotency_key),
+  UNIQUE KEY tenetkit_messages_sequence_key (target_session_id, sequence),
+  KEY tenetkit_messages_pending_idx (target_session_id, delivered_run_id, sequence)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_fan_outs (
+  `CREATE TABLE IF NOT EXISTS tenetkit_fan_outs (
   fan_out_id VARCHAR(255) PRIMARY KEY,
   parent_run_id VARCHAR(255) NOT NULL,
   idempotency_key VARCHAR(255) NOT NULL,
@@ -182,10 +182,10 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   status VARCHAR(32) NOT NULL,
   created_at VARCHAR(30) NOT NULL,
   updated_at VARCHAR(30) NOT NULL,
-  UNIQUE KEY baton_fan_out_idempotency_key (parent_run_id, idempotency_key),
-  CONSTRAINT baton_fan_out_parent_fk FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id)
+  UNIQUE KEY tenetkit_fan_out_idempotency_key (parent_run_id, idempotency_key),
+  CONSTRAINT tenetkit_fan_out_parent_fk FOREIGN KEY (parent_run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_fan_out_members (
+  `CREATE TABLE IF NOT EXISTS tenetkit_fan_out_members (
   fan_out_id VARCHAR(255) NOT NULL,
   ordinal INT NOT NULL,
   member_key VARCHAR(255) NOT NULL,
@@ -199,32 +199,32 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   terminal_event_id VARCHAR(255),
   outcome_json LONGTEXT,
   PRIMARY KEY (fan_out_id, ordinal),
-  UNIQUE KEY baton_fan_out_member_key (fan_out_id, member_key),
-  UNIQUE KEY baton_fan_out_child_key (child_run_id),
-  KEY baton_fan_out_members_status_idx (fan_out_id, status, ordinal),
-  CONSTRAINT baton_fan_out_member_fan_out_fk FOREIGN KEY (fan_out_id) REFERENCES baton_fan_outs(fan_out_id),
-  CONSTRAINT baton_fan_out_member_child_fk FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
+  UNIQUE KEY tenetkit_fan_out_member_key (fan_out_id, member_key),
+  UNIQUE KEY tenetkit_fan_out_child_key (child_run_id),
+  KEY tenetkit_fan_out_members_status_idx (fan_out_id, status, ordinal),
+  CONSTRAINT tenetkit_fan_out_member_fan_out_fk FOREIGN KEY (fan_out_id) REFERENCES tenetkit_fan_outs(fan_out_id),
+  CONSTRAINT tenetkit_fan_out_member_child_fk FOREIGN KEY (child_run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_tree_roots (
+  `CREATE TABLE IF NOT EXISTS tenetkit_tree_roots (
   root_run_id VARCHAR(255) PRIMARY KEY,
   earliest_position BIGINT NOT NULL DEFAULT 0,
   last_position BIGINT NOT NULL DEFAULT -1,
-  CONSTRAINT baton_tree_roots_run_fk FOREIGN KEY (root_run_id) REFERENCES baton_runs(run_id)
+  CONSTRAINT tenetkit_tree_roots_run_fk FOREIGN KEY (root_run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_tree_event_index (
+  `CREATE TABLE IF NOT EXISTS tenetkit_tree_event_index (
   root_run_id VARCHAR(255) NOT NULL,
   position BIGINT NOT NULL,
   run_id VARCHAR(255) NOT NULL,
   run_sequence INT NOT NULL,
   event_id VARCHAR(255) NOT NULL,
   PRIMARY KEY (root_run_id, position),
-  UNIQUE KEY baton_tree_event_id_key (event_id),
-  UNIQUE KEY baton_tree_run_sequence_key (run_id, run_sequence),
-  CONSTRAINT baton_tree_index_root_fk FOREIGN KEY (root_run_id) REFERENCES baton_tree_roots(root_run_id),
-  CONSTRAINT baton_tree_index_event_fk FOREIGN KEY (event_id) REFERENCES baton_run_events(event_id),
-  CONSTRAINT baton_tree_index_run_event_fk FOREIGN KEY (run_id, run_sequence) REFERENCES baton_run_events(run_id, sequence)
+  UNIQUE KEY tenetkit_tree_event_id_key (event_id),
+  UNIQUE KEY tenetkit_tree_run_sequence_key (run_id, run_sequence),
+  CONSTRAINT tenetkit_tree_index_root_fk FOREIGN KEY (root_run_id) REFERENCES tenetkit_tree_roots(root_run_id),
+  CONSTRAINT tenetkit_tree_index_event_fk FOREIGN KEY (event_id) REFERENCES tenetkit_run_events(event_id),
+  CONSTRAINT tenetkit_tree_index_run_event_fk FOREIGN KEY (run_id, run_sequence) REFERENCES tenetkit_run_events(run_id, sequence)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_program_runs (
+  `CREATE TABLE IF NOT EXISTS tenetkit_program_runs (
   run_id VARCHAR(255) PRIMARY KEY,
   program_pin VARCHAR(255) NOT NULL,
   budget_json LONGTEXT NOT NULL,
@@ -234,9 +234,9 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   tokens BIGINT NOT NULL DEFAULT 0,
   log_bytes BIGINT NOT NULL DEFAULT 0,
   active_slots BIGINT NOT NULL DEFAULT 0,
-  CONSTRAINT baton_program_runs_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+  CONSTRAINT tenetkit_program_runs_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_program_operations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_program_operations (
   run_id VARCHAR(255) NOT NULL,
   operation_name VARCHAR(255) NOT NULL,
   kind VARCHAR(32) NOT NULL,
@@ -253,31 +253,31 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   resolution_idempotency_key VARCHAR(255),
   resolution_json LONGTEXT,
   PRIMARY KEY (run_id, operation_name),
-  CONSTRAINT baton_program_operations_run_fk FOREIGN KEY (run_id) REFERENCES baton_program_runs(run_id)
+  CONSTRAINT tenetkit_program_operations_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_program_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_executable_registrations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_executable_registrations (
   pin VARCHAR(255) PRIMARY KEY,
   codec VARCHAR(255) NOT NULL,
   version VARCHAR(255) NOT NULL,
   payload_json LONGTEXT NOT NULL,
   registration_digest VARCHAR(128) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_run_registrations (
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_registrations (
   run_id VARCHAR(255) NOT NULL,
   pin VARCHAR(255) NOT NULL,
   PRIMARY KEY (run_id, pin),
-  CONSTRAINT baton_run_registrations_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id),
-  CONSTRAINT baton_run_registrations_pin_fk FOREIGN KEY (pin) REFERENCES baton_executable_registrations(pin)
+  CONSTRAINT tenetkit_run_registrations_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id),
+  CONSTRAINT tenetkit_run_registrations_pin_fk FOREIGN KEY (pin) REFERENCES tenetkit_executable_registrations(pin)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE INDEX baton_run_registrations_pin_idx ON baton_run_registrations(pin)`,
-  `CREATE TABLE IF NOT EXISTS baton_sessions (
+  `CREATE INDEX tenetkit_run_registrations_pin_idx ON tenetkit_run_registrations(pin)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_sessions (
   session_id VARCHAR(255) PRIMARY KEY,
   leaf_id VARCHAR(255),
   next_seq BIGINT NOT NULL DEFAULT 0,
   owner_token VARCHAR(255),
   updated_at VARCHAR(30) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  `CREATE TABLE IF NOT EXISTS baton_session_entries (
+  `CREATE TABLE IF NOT EXISTS tenetkit_session_entries (
   session_id VARCHAR(255) NOT NULL,
   entry_id VARCHAR(255) NOT NULL,
   parent_id VARCHAR(255),
@@ -286,14 +286,11 @@ export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   payload_json LONGTEXT NOT NULL,
   created_at VARCHAR(30) NOT NULL,
   PRIMARY KEY (session_id, entry_id),
-  UNIQUE KEY baton_session_entries_seq_idx (session_id, seq),
-  KEY baton_session_entries_parent_idx (session_id, parent_id),
-  CONSTRAINT baton_session_entries_session_fk FOREIGN KEY (session_id) REFERENCES baton_sessions(session_id) ON DELETE CASCADE
+  UNIQUE KEY tenetkit_session_entries_seq_idx (session_id, seq),
+  KEY tenetkit_session_entries_parent_idx (session_id, parent_id),
+  CONSTRAINT tenetkit_session_entries_session_fk FOREIGN KEY (session_id) REFERENCES tenetkit_sessions(session_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-]
-
-export const EXTERNAL_CHILD_STATEMENTS: ReadonlyArray<string> = [
-  `CREATE TABLE IF NOT EXISTS baton_external_child_placements (
+  `CREATE TABLE IF NOT EXISTS tenetkit_external_child_placements (
   placement_id VARCHAR(255) PRIMARY KEY,
   parent_run_id VARCHAR(255) NOT NULL,
   \`partition\` VARCHAR(255) NOT NULL,
@@ -310,17 +307,19 @@ export const EXTERNAL_CHILD_STATEMENTS: ReadonlyArray<string> = [
   outcome_event_id VARCHAR(255),
   created_at VARCHAR(30) NOT NULL,
   settled_at VARCHAR(30),
-  UNIQUE KEY baton_external_child_placements_ref_key (\`partition\`, external_run_id),
-  UNIQUE KEY baton_external_child_placements_invocation_key (parent_run_id, invocation_id),
-  KEY baton_external_child_placements_parent_idx (parent_run_id, settlement_id, created_at),
-  CONSTRAINT baton_external_child_placements_parent_fk FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
-  CONSTRAINT baton_external_child_placements_settlement_check CHECK
+  UNIQUE KEY tenetkit_external_child_placements_ref_key (\`partition\`, external_run_id),
+  UNIQUE KEY tenetkit_external_child_placements_invocation_key (parent_run_id, invocation_id),
+  KEY tenetkit_external_child_placements_parent_idx (parent_run_id, settlement_id, created_at),
+  CONSTRAINT tenetkit_external_child_placements_parent_fk FOREIGN KEY (parent_run_id) REFERENCES tenetkit_runs(run_id),
+  CONSTRAINT tenetkit_external_child_placements_settlement_check CHECK
     ((settlement_id IS NULL AND outcome_json IS NULL AND outcome_event_id IS NULL AND settled_at IS NULL)
       OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
 ]
 
-export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [...V7_SCHEMA_STATEMENTS, ...EXTERNAL_CHILD_STATEMENTS]
+export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(
+  (statement) => statement.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)?.slice(1, 2) ?? [],
+)
 
 export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")

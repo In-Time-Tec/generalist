@@ -46,7 +46,7 @@ export const mysqlModelResponseOperations = (input: {
     effect: Effect.Effect<A, E, SqlR>,
   ) =>
     run(
-      sql`SELECT run_id FROM baton_runs WHERE run_id = ${claim.runId} FOR UPDATE`.pipe(
+      sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${claim.runId} FOR UPDATE`.pipe(
         Effect.andThen(requireClaim(claim)),
         Effect.andThen(effect),
       ),
@@ -58,7 +58,7 @@ export const mysqlModelResponseOperations = (input: {
         Effect.gen(function* () {
           const loaded = yield* requireRun(op.runId)
           const rows = yield* sql<OperationRow>`
-            SELECT * FROM baton_run_operations
+            SELECT * FROM tenetkit_run_operations
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
             FOR UPDATE
           `
@@ -106,7 +106,7 @@ export const mysqlModelResponseOperations = (input: {
             Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
           )
           yield* sql`
-            UPDATE baton_run_operations
+            UPDATE tenetkit_run_operations
             SET status = 'failed', error_json = ${encodeJsonValue(op.outcome.error)}, finished_at = NOW()
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'running'
           `
@@ -116,7 +116,7 @@ export const mysqlModelResponseOperations = (input: {
             validated.event as unknown as { readonly _tag: string } & Record<string, unknown>,
           )
           const completed = yield* sql<OperationRow>`
-            SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+            SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
           `
           return toOperationRecord(completed[0]!)
         }),
@@ -127,7 +127,7 @@ export const mysqlModelResponseOperations = (input: {
         Effect.gen(function* () {
           const loaded = yield* requireRun(op.runId)
           const existing = yield* sql<OperationRow>`
-            SELECT * FROM baton_run_operations
+            SELECT * FROM tenetkit_run_operations
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
             FOR UPDATE
           `
@@ -175,7 +175,7 @@ export const mysqlModelResponseOperations = (input: {
           }
           for (const entryId of new Set(op.steeringEntryIds ?? [])) {
             const rows = yield* sql<{ readonly consumed_operation_id: string | null }>`
-              SELECT consumed_operation_id FROM baton_run_steering
+              SELECT consumed_operation_id FROM tenetkit_run_steering
               WHERE run_id = ${op.runId} AND entry_id = ${entryId}
             `
             if (rows[0]?.consumed_operation_id !== op.operationId) {
@@ -192,13 +192,13 @@ export const mysqlModelResponseOperations = (input: {
             Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
           )
           yield* sql`
-            UPDATE baton_run_operations
+            UPDATE tenetkit_run_operations
             SET status = 'succeeded', result_json = ${encodeJsonValue(validated.reference)}, finished_at = NOW()
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
               AND status IN ('requested', 'running')
           `
           yield* sql`
-            UPDATE baton_runs SET
+            UPDATE tenetkit_runs SET
               driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
               executable_ref_json = ${encodeExecutableRef(executableRef)},
               continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
@@ -213,7 +213,7 @@ export const mysqlModelResponseOperations = (input: {
             validated.event as unknown as { readonly _tag: string } & Record<string, unknown>,
           )
           const rows = yield* sql<OperationRow>`
-            SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+            SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
           `
           return toOperationRecord(rows[0]!)
         }),

@@ -139,7 +139,7 @@ layer(platform, liveOptions)("Bun kernel frame integrity", (it) => {
               "  JSON.stringify(Object.keys(globalThis)),",
               "  listing.stdout.toString(),",
               "]",
-              "seen.some((text) => text.includes('baton-frame-'))",
+              "seen.some((text) => text.includes('tenetkit-frame-'))",
             ].join("\n"),
           })
           expect(result.value).toBe("false")

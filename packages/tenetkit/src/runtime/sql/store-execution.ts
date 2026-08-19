@@ -63,7 +63,7 @@ export const releaseExecution = (input: ExecutionClaim) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE baton_runs SET owner_worker_id = NULL
+      UPDATE tenetkit_runs SET owner_worker_id = NULL
       WHERE run_id = ${input.runId}
         AND owner_worker_id = ${input.ownerId}
         AND attempt_fence = ${input.attemptFence}
@@ -93,7 +93,7 @@ export const claimExecution: {
         return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is queued` })
       }
       const links = yield* sql<{ readiness: string }>`
-        SELECT readiness FROM baton_run_links WHERE child_run_id = ${run.runId} LIMIT 1
+        SELECT readiness FROM tenetkit_run_links WHERE child_run_id = ${run.runId} LIMIT 1
       `
       if (links[0]?.readiness !== "ready") {
         return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting child capacity` })
@@ -103,7 +103,7 @@ export const claimExecution: {
     const nextAttempt = run.status === "queued" ? run.attempt + 1 : run.attempt
     const updated = yield* nowIso
     yield* sql`
-      UPDATE baton_runs SET
+      UPDATE tenetkit_runs SET
         owner_worker_id = ${input.ownerId},
         attempt_fence = attempt_fence + 1,
         attempt = ${nextAttempt},
@@ -172,7 +172,7 @@ export const saveExecution = (
     })
     const updated = yield* nowIso
     const rows = yield* sql<{ run_id: string }>`
-      UPDATE baton_runs SET
+      UPDATE tenetkit_runs SET
         driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
         suspension_json = COALESCE(${input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)}, suspension_json),

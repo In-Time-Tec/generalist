@@ -326,7 +326,7 @@ it.live("rolls back every SQLite steering lifecycle boundary atomically", () => 
 
       database.exec(`
         CREATE TRIGGER fail_steering_acceptance
-        BEFORE INSERT ON baton_run_events
+        BEFORE INSERT ON tenetkit_run_events
         WHEN NEW.event_json LIKE '%"_tag":"SteeringAccepted"%'
         BEGIN
           SELECT RAISE(ABORT, 'forced steering acceptance rollback');
@@ -348,7 +348,7 @@ it.live("rolls back every SQLite steering lifecycle boundary atomically", () => 
       const entries = yield* store.readSteering(claim)
       database.exec(`
         CREATE TRIGGER fail_steering_consumption
-        BEFORE INSERT ON baton_run_events
+        BEFORE INSERT ON tenetkit_run_events
         WHEN NEW.event_json LIKE '%"_tag":"SteeringConsumed"%'
         BEGIN
           SELECT RAISE(ABORT, 'forced steering consumption rollback');
@@ -385,7 +385,7 @@ it.live("rolls back every SQLite steering lifecycle boundary atomically", () => 
       const terminalClaim = yield* store.claimExecution({ runId: terminalRun.runId, ownerId: "atomic-terminal" })
       database.exec(`
         CREATE TRIGGER fail_steering_terminal
-        BEFORE INSERT ON baton_run_events
+        BEFORE INSERT ON tenetkit_run_events
         WHEN NEW.event_json LIKE '%"_tag":"RunCompleted"%'
         BEGIN
           SELECT RAISE(ABORT, 'forced steering terminal rollback');

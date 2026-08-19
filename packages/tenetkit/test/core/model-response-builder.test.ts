@@ -49,7 +49,7 @@ const urlSource = Schema.decodeUnknownSync(Response.UrlSourcePart)({
 const firstCall = Response.makePart("tool-call", {
   id: "call-1",
   name: "lookup",
-  params: { query: "baton" },
+  params: { query: "tenetkit" },
   providerExecuted: false,
   metadata: { provider: { call: 1 } },
 })
@@ -99,7 +99,7 @@ describe("model response builder", () => {
     const call = Response.makePart("tool-call", {
       id: "call",
       name: "lookup",
-      params: { query: "baton" },
+      params: { query: "tenetkit" },
       providerExecuted: false,
       metadata: { provider: { validated: true } },
     })

@@ -90,7 +90,7 @@ export const admitFanOut: {
     }
     const digest = digestFanOut({ ...input, members })
     const prior = (yield* sql<FanOutRow>`
-      SELECT * FROM baton_fan_outs
+      SELECT * FROM tenetkit_fan_outs
       WHERE parent_run_id = ${input.parentRunId} AND idempotency_key = ${input.idempotencyKey}
     `)[0]
     if (prior !== undefined) {
@@ -126,7 +126,7 @@ export const admitFanOut: {
     )
     const created = yield* nowIso
     yield* sql`
-      INSERT INTO baton_fan_outs (
+      INSERT INTO tenetkit_fan_outs (
         fan_out_id, parent_run_id, idempotency_key, input_digest, join_json, remainder,
         concurrency, status, created_at, updated_at
       ) VALUES (
@@ -168,11 +168,11 @@ export const admitFanOut: {
       ).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })))
       yield* associateRegistrations(member.childRunId, registrations)
       yield* sql`
-        INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+        INSERT INTO tenetkit_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
         VALUES (${parent.runId}, ${member.childRunId}, ${`${input.fanOutId}:${member.key}`}, ${readiness}, NULL, ${created}, NULL)
       `
       yield* sql`
-        INSERT INTO baton_fan_out_members (
+        INSERT INTO tenetkit_fan_out_members (
           fan_out_id, ordinal, member_key, selection, display_label, prompt_json, origin_json,
           child_run_id, depth, status, terminal_event_id, outcome_json
         ) VALUES (
@@ -245,21 +245,21 @@ export const reconcileFanOutWith: {
       const sql = yield* SqlClient.SqlClient
       const eventRow = (yield* sql<{
         event_json: string
-      }>`SELECT event_json FROM baton_run_events WHERE event_id = ${terminalEventId}`)[0]
+      }>`SELECT event_json FROM tenetkit_run_events WHERE event_id = ${terminalEventId}`)[0]
       if (eventRow === undefined) return
       const event = decodeEvent(eventRow.event_json)
       const row = (yield* sql<{ fan_out_id: string; status: string }>`
-      SELECT fan_out_id, status FROM baton_fan_out_members WHERE child_run_id = ${childRunId}
+      SELECT fan_out_id, status FROM tenetkit_fan_out_members WHERE child_run_id = ${childRunId}
     `)[0]
       if (row === undefined) {
         const link = (yield* sql<{ parent_run_id: string }>`
-          SELECT parent_run_id FROM baton_run_links WHERE child_run_id = ${childRunId}
+          SELECT parent_run_id FROM tenetkit_run_links WHERE child_run_id = ${childRunId}
         `)[0]
         if (link !== undefined) yield* promoteChildCapacity({ hub, parentRunId: link.parent_run_id, append })
         return
       }
       const parentLink = (yield* sql<{ parent_run_id: string }>`
-        SELECT parent_run_id FROM baton_run_links WHERE child_run_id = ${childRunId}
+        SELECT parent_run_id FROM tenetkit_run_links WHERE child_run_id = ${childRunId}
       `)[0]
       if (["succeeded", "failed", "cancelled", "abandoned"].includes(row.status)) {
         if (parentLink !== undefined)
@@ -269,7 +269,7 @@ export const reconcileFanOutWith: {
       const memberStatus =
         event._tag === "RunCompleted" ? "succeeded" : event._tag === "RunFailed" ? "failed" : "cancelled"
       yield* sql`
-      UPDATE baton_fan_out_members SET status = ${memberStatus}, terminal_event_id = ${event.eventId},
+      UPDATE tenetkit_fan_out_members SET status = ${memberStatus}, terminal_event_id = ${event.eventId},
         outcome_json = ${encodeJsonValue(outcomeFor(event))}
       WHERE child_run_id = ${childRunId}
     `
@@ -289,7 +289,7 @@ export const reconcileFanOutWith: {
         if (unsettled === 0) {
           const updated = yield* nowIso
           yield* sql`
-          UPDATE baton_fan_outs SET status = 'cancelled', updated_at = ${updated}
+          UPDATE tenetkit_fan_outs SET status = 'cancelled', updated_at = ${updated}
           WHERE fan_out_id = ${row.fan_out_id} AND status = 'running'
         `
         }
@@ -328,7 +328,7 @@ export const reconcileFanOutWith: {
               }))
       if (joined !== undefined && loaded.fanOut.remainder === "abandon") {
         yield* sql`
-        UPDATE baton_fan_out_members SET status = 'abandoned'
+        UPDATE tenetkit_fan_out_members SET status = 'abandoned'
         WHERE fan_out_id = ${row.fan_out_id} AND status IN ('pending', 'running')
       `
       } else if (joined !== undefined && loaded.fanOut.remainder === "request-cancel") {
@@ -346,7 +346,7 @@ export const reconcileFanOutWith: {
             "cancelled",
           )
           yield* sql`
-          UPDATE baton_fan_out_members SET status = 'cancelled', terminal_event_id = ${cancelledEvent.eventId},
+          UPDATE tenetkit_fan_out_members SET status = 'cancelled', terminal_event_id = ${cancelledEvent.eventId},
             outcome_json = ${encodeJsonValue(outcomeFor(cancelledEvent))}
           WHERE child_run_id = ${member.childRunId}
         `
@@ -360,7 +360,7 @@ export const reconcileFanOutWith: {
         return
       }
       const updated = yield* nowIso
-      yield* sql`UPDATE baton_fan_outs SET status = ${joined}, updated_at = ${updated} WHERE fan_out_id = ${row.fan_out_id} AND status = 'running'`
+      yield* sql`UPDATE tenetkit_fan_outs SET status = ${joined}, updated_at = ${updated} WHERE fan_out_id = ${row.fan_out_id} AND status = 'running'`
       if (parentLink !== undefined) {
         yield* promoteChildCapacity({ hub, parentRunId: parentLink.parent_run_id, append })
       }
@@ -380,7 +380,7 @@ export const reconcileFanOutWith: {
         const currentParent = yield* loadRun(parent.runId)
         const pendingOutcome = currentParent?.pendingOutcome
         const otherRunning = yield* sql<{ fan_out_id: string }>`
-        SELECT fan_out_id FROM baton_fan_outs
+        SELECT fan_out_id FROM tenetkit_fan_outs
         WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
       `
         if (
@@ -423,10 +423,10 @@ export const reconcileFanOutWith: {
         }
         const closedAt = yield* nowIso
         yield* sql`
-        UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
+        UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
         WHERE run_id = ${resumeParent.runId} AND wait_id = ${resumeParent.activeWaitId} AND status = 'open'
       `
-        yield* sql`UPDATE baton_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
+        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
         yield* append(
           hub,
           (yield* loadRun(resumeParent.runId))!,
@@ -436,7 +436,7 @@ export const reconcileFanOutWith: {
         resumeParent = yield* loadRun(resumeParent.runId)
       }
       const operations = yield* sql<{ run_id: string; operation_name: string; wait_id: string | null }>`
-      SELECT run_id, operation_name, wait_id FROM baton_program_operations
+      SELECT run_id, operation_name, wait_id FROM tenetkit_program_operations
       WHERE fan_out_id = ${row.fan_out_id} AND status = 'waiting'
     `
       const operation = operations[0]
@@ -450,14 +450,14 @@ export const reconcileFanOutWith: {
         const resolution = { _tag: "Signal" as const, name: operation.wait_id }
         const closedAt = yield* nowIso
         yield* sql`
-        UPDATE baton_program_operations SET status = 'running'
+        UPDATE tenetkit_program_operations SET status = 'running'
         WHERE run_id = ${operation.run_id} AND operation_name = ${operation.operation_name} AND status = 'waiting'
       `
         yield* sql`
-        UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
+        UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
         WHERE run_id = ${resumeParent.runId} AND wait_id = ${operation.wait_id} AND status = 'open'
       `
-        yield* sql`UPDATE baton_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
+        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
         yield* append(
           hub,
           (yield* loadRun(resumeParent.runId))!,

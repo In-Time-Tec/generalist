@@ -222,29 +222,32 @@ const measureDurableJson = (filename: string): DurableJsonMeasurement => {
   database.exec("PRAGMA wal_checkpoint(TRUNCATE)")
   const operations = readRows(
     database,
-    `SELECT run_id || ':' || operation_id || ':input' AS rowKey, input_json AS payload FROM baton_run_operations
-     UNION ALL SELECT run_id || ':' || operation_id || ':result', result_json FROM baton_run_operations
-     UNION ALL SELECT run_id || ':' || operation_id || ':error', error_json FROM baton_run_operations
-     UNION ALL SELECT run_id || ':' || operation_id || ':resolution', resolution_json FROM baton_run_operations`,
+    `SELECT run_id || ':' || operation_id || ':input' AS rowKey, input_json AS payload FROM tenetkit_run_operations
+     UNION ALL SELECT run_id || ':' || operation_id || ':result', result_json FROM tenetkit_run_operations
+     UNION ALL SELECT run_id || ':' || operation_id || ':error', error_json FROM tenetkit_run_operations
+     UNION ALL SELECT run_id || ':' || operation_id || ':resolution', resolution_json FROM tenetkit_run_operations`,
   )
   const events = readRows(
     database,
-    "SELECT run_id || ':event:' || sequence AS rowKey, event_json AS payload FROM baton_run_events",
+    "SELECT run_id || ':event:' || sequence AS rowKey, event_json AS payload FROM tenetkit_run_events",
   )
   const checkpoints = readRows(
     database,
-    `SELECT run_id || ':message' AS rowKey, message_json AS payload FROM baton_runs
-     UNION ALL SELECT run_id || ':checkpoint', driver_checkpoint_json FROM baton_runs
-     UNION ALL SELECT run_id || ':suspension', suspension_json FROM baton_runs
-     UNION ALL SELECT run_id || ':continuation', continuation_json FROM baton_runs
-     UNION ALL SELECT run_id || ':pending', pending_outcome_json FROM baton_runs`,
+    `SELECT run_id || ':message' AS rowKey, message_json AS payload FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':checkpoint', driver_checkpoint_json FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':suspension', suspension_json FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':continuation', continuation_json FROM tenetkit_runs
+     UNION ALL SELECT run_id || ':pending', pending_outcome_json FROM tenetkit_runs`,
   )
   const sessions = readRows(
     database,
-    "SELECT session_id || ':session:' || entry_id AS rowKey, payload_json AS payload FROM baton_session_entries",
+    "SELECT session_id || ':session:' || entry_id AS rowKey, payload_json AS payload FROM tenetkit_session_entries",
   )
   const tables = database
-    .query<{ readonly name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'baton_%'")
+    .query<
+      { readonly name: string },
+      []
+    >("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'tenetkit_%'")
     .all()
   let allJsonBytes = 0
   for (const { name } of tables) {
@@ -275,11 +278,11 @@ const inspectFourChildReferences = (filename: string, expectedMarkers: ReadonlyA
   const database = new Database(filename)
   const operations = readRows(
     database,
-    "SELECT run_id || ':' || operation_id AS rowKey, result_json AS payload FROM baton_run_operations WHERE result_json IS NOT NULL",
+    "SELECT run_id || ':' || operation_id AS rowKey, result_json AS payload FROM tenetkit_run_operations WHERE result_json IS NOT NULL",
   ).filter((row) => typeof row.payload === "object" && row.payload !== null && "modelCallId" in row.payload)
   const committed = readRows(
     database,
-    "SELECT run_id || ':event:' || sequence AS rowKey, event_json AS payload FROM baton_run_events",
+    "SELECT run_id || ':event:' || sequence AS rowKey, event_json AS payload FROM tenetkit_run_events",
   ).filter(
     (row) =>
       typeof row.payload === "object" &&
@@ -289,10 +292,10 @@ const inspectFourChildReferences = (filename: string, expectedMarkers: ReadonlyA
   )
   const sessions = readRows(
     database,
-    "SELECT session_id || ':' || entry_id AS rowKey, payload_json AS payload FROM baton_session_entries",
+    "SELECT session_id || ':' || entry_id AS rowKey, payload_json AS payload FROM tenetkit_session_entries",
   )
   const sessionCount = database
-    .query<{ readonly count: number }, []>("SELECT COUNT(DISTINCT session_id) AS count FROM baton_session_entries")
+    .query<{ readonly count: number }, []>("SELECT COUNT(DISTINCT session_id) AS count FROM tenetkit_session_entries")
     .get()!.count
   database.close()
   expect(operations).toHaveLength(42)

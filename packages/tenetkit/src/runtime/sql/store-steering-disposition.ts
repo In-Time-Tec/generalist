@@ -18,13 +18,13 @@ export const discardPendingSteering = (input: { readonly runId: string; readonly
     if (reason === undefined) return undefined
     const sql = yield* SqlClient.SqlClient
     const pending = yield* sql<{ entry_id: string }>`
-      SELECT entry_id FROM baton_run_steering
+      SELECT entry_id FROM tenetkit_run_steering
       WHERE run_id = ${input.runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
       ORDER BY sequence
     `
     if (pending.length === 0) return undefined
     yield* sql`
-      UPDATE baton_run_steering SET discarded_reason = ${reason}
+      UPDATE tenetkit_run_steering SET discarded_reason = ${reason}
       WHERE run_id = ${input.runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
     `
     return {

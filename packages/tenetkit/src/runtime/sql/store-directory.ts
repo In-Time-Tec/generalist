@@ -87,7 +87,7 @@ const deliverable = (entry: MailboxEntry) =>
       target.value._tag === "Run"
         ? target.value.runId
         : (yield* sql<{ run_id: string }>`
-              SELECT run_id FROM baton_agent_names
+              SELECT run_id FROM tenetkit_agent_names
               WHERE scope = ${target.value.scope} AND name = ${target.value.name}
             `)[0]?.run_id
     if (runId === undefined) return false
@@ -100,18 +100,18 @@ const quotaEntries = (input: { readonly sessionId: string; readonly admittedAfte
     const sql = yield* SqlClient.SqlClient
     const after = input.admittedAfter === undefined ? sql`` : sql`AND m.admitted_at_millis > ${input.admittedAfter}`
     const rows = yield* sql<MessageRow>`
-      SELECT * FROM baton_messages m
+      SELECT * FROM tenetkit_messages m
       WHERE m.target_session_id = ${input.sessionId}
         AND m.entry_id NOT LIKE 'child-settled:%' ${after}
         AND (
           ${input.admittedAfter === undefined ? 0 : 1} = 1
           OR m.delivered_run_id IS NULL
           OR EXISTS (
-            SELECT 1 FROM baton_runs r
+            SELECT 1 FROM tenetkit_runs r
             WHERE r.run_id = m.delivered_run_id
               AND r.status IN ('succeeded', 'failed', 'cancelled')
               AND NOT EXISTS (
-                SELECT 1 FROM baton_run_steering s
+                SELECT 1 FROM tenetkit_run_steering s
                 WHERE s.run_id = m.delivered_run_id
                   AND s.entry_id = m.steering_entry_id
                   AND s.consumed_operation_id IS NOT NULL
@@ -143,7 +143,7 @@ const entryFor = (input: {
 const nameOf = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<NameRow>`SELECT * FROM baton_agent_names WHERE run_id = ${runId}`
+    const rows = yield* sql<NameRow>`SELECT * FROM tenetkit_agent_names WHERE run_id = ${runId}`
     return rows[0]?.name
   })
 
@@ -185,10 +185,10 @@ export const resolveAddress = (address: Address) =>
         ? target.runId
         : target._tag === "Name"
           ? (yield* sql<NameRow>`
-                SELECT * FROM baton_agent_names WHERE scope = ${target.scope} AND name = ${target.name}
+                SELECT * FROM tenetkit_agent_names WHERE scope = ${target.scope} AND name = ${target.name}
               `)[0]?.run_id
           : (yield* sql<{ run_id: string }>`
-                SELECT run_id FROM baton_runs
+                SELECT run_id FROM tenetkit_runs
                 WHERE session_id = ${target.sessionId}
                 ORDER BY created_at DESC, run_id DESC
                 LIMIT 1
@@ -209,14 +209,14 @@ export const registerAgentName = (input: { readonly runId: string; readonly name
       ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
     })
     const existing = yield* sql<NameRow>`
-      SELECT * FROM baton_agent_names WHERE scope = ${scope} AND name = ${input.name}
+      SELECT * FROM tenetkit_agent_names WHERE scope = ${scope} AND name = ${input.name}
     `
     const prior = existing[0]
     if (prior !== undefined && prior.run_id !== input.runId) {
       return yield* AgentNameConflict.make({ scope, name: input.name, existingRunId: prior.run_id })
     }
     if (prior === undefined) {
-      yield* sql`INSERT INTO baton_agent_names (scope, name, run_id) VALUES (${scope}, ${input.name}, ${input.runId})`
+      yield* sql`INSERT INTO tenetkit_agent_names (scope, name, run_id) VALUES (${scope}, ${input.name}, ${input.runId})`
     }
     return entryFor({
       runId: run.runId,
@@ -236,9 +236,9 @@ export const listRelated = (runId: string) =>
     const parent = run.parentRunId
     const rows =
       parent === undefined
-        ? yield* sql<{ run_id: string }>`SELECT run_id FROM baton_runs WHERE parent_run_id = ${runId}`
+        ? yield* sql<{ run_id: string }>`SELECT run_id FROM tenetkit_runs WHERE parent_run_id = ${runId}`
         : yield* sql<{ run_id: string }>`
-            SELECT run_id FROM baton_runs
+            SELECT run_id FROM tenetkit_runs
             WHERE parent_run_id = ${runId} OR run_id = ${parent} OR parent_run_id = ${parent}
           `
     const entries: Array<DirectoryEntry> = []
@@ -265,7 +265,7 @@ export const pendingMessages = (input: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<MessageRow>`
-      SELECT * FROM baton_messages m
+      SELECT * FROM tenetkit_messages m
       WHERE m.target_session_id = ${input.sessionId}
         AND m.entry_id NOT LIKE 'child-settled:%'
         AND (
@@ -274,7 +274,7 @@ export const pendingMessages = (input: {
           OR (
             m.to_address = ${input.runId === undefined ? "" : runAddress(input.runId)}
             AND EXISTS (
-              SELECT 1 FROM baton_runs target
+              SELECT 1 FROM tenetkit_runs target
               WHERE target.run_id = ${input.runId ?? ""}
                 AND target.status NOT IN ('succeeded', 'failed', 'cancelled')
             )
@@ -283,11 +283,11 @@ export const pendingMessages = (input: {
         AND (
         m.delivered_run_id IS NULL
         OR EXISTS (
-          SELECT 1 FROM baton_runs r
+          SELECT 1 FROM tenetkit_runs r
           WHERE r.run_id = m.delivered_run_id
             AND r.status IN ('succeeded', 'failed', 'cancelled')
             AND NOT EXISTS (
-              SELECT 1 FROM baton_run_steering s
+              SELECT 1 FROM tenetkit_run_steering s
               WHERE s.run_id = m.delivered_run_id
                 AND s.entry_id = m.steering_entry_id
                 AND s.consumed_operation_id IS NOT NULL
@@ -304,7 +304,7 @@ export const admitMessage = (input: AdmitMessageInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const existing = yield* sql<MessageRow>`
-      SELECT * FROM baton_messages
+      SELECT * FROM tenetkit_messages
       WHERE target_session_id = ${input.targetSessionId}
         AND message_id = ${input.messageId}
         AND idempotency_key = ${input.idempotencyKey}
@@ -345,13 +345,13 @@ export const admitMessage = (input: AdmitMessageInput) =>
       })
     }
     const highest = yield* sql<{ next_sequence: number | string }>`
-      SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence FROM baton_messages
+      SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence FROM tenetkit_messages
       WHERE target_session_id = ${input.targetSessionId}
     `
     const sequence = Number(highest[0]?.next_sequence ?? 0)
     const entryId = `${input.targetSessionId}:message:${sequence}`
     yield* sql`
-      INSERT INTO baton_messages (
+      INSERT INTO tenetkit_messages (
         entry_id, target_session_id, sequence, from_address, from_run_id, to_address, message_id,
         idempotency_key, digest, bytes, admitted_at_millis, prompt_json, correlation_id, causation_id,
         in_reply_to, metadata_json, delivered_run_id, steering_entry_id
@@ -397,14 +397,14 @@ export const deliverPendingMessages: {
       const idempotencyKey = steeringKey(entry.entryId)
       const rows = yield* sql<{ next_sequence: number | string }>`
         SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence
-        FROM baton_run_steering WHERE run_id = ${input.runId}
+        FROM tenetkit_run_steering WHERE run_id = ${input.runId}
       `
       const sequence = Number(rows[0]?.next_sequence ?? 0)
       const steeringEntryId = `${input.runId}:steering:${sequence}`
       const prompt = deliveryPrompt(entry)
       const digest = steeringDigest(prompt)
       yield* sql`
-        INSERT INTO baton_run_steering (
+        INSERT INTO tenetkit_run_steering (
           entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id, discarded_reason
         ) VALUES (
           ${steeringEntryId}, ${input.runId}, ${sequence}, ${idempotencyKey}, ${digest},
@@ -412,7 +412,7 @@ export const deliverPendingMessages: {
         )
       `
       yield* sql`
-        UPDATE baton_messages
+        UPDATE tenetkit_messages
         SET delivered_run_id = ${input.runId}, steering_entry_id = ${steeringEntryId}
         WHERE entry_id = ${entry.entryId}
       `

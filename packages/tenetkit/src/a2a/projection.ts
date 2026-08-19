@@ -114,7 +114,7 @@ export const fromRuntime: {
         status: statusFrom(snapshot.run, events, contextId),
         artifacts: completed === undefined ? [] : [artifactFrom(completed, events)],
         history: [],
-        metadata: { batonCursor: snapshot.cursor },
+        metadata: { tenetkitCursor: snapshot.cursor },
       }
     }).pipe(
       Effect.mapError((cause) =>

@@ -34,12 +34,12 @@ export interface MemberRow {
 export const loadFanOut = (fanOutId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const fanOut = (yield* sql<FanOutRow>`SELECT * FROM baton_fan_outs WHERE fan_out_id = ${fanOutId}`)[0]
+    const fanOut = (yield* sql<FanOutRow>`SELECT * FROM tenetkit_fan_outs WHERE fan_out_id = ${fanOutId}`)[0]
     if (fanOut === undefined) return undefined
     const members = yield* sql<MemberRow>`
       SELECT m.*, l.readiness
-      FROM baton_fan_out_members m
-      JOIN baton_run_links l ON l.child_run_id = m.child_run_id
+      FROM tenetkit_fan_out_members m
+      JOIN tenetkit_run_links l ON l.child_run_id = m.child_run_id
       WHERE m.fan_out_id = ${fanOutId}
       ORDER BY m.ordinal ASC
     `

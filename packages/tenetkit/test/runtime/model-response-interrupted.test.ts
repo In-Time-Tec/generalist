@@ -193,9 +193,9 @@ it.live("rolls back SQLite outcome, Session entry, event, and subscriber notific
       const database = new Database(filename)
       database.exec(`
         CREATE TRIGGER fail_interrupted_commit_after_event
-        BEFORE UPDATE ON baton_tree_roots
+        BEFORE UPDATE ON tenetkit_tree_roots
         WHEN EXISTS (
-          SELECT 1 FROM baton_run_events
+          SELECT 1 FROM tenetkit_run_events
           WHERE run_id = '${receipt.runId.replaceAll("'", "''")}'
             AND event_json LIKE '%"_tag":"ModelResponseInterrupted"%'
         )
@@ -609,12 +609,12 @@ it.live("rejects mutated interrupted model response references and Session stora
         .query<
           { session_id: string; entry_id: string; parent_id: string | null; tag: string; payload_json: string },
           [string, string]
-        >("SELECT session_id, entry_id, parent_id, tag, payload_json FROM baton_session_entries WHERE session_id = ? AND entry_id = ?")
+        >("SELECT session_id, entry_id, parent_id, tag, payload_json FROM tenetkit_session_entries WHERE session_id = ? AND entry_id = ?")
         .get(event.sessionId, event.sessionEntryId)
       if (row === null) return yield* Effect.die("expected persisted interrupted Session entry")
 
       database
-        .query("UPDATE baton_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
         .run("corrupt-entry", row.session_id, row.entry_id)
       const missingIdentity = yield* runtime.resolveModelResponse(event).pipe(Effect.flip)
       expect(missingIdentity).toMatchObject({
@@ -623,23 +623,23 @@ it.live("rejects mutated interrupted model response references and Session stora
         entryId: event.sessionEntryId,
       })
       database
-        .query("UPDATE baton_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.entry_id, row.session_id, "corrupt-entry")
 
       database
-        .query("UPDATE baton_session_entries SET parent_id = NULL WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET parent_id = NULL WHERE session_id = ? AND entry_id = ?")
         .run(row.session_id, row.entry_id)
       yield* assertCorrupt(event)
       database
-        .query("UPDATE baton_session_entries SET parent_id = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET parent_id = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.parent_id, row.session_id, row.entry_id)
 
       database
-        .query("UPDATE baton_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
         .run("Message", row.session_id, row.entry_id)
       yield* assertCorrupt(event)
       database
-        .query("UPDATE baton_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.tag, row.session_id, row.entry_id)
 
       const payload = (yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(row.payload_json)) as {
@@ -653,11 +653,11 @@ it.live("rejects mutated interrupted model response references and Session stora
         { ...payload, content: [{ type: "text", text: "corrupt content" }] },
       ]) {
         database
-          .query("UPDATE baton_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
+          .query("UPDATE tenetkit_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
           .run(jsonText(mutated), row.session_id, row.entry_id)
         yield* assertCorrupt(event)
         database
-          .query("UPDATE baton_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
+          .query("UPDATE tenetkit_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
           .run(row.payload_json, row.session_id, row.entry_id)
       }
       database.close()

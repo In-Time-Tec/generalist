@@ -27,7 +27,7 @@ const configuration: OAuth.Configuration = {
     client_name: "TenetKit OAuth test",
     redirect_uris: ["https://app.example/oauth/callback"],
   },
-  clientInformation: { client_id: "baton-test" },
+  clientInformation: { client_id: "tenetkit-test" },
 }
 
 const dynamicConfiguration: OAuth.Configuration = {

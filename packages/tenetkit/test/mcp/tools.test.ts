@@ -6,7 +6,7 @@ import { layerToolkit, route, toolkit } from "../../src/mcp/mcp/tools"
 import { McpToolSource } from "../../src/mcp/index"
 import { makeFixture, makeTransportFixture } from "./fixture"
 
-describe("baton adapter", () => {
+describe("mcp tools adapter", () => {
   it("exports the complete scoped route", () => {
     expect(typeof route).toBe("function")
   })

@@ -185,15 +185,15 @@ describe("ExecutionHost", () => {
       // conversation whole; if this fails, orchestration state leaked into conversation state.
       const database = new Database(filename)
       for (const table of [
-        "baton_run_events",
-        "baton_run_operations",
-        "baton_run_steering",
-        "baton_run_waits",
-        "baton_run_links",
-        "baton_tree_event_index",
-        "baton_run_registrations",
-        "baton_runs",
-        "baton_lanes",
+        "tenetkit_run_events",
+        "tenetkit_run_operations",
+        "tenetkit_run_steering",
+        "tenetkit_run_waits",
+        "tenetkit_run_links",
+        "tenetkit_tree_event_index",
+        "tenetkit_run_registrations",
+        "tenetkit_runs",
+        "tenetkit_lanes",
       ]) {
         database.run(`DELETE FROM ${table}`)
       }
@@ -371,13 +371,13 @@ describe("ExecutionHost", () => {
       expect(prompts[2]).toContain("third question")
 
       const database = new Database(filename)
-      const runColumns = database.query<{ name: string }, []>("PRAGMA table_info(baton_runs)").all()
+      const runColumns = database.query<{ name: string }, []>("PRAGMA table_info(tenetkit_runs)").all()
       expect(runColumns.map((column) => column.name)).not.toContain("transcript_json")
       database.exec(`
         PRAGMA foreign_keys = OFF;
-        DELETE FROM baton_run_events;
-        DELETE FROM baton_run_operations;
-        DELETE FROM baton_runs;
+        DELETE FROM tenetkit_run_events;
+        DELETE FROM tenetkit_run_operations;
+        DELETE FROM tenetkit_runs;
       `)
       database.close()
 
