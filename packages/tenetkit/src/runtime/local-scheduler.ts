@@ -13,6 +13,8 @@ export interface Options {
 
 export interface Interface {
   readonly tick: Effect.Effect<void, never, RunStore>
+  /** Reconcile one cancellation without scanning the store. */
+  readonly reconcileCancellation: (runId: string) => Effect.Effect<void, never, RunStore>
   /** Awaits every execution this scheduler admitted and has not yet observed finish. */
   readonly idle: Effect.Effect<void>
 }
@@ -37,6 +39,27 @@ export const make = (
     const runningCursor = yield* Ref.make<string | undefined>(undefined)
     const queuedCursor = yield* Ref.make<string | undefined>(undefined)
 
+    const reconcileCancellation = (store: RunStoreInterface, runId: string) =>
+      Effect.gen(function* () {
+        yield* active.interrupt(runId)
+        const stillActive = yield* active.active
+        const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([id]) => id)))
+        if (stillActive.has(runId) || admitted.has(runId)) return
+        yield* store.loadExecution(runId).pipe(
+          Effect.flatMap((execution) =>
+            execution.ownerId === undefined
+              ? store.cancel({ runId })
+              : store.fail({
+                  runId,
+                  ownerId: execution.ownerId,
+                  attemptFence: execution.attemptFence,
+                  error: AgentExecutionFailure.make({ message: "execution interrupted" }),
+                }),
+          ),
+          Effect.ignore,
+        )
+      })
+
     const sweepCancelling = (store: RunStoreInterface) =>
       Effect.gen(function* () {
         const cursor = yield* Ref.get(cancellingCursor)
@@ -48,31 +71,10 @@ export const make = (
         })
         const last = cancelling[cancelling.length - 1]
         yield* Ref.set(cancellingCursor, cancelling.length === reconcileWindow ? last?.runId : undefined)
-        yield* Effect.forEach(cancelling, (run) => active.interrupt(run.runId), {
-          concurrency: "unbounded",
+        yield* Effect.forEach(cancelling, (run) => reconcileCancellation(store, run.runId), {
+          concurrency: concurrency ?? "unbounded",
           discard: true,
         })
-        const stillActive = yield* active.active
-        const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([runId]) => runId)))
-        yield* Effect.forEach(
-          cancelling,
-          (run) =>
-            stillActive.has(run.runId) || admitted.has(run.runId)
-              ? Effect.void
-              : store.loadExecution(run.runId).pipe(
-                  Effect.flatMap((execution) => {
-                    if (execution.ownerId === undefined) return store.cancel({ runId: run.runId })
-                    return store.fail({
-                      runId: run.runId,
-                      ownerId: execution.ownerId,
-                      attemptFence: execution.attemptFence,
-                      error: AgentExecutionFailure.make({ message: "execution interrupted" }),
-                    })
-                  }),
-                  Effect.ignore,
-                ),
-          { concurrency: concurrency ?? "unbounded", discard: true },
-        )
       })
 
     const selectReadyRuns = (store: RunStoreInterface) =>
@@ -137,7 +139,11 @@ export const make = (
       yield* selectReadyRuns(store)
     }).pipe(Effect.ignore, tickLock.withPermit)
 
-    return LocalScheduler.of({ tick, idle: FiberMap.awaitEmpty(executions) })
+    return LocalScheduler.of({
+      tick,
+      reconcileCancellation: (runId) => Effect.flatMap(RunStore, (store) => reconcileCancellation(store, runId)),
+      idle: FiberMap.awaitEmpty(executions),
+    })
   })
 
 export const layer = (
