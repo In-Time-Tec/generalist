@@ -17,6 +17,10 @@ export interface DrainResult {
   readonly processed: number
   readonly hasMore: boolean
   readonly nextDueAt?: number
+  readonly outcomes: ReadonlyArray<{
+    readonly runId: string
+    readonly outcome: "executed" | "cancelled" | "deferred" | "inactive" | "stale"
+  }>
 }
 
 interface Candidate {
@@ -46,25 +50,38 @@ export const drain = (
       ORDER BY due_at_millis, run_id LIMIT ${fuel + 1}
     `
     const selected = candidates.slice(0, fuel)
+    const outcomes: Array<DrainResult["outcomes"][number]> = []
     for (const candidate of selected) {
       if (candidate.intent === "execute") {
-        yield* store
+        const outcome = yield* store
           .claimExecution({ runId: candidate.run_id, ownerId: options.ownerId })
           .pipe(
             Effect.flatMap(host.execute),
-            Effect.catchTag("tenetkit/runtime/StaleClaim", () => Effect.void),
+            Effect.as("executed" as const),
+            Effect.catchTag("tenetkit/runtime/StaleClaim", () => Effect.succeed("stale" as const)),
             Effect.catchTag("tenetkit/runtime/RunNotFound", () =>
-              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(Effect.asVoid),
+              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
+                Effect.as("inactive" as const),
+              ),
             ),
             Effect.catchTag("tenetkit/runtime/RunTerminal", () =>
-              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(Effect.asVoid),
+              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
+                Effect.as("inactive" as const),
+              ),
             ),
           )
+        outcomes.push({ runId: candidate.run_id, outcome })
       } else {
-        yield* scheduler.reconcileCancellation(candidate.run_id)
-        const retryAt = now + Math.max(1, options.cancelRetryMillis ?? 250)
-        yield* sql`UPDATE tenetkit_activations SET due_at_millis = ${retryAt}
-          WHERE run_id = ${candidate.run_id} AND intent = 'cancel'`
+        const reconciliation = yield* scheduler.reconcileCancellation(candidate.run_id)
+        const outcome = reconciliation === "settled" ? ("cancelled" as const) : reconciliation
+        outcomes.push({ runId: candidate.run_id, outcome })
+        if (reconciliation === "inactive") {
+          yield* sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`
+        } else if (reconciliation === "deferred" || reconciliation === "stale") {
+          const retryAt = now + Math.max(1, options.cancelRetryMillis ?? 250)
+          yield* sql`UPDATE tenetkit_activations SET due_at_millis = ${retryAt}
+            WHERE run_id = ${candidate.run_id} AND intent = 'cancel'`
+        }
       }
     }
     yield* options.rearm()
@@ -74,6 +91,7 @@ export const drain = (
     return {
       processed: selected.length,
       hasMore: candidates.length > fuel,
+      outcomes,
       ...(due[0]?.due_at_millis == null ? {} : { nextDueAt: Number(due[0].due_at_millis) }),
     }
   })

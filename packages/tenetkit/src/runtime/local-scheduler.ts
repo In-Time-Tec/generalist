@@ -1,6 +1,6 @@
 import { Context, Effect, FiberMap, Layer, Ref, Schedule, type Scope, Semaphore } from "effect"
 import { ActiveExecutions } from "./active-executions.js"
-import { AgentExecutionFailure } from "./errors.js"
+import { AgentExecutionFailure, RuntimeUnavailable } from "./errors.js"
 import { ExecutionHost } from "./execution-host.js"
 import { RunStore } from "./run-store.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
@@ -11,10 +11,14 @@ export interface Options {
   readonly pollInterval?: import("effect").Duration.Input
 }
 
+export type CancellationReconciliation = "settled" | "deferred" | "inactive" | "stale"
+
 export interface Interface {
   readonly tick: Effect.Effect<void, never, RunStore>
   /** Reconcile one cancellation without scanning the store. */
-  readonly reconcileCancellation: (runId: string) => Effect.Effect<void, never, RunStore>
+  readonly reconcileCancellation: (
+    runId: string,
+  ) => Effect.Effect<CancellationReconciliation, RuntimeUnavailable, RunStore>
   /** Awaits every execution this scheduler admitted and has not yet observed finish. */
   readonly idle: Effect.Effect<void>
 }
@@ -44,8 +48,8 @@ export const make = (
         yield* active.interrupt(runId)
         const stillActive = yield* active.active
         const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([id]) => id)))
-        if (stillActive.has(runId) || admitted.has(runId)) return
-        yield* store.loadExecution(runId).pipe(
+        if (stillActive.has(runId) || admitted.has(runId)) return "deferred" as const
+        return yield* store.loadExecution(runId).pipe(
           Effect.flatMap((execution) =>
             execution.ownerId === undefined
               ? store.cancel({ runId })
@@ -56,7 +60,15 @@ export const make = (
                   error: AgentExecutionFailure.make({ message: "execution interrupted" }),
                 }),
           ),
-          Effect.ignore,
+          Effect.as("settled" as const),
+          Effect.catchTag("tenetkit/runtime/StaleClaim", () => Effect.succeed("stale" as const)),
+          Effect.catchTag("tenetkit/runtime/RunNotFound", () => Effect.succeed("inactive" as const)),
+          Effect.catchTag("tenetkit/runtime/RunTerminal", () => Effect.succeed("inactive" as const)),
+          Effect.mapError((error) =>
+            error instanceof RuntimeUnavailable
+              ? error
+              : RuntimeUnavailable.make({ message: "cancellation reconciliation storage failed" }),
+          ),
         )
       })
 
@@ -71,7 +83,7 @@ export const make = (
         })
         const last = cancelling[cancelling.length - 1]
         yield* Ref.set(cancellingCursor, cancelling.length === reconcileWindow ? last?.runId : undefined)
-        yield* Effect.forEach(cancelling, (run) => reconcileCancellation(store, run.runId), {
+        yield* Effect.forEach(cancelling, (run) => reconcileCancellation(store, run.runId).pipe(Effect.ignore), {
           concurrency: concurrency ?? "unbounded",
           discard: true,
         })
