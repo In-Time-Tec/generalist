@@ -7,6 +7,14 @@ import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from
 export { drain, type DrainOptions, type DrainResult } from "./drain.js"
 export { makeProjection, migrateAndBackfill, nextDueAt, schema, type Rearm } from "./activations.js"
 export { makeExclusiveExecutionRecovery } from "./recovery.js"
+export {
+  makeHibernatingWebSocket,
+  type Attachment,
+  type FlushResult,
+  type HibernatingWebSocket,
+  type HibernatingWebSocketOptions,
+  type HibernatingWebSocketState,
+} from "./hibernating-websocket.js"
 
 /** @experimental */
 export type DurableObjectStorage = NonNullable<Parameters<typeof SqliteClient.make>[0]["storage"]>
