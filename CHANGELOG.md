@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.29.0
+
+- Stop delivering a child settlement to the parent Session as model-facing user content. A settled child was projected through `deliveryPrompt` into the steering inbox, so it reached the model as a user message reading `Child run <id> settled with status <status>.` followed by the child's whole result. The parent already receives that outcome as the tool result of the call that started the child, so the settlement repeated content the model held and attributed it to the user. Settlements are now observation-only on every backend, which is what `observationEntry` and the child-settlement read operations were built for; hosts read them through `childSettlements`, `childSettlementChanges`, and `awaitChildSettlement`. `ChildSettlement.modelPrompt` is removed.
+
 ## 0.28.1
 
 - Fix OpenAI account routes rejecting every non-streaming Responses call. The ChatGPT account endpoint answers `HTTP 400 {"detail":"Stream must be set to true"}` unless the request body sets `stream`, and only `streamText` set it, so `generateText` and `generateObject` failed outright on account credentials and auto-compaction could never produce a summary. The account client now issues every Responses request as a stream and folds the terminal `response.completed` or `response.incomplete` event into the non-streaming response, whose payload is schema-identical to one. A stream that ends without a terminal event fails typed rather than returning an empty response.

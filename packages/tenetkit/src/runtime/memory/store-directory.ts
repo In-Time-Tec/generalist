@@ -17,14 +17,13 @@ import {
   RunNotFound,
   RuntimeUnavailable,
 } from "../errors.js"
-import { deliveryPrompt, promptBytes, steeringKey, type MailboxEntry } from "../mailbox.js"
+import { deliveryPrompt, steeringKey, type MailboxEntry } from "../mailbox.js"
 import type { AdmitMessageInput } from "../run-store.js"
 import { digest as steeringDigest } from "../steering.js"
 import { isTerminal } from "../run.js"
 import { agentNameKey, type MemoryState, type StoredRun } from "./state.js"
 import {
   fromMailboxEntry,
-  modelPrompt,
   notificationIdFor,
   observationEntry,
   payloadFromEvent,
@@ -162,13 +161,6 @@ const deliverable = (state: MemoryState, entry: MailboxEntry): boolean => {
   if (entry.to === sessionAddress(entry.targetSessionId)) return true
   const target = [...state.runs.values()].find((run) => runAddress(run.runId) === entry.to)
   return target !== undefined && !isTerminal(target.status)
-}
-
-/** One child-settled notification still reaches its addressed Run while that Run is alive. */
-const settlementDeliverable = (state: MemoryState, entry: MailboxEntry): boolean => {
-  if (entry.to === sessionAddress(entry.targetSessionId)) return false
-  const addressed = [...state.runs.values()].find((run) => runAddress(run.runId) === entry.to)
-  return addressed !== undefined && !isTerminal(addressed.status)
 }
 
 const owed = (state: MemoryState, entry: MailboxEntry): boolean => {
@@ -406,25 +398,12 @@ export const deliverPendingMessages: {
       runId: run.runId,
       limit: Number.MAX_SAFE_INTEGER,
     })
-    const settlements = [...state.messages.values()].flatMap((entry) => {
-      if (
-        entry.targetSessionId !== run.message.sessionId ||
-        !entry.entryId.startsWith("child-settled:") ||
-        !owed(state, entry) ||
-        settlementDeliverable(state, entry)
-      ) {
-        return []
-      }
-      const notification = fromMailboxEntry(entry)
-      const prompt = notification === undefined ? undefined : modelPrompt(notification)
-      return prompt === undefined ? [] : [{ ...entry, bytes: promptBytes(prompt), prompt }]
-    })
-    if (pending.length === 0 && settlements.length === 0) return [[], state] as const
+    if (pending.length === 0) return [[], state] as const
     const messages = new Map(state.messages)
     const steering = [...run.steering]
     const delivered: Array<MailboxEntry> = []
     let counter = state.nextSteeringCounter
-    for (const entry of [...pending, ...settlements]) {
+    for (const entry of pending) {
       const idempotencyKey = steeringKey(entry.entryId)
       const prompt = deliveryPrompt(entry)
       const steeringEntryId = `steer_${counter}`
