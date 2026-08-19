@@ -193,7 +193,7 @@
     },
     "packages/mysql": {
       "name": "@tenetkit/mysql",
-      "version": "0.28.1",
+      "version": "0.29.0",
       "dependencies": {
         "@effect/sql-mysql2": "catalog:",
         "tenetkit": "workspace:*",
@@ -211,7 +211,7 @@
     },
     "packages/pg": {
       "name": "@tenetkit/pg",
-      "version": "0.28.1",
+      "version": "0.29.0",
       "dependencies": {
         "@effect/sql-pg": "catalog:",
         "tenetkit": "workspace:*",
@@ -229,7 +229,7 @@
     },
     "packages/tenetkit": {
       "name": "tenetkit",
-      "version": "0.28.1",
+      "version": "0.29.0",
       "dependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",

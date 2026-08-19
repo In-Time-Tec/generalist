@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.29.0
+
 - Stop delivering a child settlement to the parent Session as model-facing user content. A settled child was projected through `deliveryPrompt` into the steering inbox, so it reached the model as a user message reading `Child run <id> settled with status <status>.` followed by the child's whole result. The parent already receives that outcome as the tool result of the call that started the child, so the settlement repeated content the model held and attributed it to the user. Settlements are now observation-only on every backend, which is what `observationEntry` and the child-settlement read operations were built for; hosts read them through `childSettlements`, `childSettlementChanges`, and `awaitChildSettlement`. `ChildSettlement.modelPrompt` is removed.
 
 ## 0.28.1
