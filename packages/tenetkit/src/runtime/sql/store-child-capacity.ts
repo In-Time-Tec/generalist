@@ -100,6 +100,7 @@ export const promoteChildCapacity = <E, R>(input: {
         UPDATE baton_run_links SET readiness = 'ready'
         WHERE parent_run_id = ${parent.runId} AND child_run_id = ${candidate.child_run_id} AND readiness = 'queued'
       `
+      yield* input.hub.touchRun(candidate.child_run_id)
       if (candidate.fan_out_id !== null) {
         yield* sql`
           UPDATE baton_fan_out_members SET status = 'running'

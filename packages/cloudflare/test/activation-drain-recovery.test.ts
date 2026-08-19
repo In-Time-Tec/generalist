@@ -15,11 +15,20 @@ import {
   nextDueAt,
   schema,
 } from "../src/durable-objects/index.js"
-import { assistantAddress, assistantRef, registrationsFor, textPrompt } from "../../tenetkit/test/runtime/helpers.js"
+import {
+  assistantAddress,
+  assistantRef,
+  completedResult,
+  registrationsFor,
+  textPrompt,
+} from "../../tenetkit/test/runtime/helpers.js"
 import { tempDbPath } from "../../tenetkit/test/runtime/sqlite-helpers.js"
 import { closedTestAgent } from "../../tenetkit/test/runtime/identity.js"
 import { assistant } from "../../tenetkit/test/runtime/helpers.js"
 import { layer as sqliteClientLayer } from "../../tenetkit/src/runtime/sql/bun-client.js"
+import { makeSqliteRunStore } from "../../tenetkit/src/runtime/sql/store.js"
+import { makeRuntime } from "../../tenetkit/src/runtime/memory/runtime-layer.js"
+import { layer as activeExecutionsLayer } from "../../tenetkit/src/runtime/active-executions.js"
 
 const options = (filename: string, projection?: RunActivationProjection) => ({
   filename,
@@ -35,6 +44,26 @@ const withLayer = <A, E, R, E2>(layer: Layer.Layer<R, E>, effect: Effect.Effect<
 const runtimeLayer = (projection?: RunActivationProjection) => {
   const filename = tempDbPath("cloudflare-activation")
   return Layer.merge(Runtime.layerSqlite(options(filename, projection)), sqliteClientLayer({ filename }))
+}
+
+const projectedRuntimeLayer = (rearm: Effect.Effect<void, RuntimeUnavailable>) => {
+  const filename = tempDbPath("cloudflare-promotion-activation")
+  const runtimeOptions = options(filename)
+  const client = sqliteClientLayer({ filename })
+  const store = Layer.effect(
+    RunStore,
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* schema
+      return yield* makeSqliteRunStore({
+        ...runtimeOptions,
+        activationProjection: makeProjection(sql, rearm),
+      })
+    }),
+  ).pipe(Layer.provide(client))
+  const dependencies = Layer.merge(store, activeExecutionsLayer)
+  const runtime = Layer.effect(Runtime.Runtime, makeRuntime(runtimeOptions)).pipe(Layer.provide(dependencies))
+  return Layer.mergeAll(runtime, store, client)
 }
 
 it.live("projects only final transaction state, emits inactive, and rolls authority back on projection failure", () => {
@@ -92,6 +121,61 @@ it.live("projects only final transaction state, emits inactive, and rolls author
         prompt: textPrompt("rollback"),
       })
       expect(retried.runId).toBeDefined()
+    }),
+  )
+})
+
+it.live("atomically projects a fan-out child promoted into ready capacity", () => {
+  let rejectProjection = false
+  return withLayer(
+    projectedRuntimeLayer(
+      Effect.suspend(() =>
+        rejectProjection ? RuntimeUnavailable.make({ message: "forced shared alarm rollback" }) : Effect.void,
+      ),
+    ),
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore
+      const sql = yield* SqlClient.SqlClient
+
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "promotion-projection",
+        idempotencyKey: "parent",
+        prompt: textPrompt("parent"),
+      })
+      const fanOut = yield* runtime.fanOut({
+        parentRunId: parent.runId,
+        idempotencyKey: "children",
+        members: [
+          { key: "first", selection: "researcher", prompt: "first" },
+          { key: "second", selection: "researcher", prompt: "second" },
+        ],
+        concurrency: 1,
+        join: { _tag: "AllSuccess" },
+        remainder: "await",
+      })
+      const [first, second] = fanOut.childRunIds
+      const firstClaim = yield* store.claimExecution({ runId: first!, ownerId: "first" })
+
+      rejectProjection = true
+      expect(
+        Exit.isFailure(
+          yield* Effect.exit(store.complete({ ...firstClaim, result: completedResult("first complete") })),
+        ),
+      ).toBe(true)
+      expect((yield* runtime.inspect(first!)).status).toBe("running")
+      expect((yield* runtime.inspectFanOut(fanOut.fanOutId)).members[1]?.status).toBe("pending")
+      expect(yield* sql`SELECT run_id FROM tenetkit_activations WHERE run_id = ${second!}`).toHaveLength(0)
+
+      rejectProjection = false
+      yield* store.complete({ ...firstClaim, result: completedResult("first complete") })
+      expect((yield* runtime.inspectFanOut(fanOut.fanOutId)).members[1]?.status).toBe("running")
+      expect(
+        yield* sql<{ intent: string; run_status: string }>`
+          SELECT intent, run_status FROM tenetkit_activations WHERE run_id = ${second!}
+        `,
+      ).toEqual([{ intent: "execute", run_status: "queued" }])
     }),
   )
 })

@@ -142,12 +142,14 @@ export const makeSqliteRunStore = (
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
             const events: Array<readonly [string, import("../run-event.js").RunEvent]> = []
+            const touchedRuns = new Set(touched)
             const transactionHub: typeof hub = {
               ...hub,
+              touchRun: (runId) => Effect.sync(() => void touchedRuns.add(runId)),
               publish: (runId, event) => Effect.sync(() => void events.push([runId, event])),
             }
             const result = yield* restore(
-              run(makeEffect(transactionHub), () => [...touched, ...events.map(([runId]) => runId)]),
+              run(makeEffect(transactionHub), () => [...touchedRuns, ...events.map(([runId]) => runId)]),
             )
             yield* Effect.forEach(events, ([runId, event]) => hub.publish(runId, event), { discard: true })
             return result
