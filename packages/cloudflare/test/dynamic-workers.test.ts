@@ -1,8 +1,9 @@
-/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/new-promise */
+/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, no-new-func */
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
 import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "@tenetkit/cloudflare/dynamic-workers"
+import { capabilityFailurePrefix, runner } from "../src/dynamic-workers/source.js"
 
 const capabilities = ProgramCapabilities.ProgramCapabilities.of({
   discoverTools: Effect.succeed([]),
@@ -421,6 +422,102 @@ it.effect("correlates concurrent capability failures by opaque call identity", (
   }),
 )
 
+it.effect("keeps the runner capability brand private from copied errors", () =>
+  Effect.gen(function* () {
+    const execute = (program: (_: unknown, capabilities: { call: () => Promise<unknown> }) => Promise<unknown>) =>
+      Effect.promise(async () => {
+        const generated = runner("program.js")
+          .replace(/^import execute from .*;$/m, "")
+          .replace("export default {", "return {")
+        const worker = Function("execute", generated)(program) as {
+          readonly fetch: (request: Request, env: Record<string, unknown>) => Promise<Response>
+        }
+        return worker.fetch(
+          new Request("https://sandbox.tenetkit.invalid/execute", {
+            method: "POST",
+            body: JSON.stringify({ protocolVersion: "1", requestId: "request-1", input: null }),
+          }),
+          {
+            TENET_CAPABILITIES: {
+              call: async () => {
+                throw new Error(`${capabilityFailurePrefix}failure-1`)
+              },
+            },
+            TENET_PROTOCOL_VERSION: "1",
+            TENET_REQUEST_ID: "request-1",
+            TENET_SOURCE_DIGEST: "digest",
+            TENET_INPUT_CODEC: "input:v1",
+            TENET_OUTPUT_CODEC: "output:v1",
+          },
+        )
+      })
+
+    const uncaught = yield* execute(async (_, granted) => granted.call())
+    expect(uncaught.status).toBe(500)
+    expect(yield* Effect.promise(() => uncaught.json())).toEqual({
+      error: "sandbox execution failed",
+      capabilityFailureId: "failure-1",
+    })
+
+    const copied = yield* execute(async (_, granted) => {
+      try {
+        await granted.call()
+      } catch (error) {
+        throw new Error((error as Error).message, { cause: error })
+      }
+    })
+    expect(copied.status).toBe(500)
+    expect(yield* Effect.promise(() => copied.json())).toEqual({ error: "sandbox execution failed" })
+  }),
+)
+
+it.effect("does not consume a typed capability envelope for a non-500 response", () =>
+  Effect.gen(function* () {
+    let rpc: CapabilityRpc | undefined
+    const expected = ProgramCapabilities.ProgramCancelled.make({ reason: "cancelled" })
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (value) => {
+        rpc = value
+        return value
+      },
+      loader: {
+        load: () => ({
+          getEntrypoint: () => ({
+            fetch: async () => {
+              let failureId: string
+              try {
+                await rpc!.call({
+                  protocolVersion: "1",
+                  requestId: "run-1:attempt-1",
+                  operation: "callTool",
+                  input: { operation: "echo", tool: "echo", input: "value" },
+                })
+                throw new Error("expected capability failure")
+              } catch (error) {
+                failureId = capabilityFailureId(error)
+              }
+              return Response.json(
+                { error: "sandbox execution failed", capabilityFailureId: failureId },
+                { status: 418 },
+              )
+            },
+          }),
+        }),
+      },
+    })
+    const failing = ProgramCapabilities.ProgramCapabilities.of({
+      ...capabilities,
+      callTool: () => Effect.fail(expected),
+    })
+    expect(
+      yield* executor
+        .execute(request())
+        .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, failing), Effect.flip),
+    ).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
+  }),
+)
+
 it.effect("streams output through the byte bound before decoding", () =>
   Effect.gen(function* () {
     const executor = make({
@@ -548,5 +645,43 @@ it.effect("turns hostile loader failures into bounded typed diagnostics", () =>
     expect(failure).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
     expect(failure.message).toContain("uninspectable failure")
     expect(failure.message.length).toBeLessThan(220)
+  }),
+)
+
+it.effect("redacts credentials from loader and fetch diagnostics before truncation", () =>
+  Effect.gen(function* () {
+    const diagnostic =
+      "provider rejected Authorization: Bearer review-secret api_key=api-secret accessToken:'token-secret' client_secret=\"client-secret\" password=hunter2"
+    const boundaries = [
+      {
+        load: () => {
+          throw new Error(diagnostic)
+        },
+      },
+      {
+        load: () => ({
+          getEntrypoint: () => ({
+            fetch: async () => {
+              throw new Error(diagnostic)
+            },
+          }),
+        }),
+      },
+    ]
+    for (const loader of boundaries) {
+      const failure = yield* make({
+        compatibilityDate: "2026-08-19",
+        capabilityBinding: (rpc) => rpc,
+        loader,
+      })
+        .execute(request())
+        .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
+      expect(failure).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
+      expect(failure.message).toContain("[REDACTED]")
+      for (const secret of ["review-secret", "api-secret", "token-secret", "client-secret"]) {
+        expect(failure.message).not.toContain(secret)
+      }
+      expect(failure.message.length).toBeLessThan(220)
+    }
   }),
 )

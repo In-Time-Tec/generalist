@@ -75,17 +75,28 @@ const capabilityFailureId = (error) => {
 };
 export default {
   async fetch(request, env) {
+    const capabilityFailures = new WeakMap();
     try {
       const envelope = await request.json();
       if (envelope.protocolVersion !== env.TENET_PROTOCOL_VERSION || envelope.requestId !== env.TENET_REQUEST_ID)
         return json({ error: "protocol identity mismatch" }, 400);
       const capabilities = Object.freeze({
-        call: (operation, input) => env.TENET_CAPABILITIES.call({
-          protocolVersion: env.TENET_PROTOCOL_VERSION,
-          requestId: env.TENET_REQUEST_ID,
-          operation,
-          input
-        })
+        call: async (operation, input) => {
+          try {
+            return await env.TENET_CAPABILITIES.call({
+              protocolVersion: env.TENET_PROTOCOL_VERSION,
+              requestId: env.TENET_REQUEST_ID,
+              operation,
+              input
+            });
+          } catch (error) {
+            const failureId = capabilityFailureId(error);
+            if (failureId === undefined) throw new Error("capability invocation failed");
+            const failure = new Error("capability invocation failed");
+            capabilityFailures.set(failure, failureId);
+            throw failure;
+          }
+        }
       });
       const output = await execute(envelope.input, capabilities);
       return json({
@@ -97,7 +108,9 @@ export default {
         output
       });
     } catch (error) {
-      const failureId = capabilityFailureId(error);
+      const failureId = typeof error === "object" && error !== null
+        ? capabilityFailures.get(error)
+        : undefined;
       return json(failureId === undefined
         ? { error: "sandbox execution failed" }
         : { error: "sandbox execution failed", capabilityFailureId: failureId }, 500);

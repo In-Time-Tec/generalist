@@ -66,10 +66,11 @@ const close = (socket: HibernatingWebSocket, code: number, reason: string): void
 export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) => {
   const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 64), 1), 1_000)
   const fuel = Math.min(Math.max(Math.trunc(options.fuel ?? 4), 1), 32)
+  const flushing = new WeakMap<HibernatingWebSocket, Promise<FlushResult>>()
   const runPage = (runId: string, cursor: Cursor) =>
     Effect.runPromise(page({ runId, cursor, limit: pageSize }).pipe(Effect.provideService(Runtime, options.runtime)))
 
-  const flushSocket = async (socket: HibernatingWebSocket): Promise<FlushResult> => {
+  const drainSocket = async (socket: HibernatingWebSocket): Promise<FlushResult> => {
     const decoded = decodeAttachment(socket)
     if (Option.isNone(decoded)) {
       close(socket, 1002, "malformed-attachment")
@@ -98,6 +99,19 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
       if (!loaded.hasMore || loaded.frames.length === 0) break
     }
     return { sockets: 1, frames, hasMore }
+  }
+
+  const flushSocket = (socket: HibernatingWebSocket): Promise<FlushResult> => {
+    const previous = flushing.get(socket)
+    const current = (previous === undefined ? Promise.resolve() : previous.catch(() => undefined)).then(() =>
+      drainSocket(socket),
+    )
+    flushing.set(socket, current)
+    const clear = () => {
+      if (flushing.get(socket) === current) flushing.delete(socket)
+    }
+    void current.then(clear, clear)
+    return current
   }
 
   const flush = async (runId?: string): Promise<FlushResult> => {
@@ -137,11 +151,15 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
         if (decodedAttachment.value.state === "attached" && decodedAttachment.value.runId !== command.value.runId) {
           return close(socket, 1008, "run-mismatch")
         }
+        const requestedCursor = command.value.cursor ?? origin
         const attachment: Attachment = {
           version: 1,
           state: "attached",
           runId: command.value.runId,
-          cursor: command.value.cursor ?? origin,
+          cursor:
+            decodedAttachment.value.state === "attached"
+              ? Math.max(decodedAttachment.value.cursor, requestedCursor)
+              : requestedCursor,
         }
         if (!persist(socket, attachment)) return close(socket, 1009, "attachment-too-large")
         await flushSocket(socket)
