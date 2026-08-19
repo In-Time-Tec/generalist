@@ -106,9 +106,13 @@
       "types": "./dist/ai/provider/openrouter.d.ts",
       "import": "./dist/ai/provider/openrouter.js"
     },
-    "./ai/openai-compat": {
-      "types": "./dist/ai/provider/openai-compat.d.ts",
-      "import": "./dist/ai/provider/openai-compat.js"
+    "./ai/openai-responses": {
+      "types": "./dist/ai/provider/openai-responses.d.ts",
+      "import": "./dist/ai/provider/openai-responses.js"
+    },
+    "./ai/openai-chat-completions": {
+      "types": "./dist/ai/provider/openai-chat-completions.d.ts",
+      "import": "./dist/ai/provider/openai-chat-completions.js"
     },
     "./ai/deterministic": {
       "types": "./dist/ai/provider/deterministic.d.ts",

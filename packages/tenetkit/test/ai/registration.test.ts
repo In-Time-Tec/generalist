@@ -32,9 +32,11 @@ import {
   toolJsonSchemaCompiler as openAiToolJsonSchemaCompiler,
 } from "tenetkit/ai/openai"
 import {
-  layer as compatibleLayer,
-  toolJsonSchemaCompiler as compatibleToolJsonSchemaCompiler,
-} from "tenetkit/ai/openai-compat"
+  decodeConfig as decodeChatCompletionsConfig,
+  layer as chatCompletionsLayer,
+  toolJsonSchemaCompiler as chatCompletionsToolJsonSchemaCompiler,
+} from "tenetkit/ai/openai-chat-completions"
+import { layer as responsesLayer } from "tenetkit/ai/openai-responses"
 import { classifyFailure as classifyOpenRouterFailure, layer as openRouterLayer } from "tenetkit/ai/openrouter"
 import { Deterministic, Embedding, Presets } from "../../src/ai/index.js"
 
@@ -91,6 +93,17 @@ describe("providers", () => {
       output_config: { effort: "medium" },
       thinking: { type: "enabled", budget_tokens: 2_048 },
     })
+    expect(
+      decodeChatCompletionsConfig({
+        max_tokens: 4_096,
+        reasoning_effort: "high",
+        provider_extension: { enabled: true },
+      }),
+    ).toEqual({
+      max_tokens: 4_096,
+      reasoning_effort: "high",
+      provider_extension: { enabled: true },
+    })
   })
 
   it("rejects invalid and cross-provider persisted options", () => {
@@ -99,6 +112,8 @@ describe("providers", () => {
     expect(() => decodeAnthropicConfig({ max_output_tokens: 1_000 })).toThrow()
     expect(() => decodeAnthropicConfig({ max_tokens: 0 })).toThrow()
     expect(() => decodeAnthropicConfig({ output_config: { effort: "extreme" } })).toThrow()
+    expect(() => decodeChatCompletionsConfig({ model: "route-bypass" })).toThrow()
+    expect(() => decodeChatCompletionsConfig({ max_tokens: undefined })).toThrow()
   })
 
   it.effect("compiles the same request schema as each released provider codec", () => {
@@ -112,7 +127,7 @@ describe("providers", () => {
 
     return Effect.gen(function* () {
       expect(yield* openAiToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
-      expect(yield* compatibleToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
+      expect(yield* chatCompletionsToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
       expect(yield* anthropicToolJsonSchemaCompiler(tool)).toEqual(expectedAnthropic)
     })
   })
@@ -227,7 +242,7 @@ describe("providers", () => {
     const registrations = (classifyFailure?: ModelRegistry.FailureClassifier) =>
       Effect.scoped(
         Layer.build(
-          compatibleLayer({
+          chatCompletionsLayer({
             model: classifyFailure === undefined ? "compatible-default" : "compatible-openai",
             apiKey,
             ...(classifyFailure === undefined ? {} : { classifyFailure }),
@@ -244,6 +259,52 @@ describe("providers", () => {
       }),
       Effect.provideService(HttpClient.HttpClient, hostHttpClient),
     )
+  })
+
+  it.effect("routes explicit compatible adapters to Responses and Chat Completions endpoints", () => {
+    const urls: Array<string> = []
+    const client = HttpClient.make((request) =>
+      Effect.sync(() => urls.push(request.url)).pipe(Effect.andThen(Effect.die("request captured"))),
+    )
+    const invoke = (
+      selection: ModelRegistry.ModelSelection,
+      providerLayer: Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient>,
+    ) =>
+      Effect.scoped(
+        Layer.build(Layer.provide(providerLayer, Layer.succeed(HttpClient.HttpClient, client))).pipe(
+          Effect.flatMap((context) =>
+            ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "hello" })).pipe(
+              Effect.exit,
+              Effect.provide(context),
+            ),
+          ),
+        ),
+      )
+    return Effect.gen(function* () {
+      yield* invoke(
+        { provider: "local-responses", model: "responses-model" },
+        responsesLayer({
+          provider: "local-responses",
+          model: "responses-model",
+          baseUrl: "https://responses.example.test/v1",
+          apiKey,
+        }),
+      )
+      yield* invoke(
+        { provider: "local-chat", model: "chat-model" },
+        chatCompletionsLayer({
+          provider: "local-chat",
+          model: "chat-model",
+          baseUrl: "https://chat.example.test/v1",
+          apiKey,
+        }),
+      )
+
+      expect(urls).toEqual([
+        "https://responses.example.test/v1/responses",
+        "https://chat.example.test/v1/chat/completions",
+      ])
+    })
   })
 
   testLayer(
@@ -517,7 +578,8 @@ describe("providers", () => {
       openAiLayer({ model: "gpt-test", apiKey }),
       anthropicLayer({ model: "claude-test", apiKey }),
       openRouterLayer({ model: "openrouter-test", apiKey }),
-      compatibleLayer({ model: "compatible-test", apiKey }),
+      responsesLayer({ model: "responses-compatible-test", apiKey }),
+      chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
       Presets.layerGroq({ model: "model", apiKey }),
       Presets.layerMistral({ model: "model", apiKey }),
       Presets.layerXai({ model: "model", apiKey }),
@@ -582,7 +644,8 @@ describe("providers", () => {
       openAiLayer({ model: "gpt-test", apiKey }),
       anthropicLayer({ model: "claude-test", apiKey }),
       openRouterLayer({ model: "openrouter-test", apiKey }),
-      compatibleLayer({ model: "compatible-test", apiKey }),
+      responsesLayer({ model: "responses-compatible-test", apiKey }),
+      chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
       Presets.layerGroq({ model: "model", apiKey }),
       Presets.layerMistral({ model: "model", apiKey }),
       Presets.layerXai({ model: "model", apiKey }),
@@ -662,7 +725,8 @@ describe("providers", () => {
     expect(typeof openAiLayer).toBe("function")
     expect(typeof anthropicLayer).toBe("function")
     expect(typeof openRouterLayer).toBe("function")
-    expect(typeof compatibleLayer).toBe("function")
+    expect(typeof responsesLayer).toBe("function")
+    expect(typeof chatCompletionsLayer).toBe("function")
     expect(typeof deterministicLayerOpenAi).toBe("function")
     expect(typeof Presets.layerGroq).toBe("function")
     expect(typeof Presets.layerMistral).toBe("function")

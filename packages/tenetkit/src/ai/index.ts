@@ -307,21 +307,45 @@ export namespace OpenAiAccountAuthHttp {
   export type layer = typeof import("./provider/openai-account-auth-http.js").layer
 }
 import {
-  toolJsonSchemaCompiler as OpenAiCompatible_toolJsonSchemaCompiler,
-  layer as OpenAiCompatible_layer,
-  layerConfig as OpenAiCompatible_layerConfig,
-} from "./provider/openai-compat.js"
-export const OpenAiCompatible = {
-  toolJsonSchemaCompiler: OpenAiCompatible_toolJsonSchemaCompiler,
-  layer: OpenAiCompatible_layer,
-  layerConfig: OpenAiCompatible_layerConfig,
-} as typeof import("./provider/openai-compat.js")
-export namespace OpenAiCompatible {
-  export type toolJsonSchemaCompiler = typeof import("./provider/openai-compat.js").toolJsonSchemaCompiler
-  export type layer = typeof import("./provider/openai-compat.js").layer
-  export type layerConfig = typeof import("./provider/openai-compat.js").layerConfig
-  export type LayerOptions = import("./provider/openai-compat.js").LayerOptions
-  export type OpenAiCompatibleInput = import("./provider/openai-compat.js").OpenAiCompatibleInput
+  decodeConfig as OpenAiChatCompletions_decodeConfig,
+  toolJsonSchemaCompiler as OpenAiChatCompletions_toolJsonSchemaCompiler,
+  layer as OpenAiChatCompletions_layer,
+  layerConfig as OpenAiChatCompletions_layerConfig,
+} from "./provider/openai-chat-completions.js"
+export const OpenAiChatCompletions = {
+  decodeConfig: OpenAiChatCompletions_decodeConfig,
+  toolJsonSchemaCompiler: OpenAiChatCompletions_toolJsonSchemaCompiler,
+  layer: OpenAiChatCompletions_layer,
+  layerConfig: OpenAiChatCompletions_layerConfig,
+} as typeof import("./provider/openai-chat-completions.js")
+export namespace OpenAiChatCompletions {
+  export type decodeConfig = typeof import("./provider/openai-chat-completions.js").decodeConfig
+  export type toolJsonSchemaCompiler = typeof import("./provider/openai-chat-completions.js").toolJsonSchemaCompiler
+  export type layer = typeof import("./provider/openai-chat-completions.js").layer
+  export type layerConfig = typeof import("./provider/openai-chat-completions.js").layerConfig
+  export type Config = import("./provider/openai-chat-completions.js").Config
+  export type LayerOptions = import("./provider/openai-chat-completions.js").LayerOptions
+  export type OpenAiChatCompletionsInput = import("./provider/openai-chat-completions.js").OpenAiChatCompletionsInput
+}
+import {
+  decodeConfig as OpenAiResponses_decodeConfig,
+  toolJsonSchemaCompiler as OpenAiResponses_toolJsonSchemaCompiler,
+  layer as OpenAiResponses_layer,
+  layerConfig as OpenAiResponses_layerConfig,
+} from "./provider/openai-responses.js"
+export const OpenAiResponses = {
+  decodeConfig: OpenAiResponses_decodeConfig,
+  toolJsonSchemaCompiler: OpenAiResponses_toolJsonSchemaCompiler,
+  layer: OpenAiResponses_layer,
+  layerConfig: OpenAiResponses_layerConfig,
+} as typeof import("./provider/openai-responses.js")
+export namespace OpenAiResponses {
+  export type decodeConfig = typeof import("./provider/openai-responses.js").decodeConfig
+  export type toolJsonSchemaCompiler = typeof import("./provider/openai-responses.js").toolJsonSchemaCompiler
+  export type layer = typeof import("./provider/openai-responses.js").layer
+  export type layerConfig = typeof import("./provider/openai-responses.js").layerConfig
+  export type LayerOptions = import("./provider/openai-responses.js").LayerOptions
+  export type OpenAiResponsesInput = import("./provider/openai-responses.js").OpenAiResponsesInput
 }
 import {
   classifyFailure as OpenRouter_classifyFailure,

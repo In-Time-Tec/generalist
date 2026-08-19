@@ -99,8 +99,11 @@ type ProviderAmazonBedrockSubpath = Assert<
   Equal<ProviderRoot["AmazonBedrock"], typeof import("tenetkit/ai/amazon-bedrock")>
 >
 type ProviderOpenRouterSubpath = Assert<Equal<ProviderRoot["OpenRouter"], typeof import("tenetkit/ai/openrouter")>>
-type ProviderOpenAiCompatibleSubpath = Assert<
-  Equal<ProviderRoot["OpenAiCompatible"], typeof import("tenetkit/ai/openai-compat")>
+type ProviderOpenAiResponsesSubpath = Assert<
+  Equal<ProviderRoot["OpenAiResponses"], typeof import("tenetkit/ai/openai-responses")>
+>
+type ProviderOpenAiChatCompletionsSubpath = Assert<
+  Equal<ProviderRoot["OpenAiChatCompletions"], typeof import("tenetkit/ai/openai-chat-completions")>
 >
 type ProviderDeterministicSubpath = Assert<
   Equal<ProviderRoot["Deterministic"], typeof import("tenetkit/ai/deterministic")>

@@ -16,7 +16,9 @@ export class ClientFailure extends Schema.TaggedError<ClientFailure>()("tenetkit
   operation: Schema.Literals(["converse", "converseStream"]),
   description: Schema.String,
   awsErrorName: Schema.optional(Schema.String),
+  awsErrorCode: Schema.optional(Schema.String),
   httpStatus: Schema.optional(Schema.Finite),
+  requestId: Schema.optional(Schema.String),
 }) {}
 
 /** @experimental */
@@ -74,11 +76,19 @@ const clientFailure = (operation: ClientFailure["operation"], cause: unknown) =>
     metadata !== undefined && "httpStatusCode" in metadata && typeof metadata.httpStatusCode === "number"
       ? metadata.httpStatusCode
       : undefined
+  const code =
+    value !== undefined && "code" in value && typeof value.code === "string" ? value.code.slice(0, 256) : undefined
+  const requestId =
+    metadata !== undefined && "requestId" in metadata && typeof metadata.requestId === "string"
+      ? metadata.requestId.slice(0, 256)
+      : undefined
   return ClientFailure.make({
     operation,
-    description: value?.message ?? value?.name ?? "request failed",
+    description: (value?.message ?? value?.name ?? "request failed").slice(0, 2_048),
     ...(value === undefined ? {} : { awsErrorName: value.name }),
+    ...(code === undefined ? {} : { awsErrorCode: code }),
     ...(status === undefined ? {} : { httpStatus: status }),
+    ...(requestId === undefined ? {} : { requestId }),
   })
 }
 
@@ -95,13 +105,23 @@ const wrapStream = (output: ConverseStreamCommandOutput, client: BedrockRuntimeC
         const iterator = source[Symbol.asyncIterator]()
         return {
           next: () =>
-            iterator.next().then((result) => {
-              if (result.done === true) client.destroy()
-              return result
-            }),
+            iterator.next().then(
+              (result) => {
+                if (result.done === true) client.destroy()
+                return result
+              },
+              (error) => {
+                client.destroy()
+                throw error
+              },
+            ),
           return: (value?: unknown) => {
             client.destroy()
             return iterator.return?.(value) ?? Promise.resolve({ done: true as const, value })
+          },
+          throw: (error?: unknown) => {
+            client.destroy()
+            return iterator.throw?.(error) ?? Promise.reject(error)
           },
         }
       },
@@ -154,6 +174,7 @@ export const layerClient = (options: Options = {}) => {
                 ClientFailure.make({
                   operation: "converse",
                   description: "AWS credential recovery failed",
+                  awsErrorName: "CredentialProviderError",
                 }),
               ),
             )
@@ -166,18 +187,20 @@ export const layerClient = (options: Options = {}) => {
         credential?: Credential,
       ) => {
         const client = makeClient(credential)
+        let streamOwnsClient = false
         return Effect.tryPromise({
           try: (signal) => client.send(command as ConverseCommand, { abortSignal: signal }) as Promise<A>,
           catch: (cause) => clientFailure(operation, cause),
         }).pipe(
-          Effect.tapError(() => Effect.sync(() => client.destroy())),
-          Effect.flatMap((output) =>
-            operation === "converseStream"
-              ? Effect.succeed(wrapStream(output as ConverseStreamCommandOutput, client) as A)
-              : Effect.sync(() => {
-                  client.destroy()
-                  return output
-                }),
+          Effect.map((output) => {
+            if (operation !== "converseStream") return output
+            streamOwnsClient = (output as ConverseStreamCommandOutput).stream !== undefined
+            return wrapStream(output as ConverseStreamCommandOutput, client) as A
+          }),
+          Effect.ensuring(
+            Effect.sync(() => {
+              if (!streamOwnsClient) client.destroy()
+            }),
           ),
         )
       }
@@ -188,7 +211,13 @@ export const layerClient = (options: Options = {}) => {
       ): Effect.Effect<A, ClientFailure> => {
         if (managedCredentials === undefined) return sendOnce(operation, makeCommand())
         return managedCredentials.acquire.pipe(
-          Effect.mapError(() => ClientFailure.make({ operation, description: "AWS credential resolution failed" })),
+          Effect.mapError(() =>
+            ClientFailure.make({
+              operation,
+              description: "AWS credential resolution failed",
+              awsErrorName: "CredentialProviderError",
+            }),
+          ),
           Effect.flatMap((credential) =>
             sendOnce<A>(operation, makeCommand(), credential).pipe(
               Effect.catch((error) =>
@@ -198,6 +227,14 @@ export const layerClient = (options: Options = {}) => {
                         ClientFailure.make({
                           operation,
                           description: refreshError.description,
+                          ...(refreshError.awsErrorName === undefined
+                            ? {}
+                            : { awsErrorName: refreshError.awsErrorName }),
+                          ...(refreshError.awsErrorCode === undefined
+                            ? {}
+                            : { awsErrorCode: refreshError.awsErrorCode }),
+                          ...(refreshError.httpStatus === undefined ? {} : { httpStatus: refreshError.httpStatus }),
+                          ...(refreshError.requestId === undefined ? {} : { requestId: refreshError.requestId }),
                         }),
                       ),
                       Effect.flatMap((refreshed) => sendOnce<A>(operation, makeCommand(), refreshed)),
