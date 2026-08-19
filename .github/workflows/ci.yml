@@ -22,33 +22,33 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: baton
-          POSTGRES_PASSWORD: baton
-          POSTGRES_DB: baton
+          POSTGRES_USER: tenetkit
+          POSTGRES_PASSWORD: tenetkit
+          POSTGRES_DB: tenetkit
         ports:
           - 55432:5432
         options: >-
-          --health-cmd "pg_isready -U baton -d baton"
+          --health-cmd "pg_isready -U tenetkit -d tenetkit"
           --health-interval 1s
           --health-timeout 3s
           --health-retries 60
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: baton
-          MYSQL_DATABASE: baton
-          MYSQL_USER: baton
-          MYSQL_PASSWORD: baton
+          MYSQL_ROOT_PASSWORD: tenetkit
+          MYSQL_DATABASE: tenetkit
+          MYSQL_USER: tenetkit
+          MYSQL_PASSWORD: tenetkit
         ports:
           - 33306:3306
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -ubaton -pbaton"
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -utenetkit -ptenetkit"
           --health-interval 1s
           --health-timeout 3s
           --health-retries 60
     env:
-      TENETKIT_DATABASE_URL: postgres://baton:baton@127.0.0.1:55432/baton
-      TENETKIT_MYSQL_URL: mysql://baton:baton@127.0.0.1:33306/baton
+      TENETKIT_DATABASE_URL: postgres://tenetkit:tenetkit@127.0.0.1:55432/tenetkit
+      TENETKIT_MYSQL_URL: mysql://tenetkit:tenetkit@127.0.0.1:33306/tenetkit
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -84,7 +84,7 @@ jobs:
         run: bun run check
 
       - name: Grant MySQL test databases
-        run: mysql -h 127.0.0.1 -P 33306 -uroot -pbaton -e "GRANT ALL PRIVILEGES ON \`baton\_%\`.* TO 'baton'@'%'; FLUSH PRIVILEGES;"
+        run: mysql -h 127.0.0.1 -P 33306 -uroot -ptenetkit -e "GRANT ALL PRIVILEGES ON \`tenetkit\_%\`.* TO 'tenetkit'@'%'; FLUSH PRIVILEGES;"
 
       - name: Test
         run: bun run test
