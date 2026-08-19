@@ -328,18 +328,21 @@ import {
   decodeConfig as OpenRouter_decodeConfig,
   layer as OpenRouter_layer,
   layerConfig as OpenRouter_layerConfig,
+  toolJsonSchemaCompiler as OpenRouter_toolJsonSchemaCompiler,
 } from "./provider/openrouter.js"
 export const OpenRouter = {
   classifyFailure: OpenRouter_classifyFailure,
   decodeConfig: OpenRouter_decodeConfig,
   layer: OpenRouter_layer,
   layerConfig: OpenRouter_layerConfig,
+  toolJsonSchemaCompiler: OpenRouter_toolJsonSchemaCompiler,
 } as typeof import("./provider/openrouter.js")
 export namespace OpenRouter {
   export type classifyFailure = typeof import("./provider/openrouter.js").classifyFailure
   export type decodeConfig = typeof import("./provider/openrouter.js").decodeConfig
   export type layer = typeof import("./provider/openrouter.js").layer
   export type layerConfig = typeof import("./provider/openrouter.js").layerConfig
+  export type toolJsonSchemaCompiler = typeof import("./provider/openrouter.js").toolJsonSchemaCompiler
   export type LayerOptions = import("./provider/openrouter.js").LayerOptions
   export type OpenRouterInput = import("./provider/openrouter.js").OpenRouterInput
 }
