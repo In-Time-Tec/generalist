@@ -33,28 +33,31 @@
       "@aws-sdk/client-bedrock-runtime": "3.859.0",
       "@aws-sdk/credential-provider-node": "3.859.0",
       "@smithy/types": "4.3.1",
-      "@effect/ai-anthropic": "4.0.0-beta.98",
-      "@effect/ai-openai": "4.0.0-beta.98",
-      "@effect/ai-openai-compat": "4.0.0-beta.98",
-      "@effect/ai-openrouter": "4.0.0-beta.98",
-      "@effect/platform-bun": "4.0.0-beta.98",
-      "@effect/sql-mysql2": "4.0.0-beta.98",
-      "@effect/sql-sqlite-bun": "4.0.0-beta.98",
-      "@effect/sql-pg": "4.0.0-beta.98",
-      "@effect/tsgo": "0.33.0",
-      "@effect/vitest": "4.0.0-beta.98",
-      "@foldkit/ui": "0.122.0",
-      "@foldkit/vite-plugin": "0.10.0",
+      "@effect/ai-anthropic": "4.0.0-rc.109",
+      "@effect/ai-openai": "4.0.0-rc.109",
+      "@effect/ai-openai-compat": "4.0.0-rc.109",
+      "@effect/ai-openrouter": "4.0.0-rc.109",
+      "@effect/platform-bun": "4.0.0-rc.109",
+      "@effect/platform-node-shared": "4.0.0-rc.109",
+      "@effect/sql-mysql2": "4.0.0-rc.109",
+      "@effect/sql-sqlite-bun": "4.0.0-rc.109",
+      "@effect/sql-sqlite-do": "4.0.0-rc.109",
+      "@effect/sql-pg": "4.0.0-rc.109",
+      "@effect/tsgo": "0.36.5",
+      "@effect/vitest": "4.0.0-rc.109",
+      "@foldkit/ui": "0.148.0",
+      "@foldkit/vite-plugin": "0.16.0",
       "@modelcontextprotocol/sdk": "1.29.0",
       "@tailwindcss/vite": "4.3.2",
       "@tsconfig/bun": "1.0.9",
       "@types/bun": "1.3.13",
       "@types/node": "24.12.2",
-      "@vitest/coverage-v8": "4.0.16",
+      "@vitest/coverage-v8": "4.1.11",
       "class-variance-authority": "0.7.1",
       "clsx": "2.1.1",
-      "effect": "4.0.0-beta.98",
-      "foldkit": "0.122.0",
+      "effect": "4.0.0-rc.109",
+      "esbuild": "0.28.2",
+      "foldkit": "0.148.0",
       "happy-dom": "20.10.6",
       "oxlint": "1.77.0",
       "oxlint-tsgolint": "7.0.2001",
@@ -64,11 +67,11 @@
       "turbo": "2.8.13",
       "typescript": "7.0.2",
       "vite": "8.1.3",
-      "vitest": "4.0.16"
+      "vitest": "4.1.11"
     },
     "catalogs": {
       "peer": {
-        "foldkit": ">=0.122.0 <1"
+        "foldkit": ">=0.148.0 <1"
       }
     }
   },
@@ -78,10 +81,15 @@
     "tenetkit": "workspace:*",
     "effect": "catalog:"
   },
+  "overrides": {
+    "@effect/platform-node-shared": "4.0.0-rc.109"
+  },
   "devDependencies": {
     "@ast-grep/cli": "catalog:",
     "@effect/platform-bun": "catalog:",
+    "@effect/platform-node-shared": "catalog:",
     "@effect/sql-mysql2": "catalog:",
+    "@effect/sql-sqlite-do": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
     "@effect/sql-pg": "catalog:",
     "@effect/tsgo": "catalog:",

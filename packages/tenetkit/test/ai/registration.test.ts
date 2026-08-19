@@ -336,7 +336,7 @@ describe("providers", () => {
               clientConfig: {
                 apiUrl: Config.fail(
                   new ConfigProvider.SourceError({ message: "test client configuration unavailable" }),
-                ),
+                ).pipe(Config.map(() => "")),
               },
             }),
           ),
@@ -646,7 +646,9 @@ describe("providers", () => {
           Layer.build(
             openAiLayer({
               model: "gpt-test",
-              apiKey: Config.fail(new ConfigProvider.SourceError({ message: "missing test key" })),
+              apiKey: Config.fail(new ConfigProvider.SourceError({ message: "missing test key" })).pipe(
+                Config.map(() => Redacted.make("")),
+              ),
             }),
           ),
         ),

@@ -2,7 +2,7 @@ import { Console, Effect, Equal, Layer, Schema } from "effect"
 import { Agent, Tool, Toolkit } from "tenetkit"
 import { TestModel } from "tenetkit/test"
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const lookupTool = Tool.make("lookup_order", {
   description: "Look up an order by id",

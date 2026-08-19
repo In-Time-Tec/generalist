@@ -127,7 +127,7 @@ describe("OpenAI account authorization protocol", () => {
           '{"device_auth_id":"device-secret","user_code":"CODE"}',
         )
       }
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(http)).not.toContain("secret")
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(http)).not.toContain("secret")
     }).pipe(provideAuth(Layer.succeed(HttpClient.HttpClient, client)))
   })
 
@@ -155,7 +155,7 @@ describe("OpenAI account authorization protocol", () => {
         expect(permanent.kind).toBe("login-required")
         expect(unauthorized.kind).toBe("login-required")
         expect(malformed.kind).toBe("protocol")
-        const rendered = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)([
+        const rendered = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))([
           terminal,
           permanent,
           unauthorized,
@@ -208,7 +208,9 @@ describe("OpenAI account authorization protocol", () => {
       }
       const credentials = credentialsFromAccountAuth(service, "fingerprint")
       const error = yield* Effect.flip(credentials.acquire)
-      expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)).not.toMatch(/token-secret|account-secret/)
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)).not.toMatch(
+        /token-secret|account-secret/,
+      )
       const mappedCredential = yield* credentials.refreshRejected("old")
       expect(Redacted.value(mappedCredential.accessToken)).toBe("access-secret")
       expect(mappedCredential.accountId).toBe("account-secret")

@@ -16,7 +16,7 @@ import {
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { Cursor } from "tenetkit/runtime"
+import { make as makeCursor, type Cursor } from "../../runtime/cursor.js"
 import { ReconnectExhausted, TransportError } from "./errors.js"
 import { encodeCommand, ObserverRunEvent, observerCodec } from "./wire.js"
 import type { ClientCommand, ResolvedRunEvent } from "./wire.js"
@@ -38,7 +38,7 @@ export interface ReconnectPolicy {
 export interface ConnectOptions {
   readonly url: string
   readonly runId: string
-  readonly cursor?: Cursor.Cursor
+  readonly cursor?: Cursor
   readonly eventCapacity?: number
   readonly reconnect?: ReconnectPolicy
 }
@@ -69,7 +69,7 @@ const errorMessage = (error: unknown): string =>
 
 const socketError = (error: unknown): TransportError => transportError(errorMessage(error), "socket")
 
-const urlWithCursor = (url: string, cursor: Cursor.Cursor | undefined): string => {
+const urlWithCursor = (url: string, cursor: Cursor | undefined): string => {
   if (cursor === undefined) return url
   const parsed = new URL(url, "http://tenetkit.local")
   parsed.searchParams.set("cursor", String(cursor))
@@ -79,7 +79,7 @@ const urlWithCursor = (url: string, cursor: Cursor.Cursor | undefined): string =
 /** @experimental Follows canonical RunEvents over SSE from an exclusive cursor. */
 export const sseEvents = (options: {
   readonly url: string
-  readonly cursor?: Cursor.Cursor
+  readonly cursor?: Cursor
 }): Stream.Stream<ResolvedRunEvent, TransportError, HttpClient.HttpClient> =>
   HttpClientResponse.stream(HttpClient.get(urlWithCursor(options.url, options.cursor))).pipe(
     Stream.decodeText,
@@ -130,7 +130,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
           const writerRef = yield* Ref.make<Option.Option<(chunk: string) => Effect.Effect<void, TransportError>>>(
             Option.none(),
           )
-          const cursorRef = yield* Ref.make<Option.Option<Cursor.Cursor>>(
+          const cursorRef = yield* Ref.make<Option.Option<Cursor>>(
             options.cursor === undefined ? Option.none() : Option.some(options.cursor),
           )
           const attemptRef = yield* Ref.make(0)
@@ -170,7 +170,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
                         Effect.mapError((error) => transportError(error.message, "protocol")),
                         Effect.flatMap((event) =>
                           Queue.offer(eventQueue, event).pipe(
-                            Effect.andThen(Ref.set(cursorRef, Option.some(Cursor.make(event.sequence)))),
+                            Effect.andThen(Ref.set(cursorRef, Option.some(makeCursor(event.sequence)))),
                           ),
                         ),
                       ),

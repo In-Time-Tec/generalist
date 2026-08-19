@@ -2,7 +2,7 @@ import { view } from "@foldkit/ui/button"
 import { type VariantProps, cva } from "class-variance-authority"
 import { Function } from "effect"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 
 import { cn } from "@/lib/utils"
 
@@ -56,18 +56,21 @@ export const button: {
     const h = html<ParentMessage>()
     const { attributes = [], class: className, dataSlot = "button", size, variant, ...primitiveConfig } = config
 
-    return view<ParentMessage>({
-      ...primitiveConfig,
-      toView: (buttonAttributes) =>
-        h.button(
-          [
-            ...buttonAttributes.button,
-            ...attributes,
-            h.DataAttribute("slot", dataSlot),
-            h.Class(cn(buttonVariants({ size, variant }), className)),
-          ],
-          [...children],
-        ),
-    })
+    return view<ParentMessage>(
+      {
+        ...primitiveConfig,
+        toView: (buttonAttributes) =>
+          h.button(
+            [
+              ...buttonAttributes.button,
+              ...attributes,
+              h.DataAttribute("slot", dataSlot),
+              h.Class(cn(buttonVariants({ size, variant }), className)),
+            ],
+            [...children],
+          ),
+      },
+      h,
+    )
   },
 )

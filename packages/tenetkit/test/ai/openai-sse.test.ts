@@ -5,7 +5,7 @@ import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstab
 import { ModelRegistry, ModelResilience } from "tenetkit"
 import { classifyFailure, layer, normalizeResponsesSse } from "tenetkit/ai/openai"
 
-const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const encoder = new TextEncoder()
 
 const nestedError = stringify({

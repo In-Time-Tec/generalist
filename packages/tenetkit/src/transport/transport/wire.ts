@@ -1,19 +1,17 @@
 import { Effect, Schema, SchemaTransformation } from "effect"
-import { Cursor, RunEvent } from "tenetkit/runtime"
+import { Cursor } from "../../runtime/cursor.js"
+import { CompletedModelResponse, RunEvent } from "../../runtime/run-event.js"
 import { WireEncodeFailed } from "./errors.js"
 
-type ModelResponseEvent = Extract<
-  RunEvent.RunEvent,
-  { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }
->
+type ModelResponseEvent = Extract<RunEvent, { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }>
 
 export type ResolvedRunEvent =
-  | Exclude<RunEvent.RunEvent, ModelResponseEvent>
-  | (ModelResponseEvent & { readonly response: RunEvent.CompletedModelResponse })
+  | Exclude<RunEvent, ModelResponseEvent>
+  | (ModelResponseEvent & { readonly response: CompletedModelResponse })
 
 /** @experimental String representation of an exclusive RunEvent replay cursor. */
 export const CursorFromString = Schema.String.check(Schema.isPattern(/^-?\d+$/)).pipe(
-  Schema.decodeTo(Cursor.Cursor, SchemaTransformation.numberFromString),
+  Schema.decodeTo(Cursor, SchemaTransformation.numberFromString),
 )
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -35,7 +33,7 @@ export const ObserverRunEvent: Schema.Codec<ResolvedRunEvent, ResolvedRunEvent, 
     typeof value.occurredAt === "string" &&
     (value._tag !== "ModelResponseCommitted" && value._tag !== "ModelResponseInterrupted"
       ? true
-      : Schema.is(RunEvent.CompletedModelResponse)(value.response)),
+      : Schema.is(CompletedModelResponse)(value.response)),
 )
 
 /** @experimental WebSocket commands are transport operations, not Run lifecycle facts. */
@@ -43,7 +41,7 @@ export const ClientCommand = Schema.Union([
   Schema.Struct({
     _tag: Schema.tag("Attach"),
     runId: Schema.String,
-    cursor: Schema.optionalKey(Cursor.Cursor),
+    cursor: Schema.optionalKey(Cursor),
   }),
   Schema.Struct({
     _tag: Schema.tag("Cancel"),
@@ -55,7 +53,7 @@ export const ClientCommand = Schema.Union([
 export type ClientCommand = typeof ClientCommand.Type
 
 /** @experimental */
-export interface EventCodec<Decoded = RunEvent.RunEvent, Encoded = Decoded> {
+export interface EventCodec<Decoded = RunEvent, Encoded = Decoded> {
   readonly encode: (event: Encoded) => Effect.Effect<string, WireEncodeFailed>
   readonly decode: (data: string) => Effect.Effect<Decoded, WireEncodeFailed>
 }
@@ -71,9 +69,7 @@ const makeCodec = <Type, Encoded>(schema: Schema.Codec<Type, Encoded, never, nev
 }
 
 /** @experimental Strict codec for Runtime-owned RunEvent producers. */
-export const producerCodec: EventCodec<RunEvent.RunEvent> = makeCodec(
-  RunEvent.RunEvent as Schema.Codec<RunEvent.RunEvent, unknown, never, never>,
-)
+export const producerCodec: EventCodec<RunEvent> = makeCodec(RunEvent)
 
 /** @experimental Forward-compatible codec for RunEvent observers. */
 export const observerCodec: EventCodec<ResolvedRunEvent> = makeCodec(ObserverRunEvent)

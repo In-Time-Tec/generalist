@@ -5,7 +5,7 @@ import { Socket } from "effect/unstable/socket"
 import type { Command } from "foldkit/command"
 import { define, mapMessages } from "foldkit/command"
 import type { Document, Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 import { m } from "foldkit/message"
 import type { ApplicationInit } from "foldkit/runtime"
 import { makeApplication, run } from "foldkit/runtime"
@@ -37,12 +37,9 @@ const Message = Schema.Union([GotChatAction, OpenedSession, FailedOpenSession])
 
 type Message = typeof Message.Type
 
-const OpenSession = define(
-  "OpenSession",
-  OpenedSession,
-  FailedOpenSession,
-)(
-  Effect.gen(function* () {
+const OpenSession = define("OpenSession", {
+  messages: [OpenedSession, FailedOpenSession],
+  execute: Effect.gen(function* () {
     const httpClient = yield* Layer.build(FetchHttpClient.layer)
     const response = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
       body: HttpBody.jsonUnsafe({}),
@@ -53,7 +50,7 @@ const OpenSession = define(
     Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
   ),
-)
+})
 
 const init: ApplicationInit<Model, Message, void, Connection.AgentConnection> = () => [
   { chat: Chat.initialModel(null), session: SessionOpening() },

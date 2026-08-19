@@ -37,7 +37,8 @@ const withSession = <A, E>(sessionId: string, body: (session: Session.Interface)
     }),
   )
 
-const jsonValue = (value: unknown): unknown => JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value))
+const jsonValue = (value: unknown): unknown =>
+  JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
 
 const completion = (operationKey: string, sessionParentId: string | null, text = "semantic answer") => {
   const response = { content: [Response.makePart("text", { text })], finishReason: "stop" as const }

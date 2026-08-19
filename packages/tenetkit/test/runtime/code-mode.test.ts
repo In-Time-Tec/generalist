@@ -412,14 +412,16 @@ describe("Runtime code_mode Program children", () => {
       const unknownSelection = yield* Effect.flip(
         Schema.decodeUnknownEffect(declaration.parametersSchema)({ ...exact, tools: ["shell"] }),
       )
-      expect(String(unknownSelection)).toContain('Expected "shell.run", got "shell"')
+      expect(String(unknownSelection)).toContain('Expected "shell.run"')
+      expect(String(unknownSelection)).toContain('["tools"][0]')
       const excessiveBudget = yield* Effect.flip(
         Schema.decodeUnknownEffect(declaration.parametersSchema)({
           ...exact,
           budget: { ...authority.budget, toolCalls: 4 },
         }),
       )
-      expect(String(excessiveBudget)).toContain("Expected a value less than or equal to 3, got 4")
+      expect(String(excessiveBudget)).toContain("Expected a value less than or equal to 3")
+      expect(String(excessiveBudget)).toContain('["budget"]["toolCalls"]')
     })
   })
 

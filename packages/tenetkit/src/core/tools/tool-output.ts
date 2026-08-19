@@ -23,7 +23,7 @@ export class ToolOutputStore extends Context.Service<ToolOutputStore, StoreInter
 ) {}
 
 /** @experimental */
-export class ToolOutputError extends Schema.TaggedErrorClass<ToolOutputError>()("tenetkit/core/ToolOutputError", {
+export class ToolOutputError extends Schema.TaggedError<ToolOutputError>()("tenetkit/core/ToolOutputError", {
   message: Schema.String,
 }) {}
 

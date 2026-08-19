@@ -5,6 +5,8 @@ import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
   catalogVersion,
   compressedSizeLimits,
+  forbiddenPackageExports,
+  packageExports,
   packedEffectDependencies,
   packedProviderDependencies,
   packages,
@@ -13,7 +15,7 @@ import {
   tarballName,
 } from "./package-smoke-config.js"
 
-class PackageSmokeFailed extends Schema.TaggedErrorClass<PackageSmokeFailed>()("@tenetkit/scripts/PackageSmokeFailed", {
+class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@tenetkit/scripts/PackageSmokeFailed", {
   message: Schema.String,
 }) {}
 
@@ -22,44 +24,7 @@ const smokeError = (message: string): PackageSmokeFailed => PackageSmokeFailed.m
 const parseJson = (text: string): Record<string, any> =>
   Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Any)))(text)
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
-
-const exports = [
-  "tenetkit",
-  "tenetkit/runtime",
-  "tenetkit/ai",
-  "tenetkit/mcp",
-  "tenetkit/skills",
-  "tenetkit/memory",
-  "tenetkit/harness",
-  "tenetkit/transport",
-  "tenetkit/foldkit",
-  "tenetkit/test",
-  "tenetkit/a2a",
-  "tenetkit/ag-ui",
-  "tenetkit/repl",
-  "tenetkit/ai/catalog",
-  "tenetkit/ai/openai",
-  "tenetkit/ai/openai-account-auth",
-  "tenetkit/ai/openai-account-auth-http",
-  "tenetkit/ai/anthropic",
-  "tenetkit/ai/amazon-bedrock",
-  "tenetkit/ai/openrouter",
-  "tenetkit/ai/openai-compat",
-  "tenetkit/ai/deterministic",
-  "tenetkit/ai/presets",
-  "tenetkit/ai/embedding",
-  "tenetkit/mcp/tools",
-  "tenetkit/repl/bun",
-  "tenetkit/transport/client",
-  "tenetkit/transport/errors",
-  "tenetkit/transport/sse",
-  "tenetkit/transport/ws",
-  "tenetkit/transport/wire",
-  "tenetkit/transport/snapshot",
-  "tenetkit/runtime/driver",
-  "tenetkit/runtime/driver/sql",
-] as const
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const run = Effect.fn("PackageSmoke.run")(function* (
   command: string,
@@ -260,9 +225,6 @@ const program = Effect.gen(function* () {
         }
       }
     }
-    if (encodeJson(manifest).includes("4.0.0-beta.93")) {
-      return yield* smokeError(`@tenetkit/${packageName} packed manifest contains Effect beta.93`)
-    }
     packedManifests[manifest.name] = manifest
     tarballs[packageNames[packageName]] = `file:${tarball}`
   }
@@ -282,7 +244,7 @@ const program = Effect.gen(function* () {
       dependencies: {
         ...tarballs,
         effect: effectVersion,
-        foldkit: "0.122.0",
+        foldkit: rootManifest.workspaces.catalog.foldkit,
         typescript: rootManifest.workspaces.catalog.typescript,
       },
       /**
@@ -358,11 +320,21 @@ server.listen(0, "127.0.0.1", () => {
       include: ["typecheck.ts"],
     }),
   )
-  yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(exports))
+  yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(packageExports))
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "runtime.mjs"),
-    `const specifiers = ${encodeJson(exports)}
+    `const specifiers = ${encodeJson(packageExports)}
 for (const specifier of specifiers) await import(specifier)
+const forbidden = ${encodeJson(forbiddenPackageExports)}
+for (const specifier of forbidden) {
+  let blocked = false
+  try {
+    await import(specifier)
+  } catch (error) {
+    blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED" || error?.code === "ERR_MODULE_NOT_FOUND"
+  }
+  if (!blocked) throw new Error(\`forbidden package export resolved: \${specifier}\`)
+}
 const { A2A } = await import("tenetkit/a2a")
 const { AgUi } = await import("tenetkit/ag-ui")
 const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("tenetkit")

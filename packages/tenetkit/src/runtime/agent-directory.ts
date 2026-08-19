@@ -37,7 +37,7 @@ export type AddressTarget =
   | { readonly _tag: "Session"; readonly sessionId: string }
   | { readonly _tag: "Name"; readonly scope: string; readonly name: string }
 
-export class AddressInvalid extends Schema.TaggedErrorClass<AddressInvalid>()("tenetkit/runtime/AddressInvalid", {
+export class AddressInvalid extends Schema.TaggedError<AddressInvalid>()("tenetkit/runtime/AddressInvalid", {
   address: Address,
   message: Schema.String,
 }) {}

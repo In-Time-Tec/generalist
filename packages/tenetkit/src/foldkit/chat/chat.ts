@@ -320,56 +320,51 @@ export const initialModel = (sessionId: string | null = null): Model => ({
 })
 
 /** @experimental */
-export const SendUserMessage = define(
-  "SendUserMessage",
-  { sessionId: Schema.String, text: Schema.String },
-  SentUserMessage,
-  FailedAgentCommand,
-)(({ sessionId, text }) =>
-  AgentConnection.use((connection) =>
-    catchCommandFailure(
-      "send",
-      connection.send({ _tag: "SendMessage", sessionId, prompt: text }).pipe(Effect.as(SentUserMessage())),
+export const SendUserMessage = define("SendUserMessage", {
+  args: { sessionId: Schema.String, text: Schema.String },
+  messages: [SentUserMessage, FailedAgentCommand],
+  execute: ({ sessionId, text }) =>
+    AgentConnection.use((connection) =>
+      catchCommandFailure(
+        "send",
+        connection.send({ _tag: "SendMessage", sessionId, prompt: text }).pipe(Effect.as(SentUserMessage())),
+      ),
     ),
-  ),
-)
+})
 
 /** @experimental */
-export const ResolveApproval = define(
-  "ResolveApproval",
-  {
+export const ResolveApproval = define("ResolveApproval", {
+  args: {
     sessionId: Schema.String,
     token: Schema.String,
     approved: Schema.Boolean,
     reason: Schema.NullOr(Schema.String),
   },
-  ResolvedApproval,
-  FailedAgentCommand,
-)(({ sessionId, token, approved, reason }) => {
-  const decision: ClientApproval = approved
-    ? { _tag: "Approved" }
-    : reason === null
-      ? { _tag: "Denied" }
-      : { _tag: "Denied", reason }
-  return AgentConnection.use((connection) =>
-    catchCommandFailure(
-      "resolveApproval",
-      connection.send({ _tag: "ResolveApproval", sessionId, token, decision }).pipe(Effect.as(ResolvedApproval())),
-    ),
-  )
+  messages: [ResolvedApproval, FailedAgentCommand],
+  execute: ({ sessionId, token, approved, reason }) => {
+    const decision: ClientApproval = approved
+      ? { _tag: "Approved" }
+      : reason === null
+        ? { _tag: "Denied" }
+        : { _tag: "Denied", reason }
+    return AgentConnection.use((connection) =>
+      catchCommandFailure(
+        "resolveApproval",
+        connection.send({ _tag: "ResolveApproval", sessionId, token, decision }).pipe(Effect.as(ResolvedApproval())),
+      ),
+    )
+  },
 })
 
 /** @experimental */
-export const CancelRun = define(
-  "CancelRun",
-  { sessionId: Schema.String },
-  CancelledRun,
-  FailedAgentCommand,
-)(({ sessionId }) =>
-  AgentConnection.use((connection) =>
-    catchCommandFailure("cancel", connection.send({ _tag: "Cancel", sessionId }).pipe(Effect.as(CancelledRun()))),
-  ),
-)
+export const CancelRun = define("CancelRun", {
+  args: { sessionId: Schema.String },
+  messages: [CancelledRun, FailedAgentCommand],
+  execute: ({ sessionId }) =>
+    AgentConnection.use((connection) =>
+      catchCommandFailure("cancel", connection.send({ _tag: "Cancel", sessionId }).pipe(Effect.as(CancelledRun()))),
+    ),
+})
 
 const jsonText = (value: unknown): string => {
   try {

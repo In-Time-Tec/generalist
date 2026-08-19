@@ -24,13 +24,13 @@ export interface DurableAgentDriver {
 }
 
 /** @experimental */
-export class DriverError extends Schema.TaggedErrorClass<DriverError>()("tenetkit/core/DriverError", {
+export class DriverError extends Schema.TaggedError<DriverError>()("tenetkit/core/DriverError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
 /** @experimental */
-export class DriverVersionMismatch extends Schema.TaggedErrorClass<DriverVersionMismatch>()(
+export class DriverVersionMismatch extends Schema.TaggedError<DriverVersionMismatch>()(
   "tenetkit/core/DriverVersionMismatch",
   {
     expected: Schema.String,
@@ -39,12 +39,9 @@ export class DriverVersionMismatch extends Schema.TaggedErrorClass<DriverVersion
 ) {}
 
 /** @experimental */
-export class DriverStateInvalid extends Schema.TaggedErrorClass<DriverStateInvalid>()(
-  "tenetkit/core/DriverStateInvalid",
-  {
-    message: Schema.String,
-  },
-) {}
+export class DriverStateInvalid extends Schema.TaggedError<DriverStateInvalid>()("tenetkit/core/DriverStateInvalid", {
+  message: Schema.String,
+}) {}
 
 /** @experimental */
 export const requireDriverVersion: {

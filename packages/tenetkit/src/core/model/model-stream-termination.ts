@@ -34,19 +34,16 @@ const terminationFields = {
  * @experimental A provider part stream reached a clean end without its terminal
  * `finish` part, so the attempt produced no finish reason and no usage.
  */
-export class ModelStreamTruncated extends Schema.TaggedErrorClass<ModelStreamTruncated>()(
+export class ModelStreamTruncated extends Schema.TaggedError<ModelStreamTruncated>()(
   "tenetkit/core/ModelStreamTruncated",
   terminationFields,
 ) {}
 
 /** @experimental A provider part stream exceeded its configured idle deadline. */
-export class ModelStreamTimeout extends Schema.TaggedErrorClass<ModelStreamTimeout>()(
-  "tenetkit/core/ModelStreamTimeout",
-  {
-    ...terminationFields,
-    idleMillis: Schema.Finite,
-  },
-) {}
+export class ModelStreamTimeout extends Schema.TaggedError<ModelStreamTimeout>()("tenetkit/core/ModelStreamTimeout", {
+  ...terminationFields,
+  idleMillis: Schema.Finite,
+}) {}
 
 /** @experimental A model part stream did not reach a provider-reported terminal event. */
 export type TerminationFailure = ModelStreamTruncated | ModelStreamTimeout

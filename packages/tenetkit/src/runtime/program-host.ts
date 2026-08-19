@@ -375,7 +375,7 @@ export const make = (input: {
         if (binding === undefined)
           return Effect.fail(ProgramCapabilities.ProgramCapabilityMissing.make({ capability: name }))
         const describe = (schema: Schema.Top) =>
-          Schema.encodeSync(SchemaRepresentation.DocumentFromJson)(SchemaRepresentation.fromAST(schema.ast))
+          SchemaRepresentation.toJson(SchemaRepresentation.toRepresentation(schema.ast))
         return Effect.succeed({ name, inputSchema: describe(binding.input), outputSchema: describe(binding.output) })
       },
       callTool: (raw) => callBinding(program, raw, "tool"),

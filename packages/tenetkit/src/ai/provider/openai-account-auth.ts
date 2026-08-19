@@ -18,13 +18,13 @@ export const deviceExchangeRedirect = `${issuer}/deviceauth/callback`
 export const credentialFormatVersion = 1
 
 /** @experimental */
-export class AuthError extends Schema.TaggedErrorClass<AuthError>()("tenetkit/ai/OpenAiAccountAuthError", {
+export class AuthError extends Schema.TaggedError<AuthError>()("tenetkit/ai/OpenAiAccountAuthError", {
   kind: Schema.Literals(["cancelled", "timeout", "host", "network", "protocol", "account-mismatch", "login-required"]),
   message: Schema.String,
 }) {}
 
 /** @experimental */
-export class StoreError extends Schema.TaggedErrorClass<StoreError>()("tenetkit/ai/OpenAiAccountAuthStoreError", {
+export class StoreError extends Schema.TaggedError<StoreError>()("tenetkit/ai/OpenAiAccountAuthStoreError", {
   kind: Schema.Literals(["missing", "corrupt", "unsafe", "busy", "io"]),
   message: Schema.String,
 }) {}

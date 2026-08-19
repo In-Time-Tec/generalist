@@ -64,7 +64,7 @@ export type CellResult = typeof CellResult.Type
  * @experimental The cell threw. This is model input, not a framework failure: the namespace, the
  * kernel, and every prior binding survive.
  */
-export class CellExecutionFailed extends Schema.TaggedErrorClass<CellExecutionFailed>()(
+export class CellExecutionFailed extends Schema.TaggedError<CellExecutionFailed>()(
   "tenetkit/repl/CellExecutionFailed",
   {
     cellId: CellId,
@@ -92,14 +92,14 @@ export const UnavailableReason = Schema.Literals([
 export type UnavailableReason = typeof UnavailableReason.Type
 
 /** @experimental No kernel was available to run the cell. Nothing was evaluated. */
-export class KernelUnavailable extends Schema.TaggedErrorClass<KernelUnavailable>()("tenetkit/repl/KernelUnavailable", {
+export class KernelUnavailable extends Schema.TaggedError<KernelUnavailable>()("tenetkit/repl/KernelUnavailable", {
   sessionId: SessionId,
   reason: UnavailableReason,
   message: Schema.String,
 }) {}
 
 /** @experimental The kernel broke the cell protocol: out-of-order sequence, unknown frame, or malformed payload. */
-export class KernelProtocolViolation extends Schema.TaggedErrorClass<KernelProtocolViolation>()(
+export class KernelProtocolViolation extends Schema.TaggedError<KernelProtocolViolation>()(
   "tenetkit/repl/KernelProtocolViolation",
   {
     sessionId: SessionId,
@@ -117,16 +117,13 @@ export type UnknownReason = typeof UnknownReason.Type
  * @experimental The cell may or may not have committed its effects. It is never replayed; a host
  * resolves it explicitly.
  */
-export class CellOutcomeUnknown extends Schema.TaggedErrorClass<CellOutcomeUnknown>()(
-  "tenetkit/repl/CellOutcomeUnknown",
-  {
-    sessionId: SessionId,
-    cellId: CellId,
-    epoch: Epoch,
-    reason: UnknownReason,
-    message: Schema.String,
-  },
-) {}
+export class CellOutcomeUnknown extends Schema.TaggedError<CellOutcomeUnknown>()("tenetkit/repl/CellOutcomeUnknown", {
+  sessionId: SessionId,
+  cellId: CellId,
+  epoch: Epoch,
+  reason: UnknownReason,
+  message: Schema.String,
+}) {}
 
 /** @experimental Closed union of everything a cell call can fail with. */
 export const CellFailure = Schema.Union([

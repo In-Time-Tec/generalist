@@ -28,26 +28,15 @@ export const RunBudget = Schema.Struct({
 export type RunBudget = typeof RunBudget.Type
 
 /** @experimental */
-export class RunBudgetExhausted extends Schema.TaggedErrorClass<RunBudgetExhausted>()(
-  "tenetkit/core/RunBudgetExhausted",
-  {
-    dimension: Schema.Literals([
-      "modelCalls",
-      "toolCalls",
-      "totalTokens",
-      "childRuns",
-      "handoffs",
-      "depth",
-      "deadline",
-    ]),
-    requested: Schema.Finite,
-    remaining: Schema.optionalKey(Schema.Finite),
-    message: Schema.optionalKey(Schema.String),
-  },
-) {}
+export class RunBudgetExhausted extends Schema.TaggedError<RunBudgetExhausted>()("tenetkit/core/RunBudgetExhausted", {
+  dimension: Schema.Literals(["modelCalls", "toolCalls", "totalTokens", "childRuns", "handoffs", "depth", "deadline"]),
+  requested: Schema.Finite,
+  remaining: Schema.optionalKey(Schema.Finite),
+  message: Schema.optionalKey(Schema.String),
+}) {}
 
 /** @experimental */
-export class RunBudgetGrantWidened extends Schema.TaggedErrorClass<RunBudgetGrantWidened>()(
+export class RunBudgetGrantWidened extends Schema.TaggedError<RunBudgetGrantWidened>()(
   "tenetkit/core/RunBudgetGrantWidened",
   {
     dimension: Schema.Literals(["modelCalls", "toolCalls", "totalTokens", "childRuns", "handoffs", "depth"]),

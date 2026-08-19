@@ -1,6 +1,6 @@
 import { Option, Function } from "effect"
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 
 import type { ButtonConfig } from "@/components/ui/button"
 import { button } from "@/components/ui/button"

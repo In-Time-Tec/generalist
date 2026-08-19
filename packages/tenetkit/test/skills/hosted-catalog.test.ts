@@ -11,7 +11,7 @@ const s3SourceIsInternal: "source" extends keyof S3Catalog.Options ? false : tru
 const githubSourceIsInternal: "source" extends keyof GitHubCatalog.Options ? false : true = true
 const digestBytes = new Uint8Array(32).fill(1)
 const digest = Encoding.encodeHex(digestBytes)
-const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const secretSource = "https://user:password@example.invalid/catalog?token=SECRET#fragment"
 
 const withSecretSource = <Options extends object>(options: Options): Options => ({ ...options, source: secretSource })

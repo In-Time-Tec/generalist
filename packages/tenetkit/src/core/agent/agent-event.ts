@@ -220,7 +220,7 @@ export type Event =
   | ModelTelemetryEvent
 
 /** @experimental The loop failed. `turn` is the 0-based turn that failed. */
-export class AgentError extends Schema.TaggedErrorClass<AgentError>()("tenetkit/core/AgentError", {
+export class AgentError extends Schema.TaggedError<AgentError>()("tenetkit/core/AgentError", {
   message: Schema.String,
   turn: Schema.Finite,
   cause: Schema.optionalKey(Schema.Defect()),
@@ -228,7 +228,7 @@ export class AgentError extends Schema.TaggedErrorClass<AgentError>()("tenetkit/
 }) {}
 
 /** @experimental The turn policy declined another turn while tool results were still pending. */
-export class TurnLimitExceeded extends Schema.TaggedErrorClass<TurnLimitExceeded>()("tenetkit/core/TurnLimitExceeded", {
+export class TurnLimitExceeded extends Schema.TaggedError<TurnLimitExceeded>()("tenetkit/core/TurnLimitExceeded", {
   turn: Schema.Finite,
   limit: Schema.Finite,
   pending: Schema.Array(
@@ -240,7 +240,7 @@ export class TurnLimitExceeded extends Schema.TaggedErrorClass<TurnLimitExceeded
 }) {}
 
 /** @experimental A turn policy successfully stopped for a reason other than a configured turn limit. */
-export class TurnPolicyStopped extends Schema.TaggedErrorClass<TurnPolicyStopped>()("tenetkit/core/TurnPolicyStopped", {
+export class TurnPolicyStopped extends Schema.TaggedError<TurnPolicyStopped>()("tenetkit/core/TurnPolicyStopped", {
   turn: Schema.Finite,
   reason: StopReason,
   pending: Schema.Array(
@@ -263,7 +263,7 @@ export class TurnPolicyStopped extends Schema.TaggedErrorClass<TurnPolicyStopped
  * means text was streamed but never committed: a middleware chain removed it,
  * or the attempt that streamed it was discarded before release.
  */
-export class RunEndedWithoutOutput extends Schema.TaggedErrorClass<RunEndedWithoutOutput>()(
+export class RunEndedWithoutOutput extends Schema.TaggedError<RunEndedWithoutOutput>()(
   "tenetkit/core/RunEndedWithoutOutput",
   {
     turn: Schema.Finite,
@@ -274,7 +274,7 @@ export class RunEndedWithoutOutput extends Schema.TaggedErrorClass<RunEndedWitho
 ) {}
 
 /** @experimental A ModelMiddleware hook violated the loop contract. */
-export class MiddlewareViolation extends Schema.TaggedErrorClass<MiddlewareViolation>()(
+export class MiddlewareViolation extends Schema.TaggedError<MiddlewareViolation>()(
   "tenetkit/core/MiddlewareViolation",
   {
     turn: Schema.Finite,
@@ -283,7 +283,7 @@ export class MiddlewareViolation extends Schema.TaggedErrorClass<MiddlewareViola
 ) {}
 
 /** @experimental A transformed model response reused a tool-call identifier. */
-export class DuplicateToolCallId extends Schema.TaggedErrorClass<DuplicateToolCallId>()(
+export class DuplicateToolCallId extends Schema.TaggedError<DuplicateToolCallId>()(
   "tenetkit/core/DuplicateToolCallId",
   {
     id: Schema.String,
@@ -293,7 +293,7 @@ export class DuplicateToolCallId extends Schema.TaggedErrorClass<DuplicateToolCa
 ) {}
 
 /** @experimental An explicitly failing tool progress queue reached capacity. */
-export class ProgressOverflow extends Schema.TaggedErrorClass<ProgressOverflow>()("tenetkit/core/ProgressOverflow", {
+export class ProgressOverflow extends Schema.TaggedError<ProgressOverflow>()("tenetkit/core/ProgressOverflow", {
   turn: Schema.Finite,
   toolCallId: Schema.String,
   capacity: Schema.Finite,
@@ -314,7 +314,7 @@ export const ToolOrigin = Schema.Union([
 export type ToolOrigin = typeof ToolOrigin.Type
 
 /** @experimental The advertised tool set contains more than one declaration for a name. */
-export class ToolNameCollision extends Schema.TaggedErrorClass<ToolNameCollision>()("tenetkit/core/ToolNameCollision", {
+export class ToolNameCollision extends Schema.TaggedError<ToolNameCollision>()("tenetkit/core/ToolNameCollision", {
   name: Schema.String,
   origins: Schema.NonEmptyArray(ToolOrigin),
 }) {}
@@ -325,7 +325,7 @@ export class ToolNameCollision extends Schema.TaggedErrorClass<ToolNameCollision
  * out-of-band and re-enters via `RunOptions.resume` with this exact suspension.
  * Field shape deliberately mirrors a tool call so durable hosts can persist it.
  */
-export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("tenetkit/core/AgentSuspended", {
+export class AgentSuspended extends Schema.TaggedError<AgentSuspended>()("tenetkit/core/AgentSuspended", {
   token: Schema.String,
   reason: Schema.Literals(["tool-wait", "approval"]),
   tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
@@ -348,7 +348,7 @@ export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("t
 }) {}
 
 /** @experimental A resume identity did not match the current authoritative suspension checkpoint. */
-export class ResumeMismatch extends Schema.TaggedErrorClass<ResumeMismatch>()("tenetkit/core/ResumeMismatch", {
+export class ResumeMismatch extends Schema.TaggedError<ResumeMismatch>()("tenetkit/core/ResumeMismatch", {
   reason: Schema.Literals(["checkpoint-not-found", "identity-mismatch"]),
   expected: Schema.optional(AgentSuspended),
   received: AgentSuspended,

@@ -78,7 +78,9 @@ layer(bunLayer)("release workflows", (it) => {
       expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
       expect(source.match(new RegExp(`\\(\\.packages \\| length\\) == ${packageNames.length}`, "g"))).toHaveLength(2)
       expect(source.match(/\(\.packages \| length\) == \d+/g)).toHaveLength(2)
-      expect(source.match(/printf '%s\\n' tenetkit @tenetkit\/pg @tenetkit\/mysql/g)).toHaveLength(2)
+      expect(
+        source.match(/printf '%s\\n' tenetkit @tenetkit\/pg @tenetkit\/mysql @tenetkit\/cloudflare/g),
+      ).toHaveLength(2)
       for (const manifests of source.matchAll(/for manifest in package\.json packages\/\{(.+?)\}/g)) {
         expect(manifests[1]!.split(",").toSorted()).toEqual(packageNames)
       }

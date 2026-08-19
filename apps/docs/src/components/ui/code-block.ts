@@ -1,16 +1,17 @@
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { inertHtml as ih } from "foldkit/html"
 import { dual } from "effect/Function"
 
 import { button } from "@/components/ui/button"
+import { html } from "@/lib/html"
 import { highlight } from "@/lib/highlight"
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
 // VIEW
 
-const iconAttributes = <ParentMessage>(className: string) => {
-  const h = html<ParentMessage>()
+const iconAttributes = (className: string) => {
+  const h = ih
   return [
     h.Attribute("xmlns", "http://www.w3.org/2000/svg"),
     h.Attribute("viewBox", "0 0 24 24"),
@@ -26,7 +27,7 @@ const iconAttributes = <ParentMessage>(className: string) => {
 
 const copyIcon = <ParentMessage>(): Html => {
   const h = html<ParentMessage>()
-  return h.svg(iconAttributes<ParentMessage>("size-3.5"), [
+  return h.svg(iconAttributes("size-3.5"), [
     h.rect(
       [
         h.Attribute("width", "14"),
@@ -44,7 +45,7 @@ const copyIcon = <ParentMessage>(): Html => {
 
 const checkIcon = <ParentMessage>(): Html => {
   const h = html<ParentMessage>()
-  return h.svg(iconAttributes<ParentMessage>("size-3.5"), [h.path([h.Attribute("d", "M20 6 9 17l-5-5")], [])])
+  return h.svg(iconAttributes("size-3.5"), [h.path([h.Attribute("d", "M20 6 9 17l-5-5")], [])])
 }
 
 export type CodeBlockConfig<ParentMessage> = SlotConfig<ParentMessage> &

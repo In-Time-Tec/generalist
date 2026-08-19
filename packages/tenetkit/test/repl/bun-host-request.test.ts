@@ -3,7 +3,7 @@ import { Deferred, Effect, Fiber, Schema } from "effect"
 import { HostBindingRegistry } from "../../src/repl/index.js"
 import { collect, platform, runCell, withPool } from "./bun-harness.js"
 
-class SlowFailure extends Schema.TaggedErrorClass<SlowFailure>()("tenetkit/repl/test/SlowFailure", {
+class SlowFailure extends Schema.TaggedError<SlowFailure>()("tenetkit/repl/test/SlowFailure", {
   message: Schema.String,
 }) {}
 

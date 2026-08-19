@@ -39,7 +39,7 @@ export interface Interface {
 export class Steering extends Context.Service<Steering, Interface>()("tenetkit/core/turn/steering") {}
 
 /** @experimental Bounded steering queue rejected an input. */
-export class SteeringQueueFull extends Schema.TaggedErrorClass<SteeringQueueFull>()("tenetkit/core/SteeringQueueFull", {
+export class SteeringQueueFull extends Schema.TaggedError<SteeringQueueFull>()("tenetkit/core/SteeringQueueFull", {
   queue: Schema.Literals(["steering", "followUp"]),
   capacity: Schema.Finite,
 }) {}

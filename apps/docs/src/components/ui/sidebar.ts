@@ -1,7 +1,7 @@
 import { Match, Schema } from "effect"
 import { dual } from "effect/Function"
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 import { m } from "foldkit/message"
 import { evo } from "foldkit/struct"
 

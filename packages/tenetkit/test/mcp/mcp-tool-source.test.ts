@@ -151,7 +151,7 @@ describe("McpToolSource", () => {
         expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
         expect(error._tag).toBe("tenetkit/mcp/McpConnectionFailed")
         expect(error.server).toBe("calc")
-        expect(error.message).toContain("default")
+        expect(error.message).toContain("Expected JSON value")
         expect(closes.count).toBeGreaterThanOrEqual(1)
       }
     }),
@@ -171,7 +171,7 @@ describe("McpToolSource", () => {
           expect(error._tag).toBe("tenetkit/mcp/McpToolCallFailed")
           expect(error.server).toBe("calc")
           expect(error.tool).toBe("stats")
-          expect(error.message).toContain("invalid")
+          expect(error.message).toContain("Expected JSON value")
         }
       }),
     ),

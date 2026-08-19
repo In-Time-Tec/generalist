@@ -152,7 +152,7 @@ export const registrationIdentity = (model: LanguageModel.Service): ModelSelecti
   registrationIdentities.get(model)
 
 /** @experimental */
-export class LanguageModelNotRegistered extends Schema.TaggedErrorClass<LanguageModelNotRegistered>()(
+export class LanguageModelNotRegistered extends Schema.TaggedError<LanguageModelNotRegistered>()(
   "tenetkit/core/LanguageModelNotRegistered",
   {
     provider: Schema.String,

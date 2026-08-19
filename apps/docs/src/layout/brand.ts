@@ -1,11 +1,9 @@
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { inertHtml as ih } from "foldkit/html"
 
 import { cn } from "@/lib/utils"
 
-import type { Message } from "../app/message"
-
-const h = html<Message>()
+const h = ih
 
 export const mark = (className: string): Html =>
   h.svg(

@@ -1,11 +1,11 @@
 import { Schema } from "effect"
 
-export class SchemaDirty extends Schema.TaggedErrorClass<SchemaDirty>()("tenetkit/runtime/SchemaDirty", {
+export class SchemaDirty extends Schema.TaggedError<SchemaDirty>()("tenetkit/runtime/SchemaDirty", {
   source: Schema.String,
   version: Schema.Finite,
 }) {}
 
-export class SchemaChecksumMismatch extends Schema.TaggedErrorClass<SchemaChecksumMismatch>()(
+export class SchemaChecksumMismatch extends Schema.TaggedError<SchemaChecksumMismatch>()(
   "tenetkit/runtime/SchemaChecksumMismatch",
   {
     source: Schema.String,
@@ -14,7 +14,7 @@ export class SchemaChecksumMismatch extends Schema.TaggedErrorClass<SchemaChecks
   },
 ) {}
 
-export class SchemaVersionUnsupported extends Schema.TaggedErrorClass<SchemaVersionUnsupported>()(
+export class SchemaVersionUnsupported extends Schema.TaggedError<SchemaVersionUnsupported>()(
   "tenetkit/runtime/SchemaVersionUnsupported",
   {
     source: Schema.String,
@@ -23,7 +23,7 @@ export class SchemaVersionUnsupported extends Schema.TaggedErrorClass<SchemaVers
   },
 ) {}
 
-export class SchemaUpgradeRequired extends Schema.TaggedErrorClass<SchemaUpgradeRequired>()(
+export class SchemaUpgradeRequired extends Schema.TaggedError<SchemaUpgradeRequired>()(
   "tenetkit/runtime/SchemaUpgradeRequired",
   {
     source: Schema.String,
@@ -32,7 +32,7 @@ export class SchemaUpgradeRequired extends Schema.TaggedErrorClass<SchemaUpgrade
   },
 ) {}
 
-export class MultiWorkerUnsupported extends Schema.TaggedErrorClass<MultiWorkerUnsupported>()(
+export class MultiWorkerUnsupported extends Schema.TaggedError<MultiWorkerUnsupported>()(
   "tenetkit/runtime/MultiWorkerUnsupported",
   {
     backend: Schema.Literals(["sqlite", "mysql"]),
@@ -40,7 +40,7 @@ export class MultiWorkerUnsupported extends Schema.TaggedErrorClass<MultiWorkerU
   },
 ) {}
 
-export class SchemaMigrationFailed extends Schema.TaggedErrorClass<SchemaMigrationFailed>()(
+export class SchemaMigrationFailed extends Schema.TaggedError<SchemaMigrationFailed>()(
   "tenetkit/runtime/SchemaMigrationFailed",
   {
     source: Schema.String,
@@ -48,7 +48,7 @@ export class SchemaMigrationFailed extends Schema.TaggedErrorClass<SchemaMigrati
   },
 ) {}
 
-export class StaleClaim extends Schema.TaggedErrorClass<StaleClaim>()("tenetkit/runtime/StaleClaim", {
+export class StaleClaim extends Schema.TaggedError<StaleClaim>()("tenetkit/runtime/StaleClaim", {
   runId: Schema.String,
   workerId: Schema.String,
   attemptFence: Schema.Finite,

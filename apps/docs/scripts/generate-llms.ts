@@ -3,7 +3,7 @@ import { layer } from "@effect/platform-bun/BunServices"
 import { Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { createServer } from "vite"
 
-class LlmsGenerationError extends Schema.TaggedErrorClass<LlmsGenerationError>()("LlmsGenerationError", {
+class LlmsGenerationError extends Schema.TaggedError<LlmsGenerationError>()("LlmsGenerationError", {
   message: Schema.String,
 }) {}
 

@@ -35,12 +35,9 @@ export type Message = typeof GotChatAction.Type | typeof FailedOpenSession.Type
 
 export const Message: Schema.Schema<Message> = Schema.Union([GotChatAction, FailedOpenSession])
 
-const OpenSession = define(
-  "OpenSession",
-  GotChatAction,
-  FailedOpenSession,
-)(
-  Effect.gen(function* () {
+const OpenSession = define("OpenSession", {
+  messages: [GotChatAction, FailedOpenSession],
+  execute: Effect.gen(function* () {
     const httpClient = yield* Layer.build(FetchHttpClient.layer)
     const response = yield* HttpClient.post(`${SERVER_URL}/sessions`, {
       body: HttpBody.jsonUnsafe({}),
@@ -51,7 +48,7 @@ const OpenSession = define(
     Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
   ),
-)
+})
 
 export const init: ApplicationInit<Model, Message, void, Connection.AgentConnection> = () => [
   { chat: Chat.initialModel(null) },

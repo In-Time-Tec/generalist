@@ -25,7 +25,7 @@ const provideScoped = Function.dual<
 const request = (url: string, headers: Headers.Input = {}): HttpServerRequest.HttpServerRequest =>
   ({ url, originalUrl: url, headers: Headers.fromInput(headers) }) as HttpServerRequest.HttpServerRequest
 
-class BodyReadError extends Schema.TaggedErrorClass<BodyReadError>()("tenetkit/transport/BodyReadError", {
+class BodyReadError extends Schema.TaggedError<BodyReadError>()("tenetkit/transport/BodyReadError", {
   message: Schema.String,
 }) {}
 

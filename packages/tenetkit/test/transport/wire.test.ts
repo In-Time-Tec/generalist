@@ -5,7 +5,7 @@ import { Response } from "effect/unstable/ai"
 import { Wire } from "../../src/transport/index.js"
 import { event } from "./helpers.js"
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 describe("Wire", () => {
   it.effect("round-trips canonical RunEvents without wrapping their lifecycle", () =>

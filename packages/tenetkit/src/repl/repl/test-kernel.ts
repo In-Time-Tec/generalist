@@ -200,7 +200,13 @@ export const makeMemoryStore: Effect.Effect<KernelStateStoreInterface> = Effect.
         ? Ref.update(snapshots, (all) => new Map(all).set(snapshot.manifest.sessionId, snapshot))
         : Effect.fail(
             KernelStateUnavailable.make({
-              sessionId: String((snapshot.manifest as { readonly sessionId: unknown }).sessionId),
+              sessionId: String(
+                (
+                  snapshot.manifest as {
+                    readonly sessionId: unknown
+                  }
+                ).sessionId,
+              ),
               reason: "corrupt",
               message: "snapshot manifest does not satisfy the manifest contract",
             }),

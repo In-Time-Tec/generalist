@@ -88,6 +88,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         id: "call-1",
         name: "lookup",
         isFailure: false,
+        providerExecuted: false,
         result: "result",
       }),
       Prompt.makePart("tool-approval-response", { approvalId: "approval-1", approved: true }),

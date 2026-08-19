@@ -7,13 +7,12 @@ import { describe, expect, test } from "vitest"
 import {
   CompletedScrollToBottom,
   GrewContent,
-  Message,
   ObserveContentGrowth,
   ScrollToBottom,
   ScrolledViewport,
   TrackViewportScroll,
 } from "./components/ui/message-scroller"
-import { GotChatAction, GotScrollerMessage, SessionReady, init, type Model, update, view } from "./main"
+import { GotScrollerMessage, SessionReady, init, type Model, update, view } from "./main"
 
 const baseModel = (): Model => ({
   ...init()[0],
@@ -30,21 +29,24 @@ const renderedText = (node: unknown): string => {
   return `${text}${children}`
 }
 
-const resolveScrollerMounts = Scene.Mount.resolveAll(
-  [TrackViewportScroll, ScrolledViewport({ isAtBottom: true }), (message: Message) => GotScrollerMessage({ message })],
-  [ObserveContentGrowth, GrewContent(), (message: Message) => GotScrollerMessage({ message })],
+const resolveViewportMount = Scene.Mount.resolve(
+  TrackViewportScroll as Scene.AnyMount,
+  GotScrollerMessage({ message: ScrolledViewport({ isAtBottom: true }) }),
+)
+const resolveContentMount = Scene.Mount.resolve(
+  ObserveContentGrowth as Scene.AnyMount,
+  GotScrollerMessage({ message: GrewContent() }),
 )
 
-const resolveScrollerCommand = Scene.Command.resolve(ScrollToBottom, CompletedScrollToBottom(), (message: Message) =>
-  GotScrollerMessage({ message }),
-)
+const resolveScrollerCommand = Scene.Command.resolve(ScrollToBottom, CompletedScrollToBottom())
 
 describe("deep-research-agent web view", () => {
   test("idle state renders the prompt and enables submit after draft text", () => {
     Scene.scene(
       { update, view },
-      Scene.with(baseModel()),
-      resolveScrollerMounts,
+      Scene.given(baseModel()),
+      resolveViewportMount,
+      resolveContentMount,
       resolveScrollerCommand,
       Scene.expect(Scene.text("Ask a research question")).toExist(),
       Scene.expect(Scene.placeholder("Ask a research question…")).toExist(),
@@ -57,7 +59,7 @@ describe("deep-research-agent web view", () => {
   test("running state renders a pending expanded tool card with the query", () => {
     Scene.scene(
       { update, view },
-      Scene.with({
+      Scene.given({
         ...baseModel(),
         chat: {
           ...baseModel().chat,
@@ -76,7 +78,8 @@ describe("deep-research-agent web view", () => {
         },
         expandedToolCallIds: ["search-1"],
       }),
-      resolveScrollerMounts,
+      resolveViewportMount,
+      resolveContentMount,
       resolveScrollerCommand,
       Scene.expect(Scene.text("web_search")).toExist(),
       Scene.expect(Scene.text("Running")).toExist(),
@@ -91,7 +94,7 @@ describe("deep-research-agent web view", () => {
   test("running state wires the Stop button to the existing cancel command", () => {
     Scene.scene(
       { update, view },
-      Scene.with({
+      Scene.given({
         ...baseModel(),
         chat: {
           ...baseModel().chat,
@@ -99,21 +102,20 @@ describe("deep-research-agent web view", () => {
           entries: [Chat.UserEntry({ text: "What makes TenetKit standalone?" })],
         },
       }),
-      resolveScrollerMounts,
+      resolveViewportMount,
+      resolveContentMount,
       resolveScrollerCommand,
       Scene.expect(Scene.role("button", { name: "Stop" })).toBeEnabled(),
       Scene.click(Scene.role("button", { name: "Stop" })),
       Scene.Command.expectExact(Chat.CancelRun({ sessionId: "deep-research-scene" })),
-      Scene.Command.resolve(Chat.CancelRun({ sessionId: "deep-research-scene" }), Chat.CancelledRun(), (action) =>
-        GotChatAction({ action }),
-      ),
+      Scene.Command.resolve(Chat.CancelRun({ sessionId: "deep-research-scene" }), Chat.CancelledRun()),
     )
   })
 
   test("completed state renders the final answer and expanded source links", () => {
     Scene.scene(
       { update, view },
-      Scene.with({
+      Scene.given({
         ...baseModel(),
         chat: {
           ...baseModel().chat,
@@ -150,7 +152,8 @@ describe("deep-research-agent web view", () => {
         },
         expandedToolCallIds: ["search-1-sources"],
       }),
-      resolveScrollerMounts,
+      resolveViewportMount,
+      resolveContentMount,
       resolveScrollerCommand,
       Scene.tap(({ html }) => {
         expect(renderedText(html)).toContain("Final cited answer")
@@ -166,7 +169,7 @@ describe("deep-research-agent web view", () => {
   test("assistant reasoning renders in the collapsible reasoning block", () => {
     Scene.scene(
       { update, view },
-      Scene.with({
+      Scene.given({
         ...baseModel(),
         chat: {
           ...baseModel().chat,
@@ -181,7 +184,8 @@ describe("deep-research-agent web view", () => {
         },
         expandedToolCallIds: ["reasoning-1"],
       }),
-      resolveScrollerMounts,
+      resolveViewportMount,
+      resolveContentMount,
       resolveScrollerCommand,
       Scene.expect(Scene.text("Thought for a few seconds")).toExist(),
       Scene.expect(Scene.text("Compare transport frames. Check the loop state.")).toExist(),
@@ -191,7 +195,7 @@ describe("deep-research-agent web view", () => {
   test("expanded tool output is bounded", () => {
     Scene.scene(
       { update, view },
-      Scene.with({
+      Scene.given({
         ...baseModel(),
         chat: {
           ...baseModel().chat,
@@ -215,7 +219,8 @@ describe("deep-research-agent web view", () => {
         },
         expandedToolCallIds: ["search-1"],
       }),
-      resolveScrollerMounts,
+      resolveViewportMount,
+      resolveContentMount,
       resolveScrollerCommand,
       Scene.tap(({ html }) => {
         const outputPre = Scene.find(html, '[data-slot="tool-output"] pre')
@@ -230,7 +235,7 @@ describe("deep-research-agent web view", () => {
   test("failed state renders the run failure and keeps retry input available", () => {
     Scene.scene(
       { update, view },
-      Scene.with({
+      Scene.given({
         ...baseModel(),
         chat: {
           ...baseModel().chat,
@@ -238,7 +243,8 @@ describe("deep-research-agent web view", () => {
           draft: "retry later",
         },
       }),
-      resolveScrollerMounts,
+      resolveViewportMount,
+      resolveContentMount,
       resolveScrollerCommand,
       Scene.expect(Scene.role("alert")).toContainText("Run failed: model unavailable"),
       Scene.expect(Scene.placeholder("Ask a research question…")).toExist(),

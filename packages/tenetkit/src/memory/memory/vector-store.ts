@@ -35,7 +35,7 @@ export interface DeleteInput {
 }
 
 /** @experimental */
-export class VectorStoreError extends Schema.TaggedErrorClass<VectorStoreError>()("tenetkit/memory/VectorStoreError", {
+export class VectorStoreError extends Schema.TaggedError<VectorStoreError>()("tenetkit/memory/VectorStoreError", {
   message: Schema.String,
 }) {}
 

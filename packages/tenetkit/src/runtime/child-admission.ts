@@ -22,7 +22,7 @@ import type { ChildReadiness } from "./child-readiness.js"
  * Parentage is read from the durable child record, so knowing a child Run id grants nothing to a
  * Run that did not admit it.
  */
-export class ChildParentageInvalid extends Schema.TaggedErrorClass<ChildParentageInvalid>()(
+export class ChildParentageInvalid extends Schema.TaggedError<ChildParentageInvalid>()(
   "tenetkit/runtime/ChildParentageInvalid",
   { parentRunId: Schema.String, childRunId: Schema.String },
 ) {}

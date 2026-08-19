@@ -3,7 +3,7 @@ import { Effect, Function, Schema } from "effect"
 import { RunEvent } from "tenetkit/runtime"
 import { EventInvalid, ValueNotSerializable } from "./errors.js"
 
-const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const emit = (event: unknown): Effect.Effect<AGUIEvent, EventInvalid> => {
   const parsed = EventSchemas.safeParse(event)

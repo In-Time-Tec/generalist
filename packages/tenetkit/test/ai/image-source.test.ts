@@ -14,7 +14,7 @@ const image = new TextEncoder().encode("image")
 const imageBase64 = "aW1hZ2U="
 const imageDataUri = `data:image/png;base64,${imageBase64}`
 const imageUrl = new URL("https://example.com/image.png")
-const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const prompt = [
   {
@@ -32,7 +32,7 @@ const prompt = [
 
 const decodeBody = (request: HttpClientRequest.HttpClientRequest): unknown =>
   request.body._tag === "Uint8Array"
-    ? Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(new TextDecoder().decode(request.body.body))
+    ? Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(new TextDecoder().decode(request.body.body))
     : undefined
 
 const capture = (

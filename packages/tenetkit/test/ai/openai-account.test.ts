@@ -42,7 +42,7 @@ const textResponseBody = {
   ],
   usage: { input_tokens: 11, output_tokens: 7, total_tokens: 18 },
 }
-const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const sse = (...events: ReadonlyArray<unknown>) => events.map((event) => `data: ${stringify(event)}\n\n`).join("")
 const completedFrame = (response: unknown = responseBody) =>
   sse({ type: "response.completed", response, sequence_number: 0 })
@@ -58,7 +58,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const decodeBody = (request: HttpClientRequest.HttpClientRequest): unknown =>
   request.body._tag === "Uint8Array"
-    ? Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(new TextDecoder().decode(request.body.body))
+    ? Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(new TextDecoder().decode(request.body.body))
     : undefined
 
 const mockClient = (statuses: Array<number>, requests: Array<CapturedRequest>, body: BodyInit = completedFrame()) =>

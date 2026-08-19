@@ -20,25 +20,25 @@ export const LogLevel = Schema.Literals(["debug", "info", "warn", "error"])
 export type LogLevel = typeof LogLevel.Type
 
 /** @experimental */
-export class ProgramCapabilityMissing extends Schema.TaggedErrorClass<ProgramCapabilityMissing>()(
+export class ProgramCapabilityMissing extends Schema.TaggedError<ProgramCapabilityMissing>()(
   "tenetkit/core/ProgramCapabilityMissing",
   { capability: Schema.String },
 ) {}
 
 /** @experimental */
-export class ProgramCapabilityDenied extends Schema.TaggedErrorClass<ProgramCapabilityDenied>()(
+export class ProgramCapabilityDenied extends Schema.TaggedError<ProgramCapabilityDenied>()(
   "tenetkit/core/ProgramCapabilityDenied",
   { capability: Schema.String, operation: ProgramOperationName, reason: Schema.String },
 ) {}
 
 /** @experimental */
-export class ProgramAuthorizationFailure extends Schema.TaggedErrorClass<ProgramAuthorizationFailure>()(
+export class ProgramAuthorizationFailure extends Schema.TaggedError<ProgramAuthorizationFailure>()(
   "tenetkit/core/ProgramAuthorizationFailure",
   { capability: Schema.String, operation: ProgramOperationName, cause: Schema.Unknown },
 ) {}
 
 /** @experimental */
-export class ProgramSchemaFailure extends Schema.TaggedErrorClass<ProgramSchemaFailure>()(
+export class ProgramSchemaFailure extends Schema.TaggedError<ProgramSchemaFailure>()(
   "tenetkit/core/ProgramSchemaFailure",
   {
     boundary: Schema.Literals([
@@ -57,33 +57,27 @@ export class ProgramSchemaFailure extends Schema.TaggedErrorClass<ProgramSchemaF
 ) {}
 
 /** @experimental */
-export class ProgramToolFailure extends Schema.TaggedErrorClass<ProgramToolFailure>()(
-  "tenetkit/core/ProgramToolFailure",
-  {
-    tool: Schema.String,
-    operation: ProgramOperationName,
-    cause: Schema.Unknown,
-  },
-) {}
+export class ProgramToolFailure extends Schema.TaggedError<ProgramToolFailure>()("tenetkit/core/ProgramToolFailure", {
+  tool: Schema.String,
+  operation: ProgramOperationName,
+  cause: Schema.Unknown,
+}) {}
 
 /** @experimental */
-export class ProgramStepFailure extends Schema.TaggedErrorClass<ProgramStepFailure>()(
-  "tenetkit/core/ProgramStepFailure",
-  {
-    step: Schema.String,
-    operation: ProgramOperationName,
-    cause: Schema.Unknown,
-  },
-) {}
+export class ProgramStepFailure extends Schema.TaggedError<ProgramStepFailure>()("tenetkit/core/ProgramStepFailure", {
+  step: Schema.String,
+  operation: ProgramOperationName,
+  cause: Schema.Unknown,
+}) {}
 
 /** @experimental */
-export class ProgramAgentFailure extends Schema.TaggedErrorClass<ProgramAgentFailure>()(
+export class ProgramAgentFailure extends Schema.TaggedError<ProgramAgentFailure>()(
   "tenetkit/core/ProgramAgentFailure",
   { selection: Schema.String, operation: ProgramOperationName, cause: Schema.Unknown },
 ) {}
 
 /** @experimental */
-export class ProgramBudgetExhausted extends Schema.TaggedErrorClass<ProgramBudgetExhausted>()(
+export class ProgramBudgetExhausted extends Schema.TaggedError<ProgramBudgetExhausted>()(
   "tenetkit/core/ProgramBudgetExhausted",
   {
     dimension: Schema.Literals([
@@ -100,32 +94,32 @@ export class ProgramBudgetExhausted extends Schema.TaggedErrorClass<ProgramBudge
 ) {}
 
 /** @experimental */
-export class ProgramReplayDivergence extends Schema.TaggedErrorClass<ProgramReplayDivergence>()(
+export class ProgramReplayDivergence extends Schema.TaggedError<ProgramReplayDivergence>()(
   "tenetkit/core/ProgramReplayDivergence",
   { operation: ProgramOperationName, expected: Schema.String, actual: Schema.String },
 ) {}
 
 /** @experimental */
-export class ProgramOperationUnknown extends Schema.TaggedErrorClass<ProgramOperationUnknown>()(
+export class ProgramOperationUnknown extends Schema.TaggedError<ProgramOperationUnknown>()(
   "tenetkit/core/ProgramOperationUnknown",
   { operation: ProgramOperationName },
 ) {}
 
 /** @experimental One decoded invocation failed with an implementation-specific error. */
-export class ProgramInvocationFailure extends Schema.TaggedErrorClass<ProgramInvocationFailure>()(
+export class ProgramInvocationFailure extends Schema.TaggedError<ProgramInvocationFailure>()(
   "tenetkit/core/ProgramInvocationFailure",
   { cause: Schema.Unknown },
 ) {}
 
 /** @experimental */
-export class ProgramSuspended extends Schema.TaggedErrorClass<ProgramSuspended>()("tenetkit/core/ProgramSuspended", {
+export class ProgramSuspended extends Schema.TaggedError<ProgramSuspended>()("tenetkit/core/ProgramSuspended", {
   operation: ProgramOperationName,
   reason: Schema.Literals(["approval", "tool-wait", "agent", "step"]),
   token: Schema.optionalKey(Schema.String),
 }) {}
 
 /** @experimental */
-export class ProgramCancelled extends Schema.TaggedErrorClass<ProgramCancelled>()("tenetkit/core/ProgramCancelled", {
+export class ProgramCancelled extends Schema.TaggedError<ProgramCancelled>()("tenetkit/core/ProgramCancelled", {
   reason: Schema.String,
 }) {}
 

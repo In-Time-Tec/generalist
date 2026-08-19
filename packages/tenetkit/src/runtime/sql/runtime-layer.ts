@@ -10,13 +10,18 @@ import { layer as activeExecutionsLayer } from "../active-executions.js"
 import { LocalScheduler, layer as localSchedulerLayer } from "../local-scheduler.js"
 import { layer as modelPreviewLayer } from "../model-preview.js"
 
-export type { SqliteStoreOptions }
+export interface BunSqliteStoreOptions extends SqliteStoreOptions {
+  readonly filename: string
+}
 
 export const layerSqlite = (
-  options: SqliteStoreOptions,
+  options: BunSqliteStoreOptions,
 ): Layer.Layer<Runtime | RunStore | ExecutionHost | LocalScheduler, SqliteStoreError> => {
   const client = sqliteClientLayer({ filename: options.filename })
-  const store = Layer.effect(RunStore, makeSqliteRunStore(options)).pipe(Layer.provide(client))
+  const store = Layer.effect(
+    RunStore,
+    makeSqliteRunStore({ ...options, source: options.source ?? options.filename }),
+  ).pipe(Layer.provide(client))
   const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
   const host = Layer.effect(ExecutionHost, makeExecutionHost({ workerId: "sqlite", resolver: options.resolver })).pipe(

@@ -16,7 +16,7 @@ import {
   textPrompt,
 } from "./helpers.js"
 import { pinnedTestAgent } from "./identity.js"
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 testIt("retains the exact active Agent registration closure", () => {
   const required = ExecutableRegistration.requiredPinsForActiveExecutable(assistantRef)

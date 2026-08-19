@@ -30,7 +30,7 @@ type Graph = {
   readonly violations: ReadonlyArray<string>
 }
 
-class RepositoryGraphFailed extends Schema.TaggedErrorClass<RepositoryGraphFailed>()(
+class RepositoryGraphFailed extends Schema.TaggedError<RepositoryGraphFailed>()(
   "@tenetkit/scripts/RepositoryGraphFailed",
   { message: Schema.String },
 ) {}
@@ -46,7 +46,7 @@ const parseJson = (text: string): Record<string, any> =>
 const parseJsonArray = (text: string): ReadonlyArray<Record<string, any>> =>
   Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Array(Schema.Record(Schema.String, Schema.Any))))(text)
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 function exportSpecifiers(value: unknown): Array<string> {
   if (value === undefined || value === null) return ["."]

@@ -34,7 +34,7 @@ import {
 } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -730,7 +730,7 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       projectedHistory: Prompt.make("projected-for-specialist"),
     })
     expect(Session.buildContext(committedResult.sessionPath)).toEqual(Prompt.make("projected-for-specialist"))
-    const handoffEntryJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(
+    const handoffEntryJson = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
       committedResult.sessionPath.at(-1),
     )
     expect(handoffEntryJson).not.toContain("start with the supervisor")
@@ -803,7 +803,7 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       expect(receivedByChild?.content.filter((message) => message.role !== "system")).toEqual(
         withCacheBreakpoints(expectedSpecialistInput, "conversation", undefined).content,
       )
-      const receivedJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(receivedByChild)
+      const receivedJson = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(receivedByChild)
       expect(receivedJson).not.toContain("start with the supervisor")
     })
     yield* scopedWith(

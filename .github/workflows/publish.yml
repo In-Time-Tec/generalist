@@ -52,7 +52,7 @@ jobs:
           tag="v$version"
           source_commit=$(git rev-parse HEAD)
           [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]]
-          for manifest in package.json packages/{tenetkit,pg,mysql}/package.json; do
+          for manifest in package.json packages/{tenetkit,pg,mysql,cloudflare}/package.json; do
             [[ "$(jq -r .version "$manifest")" == "$version" ]]
           done
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
@@ -132,6 +132,7 @@ jobs:
             "tenetkit-${VERSION}.tgz"
             "tenetkit-pg-${VERSION}.tgz"
             "tenetkit-mysql-${VERSION}.tgz"
+            "tenetkit-cloudflare-${VERSION}.tgz"
           )
           mapfile -t package_assets < <(printf '%s\n' "${package_assets[@]}" | sort)
           expected=(SHA256SUMS "${package_assets[@]}" release-evidence.json)
@@ -145,11 +146,11 @@ jobs:
           sha256sum --check SHA256SUMS
           jq -e --arg commit "$SOURCE_COMMIT" --arg version "$VERSION" '
             .schemaVersion == 1 and .sourceCommit == $commit and
-            (.packages | length) == 3 and all(.packages[]; .version == $version)
+            (.packages | length) == 4 and all(.packages[]; .version == $version)
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql | sort)
+          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql @tenetkit/cloudflare | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do
@@ -211,6 +212,7 @@ jobs:
             "tenetkit-${VERSION}.tgz"
             "tenetkit-pg-${VERSION}.tgz"
             "tenetkit-mysql-${VERSION}.tgz"
+            "tenetkit-cloudflare-${VERSION}.tgz"
           )
           mapfile -t package_assets < <(printf '%s\n' "${package_assets[@]}" | sort)
           expected=(SHA256SUMS "${package_assets[@]}" release-evidence.json)
@@ -224,11 +226,11 @@ jobs:
           sha256sum --check SHA256SUMS
           jq -e --arg commit "$SOURCE_COMMIT" --arg version "$VERSION" '
             .schemaVersion == 1 and .sourceCommit == $commit and
-            (.packages | length) == 3 and all(.packages[]; .version == $version)
+            (.packages | length) == 4 and all(.packages[]; .version == $version)
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql | sort)
+          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql @tenetkit/cloudflare | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do

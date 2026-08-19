@@ -96,7 +96,7 @@ export interface ForgetInput {
 }
 
 /** @experimental */
-export class MemoryError extends Schema.TaggedErrorClass<MemoryError>()("tenetkit/core/MemoryError", {
+export class MemoryError extends Schema.TaggedError<MemoryError>()("tenetkit/core/MemoryError", {
   message: Schema.String,
 }) {}
 
