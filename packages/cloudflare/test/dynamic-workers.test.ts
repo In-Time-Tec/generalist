@@ -15,6 +15,13 @@ const capabilities = ProgramCapabilities.ProgramCapabilities.of({
   log: () => Effect.void,
 })
 
+const capabilityFailureId = (reason: unknown): string => {
+  expect(reason).toBeInstanceOf(Error)
+  const message = (reason as Error).message
+  expect(message).toMatch(/^tenetkit-capability-failure:failure-\d+$/)
+  return message.slice("tenetkit-capability-failure:".length)
+}
+
 const request = (signal = new AbortController().signal): SandboxExecutor.Request => {
   const modules = [{ name: "program.js", source: "export default async input => ({ value: input.value + 1 })" }]
   const identity = { modules, entrypoint: "program.js", inputCodec: "input:v1", outputCodec: "output:v1" }
@@ -80,6 +87,7 @@ it.effect("loads exact cold WorkerCode with only the capability binding and pinn
       "TENET_REQUEST_ID",
       "TENET_SOURCE_DIGEST",
     ])
+    expect(loaded[0]!.modules["__tenetkit_runner.js"]).toContain("capabilityFailureId")
     expect(second.requestId).toBe(first.requestId)
   }),
 )
@@ -184,7 +192,7 @@ it.effect("strict-decodes, authorizes, and bounds every capability RPC call", ()
                   operation: "describeTool",
                   input: "echo",
                 }),
-              ).rejects.toMatchObject({ message: "capability invocation failed" })
+              ).rejects.toThrow(/^tenetkit-capability-failure:failure-\d+$/)
               await expect(
                 rpc!.call({
                   protocolVersion: "1",
@@ -271,7 +279,7 @@ it.effect("filters tool discovery to the explicit request grant", () =>
   }),
 )
 
-it.effect("returns typed host capability failures without exposing them to Worker source", () =>
+it.effect("returns only the causally linked uncaught host capability failure", () =>
   Effect.gen(function* () {
     const failures: ReadonlyArray<ProgramCapabilities.CapabilityFailure> = [
       ProgramCapabilities.ProgramSuspended.make({ operation: "echo", reason: "agent", token: "resume" }),
@@ -291,15 +299,22 @@ it.effect("returns typed host capability failures without exposing them to Worke
           load: () => ({
             getEntrypoint: () => ({
               fetch: async () => {
-                await expect(
-                  rpc!.call({
+                let failureId: string
+                try {
+                  await rpc!.call({
                     protocolVersion: "1",
                     requestId: "run-1:attempt-1",
                     operation: "callTool",
                     input: { operation: "echo", tool: "echo", input: "value" },
-                  }),
-                ).rejects.toThrow("capability invocation failed")
-                return Response.json({ error: "sandbox execution failed" }, { status: 500 })
+                  })
+                  throw new Error("expected capability failure")
+                } catch (error) {
+                  failureId = capabilityFailureId(error)
+                }
+                return Response.json(
+                  { error: "sandbox execution failed", capabilityFailureId: failureId },
+                  { status: 500 },
+                )
               },
             }),
           }),
@@ -315,6 +330,94 @@ it.effect("returns typed host capability failures without exposing them to Worke
           .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, failing), Effect.flip),
       ).toEqual(expected)
     }
+  }),
+)
+
+it.effect("does not misattribute a caught capability failure to a later source failure", () =>
+  Effect.gen(function* () {
+    let rpc: CapabilityRpc | undefined
+    const expected = ProgramCapabilities.ProgramCancelled.make({ reason: "cancelled" })
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (value) => {
+        rpc = value
+        return value
+      },
+      loader: {
+        load: () => ({
+          getEntrypoint: () => ({
+            fetch: async () => {
+              await rpc!
+                .call({
+                  protocolVersion: "1",
+                  requestId: "run-1:attempt-1",
+                  operation: "callTool",
+                  input: { operation: "echo", tool: "echo", input: "value" },
+                })
+                .catch(capabilityFailureId)
+              return Response.json({ error: "sandbox execution failed" }, { status: 500 })
+            },
+          }),
+        }),
+      },
+    })
+    const failing = ProgramCapabilities.ProgramCapabilities.of({
+      ...capabilities,
+      callTool: () => Effect.fail(expected),
+    })
+    expect(
+      yield* executor
+        .execute(request())
+        .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, failing), Effect.flip),
+    ).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
+  }),
+)
+
+it.effect("correlates concurrent capability failures by opaque call identity", () =>
+  Effect.gen(function* () {
+    let rpc: CapabilityRpc | undefined
+    const first = ProgramCapabilities.ProgramCancelled.make({ reason: "first" })
+    const second = ProgramCapabilities.ProgramBudgetExhausted.make({ dimension: "toolCalls", limit: 2 })
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (value) => {
+        rpc = value
+        return value
+      },
+      loader: {
+        load: () => ({
+          getEntrypoint: () => ({
+            fetch: async () => {
+              const outcomes = await Promise.allSettled(
+                ["first", "second"].map((tool) =>
+                  rpc!.call({
+                    protocolVersion: "1",
+                    requestId: "run-1:attempt-1",
+                    operation: "callTool",
+                    input: { operation: tool, tool, input: "value" },
+                  }),
+                ),
+              )
+              const selected = outcomes[1]
+              if (selected?.status !== "rejected") throw new Error("expected second capability failure")
+              return Response.json(
+                { error: "sandbox execution failed", capabilityFailureId: capabilityFailureId(selected.reason) },
+                { status: 500 },
+              )
+            },
+          }),
+        }),
+      },
+    })
+    const failing = ProgramCapabilities.ProgramCapabilities.of({
+      ...capabilities,
+      callTool: (input) => Effect.fail(input.tool === "first" ? first : second),
+    })
+    expect(
+      yield* executor
+        .execute({ ...request(), capabilities: [{ operation: "callTool", names: ["first", "second"] }] })
+        .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, failing), Effect.flip),
+    ).toEqual(second)
   }),
 )
 

@@ -1,10 +1,14 @@
 /* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/global-timers-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, effecttsgo/unnecessary-fail-yieldable-error, no-await-in-loop */
-import { Effect, Layer, Result, Schema } from "effect"
+import { Effect, Layer, Option, Result, Schema } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
-import { normalize, runner, runnerName } from "./source.js"
+import { capabilityFailurePrefix, normalize, runner, runnerName } from "./source.js"
 import { CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
 
 const maximumDiagnostic = 160
+const CapabilityFailureResponse = Schema.Struct({
+  error: Schema.Literal("sandbox execution failed"),
+  capabilityFailureId: Schema.String,
+})
 const safeMessage = (cause: unknown): string => {
   try {
     return (cause instanceof Error ? cause.message : String(cause))
@@ -110,7 +114,8 @@ export const make = (options: Options): SandboxExecutor.Interface =>
         const capabilities = yield* ProgramCapabilities.ProgramCapabilities
         const grants = new Map(request.capabilities.map((grant) => [grant.operation, new Set(grant.names)] as const))
         let active = true
-        let capabilityFailure: ProgramCapabilities.CapabilityFailure | undefined
+        const capabilityFailures = new Map<string, ProgramCapabilities.CapabilityFailure>()
+        let nextCapabilityFailure = 0
         const invocation = new AbortController()
         const cancel = () => invocation.abort()
         let deadlineElapsed = false
@@ -144,17 +149,18 @@ export const make = (options: Options): SandboxExecutor.Interface =>
                 : decoded.operation === "describeTool"
                   ? capabilities.describeTool(decoded.input)
                   : capabilities[decoded.operation](decoded.input as never)
-            let value: unknown
+            let outcome: Result.Result<unknown, ProgramCapabilities.CapabilityFailure>
             try {
-              const outcome = await Effect.runPromise(Effect.result(effect), { signal: invocation.signal })
-              if (Result.isFailure(outcome)) {
-                capabilityFailure = outcome.failure
-                throw new Error("capability invocation failed")
-              }
-              value = outcome.success
+              outcome = await Effect.runPromise(Effect.result(effect), { signal: invocation.signal })
             } catch {
               throw new Error("capability invocation failed")
             }
+            if (Result.isFailure(outcome)) {
+              const failureId = `failure-${++nextCapabilityFailure}`
+              capabilityFailures.set(failureId, outcome.failure)
+              throw new Error(`${capabilityFailurePrefix}${failureId}`)
+            }
+            const value = outcome.success
             if (!active || request.signal.aborted || Date.now() >= request.deadlineMillis)
               throw new Error("request fence closed")
             const outputSize = bytes(value)
@@ -226,10 +232,6 @@ export const make = (options: Options): SandboxExecutor.Interface =>
             return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
           if (deadlineElapsed || Date.now() >= request.deadlineMillis)
             return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-          if (!response.ok) {
-            if (capabilityFailure !== undefined) return yield* Effect.fail(capabilityFailure)
-            return yield* failExecution(`dynamic Worker returned status ${response.status}`)
-          }
           const text = yield* Effect.tryPromise({
             try: () => Promise.race([readBounded(response, request.limits.outputBytes), abort]),
             catch: (cause) =>
@@ -252,7 +254,21 @@ export const make = (options: Options): SandboxExecutor.Interface =>
           try {
             decoded = JSON.parse(text)
           } catch {
+            if (!response.ok) return yield* failExecution(`dynamic Worker returned status ${response.status}`)
             return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON" })
+          }
+          if (!response.ok) {
+            const envelope = Schema.decodeUnknownOption(CapabilityFailureResponse, { onExcessProperty: "error" })(
+              decoded,
+            )
+            if (Option.isSome(envelope)) {
+              const failure = capabilityFailures.get(envelope.value.capabilityFailureId)
+              if (failure !== undefined) {
+                capabilityFailures.delete(envelope.value.capabilityFailureId)
+                return yield* Effect.fail(failure)
+              }
+            }
+            return yield* failExecution(`dynamic Worker returned status ${response.status}`)
           }
           const result = yield* Schema.decodeUnknownEffect(SandboxExecutor.Result, { onExcessProperty: "error" })(
             decoded,
