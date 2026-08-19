@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.28.1
+
+- Fix OpenAI account routes rejecting every non-streaming Responses call. The ChatGPT account endpoint answers `HTTP 400 {"detail":"Stream must be set to true"}` unless the request body sets `stream`, and only `streamText` set it, so `generateText` and `generateObject` failed outright on account credentials and auto-compaction could never produce a summary. The account client now issues every Responses request as a stream and folds the terminal `response.completed` or `response.incomplete` event into the non-streaming response, whose payload is schema-identical to one. A stream that ends without a terminal event fails typed rather than returning an empty response.
+- Stop inferring the account `accept` header by scanning the serialized request body for `"stream":true`. Every account request is now `text/event-stream`.
+- Fail account `createEmbedding` with a typed error. The account transport rewrites every request URL to Responses, so an embeddings call had been posting an embeddings body to the Responses endpoint.
+
 ## 0.28.0
 
 Baton is now TenetKit. This release renames the project and replaces thirteen scoped packages with one package and two drivers. Every import changes.

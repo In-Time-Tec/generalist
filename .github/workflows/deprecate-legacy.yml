@@ -1,0 +1,52 @@
+name: Deprecate legacy packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Deprecation message shown on install
+        required: true
+        type: string
+        default: "@batonfx/* is renamed to tenetkit. Install `tenetkit` (plus `@tenetkit/pg` or `@tenetkit/mysql`) instead; see https://github.com/In-Time-Tec/tenetkit"
+
+permissions: {}
+
+concurrency:
+  group: deprecate-legacy
+  cancel-in-progress: false
+
+jobs:
+  deprecate:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.4.1
+          registry-url: https://registry.npmjs.org
+      - name: Deprecate every published @batonfx package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          MESSAGE: ${{ inputs.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(a2a ag-ui core foldkit harness mcp memory providers repl runtime skills test transport)
+          for package in "${packages[@]}"; do
+            name="@batonfx/${package}"
+            # A bare name only marks the version range npm resolves by default, so every published
+            # version is named explicitly and the whole package reads as deprecated.
+            npm deprecate "$name@*" "$MESSAGE"
+            echo "deprecated $name"
+          done
+          for package in "${packages[@]}"; do
+            name="@batonfx/${package}"
+            for attempt in {1..10}; do
+              deprecated=$(npm view "$name" deprecated 2>/dev/null || true)
+              if [[ -n "$deprecated" ]]; then
+                echo "$name verified: $deprecated"
+                break
+              fi
+              [[ "$attempt" != 10 ]] || { echo "$name is not deprecated on the registry" >&2; exit 1; }
+              sleep 6
+            done
+          done
