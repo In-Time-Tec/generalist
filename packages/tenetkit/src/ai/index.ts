@@ -167,6 +167,7 @@ import {
   credentialsFromAccountAuth as OpenAi_credentialsFromAccountAuth,
   registrationAccount as OpenAi_registrationAccount,
   layerAccount as OpenAi_layerAccount,
+  layerAccountClient as OpenAi_layerAccountClient,
 } from "./provider/openai.js"
 export const OpenAi = {
   classifyFailure: OpenAi_classifyFailure,
@@ -180,6 +181,7 @@ export const OpenAi = {
   credentialsFromAccountAuth: OpenAi_credentialsFromAccountAuth,
   registrationAccount: OpenAi_registrationAccount,
   layerAccount: OpenAi_layerAccount,
+  layerAccountClient: OpenAi_layerAccountClient,
 } as typeof import("./provider/openai.js")
 export namespace OpenAi {
   export type classifyFailure = typeof import("./provider/openai.js").classifyFailure
@@ -193,6 +195,7 @@ export namespace OpenAi {
   export type credentialsFromAccountAuth = typeof import("./provider/openai.js").credentialsFromAccountAuth
   export type registrationAccount = typeof import("./provider/openai.js").registrationAccount
   export type layerAccount = typeof import("./provider/openai.js").layerAccount
+  export type layerAccountClient = typeof import("./provider/openai.js").layerAccountClient
   export type LayerOptions = import("./provider/openai.js").LayerOptions
   export type Config = import("./provider/openai.js").Config
   export type OpenAiAccountCredential = import("./provider/openai.js").OpenAiAccountCredential
