@@ -154,7 +154,9 @@ export const sourceDigest = (input: {
 }): string =>
   digest({
     protocolVersion: input.protocolVersion ?? protocolVersion,
-    modules: input.modules.map(({ name, source }) => [name, source]),
+    modules: input.modules
+      .map(({ name, source }) => [name, source] as const)
+      .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)),
     entrypoint: input.entrypoint,
     inputCodec: input.inputCodec,
     outputCodec: input.outputCodec,

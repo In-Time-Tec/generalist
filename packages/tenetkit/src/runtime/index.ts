@@ -325,6 +325,8 @@ export * as Messaging from "./messaging.js"
 export * as OperationResolution from "./operation-resolution.js"
 export * as ChildRuns from "./child-runs.js"
 export * as ChildAdmission from "./child-admission.js"
+export * as ExternalChildPlacement from "./external-child-placement.js"
+export * as ExternalChildStore from "./external-child-store.js"
 export * as CodeMode from "./code-mode.js"
 import {
   FanOutJoin as FanOut_FanOutJoin,

@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Semaphore } from "effect"
+import { Context, Effect, Layer, Option, Semaphore } from "effect"
 import { listRuns } from "./store-list.js"
 import type { Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
@@ -79,6 +79,13 @@ import { settlementNotifications } from "./settlement-notifications.js"
 import { reconcileCancellationRequested, sessionRoots } from "./session-lifecycle.js"
 import { loadChildReadiness } from "./store-child-capacity.js"
 import { readRunActivations } from "./run-activation.js"
+import {
+  acknowledge as acknowledgeExternalChild,
+  cancel as cancelExternalChild,
+  reserve as reserveExternalChild,
+  externalChildSettlement,
+} from "./store-external-child.js"
+import { ExternalChildStore } from "../external-child-store.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly source?: string
@@ -93,9 +100,13 @@ export type SqliteStoreError =
   | SchemaMigrationFailed
   | MultiWorkerUnsupported
 
-export const makeSqliteRunStore = (
+const makeSqliteStoreServices = (
   options: SqliteStoreOptions,
-): Effect.Effect<RunStoreInterface, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
+): Effect.Effect<
+  { readonly runStore: RunStoreInterface; readonly externalChildStore: ExternalChildStore["Service"] },
+  SqliteStoreError,
+  SqlClient.SqlClient | Scope.Scope
+> =>
   Effect.gen(function* () {
     if (options.multiWorker === true || (options.workers !== undefined && options.workers > 1)) {
       return yield* MultiWorkerUnsupported.make({
@@ -165,7 +176,7 @@ export const makeSqliteRunStore = (
         [input.runId],
       )
 
-    return RunStore.of({
+    const runStore = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
       sessionStore: (sessionId: string) =>
         withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie, Effect.map(Option.some)),
@@ -359,8 +370,27 @@ export const makeSqliteRunStore = (
           requireExecutionClaim(input).pipe(Effect.andThen(commitProgramLog(transactionHub, input))),
         ),
     })
+    const externalChildStore = ExternalChildStore.of({
+      reserve: (input) => runBuffered((transactionHub) => reserveExternalChild(transactionHub, input)),
+      acknowledge: (placementId) => run(acknowledgeExternalChild(placementId)),
+      settle: (input) => runBuffered((transactionHub) => externalChildSettlement.settle(transactionHub, input)),
+      cancel: (placementId) => run(cancelExternalChild(placementId)),
+    })
+    return { runStore, externalChildStore }
   })
+
+export const makeSqliteRunStore = (
+  options: SqliteStoreOptions,
+): Effect.Effect<RunStoreInterface, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
+  makeSqliteStoreServices(options).pipe(Effect.map(({ runStore }) => runStore))
 
 export const layerSqliteStore = (
   options: SqliteStoreOptions,
-): Layer.Layer<RunStore, SqliteStoreError, SqlClient.SqlClient> => Layer.effect(RunStore, makeSqliteRunStore(options))
+): Layer.Layer<RunStore | ExternalChildStore, SqliteStoreError, SqlClient.SqlClient> =>
+  Layer.effectContext(
+    makeSqliteStoreServices(options).pipe(
+      Effect.map(({ runStore, externalChildStore }) =>
+        Context.make(RunStore, runStore).pipe(Context.add(ExternalChildStore, externalChildStore)),
+      ),
+    ),
+  )

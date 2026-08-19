@@ -10,11 +10,16 @@ import type { MemoryState, StoredRun } from "./state.js"
 export const activeChildCount: {
   (parent: StoredRun): (state: MemoryState) => number
   (state: MemoryState, parent: StoredRun): number
-} = Function.dual(2, (state: MemoryState, parent: StoredRun): number =>
-  parent.children.reduce(
-    (count, childRunId) => count + (state.runs.get(childRunId)?.childReadiness === "ready" ? 1 : 0),
-    0,
-  ),
+} = Function.dual(
+  2,
+  (state: MemoryState, parent: StoredRun): number =>
+    parent.children.reduce(
+      (count, childRunId) => count + (state.runs.get(childRunId)?.childReadiness === "ready" ? 1 : 0),
+      0,
+    ) +
+    [...state.externalChildPlacements.values()].filter(
+      (placement) => placement.parentRunId === parent.runId && !placement.settled,
+    ).length,
 )
 
 export const readinessForAdmission: {

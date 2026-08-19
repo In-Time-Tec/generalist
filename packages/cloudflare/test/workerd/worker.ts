@@ -1,10 +1,14 @@
 import { Effect, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
+import { makeTest } from "tenetkit/runtime/driver/executable-manifest"
+import type { Interface as RuntimeInterface } from "tenetkit/runtime/driver/runtime"
+import type { RunEvent } from "tenetkit/runtime/driver/run-event"
 import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { RunStore } from "tenetkit/runtime/driver/run-store"
 import {
   layerRunStore,
   layerSqlClient,
+  makeHibernatingWebSocket,
   makeProjection,
   schema as activationSchema,
   type DurableObjectStorage,
@@ -18,10 +22,81 @@ interface ObjectNamespace {
 
 interface Env extends Readonly<Record<string, unknown>> {
   readonly SQL_OBJECTS: ObjectNamespace
+  readonly REPLAY_OBJECTS: ObjectNamespace
 }
 
 interface DurableObjectState {
   readonly storage: DurableObjectStorage
+  readonly acceptWebSocket: (
+    socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket,
+    tags?: ReadonlyArray<string>,
+  ) => void
+  readonly getWebSockets: (
+    tag?: string,
+  ) => ReadonlyArray<import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket>
+}
+
+const replayExecutable = makeTest("workerd-replay", "1")
+const replayEvents = [0, 1].map(
+  (sequence) =>
+    ({
+      _tag: "RunAttemptStarted",
+      specVersion: "1",
+      eventId: `replay-run:${sequence}`,
+      runId: "replay-run",
+      sequence,
+      executableRef: replayExecutable.ref,
+      rootRunId: "replay-run",
+      depth: 0,
+      occurredAt: "2026-08-19T00:00:00.000Z",
+      attempt: 1,
+    }) as RunEvent,
+)
+const replayRuntime = {
+  history: ({ cursor }: { readonly cursor?: number }) =>
+    Effect.succeed(replayEvents.filter((event) => event.sequence > (cursor ?? -1))),
+  resolveModelResponse: () => Effect.die("model response not used"),
+  cancel: () => Effect.void,
+} as unknown as RuntimeInterface
+
+interface SocketPair {
+  readonly 0: WebSocket
+  readonly 1: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket
+}
+
+export class ReplayObject {
+  constructor(private readonly state: DurableObjectState) {}
+
+  private adapter() {
+    return makeHibernatingWebSocket({ state: this.state, runtime: replayRuntime, pageSize: 1, fuel: 1 })
+  }
+
+  fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname.endsWith("/flush")) {
+      return this.adapter()
+        .flush("replay-run")
+        .then((result) => Response.json(result))
+    }
+    const Pair = (globalThis as unknown as { readonly WebSocketPair: new () => SocketPair }).WebSocketPair
+    const pair = new Pair()
+    this.adapter().accept(pair[1])
+    return Promise.resolve(new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit))
+  }
+
+  webSocketMessage(
+    socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket,
+    message: string | ArrayBuffer,
+  ): Promise<void> {
+    return this.adapter().webSocketMessage(socket, message)
+  }
+
+  webSocketClose(socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket): void {
+    this.adapter().webSocketClose(socket)
+  }
+
+  webSocketError(socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket): void {
+    this.adapter().webSocketError(socket)
+  }
 }
 
 export class SqlObject {
@@ -134,7 +209,9 @@ export default make<Env, never>((request) =>
   Effect.gen(function* () {
     const context = yield* WorkerContext
     const bindings = context.bindings as Env
-    const id = bindings.SQL_OBJECTS.idFromName("default")
-    return yield* Effect.promise(() => bindings.SQL_OBJECTS.get(id).fetch(request))
+    const replay = new URL(request.url).pathname.startsWith("/replay")
+    const namespace = replay ? bindings.REPLAY_OBJECTS : bindings.SQL_OBJECTS
+    const id = namespace.idFromName("default")
+    return yield* Effect.promise(() => namespace.get(id).fetch(request))
   }),
 )

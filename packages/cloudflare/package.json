@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@effect/sql-sqlite-do": "catalog:",
+    "es-module-lexer": "catalog:",
     "tenetkit": "workspace:*"
   },
   "devDependencies": {

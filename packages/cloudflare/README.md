@@ -14,9 +14,11 @@ network work. Final-state projection is limited to Runs touched by that mutation
 an inactive final state deletes its candidate before `rearm` runs.
 
 Call `migrateAndBackfill(rearm)` once inside a SQL transaction to reconstruct
-candidates after the baseline `baton_runtime` migration has verified schema-meta
-version 8 and its checksum. This adapter table does not change the `baton_*`
-schema version. On each fresh exclusive host incarnation, call
+candidates after the runtime has verified its schema metadata and checksum. The
+baseline remains migration 1, `baton_runtime`; migration 2,
+`external_child_placements`, upgrades schema version 8 to 9 without importing
+historical runtime rows. The adapter table does not change the `baton_*` schema
+version. On each fresh exclusive host incarnation, call
 `makeExclusiveExecutionRecovery(...).recoverClaims(...)` before `drain(...)`.
 Drains are deterministic and fuel-bounded. Execute candidates pass through the
 normal claim and execution host; cancellation candidates use point cancellation
