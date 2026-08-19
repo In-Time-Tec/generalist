@@ -67,7 +67,7 @@ export const migrateAndBackfill = (rearm: Rearm) =>
         ${now},
         r.attempt_fence,
         r.status
-      FROM baton_runs r LEFT JOIN baton_run_links l ON l.child_run_id = r.run_id
+      FROM tenetkit_runs r LEFT JOIN tenetkit_run_links l ON l.child_run_id = r.run_id
       WHERE r.status = 'cancelling'
         OR (r.owner_worker_id IS NULL AND
           (r.status = 'running' OR

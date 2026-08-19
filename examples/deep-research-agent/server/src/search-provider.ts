@@ -38,7 +38,7 @@ const cannedTopics: ReadonlyArray<CannedTopic> = [
     ],
   },
   {
-    keywords: ["baton", "agent sdk", "agent framework"],
+    keywords: ["tenetkit", "agent sdk", "agent framework"],
     results: [
       {
         title: "TenetKit: an Effect-native agent framework",
@@ -47,7 +47,7 @@ const cannedTopics: ReadonlyArray<CannedTopic> = [
       },
       {
         title: "TenetKit docs - the agent loop",
-        url: "https://baton.dev/docs/concepts/agent-loop",
+        url: "https://tenetkit.dev/docs/concepts/agent-loop",
         snippet: "TenetKit's agent loop plans, calls tools over configurable turns, and synthesizes a final answer.",
       },
     ],

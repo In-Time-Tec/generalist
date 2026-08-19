@@ -49,7 +49,7 @@ export const admitSteering: {
     const run = yield* loadRun(input.runId)
     if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
     const existing = yield* sql<SteeringRow>`
-      SELECT * FROM baton_run_steering
+      SELECT * FROM tenetkit_run_steering
       WHERE run_id = ${input.runId} AND idempotency_key = ${input.idempotencyKey}
     `
     const prior = existing[0]
@@ -69,13 +69,13 @@ export const admitSteering: {
     }
     const rows = yield* sql<{ next_sequence: number | string }>`
       SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence
-      FROM baton_run_steering WHERE run_id = ${input.runId}
+      FROM tenetkit_run_steering WHERE run_id = ${input.runId}
     `
     const sequence = Number(rows[0]?.next_sequence ?? 0)
     const entryId = `${input.runId}:steering:${sequence}`
     const encoded = encodeJson(Prompt.Prompt, input.prompt)
     yield* sql`
-      INSERT INTO baton_run_steering (
+      INSERT INTO tenetkit_run_steering (
         entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id, discarded_reason
       ) VALUES (
         ${entryId}, ${input.runId}, ${sequence}, ${input.idempotencyKey}, ${input.digest}, ${encoded}, NULL, NULL
@@ -97,7 +97,7 @@ const readPendingSteering = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<SteeringRow>`
-      SELECT * FROM baton_run_steering
+      SELECT * FROM tenetkit_run_steering
       WHERE run_id = ${runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
       ORDER BY sequence
     `
@@ -132,7 +132,7 @@ export const saveCompletionContinuation: {
             steeringEntryIds: entries.map((entry) => entry.entryId),
           }
     yield* sql`
-      UPDATE baton_runs SET
+      UPDATE tenetkit_runs SET
         continuation_json = ${continuation === undefined ? null : encodeContinuation(continuation)},
         suspension_json = NULL
       WHERE run_id = ${runId}

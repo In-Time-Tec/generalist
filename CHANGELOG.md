@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.33.0
+
+This release removes the retired `baton` name from every surface TenetKit owns and collapses the SQL schema to a single version-1 baseline. It is a clean break: an existing database created by an earlier release cannot be upgraded and must be recreated.
+
+- Rename every SQL table, index, and constraint from the `baton_` prefix to `tenetkit_`. The 0.28.0 rename kept the old prefix to avoid stranding databases; that reason no longer applies, and the persisted schema now matches the project it belongs to. There is no rename migration.
+- Collapse the SQL schema to one baseline at `SCHEMA_VERSION = 1` on SQLite, PostgreSQL, and MySQL. The version-7 and version-8 statement sets, their frozen checksums, and the `external_child_placements` upgrade step are deleted; every backend now creates its complete schema as migration 1, `tenetkit_runtime`, in one transaction. Dirty, checksum mismatch, unsupported forward version, and migration failure remain typed schema errors.
+- Detect a foreign schema by the runtime's own table list rather than by name prefix. The prefix test would have matched the `@tenetkit/cloudflare` adapter's `tenetkit_activations` table and refused to create the baseline beside it.
+- Rename the remaining brand-bearing identifiers a consumer can observe: the A2A snapshot metadata key `batonCursor` is now `tenetkitCursor`, and the REPL kernel's internal frame, cell, module, and restore filenames carry the `tenetkit-` prefix.
+- Rename the `tenetkit/mcp` adapter documentation from the retired `./baton` subpath to the `./tools` subpath it has actually exported since 0.28.0.
+- Enforce the removal with the `no-retired-baton-naming` ast-grep rule, which fails `check` on the retired name in any identifier, property, string literal, or comment.
+- Delete the `repository-policy` and `repository-graph` scripts, their `tooling/` workspaces, and their `check` steps. A generated import-graph snapshot and a bespoke line-count walker duplicated what `oxlint`, `ast-grep`, and the type checker already enforce, and each needed its own regeneration step on every change.
+
 ## 0.32.0
 
 - Add transaction-local Durable Object activation projection, fuel-bounded drain and exclusive-host recovery, hibernating WebSocket replay from authoritative Runtime history, and atomic external-child placement for memory and SQLite stores.

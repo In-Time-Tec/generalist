@@ -82,7 +82,7 @@ const admitWaitForCancellation = (waitId: string) =>
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       yield* sql`
-        UPDATE baton_runs
+        UPDATE tenetkit_runs
         SET status = 'running', owner_worker_id = ${parentClaim.workerId}
         WHERE run_id = ${receipt.runId}
       `
@@ -116,7 +116,7 @@ const expireLease = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE baton_runs
+      UPDATE tenetkit_runs
       SET lease_expires_at = NOW() - INTERVAL '1 second'
       WHERE run_id = ${runId}
     `
@@ -138,12 +138,12 @@ const corruptEventExecutableRef = (runId: string, executableRef: unknown) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const row = (yield* sql<{ event_json: string }>`
-      SELECT event_json FROM baton_run_events WHERE run_id = ${runId} ORDER BY sequence LIMIT 1
+      SELECT event_json FROM tenetkit_run_events WHERE run_id = ${runId} ORDER BY sequence LIMIT 1
     `)[0]!
     const event = decodeJson(row.event_json)
     event.executableRef = executableRef
     yield* sql`
-      UPDATE baton_run_events SET event_json = ${encodeJson(event)}
+      UPDATE tenetkit_run_events SET event_json = ${encodeJson(event)}
       WHERE run_id = ${runId} AND sequence = 0
     `
   }).pipe(scopedWith(postgresClient(url)))
@@ -454,7 +454,7 @@ describePostgres("postgres run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
-            UPDATE baton_runs SET
+            UPDATE tenetkit_runs SET
               executable_ref_json = ${encodeJson(alternateAssistantRef.ref)},
               executable_manifest_json = ${encodeJson(alternateAssistantRef.manifest)}
             WHERE run_id = ${runId}
@@ -605,7 +605,7 @@ describePostgres("postgres run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
-            UPDATE baton_runs SET updated_at = TIMESTAMPTZ '2000-01-01 00:00:00+00'
+            UPDATE tenetkit_runs SET updated_at = TIMESTAMPTZ '2000-01-01 00:00:00+00'
             WHERE run_id = ${receipt.runId}
           `
         }).pipe(scopedWith(postgresClient(url)))
@@ -620,7 +620,7 @@ describePostgres("postgres run store", () => {
             }>`
               SELECT owner_worker_id, lease_expires_at::text AS lease_expires_at,
                 attempt_fence, updated_at::text AS updated_at
-              FROM baton_runs WHERE run_id = ${receipt.runId}
+              FROM tenetkit_runs WHERE run_id = ${receipt.runId}
             `
             return row!
           }).pipe(scopedWith(postgresClient(url)))
@@ -731,7 +731,7 @@ describePostgres("postgres run store", () => {
           yield* sql.withTransaction(
             Effect.gen(function* () {
               const pid = (yield* sql<{ readonly pid: number }>`SELECT pg_backend_pid() AS pid`)[0]!.pid
-              yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
+              yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
               yield* Deferred.succeed(locked, undefined)
               let blocked = false
               for (let attempt = 0; attempt < 200 && !blocked; attempt++) {
@@ -746,7 +746,7 @@ describePostgres("postgres run store", () => {
               }
               expect(blocked).toBe(true)
               yield* sql`
-                UPDATE baton_runs
+                UPDATE tenetkit_runs
                 SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
                   lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
                 WHERE run_id = ${receipt.runId}
@@ -781,10 +781,10 @@ describePostgres("postgres run store", () => {
             readonly attempt_fence: number
           }>`
             SELECT owner_worker_id, attempt_fence
-            FROM baton_runs WHERE run_id = ${receipt.runId}
+            FROM tenetkit_runs WHERE run_id = ${receipt.runId}
           `
           const [events] = yield* sql<{ readonly count: string }>`
-            SELECT COUNT(*) AS count FROM baton_run_events
+            SELECT COUNT(*) AS count FROM tenetkit_run_events
             WHERE run_id = ${receipt.runId} AND event_json LIKE '%"TurnCompleted"%'
           `
           return { run, eventCount: Number(events!.count) }
@@ -915,9 +915,9 @@ describePostgres("postgres run store", () => {
           yield* sql.withTransaction(
             Effect.gen(function* () {
               const pid = (yield* sql<{ readonly pid: number }>`SELECT pg_backend_pid() AS pid`)[0]!.pid
-              yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
+              yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
               yield* sql`
-                SELECT operation_id FROM baton_run_operations
+                SELECT operation_id FROM tenetkit_run_operations
                 WHERE run_id = ${receipt.runId} AND operation_id = ${operation.operationId}
                 FOR UPDATE
               `
@@ -935,7 +935,7 @@ describePostgres("postgres run store", () => {
               }
               expect(blocked).toBe(true)
               yield* sql`
-                UPDATE baton_runs
+                UPDATE tenetkit_runs
                 SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
                   lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
                 WHERE run_id = ${receipt.runId}

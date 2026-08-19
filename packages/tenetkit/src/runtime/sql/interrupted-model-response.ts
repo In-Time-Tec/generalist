@@ -30,7 +30,7 @@ export const commitInterruptedModelResponse: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
@@ -77,7 +77,7 @@ export const commitInterruptedModelResponse: {
     )
     const finished = yield* nowIso
     yield* sql`
-      UPDATE baton_run_operations
+      UPDATE tenetkit_run_operations
       SET status = 'failed', error_json = ${encodeJsonValue(input.outcome.error)}, finished_at = ${finished}
       WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
         AND status IN ('requested', 'running')
@@ -88,7 +88,7 @@ export const commitInterruptedModelResponse: {
       validated.event as unknown as { readonly _tag: string } & Record<string, unknown>,
     )
     const completed = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     return toOperationRecord(completed[0]!)
   }),

@@ -74,7 +74,7 @@ const realDelay = (millis: number): Effect.Effect<void> =>
   })
 
 const frameSecret: Effect.Effect<string> = Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER).pipe(
-  Effect.map((value) => `baton-frame-${value.toString(36)}:`),
+  Effect.map((value) => `tenetkit-frame-${value.toString(36)}:`),
 )
 
 const decodeFrame = Schema.decodeUnknownEffect(Schema.fromJsonString(WorkerFrame))

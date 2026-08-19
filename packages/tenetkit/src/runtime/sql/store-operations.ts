@@ -78,13 +78,13 @@ export const recordOperation: {
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     const existing = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations
+      SELECT * FROM tenetkit_run_operations
       WHERE run_id = ${input.runId} AND operation_key = ${input.operationKey}
     `
     const prior = existing[0]
     if (prior !== undefined) {
       const consumed = yield* sql<{ readonly entry_id: string }>`
-        SELECT entry_id FROM baton_run_steering
+        SELECT entry_id FROM tenetkit_run_steering
         WHERE run_id = ${input.runId} AND consumed_operation_id = ${prior.operation_id}
         ORDER BY sequence
       `
@@ -96,7 +96,7 @@ export const recordOperation: {
     }
     const steeringEntryIds = input.steeringEntryIds ?? []
     const pending = yield* sql<SteeringConsumptionRow>`
-      SELECT entry_id, sequence, consumed_operation_id, discarded_reason FROM baton_run_steering
+      SELECT entry_id, sequence, consumed_operation_id, discarded_reason FROM tenetkit_run_steering
       WHERE run_id = ${input.runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
       ORDER BY sequence
     `
@@ -113,7 +113,7 @@ export const recordOperation: {
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
     })
     yield* sql`
-      INSERT INTO baton_run_operations (
+      INSERT INTO tenetkit_run_operations (
         run_id, operation_id, operation_key, kind, status, input_digest, input_json,
         result_json, error_json, replay_policy, attempt, started_at, finished_at
       ) VALUES (
@@ -124,7 +124,7 @@ export const recordOperation: {
     `
     if (input.checkpoint !== undefined || input.continuation !== undefined) {
       yield* sql`
-        UPDATE baton_runs SET
+        UPDATE tenetkit_runs SET
           driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
           executable_ref_json = ${encodeExecutableRef(executableRef)},
           continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
@@ -135,7 +135,7 @@ export const recordOperation: {
     }
     for (const entryId of steeringEntryIds) {
       yield* sql`
-        UPDATE baton_run_steering SET consumed_operation_id = ${operationId}
+        UPDATE tenetkit_run_steering SET consumed_operation_id = ${operationId}
         WHERE run_id = ${input.runId} AND entry_id = ${entryId}
           AND consumed_operation_id IS NULL AND discarded_reason IS NULL
       `
@@ -152,7 +152,7 @@ export const recordOperation: {
       yield* appendEvent(hub, current, event as { readonly _tag: string } & Record<string, unknown>)
     }
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${operationId}
     `
     return toOperationRecord(rows[0]!)
   }),
@@ -165,12 +165,12 @@ export const startOperation = (input: { readonly runId: string; readonly operati
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     const started = yield* nowIso
     yield* sql`
-      UPDATE baton_run_operations
+      UPDATE tenetkit_run_operations
       SET status = 'running', started_at = ${started}
       WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'requested'
     `
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
@@ -185,7 +185,7 @@ export const completeOperation: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     const existing = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     if (existing[0] === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     if (existing[0].status === "succeeded" || existing[0].status === "failed" || existing[0].status === "unknown") {
@@ -212,7 +212,7 @@ export const completeOperation: {
     }
     for (const entryId of new Set(input.steeringEntryIds ?? [])) {
       const rows = yield* sql<SteeringConsumptionRow>`
-        SELECT entry_id, consumed_operation_id FROM baton_run_steering
+        SELECT entry_id, consumed_operation_id FROM tenetkit_run_steering
         WHERE run_id = ${input.runId} AND entry_id = ${entryId}
       `
       if (rows[0]?.consumed_operation_id !== input.operationId) {
@@ -237,27 +237,27 @@ export const completeOperation: {
     const finished = yield* nowIso
     if (input.outcome._tag === "Succeeded") {
       yield* sql`
-        UPDATE baton_run_operations
+        UPDATE tenetkit_run_operations
         SET status = 'succeeded', result_json = ${encodeJsonValue(input.outcome.value)}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
           AND status IN ('requested', 'running')
       `
     } else if (input.outcome._tag === "Failed") {
       yield* sql`
-        UPDATE baton_run_operations
+        UPDATE tenetkit_run_operations
         SET status = 'failed', error_json = ${encodeJsonValue(input.outcome.error)}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
           AND status IN ('requested', 'running')
       `
     } else {
       yield* sql`
-        UPDATE baton_run_operations SET status = 'unknown', finished_at = ${finished}
+        UPDATE tenetkit_run_operations SET status = 'unknown', finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
           AND status IN ('requested', 'running')
       `
     }
     yield* sql`
-      UPDATE baton_runs SET
+      UPDATE tenetkit_runs SET
         driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
@@ -275,7 +275,7 @@ export const completeOperation: {
       )
     }
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
@@ -291,7 +291,7 @@ export const commitModelResponse: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
@@ -353,7 +353,7 @@ export const expireRunningOperation: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
@@ -362,18 +362,18 @@ export const expireRunningOperation: {
     }
     if (canBlindRetry(row.replay_policy)) {
       yield* sql`
-        UPDATE baton_run_operations
+        UPDATE tenetkit_run_operations
         SET status = 'requested', started_at = NULL, finished_at = NULL
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'running'
       `
       const next = yield* sql<OperationRow>`
-        SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+        SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
       `
       return { record: toOperationRecord(next[0]!), outcome: "retried" as const }
     }
     const finished = yield* nowIso
     yield* sql`
-      UPDATE baton_run_operations SET status = 'unknown', finished_at = ${finished}
+      UPDATE tenetkit_run_operations SET status = 'unknown', finished_at = ${finished}
       WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'running'
     `
     yield* appendEvent(
@@ -383,7 +383,7 @@ export const expireRunningOperation: {
       run.cancellationRequested ? "cancelling" : "needs-resolution",
     )
     const next = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     return { record: toOperationRecord(next[0]!), outcome: "unknown" as const }
   }),
@@ -394,7 +394,7 @@ export const getOperation = (input: { readonly runId: string; readonly operation
     const sql = yield* SqlClient.SqlClient
     yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
@@ -406,7 +406,7 @@ export const getOperationByKey = (input: { readonly runId: string; readonly oper
     const sql = yield* SqlClient.SqlClient
     yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_key = ${input.operationKey}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_key = ${input.operationKey}
     `
     return rows[0] === undefined ? undefined : toOperationRecord(rows[0])
   })
@@ -434,7 +434,7 @@ export const resolveOperation: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
     const resolutionJson = encodeJsonValue(input.resolution)
@@ -460,19 +460,19 @@ export const resolveOperation: {
     const finished = yield* nowIso
     if (input.resolution._tag === "Succeeded") {
       yield* sql`
-        UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJsonValue(input.resolution.value)},
+        UPDATE tenetkit_run_operations SET status = 'succeeded', result_json = ${encodeJsonValue(input.resolution.value)},
           resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
       `
     } else if (input.resolution._tag === "Failed") {
       yield* sql`
-        UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJsonValue(input.resolution.error)},
+        UPDATE tenetkit_run_operations SET status = 'failed', error_json = ${encodeJsonValue(input.resolution.error)},
           resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
       `
     } else {
       yield* sql`
-        UPDATE baton_run_operations SET status = 'requested', result_json = NULL, error_json = NULL,
+        UPDATE tenetkit_run_operations SET status = 'requested', result_json = NULL, error_json = NULL,
           resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson},
           started_at = NULL, finished_at = NULL
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
@@ -480,13 +480,13 @@ export const resolveOperation: {
     }
     if (clearLease) {
       yield* sql`
-        UPDATE baton_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL,
+        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL,
           updated_at = ${finished}
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     } else {
       yield* sql`
-        UPDATE baton_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, updated_at = ${finished}
+        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, updated_at = ${finished}
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     }

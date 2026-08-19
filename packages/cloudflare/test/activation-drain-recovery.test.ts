@@ -334,7 +334,7 @@ it.live("recovers stale running and cancelling claims by status, raises fences, 
         })
       const running = yield* admit("running")
       const cancelling = yield* admit("cancelling")
-      yield* sql`UPDATE baton_runs SET status = 'running', owner_worker_id = 'old', attempt_fence = 5
+      yield* sql`UPDATE tenetkit_runs SET status = 'running', owner_worker_id = 'old', attempt_fence = 5
         WHERE run_id IN (${running.runId}, ${cancelling.runId})`
       yield* runtime.cancel({ runId: cancelling.runId, reason: "replace host" })
       const runningClaim = { runId: running.runId, ownerId: "old", attemptFence: 5 }

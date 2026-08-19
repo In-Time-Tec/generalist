@@ -21,7 +21,7 @@ export const loadTreeHistory = (input: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const roots = yield* sql<{ earliest_position: number; last_position: number }>`
-      SELECT earliest_position, last_position FROM baton_tree_roots WHERE root_run_id = ${input.rootRunId}
+      SELECT earliest_position, last_position FROM tenetkit_tree_roots WHERE root_run_id = ${input.rootRunId}
     `
     const root = roots[0]
     if (root === undefined) return yield* RunNotFound.make({ runId: input.rootRunId })
@@ -50,9 +50,9 @@ export const loadTreeHistory = (input: {
     }
     const rows = yield* sql<TreeRow>`
       SELECT i.position, e.event_json, r.root_run_id, r.parent_run_id, r.invocation_id
-      FROM baton_tree_event_index i
-      JOIN baton_run_events e ON e.run_id = i.run_id AND e.sequence = i.run_sequence
-      JOIN baton_runs r ON r.run_id = i.run_id
+      FROM tenetkit_tree_event_index i
+      JOIN tenetkit_run_events e ON e.run_id = i.run_id AND e.sequence = i.run_sequence
+      JOIN tenetkit_runs r ON r.run_id = i.run_id
       WHERE i.root_run_id = ${input.rootRunId} AND i.position > ${input.position}
       ORDER BY i.position ASC LIMIT ${sql.literal(String(Math.max(0, Math.floor(input.limit)) + 1))}
     `

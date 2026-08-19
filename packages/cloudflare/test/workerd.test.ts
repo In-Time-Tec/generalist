@@ -13,7 +13,7 @@ const ConformanceResponse = Schema.Struct({
   committed: Schema.Literal(1),
   rolledBack: Schema.Literal(0),
   alarm: Schema.Literal(4_000_000_000_000),
-  schemaVersion: Schema.Literal(9),
+  schemaVersion: Schema.Literal(1),
   migrations: Schema.Array(Schema.Struct({ id: Schema.Finite, name: Schema.String })),
 })
 
@@ -104,28 +104,22 @@ const worker :Workerd.Worker = (
             {
               backend: "sqlite",
               probe: 1,
-              tables: expect.arrayContaining(["baton_runs", "baton_schema_meta"]),
+              tables: expect.arrayContaining(["tenetkit_runs", "tenetkit_schema_meta"]),
               committed: 1,
               rolledBack: 0,
               alarm: 4_000_000_000_000,
-              schemaVersion: 9,
-              migrations: [
-                { id: 1, name: "baton_runtime" },
-                { id: 2, name: "external_child_placements" },
-              ],
+              schemaVersion: 1,
+              migrations: [{ id: 1, name: "tenetkit_runtime" }],
             },
             {
               backend: "sqlite",
               probe: 2,
-              tables: expect.arrayContaining(["baton_runs", "baton_schema_meta"]),
+              tables: expect.arrayContaining(["tenetkit_runs", "tenetkit_schema_meta"]),
               committed: 1,
               rolledBack: 0,
               alarm: 4_000_000_000_000,
-              schemaVersion: 9,
-              migrations: [
-                { id: 1, name: "baton_runtime" },
-                { id: 2, name: "external_child_placements" },
-              ],
+              schemaVersion: 1,
+              migrations: [{ id: 1, name: "tenetkit_runtime" }],
             },
           ])
 

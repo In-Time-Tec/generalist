@@ -97,11 +97,11 @@ export const appendInterruptedSessionEntry = (
     const sql = yield* SqlClient.SqlClient
     const created = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     yield* sql`
-      INSERT OR IGNORE INTO baton_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
+      INSERT OR IGNORE INTO tenetkit_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
       VALUES (${input.sessionId}, NULL, 0, NULL, ${created})
     `
     const sessionRows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${input.sessionId}
+      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
     `
     const session = sessionRows[0]
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
@@ -111,7 +111,7 @@ export const appendInterruptedSessionEntry = (
       metadata: { interruptionDigest: input.digest },
     }
     const existingRows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = existingRows[0]
@@ -127,7 +127,7 @@ export const appendInterruptedSessionEntry = (
         })
       }
       const all = yield* sql<EntryRow>`
-        SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+        SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
         WHERE session_id = ${input.sessionId} ORDER BY seq
       `
       const byId = new Map(all.map((row) => [row.entry_id, row] as const))
@@ -152,12 +152,12 @@ export const appendInterruptedSessionEntry = (
       })
     }
     yield* sql`
-      INSERT INTO baton_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
+      INSERT INTO tenetkit_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${input.sessionId}, ${input.entryId}, ${input.parentId}, ${session.next_seq}, 'ModelResponse',
         ${encodePayload(payload as Session.EntryPayload)}, ${created})
     `
     yield* sql`
-      UPDATE baton_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
+      UPDATE tenetkit_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
       WHERE session_id = ${input.sessionId}
     `
     return { ...payload, id: input.entryId, parentId: input.parentId } as Session.ModelResponseEntry
@@ -173,11 +173,11 @@ export const verifyInterruptedSessionEntry = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const sessionRows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${input.sessionId}
+      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
     `
     const session = sessionRows[0]
     const existingRows = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = existingRows[0]
@@ -198,7 +198,7 @@ export const verifyInterruptedSessionEntry = (
       })
     }
     const all = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
       WHERE session_id = ${input.sessionId} ORDER BY seq
     `
     const byId = new Map(all.map((row) => [row.entry_id, row] as const))
@@ -231,7 +231,7 @@ export const makeSqliteSessionStore = (options: {
 
     const sessionRow = Effect.gen(function* () {
       const rows = yield* sql<SessionRow>`
-        SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${options.sessionId}
+        SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${options.sessionId}
       `
       return rows[0]
     })
@@ -241,7 +241,7 @@ export const makeSqliteSessionStore = (options: {
       if (existing !== undefined) return existing
       const created = yield* now
       yield* sql`
-        INSERT OR IGNORE INTO baton_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
+        INSERT OR IGNORE INTO tenetkit_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
         VALUES (${options.sessionId}, NULL, 0, NULL, ${created})
       `
       return (yield* sessionRow) ?? { leaf_id: null, next_seq: 0, owner_token: null }
@@ -249,7 +249,7 @@ export const makeSqliteSessionStore = (options: {
 
     const entriesFor = Effect.gen(function* () {
       const rows = yield* sql<EntryRow>`
-        SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+        SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
         WHERE session_id = ${options.sessionId} ORDER BY seq
       `
       return rows
@@ -280,7 +280,7 @@ export const makeSqliteSessionStore = (options: {
     const claim = (ownerToken: string | undefined, updated: string) =>
       ownerToken === undefined
         ? Effect.void
-        : sql`UPDATE baton_sessions SET owner_token = ${ownerToken}, updated_at = ${updated} WHERE session_id = ${options.sessionId}`
+        : sql`UPDATE tenetkit_sessions SET owner_token = ${ownerToken}, updated_at = ${updated} WHERE session_id = ${options.sessionId}`
 
     const insertEntry = (input: {
       readonly id: string
@@ -290,12 +290,12 @@ export const makeSqliteSessionStore = (options: {
       readonly payload: string
       readonly created: string
     }) => sql`
-      INSERT INTO baton_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
+      INSERT INTO tenetkit_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${options.sessionId}, ${input.id}, ${input.parentId}, ${input.seq}, ${input.tag}, ${input.payload}, ${input.created})
     `
 
     const advance = (leafId: string | null, nextSeq: number, updated: string) => sql`
-      UPDATE baton_sessions SET leaf_id = ${leafId}, next_seq = ${nextSeq}, updated_at = ${updated}
+      UPDATE tenetkit_sessions SET leaf_id = ${leafId}, next_seq = ${nextSeq}, updated_at = ${updated}
       WHERE session_id = ${options.sessionId}
     `
 
@@ -319,7 +319,7 @@ export const makeSqliteSessionStore = (options: {
           const session = yield* ensureSession
           if (appendOptions?.id !== undefined) {
             const rows = yield* sql<EntryRow>`
-              SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+              SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
               WHERE session_id = ${options.sessionId} AND entry_id = ${appendOptions.id}
             `
             const existing = rows[0]
@@ -373,7 +373,7 @@ export const makeSqliteSessionStore = (options: {
         Effect.gen(function* () {
           const session = yield* ensureSession
           const rows = yield* sql<EntryRow>`
-            SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+            SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
             WHERE session_id = ${options.sessionId} AND entry_id = ${prepared.id}
           `
           const existing = rows[0]
@@ -449,14 +449,14 @@ export const makeSqliteSessionStore = (options: {
               yield* ensureSession
               if (id !== null) {
                 const rows = yield* sql<{ readonly entry_id: string }>`
-                  SELECT entry_id FROM baton_session_entries
+                  SELECT entry_id FROM tenetkit_session_entries
                   WHERE session_id = ${options.sessionId} AND entry_id = ${id}
                 `
                 if (rows[0] === undefined) return yield* storeError(`Session entry ${id} does not exist`)
               }
               const updated = yield* now
               yield* sql`
-                UPDATE baton_sessions SET leaf_id = ${id}, updated_at = ${updated} WHERE session_id = ${options.sessionId}
+                UPDATE tenetkit_sessions SET leaf_id = ${id}, updated_at = ${updated} WHERE session_id = ${options.sessionId}
               `
             }),
           )

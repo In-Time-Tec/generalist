@@ -312,7 +312,7 @@ it.live("rolls back terminal Session results when SQLite Run settlement fails", 
       const database = new Database(filename)
       database.exec(`
         CREATE TRIGGER fail_terminal_run_after_session
-        BEFORE INSERT ON baton_run_events
+        BEFORE INSERT ON tenetkit_run_events
         WHEN NEW.run_id = '${receipt.runId.replaceAll("'", "''")}'
           AND NEW.event_json LIKE '%"_tag":"RunCancelled"%'
         BEGIN

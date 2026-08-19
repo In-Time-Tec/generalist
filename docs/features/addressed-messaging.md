@@ -58,7 +58,7 @@ Messaging inside an execution goes through `Messaging.make`, which schedules eac
 
 ## Backends
 
-Memory, SQLite, PostgreSQL, and MySQL all carry the same contract, and every rule above is proven against all four rather than asserted from one. The SQL backends store the inbox in `baton_messages` and names in `baton_agent_names`; both are part of the replaced baseline schema, so they are created by the normal migration rather than added alongside it.
+Memory, SQLite, PostgreSQL, and MySQL all carry the same contract, and every rule above is proven against all four rather than asserted from one. The SQL backends store the inbox in `tenetkit_messages` and names in `tenetkit_agent_names`; both are part of the replaced baseline schema, so they are created by the normal migration rather than added alongside it.
 
 Two backend facts the contract depends on:
 

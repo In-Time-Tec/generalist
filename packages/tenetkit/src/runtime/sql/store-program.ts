@@ -94,7 +94,7 @@ const operationRows = (runId: string, operation: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     return yield* sql<OperationRow>`
-      SELECT * FROM baton_program_operations WHERE run_id = ${runId} AND operation_name = ${operation}
+      SELECT * FROM tenetkit_program_operations WHERE run_id = ${runId} AND operation_name = ${operation}
     `
   })
 
@@ -116,7 +116,7 @@ const idempotentReplay = (prior: ProgramOperationRecord, outcome: ProgramOperati
 export const loadProgramState = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<StateRow>`SELECT * FROM baton_program_runs WHERE run_id = ${runId}`
+    const rows = yield* sql<StateRow>`SELECT * FROM tenetkit_program_runs WHERE run_id = ${runId}`
     return rows[0] === undefined ? undefined : yield* decodeState(rows[0])
   })
 
@@ -153,7 +153,7 @@ export const reserveProgramOperation = (
     let state = yield* loadProgramState(input.runId)
     if (state === undefined) {
       yield* sql`
-        INSERT INTO baton_program_runs (
+        INSERT INTO tenetkit_program_runs (
           run_id, program_pin, budget_json, deadline_millis, tool_calls, agent_runs, tokens, log_bytes, active_slots
         ) VALUES (
           ${input.runId}, ${input.programPin}, ${encodeJsonValue(input.budget)},
@@ -187,7 +187,7 @@ export const reserveProgramOperation = (
         })
     }
     yield* sql`
-      UPDATE baton_program_runs SET
+      UPDATE tenetkit_program_runs SET
         tool_calls = tool_calls + ${input.reservation.toolCalls ?? 0},
         agent_runs = agent_runs + ${input.reservation.agentRuns ?? 0},
         log_bytes = log_bytes + ${input.reservation.logBytes ?? 0},
@@ -195,7 +195,7 @@ export const reserveProgramOperation = (
       WHERE run_id = ${input.runId}
     `
     yield* sql`
-      INSERT INTO baton_program_operations (
+      INSERT INTO tenetkit_program_operations (
         run_id, operation_name, kind, capability, input_digest, input_json, replay_policy,
         status, result_json, error_json, wait_id, fan_out_id, child_run_ids_json
       ) VALUES (
@@ -261,7 +261,7 @@ export const settleProgramOperation: {
           }
         : input.outcome
     yield* sql`
-      UPDATE baton_program_operations SET
+      UPDATE tenetkit_program_operations SET
         status = ${outcome._tag === "Succeeded" ? "succeeded" : outcome._tag === "Failed" ? "failed" : "unknown"},
         result_json = ${outcome._tag === "Succeeded" ? encodeJsonValue(outcome.value) : null},
         error_json = ${outcome._tag === "Failed" ? encodeJsonValue(outcome.error) : null}
@@ -269,7 +269,7 @@ export const settleProgramOperation: {
         AND status IN ('reserved', 'running', 'waiting')
     `
     yield* sql`
-      UPDATE baton_program_runs SET tokens = tokens + ${tokens},
+      UPDATE tenetkit_program_runs SET tokens = tokens + ${tokens},
         active_slots = CASE WHEN active_slots >= ${input.releaseSlots} THEN active_slots - ${input.releaseSlots} ELSE 0 END
       WHERE run_id = ${input.runId}
     `
@@ -329,7 +329,7 @@ export const resolveProgramOperation: {
     const status =
       input.resolution._tag === "Succeeded" ? "succeeded" : input.resolution._tag === "Failed" ? "failed" : "reserved"
     yield* sql`
-      UPDATE baton_program_operations SET status = ${status},
+      UPDATE tenetkit_program_operations SET status = ${status},
         result_json = ${input.resolution._tag === "Succeeded" ? encodeJsonValue(input.resolution.value) : null},
         error_json = ${input.resolution._tag === "Failed" ? encodeJsonValue(input.resolution.error) : null},
         resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}
@@ -337,12 +337,12 @@ export const resolveProgramOperation: {
     `
     if (clearLease) {
       yield* sql`
-        UPDATE baton_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL
+        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     } else {
       yield* sql`
-        UPDATE baton_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL
+        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     }
@@ -353,7 +353,7 @@ export const startProgramOperation = (input: { readonly runId: string; readonly 
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE baton_program_operations SET status = 'running'
+      UPDATE tenetkit_program_operations SET status = 'running'
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation} AND status = 'reserved'
     `
     const row = (yield* operationRows(input.runId, input.operation))[0]
@@ -373,10 +373,10 @@ export const reconcileProgramCancellation: {
     const sql = yield* SqlClient.SqlClient
     const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
     yield* sql`
-      UPDATE baton_program_operations SET status = 'failed', error_json = ${encodeJsonValue(failure)}
+      UPDATE tenetkit_program_operations SET status = 'failed', error_json = ${encodeJsonValue(failure)}
       WHERE run_id = ${runId} AND status IN ('reserved', 'running', 'waiting')
     `
-    yield* sql`UPDATE baton_program_runs SET active_slots = 0 WHERE run_id = ${runId}`
+    yield* sql`UPDATE tenetkit_program_runs SET active_slots = 0 WHERE run_id = ${runId}`
   })
 }
 
@@ -394,7 +394,7 @@ export const suspendProgramOperation: {
     if (reserved.status === "waiting") return reserved
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE baton_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId}
+      UPDATE tenetkit_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation} AND status = 'reserved'
     `
     yield* suspendParent(hub, input)
@@ -412,7 +412,7 @@ export const admitProgramAgents: {
     const receipt = yield* admitFanOut(hub, input.fanOut)
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE baton_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId},
+      UPDATE tenetkit_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId},
         fan_out_id = ${receipt.fanOutId}, child_run_ids_json = ${encodeJsonValue(receipt.childRunIds)}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation} AND status = 'reserved'
     `

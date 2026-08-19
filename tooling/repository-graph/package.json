@@ -1,9 +1,0 @@
-{
-  "name": "@tenetkit/repository-graph",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "bun --cwd ../.. vitest run tooling/repository-graph/test",
-    "typecheck": "bun --cwd ../.. tsc --noEmit"
-  }
-}

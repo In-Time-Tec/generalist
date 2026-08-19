@@ -17,7 +17,7 @@ export const persistRegistrations = (registrations: ReadonlyArray<ExecutableRegi
     const storedDigest = (pin: string) =>
       sql<RegistrationRow>`
         SELECT pin, codec, version, payload_json, registration_digest
-        FROM baton_executable_registrations WHERE pin = ${pin}
+        FROM tenetkit_executable_registrations WHERE pin = ${pin}
       `.pipe(Effect.map((rows) => rows[0]?.registration_digest))
 
     for (const registration of registrations) {
@@ -30,7 +30,7 @@ export const persistRegistrations = (registrations: ReadonlyArray<ExecutableRegi
         continue
       }
       const inserted = yield* Effect.exit(sql`
-        INSERT INTO baton_executable_registrations (pin, codec, version, payload_json, registration_digest)
+        INSERT INTO tenetkit_executable_registrations (pin, codec, version, payload_json, registration_digest)
         VALUES (${registration.pin}, ${registration.codec}, ${registration.version}, ${encodeJson(registration)}, ${registrationDigest})
       `)
       if (inserted._tag === "Success") continue
@@ -55,7 +55,7 @@ export const associateRegistrations: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     for (const registration of registrations) {
-      yield* sql`INSERT INTO baton_run_registrations (run_id, pin) VALUES (${runId}, ${registration.pin})`
+      yield* sql`INSERT INTO tenetkit_run_registrations (run_id, pin) VALUES (${runId}, ${registration.pin})`
     }
   }),
 )
@@ -66,9 +66,9 @@ export const loadRegistrations = (runId: string) =>
     const rows = yield* sql<RegistrationRow>`
       SELECT registration.pin, registration.codec, registration.version,
         registration.payload_json, registration.registration_digest
-      FROM baton_runs run
-      JOIN baton_run_registrations link ON link.run_id = run.run_id
-      JOIN baton_executable_registrations registration ON registration.pin = link.pin
+      FROM tenetkit_runs run
+      JOIN tenetkit_run_registrations link ON link.run_id = run.run_id
+      JOIN tenetkit_executable_registrations registration ON registration.pin = link.pin
       WHERE run.run_id = ${runId}
       ORDER BY registration.pin
     `

@@ -16,20 +16,20 @@ interface FirstPositionRow {
 const loadRuns = (rootRunId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE root_run_id = ${rootRunId}`
+    const rows = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE root_run_id = ${rootRunId}`
     const eventRows = yield* sql<EventRow>`
       SELECT e.run_id, e.sequence, e.event_id, e.event_json
-      FROM baton_run_events e JOIN baton_runs r ON r.run_id = e.run_id
+      FROM tenetkit_run_events e JOIN tenetkit_runs r ON r.run_id = e.run_id
       WHERE r.root_run_id = ${rootRunId}
       ORDER BY e.run_id ASC, e.sequence ASC
     `
     const positions = yield* sql<FirstPositionRow>`
       SELECT run_id, MIN(position) AS first_position
-      FROM baton_tree_event_index WHERE root_run_id = ${rootRunId} GROUP BY run_id
+      FROM tenetkit_tree_event_index WHERE root_run_id = ${rootRunId} GROUP BY run_id
     `
     const links = yield* sql<{ child_run_id: string; readiness: ChildReadiness }>`
       SELECT l.child_run_id, l.readiness
-      FROM baton_run_links l JOIN baton_runs r ON r.run_id = l.child_run_id
+      FROM tenetkit_run_links l JOIN tenetkit_runs r ON r.run_id = l.child_run_id
       WHERE r.root_run_id = ${rootRunId}
     `
     const byRun = new Map<string, Array<ReturnType<typeof decodeEvent>>>()
@@ -74,7 +74,7 @@ export const loadRunSnapshot = (runId: string) =>
     const sql = yield* SqlClient.SqlClient
     const roots = yield* sql<{
       readonly root_run_id: string
-    }>`SELECT root_run_id FROM baton_runs WHERE run_id = ${runId}`
+    }>`SELECT root_run_id FROM tenetkit_runs WHERE run_id = ${runId}`
     const rootRunId = roots[0]?.root_run_id
     if (rootRunId === undefined) return yield* RunNotFound.make({ runId })
     const runs = yield* loadRuns(rootRunId)
@@ -87,7 +87,7 @@ export const loadTreeInspection = (rootRunId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const roots = yield* sql<{ readonly last_position: number }>`
-      SELECT last_position FROM baton_tree_roots WHERE root_run_id = ${rootRunId}
+      SELECT last_position FROM tenetkit_tree_roots WHERE root_run_id = ${rootRunId}
     `
     const root = roots[0]
     if (root === undefined) return yield* RunNotFound.make({ runId: rootRunId })

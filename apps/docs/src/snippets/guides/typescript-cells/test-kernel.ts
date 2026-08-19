@@ -6,7 +6,7 @@ import { Cell, CellTool, KernelProfile, TestKernel } from "tenetkit/repl"
 const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
   bindingsDigest: KernelProfile.bindingsDigest([]),
-  workspace: { root: "/workspace", dataRoot: "/tmp/baton" },
+  workspace: { root: "/workspace", dataRoot: "/tmp/tenetkit" },
   limits: { sourceBytes: CellTool.maxSourceBytes, channelBytes: 262_144, cellDeadlineMillis: 120_000 },
   trustMode: "trusted-local",
 })

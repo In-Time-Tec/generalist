@@ -74,7 +74,6 @@ export default defineConfig({
       "examples/**/test/**/*.test.ts",
       "examples/**/src/**/*.test.ts",
       "test/**/*.test.ts",
-      "tooling/**/test/**/*.test.ts",
     ],
     coverage: {
       enabled: false,

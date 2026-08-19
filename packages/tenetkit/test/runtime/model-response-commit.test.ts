@@ -183,9 +183,9 @@ it.live("keeps rolled-back SQLite model completion invisible until commit", () =
       const database = new Database(filename)
       database.exec(`
         CREATE TRIGGER fail_model_completion_after_event
-        BEFORE UPDATE ON baton_tree_roots
+        BEFORE UPDATE ON tenetkit_tree_roots
         WHEN EXISTS (
-          SELECT 1 FROM baton_run_events
+          SELECT 1 FROM tenetkit_run_events
           WHERE run_id = '${receipt.runId.replaceAll("'", "''")}'
             AND event_json LIKE '%"_tag":"ModelResponseCommitted"%'
         )
@@ -235,13 +235,13 @@ it.live("keeps rolled-back SQLite model completion invisible until commit", () =
         .query<
           { result_json: string },
           [string, string]
-        >("SELECT result_json FROM baton_run_operations WHERE run_id = ? AND operation_id = ?")
+        >("SELECT result_json FROM tenetkit_run_operations WHERE run_id = ? AND operation_id = ?")
         .get(receipt.runId, operation.operationId)
       const eventRows = databaseAfter
         .query<
           { event_json: string },
           [string]
-        >("SELECT event_json FROM baton_run_events WHERE run_id = ? AND event_json LIKE '%ModelResponseCommitted%'")
+        >("SELECT event_json FROM tenetkit_run_events WHERE run_id = ? AND event_json LIKE '%ModelResponseCommitted%'")
         .all(receipt.runId)
       databaseAfter.close()
       expect(operationRow?.result_json).not.toContain("semantic answer")
@@ -313,12 +313,12 @@ it.live("rejects mutated completed model response references and Session storage
         .query<
           { session_id: string; entry_id: string; parent_id: string | null; tag: string; payload_json: string },
           [string, string]
-        >("SELECT session_id, entry_id, parent_id, tag, payload_json FROM baton_session_entries WHERE session_id = ? AND entry_id = ?")
+        >("SELECT session_id, entry_id, parent_id, tag, payload_json FROM tenetkit_session_entries WHERE session_id = ? AND entry_id = ?")
         .get(event.sessionId, event.sessionEntryId)
       if (row === null) return yield* Effect.die("expected persisted completed Session entry")
 
       database
-        .query("UPDATE baton_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
         .run("corrupt-entry", row.session_id, row.entry_id)
       const missingIdentity = yield* runtime.resolveModelResponse(event).pipe(Effect.flip)
       expect(missingIdentity).toMatchObject({
@@ -327,23 +327,23 @@ it.live("rejects mutated completed model response references and Session storage
         entryId: event.sessionEntryId,
       })
       database
-        .query("UPDATE baton_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.entry_id, row.session_id, "corrupt-entry")
 
       database
-        .query("UPDATE baton_session_entries SET parent_id = NULL WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET parent_id = NULL WHERE session_id = ? AND entry_id = ?")
         .run(row.session_id, row.entry_id)
       yield* assertCorrupt(event)
       database
-        .query("UPDATE baton_session_entries SET parent_id = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET parent_id = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.parent_id, row.session_id, row.entry_id)
 
       database
-        .query("UPDATE baton_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
         .run("Message", row.session_id, row.entry_id)
       yield* assertCorrupt(event)
       database
-        .query("UPDATE baton_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
+        .query("UPDATE tenetkit_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.tag, row.session_id, row.entry_id)
 
       const payload = (yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(row.payload_json)) as {
@@ -357,11 +357,11 @@ it.live("rejects mutated completed model response references and Session storage
         { ...payload, content: [{ type: "text", text: "corrupt content" }] },
       ]) {
         database
-          .query("UPDATE baton_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
+          .query("UPDATE tenetkit_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
           .run(jsonText(mutated), row.session_id, row.entry_id)
         yield* assertCorrupt(event)
         database
-          .query("UPDATE baton_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
+          .query("UPDATE tenetkit_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
           .run(row.payload_json, row.session_id, row.entry_id)
       }
       database.close()

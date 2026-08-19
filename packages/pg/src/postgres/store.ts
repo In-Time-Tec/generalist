@@ -124,7 +124,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
             )
             const existing = yield* sql<RunRow>`
-              SELECT * FROM baton_runs
+              SELECT * FROM tenetkit_runs
               WHERE address = ${input.message.to}
                 AND session_id = ${input.message.sessionId}
                 AND idempotency_key = ${input.message.idempotencyKey}
@@ -169,7 +169,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             })
             yield* associateRegistrations(runId, registrations)
             yield* sql`
-              INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+              INSERT INTO tenetkit_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
               VALUES (${parent.runId}, ${runId}, ${input.invocationId}, ${childReadiness}, NULL, NOW(), NULL)
             `
             yield* appendEvent(transactionHub, parent, {
@@ -194,7 +194,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
             }
             const started = (yield* loadRun(runId))!
-            yield* sql`UPDATE baton_runs SET attempt_fence = 1, attempt = 1, status = 'running' WHERE run_id = ${runId}`
+            yield* sql`UPDATE tenetkit_runs SET attempt_fence = 1, attempt = 1, status = 'running' WHERE run_id = ${runId}`
             yield* appendEvent(
               transactionHub,
               { ...started, attempt: 1 },
@@ -241,7 +241,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             const responded = [...loaded.respondedWaitIds, input.waitId]
             const resolution: WaitResolution = input.resolution
             const closed = yield* sql<{ wait_id: string }>`
-              UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
+              UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'open'
               RETURNING wait_id
             `
@@ -251,12 +251,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
             }
             yield* sql`
-              UPDATE baton_runs
+              UPDATE tenetkit_runs
               SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
               WHERE run_id = ${loaded.runId}
             `
             yield* sql`
-              UPDATE baton_program_operations SET status = 'reserved'
+              UPDATE tenetkit_program_operations SET status = 'reserved'
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
             `
             const current = (yield* loadRun(loaded.runId))!
@@ -278,7 +278,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             const responded = [...loaded.respondedWaitIds, response.waitId]
             const resolution: WaitResolution = input.decision
             const closed = yield* sql<{ wait_id: string }>`
-              UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
+              UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'open'
               RETURNING wait_id
             `
@@ -286,12 +286,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               return yield* ApprovalStale.make({ runId: loaded.runId, approvalId: input.approvalId })
             }
             yield* sql`
-              UPDATE baton_runs
+              UPDATE tenetkit_runs
               SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
               WHERE run_id = ${loaded.runId}
             `
             yield* sql`
-              UPDATE baton_program_operations SET status = 'reserved'
+              UPDATE tenetkit_program_operations SET status = 'reserved'
               WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'waiting'
             `
             const current = (yield* loadRun(loaded.runId))!
@@ -319,7 +319,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               ...(input.payload === undefined ? {} : { payload: input.payload }),
             }
             yield* sql`
-              UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
+              UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${loaded.activeWaitId} AND status = 'open'
             `
             yield* appendEvent(
@@ -376,11 +376,11 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               return
             }
             const runningFanOut = yield* sql<{ fan_out_id: string }>`
-              SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${loaded.runId} AND status = 'running' LIMIT 1
+              SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${loaded.runId} AND status = 'running' LIMIT 1
             `
             if (runningFanOut.length > 0) {
               yield* sql`
-                UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
+                UPDATE tenetkit_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
                   suspension_json = NULL,
                   pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
                 WHERE run_id = ${loaded.runId}
@@ -421,7 +421,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             const responded = [...loaded.respondedWaitIds, input.waitId]
             const resolution: WaitResolution = input.resolution
             const closed = yield* sql<{ wait_id: string }>`
-              UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
+              UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'open'
               RETURNING wait_id
             `
@@ -431,12 +431,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
             }
             yield* sql`
-              UPDATE baton_runs
+              UPDATE tenetkit_runs
               SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
               WHERE run_id = ${loaded.runId}
             `
             yield* sql`
-              UPDATE baton_program_operations SET status = 'reserved'
+              UPDATE tenetkit_program_operations SET status = 'reserved'
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
             `
             const current = (yield* loadRun(loaded.runId))!

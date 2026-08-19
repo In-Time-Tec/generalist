@@ -18,7 +18,7 @@ export const readRunActivations = (runIds: ReadonlyArray<string>) =>
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<ActivationRow>`
       SELECT r.run_id, r.status, r.owner_worker_id, r.parent_run_id, r.attempt_fence, l.readiness
-      FROM baton_runs r LEFT JOIN baton_run_links l ON l.child_run_id = r.run_id
+      FROM tenetkit_runs r LEFT JOIN tenetkit_run_links l ON l.child_run_id = r.run_id
       WHERE r.run_id IN ${sql.in(runIds)}
       ORDER BY r.run_id
     `

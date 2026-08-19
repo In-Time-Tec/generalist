@@ -219,7 +219,7 @@ describePostgres("postgres Program store contract", () => {
               Effect.gen(function* () {
                 const sql = yield* SqlClient.SqlClient
                 yield* sql`
-                UPDATE baton_runs SET status = 'running', owner_worker_id = 'postgres-program-cancelled-approval'
+                UPDATE tenetkit_runs SET status = 'running', owner_worker_id = 'postgres-program-cancelled-approval'
                 WHERE run_id = ${receipt.runId}
               `
               }),

@@ -16,10 +16,10 @@ export const deferCancelledFanOutParent: {
 } = Function.dual(2, (sql: SqlClient.SqlClient, runId: string) =>
   Effect.gen(function* () {
     const running = yield* sql<{ fan_out_id: string }>`
-      SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${runId} AND status = 'running' LIMIT 1
+      SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${runId} AND status = 'running' LIMIT 1
     `
     if (running.length === 0 && !(yield* hasUnsettledChild(runId))) return false
-    yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${runId}`
+    yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${runId}`
     return true
   }),
 )
@@ -48,12 +48,12 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
       }
       if (!terminal) yield* reconcileProgramCancellation(runId, reason ?? current.cancelReason)
       yield* input.sql`
-        UPDATE baton_run_waits SET status = 'cancelled', closed_at = NOW()
+        UPDATE tenetkit_run_waits SET status = 'cancelled', closed_at = NOW()
         WHERE run_id = ${runId} AND status = 'open'
       `
       const linked = yield* input.sql<{ child_run_id: string }>`
-        SELECT l.child_run_id FROM baton_run_links l
-        LEFT JOIN baton_fan_out_members m ON m.child_run_id = l.child_run_id
+        SELECT l.child_run_id FROM tenetkit_run_links l
+        LEFT JOIN tenetkit_fan_out_members m ON m.child_run_id = l.child_run_id
         WHERE l.parent_run_id = ${runId} AND m.child_run_id IS NULL
         ORDER BY l.child_run_id ASC
       `
@@ -74,7 +74,7 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
       if (executing) return
       if (isTerminal(current.status)) return
       const running = yield* input.sql<{ fan_out_id: string }>`
-        SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${runId} AND status = 'running' LIMIT 1
+        SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${runId} AND status = 'running' LIMIT 1
       `
       if (running.length > 0) return
       if (yield* hasUnsettledChild(runId)) return

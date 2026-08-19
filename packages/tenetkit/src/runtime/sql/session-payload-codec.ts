@@ -51,7 +51,7 @@ const restoreHeaders = (details: unknown): unknown => {
   }
 }
 
-const restoreV026RedactedHeaders = (value: unknown): unknown => {
+const restoreRedactedHeaders = (value: unknown): unknown => {
   if (!isRecord(value) || value._tag !== "ModelResponse" || !Array.isArray(value.content)) return value
   return {
     ...value,
@@ -138,7 +138,7 @@ export const sessionPayloadEquivalence: {
 } = Function.dual(2, sessionPayloadEquivalenceImpl)
 
 export const decodeSessionPayload = (text: string): Session.EntryPayload =>
-  decodeEntry(restoreV026RedactedHeaders(withoutUndefinedMarkers(JSON.parse(text) as unknown)))
+  decodeEntry(restoreRedactedHeaders(withoutUndefinedMarkers(JSON.parse(text) as unknown)))
 
 export const encodeSessionPayload = (payload: Session.EntryPayload): string =>
   JSON.stringify(withUndefinedMarkers(encodeEntry(payload))) ?? "null"

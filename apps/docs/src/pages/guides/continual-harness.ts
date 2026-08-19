@@ -9,7 +9,7 @@ import { Layer } from "effect"
 import { FileSystemHarnessStore } from "tenetkit/harness"
 
 const storeLayer = FileSystemHarnessStore.layer({
-  path: (scope) => \`\${process.env.HOME}/.baton/harness/\${encodeURIComponent(scope)}.json\`,
+  path: (scope) => \`\${process.env.HOME}/.tenetkit/harness/\${encodeURIComponent(scope)}.json\`,
 }).pipe(Layer.provide(bunServices))`
 
 export const continualHarness = definePage({

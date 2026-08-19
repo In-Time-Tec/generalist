@@ -131,7 +131,7 @@ export class SqlObject {
               catch: (cause) => RuntimeUnavailable.make({ message: `alarm failed: ${String(cause)}` }),
             })
           const insertRun = (runId: string) => sql`
-            INSERT INTO baton_runs (
+            INSERT INTO tenetkit_runs (
               run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
               executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents,
               attempt, attempt_fence, last_sequence, cancellation_requested, accepted_sequence,
@@ -146,7 +146,7 @@ export class SqlObject {
           yield* sql.withTransaction(
             Effect.gen(function* () {
               yield* sql`DELETE FROM tenetkit_activations WHERE run_id = 'workerd-committed'`
-              yield* sql`DELETE FROM baton_runs WHERE run_id = 'workerd-committed'`
+              yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-committed'`
               yield* insertRun("workerd-committed")
               yield* makeProjection(sql, rearm(committedAlarm)).applyInTransaction([
                 { runId: "workerd-committed", intent: "execute", attemptFence: 1, runStatus: "running" },
@@ -156,7 +156,7 @@ export class SqlObject {
           yield* Effect.exit(
             sql.withTransaction(
               Effect.gen(function* () {
-                yield* sql`DELETE FROM baton_runs WHERE run_id = 'workerd-rolled-back'`
+                yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-rolled-back'`
                 yield* insertRun("workerd-rolled-back")
                 yield* makeProjection(sql, rearm(rolledBackAlarm)).applyInTransaction([
                   { runId: "workerd-rolled-back", intent: "execute", attemptFence: 1, runStatus: "running" },
@@ -167,23 +167,23 @@ export class SqlObject {
           )
           const tables = yield* sql<{ readonly name: string }>`
             SELECT name FROM sqlite_schema
-            WHERE type = 'table' AND substr(name, 1, 6) = 'baton_'
+            WHERE type = 'table' AND substr(name, 1, 9) = 'tenetkit_'
             ORDER BY name
           `
           const probe = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
           const committed = yield* sql<{ readonly count: number }>`
-            SELECT COUNT(*) AS count FROM baton_runs r JOIN tenetkit_activations a ON a.run_id = r.run_id
+            SELECT COUNT(*) AS count FROM tenetkit_runs r JOIN tenetkit_activations a ON a.run_id = r.run_id
             WHERE r.run_id = 'workerd-committed'
           `
           const rolledBack = yield* sql<{ readonly count: number }>`
-            SELECT COUNT(*) AS count FROM baton_runs r LEFT JOIN tenetkit_activations a ON a.run_id = r.run_id
+            SELECT COUNT(*) AS count FROM tenetkit_runs r LEFT JOIN tenetkit_activations a ON a.run_id = r.run_id
             WHERE r.run_id = 'workerd-rolled-back' OR a.run_id = 'workerd-rolled-back'
           `
           const schemaMeta = yield* sql<{
             readonly version: number
-          }>`SELECT version FROM baton_schema_meta WHERE id = 1`
+          }>`SELECT version FROM tenetkit_schema_meta WHERE id = 1`
           const migrations = yield* sql<{ readonly id: number; readonly name: string }>`
-            SELECT migration_id AS id, name FROM baton_sql_migrations ORDER BY migration_id
+            SELECT migration_id AS id, name FROM tenetkit_sql_migrations ORDER BY migration_id
           `
           const info = yield* store.info
           return Response.json({

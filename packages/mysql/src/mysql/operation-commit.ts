@@ -38,7 +38,7 @@ const completeMysqlOperation = (
     const sql = yield* SqlClient.SqlClient
     const loaded = yield* requireRun(op.runId)
     const existing = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations
+      SELECT * FROM tenetkit_run_operations
       WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
       FOR UPDATE
     `
@@ -68,7 +68,7 @@ const completeMysqlOperation = (
     }
     for (const entryId of new Set(op.steeringEntryIds ?? [])) {
       const rows = yield* sql<{ readonly consumed_operation_id: string | null }>`
-        SELECT consumed_operation_id FROM baton_run_steering
+        SELECT consumed_operation_id FROM tenetkit_run_steering
         WHERE run_id = ${op.runId} AND entry_id = ${entryId}
       `
       if (rows[0]?.consumed_operation_id !== op.operationId) {
@@ -92,27 +92,27 @@ const completeMysqlOperation = (
     }
     if (op.outcome._tag === "Succeeded") {
       yield* sql`
-        UPDATE baton_run_operations
+        UPDATE tenetkit_run_operations
         SET status = 'succeeded', result_json = ${encodeJsonValue(op.outcome.value)}, finished_at = NOW(3)
         WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
           AND status IN ('requested', 'running')
       `
     } else if (op.outcome._tag === "Failed") {
       yield* sql`
-        UPDATE baton_run_operations
+        UPDATE tenetkit_run_operations
         SET status = 'failed', error_json = ${encodeJsonValue(op.outcome.error)}, finished_at = NOW(3)
         WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
           AND status IN ('requested', 'running')
       `
     } else {
       yield* sql`
-        UPDATE baton_run_operations SET status = 'unknown', finished_at = NOW(3)
+        UPDATE tenetkit_run_operations SET status = 'unknown', finished_at = NOW(3)
         WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
           AND status IN ('requested', 'running')
       `
     }
     yield* sql`
-      UPDATE baton_runs SET
+      UPDATE tenetkit_runs SET
         driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
         continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
@@ -130,7 +130,7 @@ const completeMysqlOperation = (
       )
     }
     const completed = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
     `
     return toOperationRecord(completed[0]!)
   })

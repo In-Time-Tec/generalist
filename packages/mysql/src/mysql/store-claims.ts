@@ -54,14 +54,14 @@ export const makeMysqlClaims = (input: {
           const leaseMicros = Duration.toMillis(claimInput.lease ?? "30 seconds") * 1_000
           const scanLimit = Math.max(claimInput.limit, Math.min(4096, claimInput.limit * 64))
           const candidates = yield* sql<{ run_id: string }>`
-            SELECT r.run_id FROM baton_runs r
+            SELECT r.run_id FROM tenetkit_runs r
             WHERE (
                 (r.parent_run_id IS NULL AND EXISTS (
-                  SELECT 1 FROM baton_lanes l
+                  SELECT 1 FROM tenetkit_lanes l
                   WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
                 ))
                 OR EXISTS (
-                  SELECT 1 FROM baton_run_links link
+                  SELECT 1 FROM tenetkit_run_links link
                   WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
                 )
               )
@@ -75,7 +75,7 @@ export const makeMysqlClaims = (input: {
           for (const candidate of candidates) {
             if (claimed.length >= claimInput.limit) break
             const locked = yield* sql<RunRow>`
-              SELECT * FROM baton_runs
+              SELECT * FROM tenetkit_runs
               WHERE run_id = ${candidate.run_id}
                 AND status IN ('queued', 'running', 'cancelling')
                 AND cancellation_requested = 0
@@ -86,7 +86,7 @@ export const makeMysqlClaims = (input: {
             if (row === undefined) continue
             const wasQueued = row.status === "queued"
             yield* sql`
-              UPDATE baton_runs SET
+              UPDATE tenetkit_runs SET
                 owner_worker_id = ${claimInput.workerId},
                 lease_expires_at = DATE_ADD(NOW(3), INTERVAL ${sql.literal(String(leaseMicros))} MICROSECOND),
                 attempt_fence = attempt_fence + 1,
@@ -115,7 +115,7 @@ export const makeMysqlClaims = (input: {
         Effect.gen(function* () {
           const leaseMicros = Duration.toMillis(leaseInput.lease ?? "30 seconds") * 1_000
           const rows = yield* sql<{ run_id: string }>`
-            SELECT run_id FROM baton_runs
+            SELECT run_id FROM tenetkit_runs
             WHERE run_id = ${leaseInput.runId} AND owner_worker_id = ${leaseInput.workerId}
               AND attempt_fence = ${leaseInput.attemptFence}
               AND cancellation_requested = 0
@@ -124,7 +124,7 @@ export const makeMysqlClaims = (input: {
           `
           if (rows.length === 0) return false
           yield* sql`
-            UPDATE baton_runs
+            UPDATE tenetkit_runs
             SET lease_expires_at = DATE_ADD(NOW(3), INTERVAL ${sql.literal(String(leaseMicros))} MICROSECOND), updated_at = NOW(3)
             WHERE run_id = ${leaseInput.runId}
           `
@@ -134,7 +134,7 @@ export const makeMysqlClaims = (input: {
     releaseClaim: (releaseInput) =>
       run(
         sql`
-        UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW(3)
+        UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW(3)
         WHERE run_id = ${releaseInput.runId} AND owner_worker_id = ${releaseInput.workerId}
           AND attempt_fence = ${releaseInput.attemptFence}
       `.pipe(Effect.asVoid),
@@ -143,7 +143,7 @@ export const makeMysqlClaims = (input: {
       run(
         Effect.gen(function* () {
           const rows = yield* sql<RunRow>`
-            SELECT * FROM baton_runs
+            SELECT * FROM tenetkit_runs
             WHERE run_id = ${commitInput.runId} AND owner_worker_id = ${commitInput.workerId}
               AND attempt_fence = ${commitInput.attemptFence}
             FOR UPDATE

@@ -5,7 +5,7 @@ Cloudflare Workers and Durable Objects adapters for TenetKit.
 ## Durable Run activation
 
 `@tenetkit/cloudflare/durable-objects` stores only its scheduling projection in
-`tenetkit_activations`. Run authority remains in the existing `baton_*` tables.
+`tenetkit_activations`. Run authority remains in the existing `tenetkit_*` tables.
 Construct `makeProjection(sql, rearm)` with the same full-storage SQLite client
 used by `layerRunStore`; `rearm` must synchronously compute the host-wide minimum
 due time and call the top-level Durable Object storage alarm API. The Run change,
@@ -15,10 +15,8 @@ an inactive final state deletes its candidate before `rearm` runs.
 
 Call `migrateAndBackfill(rearm)` once inside a SQL transaction to reconstruct
 candidates after the runtime has verified its schema metadata and checksum. The
-baseline remains migration 1, `baton_runtime`; migration 2,
-`external_child_placements`, upgrades schema version 8 to 9 without importing
-historical runtime rows. The adapter table does not change the `baton_*` schema
-version. On each fresh exclusive host incarnation, call
+runtime schema is one baseline, migration 1 `tenetkit_runtime` at version 1. The
+adapter table is not part of that schema and does not change its version. On each fresh exclusive host incarnation, call
 `makeExclusiveExecutionRecovery(...).recoverClaims(...)` before `drain(...)`.
 Drains are deterministic and fuel-bounded. Execute candidates pass through the
 normal claim and execution host; cancellation candidates use point cancellation

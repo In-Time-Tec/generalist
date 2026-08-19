@@ -23,7 +23,7 @@ export const loadChildReadiness = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<{ readiness: ChildReadiness }>`
-      SELECT readiness FROM baton_run_links WHERE child_run_id = ${childRunId}
+      SELECT readiness FROM tenetkit_run_links WHERE child_run_id = ${childRunId}
     `
     return rows[0]?.readiness
   })
@@ -35,8 +35,8 @@ export const readinessForAdmission = (
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<{ count: number | string }>`
       SELECT
-        (SELECT COUNT(*) FROM baton_run_links WHERE parent_run_id = ${parent.runId} AND readiness = 'ready') +
-        (SELECT COUNT(*) FROM baton_external_child_placements
+        (SELECT COUNT(*) FROM tenetkit_run_links WHERE parent_run_id = ${parent.runId} AND readiness = 'ready') +
+        (SELECT COUNT(*) FROM tenetkit_external_child_placements
           WHERE parent_run_id = ${parent.runId} AND settlement_id IS NULL) AS count
     `
     return Number(rows[0]?.count ?? 0) < parent.treePolicy.maxSubagents ? "ready" : "queued"
@@ -47,8 +47,8 @@ export const activeChildCount = (parentRunId: string): Effect.Effect<number, Sql
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<{ count: number | string }>`
       SELECT
-        (SELECT COUNT(*) FROM baton_run_links WHERE parent_run_id = ${parentRunId} AND readiness = 'ready') +
-        (SELECT COUNT(*) FROM baton_external_child_placements
+        (SELECT COUNT(*) FROM tenetkit_run_links WHERE parent_run_id = ${parentRunId} AND readiness = 'ready') +
+        (SELECT COUNT(*) FROM tenetkit_external_child_placements
           WHERE parent_run_id = ${parentRunId} AND settlement_id IS NULL) AS count
     `
     return Number(rows[0]?.count ?? 0)
@@ -78,10 +78,10 @@ export const promoteChildCapacity = <E, R>(input: {
       concurrency: number | string | null
     }>`
       SELECT l.child_run_id, m.fan_out_id, f.status AS fan_out_status, f.concurrency
-      FROM baton_run_links l
-      JOIN baton_runs r ON r.run_id = l.child_run_id
-      LEFT JOIN baton_fan_out_members m ON m.child_run_id = l.child_run_id
-      LEFT JOIN baton_fan_outs f ON f.fan_out_id = m.fan_out_id
+      FROM tenetkit_run_links l
+      JOIN tenetkit_runs r ON r.run_id = l.child_run_id
+      LEFT JOIN tenetkit_fan_out_members m ON m.child_run_id = l.child_run_id
+      LEFT JOIN tenetkit_fan_outs f ON f.fan_out_id = m.fan_out_id
       WHERE l.parent_run_id = ${parent.runId}
         AND l.readiness = 'queued'
         AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
@@ -94,20 +94,20 @@ export const promoteChildCapacity = <E, R>(input: {
         if (candidate.fan_out_status !== "running") continue
         const groupActiveRows = yield* sql<{ count: number | string }>`
           SELECT COUNT(*) AS count
-          FROM baton_fan_out_members m
-          JOIN baton_run_links l ON l.child_run_id = m.child_run_id
+          FROM tenetkit_fan_out_members m
+          JOIN tenetkit_run_links l ON l.child_run_id = m.child_run_id
           WHERE m.fan_out_id = ${candidate.fan_out_id} AND l.readiness = 'ready'
         `
         if (Number(groupActiveRows[0]?.count ?? 0) >= Number(candidate.concurrency)) continue
       }
       yield* sql`
-        UPDATE baton_run_links SET readiness = 'ready'
+        UPDATE tenetkit_run_links SET readiness = 'ready'
         WHERE parent_run_id = ${parent.runId} AND child_run_id = ${candidate.child_run_id} AND readiness = 'queued'
       `
       yield* input.hub.touchRun(candidate.child_run_id)
       if (candidate.fan_out_id !== null) {
         yield* sql`
-          UPDATE baton_fan_out_members SET status = 'running'
+          UPDATE tenetkit_fan_out_members SET status = 'running'
           WHERE child_run_id = ${candidate.child_run_id} AND status = 'pending'
         `
       }

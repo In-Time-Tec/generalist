@@ -53,7 +53,7 @@ it.effect("SQLite startup reconciles a poisoned running cancellation and stale c
       }),
     )
     const db = new Database(filename)
-    db.run("UPDATE baton_runs SET status = 'running' WHERE run_id = ? AND cancellation_requested = 1", [childRunId])
+    db.run("UPDATE tenetkit_runs SET status = 'running' WHERE run_id = ? AND cancellation_requested = 1", [childRunId])
     db.close()
 
     yield* scopedWith(runtimeLayer)(

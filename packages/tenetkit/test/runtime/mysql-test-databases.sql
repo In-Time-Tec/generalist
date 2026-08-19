@@ -1,2 +1,2 @@
-GRANT ALL PRIVILEGES ON `baton\_%`.* TO 'baton'@'%';
+GRANT ALL PRIVILEGES ON `tenetkit\_%`.* TO 'tenetkit'@'%';
 FLUSH PRIVILEGES;

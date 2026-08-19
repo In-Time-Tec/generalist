@@ -55,7 +55,7 @@ const decode = (row: Row): Placement => ({
 const load = (placementId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<Row>`SELECT * FROM baton_external_child_placements WHERE placement_id = ${placementId}`
+    const rows = yield* sql<Row>`SELECT * FROM tenetkit_external_child_placements WHERE placement_id = ${placementId}`
     return rows[0] === undefined ? undefined : decode(rows[0])
   })
 
@@ -95,7 +95,7 @@ export const reserve: {
       return existing
     }
     const conflicting = yield* sql<{ placement_id: string }>`
-      SELECT placement_id FROM baton_external_child_placements
+      SELECT placement_id FROM tenetkit_external_child_placements
       WHERE (${sql("partition")} = ${input.ref.partition} AND external_run_id = ${input.ref.runId})
          OR (parent_run_id = ${input.runId} AND invocation_id = ${input.invocationId})
       LIMIT 1
@@ -114,7 +114,7 @@ export const reserve: {
       })
     }
     const createdAt = yield* nowIso
-    yield* sql`INSERT INTO baton_external_child_placements
+    yield* sql`INSERT INTO tenetkit_external_child_placements
       (placement_id, parent_run_id, ${sql("partition")}, external_run_id, invocation_id, request_digest,
        executable_digest, wait_id, suspension_identity, cancel_requested, created_at)
       VALUES (${input.placementId}, ${input.runId}, ${input.ref.partition}, ${input.ref.runId},
@@ -135,7 +135,7 @@ export const acknowledge = (placementId: string) =>
     if ((yield* load(placementId)) === undefined) {
       return yield* ExternalChildPlacementNotFound.make({ placementId })
     }
-    yield* sql`UPDATE baton_external_child_placements SET acknowledged = 1 WHERE placement_id = ${placementId}`
+    yield* sql`UPDATE tenetkit_external_child_placements SET acknowledged = 1 WHERE placement_id = ${placementId}`
     return (yield* load(placementId))!
   })
 
@@ -145,7 +145,7 @@ export const cancel = (placementId: string) =>
     if ((yield* load(placementId)) === undefined) {
       return yield* ExternalChildPlacementNotFound.make({ placementId })
     }
-    yield* sql`UPDATE baton_external_child_placements SET cancel_requested = 1
+    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = 1
       WHERE placement_id = ${placementId} AND settlement_id IS NULL`
     return (yield* load(placementId))!
   })
@@ -153,7 +153,7 @@ export const cancel = (placementId: string) =>
 export const cancelForParent = (parentRunId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`UPDATE baton_external_child_placements SET cancel_requested = 1
+    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = 1
       WHERE parent_run_id = ${parentRunId} AND settlement_id IS NULL`
   })
 
@@ -174,7 +174,7 @@ const settle = (
       }
       return placement
     }
-    yield* sql`UPDATE baton_external_child_placements SET settlement_id = ${input.settlementId},
+    yield* sql`UPDATE tenetkit_external_child_placements SET settlement_id = ${input.settlementId},
       outcome_json = ${encodeJson(RunOutcome, input.outcome)}, outcome_event_id = ${input.outcome.eventId},
       settled_at = ${yield* nowIso} WHERE placement_id = ${input.placementId} AND settlement_id IS NULL`
     const parent = yield* loadRun(placement.parentRunId)

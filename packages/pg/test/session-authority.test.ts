@@ -127,7 +127,7 @@ const installFailureTrigger = (name: string, eventTag: string) =>
         CREATE OR REPLACE FUNCTION ${name}() RETURNS trigger AS $$
         BEGIN
           IF EXISTS (
-            SELECT 1 FROM baton_run_events
+            SELECT 1 FROM tenetkit_run_events
             WHERE event_id = NEW.event_id AND event_json LIKE '%"_tag":"${eventTag}"%'
           ) THEN
             RAISE EXCEPTION 'forced ${eventTag} rollback';
@@ -140,7 +140,7 @@ const installFailureTrigger = (name: string, eventTag: string) =>
       // PostgreSQL must discard that already-issued notification with the rest of the transaction.
       yield* sql.unsafe(`
         CREATE CONSTRAINT TRIGGER ${name}
-        AFTER INSERT ON baton_tree_event_index
+        AFTER INSERT ON tenetkit_tree_event_index
         DEFERRABLE INITIALLY DEFERRED
         FOR EACH ROW EXECUTE FUNCTION ${name}()
       `)
@@ -151,7 +151,7 @@ const removeFailureTrigger = (name: string) =>
   scopedWith(database.client)(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* sql.unsafe(`DROP TRIGGER IF EXISTS ${name} ON baton_tree_event_index`)
+      yield* sql.unsafe(`DROP TRIGGER IF EXISTS ${name} ON tenetkit_tree_event_index`)
       yield* sql.unsafe(`DROP FUNCTION IF EXISTS ${name}()`)
     }),
   )
@@ -230,19 +230,19 @@ describePostgres("postgres Session authority", () => {
       yield* scopedWith(database.client)(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`DELETE FROM baton_tree_event_index WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM baton_run_events WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM baton_run_registrations WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM baton_tree_roots WHERE root_run_id = ${runId}`
-          yield* sql`DELETE FROM baton_runs WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_tree_event_index WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_run_events WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_run_registrations WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_tree_roots WHERE root_run_id = ${runId}`
+          yield* sql`DELETE FROM tenetkit_runs WHERE run_id = ${runId}`
           const foreignKeys = yield* sql<{ count: string }>`
             SELECT COUNT(*) AS count
             FROM information_schema.table_constraints tc
             JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name
             WHERE tc.table_schema = current_schema()
-              AND tc.table_name IN ('baton_sessions', 'baton_session_entries')
+              AND tc.table_name IN ('tenetkit_sessions', 'tenetkit_session_entries')
               AND tc.constraint_type = 'FOREIGN KEY'
-              AND ccu.table_name = 'baton_runs'
+              AND ccu.table_name = 'tenetkit_runs'
           `
           expect(Number(foreignKeys[0]!.count)).toBe(0)
         }),

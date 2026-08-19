@@ -99,7 +99,7 @@ export const postgresWithWorker = (options: PostgresWorkerOptions): PostgresWork
 const serverUrl = postgresUrl ?? "postgres://postgres-unavailable"
 
 const schemaName = (label: string) =>
-  `baton_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
+  `tenetkit_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
 
 export interface PostgresDatabase {
   readonly url: string

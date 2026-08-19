@@ -64,7 +64,7 @@ const commands = commandLines()
 const handshake = await commands.next()
 const frameNonce = handshake.done === true ? "" : handshake.value
 
-const requireFromWorkspace = createRequire(`${workspaceRoot}/baton-kernel.js`)
+const requireFromWorkspace = createRequire(`${workspaceRoot}/tenetkit-kernel.js`)
 const transpiler = new Bun.Transpiler({ loader: "tsx", replMode: true })
 const encoder = new TextEncoder()
 
@@ -252,7 +252,7 @@ const importRecorder = async (specifier: string): Promise<unknown> => {
 const evaluate = (cellId: string, code: string, deadlineMillis: number): unknown => {
   const compiled = transpiler.transformSync(code)
   return vm.runInContext(compiled, context, {
-    filename: `baton-cell-${cellId}.ts`,
+    filename: `tenetkit-cell-${cellId}.ts`,
     timeout: deadlineMillis,
     breakOnSigint: true,
     importModuleDynamically: importRecorder,
@@ -373,7 +373,7 @@ const restore = async (requestId: string, payload: string): Promise<void> => {
     for (const [name, source] of Object.entries(decoded.sources)) {
       try {
         const declaration = source.startsWith("class") ? `${name} = ${source}` : source
-        vm.runInContext(transpiler.transformSync(declaration), context, { filename: `baton-restore-${name}.ts` })
+        vm.runInContext(transpiler.transformSync(declaration), context, { filename: `tenetkit-restore-${name}.ts` })
         restored.push({ name, kind: "source" })
       } catch {
         dropped.push({ name, reason: "function" })

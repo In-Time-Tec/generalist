@@ -7,7 +7,7 @@ export const mcpReference = definePage({
   description: "McpToolSource for discovering and calling MCP tools, plus the TenetKit toolkit and executor adapters.",
   content: [
     lead(
-      "tenetkit/mcp connects Model Context Protocol servers to TenetKit: McpToolSource discovers and calls MCP tools, and the baton subpath adapts them into a toolkit and a ToolExecutor.",
+      "tenetkit/mcp connects Model Context Protocol servers to TenetKit: McpToolSource discovers and calls MCP tools, and the tools subpath adapts them into a toolkit and a ToolExecutor.",
     ),
     command("Install", "bun add tenetkit tenetkit/mcp"),
     p(
@@ -23,7 +23,7 @@ export const mcpReference = definePage({
       [
         [[code(".")], ["Namespace ", code("McpToolSource")]],
         [
-          [code("./baton")],
+          [code("./tools")],
           [code("route(options)"), ", ", code("toolkit(source)"), " and ", code("layerToolkit(source)")],
         ],
       ],
@@ -74,7 +74,7 @@ export const mcpReference = definePage({
       code("McpToolCallFailed"),
       ".",
     ),
-    h2("baton-adapter", "The baton adapter"),
+    h2("tools-adapter", "The tools adapter"),
     table(
       ["Export", "Notes"],
       [

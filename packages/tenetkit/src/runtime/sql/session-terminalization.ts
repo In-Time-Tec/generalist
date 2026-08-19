@@ -30,16 +30,16 @@ export const appendTerminalToolResults = (input: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE baton_sessions SET updated_at = updated_at WHERE session_id = ${input.run.sessionId}
+      UPDATE tenetkit_sessions SET updated_at = updated_at WHERE session_id = ${input.run.sessionId}
     `
     const sessionRows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${input.run.sessionId}
+      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.run.sessionId}
     `
     const session = sessionRows[0]
     if (session === undefined) return
     const id = `${input.run.runId}:terminal-tool-results`
     const entries = yield* sql<EntryRow>`
-      SELECT entry_id, parent_id, seq, tag, payload_json FROM baton_session_entries
+      SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
       WHERE session_id = ${input.run.sessionId} ORDER BY seq
     `
     const existing = entries.find((entry) => entry.entry_id === id)
@@ -47,7 +47,7 @@ export const appendTerminalToolResults = (input: {
     const path = pathFromRows(entries, parentId)
     if (Schema.is(Session.SessionStoreError)(path)) return yield* unavailable(path.message)
     const eventRows = yield* sql<EventRow>`
-      SELECT * FROM baton_run_events WHERE run_id = ${input.run.runId} ORDER BY sequence
+      SELECT * FROM tenetkit_run_events WHERE run_id = ${input.run.runId} ORDER BY sequence
     `
     const events = yield* Effect.forEach(eventRows, (row) =>
       Effect.try({
@@ -56,7 +56,7 @@ export const appendTerminalToolResults = (input: {
       }),
     )
     const operationRows = yield* sql<OperationRow>`
-      SELECT * FROM baton_run_operations WHERE run_id = ${input.run.runId}
+      SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.run.runId}
     `
     const operations = yield* Effect.forEach(operationRows, (row) =>
       Effect.try({
@@ -90,12 +90,12 @@ export const appendTerminalToolResults = (input: {
     }
     const created = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     yield* sql`
-      INSERT INTO baton_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
+      INSERT INTO tenetkit_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${input.run.sessionId}, ${id}, ${parentId}, ${session.next_seq}, 'Message',
         ${encodePayload(payload as Session.EntryPayload)}, ${created})
     `
     yield* sql`
-      UPDATE baton_sessions SET leaf_id = ${id}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
+      UPDATE tenetkit_sessions SET leaf_id = ${id}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
       WHERE session_id = ${input.run.sessionId}
     `
   })

@@ -72,7 +72,7 @@ export const admitSend: {
       const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
       const digest = rootDigest(input.message, treePolicy)
       const existing = yield* sql<RunRow>`
-      SELECT * FROM baton_runs
+      SELECT * FROM tenetkit_runs
       WHERE address = ${input.message.to}
         AND session_id = ${input.message.sessionId}
         AND idempotency_key = ${input.message.idempotencyKey}
@@ -102,7 +102,7 @@ export const admitSend: {
         }
       }
       if (input.runId !== undefined) {
-        const byId = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${input.runId}`
+        const byId = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE run_id = ${input.runId}`
         if (byId[0] !== undefined)
           return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
       }
