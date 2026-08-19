@@ -9,10 +9,14 @@ Cloudflare Workers and Durable Objects adapters for TenetKit.
 Construct `makeProjection(sql, rearm)` with the same full-storage SQLite client
 used by `layerRunStore`; `rearm` must synchronously compute the host-wide minimum
 due time and call the top-level Durable Object storage alarm API. The Run change,
-candidate change, and alarm then share one storage transaction.
+candidate change, and alarm then share one storage transaction. It must not await
+network work. Final-state projection is limited to Runs touched by that mutation;
+an inactive final state deletes its candidate before `rearm` runs.
 
 Call `migrateAndBackfill(rearm)` once inside a SQL transaction to reconstruct
-candidates. On each fresh exclusive host incarnation, call
+candidates after the baseline `baton_runtime` migration has verified schema-meta
+version 8 and its checksum. This adapter table does not change the `baton_*`
+schema version. On each fresh exclusive host incarnation, call
 `makeExclusiveExecutionRecovery(...).recoverClaims(...)` before `drain(...)`.
 Drains are deterministic and fuel-bounded. Execute candidates pass through the
 normal claim and execution host; cancellation candidates use point cancellation

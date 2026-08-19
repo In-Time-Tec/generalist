@@ -9,6 +9,11 @@ const ConformanceResponse = Schema.Struct({
   backend: Schema.Literal("sqlite"),
   probe: Schema.Finite,
   tables: Schema.Array(Schema.String),
+  committed: Schema.Literal(1),
+  rolledBack: Schema.Literal(0),
+  alarm: Schema.Literal(4_000_000_000_000),
+  schemaVersion: Schema.Literal(8),
+  migrations: Schema.Array(Schema.Struct({ id: Schema.Finite, name: Schema.String })),
 })
 
 const encodeString = Schema.encodeSync(Schema.fromJsonString(Schema.String))
@@ -81,8 +86,26 @@ const worker :Workerd.Worker = (
           const responses = yield* Effect.forEach([1, 2], () => request)
 
           expect(responses).toEqual([
-            { backend: "sqlite", probe: 1, tables: expect.arrayContaining(["baton_runs", "baton_schema_meta"]) },
-            { backend: "sqlite", probe: 2, tables: expect.arrayContaining(["baton_runs", "baton_schema_meta"]) },
+            {
+              backend: "sqlite",
+              probe: 1,
+              tables: expect.arrayContaining(["baton_runs", "baton_schema_meta"]),
+              committed: 1,
+              rolledBack: 0,
+              alarm: 4_000_000_000_000,
+              schemaVersion: 8,
+              migrations: [{ id: 1, name: "baton_runtime" }],
+            },
+            {
+              backend: "sqlite",
+              probe: 2,
+              tables: expect.arrayContaining(["baton_runs", "baton_schema_meta"]),
+              committed: 1,
+              rolledBack: 0,
+              alarm: 4_000_000_000_000,
+              schemaVersion: 8,
+              migrations: [{ id: 1, name: "baton_runtime" }],
+            },
           ])
         }),
       ),
