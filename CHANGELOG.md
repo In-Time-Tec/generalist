@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.31.0
+
+- Replace the ambiguous OpenAI-compatible provider with explicit `OpenAiResponses` and `OpenAiChatCompletions` adapters. Both support custom provider identities, model strings, base URLs, credentials, request configuration, and package subpath imports; Chat Completions also decodes arbitrary JSON provider extensions without allowing configuration to override the registered model.
+- Harden Amazon Bedrock Converse and ConverseStream with typed authentication, throttling, invalid-request, transport, and transient-provider failures; strict stream lifecycle validation; complete finish metadata; safe unknown-event handling; credential recovery; and interruption-owned AWS client cleanup.
+
 ## 0.30.0
 
 - Add `@tenetkit/cloudflare` with independent Worker, Durable Object, dynamic Worker, and testing subpath exports. The first Worker surface provides request-owned Effect scopes, `ExecutionContext` and fetch adapters, and allowlisted configuration; the Durable Object surface provides Effect SQL over SQLite and an injected-SQL `RunStore` without adding another run lifecycle.

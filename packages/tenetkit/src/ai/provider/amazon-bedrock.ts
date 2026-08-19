@@ -3,9 +3,10 @@ import { ContextOverflow, ModelRegistry } from "tenetkit"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Tool } from "effect/unstable/ai"
 import type { RegistrationOptions } from "./openai.js"
-import { Client, ClientFailure, layerClient, type Options } from "./amazon-bedrock-client.js"
+import { Client, layerClient, type Options } from "./amazon-bedrock-client.js"
 import { conformImageSourceModel } from "../model/image-source.js"
 import { isAvailabilityFailure } from "../model/model-failure.js"
+import { bedrockFailure, clientFailure } from "./amazon-bedrock-error.js"
 import { makeRequest } from "./amazon-bedrock-request.js"
 import { responseParts, streamParts } from "./amazon-bedrock-response.js"
 export {
@@ -47,6 +48,9 @@ declare module "effect/unstable/ai/Response" {
   }
   export interface FinishPartMetadata extends ProviderMetadata {
     readonly amazonBedrock?: {
+      readonly requestId?: string
+      readonly stopReason?: string
+      readonly totalTokens?: number
       readonly metrics?: { readonly latencyMs?: number }
       readonly trace?: import("effect").Schema.Json
       readonly additionalModelResponseFields?: import("effect").Schema.Json
@@ -99,22 +103,31 @@ export interface Input extends RegistrationOptions {
   readonly config?: Config
 }
 
-const failure = (method: string, error: ClientFailure) =>
-  AiError.AiError.make({
-    module: "AmazonBedrock",
-    method,
-    reason:
-      error.awsErrorName === "ValidationException"
-        ? AiError.InvalidRequestError.make({ description: error.description })
-        : AiError.UnknownError.make({ description: error.description }),
+const streamFailure = (cause: unknown) => {
+  if (AiError.isAiError(cause)) return cause
+  const value = cause instanceof Error ? cause : undefined
+  const metadata =
+    value !== undefined && "$metadata" in value && typeof value.$metadata === "object" && value.$metadata !== null
+      ? value.$metadata
+      : undefined
+  const httpStatus =
+    metadata !== undefined && "httpStatusCode" in metadata && typeof metadata.httpStatusCode === "number"
+      ? metadata.httpStatusCode
+      : undefined
+  const errorCode =
+    value !== undefined && "code" in value && typeof value.code === "string" ? value.code.slice(0, 256) : undefined
+  const requestId =
+    metadata !== undefined && "requestId" in metadata && typeof metadata.requestId === "string"
+      ? metadata.requestId.slice(0, 256)
+      : undefined
+  return bedrockFailure("converseStream", {
+    description: (value?.message ?? (typeof cause === "string" ? cause : "stream failed")).slice(0, 2_048),
+    errorName: value?.name ?? "ModelStreamErrorException",
+    ...(errorCode === undefined ? {} : { errorCode }),
+    ...(httpStatus === undefined ? {} : { httpStatus }),
+    ...(requestId === undefined ? {} : { requestId }),
   })
-
-const streamFailure = (description: string) =>
-  AiError.AiError.make({
-    module: "AmazonBedrock",
-    method: "converseStream",
-    reason: AiError.UnknownError.make({ description }),
-  })
+}
 
 /** @experimental */
 export const make = Effect.fnUntraced(function* (input: Input) {
@@ -130,27 +143,23 @@ export const make = Effect.fnUntraced(function* (input: Input) {
             options.responseFormat.type === "json" ? options.responseFormat.objectName : undefined,
           ),
         ),
-        Effect.mapError((error) => (AiError.isAiError(error) ? error : failure("converse", error))),
+        Effect.mapError((error) => (AiError.isAiError(error) ? error : clientFailure("converse", error))),
       ),
     streamText: (options) =>
       makeRequest(input, options).pipe(
         Effect.flatMap(client.converseStream),
         Effect.map((output) =>
-          output.stream !== undefined
-            ? Stream.fromAsyncIterable(output.stream, (cause) =>
-                streamFailure(cause instanceof Error ? cause.name : "stream failed"),
-              )
-            : Stream.fail(streamFailure("response contained no stream")),
-        ),
-        Effect.map((events) =>
           streamParts(
-            events,
+            output.stream !== undefined
+              ? Stream.fromAsyncIterable(output.stream, streamFailure)
+              : Stream.fail(streamFailure("response contained no stream")),
             input.model,
             options.responseFormat.type === "json" ? options.responseFormat.objectName : undefined,
+            output.$metadata.requestId,
           ),
         ),
         Stream.unwrap,
-        Stream.mapError((error) => (AiError.isAiError(error) ? error : failure("converseStream", error))),
+        Stream.mapError((error) => (AiError.isAiError(error) ? error : clientFailure("converseStream", error))),
       ),
   })
   return conformImageSourceModel(model)

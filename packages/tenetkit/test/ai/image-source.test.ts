@@ -5,7 +5,7 @@ import { AiError, LanguageModel } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { layer as anthropicLayer } from "tenetkit/ai/anthropic"
 import { layer as openAiLayer } from "tenetkit/ai/openai"
-import { layer as compatibleLayer } from "tenetkit/ai/openai-compat"
+import { layer as chatCompletionsLayer } from "tenetkit/ai/openai-chat-completions"
 import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
 import { layerOpenAi } from "tenetkit/ai/deterministic"
 
@@ -93,10 +93,10 @@ const adapters = [
     inline: imageDataUri,
   },
   {
-    name: "OpenAI-compatible",
+    name: "OpenAI-compatible Chat Completions",
     provider: "compatible",
     model: "compatible-test",
-    layer: compatibleLayer({ provider: "compatible", model: "compatible-test", apiKey }),
+    layer: chatCompletionsLayer({ provider: "compatible", model: "compatible-test", apiKey }),
     inline: imageDataUri,
   },
   {
