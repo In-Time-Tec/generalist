@@ -39,7 +39,7 @@ export const installation = definePage({
         [
           [code("tenetkit/ai")],
           "0.14.0",
-          "Model registration for OpenAI, Anthropic, OpenRouter, and OpenAI-compatible APIs, plus the deterministic local model",
+          "Model registration for OpenAI, Anthropic, OpenRouter, Amazon Bedrock, and OpenAI-compatible Responses and Chat Completions APIs, plus the deterministic local model",
         ],
         [[code("tenetkit/runtime")], "0.14.0", "Addressable runs, replay, inspection, waits, and stores"],
         [[code("tenetkit/mcp")], "0.14.0", "MCP discovery and the TenetKit ToolExecutor adapter"],

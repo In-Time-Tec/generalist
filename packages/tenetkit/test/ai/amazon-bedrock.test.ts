@@ -1,4 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
+import {
+  InternalServerException,
+  ModelStreamErrorException,
+  ServiceUnavailableException,
+  ThrottlingException,
+  ValidationException,
+} from "@aws-sdk/client-bedrock-runtime"
 import type {
   ConverseCommandInput,
   ConverseCommandOutput,
@@ -44,7 +51,7 @@ const output: ConverseCommandOutput = {
   metrics: { latencyMs: 9 },
   trace: { promptRouter: { invokedModelId: "routed" } },
   additionalModelResponseFields: { field: true },
-  $metadata: {},
+  $metadata: { requestId: "complete-request" },
 }
 
 const iterable = (events: ReadonlyArray<ConverseStreamOutput>): AsyncIterable<ConverseStreamOutput> => ({
@@ -92,6 +99,7 @@ const authorization = (headers: Record<string, string> | undefined) =>
 const fakeClient = (options?: {
   readonly output?: ConverseCommandOutput
   readonly events?: ReadonlyArray<ConverseStreamOutput>
+  readonly requestId?: string
   readonly capture?: (input: ConverseCommandInput) => void
 }): Interface => ({
   converse: (input) =>
@@ -102,7 +110,10 @@ const fakeClient = (options?: {
   converseStream: (input) =>
     Effect.sync((): ConverseStreamCommandOutput => {
       options?.capture?.(input)
-      return { stream: iterable(options?.events ?? []), $metadata: {} }
+      return {
+        stream: iterable(options?.events ?? []),
+        $metadata: options?.requestId === undefined ? {} : { requestId: options.requestId },
+      }
     }),
 })
 
@@ -174,6 +185,9 @@ describe("AmazonBedrock", () => {
       expect(reasoning?.metadata.amazonBedrock).toEqual({ signature: "signed" })
       const finish = response.content.find((part) => part.type === "finish")
       expect(finish?.metadata.amazonBedrock).toMatchObject({
+        requestId: "complete-request",
+        stopReason: "tool_use",
+        totalTokens: 16,
         metrics: { latencyMs: 9 },
         additionalModelResponseFields: { field: true },
       })
@@ -386,7 +400,9 @@ describe("AmazonBedrock", () => {
       },
     ]
     return Effect.gen(function* () {
-      const model = yield* make({ model: "stream-model" }).pipe(Effect.provideService(Client, fakeClient({ events })))
+      const model = yield* make({ model: "stream-model" }).pipe(
+        Effect.provideService(Client, fakeClient({ events, requestId: "stream-request" })),
+      )
       const lookup = Tool.make("lookup", {
         parameters: Schema.Struct({ value: Schema.String }),
         success: Schema.String,
@@ -423,8 +439,228 @@ describe("AmazonBedrock", () => {
         type: "finish",
         reason: "tool-calls",
         usage: { inputTokens: { total: 10, cacheRead: 2 }, outputTokens: { total: 5 } },
-        metadata: { amazonBedrock: { additionalModelResponseFields: { stop: true } } },
+        metadata: {
+          amazonBedrock: {
+            requestId: "stream-request",
+            stopReason: "tool_use",
+            totalTokens: 15,
+            additionalModelResponseFields: { stop: true },
+          },
+        },
       })
+    })
+  })
+
+  it.effect("fails every modeled stream exception with retry-aware AI semantics", () => {
+    const failures: ReadonlyArray<readonly [ConverseStreamOutput, AiError.AiErrorReason["_tag"]]> = [
+      [
+        {
+          internalServerException: new InternalServerException({
+            message: "internal",
+            $metadata: { requestId: "internal-request" },
+          }),
+        },
+        "InternalProviderError",
+      ],
+      [
+        {
+          modelStreamErrorException: new ModelStreamErrorException({
+            message: "stream",
+            originalMessage: "upstream stream failed",
+            originalStatusCode: 502,
+            $metadata: {},
+          }),
+        },
+        "InternalProviderError",
+      ],
+      [
+        { serviceUnavailableException: new ServiceUnavailableException({ message: "unavailable", $metadata: {} }) },
+        "InternalProviderError",
+      ],
+      [{ throttlingException: new ThrottlingException({ message: "slow down", $metadata: {} }) }, "RateLimitError"],
+      [{ validationException: new ValidationException({ message: "invalid", $metadata: {} }) }, "InvalidRequestError"],
+    ]
+    return Effect.forEach(
+      failures,
+      ([event, expected]) =>
+        Effect.gen(function* () {
+          const model = yield* make({ model: "stream-model" }).pipe(
+            Effect.provideService(
+              Client,
+              fakeClient({ events: [{ messageStart: { role: "assistant" } }, event], requestId: "initial-request" }),
+            ),
+          )
+          const failure = yield* model.streamText({ prompt: "hello" }).pipe(Stream.runDrain, Effect.flip)
+          expect(AiError.isAiError(failure)).toBe(true)
+          if (AiError.isAiError(failure)) expect(failure.reason._tag).toBe(expected)
+        }),
+      { discard: true },
+    )
+  })
+
+  it.effect("classifies Bedrock request failures with retry-aware AI semantics", () => {
+    const failures: ReadonlyArray<readonly [ClientFailure, AiError.AiErrorReason["_tag"]]> = [
+      [
+        ClientFailure.make({
+          operation: "converse",
+          description: "denied",
+          awsErrorName: "AccessDeniedException",
+          requestId: "denied-request",
+        }),
+        "AuthenticationError",
+      ],
+      [
+        ClientFailure.make({
+          operation: "converse",
+          description: "credentials missing",
+          awsErrorName: "CredentialProviderError",
+        }),
+        "AuthenticationError",
+      ],
+      [
+        ClientFailure.make({
+          operation: "converse",
+          description: "expired",
+          awsErrorName: "ExpiredTokenException",
+        }),
+        "AuthenticationError",
+      ],
+      [
+        ClientFailure.make({
+          operation: "converse",
+          description: "throttled",
+          awsErrorName: "ThrottlingException",
+        }),
+        "RateLimitError",
+      ],
+      [
+        ClientFailure.make({
+          operation: "converse",
+          description: "bad model",
+          awsErrorName: "ResourceNotFoundException",
+        }),
+        "InvalidRequestError",
+      ],
+      [
+        ClientFailure.make({
+          operation: "converse",
+          description: "timed out",
+          awsErrorName: "ModelTimeoutException",
+        }),
+        "InternalProviderError",
+      ],
+      [
+        ClientFailure.make({ operation: "converse", description: "unavailable", httpStatus: 503 }),
+        "InternalProviderError",
+      ],
+      [
+        ClientFailure.make({
+          operation: "converse",
+          description: "DNS lookup failed",
+          awsErrorName: "Error",
+          awsErrorCode: "ENOTFOUND",
+        }),
+        "InternalProviderError",
+      ],
+    ]
+    return Effect.forEach(
+      failures,
+      ([failure, expected]) =>
+        Effect.gen(function* () {
+          const client: Interface = {
+            ...fakeClient(),
+            converse: () => Effect.fail(failure),
+          }
+          const model = yield* make({ model: "failure-model" }).pipe(Effect.provideService(Client, client))
+          const actual = yield* model.generateText({ prompt: "hello" }).pipe(Effect.flip)
+          expect(AiError.isAiError(actual)).toBe(true)
+          if (AiError.isAiError(actual)) {
+            expect(actual.reason._tag).toBe(expected)
+            if (failure.requestId !== undefined) {
+              expect("metadata" in actual.reason).toBe(true)
+              if ("metadata" in actual.reason) {
+                expect(actual.reason.metadata).toMatchObject({ amazonBedrock: { requestId: failure.requestId } })
+              }
+            }
+          }
+        }),
+      { discard: true },
+    )
+  })
+
+  it.effect("rejects malformed stream lifecycles instead of accepting partial output", () => {
+    const metadata: ConverseStreamOutput = {
+      metadata: {
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        metrics: { latencyMs: 1 },
+      },
+    }
+    const invalid: ReadonlyArray<ReadonlyArray<ConverseStreamOutput>> = [
+      [{ contentBlockDelta: { contentBlockIndex: 0, delta: { text: "early" } } }],
+      [{ messageStart: { role: "assistant" } }, { messageStart: { role: "assistant" } }],
+      [
+        { messageStart: { role: "assistant" } },
+        { contentBlockDelta: { contentBlockIndex: 0, delta: { text: "first" } } },
+        { contentBlockDelta: { contentBlockIndex: 1, delta: { text: "interleaved" } } },
+      ],
+      [
+        { messageStart: { role: "assistant" } },
+        { contentBlockDelta: { contentBlockIndex: 0, delta: { text: "first" } } },
+        { contentBlockStop: { contentBlockIndex: 0 } },
+        { contentBlockDelta: { contentBlockIndex: 0, delta: { text: "restarted" } } },
+      ],
+      [
+        { messageStart: { role: "assistant" } },
+        { contentBlockDelta: { contentBlockIndex: 0, delta: { text: "open" } } },
+        { messageStop: { stopReason: "end_turn" } },
+      ],
+      [
+        { messageStart: { role: "assistant" } },
+        { messageStop: { stopReason: "end_turn" } },
+        { contentBlockDelta: { contentBlockIndex: 0, delta: { text: "late" } } },
+      ],
+      [{ messageStart: { role: "assistant" } }, metadata],
+      [
+        { messageStart: { role: "assistant" } },
+        { messageStop: { stopReason: "end_turn" } },
+        metadata,
+        { messageStart: { role: "assistant" } },
+      ],
+    ]
+    return Effect.forEach(
+      invalid,
+      (events) =>
+        Effect.gen(function* () {
+          const model = yield* make({ model: "stream-model" }).pipe(
+            Effect.provideService(Client, fakeClient({ events })),
+          )
+          const failure = yield* model.streamText({ prompt: "hello" }).pipe(Stream.runDrain, Effect.flip)
+          expect(AiError.isAiError(failure)).toBe(true)
+          if (AiError.isAiError(failure)) expect(failure.reason._tag).toBe("InvalidOutputError")
+        }),
+      { discard: true },
+    )
+  })
+
+  it.effect("ignores future stream union members while preserving known lifecycle events", () => {
+    const events: ReadonlyArray<ConverseStreamOutput> = [
+      { $unknown: ["futureTopLevel", {}] },
+      { messageStart: { role: "assistant" } },
+      { contentBlockStart: { contentBlockIndex: 0, start: { $unknown: ["futureBlock", {}] } } },
+      { contentBlockDelta: { contentBlockIndex: 0, delta: { $unknown: ["futureDelta", {}] } } },
+      { contentBlockStop: { contentBlockIndex: 0 } },
+      { messageStop: { stopReason: "end_turn" } },
+      {
+        metadata: {
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          metrics: { latencyMs: 1 },
+        },
+      },
+    ]
+    return Effect.gen(function* () {
+      const model = yield* make({ model: "future-model" }).pipe(Effect.provideService(Client, fakeClient({ events })))
+      const parts = yield* model.streamText({ prompt: "hello" }).pipe(Stream.runCollect)
+      expect(Array.from(parts, (part) => part.type)).toEqual(["response-metadata", "finish"])
     })
   })
 
@@ -570,6 +806,39 @@ describe("AmazonBedrock", () => {
         }),
       )
       expect(yield* Ref.get(interrupted)).toBe(true)
+    })
+  })
+
+  it.effect("aborts and destroys an in-flight client when the request is interrupted", () => {
+    const started = Promise.withResolvers<void>()
+    const pending = Promise.withResolvers<ReturnType<typeof httpResponse>>()
+    let requestSignal: { readonly aborted: boolean } | undefined
+    let destroys = 0
+    const handler: NonNullable<Options["requestHandler"]> = {
+      handle: (_request: unknown, options?: { readonly abortSignal?: { readonly aborted: boolean } }) => {
+        requestSignal = options?.abortSignal
+        started.resolve()
+        return pending.promise
+      },
+      destroy: () => {
+        destroys++
+      },
+    }
+    const input: ConverseCommandInput = { modelId: "test", messages: [{ role: "user", content: [{ text: "hi" }] }] }
+    return Effect.gen(function* () {
+      const fiber = yield* runClient(
+        {
+          authMode: "bearer",
+          bearerToken: Redacted.make("test-bedrock-token"),
+          requestHandler: handler,
+        },
+        Effect.flatMap(Client, (client) => client.converse(input)),
+      ).pipe(Effect.forkChild)
+      yield* Effect.promise(() => started.promise)
+      yield* Fiber.interrupt(fiber)
+
+      expect(requestSignal?.aborted).toBe(true)
+      expect(destroys).toBe(1)
     })
   })
 

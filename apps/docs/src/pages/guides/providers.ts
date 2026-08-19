@@ -1,8 +1,10 @@
+import amazonBedrock from "../../snippets/guides/providers/amazon-bedrock.ts?raw"
 import combineProviders from "../../snippets/guides/providers/combine-providers.ts?raw"
 import deterministicRegistry from "../../snippets/guides/providers/deterministic-registry.ts?raw"
 import deterministicRegistryExpected from "../../snippets/guides/providers/deterministic-registry.expected.txt?raw"
 import geminiOpenaiCompat from "../../snippets/guides/providers/gemini-openai-compat.ts?raw"
 import openaiOrDeterministic from "../../snippets/guides/providers/openai-or-deterministic.ts?raw"
+import openaiCompatible from "../../snippets/guides/providers/openai-compatible.ts?raw"
 import openrouter from "../../snippets/guides/providers/openrouter.ts?raw"
 import { callout, code, codeBlock, command, definePage, h2, link, p, table } from "../../prose"
 export const providers = definePage({
@@ -95,10 +97,43 @@ export const providers = definePage({
       ),
       ".",
     ),
-    h2("openai-compatible-presets", "4. Pick an OpenAI-compatible preset"),
+    h2("openai-compatible", "4. Connect an OpenAI-compatible endpoint"),
+    p(
+      "Choose the adapter for the protocol the endpoint implements: ",
+      code("OpenAiResponses.layer"),
+      " posts to ",
+      code("/responses"),
+      ", while ",
+      code("OpenAiChatCompletions.layer"),
+      " posts to ",
+      code("/chat/completions"),
+      ". Both accept a custom ",
+      code("provider"),
+      ", ",
+      code("model"),
+      ", ",
+      code("baseUrl"),
+      ", optional API key, provider configuration, registration key, and metadata. The provider string becomes part of the exact registry selection; it does not need to name a built-in provider.",
+    ),
+    codeBlock({ label: "openai-compatible.ts", source: openaiCompatible }),
+    h2("amazon-bedrock", "5. Register Amazon Bedrock"),
+    p(
+      code("AmazonBedrock.layer"),
+      " accepts any Bedrock foundation-model ID, inference-profile ID, or ARN. Its client uses the AWS SDK credential chain, so environment credentials, shared profiles and roles, SSO or AWS CLI caches, credential processes, web identity, ECS, and IMDS work without copying credentials into registration data. Set ",
+      code("region"),
+      " and optionally ",
+      code("profile"),
+      "; bearer-token authentication is also available through ",
+      code("AWS_BEARER_TOKEN_BEDROCK"),
+      " or an explicitly redacted ",
+      code("bearerToken"),
+      ".",
+    ),
+    codeBlock({ label: "amazon-bedrock.ts", source: amazonBedrock }),
+    h2("openai-compatible-presets", "6. Pick an OpenAI-compatible preset"),
     p(
       "Presets are thin wrappers over ",
-      code("OpenAiCompatible.layer"),
+      code("OpenAiChatCompletions.layer"),
       " that fix the provider name and base URL. Each preset constructor returns a registry layer requiring a host HttpClient; compose FetchHttpClient.layer explicitly when selecting fetch.",
     ),
     table(

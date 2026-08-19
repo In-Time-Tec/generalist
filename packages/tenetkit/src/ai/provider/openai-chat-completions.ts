@@ -1,19 +1,34 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "tenetkit"
 import { isAvailabilityFailure } from "../model/model-failure.js"
-import { Config, Effect, Layer, Redacted } from "effect"
+import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
-export interface OpenAiCompatibleInput extends RegistrationOptions {
+export interface OpenAiChatCompletionsInput extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
-  readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+  readonly config?: Config
   readonly classifyFailure?: ModelRegistry.FailureClassifier
 }
+
+/** @experimental */
+export type Config = Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+
+const ConfigSchema = Schema.Record(Schema.String, Schema.Json).pipe(
+  Schema.check(
+    Schema.makeFilter((config) =>
+      "model" in config ? { path: ["model"], issue: "model must be configured by the registration" } : undefined,
+    ),
+  ),
+)
+
+/** @experimental Decodes persisted OpenAI-compatible Chat Completions request configuration. */
+export const decodeConfig = (options: unknown): Config =>
+  Schema.decodeUnknownSync(ConfigSchema)(options ?? {}) as Config
 
 /** @experimental */
 export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
@@ -30,7 +45,7 @@ export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (too
   })
 
 /** @experimental */
-export interface LayerOptions extends OpenAiCompatibleInput {
+export interface LayerOptions extends OpenAiChatCompletionsInput {
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
   readonly baseUrl?: string
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey" | "apiUrl">
@@ -42,7 +57,7 @@ export const layer = (
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   ModelRegistry.layer([
     ModelRegistry.registration({
-      provider: input.provider ?? "openai-compatible",
+      provider: input.provider ?? "openai-chat-completions",
       model: input.model,
       layer: layerImageSources(
         OpenAiLanguageModel.layer({

@@ -2,10 +2,10 @@ import { OpenAiClient } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "tenetkit"
 import { Config, Layer, Redacted } from "effect"
 import type { HttpClient } from "effect/unstable/http"
-import { layer as compatibleLayer, type OpenAiCompatibleInput } from "../provider/openai-compat.js"
+import { layer as chatCompletionsLayer, type OpenAiChatCompletionsInput } from "../provider/openai-chat-completions.js"
 
 /** @experimental */
-export interface PresetInput extends Omit<OpenAiCompatibleInput, "provider"> {
+export interface PresetInput extends Omit<OpenAiChatCompletionsInput, "provider"> {
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey" | "apiUrl">
 }
@@ -20,7 +20,7 @@ const preset = (
   baseUrl: string,
   input: PresetInput,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  compatibleLayer({ ...input, provider, baseUrl })
+  chatCompletionsLayer({ ...input, provider, baseUrl })
 
 /** @experimental */
 export const layerGroq = (
