@@ -4,6 +4,7 @@ import { ImportType, initSync, parse } from "es-module-lexer"
 const validName = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+\.js$/
 /** @experimental Host-owned generated entrypoint excluded from user module graphs. */
 export const runnerName = "__tenetkit_runner.js"
+export const capabilityFailurePrefix = "tenetkit-capability-failure:"
 
 const resolve = (from: string, specifier: string): string => {
   const parts = from.split("/")
@@ -60,6 +61,18 @@ import execute from ${JSON.stringify(`./${entrypoint}`)};
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status, headers: { "content-type": "application/json" }
 });
+const capabilityFailureId = (error) => {
+  try {
+    const message = typeof error === "object" && error !== null && typeof error.message === "string"
+      ? error.message
+      : "";
+    return message.startsWith(${JSON.stringify(capabilityFailurePrefix)})
+      ? message.slice(${capabilityFailurePrefix.length})
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
 export default {
   async fetch(request, env) {
     try {
@@ -83,8 +96,11 @@ export default {
         outputCodec: env.TENET_OUTPUT_CODEC,
         output
       });
-    } catch (_) {
-      return json({ error: "sandbox execution failed" }, 500);
+    } catch (error) {
+      const failureId = capabilityFailureId(error);
+      return json(failureId === undefined
+        ? { error: "sandbox execution failed" }
+        : { error: "sandbox execution failed", capabilityFailureId: failureId }, 500);
     }
   }
 };`
