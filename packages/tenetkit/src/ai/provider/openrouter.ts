@@ -1,42 +1,24 @@
-import { OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
+import { Generated, OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
 import { ContextOverflow, ModelRegistry } from "tenetkit"
-import { Config, Layer, Redacted, Schema } from "effect"
-import { AiError } from "effect/unstable/ai"
+import { Config, Effect, Layer, Redacted, Schema } from "effect"
+import { AiError, AnthropicStructuredOutput, LanguageModel, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/model-failure.js"
 import type { RegistrationOptions } from "./openai.js"
 
-const reasoningEfforts = ["xhigh", "high", "medium", "low", "minimal", "none"] as const
-const summaryVerbosities = ["auto", "concise", "detailed"] as const
-
+const {
+  messages: _messages,
+  model: _model,
+  response_format: _responseFormat,
+  stream: _stream,
+  stream_options: _streamOptions,
+  tool_choice: _toolChoice,
+  tools: _tools,
+  ...openRouterConfigFields
+} = Generated.ChatRequest.fields
 const ConfigSchema = Schema.Struct({
-  reasoning: Schema.optionalKey(
-    Schema.Struct({
-      effort: Schema.optionalKey(Schema.Union([Schema.Literals(reasoningEfforts), Schema.Null])),
-      summary: Schema.optionalKey(Schema.Union([Schema.Literals(summaryVerbosities), Schema.Null])),
-    }),
-  ),
-  max_tokens: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  max_completion_tokens: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  temperature: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  top_p: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  frequency_penalty: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  presence_penalty: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  seed: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  stop: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String), Schema.Null])),
-  user: Schema.optionalKey(Schema.Union([Schema.String, Schema.Null])),
-  session_id: Schema.optionalKey(Schema.Union([Schema.String, Schema.Null])),
-  models: Schema.optionalKey(Schema.Union([Schema.Array(Schema.String), Schema.Null])),
-  parallel_tool_calls: Schema.optionalKey(Schema.Union([Schema.Boolean, Schema.Null])),
-  logprobs: Schema.optionalKey(Schema.Union([Schema.Boolean, Schema.Null])),
-  top_logprobs: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.Null])),
-  logit_bias: Schema.optionalKey(Schema.Record(Schema.String, Schema.Finite)),
-  metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-  provider: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-  plugins: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-  route: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-  trace: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  ...openRouterConfigFields,
   strictJsonSchema: Schema.optionalKey(Schema.Boolean),
 })
 
@@ -129,6 +111,38 @@ const openRouterLanguageModelLayer = (input: OpenRouterInput) =>
 /** @experimental */
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
+const codecTransformer = (model: string): LanguageModel.CodecTransformer => {
+  if (model.startsWith("anthropic/") || model.startsWith("claude-")) {
+    return AnthropicStructuredOutput.toCodecAnthropic
+  }
+  if (
+    model.startsWith("openai/") ||
+    model.startsWith("gpt-") ||
+    model.startsWith("o1-") ||
+    model.startsWith("o3-") ||
+    model.startsWith("o4-")
+  ) {
+    return OpenAiStructuredOutput.toCodecOpenAI
+  }
+  return LanguageModel.defaultCodecTransformer
+}
+
+/** @experimental */
+export const toolJsonSchemaCompiler =
+  (model: string): ModelRegistry.ToolJsonSchemaCompiler =>
+  (tool) =>
+    Effect.try({
+      try: () => Tool.getJsonSchema(tool, { transformer: codecTransformer(model) }),
+      catch: (error) =>
+        AiError.make({
+          module: "OpenRouterLanguageModel",
+          method: "prepareTools",
+          reason: AiError.UnsupportedSchemaError.make({
+            description: error instanceof Error ? error.message : String(error),
+          }),
+        }),
+    })
+
 /** @experimental */
 export interface LayerOptions extends OpenRouterInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
@@ -145,6 +159,7 @@ export const layer = (
       model: input.model,
       layer: openRouterLanguageModelLayer(input),
       classifyFailure,
+      toolJsonSchemaCompiler: toolJsonSchemaCompiler(input.model),
       isAvailabilityFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

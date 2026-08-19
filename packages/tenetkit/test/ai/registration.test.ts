@@ -9,15 +9,7 @@ import {
   Toolkit,
 } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
-import {
-  Agent,
-  Approvals,
-  ModelMiddleware,
-  ModelRegistry,
-  ModelResilience,
-  ModelToolCallValidation,
-  ToolExecutor,
-} from "tenetkit"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
 import {
   classifyFailure as classifyAnthropicFailure,
   decodeConfig as decodeAnthropicConfig,
@@ -37,7 +29,11 @@ import {
   toolJsonSchemaCompiler as chatCompletionsToolJsonSchemaCompiler,
 } from "tenetkit/ai/openai-chat-completions"
 import { layer as responsesLayer } from "tenetkit/ai/openai-responses"
-import { classifyFailure as classifyOpenRouterFailure, layer as openRouterLayer } from "tenetkit/ai/openrouter"
+import {
+  classifyFailure as classifyOpenRouterFailure,
+  layer as openRouterLayer,
+  toolJsonSchemaCompiler as openRouterToolJsonSchemaCompiler,
+} from "tenetkit/ai/openrouter"
 import { Deterministic, Embedding, Presets } from "../../src/ai/index.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
@@ -129,6 +125,11 @@ describe("providers", () => {
       expect(yield* openAiToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
       expect(yield* chatCompletionsToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
       expect(yield* anthropicToolJsonSchemaCompiler(tool)).toEqual(expectedAnthropic)
+      expect(yield* openRouterToolJsonSchemaCompiler("anthropic/claude-sonnet-4")(tool)).toEqual(expectedAnthropic)
+      expect(yield* openRouterToolJsonSchemaCompiler("claude-local")(tool)).toEqual(expectedAnthropic)
+      expect(yield* openRouterToolJsonSchemaCompiler("openai/gpt-5")(tool)).toEqual(expectedOpenAi)
+      expect(yield* openRouterToolJsonSchemaCompiler("o4-mini")(tool)).toEqual(expectedOpenAi)
+      expect(yield* openRouterToolJsonSchemaCompiler("google/gemini-2.5-pro")(tool)).toEqual(Tool.getJsonSchema(tool))
     })
   })
 
@@ -502,6 +503,7 @@ describe("providers", () => {
       ModelRegistry.layerCombined([
         anthropicLayer({ model: "claude-test", apiKey }),
         openRouterLayer({ model: "openrouter-test", apiKey }),
+        openRouterLayer({ model: "openrouter-test", registrationKey: "secondary", apiKey }),
       ]),
       FetchHttpClient.layer,
     ),
@@ -513,40 +515,20 @@ describe("providers", () => {
         expect(registered.map((item) => [item.provider, item.model])).toEqual([
           ["anthropic", "claude-test"],
           ["openrouter", "openrouter-test"],
+          ["openrouter", "openrouter-test"],
         ])
         const openRouterCompiler = yield* ModelRegistry.operate(
           { provider: "openrouter", model: "openrouter-test" },
           LanguageModel.LanguageModel.pipe(Effect.map(ModelRegistry.toolJsonSchemaCompiler)),
         )
-        expect(openRouterCompiler).toBeUndefined()
+        expect(openRouterCompiler).toBeTypeOf("function")
+        const keyedCompiler = yield* ModelRegistry.operate(
+          { provider: "openrouter", model: "openrouter-test", registrationKey: "secondary" },
+          LanguageModel.LanguageModel.pipe(Effect.map(ModelRegistry.toolJsonSchemaCompiler)),
+        )
+        expect(keyedCompiler).toBeTypeOf("function")
       }),
     )
-  })
-
-  testLayer(
-    Layer.mergeAll(
-      Layer.provide(
-        openRouterLayer({ model: "openrouter-test", apiKey }),
-        Layer.succeed(HttpClient.HttpClient, hostHttpClient),
-      ),
-      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      unexpectedToolLayer,
-      ModelResilience.layer({ invalidToolCallCorrectionLimit: 1 }).pipe(Layer.orDie),
-    ),
-  )((test) => {
-    test.effect("rejects schema-backed OpenRouter correction before transport", () => {
-      const agent = Agent.make({ name: "openrouter-correction-agent", toolkit: unexpectedToolkit })
-      return Effect.gen(function* () {
-        const failure = yield* ModelRegistry.operate(
-          { provider: "openrouter", model: "openrouter-test" },
-          Agent.generate({ prompt: "do not send" })(agent),
-        ).pipe(Effect.flip)
-
-        expect(Schema.is(ModelToolCallValidation.ToolJsonSchemaCompilerMissing)(failure)).toBe(true)
-      })
-    })
   })
 
   it("builds embedding layers without live calls", () => {
