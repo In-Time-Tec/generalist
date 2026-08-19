@@ -56,17 +56,17 @@ export const drain = (
         const outcome = yield* store.claimExecution({ runId: candidate.run_id, ownerId: options.ownerId }).pipe(
           Effect.flatMap(host.execute),
           Effect.as("executed" as const),
-          Effect.catchTag("tenetkit/runtime/StaleClaim", () => Effect.succeed("stale" as const)),
-          Effect.catchTag("tenetkit/runtime/RunNotFound", () =>
-            sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
-              Effect.as("inactive" as const),
-            ),
-          ),
-          Effect.catchTag("tenetkit/runtime/RunTerminal", () =>
-            sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
-              Effect.as("inactive" as const),
-            ),
-          ),
+          Effect.catchTags({
+            "tenetkit/runtime/StaleClaim": () => Effect.succeed("stale" as const),
+            "tenetkit/runtime/RunNotFound": () =>
+              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
+                Effect.as("inactive" as const),
+              ),
+            "tenetkit/runtime/RunTerminal": () =>
+              sql`DELETE FROM tenetkit_activations WHERE run_id = ${candidate.run_id}`.pipe(
+                Effect.as("inactive" as const),
+              ),
+          }),
         )
         outcomes.push({ runId: candidate.run_id, outcome })
       } else {
@@ -82,7 +82,7 @@ export const drain = (
         }
       }
     }
-    yield* options.rearm()
+    yield* options.rearm
     const due = yield* sql<{
       due_at_millis: number | null
     }>`SELECT MIN(due_at_millis) AS due_at_millis FROM tenetkit_activations`

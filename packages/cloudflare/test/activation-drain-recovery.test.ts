@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest"
-import { Effect, Exit, Layer } from "effect"
+import { Clock, Effect, Exit, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { ExecutionHost } from "tenetkit/runtime/driver/execution-host"
 import { LocalScheduler } from "tenetkit/runtime/driver/local-scheduler"
@@ -86,7 +86,7 @@ it.live("deletes inactive projections and rolls candidate writes back with the c
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       yield* schema
-      const projection = makeProjection(sql, () => Effect.void)
+      const projection = makeProjection(sql, Effect.void)
       yield* sql.withTransaction(
         projection.applyInTransaction([{ runId: "run", intent: "execute", attemptFence: 0, runStatus: "running" }]),
       )
@@ -111,7 +111,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       yield* schema
-      const future = Date.now() + 60_000
+      const future = (yield* Clock.currentTimeMillis) + 60_000
       yield* sql`INSERT INTO tenetkit_activations VALUES
         ('b', 'execute', 0, 0, 'queued'),
         ('a', 'execute', 0, 0, 'queued'),
@@ -123,7 +123,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
       } as never)
       const host = ExecutionHost.of({ execute: () => Effect.void } as never)
       const scheduler = LocalScheduler.of({ reconcileCancellation: () => Effect.void } as never)
-      const result = yield* drain({ ownerId: "owner", fuel: 1, rearm: () => Effect.void }).pipe(
+      const result = yield* drain({ ownerId: "owner", fuel: 1, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, store),
         Effect.provideService(ExecutionHost, host),
         Effect.provideService(LocalScheduler, scheduler),
@@ -140,7 +140,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
         claimExecution: ({ runId }: { readonly runId: string }) =>
           Effect.fail(StaleClaim.make({ runId, workerId: "owner", attemptFence: 0 })),
       } as never)
-      const stale = yield* drain({ ownerId: "owner", fuel: 5, rearm: () => Effect.void }).pipe(
+      const stale = yield* drain({ ownerId: "owner", fuel: 5, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, harmless),
         Effect.provideService(ExecutionHost, host),
         Effect.provideService(LocalScheduler, scheduler),

@@ -1,4 +1,4 @@
-import { Context, Effect, FiberMap, Layer, Ref, Schedule, type Scope, Semaphore } from "effect"
+import { Context, Effect, FiberMap, Layer, Ref, Schedule, Schema, type Scope, Semaphore } from "effect"
 import { ActiveExecutions } from "./active-executions.js"
 import { AgentExecutionFailure, RuntimeUnavailable } from "./errors.js"
 import { ExecutionHost } from "./execution-host.js"
@@ -61,11 +61,13 @@ export const make = (
                 }),
           ),
           Effect.as("settled" as const),
-          Effect.catchTag("tenetkit/runtime/StaleClaim", () => Effect.succeed("stale" as const)),
-          Effect.catchTag("tenetkit/runtime/RunNotFound", () => Effect.succeed("inactive" as const)),
-          Effect.catchTag("tenetkit/runtime/RunTerminal", () => Effect.succeed("inactive" as const)),
+          Effect.catchTags({
+            "tenetkit/runtime/StaleClaim": () => Effect.succeed("stale" as const),
+            "tenetkit/runtime/RunNotFound": () => Effect.succeed("inactive" as const),
+            "tenetkit/runtime/RunTerminal": () => Effect.succeed("inactive" as const),
+          }),
           Effect.mapError((error) =>
-            error instanceof RuntimeUnavailable
+            Schema.is(RuntimeUnavailable)(error)
               ? error
               : RuntimeUnavailable.make({ message: "cancellation reconciliation storage failed" }),
           ),
