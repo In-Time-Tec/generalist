@@ -114,11 +114,23 @@ import {
 import {
   ExecutionFailure as SandboxExecutionFailureSchema,
   Identity as SandboxIdentity,
+  Module as SandboxModule,
+  Result as SandboxResult,
+  CapabilityGrant as SandboxCapabilityGrant,
+  protocolVersion as sandboxProtocolVersion,
+  sourceDigest as sandboxSourceDigest,
+  SandboxCancelled,
+  SandboxDeadlineExceeded,
   SandboxExecutionFailure,
   SandboxExecutor as SandboxExecutorService,
+  SandboxInputInvalid,
+  SandboxOutputInvalid,
   SandboxProtocolViolation,
+  SandboxResourceExceeded,
+  SandboxSourceInvalid,
   SandboxUnavailable,
   layerTest as layerTestSandboxExecutor,
+  makeRequest as makeSandboxRequest,
   makeTest as makeTestSandboxExecutor,
   testIdentity as testSandboxIdentity,
 } from "./program/sandbox-executor.js"
@@ -258,21 +270,38 @@ export namespace ProgramHost {
 }
 
 export const SandboxExecutor = {
+  CapabilityGrant: SandboxCapabilityGrant,
   ExecutionFailure: SandboxExecutionFailureSchema,
   Identity: SandboxIdentity,
+  Module: SandboxModule,
+  Result: SandboxResult,
+  SandboxCancelled,
+  SandboxDeadlineExceeded,
   SandboxExecutionFailure,
   SandboxExecutor: SandboxExecutorService,
+  SandboxInputInvalid,
+  SandboxOutputInvalid,
   SandboxProtocolViolation,
+  SandboxResourceExceeded,
+  SandboxSourceInvalid,
   SandboxUnavailable,
   layerTest: layerTestSandboxExecutor,
+  makeRequest: makeSandboxRequest,
   makeTest: makeTestSandboxExecutor,
+  protocolVersion: sandboxProtocolVersion,
+  sourceDigest: sandboxSourceDigest,
   testIdentity: testSandboxIdentity,
 }
 export namespace SandboxExecutor {
+  export type CapabilityGrant = import("./program/sandbox-executor.js").CapabilityGrant
   export type ExecutionFailure = import("./program/sandbox-executor.js").ExecutionFailure
   export type Identity = import("./program/sandbox-executor.js").Identity
   export type Interface = import("./program/sandbox-executor.js").Interface
+  export type Module = import("./program/sandbox-executor.js").Module
   export type Request = import("./program/sandbox-executor.js").Request
+  export type Result = import("./program/sandbox-executor.js").Result
+  export type Service = import("./program/sandbox-executor.js").SandboxExecutor
+  export type TestExecute = import("./program/sandbox-executor.js").TestExecute
 }
 
 type AgentManifestFacade = typeof import("./durable/agent-manifest.js")
