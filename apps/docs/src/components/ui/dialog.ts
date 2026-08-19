@@ -1,7 +1,7 @@
 import { Message, Model, OutMessage, close, descriptionId, init, open, titleId, update, view } from "@foldkit/ui/dialog"
 import type { InitConfig, RenderInfo, ViewInputs } from "@foldkit/ui/dialog"
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"
@@ -38,10 +38,6 @@ export const dialogUpdate: {
 export { descriptionId, titleId, view }
 export const dialogDescriptionId = descriptionId
 export const dialogTitleId = titleId
-export const dialogView: {
-  (model: Parameters<typeof view>[0], viewInputs: Parameters<typeof view>[1]): ReturnType<typeof view>
-  (viewInputs: Parameters<typeof view>[1]): (model: Parameters<typeof view>[0]) => ReturnType<typeof view>
-} = dual(2, view)
 
 const dialogClass = "items-center justify-center bg-transparent p-0 open:flex"
 

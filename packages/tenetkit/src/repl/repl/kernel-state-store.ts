@@ -44,7 +44,7 @@ export interface Snapshot {
 }
 
 /** @experimental A snapshot store operation failed. Restore failure is non-fatal and reported. */
-export class KernelStateUnavailable extends Schema.TaggedErrorClass<KernelStateUnavailable>()(
+export class KernelStateUnavailable extends Schema.TaggedError<KernelStateUnavailable>()(
   "tenetkit/repl/KernelStateUnavailable",
   {
     sessionId: Schema.String,

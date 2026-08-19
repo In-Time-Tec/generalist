@@ -38,29 +38,26 @@ const TokenDocument = Schema.Struct({
 const TokenDocumentJson = Schema.fromJsonString(TokenDocument)
 
 /** @experimental */
-export class OAuthPending extends Schema.TaggedErrorClass<OAuthPending>()("tenetkit/mcp/OAuthPending", {
+export class OAuthPending extends Schema.TaggedError<OAuthPending>()("tenetkit/mcp/OAuthPending", {
   authorizationUrl: Schema.String,
 }) {}
 
 /** @experimental */
-export class OAuthDenied extends Schema.TaggedErrorClass<OAuthDenied>()("tenetkit/mcp/OAuthDenied", {
+export class OAuthDenied extends Schema.TaggedError<OAuthDenied>()("tenetkit/mcp/OAuthDenied", {
   reason: Schema.String,
 }) {}
 
 /** @experimental */
-export class OAuthExpired extends Schema.TaggedErrorClass<OAuthExpired>()("tenetkit/mcp/OAuthExpired", {
+export class OAuthExpired extends Schema.TaggedError<OAuthExpired>()("tenetkit/mcp/OAuthExpired", {
   server: Schema.String,
 }) {}
 
 /** @experimental */
-export class OAuthProviderError extends Schema.TaggedErrorClass<OAuthProviderError>()(
-  "tenetkit/mcp/OAuthProviderError",
-  {
-    server: Schema.String,
-    operation: Schema.String,
-    message: Schema.String,
-  },
-) {}
+export class OAuthProviderError extends Schema.TaggedError<OAuthProviderError>()("tenetkit/mcp/OAuthProviderError", {
+  server: Schema.String,
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
 
 /** @experimental */
 export interface TokenStoreInterface {
@@ -184,7 +181,7 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
           Option.match({
             onNone: () => Effect.as(Effect.void, undefined),
             onSome: (secret) =>
-              Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(Redacted.value(secret)).pipe(
+              Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(Redacted.value(secret)).pipe(
                 Effect.flatMap((decoded) =>
                   Predicate.hasProperty(decoded, "version")
                     ? Schema.decodeUnknownEffect(TokenDocument)(decoded).pipe(Effect.map((document) => document.tokens))

@@ -7,8 +7,9 @@ import { Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistantAddress, memoryLayer, textPrompt } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
-const jsonValue = (value: unknown): unknown => JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value))
-const jsonText = Schema.encodeSync(Schema.UnknownFromJsonString)
+const jsonValue = (value: unknown): unknown =>
+  JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
+const jsonText = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const completion = (operationKey: string, sessionParentId: string | null, text = "semantic answer") => {
   const response = {
@@ -345,7 +346,7 @@ it.live("rejects mutated completed model response references and Session storage
         .query("UPDATE baton_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
         .run(row.tag, row.session_id, row.entry_id)
 
-      const payload = (yield* Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(row.payload_json)) as {
+      const payload = (yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(row.payload_json)) as {
         readonly _tag: string
         readonly content: ReadonlyArray<unknown>
         readonly metadata?: Readonly<Record<string, unknown>>

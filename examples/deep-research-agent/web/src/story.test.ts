@@ -119,7 +119,7 @@ describe("deep-research-agent web update", () => {
   test("projects a successful TenetKit transport event stream into the chat model", () => {
     Story.story(
       update,
-      Story.with(submittedQuestionModel()),
+      Story.given(submittedQuestionModel()),
       ...completionFrames.map((frame) => Story.message(agentAction(frame))),
       Story.model((model) => {
         expect(model.chat.run._tag).toBe("Idle")
@@ -166,13 +166,13 @@ describe("deep-research-agent web update", () => {
   test("clicking stop dispatches the existing TenetKit cancel command", () => {
     Story.story(
       update,
-      Story.with({
+      Story.given({
         ...readyModel(),
         chat: { ...readyModel().chat, run: Chat.Running({ turn: 0 }) },
       }),
       Story.message(GotChatAction({ action: Chat.ClickedCancel() })),
       Story.Command.expectExact(Chat.CancelRun({ sessionId })),
-      Story.Command.resolve(Chat.CancelRun({ sessionId }), Chat.CancelledRun(), (action) => GotChatAction({ action })),
+      Story.Command.resolve(Chat.CancelRun({ sessionId }), Chat.CancelledRun()),
       Story.model((model) => {
         expect(model.chat.run).toEqual(Chat.Running({ turn: 0 }))
       }),
@@ -182,7 +182,7 @@ describe("deep-research-agent web update", () => {
   test("projects transport failures into a failed run state", () => {
     Story.story(
       update,
-      Story.with({
+      Story.given({
         ...readyModel(),
         chat: {
           ...readyModel().chat,

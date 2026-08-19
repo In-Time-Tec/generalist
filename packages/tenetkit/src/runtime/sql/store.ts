@@ -80,7 +80,7 @@ import { reconcileCancellationRequested, sessionRoots } from "./session-lifecycl
 import { loadChildReadiness } from "./store-child-capacity.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
-  readonly filename: string
+  readonly source?: string
   readonly multiWorker?: boolean
   readonly workers?: number
 }
@@ -103,13 +103,14 @@ export const makeSqliteRunStore = (
       })
     }
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
-    yield* migrate(options.filename)
+    const source = options.source ?? "sqlite"
+    yield* migrate(source)
     const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
     yield* withSql(sql, reconcileCancellationRequested).pipe(
-      Effect.mapError((error) => SchemaMigrationFailed.make({ source: options.filename, message: error.message })),
+      Effect.mapError((error) => SchemaMigrationFailed.make({ source, message: error.message })),
     )
     const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, sql.withTransaction(effect))
     const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)

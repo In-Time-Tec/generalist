@@ -1,6 +1,6 @@
-import { Match } from "effect"
-import type { Document, Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { Function, Match } from "effect"
+import type { Document, Html, HtmlBuilder } from "foldkit/html"
+import { html, htmlScope } from "@/lib/html"
 
 import { pageByPath } from "../content/registry"
 import { docsLayout } from "../layout/docsLayout"
@@ -13,8 +13,6 @@ import type { Message } from "./message"
 import type { Model } from "./model"
 
 const site = "TenetKit"
-
-const h = html<Message>()
 
 const routeTitle = (route: Route): string =>
   Match.value(route).pipe(
@@ -53,10 +51,20 @@ const routedContent = (model: Model): Html =>
     Match.exhaustive,
   )
 
-export const view = (model: Model): Document => ({
-  title: routeTitle(model.route),
-  body: h.div(
-    [h.Class("bg-background text-foreground min-h-screen antialiased")],
-    [h.keyed("div")(toPath(model.route), [], [routedContent(model)])],
-  ),
-})
+export const view: {
+  (model: Model, builder: HtmlBuilder<Message>): Document
+  (builder: HtmlBuilder<Message>): (model: Model) => Document
+} = Function.dual(
+  2,
+  (model: Model, builder: HtmlBuilder<Message>): Document =>
+    htmlScope.with(builder, () => {
+      const h = html<Message>()
+      return {
+        title: routeTitle(model.route),
+        body: h.div(
+          [h.Class("bg-background text-foreground min-h-screen antialiased")],
+          [h.keyed("div")(toPath(model.route), [], [routedContent(model)])],
+        ),
+      }
+    }),
+)

@@ -15,7 +15,7 @@ export const HandoffOutput = Schema.Struct({
 
 export type HandoffOutput = typeof HandoffOutput.Type
 
-export class HandoffProjectionInvalid extends Schema.TaggedErrorClass<HandoffProjectionInvalid>()(
+export class HandoffProjectionInvalid extends Schema.TaggedError<HandoffProjectionInvalid>()(
   "tenetkit/core/HandoffProjectionInvalid",
   { message: Schema.String },
 ) {}

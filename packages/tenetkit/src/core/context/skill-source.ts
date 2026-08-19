@@ -22,7 +22,7 @@ export const Frontmatter = Schema.Struct({
 export type Frontmatter = typeof Frontmatter.Type
 
 /** @experimental Skill source operation failed. */
-export class SkillSourceError extends Schema.TaggedErrorClass<SkillSourceError>()("tenetkit/core/SkillSourceError", {
+export class SkillSourceError extends Schema.TaggedError<SkillSourceError>()("tenetkit/core/SkillSourceError", {
   source: Schema.String,
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),

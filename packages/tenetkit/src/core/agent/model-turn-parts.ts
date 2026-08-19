@@ -1,6 +1,18 @@
 import { Cause, Option, Schema } from "effect"
+import { Response, Tool } from "effect/unstable/ai"
 import { classify as classifyContextOverflow } from "../model/context-overflow.js"
 import { AgentError, ToolNameCollision } from "./agent-event.js"
+
+export const providerOutput = {
+  capture: (
+    state: { textCharacters: number; reasoningCharacters: number; finishReason: string | undefined },
+    part: Response.StreamPart<Record<string, Tool.Any>>,
+  ): void => {
+    if (part.type === "text-delta") state.textCharacters += part.delta.length
+    if (part.type === "reasoning-delta") state.reasoningCharacters += part.delta.length
+    if (part.type === "finish") state.finishReason = part.reason
+  },
+} as const
 
 export const classifyOtherFailure = (error: unknown) => classifyContextOverflow(error)
 

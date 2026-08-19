@@ -8,7 +8,7 @@ import { closedTestAgent, testExecutable } from "./identity.js"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistant, assistantAddress, assistantRef, completedResult, memoryLayer, registrationsFor } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const admitRun = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime

@@ -5,7 +5,7 @@ import { ModelProviderUsage, providerUsage } from "./model-attempt-observation.j
 import { type ToolJsonSchemaCompiler, toolJsonSchemaCompiler } from "./model-registry.js"
 
 /** @experimental A model emitted parameters that do not satisfy the named Effect tool schema. */
-export class InvalidToolCallParameters extends Schema.TaggedErrorClass<InvalidToolCallParameters>()(
+export class InvalidToolCallParameters extends Schema.TaggedError<InvalidToolCallParameters>()(
   "tenetkit/core/InvalidToolCallParameters",
   {
     toolName: Schema.String,
@@ -14,7 +14,7 @@ export class InvalidToolCallParameters extends Schema.TaggedErrorClass<InvalidTo
 ) {}
 
 /** @experimental Tool correction was enabled for schema-backed tools, but the active model has no exact compiler. */
-export class ToolJsonSchemaCompilerMissing extends Schema.TaggedErrorClass<ToolJsonSchemaCompilerMissing>()(
+export class ToolJsonSchemaCompilerMissing extends Schema.TaggedError<ToolJsonSchemaCompilerMissing>()(
   "tenetkit/core/ToolJsonSchemaCompilerMissing",
   {},
 ) {}

@@ -34,12 +34,12 @@ export interface TransportFixture {
   readonly hang: { readonly started: Deferred.Deferred<void>; readonly aborted: Deferred.Deferred<void> }
 }
 
-export class FixtureSetupError extends Schema.TaggedErrorClass<FixtureSetupError>()("FixtureSetupError", {
+export class FixtureSetupError extends Schema.TaggedError<FixtureSetupError>()("FixtureSetupError", {
   server: Schema.String,
   message: Schema.String,
 }) {}
 
-class FixtureTransportCloseError extends Schema.TaggedErrorClass<FixtureTransportCloseError>()(
+class FixtureTransportCloseError extends Schema.TaggedError<FixtureTransportCloseError>()(
   "FixtureTransportCloseError",
   { message: Schema.String },
 ) {}
@@ -109,7 +109,9 @@ export const makeTransportFixture = (options?: {
         const structuredContent =
           options?.malformedStructuredContent === true ? { sum: 42, invalid: undefined } : { sum: 42 }
         return {
-          content: [{ type: "text" as const, text: Schema.encodeSync(Schema.UnknownFromJsonString)({ sum: 42 }) }],
+          content: [
+            { type: "text" as const, text: Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))({ sum: 42 }) },
+          ],
           structuredContent,
         }
       }

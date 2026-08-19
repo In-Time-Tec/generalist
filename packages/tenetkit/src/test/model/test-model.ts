@@ -195,7 +195,7 @@ const executeGenerate = (
       if (options.responseFormat.type !== "json") {
         return yield* invalidRequest(claimed.request.operation, "Object step requires generateObject")
       }
-      const encoded = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(step.value).pipe(
+      const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(step.value).pipe(
         Effect.mapError(() => invalidRequest(claimed.request.operation, "Object step is not JSON serializable")),
       )
       return [

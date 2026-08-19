@@ -1,6 +1,6 @@
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { SqliteMigrator } from "@effect/sql-sqlite-bun"
+import { fromRecord, make } from "effect/unstable/sql/Migrator"
 import { SchemaChecksumMismatch, SchemaDirty, SchemaMigrationFailed, SchemaVersionUnsupported } from "./errors.js"
 import { MIGRATIONS_TABLE, SCHEMA_META_TABLE, SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "./schema.js"
 import { mapSqlError } from "./sql-effect.js"
@@ -100,8 +100,8 @@ export const migrate = (
       })
     }
 
-    yield* SqliteMigrator.run({
-      loader: SqliteMigrator.fromRecord({ "0001_baton_runtime": migrationEffect }),
+    yield* make({})({
+      loader: fromRecord({ "0001_baton_runtime": migrationEffect }),
       table: MIGRATIONS_TABLE,
     }).pipe(
       Effect.mapError((error) =>

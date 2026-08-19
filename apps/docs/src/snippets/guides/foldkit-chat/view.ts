@@ -1,6 +1,6 @@
 import { Chat } from "tenetkit/foldkit"
 import type { Document, Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 import { GotChatAction, type Message, type Model } from "./model"
 
 const entryView = (entry: Chat.ChatEntry): Html => {

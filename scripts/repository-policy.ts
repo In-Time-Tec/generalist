@@ -4,7 +4,7 @@ import { layer } from "@effect/platform-bun/BunServices"
 const ignored = new Set(["node_modules", "dist", "coverage", ".turbo", "repos", "generated", ".git"])
 const roots = ["apps", "examples", "packages", "scripts", "tooling"]
 
-class RepositoryPolicyFailed extends Schema.TaggedErrorClass<RepositoryPolicyFailed>()(
+class RepositoryPolicyFailed extends Schema.TaggedError<RepositoryPolicyFailed>()(
   "@tenetkit/scripts/RepositoryPolicyFailed",
   { message: Schema.String },
 ) {}

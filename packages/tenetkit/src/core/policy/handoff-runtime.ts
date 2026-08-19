@@ -24,7 +24,7 @@ import { ModelRegistry } from "../model/model-registry.js"
 import { validateRef } from "../durable/executable-manifest.js"
 import { SessionStore } from "../context/session.js"
 
-export class HandoffRejected extends Schema.TaggedErrorClass<HandoffRejected>()("tenetkit/core/HandoffRejected", {
+export class HandoffRejected extends Schema.TaggedError<HandoffRejected>()("tenetkit/core/HandoffRejected", {
   handoffId: Schema.String,
   turn: Schema.Finite,
   reason: Schema.String,

@@ -8,7 +8,7 @@ import type {
 } from "./model-telemetry.js"
 
 /** @experimental */
-export class InvocationCoordinationFailed extends Schema.TaggedErrorClass<InvocationCoordinationFailed>()(
+export class InvocationCoordinationFailed extends Schema.TaggedError<InvocationCoordinationFailed>()(
   "tenetkit/core/InvocationCoordinationFailed",
   { message: Schema.String },
 ) {}
@@ -39,7 +39,7 @@ export const layerInvocationCoordinatorNoop: Layer.Layer<InvocationCoordinator> 
 export const isInvocationCoordinationFailed = Schema.is(InvocationCoordinationFailed)
 
 /** @experimental Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
-export class DeliveryFailed extends Schema.TaggedErrorClass<DeliveryFailed>()("tenetkit/core/DeliveryFailed", {
+export class DeliveryFailed extends Schema.TaggedError<DeliveryFailed>()("tenetkit/core/DeliveryFailed", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}

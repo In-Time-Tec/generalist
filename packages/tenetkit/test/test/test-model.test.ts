@@ -37,7 +37,7 @@ const fixtureLayer = (
     ),
   )
 
-const jsonString = (value: unknown) => Schema.encodeEffect(Schema.UnknownFromJsonString)(value)
+const jsonString = (value: unknown) => Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(value)
 
 const user = (text: string): Prompt.Message =>
   Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })

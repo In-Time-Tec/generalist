@@ -16,7 +16,7 @@ export interface ModelMetadata {
 }
 
 /** @experimental */
-export class ModelMetadataNotFound extends Schema.TaggedErrorClass<ModelMetadataNotFound>()(
+export class ModelMetadataNotFound extends Schema.TaggedError<ModelMetadataNotFound>()(
   "tenetkit/ai/ModelMetadataNotFound",
   {
     provider: Schema.String,

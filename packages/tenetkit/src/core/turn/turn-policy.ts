@@ -65,7 +65,7 @@ export const StopReason = Schema.Union([
 export type StopReason = typeof StopReason.Type
 
 /** @experimental A turn policy could not evaluate its decision. */
-export class TurnPolicyError extends Schema.TaggedErrorClass<TurnPolicyError>()("tenetkit/core/TurnPolicyError", {
+export class TurnPolicyError extends Schema.TaggedError<TurnPolicyError>()("tenetkit/core/TurnPolicyError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}

@@ -14,7 +14,7 @@ export interface Route {
 }
 
 /** @experimental An ordered candidate route contains a candidate without provider-approved availability semantics. */
-export class AvailabilitySemanticsMissing extends Schema.TaggedErrorClass<AvailabilitySemanticsMissing>()(
+export class AvailabilitySemanticsMissing extends Schema.TaggedError<AvailabilitySemanticsMissing>()(
   "tenetkit/ai/AvailabilitySemanticsMissing",
   { provider: Schema.String, model: Schema.String, registrationKey: Schema.optionalKey(Schema.String) },
 ) {}

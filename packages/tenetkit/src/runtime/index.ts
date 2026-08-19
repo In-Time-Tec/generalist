@@ -312,7 +312,7 @@ export namespace Runtime {
   export type FanOutMemberInput = import("./fan-out.js").FanOutMemberInput
   export type FanOutError = import("./runtime.js").FanOutError
   export type InspectFanOutError = import("./runtime.js").InspectFanOutError
-  export type SqliteStoreOptions = import("./platform-layers.js").SqliteStoreOptions
+  export type SqliteStoreOptions = import("./platform-layers.js").BunSqliteStoreOptions
 }
 export * as AgentDirectory from "./agent-directory.js"
 

@@ -1,7 +1,9 @@
 import { Message, Model, OutMessage, Selected, create, init } from "@foldkit/ui/combobox"
 import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/combobox"
 import type { Html } from "foldkit/html"
-import { childAttributes, html } from "foldkit/html"
+import { childAttributes } from "foldkit/html"
+import { html } from "@/lib/html"
+import { Option } from "effect"
 import { dual } from "effect/Function"
 
 import type { ContentConfig } from "@/components/ui/dialog"
@@ -121,6 +123,8 @@ export const root = <Item extends string = string>(config: RootConfig<Item>): Vi
   const h = html<CommandMessage>()
   return {
     items: config.items,
+    restingInputValue: "",
+    maybeSelectedValue: Option.none(),
     itemToConfig: config.itemToConfig,
     itemToValue: (item) => item,
     itemToDisplayText: config.itemToDisplayText ?? ((item) => item),

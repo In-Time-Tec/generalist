@@ -15,21 +15,18 @@ export interface Request {
 }
 
 /** @experimental */
-export class SandboxUnavailable extends Schema.TaggedErrorClass<SandboxUnavailable>()(
-  "tenetkit/core/SandboxUnavailable",
-  {
-    language: Schema.Literal("javascript"),
-  },
-) {}
+export class SandboxUnavailable extends Schema.TaggedError<SandboxUnavailable>()("tenetkit/core/SandboxUnavailable", {
+  language: Schema.Literal("javascript"),
+}) {}
 
 /** @experimental */
-export class SandboxExecutionFailure extends Schema.TaggedErrorClass<SandboxExecutionFailure>()(
+export class SandboxExecutionFailure extends Schema.TaggedError<SandboxExecutionFailure>()(
   "tenetkit/core/SandboxExecutionFailure",
   { message: Schema.String },
 ) {}
 
 /** @experimental */
-export class SandboxProtocolViolation extends Schema.TaggedErrorClass<SandboxProtocolViolation>()(
+export class SandboxProtocolViolation extends Schema.TaggedError<SandboxProtocolViolation>()(
   "tenetkit/core/SandboxProtocolViolation",
   { message: Schema.String },
 ) {}

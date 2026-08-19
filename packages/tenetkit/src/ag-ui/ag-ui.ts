@@ -4,7 +4,7 @@ import { Cursor, type Address, Errors, Runtime } from "tenetkit/runtime"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
 import { project, projectModelResponse, stateSnapshot } from "./projection.js"
 
-const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 /** @experimental */
 export interface LayerOptions {

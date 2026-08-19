@@ -16,7 +16,7 @@ export const decode = (message: Message): Effect.Effect<Prompt.Prompt, MessageRe
       return Effect.succeed(Prompt.makePart("text", { text: part.content.value }))
     }
     if (part.content?.$case === "data" && part.mediaType === "application/json") {
-      return Schema.encodeEffect(Schema.UnknownFromJsonString)(part.content!.value).pipe(
+      return Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(part.content!.value).pipe(
         Effect.map((text) => Prompt.makePart("text", { text })),
         Effect.mapError((cause) => reject(`application/json part is not serializable: ${cause.message}`, index)),
       )

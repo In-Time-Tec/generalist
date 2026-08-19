@@ -87,13 +87,13 @@ export const makeParameters = (authority: AgentManifest.ProgramAuthority) => {
 }
 
 /** @experimental */
-export class ProgramAuthorityMissing extends Schema.TaggedErrorClass<ProgramAuthorityMissing>()(
+export class ProgramAuthorityMissing extends Schema.TaggedError<ProgramAuthorityMissing>()(
   "tenetkit/runtime/ProgramAuthorityMissing",
   { runId: Schema.String },
 ) {}
 
 /** @experimental */
-export class ProgramAuthorityExceeded extends Schema.TaggedErrorClass<ProgramAuthorityExceeded>()(
+export class ProgramAuthorityExceeded extends Schema.TaggedError<ProgramAuthorityExceeded>()(
   "tenetkit/runtime/ProgramAuthorityExceeded",
   {
     dimension: AuthorityDimension,
@@ -104,7 +104,7 @@ export class ProgramAuthorityExceeded extends Schema.TaggedErrorClass<ProgramAut
 ) {}
 
 /** @experimental */
-export class ProgramAdmissionFailed extends Schema.TaggedErrorClass<ProgramAdmissionFailed>()(
+export class ProgramAdmissionFailed extends Schema.TaggedError<ProgramAdmissionFailed>()(
   "tenetkit/runtime/ProgramAdmissionFailed",
   { message: Schema.String },
 ) {}

@@ -143,11 +143,11 @@ export const EntryPayload = Schema.Union([
 /** @experimental */
 export type EntryPayload = typeof EntryPayload.Type
 /** @experimental Session store operation failure. */
-export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()("tenetkit/core/SessionStoreError", {
+export class SessionStoreError extends Schema.TaggedError<SessionStoreError>()("tenetkit/core/SessionStoreError", {
   message: Schema.String,
 }) {}
 /** @experimental Session append conflict with the active path or entry identity. */
-export class SessionConflict extends Schema.TaggedErrorClass<SessionConflict>()("tenetkit/core/SessionConflict", {
+export class SessionConflict extends Schema.TaggedError<SessionConflict>()("tenetkit/core/SessionConflict", {
   reason: Schema.Literals([
     "stale-leaf",
     "entry-id-reused",

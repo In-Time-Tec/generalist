@@ -35,7 +35,7 @@ export const RefinementRejection = Schema.Literals([
 export type RefinementRejection = typeof RefinementRejection.Type
 
 /** @experimental One proposal was rejected and no state changed. */
-export class RefinementRejected extends Schema.TaggedErrorClass<RefinementRejected>()(
+export class RefinementRejected extends Schema.TaggedError<RefinementRejected>()(
   "tenetkit/harness/RefinementRejected",
   {
     reason: RefinementRejection,

@@ -16,18 +16,15 @@ export interface AccessRequest {
 }
 
 /** @experimental A final authorization denial. */
-export class PermissionDenied extends Schema.TaggedErrorClass<PermissionDenied>()("tenetkit/core/PermissionDenied", {
+export class PermissionDenied extends Schema.TaggedError<PermissionDenied>()("tenetkit/core/PermissionDenied", {
   message: Schema.String,
 }) {}
 
 /** @experimental Failure while producing a final authorization decision. */
-export class AuthorizationError extends Schema.TaggedErrorClass<AuthorizationError>()(
-  "tenetkit/core/AuthorizationError",
-  {
-    message: Schema.String,
-    cause: Schema.optional(Schema.Defect()),
-  },
-) {}
+export class AuthorizationError extends Schema.TaggedError<AuthorizationError>()("tenetkit/core/AuthorizationError", {
+  message: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {}
 
 /** @experimental The tool may execute. */
 export interface Execute {

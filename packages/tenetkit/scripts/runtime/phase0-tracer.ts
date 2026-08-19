@@ -3,7 +3,7 @@ import { Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistantAddress, textPrompt } from "../../test/runtime/helpers.js"
 import { sqliteLayer, tempDbPath } from "../../test/runtime/sqlite-helpers.js"
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const filename = tempDbPath("phase0-cli")
 

@@ -3,7 +3,7 @@ import { ToolContext, ToolExecutor } from "tenetkit"
 import { Response } from "effect/unstable/ai"
 import { Cell, CellTool, HostBindingRegistry, KernelProfile, TestKernel } from "tenetkit/repl"
 
-class NotFound extends Schema.TaggedErrorClass<NotFound>()("@tenetkit/tutorial/NotFound", {
+class NotFound extends Schema.TaggedError<NotFound>()("@tenetkit/tutorial/NotFound", {
   path: Schema.String,
 }) {}
 

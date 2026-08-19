@@ -140,6 +140,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       id: "result-secret",
       name: "echo",
       isFailure: false,
+      providerExecuted: false,
       result: { text: "secret result" },
     })
     return Effect.gen(function* () {

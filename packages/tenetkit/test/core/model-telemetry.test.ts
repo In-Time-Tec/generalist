@@ -45,7 +45,7 @@ describe("ModelTelemetry", () => {
         ModelStreamTermination.ModelStreamTimeout.make({
           turn: 0,
           emitted: { _tag: "Nothing" },
-          idleMillis: 120_000,
+          idleMillis: 120000,
         }),
       ),
     ).toBe("timeout")

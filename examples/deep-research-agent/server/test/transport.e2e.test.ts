@@ -7,7 +7,7 @@ import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "tenetkit/runtime"
 import { Client } from "tenetkit/transport"
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const RunReceipt = Schema.Struct({
   runId: Schema.String,
@@ -15,7 +15,7 @@ const RunReceipt = Schema.Struct({
   acceptedSequence: Schema.Int,
 })
 
-class TransportTestError extends Schema.TaggedErrorClass<TransportTestError>()("TransportTestError", {
+class TransportTestError extends Schema.TaggedError<TransportTestError>()("TransportTestError", {
   message: Schema.String,
 }) {}
 

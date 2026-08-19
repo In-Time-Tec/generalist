@@ -138,7 +138,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
             expect({ stage: failure.stage, tool: failure.tool, message: failure.message }).toEqual({
               stage: "decode-input",
               tool: "start_child_group",
-              message: "Expected string, got 42\n  at members[0].selection",
+              message: "Expected string\n  at members[0].selection",
             })
           }),
         ),

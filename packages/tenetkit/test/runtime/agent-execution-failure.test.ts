@@ -57,7 +57,7 @@ describe("terminal agent failure messages", () => {
     },
     {
       name: "RunBudgetExhausted",
-      error: RunBudget.RunBudgetExhausted.make({ dimension: "totalTokens", requested: 165_703, remaining: 43_421 }),
+      error: RunBudget.RunBudgetExhausted.make({ dimension: "totalTokens", requested: 165703, remaining: 43421 }),
       expected: "Run budget exhausted for totalTokens: requested 165703, remaining 43421",
     },
   ])("states what happened for $name", ({ error, expected }) => {

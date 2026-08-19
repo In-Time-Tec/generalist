@@ -12,7 +12,7 @@ export interface Credential {
 }
 
 /** @experimental */
-export class CredentialFailure extends Schema.TaggedErrorClass<CredentialFailure>()(
+export class CredentialFailure extends Schema.TaggedError<CredentialFailure>()(
   "tenetkit/ai/AmazonBedrockCredentialFailure",
   { operation: Schema.Literals(["acquire", "refreshRejected"]) },
 ) {}

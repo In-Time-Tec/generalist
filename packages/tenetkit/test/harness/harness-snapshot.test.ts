@@ -109,8 +109,8 @@ describe("HarnessSnapshot", () => {
   )
 
   it.effect("survives a JSON round trip of the registration payload", () => {
-    const wire = Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(
-      Schema.encodeSync(Schema.UnknownFromJsonString)(HarnessSnapshot.encode(state)),
+    const wire = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(
+      Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(HarnessSnapshot.encode(state)),
     )
     return HarnessSnapshot.decode(snapshot.id, wire).pipe(
       Effect.map((restored) => {

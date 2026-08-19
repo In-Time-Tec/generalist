@@ -66,7 +66,7 @@ describe("baton adapter", () => {
           )
           const result = yield* Agent.generate(agent, { prompt: "add the numbers" }).pipe(Effect.provide(services))
           const prompts = yield* model.prompts
-          const secondPrompt = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(prompts[1])
+          const secondPrompt = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(prompts[1])
 
           expect(result.text).toBe("the answer is 42")
           expect(secondPrompt).toContain("42")

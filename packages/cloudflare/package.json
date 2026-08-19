@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "version": "0.29.0",
+  "private": false,
+  "type": "module",
+  "sideEffects": false,
+  "peerDependencies": {
+    "effect": "catalog:"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@tenetkit/cloudflare",
+  "description": "Cloudflare Workers and Durable Objects adapters for TenetKit",
+  "exports": {
+    "./workers": {
+      "types": "./dist/workers/index.d.ts",
+      "import": "./dist/workers/index.js"
+    },
+    "./durable-objects": {
+      "types": "./dist/durable-objects/index.d.ts",
+      "import": "./dist/durable-objects/index.js"
+    },
+    "./dynamic-workers": {
+      "types": "./dist/dynamic-workers/index.d.ts",
+      "import": "./dist/dynamic-workers/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
+    "typecheck": "bun tsc --noEmit",
+    "test": "bun --bun --cwd ../.. vitest run packages/cloudflare/test --no-file-parallelism --maxWorkers=1"
+  },
+  "dependencies": {
+    "@effect/sql-sqlite-do": "catalog:",
+    "tenetkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "effect": "catalog:",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "directory": "packages/cloudflare"
+  }
+}

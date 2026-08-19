@@ -12,7 +12,7 @@ import { Context, Effect, Layer, Redacted, Schema, Semaphore } from "effect"
 import { defaultChain, type Credential, type Credentials } from "./amazon-bedrock-credentials.js"
 
 /** @experimental */
-export class ClientFailure extends Schema.TaggedErrorClass<ClientFailure>()("tenetkit/ai/AmazonBedrockClientFailure", {
+export class ClientFailure extends Schema.TaggedError<ClientFailure>()("tenetkit/ai/AmazonBedrockClientFailure", {
   operation: Schema.Literals(["converse", "converseStream"]),
   description: Schema.String,
   awsErrorName: Schema.optional(Schema.String),
@@ -20,10 +20,9 @@ export class ClientFailure extends Schema.TaggedErrorClass<ClientFailure>()("ten
 }) {}
 
 /** @experimental */
-export class RecoveryFailure extends Schema.TaggedErrorClass<RecoveryFailure>()(
-  "tenetkit/ai/AmazonBedrockRecoveryFailure",
-  { description: Schema.String },
-) {}
+export class RecoveryFailure extends Schema.TaggedError<RecoveryFailure>()("tenetkit/ai/AmazonBedrockRecoveryFailure", {
+  description: Schema.String,
+}) {}
 
 /** @experimental */
 export interface Interface {

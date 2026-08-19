@@ -30,16 +30,13 @@ export interface CallOptions {
 }
 
 /** @experimental */
-export class McpConnectionFailed extends Schema.TaggedErrorClass<McpConnectionFailed>()(
-  "tenetkit/mcp/McpConnectionFailed",
-  {
-    server: Schema.String,
-    message: Schema.String,
-  },
-) {}
+export class McpConnectionFailed extends Schema.TaggedError<McpConnectionFailed>()("tenetkit/mcp/McpConnectionFailed", {
+  server: Schema.String,
+  message: Schema.String,
+}) {}
 
 /** @experimental */
-export class McpToolCallFailed extends Schema.TaggedErrorClass<McpToolCallFailed>()("tenetkit/mcp/McpToolCallFailed", {
+export class McpToolCallFailed extends Schema.TaggedError<McpToolCallFailed>()("tenetkit/mcp/McpToolCallFailed", {
   server: Schema.String,
   tool: Schema.String,
   message: Schema.String,

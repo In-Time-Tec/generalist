@@ -169,7 +169,7 @@ export const makeRequest = Effect.fnUntraced(function* (input: Input, options: L
       } else if (part.type === "tool-call")
         content.push({ toolUse: { toolUseId: part.id, name: part.name, input: toDocument(part.params) } })
       else if (part.type === "tool-result") {
-        const result = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(part.result).pipe(
+        const result = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(part.result).pipe(
           Effect.mapError(() => fail(`tool '${part.name}' returned a non-JSON result`)),
         )
         content.push({

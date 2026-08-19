@@ -1,5 +1,5 @@
 import type { Html } from "foldkit/html"
-import { html } from "foldkit/html"
+import { html } from "@/lib/html"
 import { dual } from "effect/Function"
 
 import { button } from "@/components/ui/button"

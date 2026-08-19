@@ -6,7 +6,7 @@ interface Written {
   readonly patch: string
 }
 
-class WriteFailed extends Schema.TaggedErrorClass<WriteFailed>()("@tenetkit/docs/WriteFailed", {
+class WriteFailed extends Schema.TaggedError<WriteFailed>()("@tenetkit/docs/WriteFailed", {
   path: Schema.String,
 }) {}
 
