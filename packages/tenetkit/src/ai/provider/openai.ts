@@ -1,22 +1,10 @@
 import { OpenAiClient, OpenAiLanguageModel, OpenAiSchema } from "@effect/ai-openai"
 import { ContextOverflow, ModelRegistry } from "tenetkit"
-import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
+import { Config, Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
-import type { Credential, ServiceInterface } from "./openai-account-auth.js"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/model-failure.js"
-import {
-  FetchHttpClient,
-  Headers,
-  HttpClient,
-  HttpClientError,
-  HttpClientRequest,
-  HttpClientResponse,
-} from "effect/unstable/http"
-
-const openAiAccountApiUrl = "https://chatgpt.com/backend-api/codex"
-const openAiAccountResponsesUrl = `${openAiAccountApiUrl}/responses`
-const openAiAccountIdHeader = "ChatGPT-Account-ID"
+import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 
 /** @experimental */
 export interface RegistrationOptions {
@@ -100,8 +88,14 @@ const openAiRequestId = (metadata: FailureInput["metadata"]): string | null => {
   return isRecord(openai) ? boundedMetadata(openai.requestId) : null
 }
 
-const resolveOpenAiFailure = ({ error, metadata: partMetadata, method }: FailureInput): AiError.AiError => {
-  if (AiError.isAiError(error)) return error
+/** @internal Classify one decoded OpenAI error payload; shared by every OpenAI transport. */
+export const openAiFailureReason = ({
+  error,
+  requestId,
+}: {
+  readonly error: unknown
+  readonly requestId: string | null
+}): AiError.AiErrorReason => {
   const event = isRecord(error) ? error : undefined
   const code = boundedMetadata(event?.code)
   const message = boundedDescription(event?.message, "OpenAI response failed")
@@ -110,53 +104,58 @@ const resolveOpenAiFailure = ({ error, metadata: partMetadata, method }: Failure
     openai: {
       errorCode: code,
       errorType: event?.type === "error" ? null : boundedMetadata(event?.type),
-      requestId: openAiRequestId(partMetadata),
+      requestId,
     },
   }
-  const make = (reason: AiError.AiErrorReason) => AiError.make({ module: "OpenAiLanguageModel", method, reason })
   if (code !== null && serverFailureCodes.has(code)) {
-    return make(AiError.InternalProviderError.make({ description: message, metadata }))
+    return AiError.InternalProviderError.make({ description: message, metadata })
   }
   if (code !== null && rateLimitCodes.has(code)) {
-    return make(
-      AiError.RateLimitError.make({
-        metadata: {
-          openai: {
-            ...metadata.openai,
-            limit: null,
-            remaining: null,
-            resetRequests: null,
-            resetTokens: null,
-          },
+    return AiError.RateLimitError.make({
+      metadata: {
+        openai: {
+          ...metadata.openai,
+          limit: null,
+          remaining: null,
+          resetRequests: null,
+          resetTokens: null,
         },
-      }),
-    )
+      },
+    })
   }
   if (code !== null && quotaCodes.has(code)) {
-    return make(AiError.QuotaExhaustedError.make({ metadata }))
+    return AiError.QuotaExhaustedError.make({ metadata })
   }
   if (code !== null && authenticationCodes.has(code)) {
-    return make(AiError.AuthenticationError.make({ kind: "InvalidKey", metadata }))
+    return AiError.AuthenticationError.make({ kind: "InvalidKey", metadata })
   }
   if (code !== null && permissionCodes.has(code)) {
-    return make(AiError.AuthenticationError.make({ kind: "InsufficientPermissions", metadata }))
+    return AiError.AuthenticationError.make({ kind: "InsufficientPermissions", metadata })
   }
   if (code !== null && contentPolicyCodes.has(code)) {
-    return make(AiError.ContentPolicyError.make({ description: message, metadata }))
+    return AiError.ContentPolicyError.make({ description: message, metadata })
   }
   if (code === "context_length_exceeded" || (code !== null && invalidRequestCodes.has(code))) {
-    return make(
-      AiError.InvalidRequestError.make({
-        description: message,
-        ...(parameter === null ? {} : { parameter }),
-        metadata,
-      }),
-    )
+    return AiError.InvalidRequestError.make({
+      description: message,
+      ...(parameter === null ? {} : { parameter }),
+      metadata,
+    })
   }
-  return make(AiError.UnknownError.make({ description: message, metadata }))
+  return AiError.UnknownError.make({ description: message, metadata })
 }
 
-const openAiLanguageModelLayer = (input: OpenAiInput) =>
+const resolveOpenAiFailure = ({ error, metadata: partMetadata, method }: FailureInput): AiError.AiError =>
+  AiError.isAiError(error)
+    ? error
+    : AiError.make({
+        module: "OpenAiLanguageModel",
+        method,
+        reason: openAiFailureReason({ error, requestId: openAiRequestId(partMetadata) }),
+      })
+
+/** @internal Shared by the API-key and account registrations. */
+export const openAiLanguageModelLayer = (input: OpenAiInput) =>
   layerModelFailures(
     layerImageSources(
       OpenAiLanguageModel.layer({
@@ -322,174 +321,13 @@ export const layerConfig = (options?: Parameters<typeof OpenAiClient.layerConfig
         : client.pipe(normalizeResponsesSse, options.transformClient),
   })
 
-/** @experimental */
-export interface OpenAiAccountCredential {
-  readonly accessToken: Redacted.Redacted<string>
-  readonly accountId: string
-  readonly generation: string
-}
-
-/** @experimental */
-export class OpenAiAccountCredentialError extends Schema.TaggedErrorClass<OpenAiAccountCredentialError>()(
-  "tenetkit/ai/OpenAiAccountCredentialError",
-  {
-    operation: Schema.Literals(["acquire", "refreshRejected"]),
-  },
-) {}
-
-/** @experimental */
-export interface OpenAiAccountCredentials {
-  readonly acquire: Effect.Effect<OpenAiAccountCredential, OpenAiAccountCredentialError>
-  readonly refreshRejected: (generation: string) => Effect.Effect<OpenAiAccountCredential, OpenAiAccountCredentialError>
-}
-
-/** @experimental */
-const credentialsFromAccountAuthImpl = (
-  service: ServiceInterface,
-  expectedFingerprint: string,
-): OpenAiAccountCredentials => {
-  const mapCredential = (operation: OpenAiAccountCredentialError["operation"]) =>
-    Effect.mapError(() => OpenAiAccountCredentialError.make({ operation }))
-  const accountCredential = (operation: OpenAiAccountCredentialError["operation"]) =>
-    Effect.flatMap((credential: Credential) =>
-      credential.fingerprint === expectedFingerprint
-        ? Effect.succeed({
-            accessToken: credential.accessToken,
-            accountId: Redacted.value(credential.accountId),
-            generation: credential.generation,
-          })
-        : Effect.fail(OpenAiAccountCredentialError.make({ operation })),
-    )
-  return {
-    acquire: service.acquire.pipe(accountCredential("acquire"), mapCredential("acquire")),
-    refreshRejected: (generation) =>
-      service.refreshRejected(generation).pipe(accountCredential("refreshRejected"), mapCredential("refreshRejected")),
-  }
-}
-
-/** @experimental */
-export const credentialsFromAccountAuth: {
-  (service: ServiceInterface, expectedFingerprint: string): OpenAiAccountCredentials
-  (expectedFingerprint: string): (service: ServiceInterface) => OpenAiAccountCredentials
-} = Function.dual(2, credentialsFromAccountAuthImpl)
-
-/** @experimental */
-export interface OpenAiAccountInput extends RegistrationOptions {
-  readonly model: (string & {}) | OpenAiLanguageModel.Model
-  readonly credentials: OpenAiAccountCredentials
-  readonly config?: Config
-}
-
-const credentialFailure = (request: HttpClientRequest.HttpClientRequest, error: OpenAiAccountCredentialError) =>
-  new HttpClientError.HttpClientError({
-    reason: new HttpClientError.TransportError({
-      request,
-      cause: error,
-      description: `OpenAI account credential ${error.operation} failed`,
-    }),
-  })
-
-const withCredential = (request: HttpClientRequest.HttpClientRequest, credential: OpenAiAccountCredential) => {
-  const body = request.body
-  const streaming =
-    body._tag === "Uint8Array" &&
-    body.contentType === "application/json" &&
-    new TextDecoder().decode(body.body).includes('"stream":true')
-
-  return request.pipe(
-    HttpClientRequest.setUrl(openAiAccountResponsesUrl),
-    HttpClientRequest.bearerToken(credential.accessToken),
-    HttpClientRequest.setHeader(openAiAccountIdHeader, credential.accountId),
-    HttpClientRequest.accept(streaming ? "text/event-stream" : "application/json"),
-  )
-}
-
-const executeWithCredential = (
-  client: HttpClient.HttpClient,
-  request: HttpClientRequest.HttpClientRequest,
-  credential: OpenAiAccountCredential,
-): Effect.Effect<HttpClientResponse.HttpClientResponse, HttpClientError.HttpClientError> =>
-  client.postprocess(Effect.succeed(withCredential(request, credential))).pipe(
-    Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" }),
-    Effect.updateService(Headers.CurrentRedactedNames, (names) => [...names, openAiAccountIdHeader]),
-  )
-
-const accountClientTransform = (credentials: OpenAiAccountCredentials) => (client: HttpClient.HttpClient) =>
-  HttpClient.transform(client, (_, request) =>
-    credentials.acquire.pipe(
-      Effect.mapError((error) => credentialFailure(request, error)),
-      Effect.flatMap((credential) =>
-        executeWithCredential(client, request, credential).pipe(
-          Effect.catchIf(
-            (error) => error.reason._tag === "StatusCodeError" && error.reason.response.status === 401,
-            (error) => {
-              if (error.reason._tag !== "StatusCodeError") return Effect.fail(error)
-              return Stream.runDrain(error.reason.response.stream).pipe(
-                Effect.ignore,
-                Effect.andThen(credentials.refreshRejected(credential.generation)),
-                Effect.mapError((credentialError) => credentialFailure(request, credentialError)),
-                Effect.flatMap((refreshed) => executeWithCredential(client, request, refreshed)),
-              )
-            },
-          ),
-        ),
-      ),
-    ),
-  )
-
-const withAccountHeaderRedaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  effect.pipe(Effect.updateService(Headers.CurrentRedactedNames, (names) => [...names, openAiAccountIdHeader]))
-
-const withoutOpenAiSocket = <A, E>(effect: Effect.Effect<A, E>) =>
-  effect.pipe(Effect.provideService(OpenAiClient.OpenAiSocket, undefined!))
-
-const openAiAccountClientLayer = (credentials: OpenAiAccountCredentials) =>
-  Layer.effect(
-    OpenAiClient.OpenAiClient,
-    OpenAiClient.make({
-      apiUrl: openAiAccountApiUrl,
-      transformClient: (client) => client.pipe(normalizeResponsesSse, accountClientTransform(credentials)),
-    }).pipe(
-      Effect.map((client) =>
-        OpenAiClient.OpenAiClient.of({
-          client: client.client,
-          createResponse: (options) => withAccountHeaderRedaction(client.createResponse(options)),
-          createResponseStream: (options) =>
-            client.createResponseStream(options).pipe(
-              withoutOpenAiSocket,
-              withAccountHeaderRedaction,
-              Effect.map(
-                ([response, stream]) =>
-                  [
-                    response,
-                    stream.pipe(
-                      Stream.updateService(Headers.CurrentRedactedNames, (names) => [...names, openAiAccountIdHeader]),
-                    ),
-                  ] as const,
-              ),
-            ),
-          createEmbedding: (options) => withAccountHeaderRedaction(client.createEmbedding(options)),
-        }),
-      ),
-    ),
-  )
-
-/** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
-export const registrationAccount = (
-  input: OpenAiAccountInput,
-): Effect.Effect<ModelRegistry.Registration, never, HttpClient.HttpClient> =>
-  ModelRegistry.registration({
-    provider: "openai",
-    model: input.model,
-    layer: openAiLanguageModelLayer(input).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
-    classifyFailure,
-    toolJsonSchemaCompiler,
-    isAvailabilityFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
-
-export const layerAccount = (
-  input: OpenAiAccountInput,
-): Layer.Layer<ModelRegistry.ModelRegistry, never, HttpClient.HttpClient> =>
-  ModelRegistry.layer([registrationAccount(input)])
+export {
+  OpenAiAccountCredentialError,
+  credentialsFromAccountAuth,
+  layerAccount,
+  layerAccountClient,
+  registrationAccount,
+  type OpenAiAccountCredential,
+  type OpenAiAccountCredentials,
+  type OpenAiAccountInput,
+} from "./openai-account.js"

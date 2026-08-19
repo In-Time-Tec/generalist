@@ -12,6 +12,7 @@ import {
   credentialsFromAccountAuth,
   layer as openAiLayer,
   layerAccount,
+  layerAccountClient,
 } from "tenetkit/ai/openai"
 import type { ServiceInterface } from "tenetkit/ai/openai-account-auth"
 
@@ -28,7 +29,23 @@ const responseBody = {
   created_at: 1,
   output: [],
 }
+const textResponseBody = {
+  ...responseBody,
+  output: [
+    {
+      id: "message-1",
+      type: "message",
+      role: "assistant",
+      status: "completed",
+      content: [{ type: "output_text", text: "folded summary", annotations: [] }],
+    },
+  ],
+  usage: { input_tokens: 11, output_tokens: 7, total_tokens: 18 },
+}
 const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+const sse = (...events: ReadonlyArray<unknown>) => events.map((event) => `data: ${stringify(event)}\n\n`).join("")
+const completedFrame = (response: unknown = responseBody) =>
+  sse({ type: "response.completed", response, sequence_number: 0 })
 
 interface CapturedRequest {
   readonly url: string
@@ -36,19 +53,34 @@ interface CapturedRequest {
   readonly body: unknown
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
 const decodeBody = (request: HttpClientRequest.HttpClientRequest): unknown =>
   request.body._tag === "Uint8Array"
     ? Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(new TextDecoder().decode(request.body.body))
     : undefined
 
-const mockClient = (
-  statuses: Array<number>,
-  requests: Array<CapturedRequest>,
-  body: BodyInit = stringify(responseBody),
-) =>
+const mockClient = (statuses: Array<number>, requests: Array<CapturedRequest>, body: BodyInit = completedFrame()) =>
   HttpClient.make((request, url) => {
     requests.push({ url: url.toString(), headers: request.headers, body: decodeBody(request) })
     return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body, { status: statuses.shift() ?? 200 })))
+  })
+
+/** Models the ChatGPT account backend, which rejects any request body that does not set stream. */
+const streamingOnlyClient = (requests: Array<CapturedRequest>, body: BodyInit = completedFrame()) =>
+  HttpClient.make((request, url) => {
+    const decoded = decodeBody(request)
+    requests.push({ url: url.toString(), headers: request.headers, body: decoded })
+    const streaming = isRecord(decoded) && decoded.stream === true
+    return Effect.succeed(
+      HttpClientResponse.fromWeb(
+        request,
+        streaming
+          ? new Response(body, { status: 200 })
+          : new Response(stringify({ detail: "Stream must be set to true" }), { status: 400 }),
+      ),
+    )
   })
 
 const credentials = (
@@ -136,27 +168,22 @@ describe("OpenAI account Responses registration", () => {
       expect(requests[0]?.url).toBe(endpoint)
       expect(requests[0]?.headers.authorization).toBe("Bearer token-current")
       expect(requests[0]?.headers["chatgpt-account-id"]).toBe("account-current")
-      expect(requests[0]?.headers.accept).toBe("application/json")
+      expect(requests[0]?.headers.accept).toBe("text/event-stream")
       expect(requests[0]?.headers["content-type"]).toBe("application/json")
-      expect(requests[0]?.body).toMatchObject({ model: "gpt-test" })
+      expect(requests[0]?.body).toMatchObject({ model: "gpt-test", stream: true })
     })
   })
 
   it.effect("preserves Responses stream conversion and does not refresh after output starts", () => {
     const requests: Array<CapturedRequest> = []
     const refreshes: Array<string> = []
-    const completed = stringify({
-      type: "response.completed",
-      response: responseBody,
-      sequence_number: 0,
-    })
     const accountCredentials = credentials(Effect.succeed(credential("stream")), (generation) =>
       Effect.sync(() => {
         refreshes.push(generation)
         return credential("refreshed")
       }),
     )
-    const client = mockClient([200], requests, `data: ${completed}\n\n`)
+    const client = mockClient([200], requests)
 
     return Effect.gen(function* () {
       yield* ModelRegistry.stream(
@@ -195,11 +222,6 @@ describe("OpenAI account Responses registration", () => {
 
   it.effect("uses the authenticated HTTP path even when OpenAI WebSocket mode is ambient", () => {
     const requests: Array<CapturedRequest> = []
-    const completed = stringify({
-      type: "response.completed",
-      response: responseBody,
-      sequence_number: 0,
-    })
     const socketCalls: Array<unknown> = []
 
     return Effect.gen(function* () {
@@ -207,10 +229,7 @@ describe("OpenAI account Responses registration", () => {
         { provider: "openai", model: "gpt-test" },
         LanguageModel.streamText({ prompt: "hello" }),
       ).pipe(
-        provideAccountStream(
-          credentials(Effect.succeed(credential("current"))),
-          mockClient([200], requests, `data: ${completed}\n\n`),
-        ),
+        provideAccountStream(credentials(Effect.succeed(credential("current"))), mockClient([200], requests)),
         Stream.provideService(OpenAiClient.OpenAiSocket, {
           createResponseStream: (options) =>
             Effect.sync(() => {
@@ -434,6 +453,192 @@ describe("OpenAI account Responses registration", () => {
       expect(yield* Ref.get(interrupted)).toEqual(["acquire", "refresh", "replay"])
     }),
   )
+
+  it.effect("satisfies non-streaming generateText against the streaming-only account endpoint", () => {
+    const requests: Array<CapturedRequest> = []
+
+    return Effect.gen(function* () {
+      const response = yield* ModelRegistry.operate(
+        { provider: "openai", model: "gpt-test" },
+        LanguageModel.generateText({ prompt: "summarize" }),
+      ).pipe(
+        provideAccount(
+          credentials(Effect.succeed(credential("current"))),
+          streamingOnlyClient(requests, completedFrame(textResponseBody)),
+        ),
+      )
+
+      expect(requests).toHaveLength(1)
+      expect(requests[0]?.url).toBe(endpoint)
+      expect(requests[0]?.body).toMatchObject({ model: "gpt-test", stream: true })
+      expect(requests[0]?.headers.accept).toBe("text/event-stream")
+      expect(response.text).toBe("folded summary")
+      expect(response.finishReason).toBe("stop")
+      expect(response.usage.inputTokens.total).toBe(11)
+      expect(response.usage.outputTokens.total).toBe(7)
+    })
+  })
+
+  it.effect("folds a terminal event into exactly what the streaming path produces", () => {
+    const message = {
+      id: "message-1",
+      type: "message",
+      role: "assistant",
+      status: "completed",
+      content: [{ type: "output_text", text: "folded summary", annotations: [] }],
+    }
+    const incomplete = { ...textResponseBody, incomplete_details: { reason: "max_output_tokens" } }
+    const body = sse(
+      { type: "response.created", response: responseBody, sequence_number: 0 },
+      { type: "response.output_item.added", output_index: 0, item: { ...message, content: [] }, sequence_number: 1 },
+      {
+        type: "response.output_text.delta",
+        item_id: "message-1",
+        output_index: 0,
+        content_index: 0,
+        delta: "folded summary",
+        sequence_number: 2,
+      },
+      { type: "response.output_item.done", output_index: 0, item: message, sequence_number: 3 },
+      { type: "response.incomplete", response: incomplete, sequence_number: 4 },
+    )
+    const accountCredentials = credentials(Effect.succeed(credential("current")))
+
+    return Effect.gen(function* () {
+      const folded = yield* ModelRegistry.operate(
+        { provider: "openai", model: "gpt-test" },
+        LanguageModel.generateText({ prompt: "summarize" }),
+      ).pipe(provideAccount(accountCredentials, streamingOnlyClient([], body)))
+      const streamed = yield* ModelRegistry.stream(
+        { provider: "openai", model: "gpt-test" },
+        LanguageModel.streamText({ prompt: "summarize" }),
+      ).pipe(provideAccountStream(accountCredentials, streamingOnlyClient([], body)), Stream.runCollect)
+      const streamedText = streamed
+        .filter((part) => part.type === "text-delta")
+        .map((part) => part.delta)
+        .join("")
+      const streamedFinish = streamed.find((part) => part.type === "finish")
+
+      expect(folded.text).toBe(streamedText)
+      expect(folded.finishReason).toBe(streamedFinish?.reason)
+      expect(folded.usage.inputTokens.total).toBe(streamedFinish?.usage.inputTokens.total)
+      expect(folded.usage.outputTokens.total).toBe(streamedFinish?.usage.outputTokens.total)
+    })
+  })
+
+  it.effect("promotes a terminal response.failed event to a typed failure", () => {
+    const requests: Array<CapturedRequest> = []
+    const body = sse({
+      type: "response.failed",
+      response: {
+        ...responseBody,
+        error: { code: "rate_limit_exceeded", message: "slow down" },
+      },
+      sequence_number: 0,
+    })
+
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        ModelRegistry.operate(
+          { provider: "openai", model: "gpt-test" },
+          LanguageModel.generateText({ prompt: "summarize" }),
+        ).pipe(provideAccount(credentials(Effect.succeed(credential("current"))), streamingOnlyClient(requests, body))),
+      )
+
+      expect(expectAiError(failure).reason._tag).toBe("RateLimitError")
+    })
+  })
+
+  it.effect("promotes a mid-stream error frame to a typed failure", () => {
+    const requests: Array<CapturedRequest> = []
+    const body = sse({
+      type: "error",
+      code: "context_length_exceeded",
+      message: "too many tokens",
+      param: null,
+      sequence_number: 0,
+    })
+
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        ModelRegistry.operate(
+          { provider: "openai", model: "gpt-test" },
+          LanguageModel.generateText({ prompt: "summarize" }),
+        ).pipe(provideAccount(credentials(Effect.succeed(credential("current"))), streamingOnlyClient(requests, body))),
+      )
+
+      expect(expectAiError(failure).reason._tag).toBe("InvalidRequestError")
+      expect(classifyFailure(failure)).toBe("context-overflow")
+    })
+  })
+
+  it.effect("fails typed when the account stream ends without a terminal event", () => {
+    const requests: Array<CapturedRequest> = []
+    const body = sse({ type: "response.created", response: responseBody, sequence_number: 0 })
+
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        ModelRegistry.operate(
+          { provider: "openai", model: "gpt-test" },
+          LanguageModel.generateText({ prompt: "summarize" }),
+        ).pipe(provideAccount(credentials(Effect.succeed(credential("current"))), streamingOnlyClient(requests, body))),
+      )
+
+      expect(expectAiError(failure).reason._tag).toBe("InvalidOutputError")
+    })
+  })
+
+  it.effect("refreshes and replays one pre-emission 401 for a non-streaming call", () => {
+    const requests: Array<CapturedRequest> = []
+    const rejected: Array<string> = []
+    const accountCredentials = credentials(Effect.succeed(credential("old")), (generation) =>
+      Effect.sync(() => {
+        rejected.push(generation)
+        return credential("new")
+      }),
+    )
+    let calls = 0
+    const client = HttpClient.make((request, url) => {
+      calls += 1
+      requests.push({ url: url.toString(), headers: request.headers, body: decodeBody(request) })
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          calls === 1
+            ? new Response("", { status: 401 })
+            : new Response(completedFrame(textResponseBody), { status: 200 }),
+        ),
+      )
+    })
+
+    return Effect.gen(function* () {
+      const response = yield* ModelRegistry.operate(
+        { provider: "openai", model: "gpt-test" },
+        LanguageModel.generateText({ prompt: "summarize" }),
+      ).pipe(provideAccount(accountCredentials, client))
+
+      expect(rejected).toEqual(["old"])
+      expect(requests.map(({ headers }) => headers.authorization)).toEqual(["Bearer token-old", "Bearer token-new"])
+      expect(response.text).toBe("folded summary")
+    })
+  })
+
+  it.effect("fails typed instead of posting embeddings to the account Responses endpoint", () => {
+    const requests: Array<CapturedRequest> = []
+    const accountCredentials = credentials(Effect.succeed(credential("current")))
+    const accountClientLayer = Layer.provide(
+      layerAccountClient(accountCredentials),
+      Layer.succeed(HttpClient.HttpClient, mockClient([200], requests)),
+    )
+
+    return Effect.gen(function* () {
+      const client = yield* OpenAiClient.OpenAiClient
+      const failure = yield* Effect.flip(client.createEmbedding({ model: "text-embedding-3-small", input: "hello" }))
+
+      expect(requests).toEqual([])
+      expect(expectAiError(failure).reason._tag).toBe("InvalidRequestError")
+    }).pipe(provideLayer(accountClientLayer))
+  })
 
   it("exposes API-key and account Layer constructors", () => {
     const accountCredentials = credentials(Effect.succeed(credential("current")))
