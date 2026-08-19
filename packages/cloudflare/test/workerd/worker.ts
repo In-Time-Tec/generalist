@@ -65,21 +65,19 @@ interface SocketPair {
 }
 
 export class ReplayObject {
-  constructor(private readonly state: DurableObjectState) {}
+  private readonly replay: ReturnType<typeof makeHibernatingWebSocket>
 
-  private adapter() {
-    return makeHibernatingWebSocket({ state: this.state, runtime: replayRuntime, pageSize: 1, fuel: 1 })
+  constructor(state: DurableObjectState) {
+    this.replay = makeHibernatingWebSocket({ state, runtime: replayRuntime, pageSize: 1, fuel: 1 })
   }
 
   fetch(request: Request): Promise<Response> {
     if (new URL(request.url).pathname.endsWith("/flush")) {
-      return this.adapter()
-        .flush("replay-run")
-        .then((result) => Response.json(result))
+      return this.replay.flush("replay-run").then((result) => Response.json(result))
     }
     const Pair = (globalThis as unknown as { readonly WebSocketPair: new () => SocketPair }).WebSocketPair
     const pair = new Pair()
-    this.adapter().accept(pair[1])
+    this.replay.accept(pair[1])
     return Promise.resolve(new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit))
   }
 
@@ -87,15 +85,15 @@ export class ReplayObject {
     socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket,
     message: string | ArrayBuffer,
   ): Promise<void> {
-    return this.adapter().webSocketMessage(socket, message)
+    return this.replay.webSocketMessage(socket, message)
   }
 
   webSocketClose(socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket): void {
-    this.adapter().webSocketClose(socket)
+    this.replay.webSocketClose(socket)
   }
 
   webSocketError(socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket): void {
-    this.adapter().webSocketError(socket)
+    this.replay.webSocketError(socket)
   }
 }
 

@@ -174,13 +174,14 @@ describe("hibernating WebSocket", () => {
     })
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
-    adapter.accept(socket)
+    const flushHandler = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
+    const messageHandler = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
+    flushHandler.accept(socket)
     socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: -1 }
 
-    const flushing = adapter.flushSocket(socket)
+    const flushing = flushHandler.flushSocket(socket)
     await Effect.runPromise(Deferred.await(entered))
-    const attaching = adapter.webSocketMessage(
+    const attaching = messageHandler.webSocketMessage(
       socket,
       await Effect.runPromise(Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 2 })),
     )
@@ -188,5 +189,21 @@ describe("hibernating WebSocket", () => {
     await Promise.all([flushing, attaching])
 
     expect(socket.attachment).toEqual({ version: 1, state: "attached", runId: "run-1", cursor: 2 })
+  })
+
+  it("preserves arrival order for concurrent attachment and cancellation commands", async () => {
+    const cancelled = await Effect.runPromise(Ref.make<Array<string>>([]))
+    const layer = runtimeLayer({ cancel: ({ runId }) => Ref.update(cancelled, (ids) => [...ids, runId]) })
+    const state = new FakeState()
+    const socket = new FakeSocket()
+    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
+    adapter.accept(socket)
+    const attach = await Effect.runPromise(Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 2 }))
+    const cancel = await Effect.runPromise(Wire.encodeCommand({ _tag: "Cancel", runId: "run-1" }))
+
+    await Promise.all([adapter.webSocketMessage(socket, attach), adapter.webSocketMessage(socket, cancel)])
+
+    expect(await Effect.runPromise(Ref.get(cancelled))).toEqual(["run-1"])
+    expect(socket.closes).toEqual([])
   })
 })
