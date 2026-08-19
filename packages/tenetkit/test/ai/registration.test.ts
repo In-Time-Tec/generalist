@@ -138,6 +138,20 @@ describe("providers", () => {
         }
       },
     })
+    const hostileFailure = Tool.make("hostile-failure", { parameters: Schema.String })
+    Object.defineProperty(hostileFailure, "parametersSchema", {
+      configurable: true,
+      get: () => {
+        throw new Proxy(
+          {},
+          {
+            getPrototypeOf: () => {
+              throw new Error("hostile prototype inspection")
+            },
+          },
+        )
+      },
+    })
 
     return Effect.gen(function* () {
       const failure = yield* openRouterToolJsonSchemaCompiler("openai/gpt-5")(tool).pipe(Effect.flip)
@@ -151,6 +165,12 @@ describe("providers", () => {
       expect(AiError.isAiError(unknown) && unknown.reason._tag).toBe("UnsupportedSchemaError")
       if (AiError.isAiError(unknown) && unknown.reason._tag === "UnsupportedSchemaError") {
         expect(unknown.reason.description).toBe("OpenRouter tool schema compilation failed")
+      }
+
+      const hostile = yield* openRouterToolJsonSchemaCompiler("openai/gpt-5")(hostileFailure).pipe(Effect.flip)
+      expect(AiError.isAiError(hostile) && hostile.reason._tag).toBe("UnsupportedSchemaError")
+      if (AiError.isAiError(hostile) && hostile.reason._tag === "UnsupportedSchemaError") {
+        expect(hostile.reason.description).toBe("OpenRouter tool schema compilation failed")
       }
     })
   })
