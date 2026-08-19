@@ -1,9 +1,10 @@
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
+export const V7_SCHEMA_CHECKSUM = "6cfa29360d837cbfb4fecedc03fae46ebc0ea0dab4980c424941c56022f2b5b1"
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
 
-export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
+export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS baton_schema_meta (
   id INT PRIMARY KEY,
   version INT NOT NULL,
@@ -290,6 +291,36 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   CONSTRAINT baton_session_entries_session_fk FOREIGN KEY (session_id) REFERENCES baton_sessions(session_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
 ]
+
+export const EXTERNAL_CHILD_STATEMENTS: ReadonlyArray<string> = [
+  `CREATE TABLE IF NOT EXISTS baton_external_child_placements (
+  placement_id VARCHAR(255) PRIMARY KEY,
+  parent_run_id VARCHAR(255) NOT NULL,
+  \`partition\` VARCHAR(255) NOT NULL,
+  external_run_id VARCHAR(255) NOT NULL,
+  invocation_id VARCHAR(255) NOT NULL,
+  request_digest VARCHAR(128) NOT NULL,
+  executable_digest VARCHAR(128) NOT NULL,
+  wait_id VARCHAR(255),
+  suspension_identity VARCHAR(128),
+  acknowledged TINYINT(1) NOT NULL DEFAULT 0,
+  cancel_requested TINYINT(1) NOT NULL DEFAULT 0,
+  settlement_id VARCHAR(255),
+  outcome_json LONGTEXT,
+  outcome_event_id VARCHAR(255),
+  created_at VARCHAR(30) NOT NULL,
+  settled_at VARCHAR(30),
+  UNIQUE KEY baton_external_child_placements_ref_key (\`partition\`, external_run_id),
+  UNIQUE KEY baton_external_child_placements_invocation_key (parent_run_id, invocation_id),
+  KEY baton_external_child_placements_parent_idx (parent_run_id, settlement_id, created_at),
+  CONSTRAINT baton_external_child_placements_parent_fk FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
+  CONSTRAINT baton_external_child_placements_settlement_check CHECK
+    ((settlement_id IS NULL AND outcome_json IS NULL AND outcome_event_id IS NULL AND settled_at IS NULL)
+      OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+]
+
+export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [...V7_SCHEMA_STATEMENTS, ...EXTERNAL_CHILD_STATEMENTS]
 
 export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")

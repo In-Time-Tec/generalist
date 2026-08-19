@@ -1,9 +1,10 @@
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
+export const V7_SCHEMA_CHECKSUM = "4d86018b3453e9757e05694ce981fc486a15a00ebb36874b49821f6289e6d495"
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const NOTIFY_CHANNEL = "baton_run_events"
 
-export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
+export const V7_SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS baton_schema_meta (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   version INTEGER NOT NULL,
@@ -266,6 +267,35 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE UNIQUE INDEX IF NOT EXISTS baton_session_entries_seq_idx ON baton_session_entries(session_id, seq)`,
   `CREATE INDEX IF NOT EXISTS baton_session_entries_parent_idx ON baton_session_entries(session_id, parent_id)`,
 ]
+
+export const EXTERNAL_CHILD_STATEMENTS: ReadonlyArray<string> = [
+  `CREATE TABLE IF NOT EXISTS baton_external_child_placements (
+  placement_id TEXT PRIMARY KEY,
+  parent_run_id TEXT NOT NULL REFERENCES baton_runs(run_id),
+  partition TEXT NOT NULL,
+  external_run_id TEXT NOT NULL,
+  invocation_id TEXT NOT NULL,
+  request_digest TEXT NOT NULL,
+  executable_digest TEXT NOT NULL,
+  wait_id TEXT,
+  suspension_identity TEXT,
+  acknowledged BOOLEAN NOT NULL DEFAULT FALSE,
+  cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
+  settlement_id TEXT,
+  outcome_json TEXT,
+  outcome_event_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  settled_at TIMESTAMPTZ,
+  UNIQUE (partition, external_run_id),
+  UNIQUE (parent_run_id, invocation_id),
+  CHECK ((settlement_id IS NULL AND outcome_json IS NULL AND outcome_event_id IS NULL AND settled_at IS NULL)
+    OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
+)`,
+  `CREATE INDEX IF NOT EXISTS baton_external_child_placements_parent_idx
+    ON baton_external_child_placements(parent_run_id, settlement_id, created_at)`,
+]
+
+export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [...V7_SCHEMA_STATEMENTS, ...EXTERNAL_CHILD_STATEMENTS]
 
 export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
