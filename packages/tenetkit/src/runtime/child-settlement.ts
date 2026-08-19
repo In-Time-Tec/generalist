@@ -106,8 +106,9 @@ export const payloadFromEvent = (input: {
 /**
  * @experimental Encode one settlement payload as a durable observation.
  *
- * The persistence representation carries no model-facing content. `modelPrompt` separately
- * projects observations that are eligible for parent model delivery.
+ * A settlement carries no model-facing content. The parent receives a child's outcome as the tool
+ * result of the call that started it; hosts read settlements through the child-settlement
+ * operations.
  */
 export const observationEntry = (input: {
   readonly payload: Payload
