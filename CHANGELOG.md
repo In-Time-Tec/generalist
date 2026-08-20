@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.33.1
+
+- Store SQLite cancellation flags canonically as integer `0`/`1`, while decoding rows written by Effect SQL as booleans or legacy text `"true"`/`"false"`. Cancellation reconciliation, operation/program claim release, child-capacity promotion, and external-child placement now preserve cancellation across existing Cloudflare SQLite state; the workerd contract proves integer storage and terminal `cancelled` recovery through the real RunStore path.
+
 ## 0.33.0
 
 This release removes the retired `baton` name from every surface TenetKit owns and collapses the SQL schema to a single version-1 baseline. It is a clean break: an existing database created by an earlier release cannot be upgraded and must be recreated.
