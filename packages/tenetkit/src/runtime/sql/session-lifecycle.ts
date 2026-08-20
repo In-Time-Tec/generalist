@@ -4,7 +4,7 @@ import { SqlClient } from "effect/unstable/sql"
 export const reconcileCancellationRequested = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql`UPDATE tenetkit_runs SET status = 'cancelling'
-    WHERE cancellation_requested = ${true} AND status IN ('queued', 'running', 'waiting')`
+    WHERE cancellation_requested IN (1, 'true') AND status IN ('queued', 'running', 'waiting')`
 })
 
 export const sessionRoots = (sessionId: string) =>

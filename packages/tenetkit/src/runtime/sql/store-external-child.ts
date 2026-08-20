@@ -31,10 +31,13 @@ interface Row {
   wait_id: string | null
   suspension_identity: string | null
   acknowledged: number
-  cancel_requested: number
+  cancel_requested: number | boolean | string
   settlement_id: string | null
   outcome_json: string | null
 }
+
+const decodeFlag = (value: number | boolean | string): boolean =>
+  value === true || value === "true" || Number(value) === 1
 
 const decode = (row: Row): Placement => ({
   placementId: row.placement_id,
@@ -46,7 +49,7 @@ const decode = (row: Row): Placement => ({
   ...(row.wait_id === null ? {} : { waitId: row.wait_id }),
   ...(row.suspension_identity === null ? {} : { suspensionIdentity: row.suspension_identity }),
   acknowledged: Number(row.acknowledged) === 1,
-  cancelRequested: Number(row.cancel_requested) === 1,
+  cancelRequested: decodeFlag(row.cancel_requested),
   settled: row.settlement_id !== null,
   ...(row.settlement_id === null ? {} : { settlementId: row.settlement_id }),
   ...(row.outcome_json === null ? {} : { outcome: decodeJson(RunOutcome, row.outcome_json) }),
@@ -121,7 +124,7 @@ export const reserve: {
         ${input.invocationId}, ${input.requestDigest}, ${input.executableDigest},
         ${input.parentSuspension?.wait.waitId ?? null},
         ${input.parentSuspension === undefined ? null : suspensionIdentity(input.parentSuspension)},
-        ${parent.cancellationRequested}, ${createdAt})`
+        ${parent.cancellationRequested ? 1 : 0}, ${createdAt})`
     if (input.parentSuspension !== undefined) {
       yield* suspend(hub, { ...input, ...input.parentSuspension })
     }

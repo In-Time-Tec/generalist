@@ -25,7 +25,7 @@ export interface RunRow {
   readonly attempt: number
   readonly attempt_fence: number
   readonly last_sequence: number
-  readonly cancellation_requested: number | boolean
+  readonly cancellation_requested: number | boolean | string
   readonly cancel_reason: string | null
   readonly terminal_event_id: string | null
   readonly accepted_sequence: number

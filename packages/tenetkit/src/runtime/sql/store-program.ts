@@ -337,12 +337,12 @@ export const resolveProgramOperation: {
     `
     if (clearLease) {
       yield* sql`
-        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL
+        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested IN (1, 'true') THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     } else {
       yield* sql`
-        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL
+        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested IN (1, 'true') THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     }

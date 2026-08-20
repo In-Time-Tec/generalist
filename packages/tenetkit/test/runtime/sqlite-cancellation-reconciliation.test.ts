@@ -53,7 +53,13 @@ it.effect("SQLite startup reconciles a poisoned running cancellation and stale c
       }),
     )
     const db = new Database(filename)
-    db.run("UPDATE tenetkit_runs SET status = 'running' WHERE run_id = ? AND cancellation_requested = 1", [childRunId])
+    const canonical = db.query("SELECT cancellation_requested FROM tenetkit_runs WHERE run_id = ?").get(runId) as {
+      readonly cancellation_requested?: unknown
+    } | null
+    expect(canonical?.cancellation_requested).toBe(1)
+    db.run("UPDATE tenetkit_runs SET status = 'running', cancellation_requested = 'true' WHERE run_id = ?", [
+      childRunId,
+    ])
     db.close()
 
     yield* scopedWith(runtimeLayer)(
