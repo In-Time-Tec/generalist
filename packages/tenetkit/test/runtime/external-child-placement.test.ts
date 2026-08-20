@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { ProgramCapabilities } from "tenetkit"
@@ -320,6 +321,41 @@ it.live("rolls back reservation and projects settlement-driven cancellation in S
       })
       expect(yield* store.inspect(parent.runId)).toMatchObject({ status: "cancelled" })
       expect(projected).toContainEqual({ runId: parent.runId, intent: "inactive" })
+    }),
+  )
+})
+
+it.live("decodes legacy TEXT true external-child cancellation rows in SQLite", () => {
+  const filename = tempDbPath("external-child-legacy-cancellation")
+  return provideScoped(
+    sqliteLayer(filename),
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const external = yield* ExternalChildStore.ExternalChildStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "external-legacy-cancellation",
+        idempotencyKey: "external-legacy-cancellation",
+        prompt: textPrompt("external legacy cancellation"),
+        treePolicy: { maxDepth: 2, maxSubagents: 1 },
+      })
+      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-legacy-cancellation" })
+      const input = {
+        ...claim,
+        placementId: "placement:legacy-cancellation",
+        ref: { partition: "openwork:west", runId: "remote:legacy-cancellation" },
+        invocationId: "invoke:legacy-cancellation",
+        requestDigest: "request:legacy-cancellation",
+        executableDigest: "executable:v1",
+      }
+      yield* external.reserve(input)
+      const db = new Database(filename)
+      db.run("UPDATE tenetkit_external_child_placements SET cancel_requested = 'true' WHERE placement_id = ?", [
+        input.placementId,
+      ])
+      db.close()
+      expect(yield* external.reserve(input)).toMatchObject({ cancelRequested: true })
     }),
   )
 })

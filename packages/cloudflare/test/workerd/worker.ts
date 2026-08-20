@@ -1,9 +1,12 @@
 import { Effect, Layer } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { SqlClient } from "effect/unstable/sql"
 import { makeTest } from "tenetkit/runtime/driver/executable-manifest"
+import { make as makeMessage } from "tenetkit/runtime/driver/message"
+import { Address } from "tenetkit/runtime/driver/address"
 import type { Interface as RuntimeInterface } from "tenetkit/runtime/driver/runtime"
 import type { RunEvent } from "tenetkit/runtime/driver/run-event"
-import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
+import { AgentExecutionFailure, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { RunStore } from "tenetkit/runtime/driver/run-store"
 import {
   layerRunStore,
@@ -122,6 +125,17 @@ export class SqlObject {
           )
           yield* sql.unsafe("INSERT OR IGNORE INTO workerd_probe (id, requests) VALUES (1, 0)")
           yield* sql.unsafe("UPDATE workerd_probe SET requests = requests + 1 WHERE id = 1")
+          const probeCount = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
+          const cancellationRunId = `workerd-cancellation-${Number(probeCount[0]?.requests ?? 0)}`
+          const cancellationExecutable = makeTest("workerd-cancellation", "1")
+          const cancellationMessage = makeMessage({
+            id: cancellationRunId,
+            to: Address.make("agent:test"),
+            sessionId: "session",
+            prompt: Prompt.make("cancel"),
+            idempotencyKey: cancellationRunId,
+            correlationId: cancellationRunId,
+          })
           yield* activationSchema
           const committedAlarm = 4_000_000_000_000
           const rolledBackAlarm = 3_000_000_000_000
@@ -165,6 +179,31 @@ export class SqlObject {
               }),
             ),
           )
+          yield* store.admitStart({
+            runId: cancellationRunId,
+            message: cancellationMessage,
+            executableRef: cancellationExecutable.ref,
+            executableManifest: cancellationExecutable.manifest,
+            registrations: [],
+            treePolicy: { maxDepth: 4, maxSubagents: 4 },
+            initialChildren: [],
+            initialFanOuts: [],
+          })
+          const claim = yield* store.claimExecution({ runId: cancellationRunId, ownerId: "workerd" })
+          yield* store.cancel({ runId: cancellationRunId, reason: "close" })
+          const requested = yield* sql<{ readonly cancellation_requested: unknown; readonly storage_type: string }>`
+            SELECT cancellation_requested, typeof(cancellation_requested) AS storage_type
+            FROM tenetkit_runs WHERE run_id = ${cancellationRunId}
+          `
+          yield* store.fail({
+            runId: cancellationRunId,
+            ownerId: claim.ownerId,
+            attemptFence: claim.attemptFence,
+            error: AgentExecutionFailure.make({ message: "execution interrupted" }),
+          })
+          const cancellationTerminal = yield* sql<{ readonly status: string }>`
+            SELECT status FROM tenetkit_runs WHERE run_id = ${cancellationRunId}
+          `
           const tables = yield* sql<{ readonly name: string }>`
             SELECT name FROM sqlite_schema
             WHERE type = 'table' AND substr(name, 1, 9) = 'tenetkit_'
@@ -192,6 +231,9 @@ export class SqlObject {
             tables: tables.map((row) => row.name),
             committed: Number(committed[0]?.count ?? 0),
             rolledBack: Number(rolledBack[0]?.count ?? 0),
+            cancellationStoredType: requested[0]?.storage_type ?? "missing",
+            cancellationStoredValue: Number(requested[0]?.cancellation_requested ?? Number.NaN),
+            cancellationTerminalStatus: cancellationTerminal[0]?.status ?? "missing",
             alarm: yield* Effect.promise(() => storage.getAlarm()),
             schemaVersion: Number(schemaMeta[0]?.version ?? 0),
             migrations,

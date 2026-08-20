@@ -85,7 +85,7 @@ export const promoteChildCapacity = <E, R>(input: {
       WHERE l.parent_run_id = ${parent.runId}
         AND l.readiness = 'queued'
         AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
-        AND r.cancellation_requested = ${false}
+        AND r.cancellation_requested IN (0, 'false')
       ORDER BY l.created_at ASC, CASE WHEN m.ordinal IS NULL THEN -1 ELSE m.ordinal END ASC, l.child_run_id ASC
     `
     for (const candidate of queued) {
