@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.34.0",
+  "version": "0.34.1",
   "private": false,
   "type": "module",
   "sideEffects": false,
@@ -161,6 +161,14 @@
     "./transport/replay": {
       "types": "./dist/transport/transport/replay.d.ts",
       "import": "./dist/transport/transport/replay.js"
+    },
+    "./runtime/external-child-placement": {
+      "types": "./dist/runtime/external-child-placement.d.ts",
+      "import": "./dist/runtime/external-child-placement.js"
+    },
+    "./runtime/external-child-store": {
+      "types": "./dist/runtime/external-child-store.d.ts",
+      "import": "./dist/runtime/external-child-store.js"
     },
     "./runtime/driver": {
       "types": "./dist/runtime/driver/index.d.ts",
