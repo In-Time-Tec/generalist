@@ -63,6 +63,8 @@ export const packageExports = [
   "tenetkit/transport/wire",
   "tenetkit/transport/snapshot",
   "tenetkit/transport/replay",
+  "tenetkit/runtime/external-child-placement",
+  "tenetkit/runtime/external-child-store",
   "tenetkit/runtime/driver",
   "tenetkit/runtime/driver/sql",
   "tenetkit/runtime/driver/run-store",

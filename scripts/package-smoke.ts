@@ -244,6 +244,7 @@ const program = Effect.gen(function* () {
       dependencies: {
         ...tarballs,
         effect: effectVersion,
+        esbuild: rootManifest.workspaces.catalog.esbuild,
         foldkit: rootManifest.workspaces.catalog.foldkit,
         typescript: rootManifest.workspaces.catalog.typescript,
       },
@@ -322,6 +323,13 @@ server.listen(0, "127.0.0.1", () => {
   )
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(packageExports))
   yield* fileSystem.writeFileString(
+    path.join(consumerDirectory, "external-child-bundle.ts"),
+    `import * as ExternalChildPlacement from "tenetkit/runtime/external-child-placement"
+import { ExternalChildStore } from "tenetkit/runtime/external-child-store"
+console.log(ExternalChildPlacement, ExternalChildStore)
+`,
+  )
+  yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${encodeJson(packageExports)}
 for (const specifier of specifiers) await import(specifier)
@@ -389,6 +397,18 @@ console.log(\`imported \${specifiers.length} TenetKit exports\`)
     )
   }
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
+  yield* run(
+    "bun",
+    [
+      "node_modules/esbuild/bin/esbuild",
+      "external-child-bundle.ts",
+      "--bundle",
+      "--format=esm",
+      "--platform=browser",
+      "--outfile=external-child-bundle.js",
+    ],
+    consumerDirectory,
+  )
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], consumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "bun", "runtime.mjs"], consumerDirectory)
   if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@tenetkit")) {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.34.1
+
+- Export `tenetkit/runtime/external-child-placement` and `tenetkit/runtime/external-child-store` as narrow Worker-safe entrypoints. Consumers can use the cross-partition protocol without traversing the broad Runtime barrel and its Bun SQLite implementation; the packed-package smoke test now bundles both entrypoints for a browser target.
+
 ## 0.34.0
 
 - Complete the TenetKit-owned external-child protocol for independently partitioned Threads. `ExternalChildStore.admitRoot` creates a linked depth-zero child root behind a durable activation gate; `activateRoot`, `inspectRoot`, and `cancelRoot` preserve child lifecycle authority on its partition; and `rootSettlement` plus `acknowledgeRootSettlement` provide restart-safe at-least-once terminal delivery with exact acknowledgement. Parent reservation and exactly-once settlement application remain in the existing `reserve`, `acknowledge`, `cancel`, and `settle` operations. Memory and SQLite now prove idempotent admission, pre-activation cancellation, duplicate settlement handling, and reopen recovery.
