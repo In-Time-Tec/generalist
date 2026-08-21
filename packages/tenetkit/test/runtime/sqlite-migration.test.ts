@@ -84,6 +84,7 @@ const inspect = (filename: string) => {
     "tenetkit_agent_names",
     "tenetkit_executable_registrations",
     "tenetkit_external_child_placements",
+    "tenetkit_external_roots",
     "tenetkit_fan_out_members",
     "tenetkit_fan_outs",
     "tenetkit_lanes",

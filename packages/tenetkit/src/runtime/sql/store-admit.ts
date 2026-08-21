@@ -78,184 +78,187 @@ type ChildEffect = Effect.Effect<
 >
 
 export const admitStart: {
-  (input: AdmitStartInput): (hub: EventHub) => StartEffect
-  (hub: EventHub, input: AdmitStartInput): StartEffect
-} = Function.dual(2, (hub: EventHub, input: AdmitStartInput) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
-    const normalizedInput = { ...input, treePolicy }
-    const admitted = yield* Effect.try({
-      try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    if (input.initialChildren.length > 64) {
-      return yield* StartInvalid.make({ message: "initialChildren cannot contain more than 64 requests" })
-    }
-    if (input.initialFanOuts.length > 64) {
-      return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
-    }
-    const active = input.executableManifest.entries.find((entry) => entry.pin === input.executableRef.active)
-    const invocationIds = new Set<string>()
-    const idempotencySources = new Set<string>()
-    for (const child of input.initialChildren) {
-      if (invocationIds.has(child.invocationId)) {
-        return yield* StartInvalid.make({ message: `duplicate initial child invocationId: ${child.invocationId}` })
-      }
-      const source = `${child.sessionId}\0${child.idempotencyKey}`
-      if (idempotencySources.has(source)) {
-        return yield* StartInvalid.make({ message: "duplicate initial child sessionId/idempotencyKey" })
-      }
-      invocationIds.add(child.invocationId)
-      idempotencySources.add(source)
-    }
-    const resolved = input.initialChildren.map((child) => ({
-      child,
-      executableRef:
-        active?._tag === "Agent"
-          ? resolveChild(input.executableRef, input.executableManifest, child.selection)
-          : undefined,
-    }))
-    const missing = resolved.find((entry) => entry.executableRef === undefined)
-    if (missing !== undefined) {
-      return yield* ChildSelectionMissing.make({
-        parentRunId: input.runId ?? "pending",
-        selection: missing.child.selection,
+  (input: AdmitStartInput, options?: { readonly activate?: boolean }): (hub: EventHub) => StartEffect
+  (hub: EventHub, input: AdmitStartInput, options?: { readonly activate?: boolean }): StartEffect
+} = Function.dual(
+  (args) => args.length >= 2 && typeof args[0] === "object" && args[0] !== null && "publish" in args[0],
+  (hub: EventHub, input: AdmitStartInput, options?: { readonly activate?: boolean }) =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
+      const normalizedInput = { ...input, treePolicy }
+      const admitted = yield* Effect.try({
+        try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
+        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
       })
-    }
-    yield* persistRegistrations(input.registrations)
-    const digest = startDigest(normalizedInput)
-    const existing = yield* sql<RunRow>`
+      if (input.initialChildren.length > 64) {
+        return yield* StartInvalid.make({ message: "initialChildren cannot contain more than 64 requests" })
+      }
+      if (input.initialFanOuts.length > 64) {
+        return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
+      }
+      const active = input.executableManifest.entries.find((entry) => entry.pin === input.executableRef.active)
+      const invocationIds = new Set<string>()
+      const idempotencySources = new Set<string>()
+      for (const child of input.initialChildren) {
+        if (invocationIds.has(child.invocationId)) {
+          return yield* StartInvalid.make({ message: `duplicate initial child invocationId: ${child.invocationId}` })
+        }
+        const source = `${child.sessionId}\0${child.idempotencyKey}`
+        if (idempotencySources.has(source)) {
+          return yield* StartInvalid.make({ message: "duplicate initial child sessionId/idempotencyKey" })
+        }
+        invocationIds.add(child.invocationId)
+        idempotencySources.add(source)
+      }
+      const resolved = input.initialChildren.map((child) => ({
+        child,
+        executableRef:
+          active?._tag === "Agent"
+            ? resolveChild(input.executableRef, input.executableManifest, child.selection)
+            : undefined,
+      }))
+      const missing = resolved.find((entry) => entry.executableRef === undefined)
+      if (missing !== undefined) {
+        return yield* ChildSelectionMissing.make({
+          parentRunId: input.runId ?? "pending",
+          selection: missing.child.selection,
+        })
+      }
+      yield* persistRegistrations(input.registrations)
+      const digest = startDigest(normalizedInput)
+      const existing = yield* sql<RunRow>`
       SELECT * FROM tenetkit_runs
       WHERE address = ${input.message.to}
         AND session_id = ${input.message.sessionId}
         AND idempotency_key = ${input.message.idempotencyKey}
     `
-    const prior = existing[0]
-    if (prior !== undefined) {
-      if (input.runId !== undefined && input.runId !== prior.run_id) {
-        return yield* RunIdConflict.make({ runId: input.runId, existingRunId: prior.run_id })
-      }
-      const priorExecutable = yield* Effect.try({
-        try: () => decodePinnedExecutable(prior.executable_ref_json, prior.executable_manifest_json),
-        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-      })
-      if (prior.message_digest !== digest || !equals(priorExecutable, admitted)) {
-        return yield* IdempotencyConflict.make({
-          address: input.message.to,
-          sessionId: input.message.sessionId,
-          idempotencyKey: input.message.idempotencyKey,
-          existingRunId: prior.run_id,
+      const prior = existing[0]
+      if (prior !== undefined) {
+        if (input.runId !== undefined && input.runId !== prior.run_id) {
+          return yield* RunIdConflict.make({ runId: input.runId, existingRunId: prior.run_id })
+        }
+        const priorExecutable = yield* Effect.try({
+          try: () => decodePinnedExecutable(prior.executable_ref_json, prior.executable_manifest_json),
+          catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
         })
-      }
-      const links = yield* sql<{
-        child_run_id: string
-        invocation_id: string
-        session_id: string
-        idempotency_key: string
-      }>`
+        if (prior.message_digest !== digest || !equals(priorExecutable, admitted)) {
+          return yield* IdempotencyConflict.make({
+            address: input.message.to,
+            sessionId: input.message.sessionId,
+            idempotencyKey: input.message.idempotencyKey,
+            existingRunId: prior.run_id,
+          })
+        }
+        const links = yield* sql<{
+          child_run_id: string
+          invocation_id: string
+          session_id: string
+          idempotency_key: string
+        }>`
         SELECT links.child_run_id, links.invocation_id, runs.session_id, runs.idempotency_key
         FROM tenetkit_run_links links
         JOIN tenetkit_runs runs ON runs.run_id = links.child_run_id
         WHERE links.parent_run_id = ${prior.run_id}
       `
-      const childRunIds: Array<string> = []
-      for (const child of input.initialChildren) {
-        const runId = links.find(
-          (link) =>
-            link.invocation_id === child.invocationId &&
-            link.session_id === child.sessionId &&
-            link.idempotency_key === child.idempotencyKey,
-        )?.child_run_id
-        if (runId === undefined) {
-          return yield* RuntimeUnavailable.make({ message: `initial child ${child.invocationId} is missing` })
+        const childRunIds: Array<string> = []
+        for (const child of input.initialChildren) {
+          const runId = links.find(
+            (link) =>
+              link.invocation_id === child.invocationId &&
+              link.session_id === child.sessionId &&
+              link.idempotency_key === child.idempotencyKey,
+          )?.child_run_id
+          if (runId === undefined) {
+            return yield* RuntimeUnavailable.make({ message: `initial child ${child.invocationId} is missing` })
+          }
+          childRunIds.push(runId)
         }
-        childRunIds.push(runId)
-      }
-      const fanOuts = [] as Array<import("../fan-out.js").FanOutReceipt>
-      for (const fanOut of input.initialFanOuts) {
-        const rows = yield* sql<{ fan_out_id: string }>`
+        const fanOuts = [] as Array<import("../fan-out.js").FanOutReceipt>
+        for (const fanOut of input.initialFanOuts) {
+          const rows = yield* sql<{ fan_out_id: string }>`
           SELECT fan_out_id FROM tenetkit_fan_outs
           WHERE parent_run_id = ${prior.run_id} AND idempotency_key = ${fanOut.idempotencyKey}
         `
-        const fanOutId = rows[0]?.fan_out_id
-        if (fanOutId === undefined) {
-          return yield* RuntimeUnavailable.make({ message: `initial fan-out ${fanOut.idempotencyKey} is missing` })
-        }
-        const members = yield* sql<{ child_run_id: string }>`
+          const fanOutId = rows[0]?.fan_out_id
+          if (fanOutId === undefined) {
+            return yield* RuntimeUnavailable.make({ message: `initial fan-out ${fanOut.idempotencyKey} is missing` })
+          }
+          const members = yield* sql<{ child_run_id: string }>`
           SELECT child_run_id FROM tenetkit_fan_out_members WHERE fan_out_id = ${fanOutId} ORDER BY ordinal ASC
         `
-        fanOuts.push({
-          fanOutId,
-          parentRunId: prior.run_id,
-          childRunIds: members.map((member) => member.child_run_id),
+          fanOuts.push({
+            fanOutId,
+            parentRunId: prior.run_id,
+            childRunIds: members.map((member) => member.child_run_id),
+            duplicate: true,
+          })
+        }
+        return {
+          runId: prior.run_id,
+          messageId: prior.message_id,
+          acceptedSequence: Number(prior.accepted_sequence),
           duplicate: true,
-        })
+          childRunIds,
+          fanOuts,
+        }
       }
-      return {
-        runId: prior.run_id,
-        messageId: prior.message_id,
-        acceptedSequence: Number(prior.accepted_sequence),
-        duplicate: true,
-        childRunIds,
-        fanOuts,
+      if (input.runId !== undefined) {
+        const byId = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE run_id = ${input.runId}`
+        if (byId[0] !== undefined)
+          return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
       }
-    }
-    if (input.runId !== undefined) {
-      const byId = yield* sql<RunRow>`SELECT * FROM tenetkit_runs WHERE run_id = ${input.runId}`
-      if (byId[0] !== undefined) return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
-    }
-    const runId = input.runId ?? (yield* nextId("run"))
-    yield* insertRun({
-      runId,
-      status: "queued",
-      message: input.message,
-      digest,
-      executableRef: input.executableRef,
-      executableManifest: input.executableManifest,
-      rootRunId: runId,
-      depth: 0,
-      treePolicy,
-      acceptedSequence: 0,
-      attempt: 0,
-    })
-    yield* associateRegistrations(runId, input.registrations)
-    const loaded = (yield* loadRun(runId))!
-    yield* appendEvent(
-      hub,
-      loaded,
-      { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
-      "queued",
-    )
-    if (input.initialChildren.length === 0) {
-      const accepted = (yield* loadRun(runId))!
-      yield* sql`UPDATE tenetkit_runs SET attempt_fence = 1 WHERE run_id = ${runId}`
-      yield* appendEvent(hub, { ...accepted, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
-    }
-    const childRunIds: Array<string> = []
-    for (const child of input.initialChildren) {
-      const address = makeAddress(`spawn:${runId}`)
-      const message = makeMessage({
-        id: child.messageId ?? `spawn:${child.idempotencyKey}`,
-        to: address,
-        sessionId: child.sessionId,
-        prompt: child.prompt,
-        idempotencyKey: child.idempotencyKey,
-        correlationId: child.correlationId ?? runId,
-        metadata: child.metadata ?? {},
+      const runId = input.runId ?? (yield* nextId("run"))
+      yield* insertRun({
+        runId,
+        status: "queued",
+        message: input.message,
+        digest,
+        executableRef: input.executableRef,
+        executableManifest: input.executableManifest,
+        rootRunId: runId,
+        depth: 0,
+        treePolicy,
+        acceptedSequence: 0,
+        attempt: 0,
       })
-      const receipt = yield* admitSpawn(hub, { ...child, parentRunId: runId, message }).pipe(
-        Effect.mapError((error) =>
-          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
-            ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
-            : error,
-        ),
+      yield* associateRegistrations(runId, input.registrations)
+      const loaded = (yield* loadRun(runId))!
+      yield* appendEvent(
+        hub,
+        loaded,
+        { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
+        "queued",
       )
-      childRunIds.push(receipt.runId)
-    }
-    const fanOuts = yield* admitInitialFanOuts(hub, runId, input.initialFanOuts)
-    return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false, childRunIds, fanOuts }
-  }),
+      if (input.initialChildren.length === 0 && options?.activate !== false) {
+        const accepted = (yield* loadRun(runId))!
+        yield* sql`UPDATE tenetkit_runs SET attempt_fence = 1 WHERE run_id = ${runId}`
+        yield* appendEvent(hub, { ...accepted, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
+      }
+      const childRunIds: Array<string> = []
+      for (const child of input.initialChildren) {
+        const address = makeAddress(`spawn:${runId}`)
+        const message = makeMessage({
+          id: child.messageId ?? `spawn:${child.idempotencyKey}`,
+          to: address,
+          sessionId: child.sessionId,
+          prompt: child.prompt,
+          idempotencyKey: child.idempotencyKey,
+          correlationId: child.correlationId ?? runId,
+          metadata: child.metadata ?? {},
+        })
+        const receipt = yield* admitSpawn(hub, { ...child, parentRunId: runId, message }).pipe(
+          Effect.mapError((error) =>
+            Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
+              ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
+              : error,
+          ),
+        )
+        childRunIds.push(receipt.runId)
+      }
+      const fanOuts = yield* admitInitialFanOuts(hub, runId, input.initialFanOuts)
+      return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false, childRunIds, fanOuts }
+    }),
 )
 
 export const admitSpawn: {

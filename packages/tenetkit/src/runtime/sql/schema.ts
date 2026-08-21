@@ -132,6 +132,21 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
     OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
 )`,
   `CREATE INDEX IF NOT EXISTS tenetkit_external_child_placements_parent_idx ON tenetkit_external_child_placements(parent_run_id, settlement_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_external_roots (
+  placement_id TEXT PRIMARY KEY,
+  parent_partition TEXT NOT NULL,
+  parent_run_id TEXT NOT NULL,
+  partition TEXT NOT NULL,
+  run_id TEXT NOT NULL UNIQUE,
+  session_id TEXT NOT NULL,
+  request_digest TEXT NOT NULL,
+  executable_digest TEXT NOT NULL,
+  admission_digest TEXT NOT NULL,
+  activated INTEGER NOT NULL DEFAULT 0,
+  settlement_acknowledged INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
+)`,
   `CREATE TABLE IF NOT EXISTS tenetkit_run_steering (
   entry_id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,

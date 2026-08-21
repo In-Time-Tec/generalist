@@ -1,15 +1,26 @@
-import { Effect, Equal } from "effect"
+import { Effect, Equal, Option } from "effect"
 import {
   ExternalChildCapacityUnavailable,
   ExternalChildPlacementConflict,
   ExternalChildPlacementNotFound,
   ExternalChildSettlementConflict,
+  ExternalRootConflict,
+  ExternalRootExecutableMismatch,
+  ExternalRootNotFound,
+  executableDigest,
   suspensionIdentity,
+  type ExternalRoot,
+  type ExternalRootSettlement,
   type Placement,
   type ReserveInput,
 } from "../external-child-placement.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal, type RunOutcome } from "../run.js"
+import type { Interface as ExternalChildStoreInterface } from "../external-child-store.js"
+import { projectRunSnapshot } from "../inspection.js"
+import { startDigest } from "./digest.js"
+import { admitStart } from "./store-admit.js"
+import { appendLifecycle, makeAttemptStarted } from "./append.js"
 import { activeChildCount, promoteChildCapacity } from "./store-child-capacity.js"
 import { cancel as cancelRun, respond, suspend } from "./store-control.js"
 import { requireExecutionClaim } from "./store-execution.js"
@@ -150,4 +161,169 @@ const settle = (
     return [updated, next] as const
   })
 
-export const externalChildOperations = { reserve, acknowledge, cancel, settle }
+type AdmitRootInput = Parameters<ExternalChildStoreInterface["admitRoot"]>[0]
+
+const rootView = (state: MemoryState, stored: ExternalRoot) =>
+  Effect.gen(function* () {
+    const run = state.runs.get(stored.ref.runId)
+    if (run === undefined)
+      return yield* RuntimeUnavailable.make({ message: `external root ${stored.ref.runId} is missing` })
+    const snapshot = yield* projectRunSnapshot({
+      inspection: {
+        runId: run.runId,
+        status: run.status,
+        executableRef: run.executableRef,
+        executableManifest: run.executableManifest,
+        depth: run.depth,
+        treePolicy: run.treePolicy,
+        lastSequence: run.lastSequence,
+        durability: "ephemeral",
+        ...(run.wait === undefined ? {} : { wait: run.wait }),
+      },
+      rootRunId: run.rootRunId,
+      ...(run.terminalEventId === undefined ? {} : { terminalEventId: run.terminalEventId }),
+      events: run.events,
+      firstTreePosition: 0,
+    })
+    return {
+      ...stored,
+      cancelRequested: run.cancellationRequested,
+      ...(snapshot.outcome === undefined ? {} : { outcome: snapshot.outcome }),
+    }
+  })
+
+const immutableRootEqual = (stored: ExternalRoot, input: AdmitRootInput, admissionDigest: string): boolean =>
+  stored.placementId === input.placementId &&
+  Equal.equals(stored.parent, input.parent) &&
+  Equal.equals(stored.ref, input.ref) &&
+  stored.sessionId === input.root.message.sessionId &&
+  stored.requestDigest === input.requestDigest &&
+  stored.executableDigest === input.executableDigest &&
+  stored.admissionDigest === admissionDigest
+
+const admitRoot = (state: MemoryState, input: AdmitRootInput) =>
+  Effect.gen(function* () {
+    const root = { ...input.root, runId: input.ref.runId, initialChildren: [], initialFanOuts: [] }
+    const admissionDigest = startDigest(root)
+    const existing = state.externalRoots.get(input.placementId)
+    if (existing !== undefined) {
+      if (!immutableRootEqual(existing, input, admissionDigest)) {
+        return yield* ExternalRootConflict.make({ placementId: input.placementId })
+      }
+      return [yield* rootView(state, existing), state] as const
+    }
+    if (
+      [...state.externalRoots.values()].some(
+        (candidate) => Equal.equals(candidate.ref, input.ref) || candidate.ref.runId === input.ref.runId,
+      )
+    ) {
+      return yield* ExternalRootConflict.make({ placementId: input.placementId })
+    }
+    const actualExecutableDigest = executableDigest({
+      ref: input.root.executableRef,
+      manifest: input.root.executableManifest,
+    })
+    if (actualExecutableDigest !== input.executableDigest) {
+      return yield* ExternalRootExecutableMismatch.make({
+        placementId: input.placementId,
+        expected: input.executableDigest,
+        actual: actualExecutableDigest,
+      })
+    }
+    const [receipt, admitted] = yield* admitStart(state, root, { activate: false })
+    if (receipt.duplicate) return yield* ExternalRootConflict.make({ placementId: input.placementId })
+    const stored: ExternalRoot = {
+      placementId: input.placementId,
+      parent: input.parent,
+      ref: input.ref,
+      sessionId: input.root.message.sessionId,
+      requestDigest: input.requestDigest,
+      executableDigest: input.executableDigest,
+      admissionDigest,
+      activated: false,
+      cancelRequested: false,
+      settlementAcknowledged: false,
+    }
+    const roots = new Map(admitted.externalRoots)
+    roots.set(input.placementId, stored)
+    const next = { ...admitted, externalRoots: roots }
+    return [yield* rootView(next, stored), next] as const
+  })
+
+const requireRoot = (state: MemoryState, placementId: string) => {
+  const root = state.externalRoots.get(placementId)
+  return root === undefined ? ExternalRootNotFound.make({ placementId }) : Effect.succeed(root)
+}
+
+const activateRoot = (state: MemoryState, placementId: string) =>
+  Effect.gen(function* () {
+    const stored = yield* requireRoot(state, placementId)
+    if (stored.activated) return [yield* rootView(state, stored), state] as const
+    const run = state.runs.get(stored.ref.runId)
+    if (run === undefined)
+      return yield* RuntimeUnavailable.make({ message: `external root ${stored.ref.runId} is missing` })
+    let next = state
+    if (run.status === "queued" && !run.cancellationRequested) {
+      next = (yield* appendLifecycle(state, run.runId, makeAttemptStarted(run.attempt + 1), "running"))[1]
+    }
+    const activated = { ...stored, activated: true }
+    const roots = new Map(next.externalRoots)
+    roots.set(placementId, activated)
+    next = { ...next, externalRoots: roots }
+    return [yield* rootView(next, activated), next] as const
+  })
+
+const inspectRoot = (state: MemoryState, placementId: string) =>
+  Effect.flatMap(requireRoot(state, placementId), (root) => rootView(state, root))
+
+const cancelRoot = (state: MemoryState, placementId: string, reason?: string) =>
+  Effect.gen(function* () {
+    const stored = yield* requireRoot(state, placementId)
+    const next = yield* cancelRun(state, {
+      runId: stored.ref.runId,
+      ...(reason === undefined ? {} : { reason }),
+    }).pipe(Effect.mapError(() => RuntimeUnavailable.make({ message: `external root ${stored.ref.runId} is missing` })))
+    return [yield* rootView(next, stored), next] as const
+  })
+
+const rootSettlement = (state: MemoryState, placementId: string) =>
+  Effect.gen(function* () {
+    const root = yield* inspectRoot(state, placementId)
+    if (root.outcome === undefined) return Option.none<ExternalRootSettlement>()
+    return Option.some({
+      placementId,
+      ref: root.ref,
+      settlementId: root.outcome.eventId,
+      outcome: root.outcome,
+      acknowledged: root.settlementAcknowledged,
+    })
+  })
+
+const acknowledgeRootSettlement = (
+  state: MemoryState,
+  input: { readonly placementId: string; readonly settlementId: string },
+) =>
+  Effect.gen(function* () {
+    const settlement = yield* rootSettlement(state, input.placementId)
+    if (Option.isNone(settlement) || settlement.value.settlementId !== input.settlementId) {
+      return yield* ExternalChildSettlementConflict.make(input)
+    }
+    const stored = state.externalRoots.get(input.placementId)!
+    const roots = new Map(state.externalRoots)
+    roots.set(input.placementId, { ...stored, settlementAcknowledged: true })
+    const next = { ...state, externalRoots: roots }
+    return [{ ...settlement.value, acknowledged: true }, next] as const
+  })
+
+export const externalChildOperations = {
+  reserve,
+  acknowledge,
+  cancel,
+  settle,
+  admitRoot,
+  activateRoot,
+  inspectRoot,
+  cancelRoot,
+  rootSettlement,
+  acknowledgeRootSettlement,
+}

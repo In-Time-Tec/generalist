@@ -81,7 +81,11 @@ import { loadChildReadiness } from "./store-child-capacity.js"
 import { readRunActivations } from "./run-activation.js"
 import {
   acknowledge as acknowledgeExternalChild,
+  acknowledgeExternalRootSettlement,
   cancel as cancelExternalChild,
+  externalRootOperations,
+  externalRootSettlement,
+  inspectExternalRoot,
   reserve as reserveExternalChild,
   externalChildSettlement,
 } from "./store-external-child.js"
@@ -375,6 +379,14 @@ const makeSqliteStoreServices = (
       acknowledge: (placementId) => run(acknowledgeExternalChild(placementId)),
       settle: (input) => runBuffered((transactionHub) => externalChildSettlement.settle(transactionHub, input)),
       cancel: (placementId) => run(cancelExternalChild(placementId)),
+      admitRoot: (input) => runBuffered((transactionHub) => externalRootOperations.admit(transactionHub, input)),
+      activateRoot: (placementId) =>
+        runBuffered((transactionHub) => externalRootOperations.activate(transactionHub, placementId)),
+      inspectRoot: (placementId) => runNoTxn(inspectExternalRoot(placementId)),
+      cancelRoot: (placementId, reason) =>
+        runBuffered((transactionHub) => externalRootOperations.cancel(transactionHub, placementId, reason)),
+      rootSettlement: (placementId) => runNoTxn(externalRootSettlement(placementId)),
+      acknowledgeRootSettlement: (input) => run(acknowledgeExternalRootSettlement(input)),
     })
     return { runStore, externalChildStore }
   })

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.34.0
+
+- Complete the TenetKit-owned external-child protocol for independently partitioned Threads. `ExternalChildStore.admitRoot` creates a linked depth-zero child root behind a durable activation gate; `activateRoot`, `inspectRoot`, and `cancelRoot` preserve child lifecycle authority on its partition; and `rootSettlement` plus `acknowledgeRootSettlement` provide restart-safe at-least-once terminal delivery with exact acknowledgement. Parent reservation and exactly-once settlement application remain in the existing `reserve`, `acknowledge`, `cancel`, and `settle` operations. Memory and SQLite now prove idempotent admission, pre-activation cancellation, duplicate settlement handling, and reopen recovery.
+
 ## 0.33.1
 
 - Store SQLite cancellation flags canonically as integer `0`/`1`, while decoding rows written by Effect SQL as booleans or legacy text `"true"`/`"false"`. Cancellation reconciliation, operation/program claim release, child-capacity promotion, and external-child placement now preserve cancellation across existing Cloudflare SQLite state; the workerd contract proves integer storage and terminal `cancelled` recovery through the real RunStore path.

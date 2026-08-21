@@ -1,11 +1,17 @@
-import { Effect, Equal, Function } from "effect"
+import { Effect, Equal, Function, Option } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   ExternalChildCapacityUnavailable,
   ExternalChildPlacementConflict,
   ExternalChildPlacementNotFound,
   ExternalChildSettlementConflict,
+  ExternalRootConflict,
+  ExternalRootExecutableMismatch,
+  ExternalRootNotFound,
+  executableDigest,
   suspensionIdentity,
+  type ExternalRoot,
+  type ExternalRootSettlement,
   type Placement,
   type ReserveInput,
 } from "../external-child-placement.js"
@@ -19,6 +25,11 @@ import { loadRun, loadRunWait, nowIso } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import { appendEvent } from "./store-helpers.js"
 import { requireExecutionClaim } from "./store-execution.js"
+import type { Interface as ExternalChildStoreInterface } from "../external-child-store.js"
+import { startDigest } from "../memory/digest.js"
+import { admitStart } from "./store-admit.js"
+import { loadRunSnapshot } from "./inspection.js"
+import { cancel as cancelRun } from "./store-control.js"
 
 interface Row {
   placement_id: string
@@ -34,6 +45,20 @@ interface Row {
   cancel_requested: number | boolean | string
   settlement_id: string | null
   outcome_json: string | null
+}
+
+interface ExternalRootRow {
+  placement_id: string
+  parent_partition: string
+  parent_run_id: string
+  partition: string
+  run_id: string
+  session_id: string
+  request_digest: string
+  executable_digest: string
+  admission_digest: string
+  activated: number
+  settlement_acknowledged: number
 }
 
 const decodeFlag = (value: number | boolean | string): boolean =>
@@ -209,3 +234,154 @@ const settle = (
   })
 
 export const externalChildSettlement = { settle }
+
+type AdmitRootInput = Parameters<ExternalChildStoreInterface["admitRoot"]>[0]
+
+const loadExternalRoot = (placementId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<ExternalRootRow>`
+      SELECT * FROM tenetkit_external_roots WHERE placement_id = ${placementId}
+    `
+    return rows[0]
+  })
+
+const rootView = (row: ExternalRootRow) =>
+  Effect.gen(function* () {
+    const run = yield* loadRun(row.run_id)
+    if (run === undefined) return yield* RuntimeUnavailable.make({ message: `external root ${row.run_id} is missing` })
+    const snapshot = yield* loadRunSnapshot(row.run_id).pipe(
+      Effect.mapError(() => RuntimeUnavailable.make({ message: `external root ${row.run_id} snapshot is missing` })),
+    )
+    return {
+      placementId: row.placement_id,
+      parent: { partition: row.parent_partition, runId: row.parent_run_id },
+      ref: { partition: row.partition, runId: row.run_id },
+      sessionId: row.session_id,
+      requestDigest: row.request_digest,
+      executableDigest: row.executable_digest,
+      admissionDigest: row.admission_digest,
+      activated: Number(row.activated) === 1,
+      cancelRequested: run.cancellationRequested,
+      settlementAcknowledged: Number(row.settlement_acknowledged) === 1,
+      ...(snapshot.outcome === undefined ? {} : { outcome: snapshot.outcome }),
+    } satisfies ExternalRoot
+  })
+
+const immutableRootEqual = (row: ExternalRootRow, input: AdmitRootInput, admissionDigest: string): boolean =>
+  row.placement_id === input.placementId &&
+  row.parent_partition === input.parent.partition &&
+  row.parent_run_id === input.parent.runId &&
+  row.partition === input.ref.partition &&
+  row.run_id === input.ref.runId &&
+  row.session_id === input.root.message.sessionId &&
+  row.request_digest === input.requestDigest &&
+  row.executable_digest === input.executableDigest &&
+  row.admission_digest === admissionDigest
+
+const admitExternalRoot = (hub: EventHub, input: AdmitRootInput) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const root = { ...input.root, runId: input.ref.runId, initialChildren: [], initialFanOuts: [] }
+    const admissionDigest = startDigest(root)
+    const existing = yield* loadExternalRoot(input.placementId)
+    if (existing !== undefined) {
+      if (!immutableRootEqual(existing, input, admissionDigest)) {
+        return yield* ExternalRootConflict.make({ placementId: input.placementId })
+      }
+      return yield* rootView(existing)
+    }
+    const conflicts = yield* sql<{ placement_id: string }>`
+      SELECT placement_id FROM tenetkit_external_roots
+      WHERE (${sql("partition")} = ${input.ref.partition} AND run_id = ${input.ref.runId})
+         OR run_id = ${input.ref.runId}
+      LIMIT 1
+    `
+    if (conflicts.length > 0) return yield* ExternalRootConflict.make({ placementId: input.placementId })
+    const actualExecutableDigest = executableDigest({
+      ref: input.root.executableRef,
+      manifest: input.root.executableManifest,
+    })
+    if (actualExecutableDigest !== input.executableDigest) {
+      return yield* ExternalRootExecutableMismatch.make({
+        placementId: input.placementId,
+        expected: input.executableDigest,
+        actual: actualExecutableDigest,
+      })
+    }
+    const receipt = yield* admitStart(hub, root, { activate: false })
+    if (receipt.duplicate) return yield* ExternalRootConflict.make({ placementId: input.placementId })
+    yield* sql`INSERT INTO tenetkit_external_roots
+      (placement_id, parent_partition, parent_run_id, ${sql("partition")}, run_id, session_id,
+       request_digest, executable_digest, admission_digest, created_at)
+      VALUES (${input.placementId}, ${input.parent.partition}, ${input.parent.runId}, ${input.ref.partition},
+        ${input.ref.runId}, ${input.root.message.sessionId}, ${input.requestDigest}, ${input.executableDigest},
+        ${admissionDigest}, ${yield* nowIso})`
+    return yield* rootView((yield* loadExternalRoot(input.placementId))!)
+  })
+
+const requireExternalRoot = (placementId: string) =>
+  Effect.flatMap(loadExternalRoot(placementId), (root) =>
+    root === undefined ? ExternalRootNotFound.make({ placementId }) : Effect.succeed(root),
+  )
+
+const activateExternalRoot = (hub: EventHub, placementId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const root = yield* requireExternalRoot(placementId)
+    if (Number(root.activated) === 1) return yield* rootView(root)
+    const run = yield* loadRun(root.run_id)
+    if (run === undefined) return yield* RuntimeUnavailable.make({ message: `external root ${root.run_id} is missing` })
+    yield* sql`UPDATE tenetkit_external_roots SET activated = 1 WHERE placement_id = ${placementId}`
+    if (run.status === "queued" && !run.cancellationRequested) {
+      const attempt = run.attempt + 1
+      yield* sql`UPDATE tenetkit_runs SET attempt_fence = ${attempt} WHERE run_id = ${run.runId}`
+      yield* appendEvent(hub, { ...run, attempt }, { _tag: "RunAttemptStarted", attempt }, "running")
+    }
+    return yield* rootView((yield* loadExternalRoot(placementId))!)
+  })
+
+export const inspectExternalRoot = (placementId: string) => Effect.flatMap(requireExternalRoot(placementId), rootView)
+
+const cancelExternalRoot = (hub: EventHub, placementId: string, reason?: string) =>
+  Effect.gen(function* () {
+    const root = yield* requireExternalRoot(placementId)
+    yield* cancelRun(hub, { runId: root.run_id, ...(reason === undefined ? {} : { reason }) }).pipe(
+      Effect.mapError(() => RuntimeUnavailable.make({ message: `external root ${root.run_id} is missing` })),
+    )
+    return yield* rootView(root)
+  })
+
+export const externalRootSettlement = (placementId: string) =>
+  Effect.gen(function* () {
+    const root = yield* inspectExternalRoot(placementId)
+    if (root.outcome === undefined) return Option.none<ExternalRootSettlement>()
+    return Option.some({
+      placementId,
+      ref: root.ref,
+      settlementId: root.outcome.eventId,
+      outcome: root.outcome,
+      acknowledged: root.settlementAcknowledged,
+    })
+  })
+
+export const acknowledgeExternalRootSettlement = (input: {
+  readonly placementId: string
+  readonly settlementId: string
+}) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const settlement = yield* externalRootSettlement(input.placementId)
+    if (Option.isNone(settlement) || settlement.value.settlementId !== input.settlementId) {
+      return yield* ExternalChildSettlementConflict.make(input)
+    }
+    yield* sql`UPDATE tenetkit_external_roots SET settlement_acknowledged = 1
+      WHERE placement_id = ${input.placementId}`
+    return { ...settlement.value, acknowledged: true }
+  })
+
+export const externalRootOperations = {
+  admit: admitExternalRoot,
+  activate: activateExternalRoot,
+  cancel: cancelExternalRoot,
+}
