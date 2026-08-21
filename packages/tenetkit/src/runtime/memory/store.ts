@@ -69,7 +69,6 @@ import {
 import type { RunActivation } from "../run-activation.js"
 import { externalChildOperations } from "./store-external-child.js"
 import { ExternalChildStore } from "../external-child-store.js"
-
 const activationOf = (run: import("./state.js").StoredRun): RunActivation => {
   const intent: RunActivation["intent"] =
     run.status === "cancelling"
@@ -83,7 +82,6 @@ const activationOf = (run: import("./state.js").StoredRun): RunActivation => {
     ? { runId: run.runId, intent }
     : { runId: run.runId, intent, attemptFence: run.attemptFence, runStatus: run.status }
 }
-
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
@@ -471,6 +469,20 @@ const makeStoreServices = (options: LayerOptions) =>
       acknowledge: (placementId) => modifyState((state) => externalChildOperations.acknowledge(state, placementId)),
       settle: (input) => modifyState((state) => externalChildOperations.settle(state, input)),
       cancel: (placementId) => modifyState((state) => externalChildOperations.cancel(state, placementId)),
+      admitRoot: (input) => modifyState((state) => externalChildOperations.admitRoot(state, input)),
+      activateRoot: (placementId) => modifyState((state) => externalChildOperations.activateRoot(state, placementId)),
+      inspectRoot: (placementId) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) => externalChildOperations.inspectRoot(state, placementId)),
+        ),
+      cancelRoot: (placementId, reason) =>
+        modifyState((state) => externalChildOperations.cancelRoot(state, placementId, reason)),
+      rootSettlement: (placementId) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) => externalChildOperations.rootSettlement(state, placementId)),
+        ),
+      acknowledgeRootSettlement: (input) =>
+        modifyState((state) => externalChildOperations.acknowledgeRootSettlement(state, input)),
     })
     return { runStore, externalChildStore }
   })

@@ -158,157 +158,159 @@ type AdmitStartResult = Effect.Effect<
 >
 
 export const admitStart: {
-  (input: AdmitStartInput): (state: MemoryState) => AdmitStartResult
-  (state: MemoryState, input: AdmitStartInput): AdmitStartResult
-} = Function.dual(2, (state: MemoryState, input: AdmitStartInput) =>
-  Effect.gen(function* () {
-    const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
-    const normalizedInput = { ...input, treePolicy }
-    if (input.initialChildren.length > 64) {
-      return yield* StartInvalid.make({ message: "initialChildren cannot contain more than 64 requests" })
-    }
-    if (input.initialFanOuts.length > 64) {
-      return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
-    }
-    const active = input.executableManifest.entries.find((entry) => entry.pin === input.executableRef.active)
-    const invocationIds = new Set<string>()
-    const idempotencySources = new Set<string>()
-    for (const child of input.initialChildren) {
-      if (invocationIds.has(child.invocationId)) {
-        return yield* StartInvalid.make({ message: `duplicate initial child invocationId: ${child.invocationId}` })
+  (input: AdmitStartInput, options?: { readonly activate?: boolean }): (state: MemoryState) => AdmitStartResult
+  (state: MemoryState, input: AdmitStartInput, options?: { readonly activate?: boolean }): AdmitStartResult
+} = Function.dual(
+  (args) => typeof args[0] === "object" && args[0] !== null && "closed" in args[0] && "runs" in args[0],
+  (state: MemoryState, input: AdmitStartInput, options?: { readonly activate?: boolean }) =>
+    Effect.gen(function* () {
+      const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
+      const normalizedInput = { ...input, treePolicy }
+      if (input.initialChildren.length > 64) {
+        return yield* StartInvalid.make({ message: "initialChildren cannot contain more than 64 requests" })
       }
-      const source = `${child.sessionId}\0${child.idempotencyKey}`
-      if (idempotencySources.has(source)) {
-        return yield* StartInvalid.make({ message: "duplicate initial child sessionId/idempotencyKey" })
+      if (input.initialFanOuts.length > 64) {
+        return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
       }
-      invocationIds.add(child.invocationId)
-      idempotencySources.add(source)
-    }
-    const resolved = input.initialChildren.map((child) => ({
-      child,
-      executableRef:
-        active?._tag === "Agent"
-          ? resolveChild(input.executableRef, input.executableManifest, child.selection)
-          : undefined,
-    }))
-    const missing = resolved.find((entry) => entry.executableRef === undefined)
-    if (missing !== undefined) {
-      return yield* ChildSelectionMissing.make({
-        parentRunId: input.runId ?? "pending",
-        selection: missing.child.selection,
-      })
-    }
-    const catalog = new Map(state.registrationCatalog)
-    for (const registration of input.registrations) {
-      const digest = registrationDigest(registration)
-      const existing = catalog.get(registration.pin)
-      if (existing !== undefined && existing.digest !== digest) {
-        return yield* ExecutableRegistrationConflict.make({ pin: registration.pin })
+      const active = input.executableManifest.entries.find((entry) => entry.pin === input.executableRef.active)
+      const invocationIds = new Set<string>()
+      const idempotencySources = new Set<string>()
+      for (const child of input.initialChildren) {
+        if (invocationIds.has(child.invocationId)) {
+          return yield* StartInvalid.make({ message: `duplicate initial child invocationId: ${child.invocationId}` })
+        }
+        const source = `${child.sessionId}\0${child.idempotencyKey}`
+        if (idempotencySources.has(source)) {
+          return yield* StartInvalid.make({ message: "duplicate initial child sessionId/idempotencyKey" })
+        }
+        invocationIds.add(child.invocationId)
+        idempotencySources.add(source)
       }
-      catalog.set(registration.pin, { digest, value: registration })
-    }
-    const [receipt, admitted] = yield* admitSend(
-      { ...state, registrationCatalog: catalog },
-      normalizedInput,
-      startDigest(normalizedInput),
-      input.initialChildren.length === 0,
-    )
-    if (receipt.duplicate) {
-      const root = admitted.runs.get(receipt.runId)!
+      const resolved = input.initialChildren.map((child) => ({
+        child,
+        executableRef:
+          active?._tag === "Agent"
+            ? resolveChild(input.executableRef, input.executableManifest, child.selection)
+            : undefined,
+      }))
+      const missing = resolved.find((entry) => entry.executableRef === undefined)
+      if (missing !== undefined) {
+        return yield* ChildSelectionMissing.make({
+          parentRunId: input.runId ?? "pending",
+          selection: missing.child.selection,
+        })
+      }
+      const catalog = new Map(state.registrationCatalog)
+      for (const registration of input.registrations) {
+        const digest = registrationDigest(registration)
+        const existing = catalog.get(registration.pin)
+        if (existing !== undefined && existing.digest !== digest) {
+          return yield* ExecutableRegistrationConflict.make({ pin: registration.pin })
+        }
+        catalog.set(registration.pin, { digest, value: registration })
+      }
+      const [receipt, admitted] = yield* admitSend(
+        { ...state, registrationCatalog: catalog },
+        normalizedInput,
+        startDigest(normalizedInput),
+        input.initialChildren.length === 0 && options?.activate !== false,
+      )
+      if (receipt.duplicate) {
+        const root = admitted.runs.get(receipt.runId)!
+        const childRunIds: Array<string> = []
+        for (const child of input.initialChildren) {
+          const runId = root.children.find((id) => {
+            const run = admitted.runs.get(id)
+            return (
+              run?.invocationId === child.invocationId &&
+              run.message.sessionId === child.sessionId &&
+              run.message.idempotencyKey === child.idempotencyKey
+            )
+          })
+          if (runId === undefined) {
+            return yield* RuntimeUnavailable.make({ message: `initial child ${child.invocationId} is missing` })
+          }
+          childRunIds.push(runId)
+        }
+        const fanOuts = [] as Array<import("../fan-out.js").FanOutReceipt>
+        for (const fanOut of input.initialFanOuts) {
+          const existing = [...admitted.fanOuts.values()].find(
+            (entry) => entry.parentRunId === receipt.runId && entry.idempotencyKey === fanOut.idempotencyKey,
+          )
+          if (existing === undefined) {
+            return yield* RuntimeUnavailable.make({ message: `initial fan-out ${fanOut.idempotencyKey} is missing` })
+          }
+          fanOuts.push({
+            fanOutId: existing.fanOutId,
+            parentRunId: receipt.runId,
+            childRunIds: existing.members.map((member) => member.childRunId),
+            duplicate: true,
+          })
+        }
+        return [{ ...receipt, childRunIds, fanOuts }, admitted] as const
+      }
+      const lanes = new Map(admitted.lanes)
+      lanes.delete(laneKey(input.message.to, input.message.sessionId))
+      let next: MemoryState = { ...admitted, lanes }
       const childRunIds: Array<string> = []
       for (const child of input.initialChildren) {
-        const runId = root.children.find((id) => {
-          const run = admitted.runs.get(id)
-          return (
-            run?.invocationId === child.invocationId &&
-            run.message.sessionId === child.sessionId &&
-            run.message.idempotencyKey === child.idempotencyKey
-          )
+        const address = makeAddress(`spawn:${receipt.runId}`)
+        const message = makeMessage({
+          id: child.messageId ?? `spawn:${child.idempotencyKey}`,
+          to: address,
+          sessionId: child.sessionId,
+          prompt: child.prompt,
+          idempotencyKey: child.idempotencyKey,
+          correlationId: child.correlationId ?? receipt.runId,
+          metadata: child.metadata ?? {},
         })
-        if (runId === undefined) {
-          return yield* RuntimeUnavailable.make({ message: `initial child ${child.invocationId} is missing` })
-        }
-        childRunIds.push(runId)
+        const [childReceipt, childState] = yield* admitSpawn(next, {
+          ...child,
+          parentRunId: receipt.runId,
+          message,
+        }).pipe(
+          Effect.mapError((error) =>
+            Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
+              ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
+              : error,
+          ),
+        )
+        childRunIds.push(childReceipt.runId)
+        next = childState
       }
       const fanOuts = [] as Array<import("../fan-out.js").FanOutReceipt>
       for (const fanOut of input.initialFanOuts) {
-        const existing = [...admitted.fanOuts.values()].find(
-          (entry) => entry.parentRunId === receipt.runId && entry.idempotencyKey === fanOut.idempotencyKey,
-        )
-        if (existing === undefined) {
-          return yield* RuntimeUnavailable.make({ message: `initial fan-out ${fanOut.idempotencyKey} is missing` })
-        }
-        fanOuts.push({
-          fanOutId: existing.fanOutId,
+        const fanOutId = fanOutIdFor(receipt.runId, fanOut.idempotencyKey)
+        const [fanOutReceipt, fanOutState] = yield* admitFanOut(next, {
+          ...fanOut,
           parentRunId: receipt.runId,
-          childRunIds: existing.members.map((member) => member.childRunId),
-          duplicate: true,
-        })
+          fanOutId,
+          ...(fanOut.concurrency === undefined
+            ? {}
+            : { concurrency: Math.min(fanOut.concurrency, fanOut.members.length) }),
+          members: fanOut.members.map((member, ordinal) => ({
+            ordinal,
+            key: member.key,
+            ...(member.label === undefined ? {} : { label: member.label }),
+            childRunId: childRunIdFor(fanOutId, ordinal),
+            selection: member.selection,
+            prompt: member.prompt,
+            sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
+            metadata: member.metadata ?? {},
+            ...(member.origin === undefined ? {} : { origin: member.origin }),
+          })),
+        }).pipe(
+          Effect.mapError((error) =>
+            Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
+              ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial fan-out admission" })
+              : error,
+          ),
+        )
+        fanOuts.push(fanOutReceipt)
+        next = fanOutState
       }
-      return [{ ...receipt, childRunIds, fanOuts }, admitted] as const
-    }
-    const lanes = new Map(admitted.lanes)
-    lanes.delete(laneKey(input.message.to, input.message.sessionId))
-    let next: MemoryState = { ...admitted, lanes }
-    const childRunIds: Array<string> = []
-    for (const child of input.initialChildren) {
-      const address = makeAddress(`spawn:${receipt.runId}`)
-      const message = makeMessage({
-        id: child.messageId ?? `spawn:${child.idempotencyKey}`,
-        to: address,
-        sessionId: child.sessionId,
-        prompt: child.prompt,
-        idempotencyKey: child.idempotencyKey,
-        correlationId: child.correlationId ?? receipt.runId,
-        metadata: child.metadata ?? {},
-      })
-      const [childReceipt, childState] = yield* admitSpawn(next, {
-        ...child,
-        parentRunId: receipt.runId,
-        message,
-      }).pipe(
-        Effect.mapError((error) =>
-          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
-            ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
-            : error,
-        ),
-      )
-      childRunIds.push(childReceipt.runId)
-      next = childState
-    }
-    const fanOuts = [] as Array<import("../fan-out.js").FanOutReceipt>
-    for (const fanOut of input.initialFanOuts) {
-      const fanOutId = fanOutIdFor(receipt.runId, fanOut.idempotencyKey)
-      const [fanOutReceipt, fanOutState] = yield* admitFanOut(next, {
-        ...fanOut,
-        parentRunId: receipt.runId,
-        fanOutId,
-        ...(fanOut.concurrency === undefined
-          ? {}
-          : { concurrency: Math.min(fanOut.concurrency, fanOut.members.length) }),
-        members: fanOut.members.map((member, ordinal) => ({
-          ordinal,
-          key: member.key,
-          ...(member.label === undefined ? {} : { label: member.label }),
-          childRunId: childRunIdFor(fanOutId, ordinal),
-          selection: member.selection,
-          prompt: member.prompt,
-          sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
-          metadata: member.metadata ?? {},
-          ...(member.origin === undefined ? {} : { origin: member.origin }),
-        })),
-      }).pipe(
-        Effect.mapError((error) =>
-          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
-            ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial fan-out admission" })
-            : error,
-        ),
-      )
-      fanOuts.push(fanOutReceipt)
-      next = fanOutState
-    }
-    return [{ ...receipt, childRunIds, fanOuts }, next] as const
-  }),
+      return [{ ...receipt, childRunIds, fanOuts }, next] as const
+    }),
 )
 
 type AdmitSpawnResult = Effect.Effect<

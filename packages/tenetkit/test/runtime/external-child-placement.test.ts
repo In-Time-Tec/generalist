@@ -1,8 +1,15 @@
 import { Database } from "bun:sqlite"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { ProgramCapabilities } from "tenetkit"
-import { ExternalChildStore, Runtime, RunStore } from "../../src/runtime/index.js"
+import {
+  Address,
+  ExternalChildPlacement,
+  ExternalChildStore,
+  Message,
+  Runtime,
+  RunStore,
+} from "../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../src/runtime/errors.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
 import { assistant, assistantRef, completedResult, memoryLayer, registrationsFor, textPrompt } from "./helpers.js"
@@ -10,6 +17,29 @@ import { assistantAddress } from "./helpers.js"
 import { closedTestAgent } from "./identity.js"
 import { provideScoped } from "./scoped-provide.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
+
+const externalRoot = (id: string) => ({
+  placementId: `placement:${id}`,
+  parent: { partition: "openwork:parent", runId: `parent:${id}` },
+  ref: { partition: "openwork:child", runId: `child:${id}` },
+  requestDigest: `request:${id}`,
+  executableDigest: ExternalChildPlacement.executableDigest(assistantRef),
+  root: {
+    message: Message.make({
+      id: `message:${id}`,
+      to: Address.make(`external-root:${id}`),
+      sessionId: `thread:${id}`,
+      prompt: textPrompt(`delegated ${id}`),
+      idempotencyKey: `root:${id}`,
+      correlationId: `parent:${id}`,
+      metadata: {},
+    }),
+    executableRef: assistantRef.ref,
+    executableManifest: assistantRef.manifest,
+    registrations: registrationsFor(assistantRef),
+    treePolicy: { maxDepth: 2, maxSubagents: 2 },
+  },
+})
 
 const suite = <E>(
   name: string,
@@ -41,8 +71,94 @@ const suite = <E>(
       treePolicy: { maxDepth: 2, maxSubagents: 1 },
     })
   })
-
   describe(`external child placement (${name})`, () => {
+    it.live("admits an independently addressable depth-zero root behind an idempotent activation gate", () =>
+      provide(
+        Effect.gen(function* () {
+          const store = yield* RunStore.RunStore
+          const external = yield* ExternalChildStore.ExternalChildStore
+          const input = externalRoot(`${name}:gate`)
+          expect(yield* external.admitRoot(input)).toMatchObject({
+            placementId: input.placementId,
+            parent: input.parent,
+            ref: input.ref,
+            sessionId: input.root.message.sessionId,
+            activated: false,
+          })
+          expect(yield* store.inspect(input.ref.runId)).toMatchObject({
+            runId: input.ref.runId,
+            status: "queued",
+            depth: 0,
+          })
+          expect(
+            (yield* store.claimExecution({ runId: input.ref.runId, ownerId: "too-early" }).pipe(Effect.flip))._tag,
+          ).toBe("tenetkit/runtime/RuntimeUnavailable")
+          expect(yield* external.admitRoot(input)).toMatchObject({ activated: false })
+          expect(
+            (yield* external.admitRoot({ ...input, requestDigest: `${input.requestDigest}:changed` }).pipe(Effect.flip))
+              ._tag,
+          ).toBe("@tenetkit/runtime/ExternalRootConflict")
+          expect(
+            (yield* external
+              .admitRoot({ ...externalRoot(`${name}:digest-mismatch`), executableDigest: "wrong" })
+              .pipe(Effect.flip))._tag,
+          ).toBe("@tenetkit/runtime/ExternalRootExecutableMismatch")
+          expect(yield* external.activateRoot(input.placementId)).toMatchObject({ activated: true })
+          expect(yield* external.activateRoot(input.placementId)).toMatchObject({ activated: true })
+          const history = yield* store.history({ runId: input.ref.runId, cursor: -1, limit: 20 })
+          expect(history.filter((event) => event._tag === "RunAttemptStarted")).toHaveLength(1)
+          const claim = yield* store.claimExecution({ runId: input.ref.runId, ownerId: "child-worker" })
+          yield* store.complete({ ...claim, result: completedResult("delegated result") })
+          expect(yield* external.rootSettlement(input.placementId)).toMatchObject({
+            value: {
+              placementId: input.placementId,
+              ref: input.ref,
+              acknowledged: false,
+              outcome: { _tag: "Succeeded", result: completedResult("delegated result") },
+            },
+          })
+        }),
+      ),
+    )
+
+    it.live("cancels before activation and replays one terminal settlement until exact acknowledgement", () =>
+      provide(
+        Effect.gen(function* () {
+          const external = yield* ExternalChildStore.ExternalChildStore
+          const input = externalRoot(`${name}:cancel-before-activation`)
+          yield* external.admitRoot(input)
+          expect(yield* external.cancelRoot(input.placementId, "parent requested cancellation")).toMatchObject({
+            activated: false,
+            cancelRequested: true,
+            outcome: { _tag: "Cancelled", reason: "parent requested cancellation" },
+          })
+          const first = yield* external.rootSettlement(input.placementId)
+          expect(Option.isSome(first)).toBe(true)
+          if (Option.isNone(first)) return
+          expect(first.value).toMatchObject({
+            placementId: input.placementId,
+            ref: input.ref,
+            acknowledged: false,
+          })
+          expect(yield* external.rootSettlement(input.placementId)).toEqual(first)
+          expect(
+            (yield* external
+              .acknowledgeRootSettlement({ placementId: input.placementId, settlementId: "wrong" })
+              .pipe(Effect.flip))._tag,
+          ).toBe("@tenetkit/runtime/ExternalChildSettlementConflict")
+          expect(
+            yield* external.acknowledgeRootSettlement({
+              placementId: input.placementId,
+              settlementId: first.value.settlementId,
+            }),
+          ).toMatchObject({ acknowledged: true })
+          expect(yield* external.rootSettlement(input.placementId)).toMatchObject({
+            value: { acknowledged: true },
+          })
+        }),
+      ),
+    )
+
     it.live("replays exact reservations and rejects divergent or over-capacity reservations without mutation", () =>
       provide(
         Effect.gen(function* () {
@@ -245,6 +361,40 @@ const suite = <E>(
 
 suite("memory", memoryLayer)
 suite("sqlite", sqliteLayer(tempDbPath("external-child-placement")))
+
+it.live("recovers external root identity and unacknowledged terminal delivery after SQLite reopen", () => {
+  const filename = tempDbPath("external-root-reopen")
+  const input = externalRoot("sqlite:reopen")
+  return Effect.gen(function* () {
+    const settlementId = yield* provideScoped(
+      sqliteLayer(filename),
+      Effect.gen(function* () {
+        const external = yield* ExternalChildStore.ExternalChildStore
+        yield* external.admitRoot(input)
+        yield* external.cancelRoot(input.placementId, "reopen")
+        const settlement = yield* external.rootSettlement(input.placementId)
+        if (Option.isNone(settlement)) return yield* Effect.die("cancelled external root has no settlement")
+        return settlement.value.settlementId
+      }),
+    )
+    yield* provideScoped(
+      sqliteLayer(filename),
+      Effect.gen(function* () {
+        const external = yield* ExternalChildStore.ExternalChildStore
+        expect(yield* external.inspectRoot(input.placementId)).toMatchObject({
+          parent: input.parent,
+          ref: input.ref,
+          sessionId: input.root.message.sessionId,
+          activated: false,
+          outcome: { _tag: "Cancelled", eventId: settlementId },
+        })
+        expect(yield* external.rootSettlement(input.placementId)).toMatchObject({
+          value: { settlementId, acknowledged: false },
+        })
+      }),
+    )
+  })
+})
 
 it.live("rolls back reservation and projects settlement-driven cancellation in SQLite transactions", () => {
   let rejectProjection = false

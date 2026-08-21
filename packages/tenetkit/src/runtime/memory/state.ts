@@ -19,7 +19,7 @@ import type { TreePolicy } from "../tree-policy.js"
 import type { ChildReadiness } from "../child-readiness.js"
 import type { MailboxEntry } from "../mailbox.js"
 import type { Session } from "tenetkit"
-import type { Placement as ExternalChildPlacement } from "../external-child-placement.js"
+import type { ExternalRoot, Placement as ExternalChildPlacement } from "../external-child-placement.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -109,6 +109,7 @@ export interface MemoryState {
   readonly messages: ReadonlyMap<string, MailboxEntry>
   readonly agentNames: ReadonlyMap<string, string>
   readonly externalChildPlacements: ReadonlyMap<string, ExternalChildPlacement>
+  readonly externalRoots: ReadonlyMap<string, ExternalRoot>
   readonly subscriberQueueCapacity: number
   readonly publications: ReadonlyArray<MemoryPublication>
 }
@@ -166,6 +167,7 @@ export const emptyState = (input: {
   messages: new Map(),
   agentNames: new Map(),
   externalChildPlacements: new Map(),
+  externalRoots: new Map(),
   subscriberQueueCapacity: input.subscriberQueueCapacity,
   publications: [],
 })
