@@ -20,6 +20,17 @@ const ConformanceResponse = Schema.Struct({
   migrations: Schema.Array(Schema.Struct({ id: Schema.Finite, name: Schema.String })),
 })
 
+const AgentConformanceResponse = Schema.Struct({
+  objective: Schema.Literal("Arrange service"),
+  facts: Schema.Array(Schema.Literal("Provider serves Boise")),
+  lookupExecutions: Schema.Literal(1),
+  denied: Schema.Literal(true),
+  deniedExecutions: Schema.Literal(0),
+  budgetExhausted: Schema.Literal(true),
+  budgetModelRequests: Schema.Literal(0),
+  openRouterBundled: Schema.Literal(true),
+})
+
 const encodeString = Schema.encodeSync(Schema.fromJsonString(Schema.String))
 
 const socketMessages = (socket: WebSocket, count: number): Effect.Effect<ReadonlyArray<string>> =>
@@ -131,6 +142,21 @@ const worker :Workerd.Worker = (
               migrations: [{ id: 1, name: "tenetkit_runtime" }],
             },
           ])
+
+          const agentResponse = yield* HttpClient.get(`http://127.0.0.1:${port}/agent`).pipe(
+            Effect.flatMap(HttpClientResponse.filterStatusOk),
+            Effect.flatMap(HttpClientResponse.schemaBodyJson(AgentConformanceResponse)),
+          )
+          expect(agentResponse).toEqual({
+            objective: "Arrange service",
+            facts: ["Provider serves Boise"],
+            lookupExecutions: 1,
+            denied: true,
+            deniedExecutions: 0,
+            budgetExhausted: true,
+            budgetModelRequests: 0,
+            openRouterBundled: true,
+          })
 
           const socket = yield* Effect.callback<WebSocket>((resume) => {
             const candidate = new WebSocket(`ws://127.0.0.1:${port}/replay`)

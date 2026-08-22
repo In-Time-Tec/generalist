@@ -79,9 +79,10 @@ const program = Effect.gen(function* () {
       manifest.private !== false ||
       manifest.type !== "module" ||
       manifest.sideEffects !== false ||
-      !Equal.equals(manifest.files, ["dist", "README.md"])
+      manifest.license !== "MIT" ||
+      !Equal.equals(manifest.files, ["dist", "LICENSE", "README.md"])
     ) {
-      return yield* smokeError(`${manifestPath} does not match the public ESM package contract`)
+      return yield* smokeError(`${manifestPath} does not match the public MIT-licensed ESM package contract`)
     }
     sourceManifests.set(manifestPath, source)
   }
@@ -115,6 +116,7 @@ const program = Effect.gen(function* () {
       (entry) =>
         entry !== "package/" &&
         entry !== "package/package.json" &&
+        entry !== "package/LICENSE" &&
         entry !== "package/README.md" &&
         entry !== "package/dist/" &&
         !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
@@ -148,7 +150,17 @@ const program = Effect.gen(function* () {
       }
     }
     const sourceManifest = parseJson(sourceManifests.get(path.join(packageDirectory, "package.json"))!)
-    for (const field of ["description", "type", "sideEffects", "files", "engines", "repository", "homepage", "bugs"]) {
+    for (const field of [
+      "description",
+      "type",
+      "sideEffects",
+      "license",
+      "files",
+      "engines",
+      "repository",
+      "homepage",
+      "bugs",
+    ]) {
       if (!Equal.equals(manifest[field], sourceManifest[field])) {
         return yield* smokeError(`@tenetkit/${packageName} changed its packed ${field} metadata`)
       }

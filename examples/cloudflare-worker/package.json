@@ -1,0 +1,19 @@
+{
+  "name": "@tenetkit/example-cloudflare-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@tenetkit/cloudflare": "workspace:*",
+    "effect": "catalog:",
+    "tenetkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

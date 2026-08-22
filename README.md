@@ -130,3 +130,7 @@ bun run package
 ## Provenance
 
 TenetKit was developed by [In Time Tec](https://intimetec.com). Applications compose its process-local agent primitives and optional durable Runtime directly through Effect layers.
+
+## License
+
+TenetKit is available under the [MIT License](LICENSE).
