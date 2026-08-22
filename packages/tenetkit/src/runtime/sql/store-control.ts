@@ -83,7 +83,12 @@ const cancelRun = (
       current = (yield* loadRun(run.runId))!
     }
     if (!terminal) yield* reconcileProgramCancellation(run.runId, reason ?? current.cancelReason)
-    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = 1
+    const cancellationRequested = sql.onDialectOrElse({
+      pg: () => true,
+      mysql: () => 1,
+      orElse: () => 1,
+    })
+    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = ${cancellationRequested}
       WHERE parent_run_id = ${run.runId} AND settlement_id IS NULL`
     yield* sql`
       UPDATE tenetkit_run_waits SET status = 'cancelled', closed_at = ${yield* nowIso}

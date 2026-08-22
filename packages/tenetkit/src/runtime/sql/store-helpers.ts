@@ -36,7 +36,12 @@ export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
 const asBool = (value: number | boolean | string): boolean => value === true || value === "true" || Number(value) === 1
 
-const sqlBool = (value: boolean): 0 | 1 => (value ? 1 : 0)
+const sqlBool = (sql: SqlClient.SqlClient, value: boolean): boolean | 0 | 1 =>
+  sql.onDialectOrElse({
+    pg: () => value,
+    mysql: () => (value ? 1 : 0),
+    orElse: () => (value ? 1 : 0),
+  })
 
 const asIso = (value: string | Date | null | undefined): string | undefined => {
   if (value === null || value === undefined) return undefined
@@ -281,7 +286,7 @@ export const appendEvent: {
           last_sequence = ${sequence},
           active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
-          cancellation_requested = ${sqlBool(cancellationRequested)},
+          cancellation_requested = ${sqlBool(sql, cancellationRequested)},
           cancel_reason = ${cancelReason},
            attempt = ${attempt},
            continuation_json = NULL,
@@ -299,7 +304,7 @@ export const appendEvent: {
           last_sequence = ${sequence},
           active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
-          cancellation_requested = ${sqlBool(cancellationRequested)},
+          cancellation_requested = ${sqlBool(sql, cancellationRequested)},
           cancel_reason = ${cancelReason},
           attempt = ${attempt},
           updated_at = ${updated}
@@ -476,7 +481,7 @@ export const insertRun = (input: {
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
         ${input.rootRunId}, ${input.depth}, ${input.treePolicy.maxDepth}, ${input.treePolicy.maxSubagents}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
-        NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, 0, NULL, NULL, ${input.acceptedSequence},
+        NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, ${sqlBool(sql, false)}, NULL, NULL, ${input.acceptedSequence},
         ${encodeJson(StringArray, [])}, ${created}, ${created}
       )
     `

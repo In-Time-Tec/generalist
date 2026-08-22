@@ -335,14 +335,19 @@ export const resolveProgramOperation: {
         resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operationId} AND status = 'unknown'
     `
+    const cancellationRequested = sql.onDialectOrElse({
+      pg: () => sql`cancellation_requested`,
+      mysql: () => sql`cancellation_requested = 1`,
+      orElse: () => sql`cancellation_requested IN (1, 'true')`,
+    })
     if (clearLease) {
       yield* sql`
-        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested IN (1, 'true') THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL
+        UPDATE tenetkit_runs SET status = CASE WHEN ${cancellationRequested} THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     } else {
       yield* sql`
-        UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested IN (1, 'true') THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL
+        UPDATE tenetkit_runs SET status = CASE WHEN ${cancellationRequested} THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     }
