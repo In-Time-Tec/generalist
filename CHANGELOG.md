@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.34.2
+
+- Claim already-running parentless roots without requiring a mailbox lane in PostgreSQL and MySQL, so `Runtime.start` executes exact dynamic roots while queued addressed roots retain lane-head serialization.
+- Bind and test cancellation flags with each SQL dialect's native boolean representation. PostgreSQL now uses booleans, MySQL uses `0`/`1`, and SQLite keeps its legacy-compatible integer and text predicates.
+
 ## 0.34.1
 
 - Export `tenetkit/runtime/external-child-placement` and `tenetkit/runtime/external-child-store` as narrow Worker-safe entrypoints. Consumers can use the cross-partition protocol without traversing the broad Runtime barrel and its Bun SQLite implementation; the packed-package smoke test now bundles both entrypoints for a browser target.
