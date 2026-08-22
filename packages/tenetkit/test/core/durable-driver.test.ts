@@ -1240,7 +1240,8 @@ describe("DurableDriver Agent.stream integration", () => {
           if (operation.key !== targetOperation || replaySettled) return Effect.void
           return Effect.sync(() => {
             settledOutcome = outcome
-          }).pipe(Effect.andThen(Effect.interrupt))
+            throw new Error("simulated journal crash")
+          })
         },
         onCheckpoint: () => Effect.void,
       }

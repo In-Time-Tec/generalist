@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.36.0
+
+- Upgrade the complete release train to Bun 1.4.0, Effect 4.0.0-rc.111, and FoldKit 0.148.2.
+- Make every integration SDK an optional peer of `tenetkit`; installing Core now requires only Effect, while importing an integration subpath requires its owning SDK explicitly.
+- Require Bun 1.4 for the Bun REPL implementation and release verification.
+
 ## 0.35.0
 
 - License the workspace and all four published packages under MIT, include the license in every tarball, and make package verification reject missing or inconsistent license metadata.
