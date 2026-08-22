@@ -71,6 +71,11 @@ export const promoteChildCapacity = <E, R>(input: {
       return
     }
     let active = yield* activeChildCount(parent.runId)
+    const cancellationNotRequested = sql.onDialectOrElse({
+      pg: () => sql`r.cancellation_requested = FALSE`,
+      mysql: () => sql`r.cancellation_requested = 0`,
+      orElse: () => sql`r.cancellation_requested IN (0, 'false')`,
+    })
     const queued = yield* sql<{
       child_run_id: string
       fan_out_id: string | null
@@ -85,7 +90,7 @@ export const promoteChildCapacity = <E, R>(input: {
       WHERE l.parent_run_id = ${parent.runId}
         AND l.readiness = 'queued'
         AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
-        AND r.cancellation_requested IN (0, 'false')
+        AND ${cancellationNotRequested}
       ORDER BY l.created_at ASC, CASE WHEN m.ordinal IS NULL THEN -1 ELSE m.ordinal END ASC, l.child_run_id ASC
     `
     for (const candidate of queued) {

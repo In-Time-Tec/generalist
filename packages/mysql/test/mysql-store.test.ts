@@ -205,6 +205,43 @@ describeMysql("mysql run store", () => {
     ),
   )
 
+  it.live("reconciles native cancellation flags at startup", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const [cancelledRunId, activeRunId] = yield* scopedWith(mysqlLayer(url))(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const cancelled = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: uniqueSession("startup-cancelled"),
+              idempotencyKey: "startup-cancelled",
+              prompt: "cancelled",
+            })
+            const active = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: uniqueSession("startup-active"),
+              idempotencyKey: "startup-active",
+              prompt: "active",
+            })
+            return [cancelled.runId, active.runId] as const
+          }),
+        )
+        yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = 1 WHERE run_id = ${cancelledRunId}`
+          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = 0 WHERE run_id = ${activeRunId}`
+        }).pipe(scopedWith(mysqlClient(url)))
+        yield* scopedWith(mysqlLayer(url))(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            expect((yield* runtime.inspect(cancelledRunId)).status).toBe("cancelling")
+            expect((yield* runtime.inspect(activeRunId)).status).toBe("running")
+          }),
+        )
+      }),
+    ),
+  )
+
   it.live("persists the exact resolution supplied to RunStore.resume", () =>
     withSchema(
       Effect.gen(function* () {

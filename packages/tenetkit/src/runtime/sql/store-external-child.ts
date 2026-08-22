@@ -64,6 +64,13 @@ interface ExternalRootRow {
 const decodeFlag = (value: number | boolean | string): boolean =>
   value === true || value === "true" || Number(value) === 1
 
+const sqlBool = (sql: SqlClient.SqlClient, value: boolean): boolean | 0 | 1 =>
+  sql.onDialectOrElse({
+    pg: () => value,
+    mysql: () => (value ? 1 : 0),
+    orElse: () => (value ? 1 : 0),
+  })
+
 const decode = (row: Row): Placement => ({
   placementId: row.placement_id,
   parentRunId: row.parent_run_id,
@@ -149,7 +156,7 @@ export const reserve: {
         ${input.invocationId}, ${input.requestDigest}, ${input.executableDigest},
         ${input.parentSuspension?.wait.waitId ?? null},
         ${input.parentSuspension === undefined ? null : suspensionIdentity(input.parentSuspension)},
-        ${parent.cancellationRequested ? 1 : 0}, ${createdAt})`
+        ${sqlBool(sql, parent.cancellationRequested)}, ${createdAt})`
     if (input.parentSuspension !== undefined) {
       yield* suspend(hub, { ...input, ...input.parentSuspension })
     }
@@ -173,7 +180,7 @@ export const cancel = (placementId: string) =>
     if ((yield* load(placementId)) === undefined) {
       return yield* ExternalChildPlacementNotFound.make({ placementId })
     }
-    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = 1
+    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = ${sqlBool(sql, true)}
       WHERE placement_id = ${placementId} AND settlement_id IS NULL`
     return (yield* load(placementId))!
   })
@@ -181,7 +188,7 @@ export const cancel = (placementId: string) =>
 export const cancelForParent = (parentRunId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = 1
+    yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = ${sqlBool(sql, true)}
       WHERE parent_run_id = ${parentRunId} AND settlement_id IS NULL`
   })
 

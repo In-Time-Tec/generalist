@@ -309,6 +309,43 @@ describePostgres("postgres run store", () => {
     ),
   )
 
+  it.live("reconciles native cancellation flags at startup", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const [cancelledRunId, activeRunId] = yield* scopedWith(postgresLayer(url))(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const cancelled = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: uniqueSession("startup-cancelled"),
+              idempotencyKey: "startup-cancelled",
+              prompt: "cancelled",
+            })
+            const active = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: uniqueSession("startup-active"),
+              idempotencyKey: "startup-active",
+              prompt: "active",
+            })
+            return [cancelled.runId, active.runId] as const
+          }),
+        )
+        yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = TRUE WHERE run_id = ${cancelledRunId}`
+          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = FALSE WHERE run_id = ${activeRunId}`
+        }).pipe(scopedWith(postgresClient(url)))
+        yield* scopedWith(postgresLayer(url))(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            expect((yield* runtime.inspect(cancelledRunId)).status).toBe("cancelling")
+            expect((yield* runtime.inspect(activeRunId)).status).toBe("running")
+          }),
+        )
+      }),
+    ),
+  )
+
   it.live("persists the exact resolution supplied to RunStore.resume", () =>
     withSchema(
       Effect.gen(function* () {
