@@ -1,8 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "tenetkit-workspace",
-  "version": "0.34.2",
+  "version": "0.35.0",
   "description": "Effect-native agent framework with an optional durable Runtime",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.3.14",
@@ -66,7 +67,8 @@
       "turbo": "2.8.13",
       "typescript": "7.0.2",
       "vite": "8.1.3",
-      "vitest": "4.1.11"
+      "vitest": "4.1.11",
+      "wrangler": "4.123.0"
     },
     "catalogs": {
       "peer": {

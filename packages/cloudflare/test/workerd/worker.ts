@@ -1,5 +1,8 @@
-import { Effect, Layer } from "effect"
+import { Effect, Exit, Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { Agent, Approvals, Permissions, Tool, Toolkit } from "tenetkit"
+import { decodeConfig as decodeOpenRouterConfig } from "tenetkit/ai/openrouter"
+import { TestModel } from "tenetkit/test"
 import { SqlClient } from "effect/unstable/sql"
 import { makeTest } from "tenetkit/runtime/driver/executable-manifest"
 import { make as makeMessage } from "tenetkit/runtime/driver/message"
@@ -38,6 +41,112 @@ interface DurableObjectState {
     tag?: string,
   ) => ReadonlyArray<import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket>
 }
+
+const lookup = Tool.make("lookup", {
+  description: "Look up a provider fact",
+  parameters: Schema.Struct({ query: Schema.String }),
+  success: Schema.String,
+})
+
+const purchase = Tool.make("purchase", {
+  description: "Make a purchase",
+  parameters: Schema.Struct({ item: Schema.String }),
+  success: Schema.String,
+})
+
+const plannerToolkit = Toolkit.make(lookup, purchase)
+const planSchema = Schema.Struct({
+  objective: Schema.String,
+  facts: Schema.Array(Schema.String),
+})
+const planner = Agent.make({
+  name: "workerd-planner",
+  instructions: "Use read-only lookup, then return the structured plan.",
+  toolkit: plannerToolkit,
+  budget: {
+    modelCalls: 3,
+    toolCalls: 1,
+    totalTokens: 128,
+    deadline: "2099-01-01T00:00:00.000Z",
+  },
+})
+const failClosed = Permissions.layerRuleset({
+  rules: [{ pattern: "lookup", level: "allow" }],
+  fallback: "deny",
+})
+
+const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(function* () {
+  let lookupExecutions = 0
+  let deniedExecutions = 0
+  const successFixture = yield* TestModel.make([
+    TestModel.toolCall("lookup", { query: "Boise provider" }, { id: "lookup-1" }),
+    TestModel.text("I found one provider."),
+    TestModel.object({ objective: "Arrange service", facts: ["Provider serves Boise"] }),
+  ])
+  const successLayer = Layer.mergeAll(
+    successFixture.layer,
+    plannerToolkit.toLayer({
+      lookup: ({ query }) =>
+        Effect.sync(() => {
+          lookupExecutions += 1
+          return `${query}: available`
+        }),
+      purchase: ({ item }) =>
+        Effect.sync(() => {
+          deniedExecutions += 1
+          return item
+        }),
+    }),
+    failClosed,
+    Approvals.layerDenyAll,
+  )
+  const successServices = yield* Layer.build(successLayer)
+  const planned = yield* Agent.generate(planner, {
+    prompt: "Find a provider and propose a plan.",
+    output: { schema: planSchema },
+  }).pipe(Effect.provideContext(successServices))
+
+  const deniedFixture = yield* TestModel.make([
+    TestModel.toolCall("purchase", { item: "unapproved service" }, { id: "purchase-1" }),
+  ])
+  const deniedServices = yield* Layer.build(
+    Layer.mergeAll(
+      deniedFixture.layer,
+      plannerToolkit.toLayer({
+        lookup: ({ query }) => Effect.succeed(query),
+        purchase: ({ item }) =>
+          Effect.sync(() => {
+            deniedExecutions += 1
+            return item
+          }),
+      }),
+      failClosed,
+      Approvals.layerDenyAll,
+    ),
+  )
+  const denied = yield* Agent.generate(planner, { prompt: "Buy the service." }).pipe(
+    Effect.provideContext(deniedServices),
+    Effect.exit,
+  )
+
+  const exhaustedFixture = yield* TestModel.make([TestModel.text("must not execute")])
+  const exhaustedServices = yield* Layer.build(exhaustedFixture.layer)
+  const exhausted = yield* Agent.generate(Agent.make({ name: "workerd-budget", budget: { modelCalls: 0 } }), {
+    prompt: "This model call is outside the budget.",
+  }).pipe(Effect.provideContext(exhaustedServices), Effect.exit)
+  const exhaustedRequests = yield* exhaustedFixture.requests
+
+  return Response.json({
+    objective: planned.value.objective,
+    facts: planned.value.facts,
+    lookupExecutions,
+    denied: Exit.isFailure(denied),
+    deniedExecutions,
+    budgetExhausted: Exit.isFailure(exhausted),
+    budgetModelRequests: exhaustedRequests.length,
+    openRouterBundled: Object.keys(decodeOpenRouterConfig({})).length === 0,
+  })
+})
 
 const replayExecutable = makeTest("workerd-replay", "1")
 const replayEvents = [0, 1].map(
@@ -246,12 +355,14 @@ export class SqlObject {
 }
 
 export default make<Env, never>((request) =>
-  Effect.gen(function* () {
-    const context = yield* WorkerContext
-    const bindings = context.bindings as Env
-    const replay = new URL(request.url).pathname.startsWith("/replay")
-    const namespace = replay ? bindings.REPLAY_OBJECTS : bindings.SQL_OBJECTS
-    const id = namespace.idFromName("default")
-    return yield* Effect.promise(() => namespace.get(id).fetch(request))
-  }),
+  new URL(request.url).pathname === "/agent"
+    ? agentConformance().pipe(Effect.orDie)
+    : Effect.gen(function* () {
+        const context = yield* WorkerContext
+        const bindings = context.bindings as Env
+        const replay = new URL(request.url).pathname.startsWith("/replay")
+        const namespace = replay ? bindings.REPLAY_OBJECTS : bindings.SQL_OBJECTS
+        const id = namespace.idFromName("default")
+        return yield* Effect.promise(() => namespace.get(id).fetch(request))
+      }),
 )

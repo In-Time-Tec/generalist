@@ -304,6 +304,49 @@ describe("model instrumentation", () => {
     }),
   )
 
+  it.effect("emits provider-native finish metadata without normalizing it", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      const providerMetadata = {
+        openrouter: {
+          provider: "Anthropic",
+          usage: {
+            completion_tokens: 2,
+            cost: 0.0042,
+            cost_details: {
+              upstream_inference_completions_cost: 0.0028,
+              upstream_inference_cost: 0.0038,
+              upstream_inference_prompt_cost: 0.001,
+            },
+            prompt_tokens: 3,
+            total_tokens: 5,
+          },
+        },
+      }
+      const providerFinish = Response.makePart("finish", {
+        reason: "stop",
+        usage,
+        response: undefined,
+        metadata: providerMetadata,
+      })
+      const wrapped = instrument(languageModel({ streamText: () => Stream.make(providerFinish) }), {
+        emit,
+        turn: 0,
+      })
+
+      yield* wrapped.streamText({ prompt: "preserve provider telemetry" }).pipe(Stream.runDrain)
+
+      const [completed] = byTag(events, "ModelAttemptCompleted")
+      expect(completed?.providerMetadata).toEqual(providerMetadata)
+      expect(
+        Schema.is(ModelTelemetry.ModelAttemptCompleted)({
+          ...completed,
+          deliveryId: "provider-native-telemetry",
+        }),
+      ).toBe(true)
+    }),
+  )
+
   it.effect("joins one stream call across started, parts, first outputs, and completion", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()

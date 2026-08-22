@@ -68,6 +68,7 @@ interface Finished {
   readonly reason: Response.FinishReason
   readonly usage: Response.Usage
   readonly at: number
+  readonly providerMetadata: Response.ProviderMetadata
 }
 
 type Termination = { readonly _tag: "Open" } | Finished
@@ -116,6 +117,7 @@ const coordinateCompleted = (
         completedAt,
         usage: finished.usage,
         finishReason: finished.reason,
+        ...(Object.keys(finished.providerMetadata).length === 0 ? {} : { providerMetadata: finished.providerMetadata }),
         ...(attempt.state.requestId === undefined ? {} : { requestId: attempt.state.requestId }),
         ...(attempt.state.responseModel === undefined ? {} : { responseModel: attempt.state.responseModel }),
         ...identityFields(attempt.identity),
@@ -142,6 +144,7 @@ const attemptCompleted = (
       usage: finished.usage,
       usageAt: finished.at,
       finishReason: finished.reason,
+      ...(Object.keys(finished.providerMetadata).length === 0 ? {} : { providerMetadata: finished.providerMetadata }),
       ...(attempt.state.requestId === undefined ? {} : { requestId: attempt.state.requestId }),
       ...(attempt.state.responseModel === undefined ? {} : { responseModel: attempt.state.responseModel }),
       ...identityFields(attempt.identity),
@@ -243,7 +246,13 @@ const observeStreamPart = (
     }
     if (part.type === "finish") {
       const at = yield* Clock.currentTimeMillis
-      attempt.state.termination = { _tag: "Finished", reason: part.reason, usage: part.usage, at }
+      attempt.state.termination = {
+        _tag: "Finished",
+        reason: part.reason,
+        usage: part.usage,
+        at,
+        providerMetadata: part.metadata,
+      }
     }
     const kind = firstOutputKind(part)
     if (kind !== undefined && !attempt.state.firstOutputs.has(kind)) {
