@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.35.0
+
+- License the workspace and all four published packages under MIT, include the license in every tarball, and make package verification reject missing or inconsistent license metadata.
+- Prove the process-local `Agent.generate` path inside real workerd with structured output, finite budgets, fail-closed tool authorization, a denied side effect, and a bundle-time OpenRouter import; add the same request-scoped Worker composition as a runnable recipe.
+- Emit non-empty provider-native Effect AI finish metadata unchanged on completed model-attempt telemetry. TenetKit keeps normalized token usage but does not invent a common provider billing schema or discard OpenRouter cost details.
 
 ## 0.34.2
 
