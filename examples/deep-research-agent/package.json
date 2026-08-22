@@ -2,7 +2,7 @@
   "name": "@tenetkit/example-deep-research-agent",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.3.14",
+  "packageManager": "bun@1.4.0",
   "scripts": {
     "start": "bun run --cwd server start",
     "server": "bun run --cwd server start",
