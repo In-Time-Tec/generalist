@@ -222,17 +222,19 @@ const program = Effect.gen(function* () {
       return yield* smokeError(`@tenetkit/${packageName} must not bundle dependencies`)
     }
     for (const dependency of packedEffectDependencies[packageName]) {
-      if (manifest.dependencies?.[dependency] !== effectVersion) {
+      const dependencyVersion =
+        packageName === "tenetkit" ? manifest.peerDependencies?.[dependency] : manifest.dependencies?.[dependency]
+      if (dependencyVersion !== effectVersion) {
         return yield* smokeError(
-          `@tenetkit/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
+          `@tenetkit/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
         )
       }
     }
     if (packageName === "tenetkit") {
       for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
-        if (manifest.dependencies?.[dependency] !== dependencyVersion) {
+        if (manifest.peerDependencies?.[dependency] !== dependencyVersion) {
           return yield* smokeError(
-            `tenetkit must pin ${dependency}@${dependencyVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
+            `tenetkit must pin optional peer ${dependency}@${dependencyVersion}; packed ${String(manifest.peerDependencies?.[dependency])}`,
           )
         }
       }
@@ -247,6 +249,11 @@ const program = Effect.gen(function* () {
     }
   }
 
+  const integrationPeers = Object.fromEntries(
+    Object.entries((packedManifests.tenetkit?.peerDependencies as Record<string, string> | undefined) ?? {}).filter(
+      ([dependency]) => dependency !== "effect" && dependency !== "foldkit",
+    ),
+  )
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "package.json"),
     encodeJson({
@@ -255,6 +262,7 @@ const program = Effect.gen(function* () {
       type: "module",
       dependencies: {
         ...tarballs,
+        ...integrationPeers,
         effect: effectVersion,
         esbuild: rootManifest.workspaces.catalog.esbuild,
         foldkit: rootManifest.workspaces.catalog.foldkit,
@@ -426,6 +434,36 @@ console.log(\`imported \${specifiers.length} TenetKit exports\`)
   if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@tenetkit")) {
     return yield* smokeError("Bun consumer resolved a TenetKit package from npm")
   }
+
+  const coreConsumerDirectory = path.join(directory, "core-consumer")
+  yield* fileSystem.makeDirectory(coreConsumerDirectory)
+  yield* fileSystem.writeFileString(
+    path.join(coreConsumerDirectory, "package.json"),
+    encodeJson({
+      name: "tenetkit-core-consumer",
+      private: true,
+      type: "module",
+      dependencies: { effect: effectVersion, tenetkit: tarballs.tenetkit },
+    }),
+  )
+  yield* fileSystem.writeFileString(
+    path.join(coreConsumerDirectory, "runtime.mjs"),
+    `import { Agent, Session } from "tenetkit"
+if (Agent === undefined || Session === undefined) throw new Error("core export is missing")
+`,
+  )
+  yield* run("bun", ["install", "--linker=isolated"], coreConsumerDirectory, {
+    BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache"),
+  })
+  const unexpectedIntegrations = (yield* run(
+    "find",
+    ["node_modules", "-path", "*/@effect/ai-anthropic/package.json", "-print"],
+    coreConsumerDirectory,
+  )).trim()
+  if (unexpectedIntegrations.length > 0) {
+    return yield* smokeError(`core-only consumer installed optional provider SDKs:\n${unexpectedIntegrations}`)
+  }
+  yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], coreConsumerDirectory)
 
   const npmConsumerDirectory = path.join(directory, "npm-consumer")
   yield* fileSystem.makeDirectory(npmConsumerDirectory)

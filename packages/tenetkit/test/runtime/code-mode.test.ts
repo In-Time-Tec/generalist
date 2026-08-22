@@ -386,15 +386,15 @@ describe("Runtime code_mode Program children", () => {
     const modelSchema = Tool.getJsonSchema(declaration)
     expect(modelSchema).toMatchObject({
       properties: {
-        source: { type: "string", allOf: [{ maxLength: 1_000 }] },
-        tools: { items: { anyOf: [{ type: "string", enum: ["shell.run"] }] }, allOf: [{ maxItems: 64 }] },
-        agents: { items: { anyOf: [{ type: "string", enum: ["researcher"] }] }, allOf: [{ maxItems: 64 }] },
-        steps: { items: { anyOf: [{ type: "string", enum: ["load.dataset"] }] }, allOf: [{ maxItems: 64 }] },
+        source: { type: "string", maxLength: 1_000 },
+        tools: { items: { anyOf: [{ type: "string", enum: ["shell.run"] }] }, maxItems: 64 },
+        agents: { items: { anyOf: [{ type: "string", enum: ["researcher"] }] }, maxItems: 64 },
+        steps: { items: { anyOf: [{ type: "string", enum: ["load.dataset"] }] }, maxItems: 64 },
         budget: {
           properties: {
-            agentRuns: { type: "integer", allOf: [{ minimum: 0 }, { maximum: 2 }] },
-            concurrency: { type: "integer", allOf: [{ minimum: 1 }, { maximum: 1 }] },
-            toolCalls: { type: "integer", allOf: [{ minimum: 0 }, { maximum: 3 }] },
+            agentRuns: { type: "integer", minimum: 0, maximum: 2 },
+            concurrency: { type: "integer", minimum: 1, maximum: 1 },
+            toolCalls: { type: "integer", minimum: 0, maximum: 3 },
           },
         },
       },
@@ -457,7 +457,7 @@ describe("Runtime code_mode Program children", () => {
         expect((modelSchema["properties"] as Record<string, unknown>)[dimension]).toMatchObject({
           type: "array",
           items: { type: "string" },
-          allOf: [{ maxItems: 0 }],
+          maxItems: 0,
         })
       }
       const exact = { source: "return input", input: "input", tools: [], agents: [], steps: [], budget }
