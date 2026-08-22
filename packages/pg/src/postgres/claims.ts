@@ -22,7 +22,13 @@ export const claimReadyRuns = (options: ClaimOptions) =>
         WHERE r.status IN ('queued', 'running', 'cancelling')
           AND r.cancellation_requested = FALSE
           AND (
-            (r.parent_run_id IS NULL AND EXISTS (SELECT 1 FROM tenetkit_lanes l WHERE l.head_run_id = r.run_id))
+            (
+              r.parent_run_id IS NULL
+              AND (
+                r.status = 'running'
+                OR EXISTS (SELECT 1 FROM tenetkit_lanes l WHERE l.head_run_id = r.run_id)
+              )
+            )
             OR EXISTS (
               SELECT 1 FROM tenetkit_run_links link
               WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'

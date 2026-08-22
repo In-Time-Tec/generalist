@@ -1,9 +1,9 @@
 import { layerPostgres } from "@tenetkit/pg"
 import { describe, expect, layer } from "@effect/vitest"
-import { Clock, Effect } from "effect"
+import { Clock, Effect, Layer } from "effect"
 import { Pins } from "tenetkit"
 import { SqlClient } from "effect/unstable/sql"
-import { Errors, ExecutionHost, RunClaims, Runtime, RunStore } from "tenetkit/runtime"
+import { Errors, ExecutionHost, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -93,6 +93,43 @@ describePostgres("postgres Program store contract", () => {
               status: "succeeded",
             })
             expect(fixture.counts()).toEqual({ toolCalls: 1, logs: 1 })
+          }),
+        )
+      },
+    )
+  }
+
+  {
+    const database = postgresDatabase("program-exact-root-worker")
+    const fixture = programFixture()
+    const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "postgres-exact-root-worker" }).pipe(
+      Layer.provideMerge(
+        layerPostgres({
+          url: database.url,
+          maxConnections: postgresTestMaxConnections,
+          resolver: fixture.resolver,
+          addresses: [],
+        }),
+      ),
+    )
+    layer(database.provision(runtimeLayer), { excludeTestServices: true })(
+      "claims and executes a running parentless exact root without a lane",
+      (it) => {
+        it.effect("claims and executes a running parentless exact root without a lane", () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const worker = yield* RuntimeWorker.RuntimeWorker
+            const receipt = yield* runtime.start({
+              executable: programExecutable,
+              registrations: registrationsFor(programExecutable),
+              sessionId: "postgres-exact-root-worker",
+              idempotencyKey: "postgres-exact-root-worker",
+              prompt: "run",
+            })
+            const claimed = yield* worker.execute
+            expect(receipt.childRunIds).toEqual([])
+            expect(claimed.map((item) => item.run.runId)).toEqual([receipt.runId])
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
           }),
         )
       },

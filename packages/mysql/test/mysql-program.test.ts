@@ -1,8 +1,8 @@
 import { layerMysql } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
-import { Effect } from "effect"
-import { Errors, ExecutionHost, RunClaims, Runtime, RunStore } from "tenetkit/runtime"
+import { Effect, Layer } from "effect"
+import { Errors, ExecutionHost, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -52,6 +52,44 @@ describeMysql("mysql Program store contract", () => {
             Effect.andThen(programCancellationFinalizerContract),
             Effect.andThen(programCancellationFenceContract),
           ),
+        )
+      },
+    )
+  }
+
+  {
+    const url = database.url
+    const fixture = programFixture()
+    const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "mysql-exact-root-worker" }).pipe(
+      Layer.provideMerge(
+        layerMysql({
+          url,
+          source: "mysql-test",
+          resolver: fixture.resolver,
+          addresses: [],
+        }),
+      ),
+    )
+    layer(database.provision(runtimeLayer), { excludeTestServices: true })(
+      "claims and executes a running parentless exact root without a lane",
+      (it) => {
+        it.effect("claims and executes a running parentless exact root without a lane", () =>
+          Effect.gen(function* () {
+            yield* database.truncated
+            const runtime = yield* Runtime.Runtime
+            const worker = yield* RuntimeWorker.RuntimeWorker
+            const receipt = yield* runtime.start({
+              executable: programExecutable,
+              registrations: registrationsFor(programExecutable),
+              sessionId: "mysql-exact-root-worker",
+              idempotencyKey: "mysql-exact-root-worker",
+              prompt: "run",
+            })
+            const claimed = yield* worker.execute
+            expect(receipt.childRunIds).toEqual([])
+            expect(claimed.map((item) => item.run.runId)).toEqual([receipt.runId])
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+          }),
         )
       },
     )
