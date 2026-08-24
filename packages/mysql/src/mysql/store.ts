@@ -17,6 +17,7 @@ import { checkpointRef } from "tenetkit/runtime/driver/executable-manifest"
 import type { LayerOptions } from "tenetkit/runtime/driver/runtime"
 import { RunStore, type Interface as RunStoreInterface } from "tenetkit/runtime/driver/run-store"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "tenetkit/runtime/driver/sql/store-admit"
+import { activateRoot } from "tenetkit/runtime/driver/sql/store-activate"
 import { cancel, complete, emitAgentEvent, fail, respond } from "tenetkit/runtime/driver/sql/store-control"
 import { respondApproval, resume, settleAdmittedCancellation, signal } from "tenetkit/runtime/driver/sql/store-control"
 import {
@@ -259,7 +260,9 @@ export const makeMysqlServices = (
             admitSend(transactionHub, addressBindings, input, { promote: false }),
           ),
         ),
-      admitStart: (input) => run(lockNamed("tenetkit:executable-registrations", admitStart(transactionHub, input))),
+      admitStart: (input, startOptions) =>
+        run(lockNamed("tenetkit:executable-registrations", admitStart(transactionHub, input, startOptions))),
+      activate: (input) => run(lockRun(input.runId).pipe(Effect.andThen(activateRoot(transactionHub, input.runId)))),
       admitSpawn: (input) => run(lockRun(input.parentRunId).pipe(Effect.andThen(admitSpawn(transactionHub, input)))),
       admitProgramChild: (input) =>
         run(

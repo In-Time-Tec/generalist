@@ -20,7 +20,7 @@ import type { Interface as ExternalChildStoreInterface } from "../external-child
 import { projectRunSnapshot } from "../inspection.js"
 import { startDigest } from "./digest.js"
 import { admitStart } from "./store-admit.js"
-import { appendLifecycle, makeAttemptStarted } from "./append.js"
+import { activateRoot as activateAdmittedRoot } from "./store-activate.js"
 import { activeChildCount, promoteChildCapacity } from "./store-child-capacity.js"
 import { cancel as cancelRun, respond, suspend } from "./store-control.js"
 import { requireExecutionClaim } from "./store-execution.js"
@@ -262,15 +262,16 @@ const activateRoot = (state: MemoryState, placementId: string) =>
     const run = state.runs.get(stored.ref.runId)
     if (run === undefined)
       return yield* RuntimeUnavailable.make({ message: `external root ${stored.ref.runId} is missing` })
-    let next = state
-    if (run.status === "queued" && !run.cancellationRequested) {
-      next = (yield* appendLifecycle(state, run.runId, makeAttemptStarted(run.attempt + 1), "running"))[1]
-    }
+    const [, next] = yield* activateAdmittedRoot(state, run.runId).pipe(
+      Effect.catchTag("tenetkit/runtime/RunNotFound", () =>
+        RuntimeUnavailable.make({ message: `external root ${stored.ref.runId} is missing` }),
+      ),
+    )
     const activated = { ...stored, activated: true }
     const roots = new Map(next.externalRoots)
     roots.set(placementId, activated)
-    next = { ...next, externalRoots: roots }
-    return [yield* rootView(next, activated), next] as const
+    const activatedState = { ...next, externalRoots: roots }
+    return [yield* rootView(activatedState, activated), activatedState] as const
   })
 
 const inspectRoot = (state: MemoryState, placementId: string) =>
