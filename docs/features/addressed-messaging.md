@@ -21,7 +21,9 @@ An Address states which directory table to read. It never carries authority. `Ru
 Cross-session messaging is off by default and is enabled by one host-supplied policy, passed as `messagingPolicy` in the Runtime layer options. `allow` receives both resolved directory entries plus the derived `relationship` and a `crossSession` flag, and returns whether that one direction is permitted; `discover` returns addresses the host wants to advertise to a sender, and each one is still put through `allow` before it is listed. TenetKit's four relationships are checked first, so a policy only ever widens.
 
 ```ts
-Runtime.layerSqlite({
+import { Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
+
+SqliteRuntime.layerSqlite({
   // ...
   messagingPolicy: {
     allow: (input) => Effect.succeed(linkedThreads(input.sender.sessionId, input.target.sessionId)),

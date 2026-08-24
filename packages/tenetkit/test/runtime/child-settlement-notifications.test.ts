@@ -4,6 +4,7 @@ import { AgentDirectory, ChildSettlement, Errors, LocalScheduler, Runtime, RunSt
 import { assistantAddress, completedResult, parentRelativeOptions, textPrompt } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const options = {
   ...parentRelativeOptions,
   scheduler: { pollInterval: "1 hour" as const },
@@ -12,7 +13,7 @@ const options = {
 
 const layers = [
   ["memory", Runtime.layerMemory(options)],
-  ["sqlite", Runtime.layerSqlite({ ...options, filename: tempDbPath("child-settlements") })],
+  ["sqlite", SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("child-settlements") })],
 ] as const
 
 it("separates cancelled settlement observation from model delivery", () => {
@@ -308,7 +309,7 @@ const scopedWith =
 
 it.effect("SQLite preserves exactly one notification across close and reopen", () => {
   const filename = tempDbPath("child-settlement-reopen")
-  const sqlite = Runtime.layerSqlite({ ...options, filename })
+  const sqlite = SqliteRuntime.layerSqlite({ ...options, filename })
   let parentRunId = ""
   let childRunId = ""
   return Effect.gen(function* () {

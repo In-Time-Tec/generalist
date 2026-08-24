@@ -31,6 +31,7 @@ export const packedProviderDependencies = {
 export const packageExports = [
   "tenetkit",
   "tenetkit/runtime",
+  "tenetkit/runtime/sqlite-bun",
   "tenetkit/ai",
   "tenetkit/mcp",
   "tenetkit/skills",

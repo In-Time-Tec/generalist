@@ -18,6 +18,7 @@ import { closedTestAgent } from "./identity.js"
 import { provideScoped } from "./scoped-provide.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const externalRoot = (id: string) => ({
   placementId: `placement:${id}`,
   parent: { partition: "openwork:parent", runId: `parent:${id}` },
@@ -399,7 +400,7 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
 it.live("rolls back reservation and projects settlement-driven cancellation in SQLite transactions", () => {
   let rejectProjection = false
   const projected: Array<{ readonly runId: string; readonly intent: string }> = []
-  const layer = Runtime.layerSqlite({
+  const layer = SqliteRuntime.layerSqlite({
     filename: tempDbPath("external-child-rollback"),
     resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],

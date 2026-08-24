@@ -6,6 +6,7 @@ import { programAddress, programExecutable, programFixture } from "./program-fix
 import { programBudgetContract } from "./program-store-contract.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const memory = programFixture()
 const sqlite = programFixture()
 const address = (resolver: typeof memory.resolver) => ({
@@ -28,7 +29,10 @@ layer(Runtime.layerMemory(address(memory.resolver)))(
           Effect.scoped(
             Effect.flatMap(
               Layer.build(
-                Runtime.layerSqlite({ ...address(sqlite.resolver), filename: tempDbPath("program-budget-contract") }),
+                SqliteRuntime.layerSqlite({
+                  ...address(sqlite.resolver),
+                  filename: tempDbPath("program-budget-contract"),
+                }),
               ),
               (context) => programBudgetContract.pipe(Effect.provideContext(context)),
             ),

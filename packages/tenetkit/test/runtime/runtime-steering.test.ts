@@ -8,6 +8,7 @@ import { closedTestAgent, testExecutable } from "./identity.js"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistant, assistantAddress, assistantRef, completedResult, memoryLayer, registrationsFor } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const admitRun = Effect.gen(function* () {
@@ -187,7 +188,7 @@ for (const backend of ["memory", "sqlite"] as const) {
   const runtimeLayer =
     backend === "memory"
       ? Runtime.layerMemory(options)
-      : Runtime.layerSqlite({ ...options, filename: tempDbPath("steering-cancel-completion") })
+      : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("steering-cancel-completion") })
   layer(runtimeLayer, { excludeTestServices: true })(
     `${backend} completion cannot resurrect cancellation through pending steering`,
     (test) => {

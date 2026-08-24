@@ -49,7 +49,9 @@ export const runtimeReference = definePage({
     p(
       code("Runtime.layerMemory"),
       " is ephemeral and loses state when its process exits. ",
-      code("Runtime.layerSqlite"),
+      code("SqliteRuntime.layerSqlite"),
+      " from ",
+      code("tenetkit/runtime/sqlite-bun"),
       " is durable for one process. ",
       code("Runtime.layerPostgres"),
       " and ",

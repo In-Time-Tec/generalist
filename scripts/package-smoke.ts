@@ -352,7 +352,10 @@ console.log(ExternalChildPlacement, ExternalChildStore)
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${encodeJson(packageExports)}
-for (const specifier of specifiers) await import(specifier)
+const runtimeSpecifiers = process.versions.bun === undefined
+  ? specifiers.filter((specifier) => specifier !== "tenetkit/runtime/sqlite-bun")
+  : specifiers
+for (const specifier of runtimeSpecifiers) await import(specifier)
 const forbidden = ${encodeJson(forbiddenPackageExports)}
 for (const specifier of forbidden) {
   let blocked = false
@@ -396,7 +399,7 @@ if (!Layer.isLayer(OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted(
 if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {
   throw new Error("TestModel does not use the root Effect identity")
 }
-console.log(\`imported \${specifiers.length} TenetKit exports\`)
+console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
 `,
   )
 
@@ -443,13 +446,31 @@ console.log(\`imported \${specifiers.length} TenetKit exports\`)
       name: "tenetkit-core-consumer",
       private: true,
       type: "module",
-      dependencies: { effect: effectVersion, tenetkit: tarballs.tenetkit },
+      dependencies: {
+        effect: effectVersion,
+        esbuild: rootManifest.workspaces.catalog.esbuild,
+        tenetkit: tarballs.tenetkit,
+      },
     }),
   )
   yield* fileSystem.writeFileString(
     path.join(coreConsumerDirectory, "runtime.mjs"),
     `import { Agent, Session } from "tenetkit"
+import { Runtime } from "tenetkit/runtime"
 if (Agent === undefined || Session === undefined) throw new Error("core export is missing")
+if (Runtime.layerMemory === undefined) throw new Error("generic Runtime export is missing")
+`,
+  )
+  yield* fileSystem.writeFileString(
+    path.join(coreConsumerDirectory, "root-bundle.ts"),
+    `import { Agent, Session } from "tenetkit"
+console.log(Agent, Session)
+`,
+  )
+  yield* fileSystem.writeFileString(
+    path.join(coreConsumerDirectory, "runtime-bundle.ts"),
+    `import { Runtime } from "tenetkit/runtime"
+console.log(Runtime.layerMemory)
 `,
   )
   yield* run("bun", ["install", "--linker=isolated"], coreConsumerDirectory, {
@@ -462,6 +483,28 @@ if (Agent === undefined || Session === undefined) throw new Error("core export i
   )).trim()
   if (unexpectedIntegrations.length > 0) {
     return yield* smokeError(`core-only consumer installed optional provider SDKs:\n${unexpectedIntegrations}`)
+  }
+  const unexpectedSqlite = (yield* run(
+    "find",
+    ["node_modules", "-path", "*/@effect/sql-sqlite-bun/package.json", "-print"],
+    coreConsumerDirectory,
+  )).trim()
+  if (unexpectedSqlite.length > 0) {
+    return yield* smokeError(`generic Runtime consumer installed the optional SQLite peer:\n${unexpectedSqlite}`)
+  }
+  for (const entry of ["root", "runtime"]) {
+    yield* run(
+      "bun",
+      [
+        "node_modules/esbuild/bin/esbuild",
+        `${entry}-bundle.ts`,
+        "--bundle",
+        "--format=esm",
+        "--platform=node",
+        `--outfile=${entry}-bundle.js`,
+      ],
+      coreConsumerDirectory,
+    )
   }
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], coreConsumerDirectory)
 

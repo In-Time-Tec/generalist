@@ -9,6 +9,7 @@ import { testExecutable } from "./identity.js"
 import { provideScoped } from "./scoped-provide.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const scalePoints = [1, 5, 10, 20] as const
 const probe = Tool.make("linear_storage_probe", {
   parameters: Schema.Struct({ marker: Schema.String }),
@@ -111,7 +112,7 @@ const makeFixture = (scale: number, filename: string) => {
   const resolver = ExecutableResolver.makeStatic([
     { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
   ])
-  const runtimeLayer = Runtime.layerSqlite({
+  const runtimeLayer = SqliteRuntime.layerSqlite({
     filename,
     resolver,
     addresses: [{ address, executable, registrations: registrationsFor(executable) }],

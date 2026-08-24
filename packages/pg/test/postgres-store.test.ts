@@ -835,7 +835,7 @@ describePostgres("postgres run store", () => {
     ),
   )
 
-  it.live("worker layer ticks claim and refresh leases", () =>
+  it.live("worker layer claims and renews active Runs", () =>
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -847,12 +847,11 @@ describePostgres("postgres run store", () => {
           idempotencyKey: "w",
           prompt: textPrompt("w"),
         })
-        const claimed = yield* worker.tick
+        const claimed = yield* worker.poll
         const claim = claimed.find((item) => item.run.runId === receipt.runId)!
         expect(claim).toBeDefined()
-        const again = yield* worker.tick
-        expect(again.some((item) => item.run.runId === receipt.runId)).toBe(true)
-        expect(again).toHaveLength(1)
+        expect(yield* worker.active).toBe(1)
+        expect(yield* worker.poll).toEqual([])
         yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
         expect(
           yield* (yield* RunClaims.RunClaims).refreshLease({
@@ -862,6 +861,7 @@ describePostgres("postgres run store", () => {
             lease: "10 seconds",
           }),
         ).toBe(false)
+        yield* worker.idle
       }).pipe(scopedWith(postgresWithWorker({ url, workerId: "tick-worker", concurrency: 2 }))),
     ),
   )
@@ -1201,7 +1201,7 @@ describePostgres("postgres run store", () => {
             idempotencyKey: "cross-process-model",
             prompt: "block model",
           })
-          const execution = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
+          yield* worker.poll
           yield* Deferred.await(started)
           yield* scopedWith(layerPostgres(options))(
             Runtime.Runtime.pipe(
@@ -1210,7 +1210,7 @@ describePostgres("postgres run store", () => {
               ),
             ),
           )
-          yield* Fiber.join(execution)
+          yield* worker.idle
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
           expect(lifecycle).toEqual([
             "admission resolver acquired",
@@ -1290,7 +1290,7 @@ describePostgres("postgres run store", () => {
             idempotencyKey: "cross-process-tool",
             prompt: "block tool",
           })
-          const execution = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
+          yield* worker.poll
           yield* Deferred.await(started)
           yield* scopedWith(layerPostgres(options))(
             Runtime.Runtime.pipe(
@@ -1299,7 +1299,7 @@ describePostgres("postgres run store", () => {
               ),
             ),
           )
-          yield* Fiber.join(execution)
+          yield* worker.idle
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
           expect(lifecycle).toEqual(["service acquired", "service finalized", "tool finalized"])
           const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(

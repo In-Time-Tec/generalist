@@ -10,6 +10,7 @@ import { registrationsFor } from "./helpers.js"
 import { testExecutable } from "./identity.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const usage = Response.Usage.make({
   inputTokens: { total: 1, uncached: 1, cacheRead: 0, cacheWrite: 0 },
   outputTokens: { total: 1, text: 1, reasoning: 0 },
@@ -203,7 +204,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
   }
 
   return Effect.gen(function* () {
-    const runId = yield* scopedWith(Runtime.layerSqlite(options))(
+    const runId = yield* scopedWith(SqliteRuntime.layerSqlite(options))(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const host = yield* ExecutionHost.ExecutionHost
@@ -221,7 +222,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
       }),
     )
 
-    yield* scopedWith(Runtime.layerSqlite(options))(
+    yield* scopedWith(SqliteRuntime.layerSqlite(options))(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const event = (yield* runtime.history({ runId, limit: 100 })).find(

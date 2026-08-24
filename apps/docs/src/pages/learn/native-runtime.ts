@@ -47,7 +47,7 @@ export const nativeRuntime = definePage({
       ["Layer", "Use it for"],
       [
         [[code("Runtime.layerMemory")], "Local development and tests; all state is lost with the process"],
-        [[code("Runtime.layerSqlite")], "Durable single-process execution with automatic schema migration"],
+        [[code("SqliteRuntime.layerSqlite")], "Durable single-process execution with automatic schema migration"],
         [[code("Runtime.layerPostgres")], "Durable multi-worker execution on PostgreSQL"],
         [[code("Runtime.layerMysql")], "Durable multi-worker execution on MySQL 8+"],
       ],
@@ -58,6 +58,15 @@ export const nativeRuntime = definePage({
       " for PostgreSQL or ",
       code("MysqlRunSchema"),
       " for MySQL in a predeploy migration step.",
+    ),
+    p(
+      "Import ",
+      code("Runtime as SqliteRuntime"),
+      " from ",
+      code("tenetkit/runtime/sqlite-bun"),
+      ". The generic ",
+      code("tenetkit/runtime"),
+      " entrypoint does not load or require the SQLite peer.",
     ),
     h2("package-boundary", "The package boundary"),
     p(

@@ -4,11 +4,12 @@ import { Errors, Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistantAddress, parentRelativeOptions, textPrompt } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const layers = [
   ["memory", Runtime.layerMemory({ ...parentRelativeOptions, scheduler: { pollInterval: "1 day" } })],
   [
     "sqlite",
-    Runtime.layerSqlite({
+    SqliteRuntime.layerSqlite({
       ...parentRelativeOptions,
       filename: tempDbPath("operation-cancellation-convergence"),
       scheduler: { pollInterval: "1 day" },

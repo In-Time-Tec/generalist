@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.37.0
+
+- Make the SQL runtime worker a scoped service that owns claim execution, cancellation, polling, health status, and idle settlement without detached fibers.
+- Add a claim-admission hook so hosts can durably project each accepted claim before execution starts.
+- Move Bun SQLite composition to the explicit `tenetkit/runtime/sqlite-bun` export so the generic Runtime package boundary remains platform-neutral.
+
 ## 0.36.0
 
 - Upgrade the complete release train to Bun 1.4.0, Effect 4.0.0-rc.111, and FoldKit 0.148.2.

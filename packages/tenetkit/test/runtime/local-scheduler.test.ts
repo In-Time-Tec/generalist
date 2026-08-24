@@ -20,6 +20,7 @@ import { layer as activeExecutionsLayer } from "../../src/runtime/active-executi
 import { make as makeLocalScheduler } from "../../src/runtime/local-scheduler.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const finish = Response.makePart("finish", {
   reason: "stop",
   usage: Response.Usage.make({
@@ -65,7 +66,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler") })
 
     layer(runtimeLayer)(`${backend} local scheduler executes admitted roots and children`, (it) => {
       it.effect("executes admitted roots and children", () =>
@@ -144,7 +145,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-external-claim") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-external-claim") })
 
     layer(runtimeLayer)(`${backend} local scheduler preserves an external execution claim`, (it) => {
       it.effect("does not fence an external execution claim", () =>
@@ -201,7 +202,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-cancel") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-cancel") })
 
     layer(runtimeLayer)(`${backend} local scheduler reconciles an orphaned cancelling tree root last`, (it) => {
       it.effect("reconciles an orphaned cancelling tree root last", () =>
@@ -315,7 +316,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-active") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-active") })
 
     layer(runtimeLayer)(`${backend} overlapping scheduler ticks do not reclaim an active local Run`, (it) => {
       it.effect("does not reclaim an active local Run", () =>
@@ -358,7 +359,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-claim-window") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-claim-window") })
 
     layer(runtimeLayer)(
       `${backend} the cancelling sweep fences an owner absent from this process incarnation`,
@@ -414,7 +415,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-fifo") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-fifo") })
 
     layer(runtimeLayer)(`${backend} scheduler selection claims the oldest ready Runs beyond the window`, (it) => {
       it.effect("claims the oldest ready Runs beyond the window", () =>
@@ -481,7 +482,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded") })
 
     layer(runtimeLayer)(`${backend} scheduler never scans terminal or waiting Runs for child settlement`, (it) => {
       it.effect(
@@ -792,7 +793,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-resume") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-resume") })
 
     layer(runtimeLayer)(`${backend} scheduler resumes a waiting parent once its child settles`, (it) => {
       it.effect("resumes a waiting parent once its child settles", () =>
@@ -859,7 +860,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-nonblocking") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-nonblocking") })
 
     layer(runtimeLayer)(`${backend} a tick admits a long-running Run without blocking on it`, (it) => {
       it.effect("admits a long-running Run without blocking on it", () =>
@@ -935,7 +936,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-sweep-interrupt") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-sweep-interrupt") })
 
     layer(runtimeLayer)(
       `${backend} the sweep interrupts an executing Run that a durable cancellation marked cancelling`,
@@ -1001,7 +1002,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded-concurrency") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded-concurrency") })
 
     layer(runtimeLayer, { excludeTestServices: true })(
       `${backend} concurrency still bounds simultaneously executing Runs across ticks`,
@@ -1062,7 +1063,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     const runtimeLayer =
       backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-unbounded-concurrency") })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-unbounded-concurrency") })
 
     layer(runtimeLayer, { excludeTestServices: true })(
       `${backend} default concurrency starts every selected Run without a bound`,

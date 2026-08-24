@@ -7,6 +7,7 @@ import { testExecutable } from "./identity.js"
 import { registrationsFor } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const finish = Response.makePart("finish", {
   reason: "stop",
   usage: Response.Usage.make({
@@ -61,7 +62,7 @@ const execute = (input: {
     const layer =
       input.backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath(`model-preview-${input.observer}`) })
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(`model-preview-${input.observer}`) })
 
     return yield* scopedWith(layer)(
       Effect.gen(function* () {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -46,6 +46,10 @@
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
+    },
+    "./runtime/sqlite-bun": {
+      "types": "./dist/runtime/sqlite-bun.d.ts",
+      "import": "./dist/runtime/sqlite-bun.js"
     },
     "./ai": {
       "types": "./dist/ai/index.d.ts",

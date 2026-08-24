@@ -13,6 +13,7 @@ import {
 import { closedTestAgent } from "./identity.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const input = {
   to: assistantAddress,
   sessionId: "send-attestation",
@@ -51,7 +52,7 @@ layer(
 
 const sqliteAdmissions = Ref.makeUnsafe(0)
 layer(
-  Runtime.layerSqlite({
+  SqliteRuntime.layerSqlite({
     filename: tempDbPath("send-attestation"),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     resolver: staticResolver(sqliteAdmissions),

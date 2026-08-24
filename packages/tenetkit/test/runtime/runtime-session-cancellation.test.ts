@@ -4,11 +4,12 @@ import { LocalScheduler, Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistantAddress, parentRelativeOptions, textPrompt } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 for (const backend of ["memory", "sqlite"] as const) {
   const runtimeLayer =
     backend === "memory"
       ? Runtime.layerMemory({ ...parentRelativeOptions, scheduler: { pollInterval: "1 day" } })
-      : Runtime.layerSqlite({
+      : SqliteRuntime.layerSqlite({
           ...parentRelativeOptions,
           filename: tempDbPath("session-cancellation"),
           scheduler: { pollInterval: "1 day" },

@@ -34,6 +34,7 @@ import {
 } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const scopedWith =
@@ -175,7 +176,7 @@ it.live("migrates and reopens a durable sqlite store", () =>
   }),
 )
 
-layer(Runtime.layerSqlite({ filename: tempDbPath("relative-selection"), ...parentRelativeOptions }))(
+layer(SqliteRuntime.layerSqlite({ filename: tempDbPath("relative-selection"), ...parentRelativeOptions }))(
   "resolves SQLite child selections relative to each persisted parent closure",
   (suite) => {
     suite.effect("resolves selections per persisted parent closure", () =>
@@ -289,7 +290,7 @@ it.live("rejects multi-worker configuration", () =>
     const filename = tempDbPath("workers")
     const failed = yield* Effect.exit(
       scopedWith(
-        Runtime.layerSqlite({
+        SqliteRuntime.layerSqlite({
           filename,
           multiWorker: true,
           resolver: ExecutableResolver.makeStatic([]),
@@ -303,7 +304,7 @@ it.live("rejects multi-worker configuration", () =>
 
 let attestations = 0
 layer(
-  Runtime.layerSqlite({
+  SqliteRuntime.layerSqlite({
     filename: tempDbPath("idem-attestation"),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     resolver: ExecutableResolver.ExecutableResolver.of({
@@ -397,7 +398,7 @@ it.live("rejects an exact duplicate after the address binding changes", () => {
   return Effect.gen(function* () {
     yield* scopedWith(sqliteLayer(filename))(admit)
     yield* scopedWith(
-      Runtime.layerSqlite({
+      SqliteRuntime.layerSqlite({
         filename,
         resolver: ExecutableResolver.makeStatic([]),
         addresses: [
@@ -714,7 +715,7 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       return { runId: receipt.runId, fiber, execution, operation, sessionPath }
     })
     const committedResult = yield* scopedWith(
-      Runtime.layerSqlite({
+      SqliteRuntime.layerSqlite({
         filename,
         resolver: firstResolver,
         addresses: [{ address, executable: admittedRef, registrations: registrationsFor(admittedRef) }],
@@ -807,7 +808,7 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       expect(receivedJson).not.toContain("start with the supervisor")
     })
     yield* scopedWith(
-      Runtime.layerSqlite({
+      SqliteRuntime.layerSqlite({
         filename,
         resolver: reopenResolver,
         addresses: [{ address, executable: admittedRef, registrations: registrationsFor(admittedRef) }],

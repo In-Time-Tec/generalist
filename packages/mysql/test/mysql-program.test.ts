@@ -85,7 +85,8 @@ describeMysql("mysql Program store contract", () => {
               idempotencyKey: "mysql-exact-root-worker",
               prompt: "run",
             })
-            const claimed = yield* worker.execute
+            const claimed = yield* worker.poll
+            yield* worker.idle
             expect(receipt.childRunIds).toEqual([])
             expect(claimed.map((item) => item.run.runId)).toEqual([receipt.runId])
             expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")

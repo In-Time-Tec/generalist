@@ -1,7 +1,7 @@
 import { layerMysql } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
+import { Deferred, Effect, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "tenetkit"
 import { Address, Errors, ExecutableResolver, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
@@ -160,7 +160,7 @@ describeMysql("mysql worker cancellation", () => {
                   prompt: "wait",
                 })
                 lifecycle.length = 0
-                const executing = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
+                yield* worker.poll
                 yield* Deferred.await(started)
                 yield* provideScoped(
                   layerMysql(options),
@@ -169,7 +169,7 @@ describeMysql("mysql worker cancellation", () => {
                     yield* remote.cancel({ runId: receipt.runId, reason: "cancel from another runtime" })
                   }),
                 )
-                yield* Fiber.join(executing)
+                yield* worker.idle
                 yield* runtime.awaitSessionTerminal({ sessionId })
                 expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
                 yield* Deferred.await(finalized)
@@ -247,7 +247,7 @@ describeMysql("mysql worker cancellation", () => {
                 idempotencyKey: "cancel-tool",
                 prompt: "block",
               })
-              const executing = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
+              yield* worker.poll
               yield* Deferred.await(started)
               yield* provideScoped(
                 layerMysql(options),
@@ -256,7 +256,7 @@ describeMysql("mysql worker cancellation", () => {
                   yield* remote.cancel({ runId: receipt.runId, reason: "cancel from another runtime" })
                 }),
               )
-              yield* Fiber.join(executing)
+              yield* worker.idle
               expect(yield* Ref.get(interrupted)).toBe(true)
               expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
               const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(

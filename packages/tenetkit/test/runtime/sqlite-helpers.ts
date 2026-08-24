@@ -1,4 +1,4 @@
-import { ExecutableResolver, Runtime } from "../../src/runtime/index.js"
+import { ExecutableResolver } from "../../src/runtime/index.js"
 import type { MessagingOverrides } from "./messaging-helpers.js"
 import {
   analyst,
@@ -13,6 +13,7 @@ import {
 } from "./helpers.js"
 import { closedTestAgent } from "./identity.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 let tempPathCounter = 0
 export const tempDbPath = (label = "tenetkit-runtime"): string => {
   const dir = `/tmp/${label}-${process.pid.toString(36)}-${(tempPathCounter += 1).toString(36)}`
@@ -31,9 +32,9 @@ const options = {
     { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
   ],
   subscriberQueueCapacity: 8,
-} satisfies Omit<Runtime.SqliteStoreOptions, "filename">
+} satisfies Omit<SqliteRuntime.Options, "filename">
 
-export const sqliteLayer = (filename: string) => Runtime.layerSqlite({ filename, ...options })
+export const sqliteLayer = (filename: string) => SqliteRuntime.layerSqlite({ filename, ...options })
 
 /**
  * A SQLite Runtime whose mailbox bounds and messaging policy the test chooses.
@@ -42,4 +43,4 @@ export const sqliteLayer = (filename: string) => Runtime.layerSqlite({ filename,
  * own database file rather than a mutation of a shared one.
  */
 export const sqliteMessagingLayer = (label: string) => (overrides: MessagingOverrides) =>
-  Runtime.layerSqlite({ filename: tempDbPath(label), ...options, ...overrides })
+  SqliteRuntime.layerSqlite({ filename: tempDbPath(label), ...options, ...overrides })

@@ -17,6 +17,7 @@ import {
 import { closedTestAgent } from "./identity.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const registrationsFor = (executable: ExecutableManifest.PinnedExecutable, suffix = "1") => {
   const pins = new Set<string>()
   for (const entry of executable.manifest.entries) {
@@ -326,7 +327,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
       ],
     }
     const first = yield* provideScoped(
-      Runtime.layerSqlite(options),
+      SqliteRuntime.layerSqlite(options),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         expect(
@@ -359,7 +360,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
       }),
     )
     const duplicate = yield* provideScoped(
-      Runtime.layerSqlite(options),
+      SqliteRuntime.layerSqlite(options),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.start(input)
@@ -388,7 +389,7 @@ standalone.effect("reloads SQLite registrations without address binding and clos
       version,
       payload: { credentialRef: "credential:test" },
     }))
-    const firstLayer = Runtime.layerSqlite({
+    const firstLayer = SqliteRuntime.layerSqlite({
       filename,
       addresses: [],
       resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
@@ -424,7 +425,7 @@ standalone.effect("reloads SQLite registrations without address binding and clos
           () => Ref.update(finalizers, (count) => count + 1),
         ),
     })
-    const reopened = Runtime.layerSqlite({ filename, addresses: [], resolver })
+    const reopened = SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
     yield* provideScoped(
       reopened,
       Effect.gen(function* () {
@@ -463,7 +464,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
     }))
     const address = Address.make("agent:addressed")
     const receipt = yield* provideScoped(
-      Runtime.layerSqlite({
+      SqliteRuntime.layerSqlite({
         filename,
         addresses: [{ address, executable: assistantRef, registrations }],
         resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
@@ -479,7 +480,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
       }),
     )
 
-    const reopened = Runtime.layerSqlite({
+    const reopened = SqliteRuntime.layerSqlite({
       filename,
       addresses: [],
       resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),

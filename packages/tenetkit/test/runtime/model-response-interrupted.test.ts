@@ -17,6 +17,7 @@ import { assistantAddress, memoryLayer, registrationsFor, textPrompt } from "./h
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 import { CompletedModelResponse } from "../../src/runtime/run-event.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const jsonValue = (value: unknown): unknown =>
   JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
 const jsonText = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
@@ -272,7 +273,7 @@ const hostLayer = (input: {
     layer:
       input.backend === "memory"
         ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath(input.label) }),
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(input.label) }),
   }
 }
 

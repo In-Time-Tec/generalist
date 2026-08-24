@@ -15,10 +15,21 @@ export interface WorkerOptions {
 }
 
 /** @experimental Bytes a cell wrote straight to the process's own stdout or stderr. */
-export interface RawOutput {
+export interface RawChunk {
+  readonly _tag: "Chunk"
   readonly channel: "stdout" | "stderr"
   readonly text: string
 }
+
+/** @experimental The end of one cell's writes to one raw output channel. */
+export interface RawBarrier {
+  readonly _tag: "Barrier"
+  readonly channel: "stdout" | "stderr"
+  readonly cellId: string
+}
+
+/** @experimental Raw output and its cell-settlement boundary. */
+export type RawOutput = RawChunk | RawBarrier
 
 /** @experimental One live kernel child process, its private frame channel, and its raw output. */
 export interface Worker {
@@ -233,9 +244,45 @@ export const start = (options: WorkerOptions): Effect.Effect<Worker, KernelUnava
     ).pipe(Effect.forkScoped)
     const rawReader = (channel: RawOutput["channel"], stream: ReadableStream<Uint8Array>) => {
       const decoder = new TextDecoder()
+      const barrierPrefix = `\n${frameNonce}raw-barrier:`
+      let pending = ""
+      const flush = (): Effect.Effect<void> => {
+        const text = pending + decoder.decode()
+        pending = ""
+        return text.length === 0 ? Effect.void : Queue.offer(raw, { _tag: "Chunk", channel, text }).pipe(Effect.asVoid)
+      }
       return readStream(stream, (bytes) =>
-        Queue.offer(raw, { channel, text: decoder.decode(bytes, { stream: true }) }).pipe(Effect.asVoid),
-      ).pipe(Effect.forkScoped)
+        Effect.suspend(() => {
+          pending += decoder.decode(bytes, { stream: true })
+          const output: Array<RawOutput> = []
+          while (true) {
+            const markerStart = pending.indexOf(barrierPrefix)
+            if (markerStart < 0) {
+              const safeLength = Math.max(0, pending.length - barrierPrefix.length + 1)
+              if (safeLength > 0) {
+                output.push({ _tag: "Chunk", channel, text: pending.slice(0, safeLength) })
+                pending = pending.slice(safeLength)
+              }
+              break
+            }
+            if (markerStart > 0) output.push({ _tag: "Chunk", channel, text: pending.slice(0, markerStart) })
+            pending = pending.slice(markerStart)
+            const end = pending.indexOf("\n", barrierPrefix.length)
+            if (end < 0) break
+            const encodedCellId = pending.slice(barrierPrefix.length, end)
+            let cellId: unknown
+            try {
+              cellId = decodeURIComponent(encodedCellId)
+            } catch {
+              cellId = undefined
+            }
+            if (typeof cellId === "string") output.push({ _tag: "Barrier", channel, cellId })
+            else output.push({ _tag: "Chunk", channel, text: pending.slice(0, end + 1) })
+            pending = pending.slice(end + 1)
+          }
+          return Effect.forEach(output, (item) => Queue.offer(raw, item), { discard: true })
+        }),
+      ).pipe(Effect.ensuring(Effect.suspend(flush)), Effect.forkScoped)
     }
     yield* rawReader("stdout", kernelProcess.stdout)
     yield* rawReader("stderr", kernelProcess.stderr)
