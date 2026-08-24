@@ -13,6 +13,7 @@ import { RunStore, type CompletionOutcome } from "../run-store.js"
 import type { LayerOptions } from "../runtime.js"
 import { emptyState, idempotencyKey, type MemoryPublication, type MemoryState } from "./state.js"
 import { admitSend, admitSpawn, admitStart } from "./store-admit.js"
+import { activateRoot } from "./store-activate.js"
 import { admitProgramChild } from "./store-admit-program-child.js"
 import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
 import { respondApproval } from "./store-approval.js"
@@ -191,7 +192,8 @@ const makeStoreServices = (options: LayerOptions) =>
           }
           return yield* modifyState((state) => admitSend(state, input))
         }),
-      admitStart: (input) => modifyState((state) => admitStart(state, input)),
+      admitStart: (input, startOptions) => modifyState((state) => admitStart(state, input, startOptions)),
+      activate: (input) => modifyState((state) => activateRoot(state, input.runId)),
       admitSpawn: (input) => modifyState((state) => admitSpawn(state, input)),
       admitProgramChild: (input) => fencedModify(input, (state) => admitProgramChild(state, input)),
       admitProgramChildAndSuspend: (input) =>
@@ -486,10 +488,8 @@ const makeStoreServices = (options: LayerOptions) =>
     })
     return { runStore, externalChildStore }
   })
-
 export const makeRunStore = (options: LayerOptions) =>
   makeStoreServices(options).pipe(Effect.map(({ runStore }) => runStore))
-
 export const layerMemory = (options: LayerOptions): Layer.Layer<RunStore | ExternalChildStore> =>
   Layer.effectContext(
     makeStoreServices(options).pipe(

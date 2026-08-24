@@ -87,6 +87,12 @@ type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
 type AgUiCanonical = Assert<Equal<AgUiRoot["AgUi"], typeof AgUi>>
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
 type RunEventCanonical = Assert<Equal<RuntimeRoot["RunEvent"], typeof RunEvent>>
+type RuntimeAdmitInputCanonical = Assert<
+  Equal<Parameters<Runtime.Interface["admit"]>[0], Runtime.AdmitInput>
+>
+type RuntimeActivateInputCanonical = Assert<
+  Equal<Parameters<Runtime.Interface["activate"]>[0], Runtime.ActivateInput>
+>
 type SqliteRuntimeOptions = import("tenetkit/runtime/sqlite-bun").Runtime.Options
 type SqliteRunStoreOptions = import("tenetkit/runtime/sqlite-bun").RunStore.Options
 void SqliteRuntime.layerSqlite

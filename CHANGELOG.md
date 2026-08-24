@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.38.0
+
+- Add staged exact-root admission through `Runtime.admit(input)` and transactionally idempotent release through `Runtime.activate({ runId })`. Admitted roots cannot be claimed before activation; cancellation and activation serialize in memory, SQLite, PostgreSQL, and MySQL, so cancellation that wins remains terminal and duplicate activation emits one attempt.
+- Preserve `Runtime.start` as the immediate convenience and all existing typed idempotency, divergent-payload, and Run-ID conflict behavior. This release adds no SQL schema or data migration.
+
 ## 0.37.0
 
 - Make the SQL runtime worker a scoped service that owns claim execution, cancellation, polling, health status, and idle settlement without detached fibers.

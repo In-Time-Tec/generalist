@@ -101,6 +101,8 @@ const makeRuntime = (acceptedSequence = 0) => {
 
   const runtime: Runtime.Interface = {
     start: () => Effect.die("not used"),
+    admit: () => Effect.die("not used"),
+    activate: () => Effect.die("not used"),
     send: (input) => {
       sentRunIds.push(input.runId!)
       const runId = input.runId!

@@ -263,6 +263,8 @@ export namespace Runtime {
   export type AddressBinding = import("./runtime.js").AddressBinding
   export type SendInput = import("./runtime.js").SendInput
   export type StartInput = import("./runtime.js").StartInput
+  export type AdmitInput = import("./runtime.js").AdmitInput
+  export type ActivateInput = import("./runtime.js").ActivateInput
   export type InitialChildInput = import("./runtime.js").InitialChildInput
   export type StartReceipt = import("./runtime.js").StartReceipt
   export type SpawnInput = import("./runtime.js").SpawnInput
@@ -298,6 +300,8 @@ export namespace Runtime {
   export type RegisterAgentNameError = import("./runtime.js").RegisterAgentNameError
   export type SendError = import("./runtime.js").SendError
   export type StartError = import("./runtime.js").StartError
+  export type AdmitError = import("./runtime.js").AdmitError
+  export type ActivateError = import("./runtime.js").ActivateError
   export type SpawnError = import("./runtime.js").SpawnError
   export type EventsError = import("./runtime.js").EventsError
   export type RespondError = import("./runtime.js").RespondError

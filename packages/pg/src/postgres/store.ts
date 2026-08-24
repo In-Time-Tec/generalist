@@ -58,6 +58,7 @@ import { lockMailbox, lockRun, lockRunHierarchy, lockSpawnParent } from "./locks
 import { inspectionStoreMethods } from "./store-inspection.js"
 import { programStoreMethods } from "./store-program.js"
 import { admitStart as admitExactStart } from "tenetkit/runtime/driver/sql/store-admit"
+import { activateRoot } from "tenetkit/runtime/driver/sql/store-activate"
 import { admitSend } from "./store-admit.js"
 import { associateRegistrations, loadRegistrations } from "tenetkit/runtime/driver/sql/executable-registrations"
 import { narrow } from "tenetkit/runtime/driver/executable-registration"
@@ -96,12 +97,13 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       sessionStore: (sessionId) => Effect.succeed(Option.some(makePostgresSessionStore({ sessionId, run, runNoTxn }))),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
-      admitStart: (input) =>
+      admitStart: (input, startOptions) =>
         run(
           sql`SELECT pg_advisory_xact_lock(hashtext('tenetkit:executable-registrations'))`.pipe(
-            Effect.andThen(admitExactStart(transactionHub, input)),
+            Effect.andThen(admitExactStart(transactionHub, input, startOptions)),
           ),
         ),
+      activate: (input) => run(lockRun(input.runId).pipe(Effect.andThen(activateRoot(transactionHub, input.runId)))),
       admitSpawn: (input) =>
         run(
           Effect.gen(function* () {

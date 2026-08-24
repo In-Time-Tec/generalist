@@ -135,6 +135,7 @@ export interface Interface {
   >
   readonly admitStart: (
     input: AdmitStartInput,
+    options?: { readonly activate?: boolean },
   ) => Effect.Effect<
     StartReceipt,
     | IdempotencyConflict
@@ -150,6 +151,9 @@ export interface Interface {
     | ChildLimitExceeded
     | TreePolicyInvalid
   >
+  readonly activate: (input: {
+    readonly runId: string
+  }) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly admitSpawn: (
     input: SpawnInput & {
       readonly message: Message

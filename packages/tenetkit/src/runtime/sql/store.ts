@@ -14,6 +14,7 @@ import {
 } from "./errors.js"
 import { migrate } from "./migrate.js"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store-admit.js"
+import { activateRoot } from "./store-activate.js"
 import {
   cancel,
   complete,
@@ -186,7 +187,9 @@ const makeSqliteStoreServices = (
         withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie, Effect.map(Option.some)),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => runBuffered((transactionHub) => admitSend(transactionHub, addressBindings, input)),
-      admitStart: (input) => runBuffered((transactionHub) => admitStart(transactionHub, input)),
+      admitStart: (input, startOptions) =>
+        runBuffered((transactionHub) => admitStart(transactionHub, input, startOptions)),
+      activate: (input) => runBuffered((transactionHub) => activateRoot(transactionHub, input.runId), [input.runId]),
       admitSpawn: (input) => runBuffered((transactionHub) => admitSpawn(transactionHub, input)),
       admitProgramChild: (input) =>
         runBuffered((transactionHub) =>

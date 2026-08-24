@@ -81,6 +81,7 @@ const clientTools = ToolExecutor.layerRouter([
 
 | TenetKit release | Tested Effect version                             | Notes                                                                               |
 | ---------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `0.38.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 | `0.37.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 | `0.36.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 | `0.35.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |

@@ -16,7 +16,6 @@ import { RunStore } from "../run-store.js"
 import {
   Runtime,
   type Interface as RuntimeInterface,
-  type InitialChildInput,
   type InitialFanOutInput,
   type LayerOptions,
   type SendInput,
@@ -24,6 +23,7 @@ import {
   type SpawnInput,
 } from "../runtime.js"
 import { normalizePrompt } from "./prompt.js"
+import { normalizeInitialChild, normalizeInitialFanOut } from "./runtime-start.js"
 import { layerMemory as storeLayer } from "./store.js"
 import { ExternalChildStore } from "../external-child-store.js"
 import { ExecutionHost } from "../execution-host.js"
@@ -37,7 +37,6 @@ import { makeInput as makeResolverInput } from "../executable-resolver.js"
 import type { ExecutableRegistration } from "../executable-registration.js"
 import { ModelPreviewLane, layer as modelPreviewLayer, previews as modelPreviews } from "../model-preview.js"
 import { makeModelResponseResolver, makeSessionEntry } from "../runtime-session.js"
-
 type Registrations = ReadonlyArray<ExecutableRegistration>
 import { validate as validateRegistrations } from "../executable-registration.js"
 import { LocalScheduler, layer as localSchedulerLayer } from "../local-scheduler.js"
@@ -49,30 +48,8 @@ import { defaultTreePolicy } from "../tree-policy.js"
 import { RunTerminal } from "../errors.js"
 import { isTerminal } from "../run.js"
 import { awaitSessionTerminal } from "../session-lifecycle.js"
-
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
-
 const startAddress = makeAddress("runtime:start")
-
-const normalizeInitialChild = (child: InitialChildInput) => ({
-  invocationId: child.invocationId,
-  idempotencyKey: child.idempotencyKey,
-  selection: child.selection,
-  prompt: normalizePrompt(child.prompt),
-  sessionId: child.sessionId,
-  ...(child.messageId === undefined ? {} : { messageId: child.messageId }),
-  ...(child.correlationId === undefined ? {} : { correlationId: child.correlationId }),
-  ...(child.metadata === undefined ? {} : { metadata: child.metadata }),
-})
-
-const normalizeInitialFanOut = (fanOut: InitialFanOutInput) => ({
-  ...fanOut,
-  members: fanOut.members.map((member) => ({
-    ...member,
-    prompt: normalizePrompt(member.prompt),
-    ...(member.metadata === undefined ? {} : { metadata: member.metadata }),
-  })),
-})
 
 export const makeRuntime = (
   options: LayerOptions,
@@ -232,84 +209,84 @@ export const makeRuntime = (
         }
       })
 
-    return Runtime.of({
-      start: (input: StartInput) =>
-        Effect.gen(function* () {
-          const executable = yield* decode(input.executable)
-          const registrations = yield* admissionRegistrations({
-            address: startAddress,
-            sessionId: input.sessionId,
-            idempotencyKey: input.idempotencyKey,
-            executable,
-            registrations: input.registrations,
-            runId: input.runId ?? "pending",
-          })
-          const initialChildren = input.initialChildren ?? []
-          const initialFanOuts = input.initialFanOuts ?? []
-          if (initialChildren.length > 64) {
-            return yield* StartInvalid.make({ message: "initialChildren cannot contain more than 64 requests" })
+    const admitStart = (input: StartInput, activate: boolean) =>
+      Effect.gen(function* () {
+        const executable = yield* decode(input.executable)
+        const registrations = yield* admissionRegistrations({
+          address: startAddress,
+          sessionId: input.sessionId,
+          idempotencyKey: input.idempotencyKey,
+          executable,
+          registrations: input.registrations,
+          runId: input.runId ?? "pending",
+        })
+        const initialChildren = input.initialChildren ?? []
+        const initialFanOuts = input.initialFanOuts ?? []
+        if (initialChildren.length > 64) {
+          return yield* StartInvalid.make({ message: "initialChildren cannot contain more than 64 requests" })
+        }
+        if (initialFanOuts.length > 64) {
+          return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
+        }
+        const activeEntry = executable.manifest.entries.find((entry) => entry.pin === executable.ref.active)
+        const invocationIds = new Set<string>()
+        const idempotencySources = new Set<string>()
+        for (const child of initialChildren) {
+          if (invocationIds.has(child.invocationId)) {
+            return yield* StartInvalid.make({
+              message: `duplicate initial child invocationId: ${child.invocationId}`,
+            })
           }
-          if (initialFanOuts.length > 64) {
-            return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
+          const source = `${child.sessionId}\0${child.idempotencyKey}`
+          if (idempotencySources.has(source)) {
+            return yield* StartInvalid.make({ message: "duplicate initial child sessionId/idempotencyKey" })
           }
-          const activeEntry = executable.manifest.entries.find((entry) => entry.pin === executable.ref.active)
-          const invocationIds = new Set<string>()
-          const idempotencySources = new Set<string>()
-          for (const child of initialChildren) {
-            if (invocationIds.has(child.invocationId)) {
-              return yield* StartInvalid.make({
-                message: `duplicate initial child invocationId: ${child.invocationId}`,
-              })
-            }
-            const source = `${child.sessionId}\0${child.idempotencyKey}`
-            if (idempotencySources.has(source)) {
-              return yield* StartInvalid.make({ message: "duplicate initial child sessionId/idempotencyKey" })
-            }
-            invocationIds.add(child.invocationId)
-            idempotencySources.add(source)
+          invocationIds.add(child.invocationId)
+          idempotencySources.add(source)
+          if (
+            activeEntry?._tag !== "Agent" ||
+            resolveChild(executable.ref, executable.manifest, child.selection) === undefined
+          ) {
+            return yield* ChildSelectionMissing.make({
+              parentRunId: input.runId ?? "pending",
+              selection: child.selection,
+            })
+          }
+        }
+        const fanOutKeys = new Set<string>()
+        for (const fanOut of initialFanOuts) {
+          if (fanOutKeys.has(fanOut.idempotencyKey)) {
+            return yield* StartInvalid.make({
+              message: `duplicate initial fan-out idempotencyKey: ${fanOut.idempotencyKey}`,
+            })
+          }
+          fanOutKeys.add(fanOut.idempotencyKey)
+          yield* normalizeFanOut(input.runId ?? "pending", fanOut)
+          for (const member of fanOut.members) {
             if (
               activeEntry?._tag !== "Agent" ||
-              resolveChild(executable.ref, executable.manifest, child.selection) === undefined
+              resolveChild(executable.ref, executable.manifest, member.selection) === undefined
             ) {
               return yield* ChildSelectionMissing.make({
                 parentRunId: input.runId ?? "pending",
-                selection: child.selection,
+                selection: member.selection,
               })
             }
           }
-          const fanOutKeys = new Set<string>()
-          for (const fanOut of initialFanOuts) {
-            if (fanOutKeys.has(fanOut.idempotencyKey)) {
-              return yield* StartInvalid.make({
-                message: `duplicate initial fan-out idempotencyKey: ${fanOut.idempotencyKey}`,
-              })
-            }
-            fanOutKeys.add(fanOut.idempotencyKey)
-            yield* normalizeFanOut(input.runId ?? "pending", fanOut)
-            for (const member of fanOut.members) {
-              if (
-                activeEntry?._tag !== "Agent" ||
-                resolveChild(executable.ref, executable.manifest, member.selection) === undefined
-              ) {
-                return yield* ChildSelectionMissing.make({
-                  parentRunId: input.runId ?? "pending",
-                  selection: member.selection,
-                })
-              }
-            }
-          }
-          const prompt = normalizePrompt(input.prompt)
-          const message = makeMessage({
-            id: input.messageId ?? nextMessageId("start", input.idempotencyKey),
-            to: startAddress,
-            sessionId: input.sessionId,
-            prompt,
-            idempotencyKey: input.idempotencyKey,
-            correlationId: input.correlationId ?? input.idempotencyKey,
-            metadata: input.metadata ?? {},
-            ...(input.causationId === undefined ? {} : { causationId: input.causationId }),
-          })
-          return yield* store.admitStart({
+        }
+        const prompt = normalizePrompt(input.prompt)
+        const message = makeMessage({
+          id: input.messageId ?? nextMessageId("start", input.idempotencyKey),
+          to: startAddress,
+          sessionId: input.sessionId,
+          prompt,
+          idempotencyKey: input.idempotencyKey,
+          correlationId: input.correlationId ?? input.idempotencyKey,
+          metadata: input.metadata ?? {},
+          ...(input.causationId === undefined ? {} : { causationId: input.causationId }),
+        })
+        return yield* store.admitStart(
+          {
             message,
             executableRef: executable.ref,
             executableManifest: executable.manifest,
@@ -318,8 +295,22 @@ export const makeRuntime = (
             initialChildren: initialChildren.map(normalizeInitialChild),
             initialFanOuts: initialFanOuts.map(normalizeInitialFanOut),
             ...(input.runId === undefined ? {} : { runId: input.runId }),
-          })
-        }),
+          },
+          { activate },
+        )
+      })
+    return Runtime.of({
+      start: (input) => admitStart(input, true),
+      admit: (input) =>
+        admitStart({ ...input, initialChildren: [], initialFanOuts: [] }, false).pipe(
+          Effect.map(({ runId, messageId, acceptedSequence, duplicate }) => ({
+            runId,
+            messageId,
+            acceptedSequence,
+            duplicate,
+          })),
+        ),
+      activate: (input) => store.activate(input),
       send: (input: SendInput) =>
         Effect.gen(function* () {
           const binding = addresses.get(input.to)

@@ -116,6 +116,14 @@ export interface StartInput {
   readonly initialFanOuts?: ReadonlyArray<InitialFanOutInput>
 }
 
+/** @experimental One exact root admission held behind TenetKit's durable execution gate. */
+export type AdmitInput = Omit<StartInput, "initialChildren" | "initialFanOuts">
+
+/** @experimental Release one admitted root's durable execution gate. */
+export interface ActivateInput {
+  readonly runId: string
+}
+
 export interface InitialChildInput {
   readonly invocationId: string
   readonly idempotencyKey: string
@@ -284,6 +292,10 @@ export type StartError =
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
   | RuntimeUnavailable
+/** @experimental Exact-root staged admission failures. */
+export type AdmitError = StartError
+/** @experimental Staged root activation failures. */
+export type ActivateError = RunNotFound | RuntimeUnavailable
 export type SpawnError =
   | RunNotFound
   | RunTerminal
@@ -331,6 +343,10 @@ export type AwaitFanOutError = InspectFanOutError | EventsError
 
 export interface Interface {
   readonly start: (input: StartInput) => Effect.Effect<StartReceipt, StartError>
+  /** @experimental Durably admit one exact root without making it executable. */
+  readonly admit: (input: AdmitInput) => Effect.Effect<RunReceipt, AdmitError>
+  /** @experimental Idempotently activate an admitted root and return its authoritative current state. */
+  readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>
   readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>

@@ -28,6 +28,7 @@ import { requireExecutionClaim } from "./store-execution.js"
 import type { Interface as ExternalChildStoreInterface } from "../external-child-store.js"
 import { startDigest } from "../memory/digest.js"
 import { admitStart } from "./store-admit.js"
+import { activateRoot } from "./store-activate.js"
 import { loadRunSnapshot } from "./inspection.js"
 import { cancel as cancelRun } from "./store-control.js"
 
@@ -340,11 +341,11 @@ const activateExternalRoot = (hub: EventHub, placementId: string) =>
     const run = yield* loadRun(root.run_id)
     if (run === undefined) return yield* RuntimeUnavailable.make({ message: `external root ${root.run_id} is missing` })
     yield* sql`UPDATE tenetkit_external_roots SET activated = 1 WHERE placement_id = ${placementId}`
-    if (run.status === "queued" && !run.cancellationRequested) {
-      const attempt = run.attempt + 1
-      yield* sql`UPDATE tenetkit_runs SET attempt_fence = ${attempt} WHERE run_id = ${run.runId}`
-      yield* appendEvent(hub, { ...run, attempt }, { _tag: "RunAttemptStarted", attempt }, "running")
-    }
+    yield* activateRoot(hub, run.runId).pipe(
+      Effect.catchTag("tenetkit/runtime/RunNotFound", () =>
+        RuntimeUnavailable.make({ message: `external root ${root.run_id} is missing` }),
+      ),
+    )
     return yield* rootView((yield* loadExternalRoot(placementId))!)
   })
 
