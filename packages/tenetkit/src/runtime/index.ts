@@ -251,13 +251,11 @@ export * as Steering from "./steering.js"
 
 import { Runtime as Runtime_Runtime } from "./runtime.js"
 import { layer as Runtime_layer, layerMemory as Runtime_layerMemory } from "./memory/runtime-layer.js"
-import { layerSqlite as Runtime_layerSqlite } from "./platform-layers.js"
 export const Runtime = {
   Runtime: Runtime_Runtime,
   layer: Runtime_layer,
   layerMemory: Runtime_layerMemory,
-  layerSqlite: Runtime_layerSqlite,
-} as typeof import("./runtime.js") & typeof import("./memory/runtime-layer.js") & typeof import("./platform-layers.js")
+} as typeof import("./runtime.js") & typeof import("./memory/runtime-layer.js")
 export namespace Runtime {
   export type Runtime = import("./runtime.js").Runtime
   export type Interface = import("./runtime.js").Interface
@@ -312,7 +310,6 @@ export namespace Runtime {
   export type FanOutMemberInput = import("./fan-out.js").FanOutMemberInput
   export type FanOutError = import("./runtime.js").FanOutError
   export type InspectFanOutError = import("./runtime.js").InspectFanOutError
-  export type SqliteStoreOptions = import("./platform-layers.js").BunSqliteStoreOptions
 }
 export * as AgentDirectory from "./agent-directory.js"
 
@@ -358,13 +355,10 @@ export namespace FanOut {
 
 import { RunStore as RunStore_RunStore } from "./run-store.js"
 import { layerMemory as RunStore_layerMemory } from "./memory/store.js"
-import { layerSqliteStore as RunStore_layerSqlite } from "./platform-layers.js"
 export const RunStore = {
   RunStore: RunStore_RunStore,
   layerMemory: RunStore_layerMemory,
-  layerSqlite: RunStore_layerSqlite,
-} as typeof import("./run-store.js") &
-  typeof import("./memory/store.js") & { readonly layerSqlite: typeof import("./platform-layers.js").layerSqliteStore }
+} as typeof import("./run-store.js") & typeof import("./memory/store.js")
 export namespace RunStore {
   export type RunStore = import("./run-store.js").RunStore
   export type Interface = import("./run-store.js").Interface
@@ -389,22 +383,19 @@ export namespace RunClaims {
   export type Interface = import("./sql/run-claims.js").Interface
 }
 
-import {
-  RuntimeWorker as RuntimeWorker_RuntimeWorker,
-  layerWorker as RuntimeWorker_layerWorker,
-  layerWorkerLoop as RuntimeWorker_layerWorkerLoop,
-} from "./sql/worker.js"
+import { RuntimeWorker as RuntimeWorker_RuntimeWorker, layerWorker as RuntimeWorker_layerWorker } from "./sql/worker.js"
 export const RuntimeWorker = {
   RuntimeWorker: RuntimeWorker_RuntimeWorker,
   layerWorker: RuntimeWorker_layerWorker,
-  layerWorkerLoop: RuntimeWorker_layerWorkerLoop,
 } as typeof import("./sql/worker.js")
 export namespace RuntimeWorker {
   export type RuntimeWorker = import("./sql/worker.js").RuntimeWorker
   export type Interface = import("./sql/worker.js").Interface
   export type WorkerOptions = import("./sql/worker.js").WorkerOptions
+  export type WorkerFailure = import("./sql/worker.js").WorkerFailure
+  export type WorkerPoll = import("./sql/worker.js").WorkerPoll
+  export type WorkerStatus = import("./sql/worker.js").WorkerStatus
   export type layerWorker = typeof import("./sql/worker.js").layerWorker
-  export type layerWorkerLoop = typeof import("./sql/worker.js").layerWorkerLoop
 }
 
 import { LocalScheduler as LocalScheduler_LocalScheduler } from "./local-scheduler.js"

@@ -26,9 +26,8 @@ const workspaceRoot = process.cwd()
  *
  * A descriptor is not by itself an authority boundary, though: cell code runs in this same process,
  * so it can name descriptor 3 and write to it. Every frame therefore also carries a boot-time
- * secret read from `frameIn` before any cell can run, which travels on that private descriptor
- * rather than through argv or the environment, since the process table exposes argv to anything on
- * the machine. The workspace arrives the same way, as the spawned working directory.
+ * secret read from `frameIn` before any cell can run. It stays off argv and the environment, and the
+ * workspace arrives as the spawned working directory.
  *
  * THE SECRET IS NOT A SECURITY BOUNDARY AGAINST THE CELL. `node:vm` supplies a different global,
  * not a severed realm: every object the bootstrap places in the context carries
@@ -67,14 +66,13 @@ const frameNonce = handshake.done === true ? "" : handshake.value
 const requireFromWorkspace = createRequire(`${workspaceRoot}/tenetkit-kernel.js`)
 const transpiler = new Bun.Transpiler({ loader: "tsx", replMode: true })
 const encoder = new TextEncoder()
-
-const writeFrame = (frame: Frame): void => {
-  writeSync(frameOut, encoder.encode(`${frameNonce}${JSON.stringify(frame)}\n`))
-}
-
-const write = (frame: Frame): void => {
+const writeFrame = (frame: Frame): void =>
+  void writeSync(frameOut, encoder.encode(`${frameNonce}${JSON.stringify(frame)}\n`))
+const write = (frame: Frame, barrierCellId?: string): void => {
   flushOutput()
-  writeFrame(frame)
+  if (barrierCellId !== undefined)
+    for (const fd of [1, 2]) writeSync(fd, `\n${frameNonce}raw-barrier:${encodeURIComponent(barrierCellId)}\n`)
+  writeSync(frameOut, encoder.encode(`${frameNonce}${JSON.stringify(frame)}\n`))
 }
 
 let cell: CellState | undefined
@@ -291,18 +289,21 @@ const execute = async (cellId: string, code: string, deadlineMillis: number): Pr
     })
     const evaluated = cellScope.run(state, () => evaluate(cellId, code, deadlineMillis))
     const settled = (await Promise.race([Promise.resolve(evaluated), aborted])) as { value?: unknown } | undefined
-    write({ _tag: "Completed", cellId, value: format(settled?.value), durationMillis: elapsed() })
+    write({ _tag: "Completed", cellId, value: format(settled?.value), durationMillis: elapsed() }, cellId)
   } catch (error) {
     const failure = error as { name?: string; message?: string; stack?: string } | undefined
-    write({
-      _tag: "Stopped",
+    write(
+      {
+        _tag: "Stopped",
+        cellId,
+        kind: stopKind(error),
+        name: failure?.name ?? "Error",
+        message: failure?.message ?? String(error),
+        ...(failure?.stack === undefined ? {} : { stack: failure.stack }),
+        durationMillis: elapsed(),
+      },
       cellId,
-      kind: stopKind(error),
-      name: failure?.name ?? "Error",
-      message: failure?.message ?? String(error),
-      ...(failure?.stack === undefined ? {} : { stack: failure.stack }),
-      durationMillis: elapsed(),
-    })
+    )
   } finally {
     cell = undefined
   }

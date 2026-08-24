@@ -30,6 +30,7 @@ import { makeSqliteRunStore } from "../../tenetkit/src/runtime/sql/store.js"
 import { makeRuntime } from "../../tenetkit/src/runtime/memory/runtime-layer.js"
 import { layer as activeExecutionsLayer } from "../../tenetkit/src/runtime/active-executions.js"
 
+import { Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
 const options = (filename: string, projection?: RunActivationProjection) => ({
   filename,
   resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
@@ -43,7 +44,7 @@ const withLayer = <A, E, R, E2>(layer: Layer.Layer<R, E>, effect: Effect.Effect<
 
 const runtimeLayer = (projection?: RunActivationProjection) => {
   const filename = tempDbPath("cloudflare-activation")
-  return Layer.merge(Runtime.layerSqlite(options(filename, projection)), sqliteClientLayer({ filename }))
+  return Layer.merge(SqliteRuntime.layerSqlite(options(filename, projection)), sqliteClientLayer({ filename }))
 }
 
 const projectedRuntimeLayer = (rearm: Effect.Effect<void, RuntimeUnavailable>) => {

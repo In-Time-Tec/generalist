@@ -31,6 +31,10 @@ interface ActiveCell {
   readonly sequence: Ref.Ref<number>
   readonly channels: Ref.Ref<Accumulator>
   readonly settled: Ref.Ref<boolean>
+  readonly rawBarriers: {
+    readonly stdout: Deferred.Deferred<void>
+    readonly stderr: Deferred.Deferred<void>
+  }
   readonly channelBytes: number
 }
 
@@ -146,6 +150,10 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
           yield* Ref.set(cell.sequence, sequence + 1)
           return
         }
+        if (frame._tag === "Completed" || frame._tag === "Stopped") {
+          yield* Deferred.await(cell.rawBarriers.stdout)
+          yield* Deferred.await(cell.rawBarriers.stderr)
+        }
         const channels = yield* Ref.get(cell.channels)
         const sequence = yield* Ref.getAndUpdate(cell.sequence, (value) => value + 1)
         const event = toCellEvent(frame, sequence)
@@ -207,9 +215,19 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
     const rawReader = yield* Queue.take(worker.raw).pipe(
       Effect.flatMap((output) =>
         Ref.get(active).pipe(
-          Effect.flatMap((cell) =>
-            cell === undefined ? Effect.void : onOutput(cell, { channel: output.channel, text: output.text }),
-          ),
+          Effect.flatMap((cell) => {
+            if (cell === undefined) return Effect.void
+            const barrier = cell.rawBarriers[output.channel]
+            if (output._tag === "Barrier")
+              return output.cellId === cell.cellId
+                ? Deferred.succeed(barrier, undefined).pipe(Effect.asVoid)
+                : Effect.void
+            return Deferred.isDone(barrier).pipe(
+              Effect.flatMap((done) =>
+                done ? Effect.void : onOutput(cell, { channel: output.channel, text: output.text }),
+              ),
+            )
+          }),
         ),
       ),
       Effect.forever,
@@ -341,6 +359,10 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
             sequence: yield* Ref.make(input.sequenceStart),
             channels: yield* Ref.make(emptyAccumulator),
             settled: yield* Ref.make(false),
+            rawBarriers: {
+              stdout: yield* Deferred.make<void>(),
+              stderr: yield* Deferred.make<void>(),
+            },
             channelBytes: input.channelBytes,
           }
           yield* Ref.set(active, cell)

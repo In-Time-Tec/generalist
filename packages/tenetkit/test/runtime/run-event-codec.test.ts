@@ -17,6 +17,7 @@ import {
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 import { closedTestAgent } from "./identity.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const failures: ReadonlyArray<RunFailureType> = [
   Errors.AgentExecutionFailure.make({ message: "agent failed", cause: new Error("model detail") }),
   Errors.ExecutablePinMissing.make({ runId: "run:codec", ref: assistantRef.ref }),
@@ -281,7 +282,7 @@ it.live("makes a changed SQLite resolver identity terminal once without schedule
       }),
   })
   const execute = provideScoped(
-    Runtime.layerSqlite({
+    SqliteRuntime.layerSqlite({
       filename,
       resolver: changedResolver,
       addresses: [],

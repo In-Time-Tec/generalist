@@ -7,9 +7,11 @@ import { assistantAddress, completedResult, parentRelativeOptions } from "./help
 import { tempDbPath } from "./sqlite-helpers.js"
 import { provideScoped } from "./scoped-provide.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const scheduler = { pollInterval: "1 day" as const }
 const memoryGroupLayer = Runtime.layerMemory({ ...parentRelativeOptions, scheduler })
-const sqliteGroupLayer = (filename: string) => Runtime.layerSqlite({ ...parentRelativeOptions, scheduler, filename })
+const sqliteGroupLayer = (filename: string) =>
+  SqliteRuntime.layerSqlite({ ...parentRelativeOptions, scheduler, filename })
 
 const toolRequest = (name: string, params: unknown): ToolExecutor.Request => {
   const call = Response.makePart("tool-call", { id: `call-${name}`, name, params, providerExecuted: false })

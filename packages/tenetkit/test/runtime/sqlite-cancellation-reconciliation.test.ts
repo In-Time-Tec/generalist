@@ -5,6 +5,7 @@ import { LocalScheduler, Runtime, RunStore } from "../../src/runtime/index.js"
 import { assistantAddress, parentRelativeOptions, textPrompt } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
   <B, E2, R extends A>(effect: Effect.Effect<B, E2, R>): Effect.Effect<B, E | E2> =>
@@ -12,7 +13,7 @@ const scopedWith =
 
 it.effect("SQLite startup reconciles a poisoned running cancellation and stale claim", () => {
   const filename = tempDbPath("poisoned-cancellation")
-  const runtimeLayer = Runtime.layerSqlite({
+  const runtimeLayer = SqliteRuntime.layerSqlite({
     ...parentRelativeOptions,
     filename,
     scheduler: { pollInterval: "1 day" },

@@ -588,7 +588,7 @@ describeMysql("mysql run store", () => {
           idempotencyKey: "worker",
           prompt: "worker",
         })
-        const first = yield* worker.tick
+        const first = yield* worker.poll
         const claimed = first.find((item) => item.run.runId === receipt.runId)!
         expect(claimed).toBeDefined()
         expect(

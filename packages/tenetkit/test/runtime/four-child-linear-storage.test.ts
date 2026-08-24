@@ -9,6 +9,7 @@ import { pinnedTestAgent } from "./identity.js"
 import { provideScoped } from "./scoped-provide.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const probe = Tool.make("linear_storage_probe", {
   parameters: Schema.Struct({ marker: Schema.String }),
   success: Schema.String,
@@ -202,7 +203,7 @@ const makeFourChildFixture = (filename: string) => {
     address,
     expectedMarkers,
     runtimeLayer: () =>
-      Runtime.layerSqlite({
+      SqliteRuntime.layerSqlite({
         filename,
         resolver,
         addresses: [{ address, executable: parentRef, registrations: registrationsFor(parentRef) }],

@@ -2,7 +2,7 @@
 
 Core `Session` is an append-only conversation-entry log with a current leaf. Context is projected from a root-to-leaf path.
 
-Session is the authority for model-facing history. A Run does not carry a conversation across turns: when a Session is active a Run seeds its Chat from `buildContext(path)`, so a second Run on one session identity continues the first instead of starting empty. `Runtime.layerSqlite` and `Runtime.layerPostgres` provide a durable Session per session identity, so history survives a process restart. A store without durable Session leaves Runs process-bound.
+Session is the authority for model-facing history. A Run does not carry a conversation across turns: when a Session is active a Run seeds its Chat from `buildContext(path)`, so a second Run on one session identity continues the first instead of starting empty. `SqliteRuntime.layerSqlite` from `tenetkit/runtime/sqlite-bun` and `Runtime.layerPostgres` provide a durable Session per session identity, so history survives a process restart. A store without durable Session leaves Runs process-bound.
 
 Every framework tool call admitted into reusable model context has exactly one matching terminal tool result. Core rejects duplicate, mismatched, or unresolved framework tool history before provider invocation. Runtime appends proven tool outcomes, explicit unknown outcomes, or terminal cancellation and failure results in the same state transition or SQL transaction that settles the owning Run; successful Run settlement is rejected while one of its tool calls remains unresolved.
 

@@ -22,6 +22,7 @@ import {
 } from "./program-fixture.js"
 import { programReplayDivergenceContract } from "./program-store-contract.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
   <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
@@ -44,7 +45,7 @@ describe("durable Agent Programs", () => {
     return Effect.gen(function* () {
       yield* scopedWith(Runtime.layerMemory(options(memory.resolver)))(programReplayDivergenceContract)
       yield* scopedWith(
-        Runtime.layerSqlite({
+        SqliteRuntime.layerSqlite({
           ...options(sqlite.resolver),
           filename: tempDbPath("program-replay-divergence"),
         }),
@@ -230,8 +231,8 @@ describe("durable Agent Programs", () => {
       }),
     )
     return Effect.gen(function* () {
-      yield* scopedWith(Runtime.layerSqlite(options))(suspend)
-      yield* scopedWith(Runtime.layerSqlite(options))(resume)
+      yield* scopedWith(SqliteRuntime.layerSqlite(options))(suspend)
+      yield* scopedWith(SqliteRuntime.layerSqlite(options))(resume)
     })
   })
 
@@ -281,7 +282,7 @@ describe("durable Agent Programs", () => {
               },
             ],
           })
-        : Runtime.layerSqlite({
+        : SqliteRuntime.layerSqlite({
             filename: tempDbPath(sqliteName),
             resolver: fixture.resolver,
             addresses: [
@@ -323,7 +324,7 @@ describe("durable Agent Programs", () => {
     })
     return Effect.gen(function* () {
       yield* scopedWith(
-        Runtime.layerSqlite({
+        SqliteRuntime.layerSqlite({
           filename,
           resolver: first.resolver,
           addresses: [
@@ -336,7 +337,7 @@ describe("durable Agent Programs", () => {
         }),
       )(write)
       yield* scopedWith(
-        Runtime.layerSqlite({
+        SqliteRuntime.layerSqlite({
           filename,
           resolver: programFixture().resolver,
           addresses: [
@@ -427,7 +428,7 @@ describe("durable Agent Programs", () => {
         }),
       )(verify)
       yield* scopedWith(
-        Runtime.layerSqlite({
+        SqliteRuntime.layerSqlite({
           filename: tempDbPath("program-unknown"),
           resolver: sqlite.resolver,
           addresses: [
@@ -535,11 +536,11 @@ describe("durable Agent Programs", () => {
       })
       return Effect.gen(function* () {
         yield* scopedWith(Runtime.layerMemory(options))(memory)
-        yield* scopedWith(Runtime.layerSqlite({ ...options, filename }))(sqliteAdmit)
-        yield* scopedWith(Runtime.layerSqlite({ ...options, filename }))(sqliteReopen)
+        yield* scopedWith(SqliteRuntime.layerSqlite({ ...options, filename }))(sqliteAdmit)
+        yield* scopedWith(SqliteRuntime.layerSqlite({ ...options, filename }))(sqliteReopen)
         yield* scopedWith(Runtime.layerMemory(options))(cancelAdmitted)
         yield* scopedWith(
-          Runtime.layerSqlite({
+          SqliteRuntime.layerSqlite({
             ...options,
             filename: tempDbPath("program-agent-map-cancel"),
           }),

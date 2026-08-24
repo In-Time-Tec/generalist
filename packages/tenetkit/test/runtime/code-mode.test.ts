@@ -17,6 +17,7 @@ import { make as makeExecutionHost } from "../../src/runtime/execution-host.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/active-executions.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const sandboxPin = Pins.makeCapability({ sandbox: "code-mode-test-v1" })
 const inputPin = Pins.makeCapability({ codec: "prompt-v1" })
 const outputPin = Pins.makeCapability({ codec: "unknown-v1" })
@@ -183,8 +184,8 @@ describe("Runtime code_mode Program children", () => {
       if (backend === "memory") {
         return withLayer(Runtime.layerMemory(options))(admit.pipe(Effect.andThen(finishRun)))
       }
-      return withLayer(Runtime.layerSqlite({ ...options, filename }))(admit).pipe(
-        Effect.andThen(withLayer(Runtime.layerSqlite({ ...options, filename }))(finishRun)),
+      return withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(admit).pipe(
+        Effect.andThen(withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(finishRun)),
       )
     })
 
@@ -194,7 +195,7 @@ describe("Runtime code_mode Program children", () => {
       const runtimeLayer =
         backend === "memory"
           ? Runtime.layerMemory(options)
-          : Runtime.layerSqlite({ ...options, filename: tempDbPath("code-mode-cancel") })
+          : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("code-mode-cancel") })
       layer(runtimeLayer)(`${backend} propagates root cancellation to an admitted code_mode Program child`, (it) => {
         it.effect("propagates root cancellation to the child", () =>
           Effect.gen(function* () {
@@ -228,7 +229,7 @@ describe("Runtime code_mode Program children", () => {
       const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
       let rootRunId = ""
       let childRunId = ""
-      const crash = withLayer(Runtime.layerSqlite({ ...options, filename }))(
+      const crash = withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -270,7 +271,7 @@ describe("Runtime code_mode Program children", () => {
           yield* Scope.close(scope, Effect.void as never)
         }),
       )
-      const reopen = withLayer(Runtime.layerSqlite({ ...options, filename }))(
+      const reopen = withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           if (crashPoint === "before-admission") {
@@ -304,7 +305,7 @@ describe("Runtime code_mode Program children", () => {
     const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
     let rootRunId = ""
     let childRunId = ""
-    const completeChild = withLayer(Runtime.layerSqlite({ ...options, filename }))(
+    const completeChild = withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const scheduler = yield* LocalScheduler.LocalScheduler
@@ -330,7 +331,7 @@ describe("Runtime code_mode Program children", () => {
         expect(counts.capability).toBe(1)
       }),
     )
-    const reopen = withLayer(Runtime.layerSqlite({ ...options, filename }))(
+    const reopen = withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const scheduler = yield* LocalScheduler.LocalScheduler

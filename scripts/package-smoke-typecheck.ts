@@ -23,6 +23,7 @@ import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
 import { AmazonBedrock, Catalog, OpenAi } from "tenetkit/ai"
 import { TestModel } from "tenetkit/test"
 import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
+import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
 import { Client, Snapshot, Sse, Wire, Ws } from "tenetkit/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool } from "effect/unstable/ai"
@@ -86,6 +87,10 @@ type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
 type AgUiCanonical = Assert<Equal<AgUiRoot["AgUi"], typeof AgUi>>
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
 type RunEventCanonical = Assert<Equal<RuntimeRoot["RunEvent"], typeof RunEvent>>
+type SqliteRuntimeOptions = import("tenetkit/runtime/sqlite-bun").Runtime.Options
+type SqliteRunStoreOptions = import("tenetkit/runtime/sqlite-bun").RunStore.Options
+void SqliteRuntime.layerSqlite
+void SqliteRunStore.layerSqlite
 type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("tenetkit/ai/catalog")>>
 type ProviderOpenAiSubpath = Assert<Equal<ProviderRoot["OpenAi"], typeof import("tenetkit/ai/openai")>>
 type ProviderOpenAiAccountAuthSubpath = Assert<

@@ -35,6 +35,7 @@ import { assistant, assistantRef, registrationsFor, researcherRef } from "./help
 import { provideScoped } from "./scoped-provide.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const waitTool = Tool.make("wait_for_human", {
   parameters: Schema.Struct({ question: Schema.String }),
   success: Schema.String,
@@ -165,7 +166,7 @@ describe("ExecutionHost", () => {
     Effect.gen(function* () {
       const filename = tempDbPath("session-record-independence")
       const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
-      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
       const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
@@ -209,7 +210,7 @@ describe("ExecutionHost", () => {
     Effect.gen(function* () {
       const filename = tempDbPath("session-usage-roundtrip")
       const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
-      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
       const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
@@ -265,7 +266,7 @@ describe("ExecutionHost", () => {
     Effect.gen(function* () {
       const filename = tempDbPath("durable-session-store")
       const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
-      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
       const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
@@ -337,7 +338,7 @@ describe("ExecutionHost", () => {
             attestation: executable,
           }),
       })
-      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const turn = (idempotencyKey: string, prompt: string) =>
         Effect.scoped(
           Effect.gen(function* () {
@@ -520,7 +521,7 @@ describe("ExecutionHost", () => {
             }
           }),
       })
-      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const receipt = yield* scopedWith(layerSqlite())(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -1154,7 +1155,7 @@ describe("ExecutionHost", () => {
     )
     const resolver = ExecutableResolver.makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }])
     const layerSqlite = () =>
-      Runtime.layerSqlite({
+      SqliteRuntime.layerSqlite({
         filename,
         resolver,
         addresses: [{ address, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
@@ -1587,7 +1588,7 @@ describe("ExecutionHost", () => {
       )
       const firstResolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, blockingModel) }])
       const runId = yield* scopedWith(
-        Runtime.layerSqlite({
+        SqliteRuntime.layerSqlite({
           filename,
           resolver: firstResolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
@@ -1624,7 +1625,7 @@ describe("ExecutionHost", () => {
       )
       const secondResolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, recoveredModel) }])
       yield* scopedWith(
-        Runtime.layerSqlite({
+        SqliteRuntime.layerSqlite({
           filename,
           resolver: secondResolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
@@ -1800,7 +1801,7 @@ describe("ExecutionHost", () => {
                 resolver,
                 addresses: [{ address, executable, registrations: registrationsFor(executable) }],
               })
-            : Runtime.layerSqlite({
+            : SqliteRuntime.layerSqlite({
                 filename,
                 resolver,
                 addresses: [{ address, executable, registrations: registrationsFor(executable) }],
@@ -2639,7 +2640,7 @@ describe("ExecutionHost", () => {
       return scopedWith(
         backend === "memory"
           ? Runtime.layerMemory(options)
-          : Runtime.layerSqlite({ ...options, filename: tempDbPath(`failed-agent-map-${backend}`) }),
+          : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(`failed-agent-map-${backend}`) }),
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime

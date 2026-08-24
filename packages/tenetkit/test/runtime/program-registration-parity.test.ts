@@ -5,6 +5,7 @@ import { registrationsFor } from "./helpers.js"
 import { agentMapProgramFixture } from "./program-fixture.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 for (const backend of ["memory", "sqlite"] as const) {
   const fixture = agentMapProgramFixture()
   const filename = tempDbPath(`program-registration-parity-${backend}`)
@@ -18,7 +19,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       },
     ],
   }
-  layer(backend === "memory" ? Runtime.layerMemory(options) : Runtime.layerSqlite({ ...options, filename }))(
+  layer(backend === "memory" ? Runtime.layerMemory(options) : SqliteRuntime.layerSqlite({ ...options, filename }))(
     `${backend} gives each Program fan-out child only its required registrations`,
     (it) => {
       it.effect(`${backend} gives each Program fan-out child only its required registrations`, () =>

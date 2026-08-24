@@ -5,13 +5,14 @@ import { assistant, assistantAddress, assistantRef, registrationsFor, textPrompt
 import { closedTestAgent } from "./identity.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const scopedWith =
   <A, E>(layer: Layer.Layer<A, E, never>) =>
   <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
 const highWaterLayer = (capacity: number) =>
-  Runtime.layerSqlite({
+  SqliteRuntime.layerSqlite({
     filename: tempDbPath(`subscriber-high-water-${capacity}`),
     resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],

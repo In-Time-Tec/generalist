@@ -10,6 +10,7 @@ import {
 } from "./program-store-contract.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const memory = programFixture()
 const sqlite = programFixture()
 const address = (resolver: typeof memory.resolver) => ({
@@ -34,7 +35,7 @@ layer(Runtime.layerMemory(address(memory.resolver)))("fences stale Program settl
         Effect.scoped(
           Effect.flatMap(
             Layer.build(
-              Runtime.layerSqlite({
+              SqliteRuntime.layerSqlite({
                 ...address(sqlite.resolver),
                 filename: tempDbPath("program-settlement-contract"),
               }),
