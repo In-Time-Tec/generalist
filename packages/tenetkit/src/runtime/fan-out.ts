@@ -4,6 +4,7 @@ import { Prompt } from "effect/unstable/ai"
 import { ExecutableRef } from "./executable-manifest.js"
 import { RunId } from "./run.js"
 import { ChildReadiness } from "./child-readiness.js"
+import { promptDigestValue } from "./prompt-digest.js"
 
 export const FanOutJoin = Schema.Union([
   Schema.TaggedStruct("AllSuccess", {}),
@@ -188,7 +189,7 @@ export const digestFanOut = (input: {
       selection: member.selection,
       label: member.label ?? null,
       executableRef: member.executableRef,
-      prompt: Schema.encodeSync(Prompt.Prompt)(member.prompt),
+      prompt: promptDigestValue(member.prompt),
       sessionId: member.sessionId,
       metadata: member.metadata,
       origin: member.origin ?? null,
