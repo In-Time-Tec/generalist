@@ -50,6 +50,7 @@ export namespace ToolExecutor {
   export type DomainFailure = import("./tool-executor.js").DomainFailure
   export type Interface<R = import("./tool-context.js").ToolContext> = import("./tool-executor.js").Interface<R>
   export type Outcome = import("./tool-executor.js").Outcome
+  export type ReplayPolicy = import("./tool-executor.js").ReplayPolicy
   export type Route<R = import("./tool-context.js").ToolContext> = import("./tool-placement.js").Route<R>
   export type Request = import("./tool-executor.js").Request
   export type Success = import("./tool-executor.js").Success

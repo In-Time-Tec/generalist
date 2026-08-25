@@ -256,6 +256,10 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
                   resolvingToolCallIds: request.toolCallBatch.calls.map((entry) => entry.id),
                 })
               : undefined
+          const skillActivation = isSkillActivationCall(call, registry)
+          const requestExecutor =
+            !skillActivation && handoffExecution === undefined && Option.isSome(executor) ? executor.value : undefined
+          const replayPolicy = requestExecutor?.replayPolicy?.(request) ?? "never"
           const executionBase: Effect.Effect<
             Outcome,
             AgentError | ToolNameCollision | FrameworkFailure | import("./agent.js").RunError,
@@ -263,13 +267,13 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             | Tool.HandlersFor<T>
             | Tool.HandlerServices<T[keyof T]>
             | import("../durable/driver-interpreter.js").DriverInterpreter
-          > = isSkillActivationCall(call, registry)
+          > = skillActivation
             ? activateSkillOutcome(turn, call)
             : handoffExecution !== undefined
               ? handoffExecution
-              : Option.isNone(executor)
+              : requestExecutor === undefined
                 ? defaultExecute(request, registry)
-                : executor.value
+                : requestExecutor
                     .execute(request)
                     .pipe(
                       Effect.mapError((error) =>
@@ -284,7 +288,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
               key: durableOperationKey,
               turn,
               input: { turn, callId: call.id, name: call.name },
-              replayPolicy: "never",
+              replayPolicy,
             },
             executionBase,
           )

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, ToolExecutor } from "tenetkit"
+import { Agent, ToolContext, ToolExecutor } from "tenetkit"
 import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/active-executions.js"
 import { make as makeExecutionHost } from "../../src/runtime/execution-host.js"
@@ -227,6 +227,126 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             expect(
               (yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,
             ).toBe("unknown")
+
+            yield* Fiber.interrupt(orphan)
+          }),
+        )
+      })
+    })
+
+    it.live("re-enters a provider-idempotent Agent tool with the same operation key after a crash", () => {
+      const started = Deferred.make<void>()
+      return Effect.gen(function* () {
+        const toolStarted = yield* started
+        const tool = Tool.make("idempotent_write", { parameters: Schema.Struct({}), success: Schema.String })
+        const agent = Agent.make({ name: `idempotent-recovery-${options.name}`, toolkit: Toolkit.make(tool) })
+        const executable = testExecutable(agent, `idempotent-recovery-${options.name}-v1`)
+        const address = Address.make(`agent:idempotent-recovery-${options.name}`)
+        const providerResults = new Map<string, string>()
+        const executorKeys = new Array<string>()
+        let modelCalls = 0
+        let toolCalls = 0
+        let sideEffects = 0
+        const model = Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () => {
+              modelCalls += 1
+              return modelCalls === 1
+                ? Stream.fromIterable<Response.StreamPartEncoded>([
+                    Response.makePart("tool-call", {
+                      id: "idempotent-call",
+                      name: "idempotent_write",
+                      params: {},
+                      providerExecuted: false,
+                    }),
+                    finish,
+                  ])
+                : Stream.fromIterable<Response.StreamPartEncoded>([
+                    Response.makePart("text-delta", { id: "done", delta: "done" }),
+                    finish,
+                  ])
+            },
+          }),
+        )
+        const executor = ToolExecutor.layerTest({
+          replayPolicy: (request) => (request.call.name === "idempotent_write" ? "provider-idempotent" : "never"),
+          execute: () =>
+            Effect.gen(function* () {
+              const context = yield* ToolContext.ToolContext
+              if (context.operationKey === undefined || context.idempotencyKey === undefined) {
+                return yield* Effect.die("Agent ToolContext is missing durable operation identity")
+              }
+              toolCalls += 1
+              executorKeys.push(context.operationKey)
+              const completed = providerResults.get(context.idempotencyKey)
+              if (completed !== undefined) {
+                return { _tag: "Success" as const, result: completed, encodedResult: completed }
+              }
+              sideEffects += 1
+              providerResults.set(context.idempotencyKey, "applied once")
+              yield* Deferred.succeed(toolStarted, undefined)
+              return yield* Effect.never
+            }),
+        })
+        const handlers = Toolkit.make(tool).toLayer({
+          idempotent_write: () => Effect.die("ToolExecutor test layer owns execution"),
+        })
+        const resolver = ExecutableResolver.makeStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        ])
+
+        yield* provideScoped(
+          options.makeLayer({
+            resolver,
+            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+            scheduler: { pollInterval: "1 hour" },
+          }),
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const store = yield* RunStore.RunStore
+            const host = yield* ExecutionHost.ExecutionHost
+            const receipt = yield* runtime.send({
+              to: address,
+              sessionId: `session:idempotent-recovery:${options.name}`,
+              idempotencyKey: "idempotent-recovery",
+              prompt: textPrompt("write once"),
+            })
+            const operationKey = `${receipt.runId}:tool:0:idempotent-call:idempotent_write`
+            const original = yield* claim(receipt.runId, "process-before-crash")
+            const orphan = yield* host.execute(original).pipe(Effect.forkChild({ startImmediately: true }))
+            yield* Deferred.await(toolStarted).pipe(Effect.timeout("5 seconds"))
+            const operation = yield* store.getOperationByKey({ runId: receipt.runId, operationKey })
+            expect(operation).toMatchObject({ status: "running", replayPolicy: "provider-idempotent" })
+
+            if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
+            const recoveryClaim = yield* claim(receipt.runId, "process-after-crash")
+            expect(yield* store.recoverRunningOperations(recoveryClaim)).toBe("ready")
+            if (operation === undefined) return yield* Effect.die("running operation missing")
+            expect(
+              (yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,
+            ).toBe("requested")
+            expect((yield* runtime.inspect(receipt.runId)).status).not.toBe("needs-resolution")
+
+            const recoveryActive = yield* Layer.build(activeExecutionsLayer)
+            const recoveryHost = yield* makeExecutionHost({
+              workerId: "process-after-crash",
+              resolver,
+            }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(recoveryActive))
+            yield* recoveryHost.execute(recoveryClaim).pipe(Effect.timeout("5 seconds"))
+
+            const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+            expect(history.filter((event) => event._tag === "OperationUnknown")).toHaveLength(0)
+            expect(
+              (yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,
+            ).toBe("succeeded")
+            expect(modelCalls).toBe(2)
+            expect(toolCalls).toBe(2)
+            expect(executorKeys).toEqual([operationKey, operationKey])
+            expect(sideEffects).toBe(1)
+            expect(providerResults).toEqual(new Map([[operationKey, "applied once"]]))
 
             yield* Fiber.interrupt(orphan)
           }),

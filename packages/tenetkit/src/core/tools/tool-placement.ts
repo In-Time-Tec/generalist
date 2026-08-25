@@ -1,6 +1,13 @@
 import { Effect, Schedule, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { FrameworkFailure, type Interface, type Outcome, type Request, type ToolkitInput } from "./tool-executor.js"
+import {
+  FrameworkFailure,
+  type Interface,
+  type Outcome,
+  type ReplayPolicy,
+  type Request,
+  type ToolkitInput,
+} from "./tool-executor.js"
 import { toolResultCodec } from "./tool-result-codec.js"
 import type { ToolContext } from "./tool-context.js"
 
@@ -8,6 +15,7 @@ import type { ToolContext } from "./tool-context.js"
 export interface Route<R = ToolContext> {
   readonly tools: ReadonlyArray<string>
   readonly matches: (request: Request) => boolean
+  readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly execute: Interface<R>["execute"]
 }
 
@@ -15,6 +23,7 @@ export interface Route<R = ToolContext> {
 export interface RouteOptions<R = ToolContext> {
   readonly tools?: ReadonlyArray<string> | undefined
   readonly matches?: ((request: Request) => boolean) | undefined
+  readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly execute: Interface<R>["execute"]
 }
 

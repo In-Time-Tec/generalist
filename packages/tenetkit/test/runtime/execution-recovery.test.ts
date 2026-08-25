@@ -6,6 +6,7 @@ import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from ".
 import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 import { registrationsFor } from "./helpers.js"
 import { testExecutable } from "./identity.js"
+import { operationRecoverySuite } from "./operation-recovery-suite.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
 const finish = Response.makePart("finish", {
@@ -21,6 +22,11 @@ const scopedWith =
   <A, E>(layer: Layer.Layer<A, E, never>) =>
   <B, E2, R extends A>(effect: Effect.Effect<B, E2, R>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Layer.build(layer).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))))
+
+operationRecoverySuite({
+  name: "sqlite",
+  makeLayer: (options) => SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("operation-recovery") }),
+})
 
 it.live("reconciles a crashed framework tool before resuming its Agent", () =>
   Effect.gen(function* () {

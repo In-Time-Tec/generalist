@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.38.3
+
+- Add `ToolExecutor.replayPolicy?: (request) => "never" | "provider-idempotent"`, selected synchronously for each concrete Agent tool request before durable scheduling. Omission remains `never`; static tools, handoffs, skill activation, child/code-mode tools, client, MCP, sandbox, and non-idempotent remote routes remain non-replayable. Router policy and execution share first-match precedence, while existing `remote({ idempotent: true, ... })` routes opt into provider-idempotent recovery.
+- Re-enter a crashed provider-idempotent Agent tool through its executor with the same `ToolContext.operationKey` / `idempotencyKey`, allowing a durable provider to return or reattach to the original operation instead of redispatching it. Memory, SQLite, PostgreSQL, and MySQL share crash-recovery coverage; `never` recovery still becomes unknown and requires resolution. This release requires no SQL schema or data migration.
+
 ## 0.38.2
 
 - Complete crashed framework-tool recovery after explicit resolution: the Agent reconstructs the pending tool batch from the durable Driver checkpoint and authoritative Session history, consumes the persisted outcome through normal tool completion, and continues without redispatching the tool, weakening history validation, or manufacturing a Session result.
