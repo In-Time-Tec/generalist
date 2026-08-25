@@ -345,6 +345,8 @@ export interface Interface {
     { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
     WorkerMutationError
   >
+  /** @experimental Reconcile operations left running by the prior owner before execution resumes. */
+  readonly recoverRunningOperations: (input: ExecutionClaim) => Effect.Effect<"ready" | "blocked", WorkerMutationError>
   readonly getOperation: (input: {
     readonly runId: string
     readonly operationId: string

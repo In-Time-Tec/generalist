@@ -1,0 +1,217 @@
+import { describe, expect, it } from "@effect/vitest"
+import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, ToolExecutor } from "tenetkit"
+import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
+import { layer as activeExecutionsLayer } from "../../src/runtime/active-executions.js"
+import { make as makeExecutionHost } from "../../src/runtime/execution-host.js"
+import type { ExecutionClaim, WorkerMutationError } from "../../src/runtime/run-store.js"
+import { assistant, assistantRef, registrationsFor, textPrompt } from "./helpers.js"
+import { closedTestAgent, testExecutable } from "./identity.js"
+import { provideScoped } from "./scoped-provide.js"
+
+export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
+  readonly name: string
+  readonly makeLayer: (
+    options: Runtime.LayerOptions,
+  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExecutionHost.ExecutionHost | Extra, StoreError>
+  readonly claim?: (
+    runId: string,
+    ownerId: string,
+  ) => Effect.Effect<ExecutionClaim, WorkerMutationError, RunStore.RunStore | Extra>
+  readonly expireClaim?: (runId: string) => Effect.Effect<void, WorkerMutationError, Extra>
+  readonly skip?: boolean
+}
+
+const finish = Response.makePart("finish", {
+  reason: "stop",
+  usage: Response.Usage.make({
+    inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
+    outputTokens: { total: 1, text: 1, reasoning: undefined },
+  }),
+  response: undefined,
+})
+
+export const operationRecoverySuite = <StoreError, Extra = never>(
+  options: OperationRecoverySuiteOptions<StoreError, Extra>,
+) => {
+  const describeBackend = options.skip === true ? describe.skip : describe
+  const claim = (runId: string, ownerId: string) =>
+    options.claim === undefined
+      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({ runId, ownerId }))
+      : options.claim(runId, ownerId)
+
+  describeBackend(`running operation recovery (${options.name})`, () => {
+    it.live("reconciles every replay policy atomically and idempotently under the current claim", () =>
+      provideScoped(
+        options.makeLayer({
+          resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+          addresses: [],
+          scheduler: { pollInterval: "1 hour" },
+        }),
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.start({
+            executable: assistantRef,
+            registrations: registrationsFor(assistantRef),
+            sessionId: `session:operation-recovery:${options.name}:policies`,
+            idempotencyKey: "operation-recovery:policies",
+            prompt: textPrompt("recover policies"),
+          })
+          const original = yield* claim(receipt.runId, "original")
+          const attempt = (yield* store.loadExecution(receipt.runId)).attempt
+          const operations = yield* Effect.forEach(["pure", "provider-idempotent", "never"] as const, (replayPolicy) =>
+            Effect.gen(function* () {
+              const operation = yield* store.recordOperation({
+                ...original,
+                operationKey: `operation:${replayPolicy}`,
+                kind: "tool",
+                inputDigest: replayPolicy,
+                input: { replayPolicy },
+                replayPolicy,
+                attempt,
+              })
+              yield* store.startOperation({ ...original, operationId: operation.operationId })
+              return operation
+            }),
+          )
+
+          if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
+          const recovery = yield* claim(receipt.runId, "recovery")
+          expect(yield* store.recoverRunningOperations(recovery)).toBe("blocked")
+          expect(
+            (yield* store.getOperation({ runId: receipt.runId, operationId: operations[0]!.operationId })).status,
+          ).toBe("requested")
+          expect(
+            (yield* store.getOperation({ runId: receipt.runId, operationId: operations[1]!.operationId })).status,
+          ).toBe("requested")
+          expect(
+            (yield* store.getOperation({ runId: receipt.runId, operationId: operations[2]!.operationId })).status,
+          ).toBe("unknown")
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+
+          expect(yield* store.recoverRunningOperations(recovery)).toBe("blocked")
+          const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+          expect(history.filter((event) => event._tag === "OperationUnknown")).toHaveLength(1)
+          expect((yield* store.recoverRunningOperations(original).pipe(Effect.flip))._tag).toBe(
+            "tenetkit/runtime/StaleClaim",
+          )
+
+          yield* runtime.resolveOperation({
+            runId: receipt.runId,
+            operationId: operations[2]!.operationId,
+            idempotencyKey: "operation-recovery:resolve",
+            resolution: { _tag: "Succeeded", value: "already happened" },
+          })
+          expect((yield* runtime.inspect(receipt.runId)).status).not.toBe("needs-resolution")
+          expect(
+            (yield* store.getOperation({ runId: receipt.runId, operationId: operations[2]!.operationId })).status,
+          ).toBe("succeeded")
+        }),
+      ),
+    )
+
+    it.live("blocks crash recovery before another agent turn when a never-replay tool was running", () => {
+      const started = Deferred.make<void>()
+      return Effect.gen(function* () {
+        const toolStarted = yield* started
+        const tool = Tool.make("crash_tool", { parameters: Schema.Struct({}), success: Schema.String })
+        const agent = Agent.make({ name: `operation-recovery-${options.name}`, toolkit: Toolkit.make(tool) })
+        const executable = testExecutable(agent, `operation-recovery-${options.name}-v1`)
+        const address = Address.make(`agent:operation-recovery-${options.name}`)
+        let modelCalls = 0
+        let toolCalls = 0
+        const model = Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () => {
+              modelCalls += 1
+              return Stream.fromIterable<Response.StreamPartEncoded>([
+                Response.makePart("tool-call", {
+                  id: "crash-call",
+                  name: "crash_tool",
+                  params: {},
+                  providerExecuted: false,
+                }),
+                finish,
+              ])
+            },
+          }),
+        )
+        const executor = ToolExecutor.layerTest({
+          execute: () =>
+            Effect.gen(function* () {
+              toolCalls += 1
+              yield* Deferred.succeed(toolStarted, undefined)
+              return yield* Effect.never
+            }),
+        })
+        const handlers = Toolkit.make(tool).toLayer({
+          crash_tool: () => Effect.die("ToolExecutor test layer owns execution"),
+        })
+        const resolver = ExecutableResolver.makeStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        ])
+
+        yield* provideScoped(
+          options.makeLayer({
+            resolver,
+            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+            scheduler: { pollInterval: "1 hour" },
+          }),
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const store = yield* RunStore.RunStore
+            const host = yield* ExecutionHost.ExecutionHost
+            const receipt = yield* runtime.send({
+              to: address,
+              sessionId: `session:operation-recovery:${options.name}:crash`,
+              idempotencyKey: "operation-recovery:crash",
+              prompt: textPrompt("crash after tool dispatch"),
+            })
+            const original = yield* claim(receipt.runId, "process-before-crash")
+            const orphan = yield* host.execute(original).pipe(Effect.forkChild({ startImmediately: true }))
+            yield* Deferred.await(toolStarted).pipe(Effect.timeout("5 seconds"))
+
+            const before = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+            const beforeTags = before.map((event) => event._tag)
+            expect(beforeTags).toContain("ModelResponseCommitted")
+            expect(beforeTags).toContain("ToolExecutionStarted")
+            const turnsBefore = beforeTags.filter((tag) => tag === "TurnStarted").length
+            const operation = yield* store.getOperationByKey({
+              runId: receipt.runId,
+              operationKey: `${receipt.runId}:tool:0:crash-call:crash_tool`,
+            })
+            expect(operation).toMatchObject({ status: "running", replayPolicy: "never" })
+
+            if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
+            const recoveryClaim = yield* claim(receipt.runId, "process-after-crash")
+            const recoveryActive = yield* Layer.build(activeExecutionsLayer)
+            const recoveryHost = yield* makeExecutionHost({
+              workerId: "process-after-crash",
+              resolver,
+            }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(recoveryActive))
+            yield* recoveryHost.execute(recoveryClaim).pipe(Effect.timeout("5 seconds"))
+
+            const after = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+            const afterTags = after.map((event) => event._tag)
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+            expect(afterTags.filter((tag) => tag === "OperationUnknown")).toHaveLength(1)
+            expect(afterTags.filter((tag) => tag === "TurnStarted")).toHaveLength(turnsBefore)
+            expect(afterTags).not.toContain("RunFailed")
+            expect(modelCalls).toBe(1)
+            expect(toolCalls).toBe(1)
+            if (operation === undefined) return yield* Effect.die("running operation missing")
+            expect(
+              (yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,
+            ).toBe("unknown")
+
+            yield* Fiber.interrupt(orphan)
+          }),
+        )
+      })
+    })
+  })
+}

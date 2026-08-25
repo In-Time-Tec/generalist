@@ -50,6 +50,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
           yield* store.saveExecution(claim)
           return
         }
+        if ((yield* store.recoverRunningOperations(claim)) === "blocked") return
         const runId = claim.runId
         const activeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
         const completingRetrySafeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())

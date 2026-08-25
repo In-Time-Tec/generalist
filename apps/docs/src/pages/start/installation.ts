@@ -1,8 +1,8 @@
 import { callout, code, codeBlock, definePage, h2, lead, link, p, table } from "../../prose"
-const bunInstall = `bun add effect@4.0.0-rc.111 tenetkit@0.38.0`
+const bunInstall = `bun add effect@4.0.0-rc.111 tenetkit@0.38.1`
 
-const otherManagers = `npm install effect@4.0.0-rc.111 tenetkit@0.38.0
-pnpm add effect@4.0.0-rc.111 tenetkit@0.38.0`
+const otherManagers = `npm install effect@4.0.0-rc.111 tenetkit@0.38.1
+pnpm add effect@4.0.0-rc.111 tenetkit@0.38.1`
 
 export const installation = definePage({
   path: "/docs/start/installation",
@@ -33,27 +33,27 @@ export const installation = definePage({
       [
         [
           [code("tenetkit")],
-          "0.38.0",
+          "0.38.1",
           "The agent loop: events, typed suspension, turn policy, tools, approvals, permissions, steering, and compaction",
         ],
         [
           [code("tenetkit/ai")],
-          "0.38.0",
+          "0.38.1",
           "Optional model registration for OpenAI, Anthropic, OpenRouter, Amazon Bedrock, and OpenAI-compatible APIs",
         ],
-        [[code("tenetkit/runtime")], "0.38.0", "Addressable Runs, replay, inspection, waits, and stores"],
-        [[code("tenetkit/mcp")], "0.38.0", "MCP discovery and the TenetKit ToolExecutor adapter"],
-        [[code("tenetkit/skills")], "0.38.0", "SKILL.md and instruction-file sources"],
-        [[code("tenetkit/memory")], "0.38.0", "Working memory, vector store, and semantic recall"],
-        [[code("tenetkit/test")], "0.38.0", "Scripted model fixtures and normalized request capture"],
+        [[code("tenetkit/runtime")], "0.38.1", "Addressable Runs, replay, inspection, waits, and stores"],
+        [[code("tenetkit/mcp")], "0.38.1", "MCP discovery and the TenetKit ToolExecutor adapter"],
+        [[code("tenetkit/skills")], "0.38.1", "SKILL.md and instruction-file sources"],
+        [[code("tenetkit/memory")], "0.38.1", "Working memory, vector store, and semantic recall"],
+        [[code("tenetkit/test")], "0.38.1", "Scripted model fixtures and normalized request capture"],
         [
           [code("tenetkit/transport")],
-          "0.38.0",
+          "0.38.1",
           "Runtime wire codecs, snapshots, SSE and WebSocket serving, and client adapters",
         ],
-        [[code("tenetkit/foldkit")], "0.38.0", "FoldKit connection service and headless chat model"],
-        [[code("tenetkit/a2a")], "0.38.0", "A2A v1 server projection over Runtime"],
-        [[code("tenetkit/ag-ui")], "0.38.0", "AG-UI event projection over Runtime"],
+        [[code("tenetkit/foldkit")], "0.38.1", "FoldKit connection service and headless chat model"],
+        [[code("tenetkit/a2a")], "0.38.1", "A2A v1 server projection over Runtime"],
+        [[code("tenetkit/ag-ui")], "0.38.1", "AG-UI event projection over Runtime"],
       ],
     ),
     h2("effect-compatibility", "Effect compatibility"),

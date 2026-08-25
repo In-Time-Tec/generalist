@@ -30,6 +30,7 @@ import {
   commitInterruptedModelResponse,
 } from "./store-operations.js"
 import { resolveOperation } from "./store-operation-resolution.js"
+import { recoverRunningOperations } from "./store-operation-recovery.js"
 import { cancelSession } from "./store-session.js"
 import {
   claimExecution,
@@ -93,7 +94,6 @@ const makeStoreServices = (options: LayerOptions) =>
       }),
     )
     yield* Effect.addFinalizer(() => shutdownStore(stateRef))
-
     const publish = (initial: MemoryState, publications: ReadonlyArray<MemoryPublication>) =>
       Effect.gen(function* () {
         let state = initial
@@ -148,7 +148,6 @@ const makeStoreServices = (options: LayerOptions) =>
           return result
         }).pipe(Effect.uninterruptible),
       )
-
     const update = <E>(transition: (state: MemoryState) => Effect.Effect<MemoryState, E>) =>
       modifyState((state) => transition(state).pipe(Effect.map((next) => [undefined, next] as const))).pipe(
         Effect.asVoid,
@@ -161,7 +160,6 @@ const makeStoreServices = (options: LayerOptions) =>
       input: import("../run-store.js").ExecutionClaim,
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
     ) => modifyState((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
-
     const runStore = RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
       sessionStore: (sessionId) => Effect.succeed(Option.some(makeMemorySessionStore({ stateRef, sessionId }))),
@@ -411,6 +409,7 @@ const makeStoreServices = (options: LayerOptions) =>
       commitInterruptedModelResponse: (input) =>
         fencedModify(input, (state) => commitInterruptedModelResponse(state, input)),
       expireRunningOperation: (input) => fencedModify(input, (state) => expireRunningOperation(state, input)),
+      recoverRunningOperations: (input) => fencedModify(input, (state) => recoverRunningOperations(state, input)),
       getOperation: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperation(state, input))),
       getOperationByKey: (input) =>
