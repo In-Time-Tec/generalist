@@ -59,6 +59,7 @@ export const postgresOperations = (input: {
   | "commitModelResponse"
   | "commitInterruptedModelResponse"
   | "expireRunningOperation"
+  | "recoverRunningOperations"
   | "getOperation"
   | "getOperationByKey"
   | "resolveOperation"
@@ -74,6 +75,43 @@ export const postgresOperations = (input: {
         Effect.andThen(effect),
       ),
     )
+  const expire = (op: { readonly runId: string; readonly operationId: string }) =>
+    Effect.gen(function* () {
+      const loaded = yield* requireRun(op.runId)
+      const rows = yield* sql<OperationRow>`
+        SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+      `
+      const row = rows[0]
+      if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+      if (row.status !== "running") {
+        return { record: toOperationRecord(row), outcome: row.status }
+      }
+      if (canBlindRetry(row.replay_policy)) {
+        yield* sql`
+          UPDATE tenetkit_run_operations
+          SET status = 'requested', started_at = NULL, finished_at = NULL, owner_worker_id = NULL, lease_expires_at = NULL
+          WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'running'
+        `
+        const next = yield* sql<OperationRow>`
+          SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+        `
+        return { record: toOperationRecord(next[0]!), outcome: "retried" as const }
+      }
+      yield* sql`
+        UPDATE tenetkit_run_operations SET status = 'unknown', finished_at = NOW()
+        WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'running'
+      `
+      yield* appendEvent(
+        hub,
+        loaded,
+        { _tag: "OperationUnknown", operationId: op.operationId },
+        loaded.cancellationRequested ? "cancelling" : "needs-resolution",
+      )
+      const next = yield* sql<OperationRow>`
+        SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+      `
+      return { record: toOperationRecord(next[0]!), outcome: "unknown" as const }
+    })
   return {
     recordOperation: (op) =>
       fenced(
@@ -293,44 +331,21 @@ export const postgresOperations = (input: {
         }),
       ),
     ...postgresModelResponseOperations(input),
-    expireRunningOperation: (op) =>
+    expireRunningOperation: (op) => fenced(op, expire(op)),
+    recoverRunningOperations: (claim) =>
       fenced(
-        op,
+        claim,
         Effect.gen(function* () {
-          const loaded = yield* requireRun(op.runId)
-          const rows = yield* sql<OperationRow>`
-            SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+          const operations = yield* sql<{ readonly operation_id: string }>`
+            SELECT operation_id FROM tenetkit_run_operations
+            WHERE run_id = ${claim.runId} AND status = 'running'
+            ORDER BY operation_id
           `
-          const row = rows[0]
-          if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-          if (row.status !== "running") {
-            return { record: toOperationRecord(row), outcome: row.status }
+          for (const operation of operations) {
+            yield* expire({ runId: claim.runId, operationId: operation.operation_id })
           }
-          if (canBlindRetry(row.replay_policy)) {
-            yield* sql`
-              UPDATE tenetkit_run_operations
-              SET status = 'requested', started_at = NULL, finished_at = NULL, owner_worker_id = NULL, lease_expires_at = NULL
-              WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'running'
-            `
-            const next = yield* sql<OperationRow>`
-              SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
-            `
-            return { record: toOperationRecord(next[0]!), outcome: "retried" as const }
-          }
-          yield* sql`
-            UPDATE tenetkit_run_operations SET status = 'unknown', finished_at = NOW()
-            WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'running'
-          `
-          yield* appendEvent(
-            hub,
-            loaded,
-            { _tag: "OperationUnknown", operationId: op.operationId },
-            loaded.cancellationRequested ? "cancelling" : "needs-resolution",
-          )
-          const next = yield* sql<OperationRow>`
-            SELECT * FROM tenetkit_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
-          `
-          return { record: toOperationRecord(next[0]!), outcome: "unknown" as const }
+          const loaded = yield* requireRun(claim.runId)
+          return loaded.status === "needs-resolution" ? "blocked" : "ready"
         }),
       ),
     getOperation: (op) =>

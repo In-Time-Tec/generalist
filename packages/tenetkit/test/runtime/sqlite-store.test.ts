@@ -584,7 +584,7 @@ it.live("atomically imports SQLite handoff projections with exact retry and dive
   })
 })
 
-it.live("recovers a committed ExecutionHost handoff through the active Agent after reopen", () =>
+it.live("requires explicit resolution of a handoff tool interrupted after its inner commit", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("execution-host-handoff-reopen")
     const childAgent = Agent.make({ name: "durable-specialist" })
@@ -786,8 +786,35 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       const conversationBeforeContinuation = Session.buildContext(yield* session.value.path())
       const claim = yield* store.claimExecution({ runId: committedResult.runId, ownerId: "after-reopen" })
       yield* host.execute(claim)
+      expect((yield* runtime.inspect(committedResult.runId)).status).toBe("needs-resolution")
+      expect(resolvedActive).toBeUndefined()
+      const history = yield* runtime.history({ runId: committedResult.runId, cursor: -1, limit: 100 })
+      const unknown = history.findLast((event) => event._tag === "OperationUnknown")
+      if (unknown?._tag !== "OperationUnknown" || committedResult.operation === undefined) {
+        return yield* Effect.die("interrupted handoff operation recovery is missing")
+      }
+      const accepted = {
+        _tag: "HandoffAccepted" as const,
+        handoffId: committedResult.operation.operationKey,
+        source: supervisor.agent.name,
+        target: childAgent.name,
+      }
+      yield* runtime.resolveOperation({
+        runId: committedResult.runId,
+        operationId: unknown.operationId,
+        idempotencyKey: "resolve:committed-handoff-tool",
+        resolution: {
+          _tag: "Succeeded",
+          value: { _tag: "Success", result: accepted, encodedResult: accepted },
+        },
+      })
+      const resumed = yield* store.claimExecution({ runId: committedResult.runId, ownerId: "after-resolution" })
+      yield* host.execute(resumed)
       expect(resolvedActive).toBe(child.pin)
       expect((yield* runtime.inspect(committedResult.runId)).status).toBe("succeeded")
+      expect(
+        (yield* runtime.history({ runId: committedResult.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
+      ).not.toContain("RunFailed")
       const completed = yield* store.loadExecution(committedResult.runId)
       const completedState = (
         completed.checkpoint !== undefined && "state" in completed.checkpoint ? completed.checkpoint.state : undefined

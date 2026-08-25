@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.38.1
+
+- Reconcile operations left `running` by a crashed execution owner before resolver or Agent entry on every Runtime host. Pure and provider-idempotent operations return to `requested`; a `never` operation becomes `unknown`, emits `OperationUnknown`, and blocks the Run in `needs-resolution` until `Runtime.resolveOperation` records an explicit decision.
+- Fence recovery with the current Run claim and commit all operation repairs atomically in memory, SQLite, PostgreSQL, and MySQL. Repeated recovery is idempotent and cannot append another unknown event or start another turn. This release changes no application Runtime API and requires no SQL schema or data migration.
+
 ## 0.38.0
 
 - Add staged exact-root admission through `Runtime.admit(input)` and transactionally idempotent release through `Runtime.activate({ runId })`. Admitted roots cannot be claimed before activation; cancellation and activation serialize in memory, SQLite, PostgreSQL, and MySQL, so cancellation that wins remains terminal and duplicate activation emits one attempt.
