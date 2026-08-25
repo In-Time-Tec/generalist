@@ -74,6 +74,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         system,
         persisted,
         validatedResume,
+        recoveredToolCheckpoint,
         executor,
         chain,
         activeModelResponse,
@@ -423,11 +424,9 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       const interpreterServices = yield* Layer.build(layerForRun(agent, options, baseInitialPrompt, runBudget))
       const withInterpreter = <A, E, RInner>(effect: Effect.Effect<A, E, RInner>) =>
         effect.pipe(Effect.provideContext(interpreterServices))
-      if (validatedResume !== undefined) {
-        yield* withInterpreter(bindResume(validatedResume.suspension.token))
-      }
+      if (validatedResume !== undefined) yield* withInterpreter(bindResume(validatedResume.suspension.token))
       const initialPrompt =
-        options.resume === undefined
+        options.resume === undefined && recoveredToolCheckpoint === undefined
           ? yield* recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
           : baseInitialPrompt
       const runPrompt =
@@ -456,6 +455,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               steeringService,
               structured,
               validatedResume,
+              recoveredToolCheckpoint,
               seedSystem,
               recallInitialPrompt,
               initialPrompt: prompt,

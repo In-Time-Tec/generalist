@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.38.2
+
+- Complete crashed framework-tool recovery after explicit resolution: the Agent reconstructs the pending tool batch from the durable Driver checkpoint and authoritative Session history, consumes the persisted outcome through normal tool completion, and continues without redispatching the tool, weakening history validation, or manufacturing a Session result.
+- Keep Runs with several unknown operations in `needs-resolution` until every unknown is resolved. Memory, SQLite, PostgreSQL, and MySQL now share this contract; this release requires no SQL schema or data migration.
+- Applications upgrading directly from 0.38.0 with a custom `RunStore` must implement the claim-fenced `recoverRunningOperations` operation introduced in 0.38.1. Built-in stores require no application changes.
+
 ## 0.38.1
 
 - Reconcile operations left `running` by a crashed execution owner before resolver or Agent entry on every Runtime host. Pure and provider-idempotent operations return to `requested`; a `never` operation becomes `unknown`, emits `OperationUnknown`, and blocks the Run in `needs-resolution` until `Runtime.resolveOperation` records an explicit decision.

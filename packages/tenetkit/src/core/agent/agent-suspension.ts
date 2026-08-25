@@ -6,11 +6,16 @@ import type { Request } from "../tools/tool-executor.js"
 import type { ResumeResolution } from "./agent.js"
 import { domainFailureResult, successResult } from "./agent-tool-result.js"
 
-export interface SuspensionCheckpoint {
+export interface ToolCheckpoint {
   readonly call: Prompt.ToolCallPart
   readonly messages: ReadonlyArray<Prompt.Message>
-  readonly suspension: AgentSuspended
+  readonly toolCallBatch: ReadonlyArray<AnyToolCall>
   readonly unresolvedToolCallIndexes: ReadonlyArray<number>
+  readonly suspension?: AgentSuspended
+}
+
+export interface SuspensionCheckpoint extends ToolCheckpoint {
+  readonly suspension: AgentSuspended
 }
 
 export const suspensionCheckpointOption = "tenetkit/suspension" as const
@@ -138,6 +143,7 @@ export const suspensionCheckpoint = (messages: ReadonlyArray<Prompt.Message>): S
   return {
     call: unresolved.call,
     messages: unresolved.messages,
+    toolCallBatch: unresolved.toolCallBatch,
     unresolvedToolCallIndexes: unresolved.unresolvedToolCallIndexes,
     suspension: AgentSuspended.make({
       ...metadata.value,
@@ -148,6 +154,30 @@ export const suspensionCheckpoint = (messages: ReadonlyArray<Prompt.Message>): S
     }),
   }
 }
+
+export const pendingToolCheckpoint: {
+  (input: unknown): (messages: ReadonlyArray<Prompt.Message>) => ToolCheckpoint | undefined
+  (messages: ReadonlyArray<Prompt.Message>, input: unknown): ToolCheckpoint | undefined
+} = Function.dual(2, (messages: ReadonlyArray<Prompt.Message>, input: unknown): ToolCheckpoint | undefined => {
+  if (
+    typeof input !== "object" ||
+    input === null ||
+    !("callId" in input) ||
+    typeof input.callId !== "string" ||
+    !("name" in input) ||
+    typeof input.name !== "string"
+  ) {
+    return undefined
+  }
+  const unresolved = unresolvedToolCall(messages, input.callId)
+  if (unresolved === undefined || unresolved.call.name !== input.name) return undefined
+  return {
+    call: unresolved.call,
+    messages: unresolved.messages,
+    toolCallBatch: unresolved.toolCallBatch,
+    unresolvedToolCallIndexes: unresolved.unresolvedToolCallIndexes,
+  }
+})
 
 export const sameSuspension: {
   (right: AgentSuspended): (left: AgentSuspended) => boolean

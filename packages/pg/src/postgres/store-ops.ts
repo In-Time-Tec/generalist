@@ -429,8 +429,16 @@ export const postgresOperations = (input: {
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'unknown'
             `
           }
+          const unresolved = yield* sql<{ readonly unresolved: number }>`
+            SELECT COUNT(*)::int AS unresolved FROM tenetkit_run_operations
+            WHERE run_id = ${op.runId} AND status = 'unknown'
+          `
+          const runStatus =
+            Number(unresolved[0]?.unresolved ?? 0) > 0
+              ? sql`'needs-resolution'`
+              : sql`CASE WHEN cancellation_requested THEN 'cancelling' ELSE 'queued' END`
           yield* sql`
-            UPDATE tenetkit_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE 'queued' END, owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW()
+            UPDATE tenetkit_runs SET status = ${runStatus}, owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW()
             WHERE run_id = ${op.runId} AND status = 'needs-resolution'
           `
           yield* settleAdmittedCancellation(hub, op.runId)

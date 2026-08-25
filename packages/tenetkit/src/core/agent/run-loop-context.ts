@@ -13,7 +13,7 @@ import type { Key, Memory } from "../context/memory.js"
 import type { Middleware } from "../model/model-middleware.js"
 import type { Registry } from "../tools/tool-registry.js"
 import type { Request } from "../tools/tool-executor.js"
-import type { SuspensionCheckpoint } from "./agent-suspension.js"
+import type { SuspensionCheckpoint, ToolCheckpoint } from "./agent-suspension.js"
 import type { HandoffRunState } from "./handoff-state.js"
 import type { SessionStore, Entry } from "../context/session.js"
 import type { Steering, Input } from "../turn/steering.js"
@@ -64,6 +64,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly steeringService: Option.Option<typeof Steering.Service>
   readonly structured: StructuredRunConfig<S> | undefined
   readonly validatedResume: SuspensionCheckpoint | undefined
+  readonly recoveredToolCheckpoint: ToolCheckpoint | undefined
   readonly seedSystem: string | undefined
   readonly recallInitialPrompt: (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter>
   readonly initialPrompt: Prompt.RawInput

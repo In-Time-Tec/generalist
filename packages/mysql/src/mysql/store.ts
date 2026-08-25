@@ -26,9 +26,9 @@ import {
   getOperationByKey,
   recordOperation,
   startOperation,
-  resolveOperation,
 } from "tenetkit/runtime/driver/sql/store-operations"
 import { recoverRunningOperations } from "tenetkit/runtime/driver/sql/store-operation-recovery"
+import { resolveOperation } from "tenetkit/runtime/driver/sql/store-operation-resolution"
 import {
   claimExecution,
   loadExecution,
