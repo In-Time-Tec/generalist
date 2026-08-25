@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/agent-event.js"
-import { FrameworkFailure, RemoteRetryMisconfigured } from "./tool-executor.js"
+import { FrameworkFailure, RemoteRetryMisconfigured, type ReplayPolicy } from "./tool-executor.js"
 import {
   type Placement,
   type PlacementRequest,
@@ -26,6 +26,7 @@ export function route<R>(options: RouteOptions<R>): Route<R> {
   return {
     tools: routedTools,
     matches: (request) => routedTools.includes(request.call.name) || options.matches?.(request) === true,
+    ...(options.replayPolicy === undefined ? {} : { replayPolicy: options.replayPolicy }),
     execute: options.execute,
   }
 }
@@ -33,10 +34,12 @@ export function route<R>(options: RouteOptions<R>): Route<R> {
 const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
   placement: Placement,
   options: PlacementRouteOptions<Tools, E>,
+  replayPolicy: ReplayPolicy = "never",
 ): Route<ToolContext | PlacementSchemaServices<Tools>> => {
   const routedTools = options.tools ?? Object.keys(options.toolkit.tools)
   return route<ToolContext | PlacementSchemaServices<Tools>>({
     tools: routedTools,
+    replayPolicy: () => replayPolicy,
     execute: (request) => {
       const tool = options.toolkit.tools[request.call.name]
       if (tool === undefined) {
@@ -142,11 +145,15 @@ export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFail
   options: RemoteRouteOptions<Tools, E>,
 ): Route<ToolContext | PlacementSchemaServices<Tools>> =>
   options.idempotent === true
-    ? placementRoute("remote", {
-        toolkit: options.toolkit,
-        ...(options.tools === undefined ? {} : { tools: options.tools }),
-        execute: (request) => retryRemote(options, request),
-      })
+    ? placementRoute(
+        "remote",
+        {
+          toolkit: options.toolkit,
+          ...(options.tools === undefined ? {} : { tools: options.tools }),
+          execute: (request) => retryRemote(options, request),
+        },
+        "provider-idempotent",
+      )
     : placementRoute("remote", options)
 
 /** @experimental Route tool calls to an MCP placement adapter. */

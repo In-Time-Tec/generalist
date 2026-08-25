@@ -368,6 +368,12 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
   readonly upstream: Option.Option<ToolExecutor.Interface>
 }): ToolExecutor.Interface =>
   ToolExecutor.ToolExecutor.of({
+    replayPolicy: (request) =>
+      request.call.name === options.implementation.tool.name
+        ? "never"
+        : Option.isSome(options.upstream)
+          ? (options.upstream.value.replayPolicy?.(request) ?? "never")
+          : "never",
     execute: (request) =>
       request.call.name === options.implementation.tool.name
         ? Schema.decodeUnknownEffect(options.implementation.parameters, { onExcessProperty: "error" })(

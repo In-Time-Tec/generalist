@@ -378,6 +378,47 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "ToolExecutor.layerRouter selects replay policy and execution from the same first route", () => {
+    const localTool = Tool.make("overlap", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(localTool)
+
+    return [
+      Layer.mergeAll(
+        ToolExecutor.layerRouter([
+          ToolExecutor.routeToolkit(toolkit),
+          ToolExecutor.route({
+            tools: ["overlap"],
+            replayPolicy: () => "provider-idempotent",
+            execute: () => Effect.succeed({ _tag: "Success", result: "remote", encodedResult: "remote" }),
+          }),
+          ToolExecutor.route({
+            tools: ["provider"],
+            replayPolicy: () => "provider-idempotent",
+            execute: () => Effect.succeed({ _tag: "Success", result: "first", encodedResult: "first" }),
+          }),
+          ToolExecutor.route({
+            tools: ["provider"],
+            execute: () => Effect.succeed({ _tag: "Success", result: "second", encodedResult: "second" }),
+          }),
+        ]).pipe(Layer.provide(toolkit.toLayer({ overlap: () => Effect.succeed("local") }))),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const localRequest = request("overlap", {})
+        const providerRequest = request("provider", {})
+
+        expect(executor.replayPolicy?.(localRequest)).toBe("never")
+        expect(yield* executor.execute(localRequest)).toMatchObject({ result: "local" })
+        expect(executor.replayPolicy?.(providerRequest)).toBe("provider-idempotent")
+        expect(yield* executor.execute(providerRequest)).toMatchObject({ result: "first" })
+        expect(executor.replayPolicy?.(request("missing", {}))).toBe("never")
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "ToolExecutor.client validates placement results against the Effect AI tool schema", () => {
     const selectFile = Tool.make("select_file", {
       parameters: Schema.Struct({}),
@@ -509,6 +550,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
+        expect(executor.replayPolicy?.(request("run_ci", {}))).toBe("provider-idempotent")
         const recovered = yield* executor.execute(request("run_ci", {}))
         const failed = yield* executor.execute(request("run_ci", { toolFailure: true }))
         const infrastructure = yield* Effect.flip(executor.execute(request("run_ci", { infrastructureFailure: true })))
@@ -552,6 +594,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
+        expect(executor.replayPolicy?.(request("run_ci", {}))).toBe("never")
         const failed = yield* Effect.flip(executor.execute(request("run_ci", {})))
 
         expect(attempts).toBe(1)

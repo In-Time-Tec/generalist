@@ -834,6 +834,32 @@ describe("DurableDriver Agent.stream integration", () => {
     })
   }
 
+  {
+    const { scheduled, journalLayer } = captureJournal()
+    const agent = Agent.make({ name: "replay-safe-tool-agent", toolkit: Toolkit.make(echoTool) })
+    layer(
+      Layer.mergeAll(
+        makeToolCallModelLayer(),
+        ToolExecutor.layerTest({
+          replayPolicy: (request) => (request.call.name === "echo" ? "provider-idempotent" : "never"),
+          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+        }),
+        journalLayer,
+        unusedToolHandlerLayer,
+      ),
+    )("selects a concrete ToolExecutor request replay policy before journaling", (suite) => {
+      suite.effect("selects a concrete ToolExecutor request replay policy before journaling", () =>
+        Effect.gen(function* () {
+          yield* Agent.stream(agent, { prompt: "use echo", logicalOperationId: "replay-safe-run" }).pipe(
+            Stream.runDrain,
+          )
+          expect(scheduled.find((operation) => operation.kind === "model")?.replayPolicy).toBe("never")
+          expect(scheduled.find((operation) => operation.kind === "tool")?.replayPolicy).toBe("provider-idempotent")
+        }),
+      )
+    })
+  }
+
   it.effect("keeps operation keys stable across equivalent runs", () =>
     Effect.gen(function* () {
       const runKeys = () =>

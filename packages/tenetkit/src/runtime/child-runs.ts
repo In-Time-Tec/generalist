@@ -246,6 +246,12 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
   readonly upstream: Option.Option<ToolExecutor.Interface>
 }): ToolExecutor.Interface =>
   ToolExecutor.ToolExecutor.of({
+    replayPolicy: (request) =>
+      route.matches(request)
+        ? "never"
+        : Option.isSome(options.upstream)
+          ? (options.upstream.value.replayPolicy?.(request) ?? "never")
+          : "never",
     execute: (request) =>
       route.matches(request)
         ? route.execute(request).pipe(Effect.provideService(ChildRuns, options.implementation))

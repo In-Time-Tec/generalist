@@ -38,6 +38,8 @@ export interface Suspend {
 }
 /** @experimental */
 export type Outcome = Success | DomainFailure | Suspend
+/** @experimental How the Runtime may re-enter one concrete ToolExecutor request after recovery. */
+export type ReplayPolicy = "never" | "provider-idempotent"
 /** @experimental */
 export const FrameworkStage = Schema.Literals([
   "decode-input",
@@ -67,6 +69,7 @@ export class RemoteRetryMisconfigured extends Schema.TaggedError<RemoteRetryMisc
 ) {}
 /** @experimental */
 export interface Interface<R = ToolContext> {
+  readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly execute: (request: Request) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, R>
 }
 
@@ -412,6 +415,9 @@ export function routeToolkit<
 const routeInputEffect = <R>(input: RouteInput<R>): Effect.Effect<Route<R>, never, R> =>
   Effect.isEffect(input) ? input : Effect.succeed(input)
 
+const firstMatchingRoute = <R>(routes: ReadonlyArray<Route<R>>, request: Request): Route<R> | undefined =>
+  routes.find((candidate) => candidate.matches(request))
+
 /** @experimental */
 export function layerRouter(routes: Iterable<Route<ToolContext>>): Layer.Layer<ToolExecutor, never, ToolContext>
 export function layerRouter<R>(
@@ -430,8 +436,9 @@ export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<Too
     Effect.contextWith((context: Context.Context<R>) =>
       Effect.map(Effect.all(Array.from(routes, routeInputEffect)), (resolved) =>
         ToolExecutor.of({
+          replayPolicy: (request) => firstMatchingRoute(resolved, request)?.replayPolicy?.(request) ?? "never",
           execute: (request) => {
-            const matched = resolved.find((candidate) => candidate.matches(request))
+            const matched = firstMatchingRoute(resolved, request)
             const execution =
               matched === undefined
                 ? Effect.fail(

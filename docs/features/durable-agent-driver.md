@@ -33,7 +33,7 @@ Inline process-local `AgentTool` children call `reserveChildBudget` before the n
 `Agent.stream` and `Agent.generate` construct one production `DriverInterpreter` layer per run via `DurableDriver.layerForRun`. The interpreter wraps `makeLoopDriver` and schedules every nondeterministic effect boundary through `decide` → execute → `apply`:
 
 - **Model turns** — `interceptStream` per attempt in `model-turn-driver.ts` with `never` replay policy. The Runtime must settle the persisted outcome before recovery because an interrupted provider call is never re-dispatched automatically. Model and tool dimensions charge at schedule time; reported or estimated token usage charges at finish boundaries via `chargeUsage`.
-- **Tool execution** — `intercept` in `tool-execution.ts` with `never` replay policy.
+- **Tool execution** — `intercept` in `tool-execution.ts` with the concrete `ToolExecutor.replayPolicy?(request)` selection, defaulting to `never`. The selector is synchronous and runs before scheduling. Its only opt-in value is `provider-idempotent`; recovery then re-enters execution with the same `ToolContext.operationKey` / `idempotencyKey`. Static tools, handoffs, skill activation, and executor routes without an explicit selection remain `never`.
 - **Same-run handoff** — `intercept` around requested/completed/rejected `handoff` operations in `handoff-runtime.ts`; handoff tools dispatch through the agent loop rather than nested child runs.
 - **Compaction** — `intercept` around proactive `maybeCompact` and `applyCompactionResult`; reactive overflow compaction runs inline inside an active model operation without a separate driver record.
 - **Memory / session** — `intercept` for recall, remember, and `syncSession` in `compaction-runtime.ts`.
