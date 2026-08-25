@@ -36,9 +36,9 @@ import {
   startOperation,
   completeOperation,
   commitModelResponse,
-  resolveOperation,
 } from "./store-operations.js"
 import { recoverRunningOperations } from "./store-operation-recovery.js"
+import { resolveOperation } from "./store-operation-resolution.js"
 import { hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
 import { commitInterruptedModelResponse } from "./interrupted-model-response.js"
 import {

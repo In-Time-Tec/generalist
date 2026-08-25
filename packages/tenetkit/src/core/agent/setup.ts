@@ -42,6 +42,7 @@ import { dispatchForOrigin } from "./tool-dispatch.js"
 import type { SuspensionCheckpoint } from "./agent-suspension.js"
 import { skillListingsInstructions } from "./agent-message.js"
 import { validationFailure as toolSchedulingFailure } from "./tool-scheduler.js"
+import { recoverToolCheckpoint } from "./tool-checkpoint-recovery.js"
 const { errorMessage, appendInstructionFragment, defaultProgressOverflowPolicy, progressOverflowPolicySchema } =
   SetupHelpers
 const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
@@ -193,7 +194,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
         turn: 0,
       })
     }
-
     const decodedProgressPolicy = Schema.decodeUnknownOption(progressOverflowPolicySchema)(
       options.toolProgress === undefined ? defaultProgressOverflowPolicy : options.toolProgress,
     )
@@ -208,7 +208,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     if (invalidToolScheduling !== undefined) {
       return yield* AgentError.make({ message: invalidToolScheduling, turn: 0 })
     }
-
     const invalidCompaction =
       options.compaction?.contextWindow !== undefined &&
       (!Number.isFinite(options.compaction.contextWindow) || options.compaction.contextWindow <= 0)
@@ -438,6 +437,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       recoveredHistory,
       resumeChat,
       validatedResume,
+      recoveredToolCheckpoint: yield* recoverToolCheckpoint({ options, chat }),
       staticCandidates,
       staticRegistry,
       staticToolkit,

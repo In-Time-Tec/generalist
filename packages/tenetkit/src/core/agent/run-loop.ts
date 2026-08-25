@@ -20,7 +20,7 @@ import {
 import { TurnPolicyError, type TurnOverrides } from "../turn/turn-policy.js"
 import type { LanguageModelNotRegistered } from "../model/model-registry.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
-import { resolvedToolResult, type SuspensionCheckpoint } from "./agent-suspension.js"
+import { resolvedToolResult, type ToolCheckpoint } from "./agent-suspension.js"
 import type { ResumeResolution, RunError } from "./agent.js"
 import type { Input } from "../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "./agent-message.js"
@@ -65,6 +65,7 @@ export const makeRunLoop = <
     steeringService,
     structured,
     validatedResume,
+    recoveredToolCheckpoint,
     initialPrompt,
     toolState,
     modelTurn,
@@ -361,7 +362,7 @@ export const makeRunLoop = <
       }),
     )
   }
-  const resumeStream = (checkpoint: SuspensionCheckpoint, turn: number) => {
+  const resumeStream = (checkpoint: ToolCheckpoint, turn: number) => {
     let next:
       | {
           readonly prompt: Prompt.RawInput
@@ -374,9 +375,9 @@ export const makeRunLoop = <
           Effect.all({ tools: Ref.get(toolState), activeAgent: policyAgent() }).pipe(
             Effect.map(({ tools, activeAgent }) => {
               const suspension = checkpoint.suspension
-              const registry =
-                suspension.active_tools === undefined ? tools.registry : select(tools.registry, suspension.active_tools)
-              const calls = suspension.tool_call_batch.map((call) =>
+              const activeTools = suspension?.active_tools
+              const registry = activeTools === undefined ? tools.registry : select(tools.registry, activeTools)
+              const calls = checkpoint.toolCallBatch.map((call) =>
                 Response.makePart("tool-call", {
                   id: call.id,
                   name: call.name,
@@ -386,8 +387,8 @@ export const makeRunLoop = <
                 }),
               )
               const toolCallBatch: Request["toolCallBatch"] = { calls }
-              const suspendedIndex = suspension.tool_call_index ?? 0
-              if (calls[suspendedIndex] === undefined) {
+              const suspendedIndex = suspension?.tool_call_index ?? 0
+              if (suspension !== undefined && calls[suspendedIndex] === undefined) {
                 return Stream.fail(
                   AgentError.make({ message: "Suspension tool call index is outside its batch", turn }),
                 )
@@ -404,9 +405,9 @@ export const makeRunLoop = <
                 readonly toolCallIndex: number
               }): ReturnType<typeof toolCallEvents> => {
                 const resolution = options.resume?.resolution
-                return toolCallIndex === suspendedIndex && resolution?._tag === "Approved"
+                return suspension !== undefined && toolCallIndex === suspendedIndex && resolution?._tag === "Approved"
                   ? resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
-                  : toolCallIndex === suspendedIndex && resolution !== undefined
+                  : suspension !== undefined && toolCallIndex === suspendedIndex && resolution !== undefined
                     ? (Stream.fromEffect(
                         Effect.sync(() => {
                           const result = resolvedToolResult(
@@ -442,8 +443,9 @@ export const makeRunLoop = <
     )
   }
   const startTurn = options.turnStart ?? options.driverCheckpoint?.turn ?? 0
+  const toolCheckpoint = validatedResume ?? recoveredToolCheckpoint
   const runStream =
-    validatedResume === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(validatedResume, startTurn)
+    toolCheckpoint === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(toolCheckpoint, startTurn)
   const guardedStream = runStream.pipe(
     Stream.catchCause((cause) => {
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined

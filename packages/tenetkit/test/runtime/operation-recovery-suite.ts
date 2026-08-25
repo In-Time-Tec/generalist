@@ -61,20 +61,27 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           })
           const original = yield* claim(receipt.runId, "original")
           const attempt = (yield* store.loadExecution(receipt.runId)).attempt
-          const operations = yield* Effect.forEach(["pure", "provider-idempotent", "never"] as const, (replayPolicy) =>
-            Effect.gen(function* () {
-              const operation = yield* store.recordOperation({
-                ...original,
-                operationKey: `operation:${replayPolicy}`,
-                kind: "tool",
-                inputDigest: replayPolicy,
-                input: { replayPolicy },
-                replayPolicy,
-                attempt,
-              })
-              yield* store.startOperation({ ...original, operationId: operation.operationId })
-              return operation
-            }),
+          const operations = yield* Effect.forEach(
+            [
+              { key: "pure", replayPolicy: "pure" },
+              { key: "provider-idempotent", replayPolicy: "provider-idempotent" },
+              { key: "first-never", replayPolicy: "never" },
+              { key: "second-never", replayPolicy: "never" },
+            ] as const,
+            ({ key, replayPolicy }) =>
+              Effect.gen(function* () {
+                const operation = yield* store.recordOperation({
+                  ...original,
+                  operationKey: `operation:${key}`,
+                  kind: "tool",
+                  inputDigest: key,
+                  input: { key, replayPolicy },
+                  replayPolicy,
+                  attempt,
+                })
+                yield* store.startOperation({ ...original, operationId: operation.operationId })
+                return operation
+              }),
           )
 
           if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
@@ -89,11 +96,14 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           expect(
             (yield* store.getOperation({ runId: receipt.runId, operationId: operations[2]!.operationId })).status,
           ).toBe("unknown")
+          expect(
+            (yield* store.getOperation({ runId: receipt.runId, operationId: operations[3]!.operationId })).status,
+          ).toBe("unknown")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
 
           expect(yield* store.recoverRunningOperations(recovery)).toBe("blocked")
           const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
-          expect(history.filter((event) => event._tag === "OperationUnknown")).toHaveLength(1)
+          expect(history.filter((event) => event._tag === "OperationUnknown")).toHaveLength(2)
           expect((yield* store.recoverRunningOperations(original).pipe(Effect.flip))._tag).toBe(
             "tenetkit/runtime/StaleClaim",
           )
@@ -104,9 +114,19 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             idempotencyKey: "operation-recovery:resolve",
             resolution: { _tag: "Succeeded", value: "already happened" },
           })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+          yield* runtime.resolveOperation({
+            runId: receipt.runId,
+            operationId: operations[3]!.operationId,
+            idempotencyKey: "operation-recovery:resolve-second",
+            resolution: { _tag: "Succeeded", value: "also already happened" },
+          })
           expect((yield* runtime.inspect(receipt.runId)).status).not.toBe("needs-resolution")
           expect(
             (yield* store.getOperation({ runId: receipt.runId, operationId: operations[2]!.operationId })).status,
+          ).toBe("succeeded")
+          expect(
+            (yield* store.getOperation({ runId: receipt.runId, operationId: operations[3]!.operationId })).status,
           ).toBe("succeeded")
         }),
       ),

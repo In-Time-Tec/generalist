@@ -52,7 +52,13 @@ export const resolveOperation: {
     operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
     const runs = new Map(state.runs)
     const { ownerId: _, ...withoutOwner } = run
-    runs.set(run.runId, { ...withoutOwner, status: run.cancellationRequested ? "cancelling" : "running" })
+    const hasUnknown = [...operations.values()].some(
+      (operation) => operation.runId === input.runId && operation.status === "unknown",
+    )
+    runs.set(run.runId, {
+      ...withoutOwner,
+      status: hasUnknown ? "needs-resolution" : run.cancellationRequested ? "cancelling" : "running",
+    })
     return { ...state, operations, runs }
   }),
 )
