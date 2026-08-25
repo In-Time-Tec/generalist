@@ -1,6 +1,7 @@
 import { expect, it as standalone, layer } from "@effect/vitest"
 import { provideScoped } from "./scoped-provide.js"
 import { Effect, Ref } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { Database } from "bun:sqlite"
 import { AgentManifest, ExecutableManifest, Pins } from "tenetkit"
 import { Address, Errors, ExecutableResolver, RunStore, Runtime } from "../../src/runtime/index.js"
@@ -16,6 +17,13 @@ import {
 } from "./helpers.js"
 import { closedTestAgent } from "./identity.js"
 import { tempDbPath } from "./sqlite-helpers.js"
+
+const filePrompt = (data: Uint8Array): Prompt.Prompt =>
+  Prompt.fromMessages([
+    Prompt.makeMessage("user", {
+      content: [Prompt.makePart("file", { mediaType: "image/png", fileName: "upload.png", data })],
+    }),
+  ])
 
 const registrationsFor = (executable: ExecutableManifest.PinnedExecutable, suffix = "1") => {
   const pins = new Set<string>()
@@ -82,6 +90,27 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
       expect(
         yield* runtime.start({ ...base, registrations: registrationsFor(assistantRef, "changed") }).pipe(Effect.flip),
       ).toBeInstanceOf(Errors.ExecutableRegistrationConflict)
+    }),
+  )
+
+  it.effect("admits and deduplicates typed file bytes while conflicting on changed bytes", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const input = {
+        executable: assistantRef,
+        registrations: registrationsFor(assistantRef),
+        sessionId: "file-session",
+        idempotencyKey: "file-key",
+        prompt: filePrompt(new Uint8Array([0, 1, 2, 255])),
+      }
+      const first = yield* runtime.start(input)
+      expect(yield* runtime.start({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 2, 255])) })).toEqual({
+        ...first,
+        duplicate: true,
+      })
+      expect(
+        yield* runtime.start({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.IdempotencyConflict)
     }),
   )
 
@@ -233,6 +262,18 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
       expect((yield* runtime.inspectTree((yield* runtime.start(base)).runId)).runs).toHaveLength(3)
     }),
   )
+
+  it.effect("admits typed file bytes in an initial child prompt", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const receipt = yield* runtime.start({
+        ...base,
+        idempotencyKey: "initial-child-file",
+        initialChildren: [{ ...base.initialChildren[0]!, prompt: filePrompt(new Uint8Array([4, 5, 6])) }],
+      })
+      expect(receipt.childRunIds).toHaveLength(1)
+    }),
+  )
 })
 
 layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
@@ -301,6 +342,28 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
           })
           .pipe(Effect.flip),
       ).toBeInstanceOf(Errors.IdempotencyConflict)
+    }),
+  )
+
+  it.effect("admits typed file bytes in an initial fan-out member prompt", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const receipt = yield* runtime.start({
+        ...input,
+        idempotencyKey: "initial-fan-out-file",
+        initialFanOuts: [
+          {
+            ...input.initialFanOuts[0]!,
+            members: [
+              {
+                ...input.initialFanOuts[0]!.members[0]!,
+                prompt: filePrompt(new Uint8Array([7, 8, 9])),
+              },
+            ],
+          },
+        ],
+      })
+      expect(receipt.fanOuts[0]?.childRunIds).toHaveLength(1)
     }),
   )
 })

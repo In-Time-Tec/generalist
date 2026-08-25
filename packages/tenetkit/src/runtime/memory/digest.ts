@@ -1,11 +1,11 @@
 import { Pins } from "tenetkit"
-import { Function, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Function } from "effect"
 import type { Message } from "../message.js"
 import type { ExecutableRef } from "../executable-manifest.js"
 import type { AdmitStartInput } from "../run-store.js"
 import { defaultTreePolicy, type TreePolicy } from "../tree-policy.js"
 import type { FanOutMemberOrigin } from "../fan-out.js"
+import { promptDigestValue } from "../prompt-digest.js"
 
 interface ChildDigestDetails {
   readonly parentRunId?: string
@@ -14,19 +14,17 @@ interface ChildDigestDetails {
   readonly origin?: FanOutMemberOrigin
 }
 
-export const messageDigest = (message: Message): string => {
-  const encodedPrompt = Schema.encodeSync(Prompt.Prompt)(message.prompt)
-  return Pins.digest({
+export const messageDigest = (message: Message): string =>
+  Pins.digest({
     to: message.to,
     from: message.from ?? null,
     sessionId: message.sessionId,
-    prompt: encodedPrompt,
+    prompt: promptDigestValue(message.prompt),
     causationId: message.causationId ?? null,
     correlationId: message.correlationId,
     inReplyTo: message.inReplyTo ?? null,
     metadata: message.metadata,
   })
-}
 
 export const rootDigest: {
   (treePolicy: TreePolicy): (message: Message) => string
@@ -52,7 +50,7 @@ export const startDigest = (input: AdmitStartInput): string =>
       invocationId: child.invocationId,
       idempotencyKey: child.idempotencyKey,
       selection: child.selection,
-      prompt: Schema.encodeSync(Prompt.Prompt)(child.prompt),
+      prompt: promptDigestValue(child.prompt),
       sessionId: child.sessionId,
       messageId: child.messageId ?? null,
       correlationId: child.correlationId ?? null,
@@ -67,7 +65,7 @@ export const startDigest = (input: AdmitStartInput): string =>
         key: member.key,
         selection: member.selection,
         label: member.label ?? null,
-        prompt: Schema.encodeSync(Prompt.Prompt)(member.prompt),
+        prompt: promptDigestValue(member.prompt),
         sessionId: member.sessionId ?? null,
         metadata: member.metadata ?? {},
         origin: member.origin ?? null,
