@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.34.3
+
+- Normalize `Uint8Array` file data to tagged base64 closed JSON at the durable prompt-digest boundary. Root, initial-child, and initial fan-out admission now accept typed file bytes while preserving exact duplicate and changed-input conflict behavior. The public Prompt API remains `Uint8Array`, `Pins.digest` remains closed-JSON-only, and this release requires no SQL schema or data migration.
+
 ## 0.34.2
 
 - Claim already-running parentless roots without requiring a mailbox lane in PostgreSQL and MySQL, so `Runtime.start` executes exact dynamic roots while queued addressed roots retain lane-head serialization.
