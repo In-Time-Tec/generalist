@@ -61,6 +61,7 @@ export const makePostgresClaims = (input: {
           runId: leaseInput.runId,
           workerId: leaseInput.workerId,
           attemptFence: leaseInput.attemptFence,
+          cancellationRequested: leaseInput.cancellationRequested,
           lease: leaseInput.lease ?? "30 seconds",
         }),
       ),

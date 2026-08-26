@@ -25,7 +25,12 @@ import type { DecodedRun, EventRow, RunRow, WaitRow } from "./rows.js"
 import { decodeReason, WaitResolution, type RunWait } from "../run-wait.js"
 import { decodeContinuation } from "../steering.js"
 import { reconcileFanOut } from "./store-fan-out.js"
-import { hasUnsettledChild, loadTerminalEvent, reconcileChildWaitWith } from "./store-child-settlement.js"
+import {
+  hasPendingOperationCancellation,
+  hasUnsettledChild,
+  loadTerminalEvent,
+  reconcileChildWaitWith,
+} from "./store-child-settlement.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { PendingRunOutcome } from "../run-store.js"
 import { admitChildSettlementFromEventId } from "./settlement-notifications.js"
@@ -436,6 +441,7 @@ export const settleParent: {
       SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
     `
     if (running.length > 0) return
+    if (yield* hasPendingOperationCancellation(parent.runId)) return
     if (yield* hasUnsettledChild(parent.runId)) return
     const cancelled = yield* appendEvent(
       hub,

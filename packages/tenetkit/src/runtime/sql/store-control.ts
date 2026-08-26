@@ -28,7 +28,8 @@ import { PendingRunOutcome } from "../run-store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { inspectFanOut } from "./store-fan-out.js"
 import { approvalResponse } from "./respond-approval.js"
-import { hasUnsettledChild, loadTerminalEvent, reconcileChildWaitWith } from "./store-child-settlement.js"
+import { hasPendingCancellationWork, loadTerminalEvent, reconcileChildWaitWith } from "./store-child-settlement.js"
+import { markOperationCancellations } from "./store-operations.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(
@@ -82,6 +83,11 @@ const cancelRun = (
       )
       current = (yield* loadRun(run.runId))!
     }
+    const marked = terminal ? 0 : yield* markOperationCancellations(run.runId)
+    if (marked > 0 && current.status === "needs-resolution") {
+      yield* sql`UPDATE tenetkit_runs SET status = 'cancelling' WHERE run_id = ${run.runId}`
+      current = (yield* loadRun(run.runId))!
+    }
     if (!terminal) yield* reconcileProgramCancellation(run.runId, reason ?? current.cancelReason)
     const cancellationRequested = sql.onDialectOrElse({
       pg: () => true,
@@ -125,7 +131,7 @@ const cancelRun = (
       SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
     `
     if (running.length > 0) return
-    if (yield* hasUnsettledChild(run.runId)) return
+    if (yield* hasPendingCancellationWork(run.runId)) return
     const event = yield* appendEvent(
       hub,
       current,
@@ -269,7 +275,7 @@ export const complete: {
       const running = yield* sql<{ fan_out_id: string }>`
         SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
       `
-      if (running.length > 0 || (yield* hasUnsettledChild(run.runId))) {
+      if (running.length > 0 || (yield* hasPendingCancellationWork(run.runId))) {
         yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
         return
       }
@@ -316,7 +322,7 @@ export const fail: {
       const running = yield* sql<{ fan_out_id: string }>`
         SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
       `
-      if (running.length > 0 || (yield* hasUnsettledChild(run.runId))) {
+      if (running.length > 0 || (yield* hasPendingCancellationWork(run.runId))) {
         yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
         return
       }

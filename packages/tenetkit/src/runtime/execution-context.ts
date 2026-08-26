@@ -1,10 +1,24 @@
-import { Context, Effect, Layer, Option, type Scope } from "effect"
+import { Context, Effect, Function, Layer, Option, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { Agent, NestedOperation, Session, ToolExecutor } from "tenetkit"
 import { ChildRuns, make as makeChildRuns, makeExecutor as makeChildRunsExecutor } from "./child-runs.js"
 import { makeExecutor as makeCodeModeExecutor, type Interface as CodeMode } from "./code-mode.js"
 import type { Interface as NestedOperations } from "./nested-operations.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
+
+/** @experimental Select the resolved executable's ToolExecutor before the ambient host executor. */
+export const selectToolExecutor: {
+  (
+    ambient: Option.Option<ToolExecutor.Interface>,
+  ): <R>(services: Context.Context<R>) => Option.Option<ToolExecutor.Interface>
+  <R>(
+    services: Context.Context<R>,
+    ambient: Option.Option<ToolExecutor.Interface>,
+  ): Option.Option<ToolExecutor.Interface>
+} = Function.dual(2, <R>(services: Context.Context<R>, ambient: Option.Option<ToolExecutor.Interface>) => {
+  const resolved = Context.getOption(services, ToolExecutor.ToolExecutor)
+  return Option.isSome(resolved) ? resolved : ambient
+})
 
 /**
  * @experimental Build the Run-scoped context that hosts one resolved Agent. The resolver environment is built once
@@ -27,9 +41,8 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
   Effect.gen(function* () {
     const services = yield* Layer.build(options.environment)
     const ambient = yield* Effect.serviceOption(ToolExecutor.ToolExecutor)
-    const resolved = Context.getOption(services, ToolExecutor.ToolExecutor)
     const children = makeChildRuns(options.store)
-    const resolvedOrAmbient = Option.isSome(resolved) ? resolved : ambient
+    const resolvedOrAmbient = selectToolExecutor(services, ambient)
     const upstream =
       options.codeMode === undefined
         ? resolvedOrAmbient

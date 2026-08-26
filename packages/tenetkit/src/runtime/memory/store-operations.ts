@@ -57,6 +57,9 @@ export const recordOperation: {
       }
       return [byKey, state] as const
     }
+    if (run.cancellationRequested) {
+      return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is cancelling` })
+    }
     const steeringEntryIds = input.steeringEntryIds ?? []
     const selected = run.steering
       .filter((entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined)
@@ -142,6 +145,9 @@ export const startOperation: {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
+    if (run.cancellationRequested) {
+      return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is cancelling` })
+    }
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     if (current.status !== "requested") return [current, state] as const
@@ -198,7 +204,13 @@ export const completeOperation: {
       const run = yield* getRun(state, input.runId)
       const current = state.operations.get(operationMapKey(input.runId, input.operationId))
       if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-      if (current.status === "succeeded" || current.status === "failed" || current.status === "unknown") {
+      if (
+        current.status === "cancelling" ||
+        current.status === "cancelled" ||
+        current.status === "succeeded" ||
+        current.status === "failed" ||
+        current.status === "unknown"
+      ) {
         if (current.kind === "handoff" && current.status === "succeeded" && isHandoffCommit(current.result)) {
           if (
             input.outcome._tag !== "Succeeded" ||
@@ -457,39 +469,5 @@ export const expireRunningOperation: {
       { record, outcome: "unknown" as const },
       { ...state, operations },
     ] as const
-  }),
-)
-
-export const getOperation: {
-  (input: {
-    readonly runId: string
-    readonly operationId: string
-  }): (state: MemoryState) => Effect.Effect<OperationRecord, RunNotFound | RuntimeUnavailable>
-  (
-    state: MemoryState,
-    input: { readonly runId: string; readonly operationId: string },
-  ): Effect.Effect<OperationRecord, RunNotFound | RuntimeUnavailable>
-} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly operationId: string }) =>
-  Effect.gen(function* () {
-    yield* getRun(state, input.runId)
-    const current = state.operations.get(operationMapKey(input.runId, input.operationId))
-    if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-    return current
-  }),
-)
-
-export const getOperationByKey: {
-  (input: {
-    readonly runId: string
-    readonly operationKey: string
-  }): (state: MemoryState) => Effect.Effect<OperationRecord | undefined, RunNotFound | RuntimeUnavailable, never>
-  (
-    state: MemoryState,
-    input: { readonly runId: string; readonly operationKey: string },
-  ): Effect.Effect<OperationRecord | undefined, RunNotFound | RuntimeUnavailable, never>
-} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly operationKey: string }) =>
-  Effect.gen(function* () {
-    yield* getRun(state, input.runId)
-    return state.operations.get(operationKeyMapKey(input.runId, input.operationKey))
   }),
 )

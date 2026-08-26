@@ -346,6 +346,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         let modelCalls = 0
         let toolCalls = 0
         let sideEffects = 0
+        let semanticCancellations = 0
         const model = Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -387,6 +388,11 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
               providerResults.set(context.idempotencyKey, "applied once")
               yield* Deferred.succeed(toolStarted, undefined)
               return yield* Effect.never
+            }),
+          cancel: () =>
+            Effect.sync(() => {
+              semanticCancellations += 1
+              return { _tag: "Cancelled" as const }
             }),
         })
         const handlers = Toolkit.make(tool).toLayer({
@@ -445,6 +451,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             expect(toolCalls).toBe(2)
             expect(executorKeys).toEqual([operationKey, operationKey])
             expect(sideEffects).toBe(1)
+            expect(semanticCancellations).toBe(0)
             expect(providerResults).toEqual(new Map([[operationKey, "applied once"]]))
 
             yield* Fiber.interrupt(orphan)

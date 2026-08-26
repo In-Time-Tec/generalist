@@ -77,10 +77,23 @@ const clientTools = ToolExecutor.layerRouter([
 ])
 ```
 
+A concrete route can opt admitted tool operations into Runtime-owned semantic cancellation. The callback must be idempotent for `operationKey` and return only after the provider has definitively cancelled the operation or reports its terminal outcome:
+
+```ts
+const durableTools = ToolExecutor.layerRouter([
+  ToolExecutor.route({
+    tools: ["run_cell"],
+    execute: executeCell,
+    cancel: ({ operationKey, execution }) => cancelCell(operationKey, execution.call.id),
+  }),
+])
+```
+
 ## Effect compatibility
 
 | TenetKit release | Tested Effect version                             | Notes                                                                               |
 | ---------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `0.39.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 | `0.38.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 | `0.37.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 | `0.36.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |

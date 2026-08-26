@@ -1,6 +1,7 @@
 type ToolExecutorFacade = typeof import("./tool-executor.js")
 
 import {
+  CancellationFailure as ToolExecutor_CancellationFailure,
   FrameworkStage as ToolExecutor_FrameworkStage,
   FrameworkFailure as ToolExecutor_FrameworkFailure,
   RemoteRetryMisconfigured as ToolExecutor_RemoteRetryMisconfigured,
@@ -17,6 +18,7 @@ import {
   layerTest as ToolExecutor_layerTest,
 } from "./tool-executor.js"
 export const ToolExecutor = {
+  CancellationFailure: ToolExecutor_CancellationFailure,
   FrameworkStage: ToolExecutor_FrameworkStage,
   FrameworkFailure: ToolExecutor_FrameworkFailure,
   RemoteRetryMisconfigured: ToolExecutor_RemoteRetryMisconfigured,
@@ -33,6 +35,10 @@ export const ToolExecutor = {
   layerTest: ToolExecutor_layerTest,
 } as ToolExecutorFacade
 export namespace ToolExecutor {
+  export type CancellationFailure = import("./tool-executor.js").CancellationFailure
+  export type CancellationRequest = import("./tool-executor.js").CancellationRequest
+  export type CancellationOutcome = import("./tool-executor.js").CancellationOutcome
+  export type TerminalOutcome = import("./tool-executor.js").TerminalOutcome
   export type FrameworkStage = import("./tool-executor.js").FrameworkStage
   export type FrameworkFailure = import("./tool-executor.js").FrameworkFailure
   export type RemoteRetryMisconfigured = import("./tool-executor.js").RemoteRetryMisconfigured

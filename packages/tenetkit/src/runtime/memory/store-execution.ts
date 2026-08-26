@@ -32,6 +32,7 @@ const executionRecord = (
   executableManifest: run.executableManifest,
   attempt: run.attempt,
   attemptFence: run.attemptFence,
+  cancellationRequested: run.cancellationRequested,
   ...(run.checkpoint === undefined ? {} : { checkpoint: run.checkpoint }),
   ...(run.suspension === undefined ? {} : { suspension: run.suspension }),
   ...(run.wait?.resolution === undefined ? {} : { resolution: run.wait.resolution }),
@@ -108,7 +109,7 @@ export const claimExecution: {
     }
     const claimed = {
       ...run,
-      status: "running" as const,
+      status: run.cancellationRequested ? ("cancelling" as const) : ("running" as const),
       ownerId: input.ownerId,
       attemptFence: run.attemptFence + 1,
       attempt: run.status === "queued" ? run.attempt + 1 : run.attempt,

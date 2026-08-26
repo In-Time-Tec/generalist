@@ -5,6 +5,13 @@ import { ToolContext } from "./tool-context.js"
 import type { Route, RouteInput } from "./tool-placement.js"
 import { client, mcp, remote, route, sandbox } from "./tool-executor-routes.js"
 export { client, mcp, remote, route, sandbox }
+import {
+  CancellationFailure,
+  type CancellationOutcome,
+  type CancellationRequest,
+} from "./tool-executor-cancellation.js"
+export { CancellationFailure }
+export type { CancellationOutcome, CancellationRequest, TerminalOutcome } from "./tool-executor-cancellation.js"
 import { toolResultCodec } from "./tool-result-codec.js"
 import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
 import type { SchemaTool, ToolSchemaServices } from "./tool-result-codec.js"
@@ -70,7 +77,11 @@ export class RemoteRetryMisconfigured extends Schema.TaggedError<RemoteRetryMisc
 /** @experimental */
 export interface Interface<R = ToolContext> {
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
+  readonly cancellable?: ((request: Request) => boolean) | undefined
   readonly execute: (request: Request) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, R>
+  readonly cancel?:
+    | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
+    | undefined
 }
 
 /** @experimental */
@@ -437,6 +448,7 @@ export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<Too
       Effect.map(Effect.all(Array.from(routes, routeInputEffect)), (resolved) =>
         ToolExecutor.of({
           replayPolicy: (request) => firstMatchingRoute(resolved, request)?.replayPolicy?.(request) ?? "never",
+          cancellable: (request) => firstMatchingRoute(resolved, request)?.cancel !== undefined,
           execute: (request) => {
             const matched = firstMatchingRoute(resolved, request)
             const execution =
@@ -450,6 +462,17 @@ export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<Too
                   )
                 : matched.execute(request)
             return execution.pipe(Effect.provideContext(context))
+          },
+          cancel: (request) => {
+            const matched = firstMatchingRoute(resolved, request.execution)
+            return matched?.cancel === undefined
+              ? Effect.fail(
+                  CancellationFailure.make({
+                    tool: request.toolName,
+                    message: `Tool ${request.toolName} has no matching cancellation route`,
+                  }),
+                )
+              : matched.cancel(request).pipe(Effect.provideContext(context))
           },
         }),
       ),

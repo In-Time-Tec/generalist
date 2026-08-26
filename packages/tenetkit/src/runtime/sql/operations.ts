@@ -18,7 +18,15 @@ export const OperationKind = Schema.Literals([
 ])
 export type OperationKind = typeof OperationKind.Type
 
-export const OperationStatus = Schema.Literals(["requested", "running", "succeeded", "failed", "unknown"])
+export const OperationStatus = Schema.Literals([
+  "requested",
+  "running",
+  "cancelling",
+  "cancelled",
+  "succeeded",
+  "failed",
+  "unknown",
+])
 export type OperationStatus = typeof OperationStatus.Type
 
 export const ReplayPolicy = DurableDriver.ReplayPolicy

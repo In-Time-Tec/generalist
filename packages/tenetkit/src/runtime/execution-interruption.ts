@@ -98,7 +98,7 @@ export interface ExecutionInterruption {
     blocked: boolean,
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A | undefined, E | RunNotFound | RuntimeUnavailable, R>
-  readonly abandon: Effect.Effect<void>
+  readonly onInterrupt: (cancellationRequested: Effect.Effect<boolean>) => Effect.Effect<void>
 }
 
 /** Bind interruption settlement and Core's retained response to one hosted execution. */
@@ -119,6 +119,13 @@ export const makeExecutionInterruption = (input: {
     }
     return false
   })
+  const abandon = settleInterruptedExecution({
+    ...input,
+    activeModelResponse,
+    reason: "failure",
+    error: interrupted,
+    settleRun: false,
+  })
   return {
     context: Context.make(ActiveModelResponse.ActiveModelResponse, activeModelResponse),
     settle,
@@ -128,12 +135,7 @@ export const makeExecutionInterruption = (input: {
         : hasRunningModelOperation.pipe(
             Effect.flatMap((running) => (running ? Effect.succeed(undefined as A | undefined) : effect)),
           ),
-    abandon: settleInterruptedExecution({
-      ...input,
-      activeModelResponse,
-      reason: "failure",
-      error: interrupted,
-      settleRun: false,
-    }),
+    onInterrupt: (cancellationRequested) =>
+      cancellationRequested.pipe(Effect.flatMap((requested) => (requested ? settle({ reason: "cancel" }) : abandon))),
   }
 }

@@ -22,6 +22,7 @@ import {
   ToolExecutor,
   executeToolkit,
 } from "../tools/tool-executor.js"
+import { cancellableOperation, supportsCancellation } from "../tools/tool-executor-cancellation.js"
 import { bound } from "../tools/tool-output.js"
 import { type Registry, get } from "../tools/tool-registry.js"
 import { ToolContext } from "../tools/tool-context.js"
@@ -260,6 +261,10 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
           const requestExecutor =
             !skillActivation && handoffExecution === undefined && Option.isSome(executor) ? executor.value : undefined
           const replayPolicy = requestExecutor?.replayPolicy?.(request) ?? "never"
+          const cancellation =
+            requestExecutor !== undefined && supportsCancellation(requestExecutor, request)
+              ? { cancellation: cancellableOperation(request) }
+              : {}
           const executionBase: Effect.Effect<
             Outcome,
             AgentError | ToolNameCollision | FrameworkFailure | import("./agent.js").RunError,
@@ -287,7 +292,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
               kind: "tool",
               key: durableOperationKey,
               turn,
-              input: { turn, callId: call.id, name: call.name },
+              input: { turn, callId: call.id, name: call.name, ...cancellation },
               replayPolicy,
             },
             executionBase,

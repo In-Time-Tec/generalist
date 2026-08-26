@@ -1,5 +1,5 @@
 import { Context, Effect, Schema, Stream, Option } from "effect"
-import type { ProgramCapabilities, Session } from "tenetkit"
+import type { ProgramCapabilities, Session, ToolExecutor } from "tenetkit"
 import type { Address } from "./address.js"
 import type { Cursor } from "./cursor.js"
 import type {
@@ -355,6 +355,17 @@ export interface Interface {
     readonly runId: string
     readonly operationKey: string
   }) => Effect.Effect<OperationRecord | undefined, RunNotFound | RuntimeUnavailable>
+  /** @experimental Cancellable tool operations awaiting a definitive concrete-executor acknowledgement. */
+  readonly operationCancellations: (
+    input: ExecutionClaim,
+  ) => Effect.Effect<ReadonlyArray<OperationRecord>, WorkerMutationError>
+  /** @experimental Persist one definitive semantic cancellation acknowledgement under the current claim. */
+  readonly acknowledgeOperationCancellation: (
+    input: ExecutionClaim & {
+      readonly operationId: string
+      readonly outcome: ToolExecutor.CancellationOutcome
+    },
+  ) => Effect.Effect<OperationRecord, WorkerMutationError>
   readonly resolveOperation: (
     input: ResolveOperationInput,
   ) => Effect.Effect<void, RunNotFound | OperationResolutionConflict | RuntimeUnavailable>

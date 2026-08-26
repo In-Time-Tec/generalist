@@ -30,6 +30,7 @@ import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import { admitChildSettlementFromEventId } from "tenetkit/runtime/driver/sql/settlement-notifications"
 import { discardPendingSteering } from "tenetkit/runtime/driver/sql/store-steering-disposition"
 import {
+  hasPendingOperationCancellation,
   hasUnsettledChild,
   loadTerminalEvent,
   reconcileChildWaitWith,
@@ -288,7 +289,11 @@ export const completeRun: {
       const runningFanOut = yield* sql<{ fan_out_id: string }>`
         SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
       `
-      if (runningFanOut.length > 0 || (yield* hasUnsettledChild(run.runId))) {
+      if (
+        runningFanOut.length > 0 ||
+        (yield* hasPendingOperationCancellation(run.runId)) ||
+        (yield* hasUnsettledChild(run.runId))
+      ) {
         yield* sql`
           UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${run.runId}
         `
@@ -384,6 +389,7 @@ export const settleParent: {
       SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
     `
     if (running.length > 0) return
+    if (yield* hasPendingOperationCancellation(parent.runId)) return
     if (yield* hasUnsettledChild(parent.runId)) return
     const cancelled = yield* appendEvent(
       hub,

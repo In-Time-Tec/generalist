@@ -28,6 +28,7 @@ export function route<R>(options: RouteOptions<R>): Route<R> {
     matches: (request) => routedTools.includes(request.call.name) || options.matches?.(request) === true,
     ...(options.replayPolicy === undefined ? {} : { replayPolicy: options.replayPolicy }),
     execute: options.execute,
+    ...(options.cancel === undefined ? {} : { cancel: options.cancel }),
   }
 }
 

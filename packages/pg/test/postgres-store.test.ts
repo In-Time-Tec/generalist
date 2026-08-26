@@ -858,6 +858,7 @@ describePostgres("postgres run store", () => {
             runId: receipt.runId,
             workerId: "tick-worker",
             attemptFence: claim.attemptFence,
+            cancellationRequested: false,
             lease: "10 seconds",
           }),
         ).toBe(false)
@@ -1141,6 +1142,7 @@ describePostgres("postgres run store", () => {
             runId: receipt.runId,
             workerId: claim!.workerId,
             attemptFence: claim!.attemptFence,
+            cancellationRequested: false,
             lease: "5 seconds",
           }),
         ).toBe(false)

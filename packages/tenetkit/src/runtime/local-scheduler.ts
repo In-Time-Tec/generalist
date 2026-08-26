@@ -1,6 +1,6 @@
 import { Context, Effect, FiberMap, Layer, Ref, Schedule, Schema, type Scope, Semaphore } from "effect"
 import { ActiveExecutions } from "./active-executions.js"
-import { AgentExecutionFailure, RuntimeUnavailable } from "./errors.js"
+import { RuntimeUnavailable } from "./errors.js"
 import { ExecutionHost } from "./execution-host.js"
 import { RunStore } from "./run-store.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
@@ -49,18 +49,10 @@ export const make = (
         const stillActive = yield* active.active
         const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([id]) => id)))
         if (stillActive.has(runId) || admitted.has(runId)) return "deferred" as const
-        return yield* store.loadExecution(runId).pipe(
-          Effect.flatMap((execution) =>
-            execution.ownerId === undefined
-              ? store.cancel({ runId })
-              : store.fail({
-                  runId,
-                  ownerId: execution.ownerId,
-                  attemptFence: execution.attemptFence,
-                  error: AgentExecutionFailure.make({ message: "execution interrupted" }),
-                }),
-          ),
-          Effect.as("settled" as const),
+        return yield* store.claimExecution({ runId, ownerId: options.workerId }).pipe(
+          Effect.flatMap(host.execute),
+          Effect.andThen(store.inspect(runId)),
+          Effect.map((run) => (run.status === "cancelled" ? ("settled" as const) : ("deferred" as const))),
           Effect.catchTags({
             "tenetkit/runtime/StaleClaim": () => Effect.succeed("stale" as const),
             "tenetkit/runtime/RunNotFound": () => Effect.succeed("inactive" as const),

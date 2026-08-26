@@ -8,6 +8,7 @@ import { registrationsFor } from "./helpers.js"
 import { testExecutable } from "./identity.js"
 import { operationRecoverySuite } from "./operation-recovery-suite.js"
 import { tempDbPath } from "./sqlite-helpers.js"
+import { toolCancellationSuite } from "./tool-cancellation-suite.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -26,6 +27,11 @@ const scopedWith =
 operationRecoverySuite({
   name: "sqlite",
   makeLayer: (options) => SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("operation-recovery") }),
+})
+
+toolCancellationSuite({
+  name: "sqlite",
+  makeLayer: (options) => SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("tool-cancellation") }),
 })
 
 it.live("reconciles a crashed framework tool before resuming its Agent", () =>

@@ -141,6 +141,7 @@ export interface ExecutionRecord {
   readonly executableManifest: ExecutableManifest
   readonly attempt: number
   readonly attemptFence: number
+  readonly cancellationRequested: boolean
   readonly checkpoint?: ExecutionCheckpoint
   readonly suspension?: ExecutionSuspension
   readonly resolution?: WaitResolution

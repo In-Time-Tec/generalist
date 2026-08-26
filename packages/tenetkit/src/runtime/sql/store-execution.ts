@@ -44,6 +44,7 @@ const executionRecord = (
   executableManifest: run.executableManifest,
   attempt: run.attempt,
   attemptFence: run.attemptFence,
+  cancellationRequested: run.cancellationRequested,
   ...(run.driverCheckpoint === undefined ? {} : { checkpoint: run.driverCheckpoint }),
   ...(run.suspension === undefined ? {} : { suspension: run.suspension }),
   ...(resolution === undefined ? {} : { resolution }),
@@ -107,10 +108,10 @@ export const claimExecution: {
         owner_worker_id = ${input.ownerId},
         attempt_fence = attempt_fence + 1,
         attempt = ${nextAttempt},
-        status = 'running',
+        status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE 'running' END,
         updated_at = ${updated}
       WHERE run_id = ${input.runId}
-        AND status IN ('queued', 'running')
+        AND status IN ('queued', 'running', 'cancelling')
         AND attempt_fence = ${run.attemptFence}
     `
     const claimed = yield* requireRun(input.runId)

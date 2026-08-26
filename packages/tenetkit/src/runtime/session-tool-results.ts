@@ -13,7 +13,7 @@ export interface ToolOperation {
   readonly operationId: string
   readonly operationKey: string
   readonly kind: string
-  readonly status: "requested" | "running" | "succeeded" | "failed" | "unknown"
+  readonly status: "requested" | "running" | "cancelling" | "cancelled" | "succeeded" | "failed" | "unknown"
   readonly input: unknown
   readonly result?: unknown
   readonly error?: unknown

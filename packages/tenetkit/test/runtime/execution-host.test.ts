@@ -1532,6 +1532,7 @@ describe("ExecutionHost", () => {
           const runtime = yield* Runtime.Runtime
           const host = yield* ExecutionHost.ExecutionHost
           const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler.LocalScheduler
           const receipt = yield* runtime.send({
             to: address,
             sessionId: "session:cancel",
@@ -1554,6 +1555,7 @@ describe("ExecutionHost", () => {
           const exit = yield* Fiber.await(fiber)
           expect(exit._tag).toBe("Success")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect(yield* scheduler.reconcileCancellation(receipt.runId)).toBe("inactive")
           expect(yield* Ref.get(interrupted)).toBe(true)
           expect(lifecycle).toEqual([
             "admission resolver acquired",
@@ -1689,6 +1691,7 @@ describe("ExecutionHost", () => {
           const runtime = yield* Runtime.Runtime
           const host = yield* ExecutionHost.ExecutionHost
           const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler.LocalScheduler
           const receipt = yield* runtime.send({
             to: address,
             sessionId: "session:cancel-tool",
@@ -1712,6 +1715,7 @@ describe("ExecutionHost", () => {
           const exit = yield* Fiber.await(fiber)
           expect(exit._tag).toBe("Success")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect(yield* scheduler.reconcileCancellation(receipt.runId)).toBe("inactive")
           expect(yield* Ref.get(interrupted)).toBe(true)
           const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
             (event) => event._tag === "OperationUnknown",
@@ -1812,6 +1816,7 @@ describe("ExecutionHost", () => {
             const runtime = yield* Runtime.Runtime
             const host = yield* ExecutionHost.ExecutionHost
             const store = yield* RunStore.RunStore
+            const scheduler = yield* LocalScheduler.LocalScheduler
             const receipt = yield* runtime.send({
               to: address,
               sessionId: `session:uncertain-${backend}`,
@@ -1832,6 +1837,8 @@ describe("ExecutionHost", () => {
             expect(new Set(lifecycle.slice(2))).toEqual(
               new Set(["tool finalized", "service finalized", "execution resolver finalized"]),
             )
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+            expect(yield* scheduler.reconcileCancellation(receipt.runId)).toBe("inactive")
             const persistedTool = yield* store.getOperationByKey({
               runId: receipt.runId,
               operationKey: `${receipt.runId}:tool:0:external-counter-1:external_counter`,
@@ -1841,7 +1848,6 @@ describe("ExecutionHost", () => {
               (event) => event._tag === "OperationUnknown",
             )
             expect(unknown?._tag).toBe("OperationUnknown")
-            expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
             if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
             const operation = yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })
             expect(operation.status).toBe("unknown")

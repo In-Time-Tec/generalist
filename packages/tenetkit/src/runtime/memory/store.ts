@@ -13,7 +13,7 @@ import { RunStore, type CompletionOutcome } from "../run-store.js"
 import type { LayerOptions } from "../runtime.js"
 import { emptyState, idempotencyKey, type MemoryPublication, type MemoryState } from "./state.js"
 import { admitSend, admitSpawn, admitStart } from "./store-admit.js"
-import { activateRoot } from "./store-activate.js"
+import { activateRoot, activationOf } from "./store-activate.js"
 import { admitProgramChild } from "./store-admit-program-child.js"
 import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
 import { respondApproval } from "./store-approval.js"
@@ -21,14 +21,14 @@ import { isTerminal } from "../run.js"
 import { followEvents, followTreeChanges, inspectRun, shutdownStore, toInspection } from "./store-events.js"
 import {
   expireRunningOperation,
-  getOperation,
-  getOperationByKey,
   recordOperation,
   startOperation,
   completeOperation,
   commitModelResponse,
   commitInterruptedModelResponse,
 } from "./store-operations.js"
+import { acknowledgeOperationCancellation, operationCancellations } from "./store-operation-cancellation.js"
+import { getOperation, getOperationByKey } from "./store-operation-inspection.js"
 import { resolveOperation } from "./store-operation-resolution.js"
 import { recoverRunningOperations } from "./store-operation-recovery.js"
 import { cancelSession } from "./store-session.js"
@@ -68,22 +68,9 @@ import {
   settleProgramOperation,
   startProgramOperation,
 } from "./store-program.js"
-import type { RunActivation } from "../run-activation.js"
 import { externalChildOperations } from "./store-external-child.js"
 import { ExternalChildStore } from "../external-child-store.js"
-const activationOf = (run: import("./state.js").StoredRun): RunActivation => {
-  const intent: RunActivation["intent"] =
-    run.status === "cancelling"
-      ? "cancel"
-      : run.ownerId === undefined &&
-          (run.status === "running" ||
-            (run.status === "queued" && run.parentRunId !== undefined && run.childReadiness === "ready"))
-        ? "execute"
-        : "inactive"
-  return intent === "inactive"
-    ? { runId: run.runId, intent }
-    : { runId: run.runId, intent, attemptFence: run.attemptFence, runStatus: run.status }
-}
+import type { RunActivation } from "../run-activation.js"
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
@@ -414,6 +401,12 @@ const makeStoreServices = (options: LayerOptions) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperation(state, input))),
       getOperationByKey: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperationByKey(state, input))),
+      operationCancellations: (input) =>
+        fencedModify(input, (state) =>
+          operationCancellations(state, input).pipe(Effect.map((records) => [records, state] as const)),
+        ),
+      acknowledgeOperationCancellation: (input) =>
+        fencedModify(input, (state) => acknowledgeOperationCancellation(state, input)),
       resolveOperation: (input) =>
         update((state) =>
           (state.programOperations.has(`${input.runId}\0${input.operationId}`)

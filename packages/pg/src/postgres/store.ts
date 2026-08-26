@@ -68,6 +68,7 @@ import { reconcileCancellationRequested } from "tenetkit/runtime/driver/sql/sess
 import { cancelSessionRuns } from "./session-cancellation.js"
 import { makePostgresSessionStore } from "./session-store.js"
 import { readinessForAdmission } from "tenetkit/runtime/driver/sql/store-child-capacity"
+import { hasPendingOperationCancellation } from "tenetkit/runtime/driver/sql/store-child-settlement"
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
@@ -365,7 +366,11 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
             if (loaded.cancellationRequested) {
-              if (yield* deferCancelledFanOutParent(sql, loaded.runId)) return
+              if (
+                (yield* deferCancelledFanOutParent(sql, loaded.runId)) ||
+                (yield* hasPendingOperationCancellation(loaded.runId))
+              )
+                return
               const event = yield* appendEvent(
                 transactionHub,
                 loaded,
