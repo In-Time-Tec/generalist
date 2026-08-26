@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.38.4
+
+- Validate interrupted model responses in the schema's Type-to-wire direction before the atomic failure commit. Provider metadata such as OpenRouter's `DateTime.Utc` timestamp now serializes correctly, so a terminal stream-decode failure durably settles its never-replay model operation and Run as failed instead of leaving a running operation that recovery must mark unknown. Genuinely indeterminate never-replay operations retain their existing `OperationUnknown` and `needs-resolution` behavior. This release requires no SQL schema or data migration.
+
 ## 0.38.3
 
 - Add `ToolExecutor.replayPolicy?: (request) => "never" | "provider-idempotent"`, selected synchronously for each concrete Agent tool request before durable scheduling. Omission remains `never`; static tools, handoffs, skill activation, child/code-mode tools, client, MCP, sandbox, and non-idempotent remote routes remain non-replayable. Router policy and execution share first-match precedence, while existing `remote({ idempotent: true, ... })` routes opt into provider-idempotent recovery.

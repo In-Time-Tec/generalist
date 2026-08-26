@@ -119,7 +119,7 @@ export const validateInterruptedModelResponse = (input: {
   }
   try {
     Schema.decodeUnknownSync(RunFailure)(outcome.error)
-    Schema.decodeUnknownSync(CompletedModelResponse)(event.response)
+    Schema.encodeUnknownSync(CompletedModelResponse)(event.response)
   } catch (error) {
     return fail(`interrupted model operation ${event.operationKey} outcome or response is invalid: ${String(error)}`)
   }
