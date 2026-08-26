@@ -18,14 +18,24 @@ layer(platform, liveOptions)("Bun kernel cancellation", (it) => {
         Effect.gen(function* () {
           const fileSystem = yield* FileSystem.FileSystem
           const marker = `${dataRoot}/cancellation-side-effect`
+          const started = `${dataRoot}/cancellation-started`
+          const first = yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "process.pid" })
           const running = yield* Effect.forkChild(
             Effect.gen(function* () {
               const signal = yield* Effect.abortSignal
-              return yield* runCell({ pool, sessionId: "s", cellId: "c1", signal, code: delayThenWrite(marker) })
+              return yield* runCell({
+                pool,
+                sessionId: "s",
+                cellId: "c2",
+                signal,
+                code: `await Bun.write(${"`"}${started}${"`"}, "started"); ${delayThenWrite(marker)}`,
+              })
             }).pipe(Effect.exit),
           )
-          yield* Effect.sleep(250)
+          while (!(yield* fileSystem.exists(started))) yield* Effect.sleep(10)
           yield* Fiber.interrupt(running)
+          const reused = yield* runCell({ pool, sessionId: "s", cellId: "c3", code: "process.pid" })
+          expect(reused.value).not.toBe(first.value)
           /**
            * Watching for the marker past the moment the cell would have written it is stronger than
            * sleeping once and looking afterwards: a surviving cell fails the assertion as soon as

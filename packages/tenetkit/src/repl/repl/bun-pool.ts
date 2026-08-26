@@ -135,6 +135,16 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
       idleTimeToLive: options.idleTimeToLive,
     })
 
+    const retire = (sessionId: SessionId, lease: Lease): Effect.Effect<void> =>
+      Effect.gen(function* () {
+        const retired = yield* Ref.modify(states, (all) => {
+          const current = all.get(sessionId) ?? initialState
+          if (current.lease?.generation !== lease.generation) return [false, all]
+          return [true, new Map(all).set(sessionId, { ...current, lease: undefined })]
+        })
+        if (retired) yield* RcMap.invalidate(kernels, sessionId)
+      }).pipe(Effect.uninterruptible)
+
     const capture = (sessionId: SessionId, lease: Lease): Effect.Effect<void> =>
       Effect.gen(function* () {
         const captured = yield* lease.kernel.capture
@@ -239,7 +249,9 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
             const execution: Execution = {
               events: Stream.concat(Stream.fromIterable(prelude), Stream.fromQueue(started.events)),
               result: started.outcome.pipe(
-                Effect.onInterrupt(() => lease.kernel.kill.pipe(Effect.ignore)),
+                Effect.onInterrupt(() =>
+                  lease.kernel.kill.pipe(Effect.ignore, Effect.andThen(retire(request.sessionId, lease))),
+                ),
                 Effect.onExit(() =>
                   capture(request.sessionId, lease).pipe(
                     Effect.andThen(Scope.close(cellScope, Exit.succeed(undefined))),
