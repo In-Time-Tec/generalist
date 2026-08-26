@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
+import { Config, Deferred, Effect, Fiber, Layer, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Agent, ToolContext, ToolExecutor } from "tenetkit"
+import { layer } from "tenetkit/ai/openrouter"
 import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/active-executions.js"
 import { make as makeExecutionHost } from "../../src/runtime/execution-host.js"
@@ -32,6 +34,29 @@ const finish = Response.makePart("finish", {
   response: undefined,
 })
 
+const openRouterChunk = (delta: Record<string, unknown>): string =>
+  JSON.stringify({
+    id: "generation-1",
+    choices: [{ delta, index: 0 }],
+    created: 1,
+    model: "router-test",
+    object: "chat.completion.chunk",
+  })
+
+const terminalDecodeResponse = [
+  openRouterChunk({ reasoning: "thinking" }),
+  openRouterChunk({ content: "partial answer" }),
+  JSON.stringify({
+    id: "generation-1",
+    choices: "invalid",
+    created: 1,
+    model: "router-test",
+    object: "chat.completion.chunk",
+  }),
+]
+  .map((data) => `data: ${data}\n\n`)
+  .join("")
+
 export const operationRecoverySuite = <StoreError, Extra = never>(
   options: OperationRecoverySuiteOptions<StoreError, Extra>,
 ) => {
@@ -42,6 +67,80 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
       : options.claim(runId, ownerId)
 
   describeBackend(`running operation recovery (${options.name})`, () => {
+    it.live("settles a terminal OpenRouter stream decode failure without making the model operation unknown", () => {
+      let providerCalls = 0
+      const client = HttpClient.make((request) =>
+        Effect.sync(() => {
+          providerCalls += 1
+          return HttpClientResponse.fromWeb(
+            request,
+            new globalThis.Response(terminalDecodeResponse, {
+              status: 200,
+              headers: { "content-type": "text/event-stream" },
+            }),
+          )
+        }),
+      )
+      const agent = Agent.make({
+        name: `terminal-stream-decode-${options.name}`,
+        model: { provider: "openrouter", model: "router-test" },
+      })
+      const executable = testExecutable(agent, `terminal-stream-decode-${options.name}-v1`)
+      const model = layer({
+        model: "router-test",
+        apiKey: Config.succeed(Redacted.make("test-key")),
+      }).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))
+      const resolver = ExecutableResolver.makeStatic([
+        { executable, agent: Agent.close(agent, model.pipe(Layer.orDie)) },
+      ])
+
+      return provideScoped(
+        options.makeLayer({ resolver, addresses: [], scheduler: { pollInterval: "1 hour" } }),
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const host = yield* ExecutionHost.ExecutionHost
+          const receipt = yield* runtime.start({
+            executable,
+            registrations: registrationsFor(executable),
+            sessionId: `session:terminal-stream-decode:${options.name}`,
+            idempotencyKey: `terminal-stream-decode:${options.name}`,
+            prompt: textPrompt("decode the response"),
+          })
+          const executionClaim = yield* claim(receipt.runId, `terminal-stream-decode-${options.name}`)
+          yield* host.execute(executionClaim)
+
+          const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+          const tags = history.map((event) => event._tag)
+          const operation = yield* store.getOperationByKey({
+            runId: receipt.runId,
+            operationKey: `${receipt.runId}:model:0:0:conversation`,
+          })
+          expect(providerCalls).toBe(1)
+          expect(history).toContainEqual(
+            expect.objectContaining({
+              _tag: "ModelAttemptFailed",
+              category: "stream-decode",
+              classification: "terminal",
+              disposition: "terminal",
+            }),
+          )
+          expect(history).toContainEqual(
+            expect.objectContaining({
+              _tag: "ModelCallFailed",
+              category: "stream-decode",
+              classification: "terminal",
+            }),
+          )
+          expect(operation).toMatchObject({ kind: "model", replayPolicy: "never", status: "failed" })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
+          expect(tags).toContain("ModelResponseInterrupted")
+          expect(tags).toContain("RunFailed")
+          expect(tags).not.toContain("OperationUnknown")
+        }),
+      )
+    })
+
     it.live("reconciles every replay policy atomically and idempotently under the current claim", () =>
       provideScoped(
         options.makeLayer({
