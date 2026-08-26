@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.39.1
+
+- Retire the exact Bun REPL kernel generation after caller interruption kills its worker, and invalidate the Session's pooled lease before the result settles. Delayed cell effects remain suppressed, while the next execute for the same Session starts a live worker instead of reusing the killed command channel. This release changes no public API and requires no SQL schema or data migration.
+
 ## 0.39.0
 
 - Add optional `ToolExecutor.cancel(request)` semantic cancellation with `CancellationRequest`, `CancellationOutcome`, `TerminalOutcome`, and typed `CancellationFailure`. A direct executor may narrow support with `cancellable(request)`; `ToolExecutor.route({ cancel })` and `layerRouter` select cancellation with the same first matching concrete route as execution. Existing executors remain compatible and opt in only by defining `cancel`; callbacks must be idempotent for the stable operation identity.
