@@ -1,6 +1,6 @@
 import { expect, it as standalone, layer } from "@effect/vitest"
 import { provideScoped } from "./scoped-provide.js"
-import { Effect, Ref } from "effect"
+import { Effect, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Database } from "bun:sqlite"
 import { AgentManifest, ExecutableManifest, Pins } from "tenetkit"
@@ -23,7 +23,10 @@ import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const filePrompt = (data: Uint8Array): Prompt.Prompt =>
   Prompt.fromMessages([
     Prompt.makeMessage("user", {
-      content: [Prompt.makePart("file", { mediaType: "image/png", fileName: "upload.png", data })],
+      content: [
+        Prompt.makePart("text", { text: "inspect this image" }),
+        Prompt.makePart("file", { mediaType: "image/png", fileName: "upload.png", data }),
+      ],
     }),
   ])
 
@@ -441,6 +444,50 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
       }),
     )
     expect(duplicate).toEqual({ ...first, duplicate: true })
+  }),
+)
+
+standalone.effect("loads typed root prompt bytes immediately and after reopening SQLite", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("tenetkit-root-file-bytes")
+    const options = { ...parentRelativeOptions, filename, addresses: [] }
+    const bytes = new Uint8Array([0, 1, 2, 255])
+    const assertFileBytes = (prompt: Prompt.Prompt) => {
+      const content = prompt.content[0]?.content
+      expect(Array.isArray(content)).toBe(true)
+      if (!Array.isArray(content)) throw new Error("expected multipart user content")
+      const file = content[1]
+      expect(file?.type).toBe("file")
+      if (file?.type !== "file") throw new Error("expected file content")
+      const restored = Schema.decodeUnknownSync(Schema.toCodecJson(Schema.Uint8Array))(file.data)
+      expect(restored).toBeInstanceOf(Uint8Array)
+      expect(restored).toEqual(bytes)
+    }
+    const input = {
+      executable: assistantRef,
+      registrations: registrationsFor(assistantRef),
+      sessionId: "sqlite-root-file-bytes",
+      idempotencyKey: "sqlite-root-file-bytes",
+      prompt: filePrompt(bytes),
+    }
+
+    const runId = yield* provideScoped(
+      SqliteRuntime.layerSqlite(options),
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const receipt = yield* runtime.start(input)
+        const store = yield* RunStore.RunStore
+        assertFileBytes((yield* store.loadExecution(receipt.runId)).message.prompt)
+        return receipt.runId
+      }),
+    )
+    yield* provideScoped(
+      SqliteRuntime.layerSqlite(options),
+      Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        assertFileBytes((yield* store.loadExecution(runId)).message.prompt)
+      }),
+    )
   }),
 )
 

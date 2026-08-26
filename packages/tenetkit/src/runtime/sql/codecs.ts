@@ -8,6 +8,8 @@ import type { RunEvent } from "../run-event.js"
 import { RunEvent as RunEventSchema } from "../run-event.js"
 import { RuntimeUnavailable } from "../errors.js"
 
+const messageJsonStringCodec = Schema.fromJsonString(Schema.toCodecJson(Message))
+
 export const encodeJson: {
   <S extends Schema.Codec<any, any, never, never>>(value: Schema.Schema.Type<S>): (schema: S) => string
   <S extends Schema.Codec<any, any, never, never>>(schema: S, value: Schema.Schema.Type<S>): string
@@ -78,9 +80,9 @@ export const PromptCodec = Prompt.Prompt
 export const StringArray = Schema.Array(Schema.String)
 export const RunEventCodec = RunEventSchema
 
-export const encodeMessage = (message: Message): string => encodeJson(MessageCodec, message)
+export const encodeMessage = (message: Message): string => Schema.encodeSync(messageJsonStringCodec)(message)
 
-export const decodeMessage = (text: string): Message => decodeJson(MessageCodec, text)
+export const decodeMessage = (text: string): Message => Schema.decodeUnknownSync(messageJsonStringCodec)(text)
 
 export const encodeExecutableRef = (ref: ExecutableRef): string => encodeJson(ExecutableRefCodec, ref)
 
