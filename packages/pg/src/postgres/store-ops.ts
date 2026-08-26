@@ -21,6 +21,7 @@ import { encodeContinuation } from "tenetkit/runtime/driver/steering"
 import { checkpointRef } from "tenetkit/runtime/driver/executable-manifest"
 import { getProgramOperation, resolveProgramOperation } from "tenetkit/runtime/driver/sql/store-program"
 import { settleAdmittedCancellation } from "tenetkit/runtime/driver/sql/store-control"
+import { acknowledgeOperationCancellation, operationCancellations } from "tenetkit/runtime/driver/sql/store-operations"
 import { postgresModelResponseOperations } from "./store-model-response.js"
 import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/sql-effect"
 import { appendHandoffSessionEntry, verifyHandoffSessionEntry } from "./session-store.js"
@@ -62,6 +63,8 @@ export const postgresOperations = (input: {
   | "recoverRunningOperations"
   | "getOperation"
   | "getOperationByKey"
+  | "operationCancellations"
+  | "acknowledgeOperationCancellation"
   | "resolveOperation"
 > => {
   const { sql, hub, run, runNoTxn, requireRun, requireClaim, nextId } = input
@@ -141,6 +144,9 @@ export const postgresOperations = (input: {
             }
             return toOperationRecord(prior)
           }
+          if (loaded.cancellationRequested) {
+            return yield* RuntimeUnavailable.make({ message: `run ${loaded.runId} is cancelling` })
+          }
           const steeringEntryIds = op.steeringEntryIds ?? []
           const pending = yield* sql<{ readonly entry_id: string }>`
             SELECT entry_id FROM tenetkit_run_steering
@@ -211,7 +217,10 @@ export const postgresOperations = (input: {
       fenced(
         op,
         Effect.gen(function* () {
-          yield* requireRun(op.runId)
+          const loaded = yield* requireRun(op.runId)
+          if (loaded.cancellationRequested) {
+            return yield* RuntimeUnavailable.make({ message: `run ${loaded.runId} is cancelling` })
+          }
           yield* sql`
             UPDATE tenetkit_run_operations
             SET status = 'running', started_at = NOW()
@@ -238,7 +247,13 @@ export const postgresOperations = (input: {
           const row = existing[0]
           if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
           const current = toOperationRecord(row)
-          if (row.status === "succeeded" || row.status === "failed" || row.status === "unknown") {
+          if (
+            row.status === "cancelling" ||
+            row.status === "cancelled" ||
+            row.status === "succeeded" ||
+            row.status === "failed" ||
+            row.status === "unknown"
+          ) {
             if (current.kind === "handoff" && current.status === "succeeded" && isHandoffCommit(current.result)) {
               if (
                 op.outcome._tag !== "Succeeded" ||
@@ -370,6 +385,8 @@ export const postgresOperations = (input: {
           return rows[0] === undefined ? undefined : toOperationRecord(rows[0])
         }),
       ),
+    operationCancellations: (claim) => fenced(claim, operationCancellations(claim)),
+    acknowledgeOperationCancellation: (op) => fenced(op, acknowledgeOperationCancellation(op)),
     resolveOperation: (op) =>
       run(
         Effect.gen(function* () {

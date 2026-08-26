@@ -18,6 +18,7 @@ import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
 import { make as makeExecutionRetry } from "./execution-retry.js"
 import { ExecutionClaimLifecycle } from "./execution-claim-lifecycle.js"
 import { ExecutionResolution } from "./execution-resolution.js"
+import { makeToolCancellation } from "./tool-cancellation.js"
 import { make as makeAgentRunOptions } from "./agent-run-options.js"
 import { ModelPreviewLane, open as openModelPreview } from "./model-preview.js"
 import {
@@ -43,11 +44,16 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
+    const reconcileCancellation = yield* makeToolCancellation({ store, resolver: options.resolver })
     const executeClaim = (claim: ExecutionClaim): Effect.Effect<void> =>
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
         if (claimed.attemptFence !== claim.attemptFence) {
           yield* store.saveExecution(claim)
+          return
+        }
+        if (claimed.cancellationRequested) {
+          yield* reconcileCancellation(claim, claimed)
           return
         }
         if ((yield* store.recoverRunningOperations(claim)) === "blocked") return
@@ -477,15 +483,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               interruption.settle({ reason: "failure", error }),
             ),
           ),
-          Effect.onInterrupt(() =>
-            active
-              .cancellationRequested(runId)
-              .pipe(
-                Effect.flatMap((requested) =>
-                  requested ? interruption.settle({ reason: "cancel" }) : interruption.abandon,
-                ),
-              ),
-          ),
+          Effect.onInterrupt(() => interruption.onInterrupt(active.cancellationRequested(runId))),
         )
         yield* execution
       }).pipe(Effect.orDie)

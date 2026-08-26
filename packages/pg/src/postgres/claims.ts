@@ -20,18 +20,23 @@ export const claimReadyRuns = (options: ClaimOptions) =>
         SELECT r.run_id
         FROM tenetkit_runs r
         WHERE r.status IN ('queued', 'running', 'cancelling')
-          AND r.cancellation_requested = FALSE
           AND (
-            (
-              r.parent_run_id IS NULL
+            (r.cancellation_requested = TRUE AND r.status = 'cancelling')
+            OR (
+              r.cancellation_requested = FALSE
               AND (
-                r.status = 'running'
-                OR EXISTS (SELECT 1 FROM tenetkit_lanes l WHERE l.head_run_id = r.run_id)
+                (
+                  r.parent_run_id IS NULL
+                  AND (
+                    r.status = 'running'
+                    OR EXISTS (SELECT 1 FROM tenetkit_lanes l WHERE l.head_run_id = r.run_id)
+                  )
+                )
+                OR EXISTS (
+                  SELECT 1 FROM tenetkit_run_links link
+                  WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
+                )
               )
-            )
-            OR EXISTS (
-              SELECT 1 FROM tenetkit_run_links link
-              WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
             )
           )
           AND (
@@ -78,6 +83,7 @@ export const refreshLease = (input: {
   readonly runId: string
   readonly workerId: string
   readonly attemptFence: number
+  readonly cancellationRequested: boolean
   readonly lease: Duration.Input
 }) =>
   Effect.gen(function* () {
@@ -91,7 +97,7 @@ export const refreshLease = (input: {
       WHERE run_id = ${input.runId}
         AND owner_worker_id = ${input.workerId}
         AND attempt_fence = ${input.attemptFence}
-        AND cancellation_requested = FALSE
+        AND cancellation_requested = ${input.cancellationRequested}
         AND status NOT IN ('succeeded', 'failed', 'cancelled')
       RETURNING run_id
     `

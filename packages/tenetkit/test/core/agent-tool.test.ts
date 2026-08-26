@@ -384,6 +384,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       success: Schema.String,
     })
     const toolkit = Toolkit.make(localTool)
+    const cancellations = new Array<string>()
 
     return [
       Layer.mergeAll(
@@ -398,10 +399,16 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             tools: ["provider"],
             replayPolicy: () => "provider-idempotent",
             execute: () => Effect.succeed({ _tag: "Success", result: "first", encodedResult: "first" }),
+            cancel: () =>
+              Effect.sync(() => {
+                cancellations.push("first")
+                return { _tag: "Cancelled" as const }
+              }),
           }),
           ToolExecutor.route({
             tools: ["provider"],
             execute: () => Effect.succeed({ _tag: "Success", result: "second", encodedResult: "second" }),
+            cancel: () => Effect.die("second overlapping route must not cancel"),
           }),
         ]).pipe(Layer.provide(toolkit.toLayer({ overlap: () => Effect.succeed("local") }))),
       ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
@@ -414,6 +421,21 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         expect(yield* executor.execute(localRequest)).toMatchObject({ result: "local" })
         expect(executor.replayPolicy?.(providerRequest)).toBe("provider-idempotent")
         expect(yield* executor.execute(providerRequest)).toMatchObject({ result: "first" })
+        expect(executor.cancellable?.(providerRequest)).toBe(true)
+        expect(
+          yield* executor.cancel!({
+            operationKey: "operation:provider",
+            attempt: 1,
+            sessionId: "session",
+            runId: "run",
+            rootRunId: "run",
+            toolCallId: providerRequest.call.id,
+            toolName: providerRequest.call.name,
+            execution: providerRequest,
+          }),
+        ).toEqual({ _tag: "Cancelled" })
+        expect(cancellations).toEqual(["first"])
+        expect(executor.cancellable?.(localRequest)).toBe(false)
         expect(executor.replayPolicy?.(request("missing", {}))).toBe("never")
       }),
     ] as const

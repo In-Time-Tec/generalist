@@ -20,6 +20,7 @@ import {
   toolName,
 } from "./child-group.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "./errors.js"
+import { supportsCancellation } from "../core/tools/tool-executor-cancellation.js"
 
 export * from "./child-group.js"
 
@@ -244,8 +245,17 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
   readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
   readonly implementation: Interface
   readonly upstream: Option.Option<ToolExecutor.Interface>
-}): ToolExecutor.Interface =>
-  ToolExecutor.ToolExecutor.of({
+}): ToolExecutor.Interface => {
+  const upstream = Option.getOrUndefined(options.upstream)
+  const upstreamCancellation =
+    upstream?.cancel !== undefined
+      ? {
+          cancellable: (request: ToolExecutor.Request) =>
+            !route.matches(request) && supportsCancellation(upstream, request),
+          cancel: (request: ToolExecutor.CancellationRequest) => upstream.cancel!(request),
+        }
+      : {}
+  return ToolExecutor.ToolExecutor.of({
     replayPolicy: (request) =>
       route.matches(request)
         ? "never"
@@ -267,7 +277,9 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
                 ),
               ),
             ),
+    ...upstreamCancellation,
   })
+}
 
 const runtimeContext = Effect.gen(function* () {
   const context = yield* ToolContext.ToolContext

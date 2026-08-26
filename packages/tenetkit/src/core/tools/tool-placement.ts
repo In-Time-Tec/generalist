@@ -17,6 +17,7 @@ export interface Route<R = ToolContext> {
   readonly matches: (request: Request) => boolean
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly execute: Interface<R>["execute"]
+  readonly cancel?: Interface<R>["cancel"] | undefined
 }
 
 /** @experimental */
@@ -25,6 +26,7 @@ export interface RouteOptions<R = ToolContext> {
   readonly matches?: ((request: Request) => boolean) | undefined
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly execute: Interface<R>["execute"]
+  readonly cancel?: Interface<R>["cancel"] | undefined
 }
 
 /** @experimental */

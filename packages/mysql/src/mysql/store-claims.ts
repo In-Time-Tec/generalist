@@ -56,23 +56,28 @@ export const makeMysqlClaims = (input: {
           const candidates = yield* sql<{ run_id: string }>`
             SELECT r.run_id FROM tenetkit_runs r
             WHERE (
-                (
-                  r.parent_run_id IS NULL
+                (r.cancellation_requested = 1 AND r.status = 'cancelling')
+                OR (
+                  r.cancellation_requested = 0
                   AND (
-                    r.status = 'running'
+                    (
+                      r.parent_run_id IS NULL
+                      AND (
+                        r.status = 'running'
+                        OR EXISTS (
+                          SELECT 1 FROM tenetkit_lanes l
+                          WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
+                        )
+                      )
+                    )
                     OR EXISTS (
-                      SELECT 1 FROM tenetkit_lanes l
-                      WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
+                      SELECT 1 FROM tenetkit_run_links link
+                      WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
                     )
                   )
                 )
-                OR EXISTS (
-                  SELECT 1 FROM tenetkit_run_links link
-                  WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
-                )
               )
               AND r.status IN ('queued', 'running', 'cancelling')
-              AND r.cancellation_requested = 0
               AND (r.owner_worker_id IS NULL OR r.lease_expires_at IS NULL OR r.lease_expires_at < NOW(3))
             ORDER BY r.accepted_sequence ASC
             LIMIT ${sql.literal(String(Math.max(0, Math.floor(scanLimit))))}
@@ -84,7 +89,6 @@ export const makeMysqlClaims = (input: {
               SELECT * FROM tenetkit_runs
               WHERE run_id = ${candidate.run_id}
                 AND status IN ('queued', 'running', 'cancelling')
-                AND cancellation_requested = 0
                 AND (owner_worker_id IS NULL OR lease_expires_at IS NULL OR lease_expires_at < NOW(3))
               FOR UPDATE SKIP LOCKED
             `
@@ -124,7 +128,7 @@ export const makeMysqlClaims = (input: {
             SELECT run_id FROM tenetkit_runs
             WHERE run_id = ${leaseInput.runId} AND owner_worker_id = ${leaseInput.workerId}
               AND attempt_fence = ${leaseInput.attemptFence}
-              AND cancellation_requested = 0
+              AND cancellation_requested = ${leaseInput.cancellationRequested ? 1 : 0}
               AND status NOT IN ('succeeded', 'failed', 'cancelled')
             FOR UPDATE
           `

@@ -25,6 +25,7 @@ import { reconcileFanOut } from "./store-fan-out.js"
 import { ProgramCapabilities } from "tenetkit"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { hasUnsettledChild, reconcileChildWait, settleParentChild } from "./store-child-settlement.js"
+import { hasPendingOperationCancellation, markOperationCancellations } from "./store-operation-cancellation.js"
 
 type RespondResult = Effect.Effect<
   MemoryState,
@@ -77,6 +78,7 @@ const finalizeCancellingParent = (state: MemoryState, runId: string): Effect.Eff
       run.status !== "cancelling" ||
       run.ownerId !== undefined ||
       hasRunningOwnedFanOut(state, runId) ||
+      hasPendingOperationCancellation(state, runId) ||
       hasUnsettledChild(state, runId)
     ) {
       return state
@@ -209,6 +211,7 @@ export const cancel: {
       )
       next = requested
     }
+    if (!terminal) next = markOperationCancellations(next, run.runId)
     if (!terminal) next = reconcileProgramCancellation(next, run.runId, input.reason ?? run.cancelReason)
     for (const childRunId of run.children) {
       const fanOutChild = [...next.fanOuts.values()].some((fanOut) =>
@@ -237,6 +240,7 @@ export const cancel: {
       current === undefined ||
       isTerminal(current.status) ||
       hasRunningOwnedFanOut(next, run.runId) ||
+      hasPendingOperationCancellation(next, run.runId) ||
       hasUnsettledChild(next, run.runId)
     ) {
       return next
@@ -270,7 +274,11 @@ export const complete: {
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     if (run.cancellationRequested) {
-      if (hasRunningOwnedFanOut(state, run.runId) || hasUnsettledChild(state, run.runId)) {
+      if (
+        hasRunningOwnedFanOut(state, run.runId) ||
+        hasPendingOperationCancellation(state, run.runId) ||
+        hasUnsettledChild(state, run.runId)
+      ) {
         const runs = new Map(state.runs)
         const { ownerId: _, ...released } = run
         runs.set(run.runId, released)
@@ -322,7 +330,11 @@ export const fail: {
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     if (run.cancellationRequested) {
-      if (hasRunningOwnedFanOut(state, run.runId) || hasUnsettledChild(state, run.runId)) {
+      if (
+        hasRunningOwnedFanOut(state, run.runId) ||
+        hasPendingOperationCancellation(state, run.runId) ||
+        hasUnsettledChild(state, run.runId)
+      ) {
         const runs = new Map(state.runs)
         const { ownerId: _, ...released } = run
         runs.set(run.runId, released)

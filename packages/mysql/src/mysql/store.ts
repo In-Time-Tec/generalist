@@ -24,6 +24,8 @@ import {
   expireRunningOperation,
   getOperation,
   getOperationByKey,
+  acknowledgeOperationCancellation,
+  operationCancellations,
   recordOperation,
   startOperation,
 } from "tenetkit/runtime/driver/sql/store-operations"
@@ -387,6 +389,8 @@ export const makeMysqlServices = (
       recoverRunningOperations: (input) => fenced(input, recoverRunningOperations(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
+      operationCancellations: (input) => fenced(input, operationCancellations(input)),
+      acknowledgeOperationCancellation: (input) => fenced(input, acknowledgeOperationCancellation(input)),
       resolveOperation: (input) =>
         run(
           lockRun(input.runId).pipe(

@@ -20,6 +20,7 @@ export interface Interface {
     readonly runId: string
     readonly workerId: string
     readonly attemptFence: number
+    readonly cancellationRequested: boolean
     readonly lease?: Duration.Input
   }) => Effect.Effect<boolean, RuntimeUnavailable>
   readonly releaseClaim: (input: {

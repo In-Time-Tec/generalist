@@ -14,6 +14,7 @@ import { make as makeAddress } from "./address.js"
 import { make as makeMessage } from "./message.js"
 import { narrow as narrowRegistrations } from "./executable-registration.js"
 import { normalizePrompt } from "./memory/prompt.js"
+import { supportsCancellation } from "../core/tools/tool-executor-cancellation.js"
 
 const SelectionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
 const SelectionIds = Schema.Array(SelectionId).pipe(Schema.check(Schema.isMaxLength(64)))
@@ -366,8 +367,17 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
   readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
   readonly implementation: Interface
   readonly upstream: Option.Option<ToolExecutor.Interface>
-}): ToolExecutor.Interface =>
-  ToolExecutor.ToolExecutor.of({
+}): ToolExecutor.Interface => {
+  const upstream = Option.getOrUndefined(options.upstream)
+  const upstreamCancellation =
+    upstream?.cancel !== undefined
+      ? {
+          cancellable: (request: ToolExecutor.Request) =>
+            request.call.name !== options.implementation.tool.name && supportsCancellation(upstream, request),
+          cancel: (request: ToolExecutor.CancellationRequest) => upstream.cancel!(request),
+        }
+      : {}
+  return ToolExecutor.ToolExecutor.of({
     replayPolicy: (request) =>
       request.call.name === options.implementation.tool.name
         ? "never"
@@ -402,4 +412,6 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
                 ),
               ),
             ),
+    ...upstreamCancellation,
   })
+}

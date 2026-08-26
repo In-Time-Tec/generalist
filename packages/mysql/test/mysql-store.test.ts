@@ -596,6 +596,7 @@ describeMysql("mysql run store", () => {
             runId: receipt.runId,
             workerId: "mysql-worker",
             attemptFence: claimed.attemptFence,
+            cancellationRequested: false,
             lease: "10 seconds",
           }),
         ).toBe(true)
@@ -605,6 +606,7 @@ describeMysql("mysql run store", () => {
             runId: receipt.runId,
             workerId: "mysql-worker",
             attemptFence: claimed.attemptFence,
+            cancellationRequested: false,
             lease: "10 seconds",
           }),
         ).toBe(false)

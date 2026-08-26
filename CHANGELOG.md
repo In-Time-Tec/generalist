@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.39.0
+
+- Add optional `ToolExecutor.cancel(request)` semantic cancellation with `CancellationRequest`, `CancellationOutcome`, `TerminalOutcome`, and typed `CancellationFailure`. A direct executor may narrow support with `cancellable(request)`; `ToolExecutor.route({ cancel })` and `layerRouter` select cancellation with the same first matching concrete route as execution. Existing executors remain compatible and opt in only by defining `cancel`; callbacks must be idempotent for the stable operation identity.
+- Make `Runtime.cancel` durably close operation admission across the target Run tree before executor delivery. The existing operation journal now retains the exact execute request and marks cancellable tool operations `cancelling`; `RunCancelled` commits only after each executor returns definitive `Cancelled` or `AlreadyTerminal`. Callback interruption or host loss before acknowledgement is reclaimed and redelivered with the same operation key, attempt, Session, Run, root, tool-call, tool-name, and execute request without another application `Runtime.cancel` call. Host shutdown, execution interruption, and lease loss never invoke semantic cancellation and retain the existing provider-idempotent/unknown recovery behavior.
+- Memory, SQLite, PostgreSQL, and MySQL share cancellation ordering, root/descendant admission-race, route-selection, lease-loss, and cross-host callback-redelivery coverage. Built-in stores require no SQL schema or data migration. Custom `RunStore` implementations must add the cancellation-operation claim and acknowledgement methods and accept the new `cancelling` and `cancelled` operation statuses.
+
 ## 0.38.4
 
 - Validate interrupted model responses in the schema's Type-to-wire direction before the atomic failure commit. Provider metadata such as OpenRouter's `DateTime.Utc` timestamp now serializes correctly, so a terminal stream-decode failure durably settles its never-replay model operation and Run as failed instead of leaving a running operation that recovery must mark unknown. Genuinely indeterminate never-replay operations retain their existing `OperationUnknown` and `needs-resolution` behavior. This release requires no SQL schema or data migration.

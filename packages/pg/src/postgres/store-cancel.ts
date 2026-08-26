@@ -5,7 +5,8 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { RunNotFound, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { isTerminal } from "tenetkit/runtime/driver/run"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import { hasUnsettledChild } from "tenetkit/runtime/driver/sql/store-child-settlement"
+import { hasPendingOperationCancellation, hasUnsettledChild } from "tenetkit/runtime/driver/sql/store-child-settlement"
+import { markOperationCancellations } from "tenetkit/runtime/driver/sql/store-operations"
 import { afterTerminal, appendEvent, loadRun, settleParent } from "./pg-helpers.js"
 import { cancelOwnedFanOuts } from "./store-fan-out.js"
 import { reconcileProgramCancellation } from "tenetkit/runtime/driver/sql/store-program"
@@ -46,6 +47,11 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
         )
         current = (yield* loadRun(runId))!
       }
+      const marked = terminal ? 0 : yield* markOperationCancellations(runId)
+      if (marked > 0 && current.status === "needs-resolution") {
+        yield* input.sql`UPDATE tenetkit_runs SET status = 'cancelling' WHERE run_id = ${runId}`
+        current = (yield* loadRun(runId))!
+      }
       if (!terminal) yield* reconcileProgramCancellation(runId, reason ?? current.cancelReason)
       yield* input.sql`
         UPDATE tenetkit_run_waits SET status = 'cancelled', closed_at = NOW()
@@ -77,6 +83,7 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
         SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${runId} AND status = 'running' LIMIT 1
       `
       if (running.length > 0) return
+      if (yield* hasPendingOperationCancellation(runId)) return
       if (yield* hasUnsettledChild(runId)) return
       const event = yield* appendEvent(
         input.hub,

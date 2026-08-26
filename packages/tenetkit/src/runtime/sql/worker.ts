@@ -124,14 +124,18 @@ export const makeWorker = (
             runId: item.run.runId,
             workerId: options.workerId,
             attemptFence: item.attemptFence,
+            cancellationRequested: item.run.cancellationRequested,
             lease,
           }),
         ),
         Effect.flatMap((refreshed) => (refreshed ? renew : Effect.void)),
       )
-      return host.execute({ runId: item.run.runId, ownerId: options.workerId, attemptFence: item.attemptFence }).pipe(
-        Effect.raceFirst(renew),
-        Effect.raceFirst(watchCancellation(item.run.runId)),
+      const hosted = host
+        .execute({ runId: item.run.runId, ownerId: options.workerId, attemptFence: item.attemptFence })
+        .pipe(Effect.raceFirst(renew))
+      return (
+        item.run.cancellationRequested ? hosted : hosted.pipe(Effect.raceFirst(watchCancellation(item.run.runId)))
+      ).pipe(
         Effect.catchCause((cause) =>
           Cause.hasInterruptsOnly(cause)
             ? Effect.interrupt

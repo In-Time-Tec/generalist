@@ -44,6 +44,24 @@ export const hasUnsettledChild = (runId: string): Effect.Effect<boolean, SqlErro
     return pending.length > 0
   })
 
+export const hasPendingOperationCancellation = (runId: string): Effect.Effect<boolean, SqlError, SqlClient.SqlClient> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const pending = yield* sql<{ present: number }>`
+      SELECT 1 AS present FROM tenetkit_run_operations
+      WHERE run_id = ${runId} AND status = 'cancelling'
+      LIMIT 1
+    `
+    return pending.length > 0
+  })
+
+export const hasPendingCancellationWork = (runId: string): Effect.Effect<boolean, SqlError, SqlClient.SqlClient> =>
+  Effect.zipWith(
+    hasPendingOperationCancellation(runId),
+    hasUnsettledChild(runId),
+    (operation, child) => operation || child,
+  )
+
 export const reconcileChildWaitWith = <E, R>(input: {
   readonly hub: EventHub
   readonly parent: DecodedRun

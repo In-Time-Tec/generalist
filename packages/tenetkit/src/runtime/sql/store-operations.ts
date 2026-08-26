@@ -22,6 +22,8 @@ import {
   verifyHandoffSessionEntry,
 } from "./completed-model-response.js"
 import { handoffSessionEntry, isHandoffCommit, sameHandoffCheckpoint, sameHandoffCommit } from "../handoff-session.js"
+import type { ToolExecutor } from "tenetkit"
+import { decodeCancellableOperation } from "../../core/tools/tool-executor-cancellation.js"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.gen(function* () {
@@ -86,6 +88,9 @@ export const recordOperation: {
         return yield* RuntimeUnavailable.make({ message: "steering consumption does not match operation" })
       }
       return toOperationRecord(prior)
+    }
+    if (run.cancellationRequested) {
+      return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is cancelling` })
     }
     const steeringEntryIds = input.steeringEntryIds ?? []
     const pending = yield* sql<SteeringConsumptionRow>`
@@ -156,6 +161,9 @@ export const startOperation = (input: { readonly runId: string; readonly operati
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    if (run.cancellationRequested) {
+      return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is cancelling` })
+    }
     const started = yield* nowIso
     yield* sql`
       UPDATE tenetkit_run_operations
@@ -181,7 +189,13 @@ export const completeOperation: {
       SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     if (existing[0] === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-    if (existing[0].status === "succeeded" || existing[0].status === "failed" || existing[0].status === "unknown") {
+    if (
+      existing[0].status === "cancelling" ||
+      existing[0].status === "cancelled" ||
+      existing[0].status === "succeeded" ||
+      existing[0].status === "failed" ||
+      existing[0].status === "unknown"
+    ) {
       const current = toOperationRecord(existing[0])
       if (current.kind === "handoff" && current.status === "succeeded" && isHandoffCommit(current.result)) {
         if (
@@ -402,4 +416,85 @@ export const getOperationByKey = (input: { readonly runId: string; readonly oper
       SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_key = ${input.operationKey}
     `
     return rows[0] === undefined ? undefined : toOperationRecord(rows[0])
+  })
+
+export const operationCancellations = (input: { readonly runId: string }) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* requireRun(input.runId)
+    const rows = yield* sql<OperationRow>`
+      SELECT * FROM tenetkit_run_operations
+      WHERE run_id = ${input.runId} AND status = 'cancelling'
+      ORDER BY operation_id
+    `
+    return rows.map(toOperationRecord)
+  })
+
+export const markOperationCancellations = (runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<OperationRow>`
+      SELECT * FROM tenetkit_run_operations
+      WHERE run_id = ${runId} AND kind = 'tool' AND status IN ('requested', 'running', 'unknown')
+      ORDER BY operation_id
+    `
+    let marked = 0
+    for (const row of rows) {
+      const operationInput = toOperationRecord(row).input
+      const cancellation =
+        typeof operationInput === "object" && operationInput !== null && "cancellation" in operationInput
+          ? decodeCancellableOperation(operationInput.cancellation)
+          : undefined
+      if (cancellation === undefined) continue
+      yield* sql`
+        UPDATE tenetkit_run_operations SET status = 'cancelling', finished_at = NULL
+        WHERE run_id = ${runId} AND operation_id = ${row.operation_id}
+          AND status IN ('requested', 'running', 'unknown')
+      `
+      marked += 1
+    }
+    return marked
+  })
+
+export const acknowledgeOperationCancellation = (input: {
+  readonly runId: string
+  readonly operationId: string
+  readonly outcome: ToolExecutor.CancellationOutcome
+}) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const run = yield* requireRun(input.runId)
+    if (!run.cancellationRequested) {
+      return yield* RuntimeUnavailable.make({ message: `run ${input.runId} has not requested cancellation` })
+    }
+    const rows = yield* sql<OperationRow>`
+      SELECT * FROM tenetkit_run_operations
+      WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+    `
+    const row = rows[0]
+    if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+    if (row.status === "cancelled" || row.status === "succeeded" || row.status === "failed") {
+      return toOperationRecord(row)
+    }
+    if (row.status !== "cancelling") {
+      return yield* RuntimeUnavailable.make({ message: `operation ${input.operationId} is not cancelling` })
+    }
+    const finished = yield* nowIso
+    if (input.outcome._tag === "Cancelled") {
+      yield* sql`
+        UPDATE tenetkit_run_operations SET status = 'cancelled', finished_at = ${finished}
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'cancelling'
+      `
+    } else {
+      yield* sql`
+        UPDATE tenetkit_run_operations
+        SET status = 'succeeded', result_json = ${encodeJsonValue(input.outcome.outcome)}, finished_at = ${finished}
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'cancelling'
+      `
+    }
+    const completed = yield* sql<OperationRow>`
+      SELECT * FROM tenetkit_run_operations
+      WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+    `
+    return toOperationRecord(completed[0]!)
   })

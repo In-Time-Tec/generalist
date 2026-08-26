@@ -1,11 +1,26 @@
 import { Effect, Function } from "effect"
 import { RunNotFound, RuntimeUnavailable } from "../errors.js"
+import type { RunActivation } from "../run-activation.js"
 import type { RunInspection } from "../run.js"
 import { appendLifecycle, makeAttemptStarted } from "./append.js"
-import type { MemoryState } from "./state.js"
+import type { MemoryState, StoredRun } from "./state.js"
 import { toInspection } from "./store-events.js"
 
 type ActivateResult = Effect.Effect<readonly [RunInspection, MemoryState], RunNotFound | RuntimeUnavailable>
+
+export const activationOf = (run: StoredRun): RunActivation => {
+  const intent: RunActivation["intent"] =
+    run.status === "cancelling"
+      ? "cancel"
+      : run.ownerId === undefined &&
+          (run.status === "running" ||
+            (run.status === "queued" && run.parentRunId !== undefined && run.childReadiness === "ready"))
+        ? "execute"
+        : "inactive"
+  return intent === "inactive"
+    ? { runId: run.runId, intent }
+    : { runId: run.runId, intent, attemptFence: run.attemptFence, runStatus: run.status }
+}
 
 export const activateRoot: {
   (runId: string): (state: MemoryState) => ActivateResult

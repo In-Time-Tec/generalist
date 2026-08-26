@@ -35,7 +35,9 @@ import {
   recordOperation,
   startOperation,
   completeOperation,
+  acknowledgeOperationCancellation,
   commitModelResponse,
+  operationCancellations,
 } from "./store-operations.js"
 import { recoverRunningOperations } from "./store-operation-recovery.js"
 import { resolveOperation } from "./store-operation-resolution.js"
@@ -309,6 +311,8 @@ const makeSqliteStoreServices = (
         fenced(input, (transactionHub) => recoverRunningOperations(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
+      operationCancellations: (input) => fenced(input, () => operationCancellations(input)),
+      acknowledgeOperationCancellation: (input) => fenced(input, () => acknowledgeOperationCancellation(input)),
       resolveOperation: (input) =>
         runBuffered(
           (transactionHub) =>
