@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "tenetkit-workspace",
-  "version": "0.40.1",
+  "version": "0.41.0",
   "description": "Effect-native agent framework with an optional durable Runtime",
   "license": "MIT",
   "private": true,
@@ -9,7 +9,7 @@
   "packageManager": "bun@1.4.0",
   "scripts": {
     "build": "bun turbo build",
-    "check": "bun run build && prettier --cache --check . && repo-lint check --no-cache && bun node_modules/oxlint/dist/cli.js --deny-warnings packages apps examples scripts test && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck",
+    "check": "bun run build && prettier --cache --check . && repo-lint check --no-cache && bun node_modules/oxlint/dist/cli.js --deny-warnings packages apps examples scripts test vitest.config.ts && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck",
     "install-preflight": "bun scripts/install-preflight.ts",
     "dev": "bun --cwd apps/docs dev",
     "format": "prettier --write .",

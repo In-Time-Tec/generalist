@@ -1,11 +1,12 @@
-import { readFileSync } from "node:fs"
 import { availableParallelism } from "node:os"
-import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
+import { sourceTextPlugin } from "./apps/docs/scripts/source-text-plugin"
+import tenetkitManifest from "./packages/tenetkit/package.json" with { type: "json" }
 
-const repositoryRoot = dirname(fileURLToPath(import.meta.url))
-const tenetkitRoot = join(repositoryRoot, "packages/tenetkit")
+const repositoryRoot = fileURLToPath(new URL(".", import.meta.url))
+const tenetkitRoot = new URL("./packages/tenetkit/", import.meta.url)
+const tenetkitExports: Readonly<Record<string, { readonly import: string }>> = tenetkitManifest.exports
 
 /**
  * `@tenetkit/pg` and `@tenetkit/mysql` import the published `tenetkit` entrypoints while the shared
@@ -14,24 +15,22 @@ const tenetkitRoot = join(repositoryRoot, "packages/tenetkit")
  * The `exports` map is the only place that knows how a specifier maps onto a file, so the alias
  * table is derived from it rather than restated.
  */
-const tenetkitSourceAliases = Object.entries(
-  (
-    JSON.parse(readFileSync(join(tenetkitRoot, "package.json"), "utf8")) as {
-      readonly exports: Readonly<Record<string, { readonly import: string }>>
-    }
-  ).exports,
-)
-  .map(([specifier, target]) => {
-    const source = target.import.replace(/^\.\/dist\//, "src/").replace(/\.js$/, ".ts")
-    const pattern = `tenetkit${specifier === "." ? "" : specifier.slice(1)}`
-    return specifier.includes("*")
+const tenetkitSourceAliases: Array<{ readonly find: RegExp; readonly replacement: string }> = []
+for (const specifier in tenetkitExports) {
+  const source = tenetkitExports[specifier].import.replace(/^\.\/dist\//, "src/").replace(/\.js$/, ".ts")
+  const pattern = `tenetkit${specifier === "." ? "" : specifier.slice(1)}`
+  tenetkitSourceAliases.push(
+    specifier.includes("*")
       ? {
           find: new RegExp(`^${pattern.replace("*", "(.*)")}$`),
-          replacement: join(tenetkitRoot, source.replace("*", "$1")),
+          replacement: fileURLToPath(new URL(source.replace("*", "$1"), tenetkitRoot)),
         }
-      : { find: new RegExp(`^${pattern}$`), replacement: join(tenetkitRoot, source) }
-  })
-  .toSorted((left, right) => Number(left.find.source.includes("(")) - Number(right.find.source.includes("(")))
+      : { find: new RegExp(`^${pattern}$`), replacement: fileURLToPath(new URL(source, tenetkitRoot)) },
+  )
+}
+tenetkitSourceAliases.sort(
+  (left, right) => Number(left.find.source.includes("(")) - Number(right.find.source.includes("(")),
+)
 
 /**
  * Each worker runs real Bun kernel processes, so the useful ceiling is the machine's own
@@ -51,14 +50,13 @@ export default defineConfig({
     alias: tenetkitSourceAliases,
   },
   plugins: [
+    sourceTextPlugin,
     {
       name: "workspace-at-alias",
       resolveId(source: string, importer: string | undefined) {
-        if (!source.startsWith("@/")) return undefined
-        const docs = importer?.indexOf("/apps/docs/") ?? -1
-        const workspaceRoot = docs >= 0 ? importer!.slice(0, docs) : importer!.slice(0, importer!.indexOf("/examples/"))
-        const base = docs >= 0 ? "apps/docs/src" : "examples/deep-research-agent/web/src"
-        return `${join(workspaceRoot, base, source.slice(2))}.ts`
+        if (!source.startsWith("@/") || importer === undefined) return undefined
+        const base = importer.includes("/apps/docs/") ? "apps/docs/src" : "examples/deep-research-agent/web/src"
+        return `${repositoryRoot}${base}/${source.slice(2)}.ts`
       },
     },
   ],

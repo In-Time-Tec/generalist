@@ -68,12 +68,11 @@ export const packageExports = [
   "tenetkit/runtime/external-child-store",
   "tenetkit/runtime/driver",
   "tenetkit/runtime/driver/sql",
-  "tenetkit/runtime/driver/run-store",
+  "tenetkit/runtime/driver/run/store",
   "tenetkit/runtime/driver/sql/store",
   "@tenetkit/cloudflare/workers",
   "@tenetkit/cloudflare/durable-objects",
   "@tenetkit/cloudflare/dynamic-workers",
-  "@tenetkit/cloudflare/testing",
 ] as const
 export const forbiddenPackageExports = ["@tenetkit/cloudflare"] as const
 const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>

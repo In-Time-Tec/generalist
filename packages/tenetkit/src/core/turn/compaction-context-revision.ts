@@ -4,7 +4,7 @@ import { Prompt } from "effect/unstable/ai"
 interface RevisionRecord {
   readonly [key: string]: RevisionValue
 }
-interface RevisionArray extends ReadonlyArray<RevisionValue> {}
+type RevisionArray = ReadonlyArray<RevisionValue>
 type RevisionValue = string | number | boolean | bigint | symbol | RevisionRecord | RevisionArray | null | undefined
 const RevisionValue: Schema.Codec<RevisionValue> = Schema.Union([
   Schema.String,
@@ -20,48 +20,54 @@ const RevisionValue: Schema.Codec<RevisionValue> = Schema.Union([
     Schema.suspend((): Schema.Codec<RevisionValue> => RevisionValue),
   ),
 ])
-const revisionRecord = Schema.Record(Schema.String, Schema.Unknown)
+const revisionRecord: Schema.Codec<RevisionRecord> = Schema.Record(
+  Schema.String,
+  Schema.suspend((): Schema.Codec<RevisionValue> => RevisionValue),
+)
 
 const hasFaithfulJsonIdentity = (value: RevisionValue, ancestors: Set<object> = new Set()): boolean => {
   if (Schema.is(Schema.String)(value) || Schema.is(Schema.Boolean)(value)) return true
   if (Schema.is(Schema.Finite)(value)) return !Object.is(value, -0)
   if (value === null) return true
-  if (Array.isArray(value)) {
-    if (ancestors.has(value)) return false
-    if (Object.getPrototypeOf(value) !== Array.prototype || Object.getOwnPropertySymbols(value).length > 0) return false
-    for (let index = 0; index < value.length; index += 1) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
-      if (
-        descriptor === undefined ||
-        "get" in descriptor ||
-        !Schema.is(RevisionValue)(descriptor.value) ||
-        !hasFaithfulJsonIdentity(descriptor.value, new Set(ancestors).add(value))
-      )
-        return false
-    }
-    return Object.getOwnPropertyNames(value).every((key) => {
-      if (key === "length") return true
-      const index = Number(key)
-      return Number.isInteger(index) && index >= 0 && index < value.length && String(index) === key
-    })
-  }
-  if (Schema.is(revisionRecord)(value)) {
-    if (ancestors.has(value)) return false
-    const prototype = Object.getPrototypeOf(value)
-    if ((prototype !== Object.prototype && prototype !== null) || Object.getOwnPropertySymbols(value).length > 0)
-      return false
-    return Object.getOwnPropertyNames(value).every((key) => {
-      const descriptor = Object.getOwnPropertyDescriptor(value, key)
-      return (
-        descriptor !== undefined &&
-        descriptor.enumerable &&
-        "value" in descriptor &&
-        Schema.is(RevisionValue)(descriptor.value) &&
-        hasFaithfulJsonIdentity(descriptor.value, new Set(ancestors).add(value))
-      )
-    })
-  }
+  if (Array.isArray(value)) return hasFaithfulArrayIdentity(value, ancestors)
+  if (Schema.is(revisionRecord)(value)) return hasFaithfulRecordIdentity(value, ancestors)
   return false
+}
+
+const hasFaithfulArrayIdentity = (value: RevisionArray, ancestors: Set<object>): boolean => {
+  if (ancestors.has(value)) return false
+  if (Reflect.getPrototypeOf(value) !== Array.prototype || Object.getOwnPropertySymbols(value).length > 0) return false
+  const descendants = new Set(ancestors).add(value)
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
+    const child: unknown = descriptor?.value
+    if (descriptor === undefined || "get" in descriptor || !Schema.is(RevisionValue)(child)) return false
+    if (!hasFaithfulJsonIdentity(child, descendants)) return false
+  }
+  return Object.getOwnPropertyNames(value).every((key) => {
+    if (key === "length") return true
+    const index = Number(key)
+    return Number.isInteger(index) && index >= 0 && index < value.length && String(index) === key
+  })
+}
+
+const hasFaithfulRecordIdentity = (value: RevisionRecord, ancestors: Set<object>): boolean => {
+  if (ancestors.has(value)) return false
+  const prototype = Reflect.getPrototypeOf(value)
+  if ((prototype !== Object.prototype && prototype !== null) || Object.getOwnPropertySymbols(value).length > 0)
+    return false
+  const descendants = new Set(ancestors).add(value)
+  return Object.getOwnPropertyNames(value).every((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    const child: unknown = descriptor?.value
+    return (
+      descriptor !== undefined &&
+      descriptor.enumerable &&
+      "value" in descriptor &&
+      Schema.is(RevisionValue)(child) &&
+      hasFaithfulJsonIdentity(child, descendants)
+    )
+  })
 }
 
 export const ContextRevision = {

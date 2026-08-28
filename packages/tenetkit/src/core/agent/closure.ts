@@ -6,8 +6,9 @@ import type { Key } from "../context/memory.js"
 import type { ModelSelection } from "../model/registry.js"
 import type { ToolContext } from "../tools/tool-context.js"
 import type { TurnPolicy } from "../turn/policy.js"
+import { ClosedTypeId, isClosed as hasClosedIdentity } from "./lifecycle/closure-identity.js"
 
-export const ClosedTypeId: unique symbol = Symbol.for("tenetkit/core/agent/closure/Closed")
+export { ClosedTypeId } from "./lifecycle/closure-identity.js"
 
 /** @experimental One Agent observed where its tool and requirement types are not available. */
 export interface Any<PolicyServices = unknown> {
@@ -48,7 +49,7 @@ export interface Closed extends Any<never> {
 }
 
 /** @internal Whether an erased Agent carries its closed environment. */
-export const isClosed = (agent: Any): agent is Closed => ClosedTypeId in agent
+export const isClosed = (agent: Any): agent is Closed => hasClosedIdentity(agent)
 
 interface ClosedPolicyAgent extends Omit<Any, "policy"> {
   readonly policy: TurnPolicy<never>

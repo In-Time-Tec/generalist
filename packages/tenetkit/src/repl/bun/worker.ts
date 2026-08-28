@@ -40,8 +40,8 @@ const write = (frame: Frame, barrierCellId?: string): void => {
   flushOutput()
   if (barrierCellId !== undefined)
     for (const writer of Object.values(rawWriters))
-      writer.write(`\n${frameNonce}raw-barrier:${encodeURIComponent(barrierCellId)}\n`)
-  frameWriter.write(encoder.encode(`${frameNonce}${JSON.stringify(frame)}\n`))
+      void writer.write(`\n${frameNonce}raw-barrier:${encodeURIComponent(barrierCellId)}\n`)
+  void frameWriter.write(encoder.encode(`${frameNonce}${JSON.stringify(frame)}\n`))
 }
 
 let cell: CellState | undefined
@@ -259,6 +259,7 @@ const execute = (cellId: string, code: string, deadlineMillis: number): Promise<
         const result = Schema.decodeUnknownOption(Schema.Struct({ value: Schema.optional(Schema.Unknown) }))(settled)
         const value = result._tag === "Some" ? result.value.value : undefined
         write({ _tag: "Completed", cellId, value: resultValue(value), durationMillis: elapsed() }, cellId)
+        return undefined
       },
       (error) => {
         const failure = errorDetails(error)
@@ -346,9 +347,11 @@ const restore = (requestId: string, payload: string): Promise<void> =>
       }
       for (const [name, source] of Object.entries(decoded.sources)) {
         try {
-          const restoredValue = vm.runInContext(`(${source})`, context, {
-            filename: `tenetkit-restore-${name}.ts`,
-          })
+          const restoredValue = Schema.decodeUnknownSync(RuntimeValueSchema)(
+            vm.runInContext(`(${source})`, context, {
+              filename: `tenetkit-restore-${name}.ts`,
+            }),
+          )
           Reflect.set(context, name, restoredValue)
           restored.push({ name, kind: "source" })
         } catch {
@@ -372,6 +375,7 @@ const restore = (requestId: string, payload: string): Promise<void> =>
           }
         }
         write({ _tag: "Restored", requestId, restored, dropped })
+        return undefined
       })
     } catch (error) {
       write({

@@ -4,10 +4,10 @@ import type { ModelSelection } from "../../model/registry.js"
 import type { ToolSchedulingPolicy } from "../service.js"
 import type { HandoffRunState } from "../handoff/state.js"
 import type { Closed } from "../closure.js"
+import { isClosed } from "../lifecycle/closure-identity.js"
 
-const ClosedTypeId = Symbol.for("tenetkit/core/agent/closure/Closed")
-const isClosed = (agent: HandoffRunState["active"]["agent"]): agent is Closed => ClosedTypeId in agent
-export const ActiveTurn = { isClosed }
+const isClosedAgent = (agent: HandoffRunState["active"]["agent"]): agent is Closed => isClosed(agent)
+export const ActiveTurn = { isClosed: isClosedAgent }
 
 /** @internal Resolve turn-scoped authority from the current handoff state. */
 export const make = (input: {

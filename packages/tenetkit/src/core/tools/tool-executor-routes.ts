@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/event.js"
-import { FrameworkFailure, RemoteRetryMisconfigured, type ReplayPolicy } from "./tool-result-codec.js"
+import { FrameworkFailure, RemoteRetryMisconfigured, type ReplayPolicy, toolResultCodec } from "./tool-result-codec.js"
 import {
   type Placement,
   type PlacementRequest,
@@ -15,7 +15,6 @@ import {
   type RouteOptions,
 } from "./tool-placement.js"
 import type { ToolContext } from "./tool-context.js"
-import { toolResultCodec } from "./tool-result-codec.js"
 
 /** @experimental */
 export function route(options: RouteOptions<ToolContext>): Route<ToolContext>

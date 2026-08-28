@@ -12,7 +12,9 @@ const authored = (edits: ReadonlyArray<unknown>) => ({ id: "model-1", at: at(2),
 
 const expectRejected = (failure: Effect.Error<ReturnType<typeof Authorship.authorProposal>>) => {
   expect(failure._tag).toBe("tenetkit/harness/AuthorshipRejected")
-  if (!Schema.is(Authorship.AuthorshipRejected)(failure)) throw failure
+  if (!Schema.is(Authorship.AuthorshipRejected)(failure)) {
+    throw new Error("Expected an AuthorshipRejected failure", { cause: failure })
+  }
   return failure
 }
 

@@ -14,9 +14,6 @@ export interface AnthropicInput extends RegistrationOptions {
   readonly config?: Config
 }
 
-/** @experimental */
-export type Config = Omit<typeof AnthropicLanguageModel.Config.Service, "model">
-
 const {
   max_tokens: maxTokens,
   messages: _messages,
@@ -38,14 +35,14 @@ const ConfigSchema = Schema.Struct({
   strictJsonSchema: Schema.optionalKey(Schema.Boolean),
 })
 
+/** @experimental */
+export type Config = typeof ConfigSchema.Type
+
 /** @experimental Decodes persisted provider options into Anthropic request configuration. */
 type ConfigInput = typeof Schema.Unknown.Type
 
-export const decodeConfig = (options: ConfigInput): Config => {
-  const decoded = Schema.decodeSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {})
-  // SAFETY: Anthropic's generated schema and request builder accept every BetaEffortLevel, but the dependency's Config service type omits the newer `max` literal.
-  return decoded as Config
-}
+export const decodeConfig = (options: ConfigInput): Config =>
+  Schema.decodeSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {})
 
 const FailureEventSchema = Schema.Struct({
   type: Schema.optionalKey(Schema.String),
@@ -107,8 +104,15 @@ const resolveAnthropicFailure = ({ error, metadata: partMetadata, method }: Fail
 /** @experimental Effective Anthropic request config; callers opt into top-level automatic caching. */
 export const resolvedConfig = (input: AnthropicInput): Config => input.config ?? {}
 
+const providerConfig = (config: Config): Omit<typeof AnthropicLanguageModel.Config.Service, "model"> => {
+  const target: Omit<typeof AnthropicLanguageModel.Config.Service, "model"> = {}
+  Object.assign(target, config)
+  return target
+}
+
 const anthropicLanguageModelLayer = (input: AnthropicInput) => {
-  const options = input.config === undefined ? { model: input.model } : { model: input.model, config: input.config }
+  const options =
+    input.config === undefined ? { model: input.model } : { model: input.model, config: providerConfig(input.config) }
   return layerModelFailures(layerImageSources(AnthropicLanguageModel.layer(options)), resolveAnthropicFailure)
 }
 

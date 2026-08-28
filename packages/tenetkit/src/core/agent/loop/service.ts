@@ -8,7 +8,7 @@ import {
   CurrentSummaryCall,
   DeliveryFailed,
 } from "../../model/telemetry/events.js"
-import { TurnPolicyError, type Decision, type TurnOverrides } from "../../turn/policy.js"
+import { TurnPolicyError, type Decision, type TurnOverrides, type TurnPolicy } from "../../turn/policy.js"
 import type { LanguageModelNotRegistered } from "../../model/registry.js"
 import type { AnyToolCall } from "../tools/result.js"
 import { resolvedToolResult, type ToolCheckpoint } from "../suspension.js"
@@ -34,11 +34,17 @@ import {
 } from "../../durable/driver/run.js"
 import { operationKey, type DriverInterpreter } from "../../durable/driver/interpreter.js"
 import { LoopDriverState, modelCallOrdinal } from "../../durable/loop-driver-state.js"
-import { HandoffRequirementsMissing, takePendingContinuation } from "../handoff/state.js"
+import { HandoffRequirementsMissing, type HandoffRunState, takePendingContinuation } from "../handoff/state.js"
 import { DriverStateInvalid } from "../../durable/service.js"
 import { terminalCompletedEvent, TurnFinish, turnCompletedEvent } from "../model-turn/finish.js"
 import { schedule as scheduleTools } from "../tools/scheduler.js"
-import { hasClosedPolicy } from "../closure.js"
+import { isClosed } from "../lifecycle/closure-identity.js"
+
+type ActiveAgent = HandoffRunState["active"]["agent"]
+type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: TurnPolicy<never> }
+const hasClosedPolicy = (agent: ActiveAgent): agent is ClosedPolicyAgent =>
+  isClosed(agent) || agent.policy.snapshot !== undefined
+
 export const make = <
   Tools extends Record<string, Tool.Any>,
   R,

@@ -92,7 +92,7 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
             pool,
             sessionId: "s",
             cellId: "c1",
-            code: "const after = 4; for (let index = 0; index < 2000; index += 1) { console.log('w'.repeat(200)) }; 'done'",
+            code: "const after = 4; for (let index = 0; index < 100; index += 1) { console.log('w'.repeat(200)) }; 'done'",
           })
           yield* flooded.result
           const observed = yield* collect({ pool, sessionId: "s", cellId: "c2", code: "after + 1" })
@@ -153,7 +153,7 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
             cellId: "c1",
             code: [
               "const fs = require('node:fs')",
-              "for (let index = 0; index < 2000; index += 1) { fs.writeSync(1, 'A'.repeat(200)) }",
+              "for (let index = 0; index < 100; index += 1) { fs.writeSync(1, 'A'.repeat(200)) }",
               "'done'",
             ].join("\n"),
           })

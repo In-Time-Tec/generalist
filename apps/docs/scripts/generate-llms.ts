@@ -2,6 +2,7 @@ import { runMain } from "@effect/platform-bun/BunRuntime"
 import { layer } from "@effect/platform-bun/BunServices"
 import { Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { createServer } from "vite"
+import { sourceTextPlugin } from "./source-text-plugin"
 
 class LlmsGenerationError extends Schema.TaggedError<LlmsGenerationError>()("LlmsGenerationError", {
   message: Schema.String,
@@ -26,17 +27,7 @@ const program = Effect.gen(function* () {
           configFile: false,
           server: { middlewareMode: true },
           appType: "custom",
-          plugins: [
-            {
-              name: "source-text",
-              enforce: "pre",
-              resolveId(id) {
-                return id.startsWith("virtual:source/")
-                  ? `${new URL(`../${id.slice("virtual:source/".length)}`, import.meta.url).pathname}?raw`
-                  : null
-              },
-            },
-          ],
+          plugins: [sourceTextPlugin],
         }),
       catch: (error) => LlmsGenerationError.make({ message: String(error) }),
     }),
