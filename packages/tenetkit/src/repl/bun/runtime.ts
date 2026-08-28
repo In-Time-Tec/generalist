@@ -317,9 +317,50 @@ interface BoundedResult {
   readonly droppedBytes: number
 }
 
+const boundedJsonPreview = (value: string): string | undefined => {
+  let decoded: unknown
+  try {
+    decoded = JSON.parse(value)
+  } catch {
+    return undefined
+  }
+  if (decoded === null || typeof decoded !== "object") return undefined
+  const clip = (current: unknown, stringLimit: number, itemLimit: number, depth: number): unknown => {
+    if (typeof current === "string") return current.slice(0, stringLimit)
+    if (current === null || typeof current !== "object") return current
+    if (depth === 0) return Array.isArray(current) ? [] : {}
+    if (Array.isArray(current))
+      return current.slice(0, itemLimit).map((item) => clip(item, stringLimit, itemLimit, depth - 1))
+    return Object.fromEntries(
+      Object.entries(current)
+        .slice(0, itemLimit)
+        .map(([key, item]) => [key, clip(item, stringLimit, itemLimit, depth - 1)]),
+    )
+  }
+  for (const [stringLimit, itemLimit] of [
+    [4_096, 64],
+    [2_048, 32],
+    [1_024, 16],
+    [512, 8],
+    [256, 4],
+    [128, 2],
+    [64, 1],
+  ] as const) {
+    const encoded = JSON.stringify(clip(decoded, stringLimit, itemLimit, 16))
+    if (new TextEncoder().encode(encoded).byteLength <= maxResultBytes) return encoded
+  }
+  return Array.isArray(decoded) ? "[]" : "{}"
+}
+
 const boundResult = (value: string): BoundedResult => {
   const bytes = new TextEncoder().encode(value).byteLength
   if (bytes <= maxResultBytes) return { value, droppedBytes: 0 }
+  const jsonPreview = boundedJsonPreview(value)
+  if (jsonPreview !== undefined)
+    return {
+      value: jsonPreview,
+      droppedBytes: bytes - new TextEncoder().encode(jsonPreview).byteLength,
+    }
   const kept = keptWithinBytes(value, maxResultBytes)
   const keptBytes = new TextEncoder().encode(kept).byteLength
   return {

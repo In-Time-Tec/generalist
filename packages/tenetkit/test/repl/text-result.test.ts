@@ -62,3 +62,14 @@ test("bounds a multibyte result on a valid UTF-8 prefix", () => {
   expect(event.value).not.toContain("TAIL")
   expect(event.value.match(/\[result truncated:/g)).toHaveLength(1)
 })
+
+test("keeps an oversized structured result valid JSON", () => {
+  const value = JSON.stringify({ content: "first\nsecond\n".repeat(maxResultBytes), tail: "hidden" })
+  const event = toCellEvent({ _tag: "Completed", cellId: "cell", value, durationMillis: 0 }, 0)
+  expect(event?._tag).toBe("Result")
+  if (event?._tag !== "Result") return
+  const decoded = JSON.parse(event.value) as { readonly content: string; readonly tail?: string }
+  expect(decoded.content).toContain("first\nsecond")
+  expect(new TextEncoder().encode(event.value).byteLength).toBeLessThanOrEqual(maxResultBytes)
+  expect(event.value).not.toContain("[result truncated:")
+})
