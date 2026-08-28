@@ -1,9 +1,8 @@
 import { layerPostgres, RunSchema } from "@tenetkit/pg"
-import { Config, Effect, Layer, Option, Redacted } from "effect"
+import { Config, Effect, Layer, Option } from "effect"
 import { provideScoped } from "../../../tenetkit/test/runtime/execution/scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { PgClient } from "@effect/sql-pg"
 import { ExecutableResolver, RuntimeWorker } from "tenetkit/runtime"
 import type { PostgresStoreError } from "../../src/postgres/runtime-layer.js"
 import {
@@ -30,7 +29,7 @@ export const postgresAvailable = postgresUrl !== undefined && postgresUrl.length
 
 export const postgresTestMaxConnections = 8
 
-export const postgresClient = (url: string) => PgClient.layer({ url: Redacted.make(url), maxConnections: 2 })
+export const postgresClient = (url: string) => RunSchema.layerClient({ url, maxConnections: 2 })
 
 type PostgresWorkerLayer = Layer.Layer<
   | import("tenetkit/runtime/driver/execution/host").ExecutionHost

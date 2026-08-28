@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.41.3",
+  "version": "0.41.4",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -39,11 +39,13 @@
   },
   "dependencies": {
     "@effect/sql-pg": "catalog:",
+    "pg": "catalog:",
     "tenetkit": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/bun": "catalog:",
+    "@types/pg": "catalog:",
     "effect": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
