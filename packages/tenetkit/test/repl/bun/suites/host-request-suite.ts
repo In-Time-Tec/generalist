@@ -217,6 +217,22 @@ layer(platform)("Bun kernel host requests", (it) => {
     }),
   )
 
+  it.effect("renders a returned text-result object as canonical JSON", () =>
+    withPool({
+      overrides: { modules: [textModule] },
+      use: ({ pool }) =>
+        Effect.gen(function* () {
+          const result = yield* runCell({
+            pool,
+            sessionId: "s",
+            cellId: "c1",
+            code: 'await workspace.read({ path: "data.json" })',
+          })
+          expect(result.value).toBe('{"text":"{\\"answer\\":42}","truncated":false}')
+        }),
+    }),
+  )
+
   it.effect("keeps a decorated text result snapshotable", () =>
     withPool({
       overrides: { modules: [textModule] },
