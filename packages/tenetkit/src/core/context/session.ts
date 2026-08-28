@@ -1,11 +1,11 @@
 import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
-import { CompactionCommit, Event as ModelTelemetryEvent } from "../model/model-telemetry.js"
+import { CompactionCommit, Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
 /** @experimental Opaque session entry id. */
 export type EntryId = string
 /** @experimental Host-defined metadata carried by session entries. */
-export type Metadata = Readonly<Record<string, unknown>>
+export type Metadata = Readonly<Record<string, typeof Schema.Unknown.Type>>
 /** @experimental Common fields for session entries. */
 export type BaseEntry = { readonly id: EntryId; readonly parentId: EntryId | null; readonly metadata?: Metadata }
 /** @experimental A verbatim conversation message. */
@@ -234,11 +234,7 @@ const effectFromAppendResult = (
   result._tag === "tenetkit/core/SessionConflict" ? Effect.fail(result) : effectFromResult(result)
 
 const entryFromInput = (input: AppendInput, id: EntryId, parentId: EntryId | null): Entry => {
-  const base = {
-    id,
-    parentId,
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  }
+  const base: BaseEntry = input.metadata === undefined ? { id, parentId } : { id, parentId, metadata: input.metadata }
 
   switch (input._tag) {
     case "Message":
@@ -288,8 +284,29 @@ const entryPayloadEquivalence = Schema.toEquivalence(EntryPayload)
 
 /** @experimental Canonical exact normal-entry equivalence, excluding the write-owner token. */
 const appendMatches = (entry: Entry, input: AppendInput, parentId: EntryId | null): boolean =>
-  entry.parentId === parentId &&
-  entryPayloadEquivalence(entry as EntryPayload, entryFromInput(input, entry.id, parentId) as EntryPayload)
+  entry.parentId === parentId && entryPayloadEquivalence(entry, entryFromInput(input, entry.id, parentId))
+
+const existingAppend = (
+  state: State,
+  input: AppendInput,
+  options: StableAppendOptions,
+  existing: Entry,
+): Result<Entry> | SessionConflict => {
+  if (!appendMatches(existing, input, options.expectedLeafId)) {
+    return SessionConflict.make({
+      reason: "entry-id-reused",
+      message: `Session entry id ${options.id} was reused with different parent or content`,
+    })
+  }
+  const activePath = state.leaf === null ? success<ReadonlyArray<Entry>>([]) : pathFromState(state, state.leaf)
+  if (activePath._tag === "Failure" || !activePath.value.some((active) => active.id === options.id)) {
+    return SessionConflict.make({
+      reason: "stale-leaf",
+      message: `Session entry id ${options.id} is not on the active path from ${String(state.leaf)}`,
+    })
+  }
+  return success(existing)
+}
 
 const appendState = (
   state: State,
@@ -299,26 +316,7 @@ const appendState = (
   if (options?.id !== undefined) {
     const existing = HashMap.get(state.entries, options.id)
     if (Option.isSome(existing)) {
-      if (!appendMatches(existing.value, input, options.expectedLeafId)) {
-        return [
-          SessionConflict.make({
-            reason: "entry-id-reused",
-            message: `Session entry id ${options.id} was reused with different parent or content`,
-          }),
-          state,
-        ]
-      }
-      const activePath = state.leaf === null ? success<ReadonlyArray<Entry>>([]) : pathFromState(state, state.leaf)
-      if (activePath._tag === "Failure" || !activePath.value.some((active) => active.id === options.id)) {
-        return [
-          SessionConflict.make({
-            reason: "stale-leaf",
-            message: `Session entry id ${options.id} is not on the active path from ${String(state.leaf)}`,
-          }),
-          state,
-        ]
-      }
-      return [success(existing.value), state]
+      return [existingAppend(state, input, options, existing.value), state]
     }
   }
   if (options?.expectedLeafId !== undefined && options.expectedLeafId !== state.leaf) {
@@ -421,15 +419,19 @@ const appendCheckpointState = (
       state,
     ]
   }
-  const checkpoint: CompactionEntry = {
+  const checkpointBase: Omit<CompactionEntry, "compactionCommit" | "summary"> = {
     _tag: "Compaction",
     id: prepared.id,
     parentId: prepared.parentId,
     projectedHistory: prepared.projectedHistory,
     telemetry: prepared.telemetry,
-    ...(prepared.compactionCommit === undefined ? {} : { compactionCommit: prepared.compactionCommit }),
-    ...(prepared.summary === undefined ? {} : { summary: prepared.summary }),
   }
+  const withCommit: CompactionEntry =
+    prepared.compactionCommit === undefined
+      ? checkpointBase
+      : { ...checkpointBase, compactionCommit: prepared.compactionCommit }
+  const checkpoint: CompactionEntry =
+    prepared.summary === undefined ? withCommit : { ...withCommit, summary: prepared.summary }
   return [
     { _tag: "Appended", checkpoint, leafId: checkpoint.id },
     {

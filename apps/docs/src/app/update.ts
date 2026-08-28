@@ -8,8 +8,8 @@ import { toString } from "foldkit/url"
 import { dialogClose, dialogOpen, dialogUpdate } from "@/components/ui/dialog"
 
 import { legacyRedirects } from "../content/registry"
-import { isSidebarGroupOpen, readSidebarGroups, writeSidebarGroups, SidebarGroups } from "../layout/sidebarStorage"
-import { toPath, urlToRoute } from "../route/route"
+import { isSidebarGroupOpen, readSidebarGroups, writeSidebarGroups, SidebarGroups } from "../layout/sidebar-storage"
+import { toPath, urlToRoute } from "../route/match"
 import {
   ClearedCopiedCode,
   CompletedApplyTheme,
@@ -25,8 +25,8 @@ import {
   type Message,
 } from "./message"
 import { ThemePreference, type Model } from "./model"
-import { SearchCommand, initialSearchCommand, itemToPath } from "./searchPalette"
-const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
+import { SearchCommand, initialSearchCommand, itemToPath } from "./search-palette"
+const encodeJsonValue = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 type Update = readonly [Model, ReadonlyArray<Command.Command<Message>>]
 
@@ -232,14 +232,13 @@ const readThemePreference = (): ThemePreference => {
     if (raw === null) {
       return "System"
     }
-    return Option.getOrElse(Schema.decodeUnknownOption(ThemePreferenceJson)(raw), () => "System" as const)
+    return Option.getOrElse(Schema.decodeOption(ThemePreferenceJson)(raw), () => "System" as const)
   } catch {
     return "System"
   }
 }
 
-const prefersDark = (): boolean =>
-  typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
+const prefersDark = (): boolean => window.matchMedia("(prefers-color-scheme: dark)").matches
 
 export const LoadThemePreference = Command.define("LoadThemePreference", {
   messages: [GotThemePreference],

@@ -39,7 +39,7 @@ export const Handoff = {
   FanOutUnsatisfied: Handoff_FanOutUnsatisfied,
   HandoffCommit: Handoff_Commit,
   HandoffControlState: Handoff_ControlState,
-} as typeof import("./handoff.js")
+}
 export namespace Handoff {
   export type register = typeof import("./handoff.js").register
   export type delegateTool = typeof import("./handoff.js").delegateTool

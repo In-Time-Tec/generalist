@@ -53,14 +53,17 @@ export const pageHistory: {
   const entries = input.after === undefined ? window.slice(Math.max(0, window.length - limit)) : window.slice(0, limit)
   const start = lower + (input.after === undefined ? Math.max(0, window.length - limit) : 0)
   const end = start + entries.length
-  return {
+  const first = entries[0]
+  const last = entries.at(-1)
+  let page: HistoryPage = {
     entries,
     hasBefore: start > 0,
     hasAfter: end < path.length,
-    ...(unknownCursors.length === 0 ? {} : { unknownCursors }),
-    ...(entries[0] === undefined ? {} : { firstEntryId: entries[0].id }),
-    ...(entries.at(-1) === undefined ? {} : { lastEntryId: entries.at(-1)!.id }),
   }
+  if (unknownCursors.length > 0) page = { ...page, unknownCursors }
+  if (first !== undefined) page = { ...page, firstEntryId: first.id }
+  if (last !== undefined) page = { ...page, lastEntryId: last.id }
+  return page
 })
 
 /** @experimental Every compaction checkpoint on one path, oldest first. */

@@ -13,7 +13,7 @@ export const Anthropic = {
   layer: Anthropic_layer,
   registration: Anthropic_registration,
   layerConfig: Anthropic_layerConfig,
-} as typeof import("./provider/anthropic.js")
+}
 export namespace Anthropic {
   export type classifyFailure = typeof import("./provider/anthropic.js").classifyFailure
   export type decodeConfig = typeof import("./provider/anthropic.js").decodeConfig
@@ -33,14 +33,15 @@ import {
   defaultChain as amazonBedrockDefaultChain,
   isRecoverableCredentialFailure as amazonBedrockIsRecoverableCredentialFailure,
   layerClient as amazonBedrockLayerClient,
-  makeRequest as amazonBedrockMakeRequest,
   make as amazonBedrockMake,
   layerLanguageModel as amazonBedrockLayerLanguageModel,
   classifyFailure as amazonBedrockClassifyFailure,
   decodeConfig as amazonBedrockDecodeConfig,
   toolJsonSchemaCompiler as amazonBedrockToolJsonSchemaCompiler,
   layer as amazonBedrockLayer,
-} from "./provider/amazon-bedrock.js"
+} from "./provider/bedrock/service.js"
+import { make as amazonBedrockRequestMake } from "./provider/bedrock/request.js"
+const AmazonBedrockRequest = { make: amazonBedrockRequestMake }
 export const AmazonBedrock = {
   Client: amazonBedrockClient,
   ClientFailure: amazonBedrockClientFailure,
@@ -49,37 +50,37 @@ export const AmazonBedrock = {
   defaultChain: amazonBedrockDefaultChain,
   isRecoverableCredentialFailure: amazonBedrockIsRecoverableCredentialFailure,
   layerClient: amazonBedrockLayerClient,
-  makeRequest: amazonBedrockMakeRequest,
+  Request: AmazonBedrockRequest,
   make: amazonBedrockMake,
   layerLanguageModel: amazonBedrockLayerLanguageModel,
   classifyFailure: amazonBedrockClassifyFailure,
   decodeConfig: amazonBedrockDecodeConfig,
   toolJsonSchemaCompiler: amazonBedrockToolJsonSchemaCompiler,
   layer: amazonBedrockLayer,
-} as typeof import("./provider/amazon-bedrock.js")
+}
 export namespace AmazonBedrock {
-  export type Client = typeof import("./provider/amazon-bedrock.js").Client
-  export type ClientFailure = typeof import("./provider/amazon-bedrock.js").ClientFailure
-  export type CredentialFailure = typeof import("./provider/amazon-bedrock.js").CredentialFailure
-  export type RecoveryFailure = typeof import("./provider/amazon-bedrock.js").RecoveryFailure
-  export type defaultChain = typeof import("./provider/amazon-bedrock.js").defaultChain
+  export type Client = typeof import("./provider/bedrock/service.js").Client
+  export type ClientFailure = typeof import("./provider/bedrock/service.js").ClientFailure
+  export type CredentialFailure = typeof import("./provider/bedrock/service.js").CredentialFailure
+  export type RecoveryFailure = typeof import("./provider/bedrock/service.js").RecoveryFailure
+  export type defaultChain = typeof import("./provider/bedrock/service.js").defaultChain
   export type isRecoverableCredentialFailure =
-    typeof import("./provider/amazon-bedrock.js").isRecoverableCredentialFailure
-  export type layerClient = typeof import("./provider/amazon-bedrock.js").layerClient
-  export type makeRequest = typeof import("./provider/amazon-bedrock.js").makeRequest
-  export type make = typeof import("./provider/amazon-bedrock.js").make
-  export type layerLanguageModel = typeof import("./provider/amazon-bedrock.js").layerLanguageModel
-  export type classifyFailure = typeof import("./provider/amazon-bedrock.js").classifyFailure
-  export type decodeConfig = typeof import("./provider/amazon-bedrock.js").decodeConfig
-  export type toolJsonSchemaCompiler = typeof import("./provider/amazon-bedrock.js").toolJsonSchemaCompiler
-  export type layer = typeof import("./provider/amazon-bedrock.js").layer
-  export type Config = import("./provider/amazon-bedrock.js").Config
-  export type Credential = import("./provider/amazon-bedrock.js").Credential
-  export type Credentials = import("./provider/amazon-bedrock.js").Credentials
-  export type Input = import("./provider/amazon-bedrock.js").Input
-  export type Interface = import("./provider/amazon-bedrock.js").Interface
-  export type Options = import("./provider/amazon-bedrock.js").Options
-  export type Recovery = import("./provider/amazon-bedrock.js").Recovery
+    typeof import("./provider/bedrock/service.js").isRecoverableCredentialFailure
+  export type layerClient = typeof import("./provider/bedrock/service.js").layerClient
+  export type Request = typeof AmazonBedrockRequest
+  export type make = typeof import("./provider/bedrock/service.js").make
+  export type layerLanguageModel = typeof import("./provider/bedrock/service.js").layerLanguageModel
+  export type classifyFailure = typeof import("./provider/bedrock/service.js").classifyFailure
+  export type decodeConfig = typeof import("./provider/bedrock/service.js").decodeConfig
+  export type toolJsonSchemaCompiler = typeof import("./provider/bedrock/service.js").toolJsonSchemaCompiler
+  export type layer = typeof import("./provider/bedrock/service.js").layer
+  export type Config = import("./provider/bedrock/service.js").Config
+  export type Credential = import("./provider/bedrock/service.js").Credential
+  export type Credentials = import("./provider/bedrock/service.js").Credentials
+  export type Input = import("./provider/bedrock/service.js").Input
+  export type Interface = import("./provider/bedrock/service.js").Interface
+  export type Options = import("./provider/bedrock/service.js").Options
+  export type Recovery = import("./provider/bedrock/service.js").Recovery
 }
 import {
   ModelMetadataNotFound as Catalog_ModelMetadataNotFound,
@@ -90,7 +91,7 @@ import {
   lookup as Catalog_lookup,
   require as Catalog_require,
   all as Catalog_all,
-} from "./catalog/catalog.js"
+} from "./catalog/service.js"
 export const Catalog = {
   ModelMetadataNotFound: Catalog_ModelMetadataNotFound,
   ModelCatalog: Catalog_ModelCatalog,
@@ -100,18 +101,18 @@ export const Catalog = {
   lookup: Catalog_lookup,
   require: Catalog_require,
   all: Catalog_all,
-} as typeof import("./catalog/catalog.js")
+}
 export namespace Catalog {
-  export type ModelMetadataNotFound = import("./catalog/catalog.js").ModelMetadataNotFound
-  export type ModelCatalog = import("./catalog/catalog.js").ModelCatalog
-  export type bundled = typeof import("./catalog/catalog.js").bundled
-  export type layer = typeof import("./catalog/catalog.js").layer
-  export type layerTest = typeof import("./catalog/catalog.js").layerTest
-  export type lookup = typeof import("./catalog/catalog.js").lookup
-  export type require = typeof import("./catalog/catalog.js").require
-  export type all = typeof import("./catalog/catalog.js").all
-  export type Interface = import("./catalog/catalog.js").Interface
-  export type ModelMetadata = import("./catalog/catalog.js").ModelMetadata
+  export type ModelMetadataNotFound = import("./catalog/service.js").ModelMetadataNotFound
+  export type ModelCatalog = import("./catalog/service.js").ModelCatalog
+  export type bundled = typeof import("./catalog/service.js").bundled
+  export type layer = typeof import("./catalog/service.js").layer
+  export type layerTest = typeof import("./catalog/service.js").layerTest
+  export type lookup = typeof import("./catalog/service.js").lookup
+  export type require = typeof import("./catalog/service.js").require
+  export type all = typeof import("./catalog/service.js").all
+  export type Interface = import("./catalog/service.js").Interface
+  export type ModelMetadata = import("./catalog/service.js").ModelMetadata
 }
 import {
   registration as Deterministic_registration,
@@ -122,7 +123,7 @@ export const Deterministic = {
   registration: Deterministic_registration,
   layer: Deterministic_layer,
   layerOpenAi: Deterministic_layerOpenAi,
-} as typeof import("./provider/deterministic.js")
+}
 export namespace Deterministic {
   export type registration = typeof import("./provider/deterministic.js").registration
   export type layer = typeof import("./provider/deterministic.js").layer
@@ -134,7 +135,7 @@ import { layer as Embedding_layer, layerCompatible as Embedding_layerCompatible 
 export const Embedding = {
   layer: Embedding_layer,
   layerCompatible: Embedding_layerCompatible,
-} as typeof import("./model/embedding.js")
+}
 export namespace Embedding {
   export type layer = typeof import("./model/embedding.js").layer
   export type layerCompatible = typeof import("./model/embedding.js").layerCompatible
@@ -144,16 +145,16 @@ export namespace Embedding {
 import {
   AvailabilitySemanticsMissing as ModelRoute_AvailabilitySemanticsMissing,
   make as ModelRoute_make,
-} from "./model/model-route.js"
+} from "./model/route.js"
 export const ModelRoute = {
   AvailabilitySemanticsMissing: ModelRoute_AvailabilitySemanticsMissing,
   make: ModelRoute_make,
-} as typeof import("./model/model-route.js")
+}
 export namespace ModelRoute {
-  export type AvailabilitySemanticsMissing = import("./model/model-route.js").AvailabilitySemanticsMissing
-  export type make = typeof import("./model/model-route.js").make
-  export type Input = import("./model/model-route.js").Input
-  export type Route = import("./model/model-route.js").Route
+  export type AvailabilitySemanticsMissing = import("./model/route.js").AvailabilitySemanticsMissing
+  export type make = typeof import("./model/route.js").make
+  export type Input = import("./model/route.js").Input
+  export type Route = import("./model/route.js").Route
 }
 import {
   classifyFailure as OpenAi_classifyFailure,
@@ -163,12 +164,14 @@ import {
   registration as OpenAi_registration,
   normalizeResponsesSse as OpenAi_normalizeResponsesSse,
   layerConfig as OpenAi_layerConfig,
+} from "./provider/openai.js"
+import {
   OpenAiAccountCredentialError as OpenAi_OpenAiAccountCredentialError,
   credentialsFromAccountAuth as OpenAi_credentialsFromAccountAuth,
   registrationAccount as OpenAi_registrationAccount,
   layerAccount as OpenAi_layerAccount,
   layerAccountClient as OpenAi_layerAccountClient,
-} from "./provider/openai.js"
+} from "./provider/openai-account.js"
 export const OpenAi = {
   classifyFailure: OpenAi_classifyFailure,
   decodeConfig: OpenAi_decodeConfig,
@@ -182,7 +185,7 @@ export const OpenAi = {
   registrationAccount: OpenAi_registrationAccount,
   layerAccount: OpenAi_layerAccount,
   layerAccountClient: OpenAi_layerAccountClient,
-} as typeof import("./provider/openai.js")
+}
 export namespace OpenAi {
   export type classifyFailure = typeof import("./provider/openai.js").classifyFailure
   export type decodeConfig = typeof import("./provider/openai.js").decodeConfig
@@ -191,16 +194,16 @@ export namespace OpenAi {
   export type registration = typeof import("./provider/openai.js").registration
   export type normalizeResponsesSse = typeof import("./provider/openai.js").normalizeResponsesSse
   export type layerConfig = typeof import("./provider/openai.js").layerConfig
-  export type OpenAiAccountCredentialError = import("./provider/openai.js").OpenAiAccountCredentialError
-  export type credentialsFromAccountAuth = typeof import("./provider/openai.js").credentialsFromAccountAuth
-  export type registrationAccount = typeof import("./provider/openai.js").registrationAccount
-  export type layerAccount = typeof import("./provider/openai.js").layerAccount
-  export type layerAccountClient = typeof import("./provider/openai.js").layerAccountClient
+  export type OpenAiAccountCredentialError = import("./provider/openai-account.js").OpenAiAccountCredentialError
+  export type credentialsFromAccountAuth = typeof import("./provider/openai-account.js").credentialsFromAccountAuth
+  export type registrationAccount = typeof import("./provider/openai-account.js").registrationAccount
+  export type layerAccount = typeof import("./provider/openai-account.js").layerAccount
+  export type layerAccountClient = typeof import("./provider/openai-account.js").layerAccountClient
   export type LayerOptions = import("./provider/openai.js").LayerOptions
   export type Config = import("./provider/openai.js").Config
-  export type OpenAiAccountCredential = import("./provider/openai.js").OpenAiAccountCredential
-  export type OpenAiAccountCredentials = import("./provider/openai.js").OpenAiAccountCredentials
-  export type OpenAiAccountInput = import("./provider/openai.js").OpenAiAccountInput
+  export type OpenAiAccountCredential = import("./provider/openai-account.js").OpenAiAccountCredential
+  export type OpenAiAccountCredentials = import("./provider/openai-account.js").OpenAiAccountCredentials
+  export type OpenAiAccountInput = import("./provider/openai-account.js").OpenAiAccountInput
   export type OpenAiInput = import("./provider/openai.js").OpenAiInput
   export type RegistrationOptions = import("./provider/openai.js").RegistrationOptions
 }
@@ -223,7 +226,6 @@ import {
   OpenAiAccountAuthHttp as OpenAiAccountAuth_OpenAiAccountAuthHttp,
   CredentialDisk as OpenAiAccountAuth_CredentialDisk,
   OpenAiAccountCredentialStore as OpenAiAccountAuth_OpenAiAccountCredentialStore,
-  makePkce as OpenAiAccountAuth_makePkce,
   authorizationUrl as OpenAiAccountAuth_authorizationUrl,
   OpenAiAccountAuth as OpenAiAccountAuth_OpenAiAccountAuth,
   layer as OpenAiAccountAuth_layer,
@@ -231,6 +233,7 @@ import {
   layerPresenterTest as OpenAiAccountAuth_layerPresenterTest,
   layerHttpTest as OpenAiAccountAuth_layerHttpTest,
   layerStoreTest as OpenAiAccountAuth_layerStoreTest,
+  generatePkce as OpenAiAccountAuth_generatePkce,
 } from "./provider/openai-account-auth.js"
 export const OpenAiAccountAuth = {
   issuer: OpenAiAccountAuth_issuer,
@@ -251,7 +254,7 @@ export const OpenAiAccountAuth = {
   OpenAiAccountAuthHttp: OpenAiAccountAuth_OpenAiAccountAuthHttp,
   CredentialDisk: OpenAiAccountAuth_CredentialDisk,
   OpenAiAccountCredentialStore: OpenAiAccountAuth_OpenAiAccountCredentialStore,
-  makePkce: OpenAiAccountAuth_makePkce,
+  generatePkce: OpenAiAccountAuth_generatePkce,
   authorizationUrl: OpenAiAccountAuth_authorizationUrl,
   OpenAiAccountAuth: OpenAiAccountAuth_OpenAiAccountAuth,
   layer: OpenAiAccountAuth_layer,
@@ -259,7 +262,7 @@ export const OpenAiAccountAuth = {
   layerPresenterTest: OpenAiAccountAuth_layerPresenterTest,
   layerHttpTest: OpenAiAccountAuth_layerHttpTest,
   layerStoreTest: OpenAiAccountAuth_layerStoreTest,
-} as typeof import("./provider/openai-account-auth.js")
+}
 export namespace OpenAiAccountAuth {
   export type issuer = typeof import("./provider/openai-account-auth.js").issuer
   export type clientId = typeof import("./provider/openai-account-auth.js").clientId
@@ -279,7 +282,7 @@ export namespace OpenAiAccountAuth {
   export type OpenAiAccountAuthHttp = import("./provider/openai-account-auth.js").OpenAiAccountAuthHttp
   export type CredentialDisk = typeof import("./provider/openai-account-auth.js").CredentialDisk
   export type OpenAiAccountCredentialStore = import("./provider/openai-account-auth.js").OpenAiAccountCredentialStore
-  export type makePkce = typeof import("./provider/openai-account-auth.js").makePkce
+  export type generatePkce = typeof import("./provider/openai-account-auth.js").generatePkce
   export type authorizationUrl = typeof import("./provider/openai-account-auth.js").authorizationUrl
   export type OpenAiAccountAuth = import("./provider/openai-account-auth.js").OpenAiAccountAuth
   export type layer = typeof import("./provider/openai-account-auth.js").layer
@@ -302,7 +305,7 @@ export namespace OpenAiAccountAuth {
 import { layer as OpenAiAccountAuthHttp_layer } from "./provider/openai-account-auth-http.js"
 export const OpenAiAccountAuthHttp = {
   layer: OpenAiAccountAuthHttp_layer,
-} as typeof import("./provider/openai-account-auth-http.js")
+}
 export namespace OpenAiAccountAuthHttp {
   export type layer = typeof import("./provider/openai-account-auth-http.js").layer
 }
@@ -317,7 +320,7 @@ export const OpenAiChatCompletions = {
   toolJsonSchemaCompiler: OpenAiChatCompletions_toolJsonSchemaCompiler,
   layer: OpenAiChatCompletions_layer,
   layerConfig: OpenAiChatCompletions_layerConfig,
-} as typeof import("./provider/openai-chat-completions.js")
+}
 export namespace OpenAiChatCompletions {
   export type decodeConfig = typeof import("./provider/openai-chat-completions.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/openai-chat-completions.js").toolJsonSchemaCompiler
@@ -338,7 +341,7 @@ export const OpenAiResponses = {
   toolJsonSchemaCompiler: OpenAiResponses_toolJsonSchemaCompiler,
   layer: OpenAiResponses_layer,
   layerConfig: OpenAiResponses_layerConfig,
-} as typeof import("./provider/openai-responses.js")
+}
 export namespace OpenAiResponses {
   export type decodeConfig = typeof import("./provider/openai-responses.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/openai-responses.js").toolJsonSchemaCompiler
@@ -360,7 +363,7 @@ export const OpenRouter = {
   layer: OpenRouter_layer,
   layerConfig: OpenRouter_layerConfig,
   toolJsonSchemaCompiler: OpenRouter_toolJsonSchemaCompiler,
-} as typeof import("./provider/openrouter.js")
+}
 export namespace OpenRouter {
   export type classifyFailure = typeof import("./provider/openrouter.js").classifyFailure
   export type decodeConfig = typeof import("./provider/openrouter.js").decodeConfig
@@ -387,7 +390,7 @@ export const Presets = {
   layerGoogleAiStudio: Presets_layerGoogleAiStudio,
   layerAzureOpenAi: Presets_layerAzureOpenAi,
   layerOllama: Presets_layerOllama,
-} as typeof import("./catalog/presets.js")
+}
 export namespace Presets {
   export type layerGroq = typeof import("./catalog/presets.js").layerGroq
   export type layerMistral = typeof import("./catalog/presets.js").layerMistral

@@ -3,8 +3,10 @@ import { Prompt } from "effect/unstable/ai"
 import type { Entry } from "../context/session.js"
 import { estimateEntryTokens } from "./prompt-token-estimate.js"
 
-const messageHasToolCall = (message: Prompt.Message): boolean =>
-  typeof message.content !== "string" && message.content.some((part) => part.type === "tool-call")
+const messageHasToolCall = (message: Prompt.Message): boolean => {
+  if (message.role !== "assistant") return false
+  return message.content.some((part) => part.type === "tool-call")
+}
 
 const isToolMessage = (entry: Entry | undefined): boolean => entry?._tag === "Message" && entry.message.role === "tool"
 
@@ -20,7 +22,8 @@ export const safeCutIndex: {
   let index = entries.length
   while (index > 0 && total < keepRecentTokens) {
     index -= 1
-    total += estimateEntryTokens(entries[index] as Entry)
+    const entry = entries[index]
+    if (entry !== undefined) total += estimateEntryTokens(entry)
   }
   while (index > 0 && (isToolMessage(entries[index]) || isAssistantToolCallEntry(entries[index - 1]))) {
     index -= 1

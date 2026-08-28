@@ -9,8 +9,8 @@ import {
   SCHEMA_TABLES,
   SCHEMA_VERSION,
   schemaChecksum,
-} from "./schema.js"
-import { mapSqlError } from "./sql-effect.js"
+} from "./codec/schema.js"
+import { mapSqlError } from "./effect.js"
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -45,26 +45,22 @@ export const verifySchema = (
       if (row === undefined) {
         return yield* SchemaMigrationFailed.make({ source, message: "schema meta missing after migration" })
       }
-      if (Number(row.dirty) === 1) return yield* SchemaDirty.make({ source, version: Number(row.version) })
-      if (Number(row.version) > SCHEMA_VERSION) {
+      if (row.dirty === 1) return yield* SchemaDirty.make({ source, version: row.version })
+      if (row.version > SCHEMA_VERSION) {
         return yield* SchemaVersionUnsupported.make({
           source,
-          version: Number(row.version),
+          version: row.version,
           supported: SCHEMA_VERSION,
         })
       }
       const expected = schemaChecksum()
-      if (Number(row.version) !== SCHEMA_VERSION || row.checksum !== expected) {
+      if (row.version !== SCHEMA_VERSION || row.checksum !== expected) {
         return yield* SchemaChecksumMismatch.make({ source, expected, actual: row.checksum })
       }
       const migrations = yield* sql<{ migration_id: number; name: string }>`
         SELECT migration_id, name FROM ${sql(MIGRATIONS_TABLE)} ORDER BY migration_id
       `
-      if (
-        migrations.length !== 1 ||
-        Number(migrations[0]?.migration_id) !== 1 ||
-        migrations[0]?.name !== MIGRATION_NAME
-      ) {
+      if (migrations.length !== 1 || migrations[0]?.migration_id !== 1 || migrations[0]?.name !== MIGRATION_NAME) {
         return yield* SchemaMigrationFailed.make({ source, message: "migration identity or checksum mismatch" })
       }
     }),
@@ -72,7 +68,7 @@ export const verifySchema = (
     Effect.mapError((error) =>
       "_tag" in error && error._tag === "tenetkit/runtime/RuntimeUnavailable"
         ? SchemaMigrationFailed.make({ source, message: error.message })
-        : (error as SchemaDirty | SchemaChecksumMismatch | SchemaVersionUnsupported | SchemaMigrationFailed),
+        : error,
     ),
   )
 
@@ -86,7 +82,7 @@ export const markDirty = (source: string): Effect.Effect<void, SchemaMigrationFa
     Effect.mapError((error) =>
       SchemaMigrationFailed.make({
         source,
-        message: "message" in error ? String(error.message) : "failed to mark schema dirty",
+        message: "message" in error ? error.message : "failed to mark schema dirty",
       }),
     ),
   )
@@ -104,7 +100,7 @@ export const migrate = (
       Effect.mapError((error) =>
         SchemaMigrationFailed.make({
           source,
-          message: "message" in error ? String(error.message) : "pragma failed",
+          message: "message" in error ? error.message : "pragma failed",
         }),
       ),
     )
@@ -114,8 +110,8 @@ export const migrate = (
         SUM(CASE WHEN name = ${MIGRATIONS_TABLE} THEN 0 ELSE 1 END) AS application_tables
       FROM sqlite_master WHERE type = 'table' AND name IN ${sql.in(SCHEMA_TABLES)}
     `).pipe(Effect.mapError(() => SchemaMigrationFailed.make({ source, message: "schema meta read failed" })))
-    if (Number(existing[0]?.meta_present ?? 0) > 0) return yield* verifySchema(source)
-    if (Number(existing[0]?.application_tables ?? 0) > 0) {
+    if ((existing[0]?.meta_present ?? 0) > 0) return yield* verifySchema(source)
+    if ((existing[0]?.application_tables ?? 0) > 0) {
       return yield* SchemaMigrationFailed.make({
         source,
         message: "cannot create the baseline over an existing TenetKit schema",
@@ -126,7 +122,7 @@ export const migrate = (
       Effect.mapError((error) =>
         SchemaMigrationFailed.make({
           source,
-          message: "message" in error ? String(error.message) : "migration failed",
+          message: "message" in error ? error.message : "migration failed",
         }),
       ),
     )

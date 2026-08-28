@@ -2,7 +2,7 @@ import { view } from "@foldkit/ui/input"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
 import { html } from "@/lib/html"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/styling"
 
 // VIEW
 

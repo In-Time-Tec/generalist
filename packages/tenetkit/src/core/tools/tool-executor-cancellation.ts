@@ -1,5 +1,7 @@
 import { Function, Option, Schema } from "effect"
-import type { DomainFailure, Interface, Request, Success } from "./tool-executor.js"
+import { Response } from "effect/unstable/ai"
+import type { Interface } from "./tool-executor.js"
+import type { DomainFailure, Request, Success } from "./tool-result-codec.js"
 
 /** @experimental A completed tool outcome reported while cancelling an exact durable operation. */
 export type TerminalOutcome = Success | DomainFailure
@@ -37,7 +39,7 @@ const PersistedToolCall = Schema.Struct({
   params: Schema.Unknown,
   providerExecuted: Schema.Boolean,
   "~effect/ai/Content/Part": Schema.Literal("~effect/ai/Content/Part"),
-  metadata: Schema.optional(Schema.Unknown),
+  metadata: Response.ProviderMetadata,
 })
 
 const PersistedRequest = Schema.Struct({
@@ -55,10 +57,10 @@ const CancellableOperation = Schema.TaggedStruct("CancellableTool", {
 
 export const cancellableOperation = (execution: Request) => ({ _tag: "CancellableTool" as const, execution })
 
-export const decodeCancellableOperation = (input: unknown): Request | undefined =>
+export const decodeCancellableOperation = (input: typeof Schema.Unknown.Type): Request | undefined =>
   Option.getOrUndefined(
     Schema.decodeUnknownOption(CancellableOperation)(input, { onExcessProperty: "preserve" }).pipe(
-      Option.map((decoded) => decoded.execution as Request),
+      Option.map((decoded) => decoded.execution),
     ),
   )
 

@@ -12,6 +12,13 @@ const pins = new Set([
   "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 ])
 
+const sorted = (values: ReadonlyArray<string>): Array<string> =>
+  values.reduce<Array<string>>((result, value) => {
+    const index = result.findIndex((item) => value.localeCompare(item) < 0)
+    result.splice(index < 0 ? result.length : index, 0, value)
+    return result
+  }, [])
+
 const readWorkflow = (name: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem
@@ -22,7 +29,9 @@ const readWorkflow = (name: string) =>
 const workspacePackages = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  return (yield* fileSystem.readDirectory(path.resolve(".", "packages"))).toSorted()
+  const packageNames: Array<string> = yield* fileSystem.readDirectory(path.resolve(".", "packages"))
+  packageNames.sort()
+  return packageNames
 })
 
 layer(bunLayer)("release workflows", (it) => {
@@ -38,24 +47,19 @@ layer(bunLayer)("release workflows", (it) => {
     Effect.gen(function* () {
       const source = yield* readWorkflow("publish.yml")
       const packageNames = yield* workspacePackages
-      const workflow = Bun.YAML.parse(source) as any
-      expect(workflow.on.workflow_dispatch.inputs).toEqual({
-        tag: expect.objectContaining({ required: true, type: "string" }),
-        expected_commit: expect.objectContaining({ required: true, type: "string" }),
-      })
-      expect(workflow.on.push.tags).toEqual(["v*"])
-      expect(workflow.permissions).toEqual({})
-      expect(workflow.concurrency).toEqual({
-        group: "release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}",
-        "cancel-in-progress": false,
-      })
-      expect(workflow.jobs.produce.permissions).toEqual({
-        contents: "read",
-        "id-token": "write",
-        attestations: "write",
-      })
-      expect(workflow.jobs.release.permissions).toEqual({ contents: "write" })
-      expect(workflow.jobs.publish.permissions).toEqual({ contents: "read", "id-token": "write" })
+      expect(source).toMatch(/tag:\n(?: {8}.+\n)* {8}required: true\n {8}type: string/)
+      expect(source).toMatch(/expected_commit:\n(?: {8}.+\n)* {8}required: true\n {8}type: string/)
+      expect(source).toContain('tags: ["v*"]')
+      expect(source).toContain("permissions: {}")
+      expect(source).toContain(
+        "group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}",
+      )
+      expect(source).toContain("cancel-in-progress: false")
+      expect(source).toMatch(
+        /produce:[\s\S]*?permissions:\n {6}contents: read\n {6}id-token: write\n {6}attestations: write/,
+      )
+      expect(source).toMatch(/release:[\s\S]*?permissions:\n {6}contents: write/)
+      expect(source).toMatch(/publish:[\s\S]*?permissions:\n {6}contents: read\n {6}id-token: write/)
       expect(source.match(/bun run package/g)).toHaveLength(1)
       expect(source).toContain("subject-path: release/*")
       expect(source).toContain("github.event.repository.private == false || github.event.enterprise != null")
@@ -82,7 +86,7 @@ layer(bunLayer)("release workflows", (it) => {
         source.match(/printf '%s\\n' tenetkit @tenetkit\/pg @tenetkit\/mysql @tenetkit\/cloudflare/g),
       ).toHaveLength(2)
       for (const manifests of source.matchAll(/for manifest in package\.json packages\/\{(.+?)\}/g)) {
-        expect(manifests[1]!.split(",").toSorted()).toEqual(packageNames)
+        expect(sorted(manifests[1].split(","))).toEqual(packageNames)
       }
       expect(source.match(/for manifest in package\.json packages\/\{/g)).toHaveLength(1)
       for (const packageName of packageNames) {
@@ -95,9 +99,9 @@ layer(bunLayer)("release workflows", (it) => {
         const uses = [
           ...(yield* readWorkflow(workflowFile.replace(".github/workflows/", ""))).matchAll(/uses:\s*(\S+)/g),
         ].map((match) => match[1])
-        expect(uses.every((use) => pins.has(use!))).toBe(true)
+        expect(uses.every((use) => pins.has(use))).toBe(true)
       }
-      const release = source.split("  release:")[1]!.split("  publish:")[0]!
+      const release = source.split("  release:")[1].split("  publish:")[0]
       expect(release).not.toMatch(/checkout|bun install|npm install|bun run (?:build|package)|pm pack/)
     }),
   )

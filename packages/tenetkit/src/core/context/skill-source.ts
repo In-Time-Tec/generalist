@@ -57,11 +57,11 @@ export class SkillSource extends Context.Service<SkillSource, Interface>()(
 ) {}
 
 /** @experimental Build a startup listing line from skill frontmatter. */
-export const makeListing: {
+export const listing: {
   (descriptionCap?: number): (frontmatter: Frontmatter) => string
   (frontmatter: Frontmatter, descriptionCap?: number): string
 } = Function.dual(
-  (args) => typeof args[0] !== "number",
+  (args) => Schema.is(Frontmatter)(args[0]),
   (frontmatter: Frontmatter, descriptionCap: number = DESCRIPTION_CAP): string =>
     `- ${frontmatter.name}: ${frontmatter.description.slice(0, Math.max(0, descriptionCap))}`,
 )
@@ -121,7 +121,7 @@ export const layer = <R>(sources: ReadonlyArray<Source<R>>): Layer.Layer<SkillSo
     ),
   )
 
-const estimatedTokens = (listing: string): number => Math.ceil(listing.length / 4)
+const estimatedTokens = (listingText: string): number => Math.ceil(listingText.length / 4)
 
 const usageRank = (skill: Skill, recentlyUsed: ReadonlyArray<string>): number => {
   const index = recentlyUsed.indexOf(skill.frontmatter.name)
@@ -143,7 +143,13 @@ export const selectListings: {
     while (total > budgetTokens && selected.length > 0) {
       let dropIndex = 0
       for (let index = 1; index < selected.length; index += 1) {
-        if (usageRank(selected[index] as Skill, recentlyUsed) < usageRank(selected[dropIndex] as Skill, recentlyUsed)) {
+        const candidate = selected[index]
+        const current = selected[dropIndex]
+        if (
+          candidate !== undefined &&
+          current !== undefined &&
+          usageRank(candidate, recentlyUsed) < usageRank(current, recentlyUsed)
+        ) {
           dropIndex = index
         }
       }

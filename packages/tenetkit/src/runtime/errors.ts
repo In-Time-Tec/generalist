@@ -1,9 +1,12 @@
 import { Schema } from "effect"
-import { AgentEvent, RunBudget } from "tenetkit"
+import { AgentEvent } from "../core/index.js"
+import { RunBudget } from "../core/durable/public/run-budget.js"
 import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
-import { ExecutableRef } from "./executable-manifest.js"
-import { TreeCursor } from "./tree-cursor.js"
+import { ExecutableRef } from "./executable/manifest.js"
+import { TreeCursor, TreeCursorInvalid } from "./tree/cursor.js"
+
+export { TreeCursorInvalid }
 
 export class AddressNotFound extends Schema.TaggedError<AddressNotFound>()("tenetkit/runtime/AddressNotFound", {
   address: Address,
@@ -171,12 +174,6 @@ export class CursorExpired extends Schema.TaggedError<CursorExpired>()("tenetkit
   runId: Schema.String,
   cursor: Cursor,
   earliestSequence: Schema.Int,
-}) {}
-
-export class TreeCursorInvalid extends Schema.TaggedError<TreeCursorInvalid>()("tenetkit/runtime/TreeCursorInvalid", {
-  rootRunId: Schema.String,
-  cursor: TreeCursor,
-  message: Schema.String,
 }) {}
 
 export class TreeCursorExpired extends Schema.TaggedError<TreeCursorExpired>()("tenetkit/runtime/TreeCursorExpired", {

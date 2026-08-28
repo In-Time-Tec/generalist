@@ -9,7 +9,7 @@ export const Steering = {
   SteeringQueueFull: Steering_SteeringQueueFull,
   layer: Steering_layer,
   layerTest: Steering_layerTest,
-} as typeof import("./steering.js")
+}
 export namespace Steering {
   export type Steering = import("./steering.js").Steering
   export type SteeringQueueFull = import("./steering.js").SteeringQueueFull

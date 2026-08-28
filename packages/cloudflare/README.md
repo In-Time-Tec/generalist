@@ -27,7 +27,6 @@ Each runtime surface is an independent export so Workers bundle only the capabil
 - `@tenetkit/cloudflare/workers`
 - `@tenetkit/cloudflare/durable-objects`
 - `@tenetkit/cloudflare/dynamic-workers`
-- `@tenetkit/cloudflare/testing`
 
 ## Dynamic Program Workers
 

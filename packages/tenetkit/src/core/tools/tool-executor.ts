@@ -1,6 +1,6 @@
-import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
-import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
-import type { AgentToolToolkit } from "../agent/agent-tool.js"
+import { Context, Effect, Function, Layer, Option, Schema, Stream } from "effect"
+import { AiError, Tool, Toolkit } from "effect/unstable/ai"
+import type { AgentToolToolkit } from "../agent/tool.js"
 import { ToolContext } from "./tool-context.js"
 import type { Route, RouteInput } from "./tool-placement.js"
 import { client, mcp, remote, route, sandbox } from "./tool-executor-routes.js"
@@ -12,68 +12,32 @@ import {
 } from "./tool-executor-cancellation.js"
 export { CancellationFailure }
 export type { CancellationOutcome, CancellationRequest, TerminalOutcome } from "./tool-executor-cancellation.js"
-import { toolResultCodec } from "./tool-result-codec.js"
+import {
+  FrameworkFailure,
+  FrameworkStage,
+  RemoteRetryMisconfigured,
+  toolResultCodec,
+  type ClosedToolSet,
+  type DomainFailure,
+  type Outcome,
+  type ReplayPolicy,
+  type Request,
+  type SchemaTool,
+  type Success,
+  type Suspend,
+  type ToolSchemaServices,
+  type ToolkitInput,
+} from "./tool-result-codec.js"
+export { FrameworkFailure, FrameworkStage, RemoteRetryMisconfigured }
+export type { ClosedToolSet, DomainFailure, Outcome, ReplayPolicy, Request, Success, Suspend, ToolkitInput }
 import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
-import type { SchemaTool, ToolSchemaServices } from "./tool-result-codec.js"
-/** @experimental */
-export interface Request {
-  readonly call: Response.ToolCallPart<string, unknown>
-  readonly toolCallBatch: {
-    readonly calls: ReadonlyArray<Response.ToolCallPart<string, unknown>>
-  }
-  readonly turn: number
-  readonly toolCallIndex: number
-  readonly agentName: string
-  readonly sessionId: string
-}
-/** @experimental */
-export interface Success {
-  readonly _tag: "Success"
-  readonly result: unknown
-  readonly encodedResult: unknown
-}
-/** @experimental */
-export interface DomainFailure {
-  readonly _tag: "DomainFailure"
-  readonly failure: unknown
-  readonly encodedFailure: unknown
-}
-/** @experimental */
-export interface Suspend {
-  readonly _tag: "Suspend"
-  readonly token: string
-}
-/** @experimental */
-export type Outcome = Success | DomainFailure | Suspend
-/** @experimental How the Runtime may re-enter one concrete ToolExecutor request after recovery. */
-export type ReplayPolicy = "never" | "provider-idempotent"
-/** @experimental */
-export const FrameworkStage = Schema.Literals([
-  "decode-input",
-  "handler",
-  "encode-success",
-  "encode-domain-failure",
-  "missing-handler",
-  "route",
-  "placement",
-  "authorization",
-])
-/** @experimental */
-export type FrameworkStage = typeof FrameworkStage.Type
-/** @experimental */
-export class FrameworkFailure extends Schema.TaggedError<FrameworkFailure>()("tenetkit/core/FrameworkFailure", {
-  stage: FrameworkStage,
-  tool: Schema.String,
-  message: Schema.String,
-}) {}
-/** @experimental An idempotent remote route supplied an invalid or unstable operation key or retry bound. */
-export class RemoteRetryMisconfigured extends Schema.TaggedError<RemoteRetryMisconfigured>()(
-  "tenetkit/core/RemoteRetryMisconfigured",
-  {
-    reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),
-    message: Schema.String,
-  },
-) {}
+
+type AgentToolSchemaServices<Parameters extends Schema.Top, SuccessSchema extends Schema.Top> =
+  | Parameters["DecodingServices"]
+  | Parameters["EncodingServices"]
+  | SuccessSchema["DecodingServices"]
+  | SuccessSchema["EncodingServices"]
+
 /** @experimental */
 export interface Interface<R = ToolContext> {
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
@@ -88,19 +52,10 @@ export interface Interface<R = ToolContext> {
 export class ToolExecutor extends Context.Service<ToolExecutor, Interface<ToolContext>>()(
   "tenetkit/core/tools/tool-executor/ToolExecutor",
 ) {}
-/** @experimental */
-export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
-
-/** @experimental A schema-backed tool set with a closed name-based invocation. */
-export interface ClosedToolSet<R = unknown, T extends SchemaTool = SchemaTool> {
-  readonly tools: Readonly<Record<string, T>>
-  readonly invoke: (name: string, params: unknown) => Effect.Effect<unknown, unknown, R>
-}
-
 type ResolvedTool<T extends Tool.Any & SchemaTool> = {
   readonly tool: T
   invoke(
-    params: unknown,
+    params: T["parametersSchema"]["Type"],
   ): Effect.Effect<Stream.Stream<Tool.HandlerResult<T>, Tool.HandlerError<T>, Tool.HandlerServices<T>>, AiError.AiError>
 }
 
@@ -119,8 +74,6 @@ const hasTool = <Tools extends Record<string, Tool.Any>, Name extends string>(
   name: Name,
 ): name is Name & Extract<keyof Tools, string> => Object.hasOwn(tools, name)
 
-const isRequest = (value: unknown): value is Request =>
-  typeof value === "object" && value !== null && "call" in value && "toolCallBatch" in value
 const resolveTools = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
 ): ReadonlyMap<string, ResolvedTool<Tools[keyof Tools] & SchemaTool>> => {
@@ -154,7 +107,7 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   const { tool } = resolved
   type ResolvedSchemaTool = typeof tool
   const handleFailure = (
-    error: unknown,
+    error: Tool.HandlerError<ResolvedSchemaTool> | AiError.AiError | FrameworkFailure,
   ): Effect.Effect<Outcome, FrameworkFailure, ResolvedSchemaTool["failureSchema"]["EncodingServices"]> => {
     if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
     if (AiError.isAiError(error)) return Effect.fail(toolResultCodec.aiFrameworkFailure(tool, error))
@@ -171,7 +124,11 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
       (option): Effect.Effect<Outcome, FrameworkFailure, ResolvedSchemaTool["successSchema"]["EncodingServices"]> => {
         if (Option.isNone(option)) {
           return Effect.fail(
-            toolResultCodec.frameworkFailure("handler", tool.name, "Tool handler did not produce a final result"),
+            toolResultCodec.frameworkFailure(
+              "handler",
+              request.call.name,
+              "Tool handler did not produce a final result",
+            ),
           )
         }
         const result = option.value
@@ -187,35 +144,28 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   )
 }
 
-/** @experimental */
-export function executeToolkit<R, T extends SchemaTool>(
+function executeToolkitUncurried<R, T extends SchemaTool>(
   toolkit: ClosedToolSet<R, T>,
   request: Request,
 ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | ToolSchemaServices<T>>
-export function executeToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+function executeToolkitUncurried<
+  Name extends string,
+  Parameters extends Schema.Top,
+  SuccessSchema extends Schema.Top,
+  R,
+>(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
   request: Request,
-): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>
-export function executeToolkit<Tools extends Record<string, Tool.Any>>(
+): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
+function executeToolkitUncurried<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
 ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<Tools[keyof Tools]>>
-export function executeToolkit<Tools extends Record<string, Tool.Any>>(
+function executeToolkitUncurried<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.Toolkit<Tools>,
   request: Request,
 ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>>
-export function executeToolkit(
-  request: Request,
-): (<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
-  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>) &
-  (<Tools extends Record<string, Tool.Any>>(
-    toolkit: Toolkit.WithHandler<Tools>,
-  ) => Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<Tools[keyof Tools]>>) &
-  (<Tools extends Record<string, Tool.Any>>(
-    toolkit: Toolkit.Toolkit<Tools>,
-  ) => Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>>)
-export function executeToolkit<
+function executeToolkitUncurried<
   Tools extends Record<string, Tool.Any>,
   Name extends string,
   Parameters extends Schema.Top,
@@ -223,64 +173,38 @@ export function executeToolkit<
   R,
   T extends SchemaTool = SchemaTool,
 >(
-  toolkitOrRequest:
-    | ToolkitInput<Tools>
-    | AgentToolToolkit<Name, Parameters, SuccessSchema, R>
-    | ClosedToolSet<R, T>
-    | Request,
-  request?: Request,
-): unknown {
-  if (request === undefined) {
-    if (!isRequest(toolkitOrRequest)) return () => Effect.die("executeToolkit pipeable form requires a Request")
-    const pipeableRequest = toolkitOrRequest
-    function pipeable<T extends SchemaTool = SchemaTool>(
-      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R, T>,
-    ): unknown
-    function pipeable<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
-      toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-    ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>
-    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
-      toolkit: Toolkit.WithHandler<CurrentTools>,
-    ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<CurrentTools[keyof CurrentTools]>>
-    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
-      toolkit: Toolkit.Toolkit<CurrentTools>,
-    ): Effect.Effect<
-      Outcome,
-      FrameworkFailure,
-      Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
-    >
-    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
-      toolkit: ToolkitInput<CurrentTools>,
-    ): Effect.Effect<
-      Outcome,
-      FrameworkFailure,
-      Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
-    >
-    function pipeable(
-      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R, T>,
-    ): unknown {
-      if ("invoke" in toolkit) {
-        return "name" in toolkit
-          ? executeWithClosedToolkit<R>(toolkit, pipeableRequest)
-          : executeWithClosedSet<R, T>(toolkit, pipeableRequest)
-      }
-      if ("handle" in toolkit) return executeWithToolkit(toolkit, pipeableRequest)
-      const unhandled: Toolkit.Toolkit<Tools> = toolkit
-      return executeToolkit(unhandled, pipeableRequest)
-    }
-    return pipeable
-  }
-  if (isRequest(toolkitOrRequest)) return Effect.die("executeToolkit requires a toolkit when a Request is supplied")
-  const toolkit = toolkitOrRequest
+  toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R, T>,
+  request: Request,
+) {
   if ("invoke" in toolkit) {
-    return "name" in toolkit
-      ? executeWithClosedToolkit<R>(toolkit, request)
-      : executeWithClosedSet<R, T>(toolkit, request)
+    return "name" in toolkit ? executeWithClosedToolkit(toolkit, request) : executeWithClosedSet(toolkit, request)
   }
   if ("handle" in toolkit) return executeWithToolkit(toolkit, request)
   const unhandled: Toolkit.Toolkit<Tools> = toolkit
   return Effect.flatMap(unhandled, (handled) => executeWithToolkit(handled, request))
 }
+
+/** @experimental */
+export const executeToolkit: typeof executeToolkitUncurried & {
+  <R, T extends SchemaTool>(
+    request: Request,
+  ): (toolkit: ClosedToolSet<R, T>) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | ToolSchemaServices<T>>
+  <Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+    request: Request,
+  ): (
+    toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+  ) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
+  <Tools extends Record<string, Tool.Any>>(
+    request: Request,
+  ): (
+    toolkit: Toolkit.WithHandler<Tools>,
+  ) => Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<Tools[keyof Tools]>>
+  <Tools extends Record<string, Tool.Any>>(
+    request: Request,
+  ): (
+    toolkit: Toolkit.Toolkit<Tools>,
+  ) => Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>>
+} = Function.dual(2, executeToolkitUncurried)
 
 const layerClosedAgentToolkit = <
   Name extends string,
@@ -289,10 +213,10 @@ const layerClosedAgentToolkit = <
   R,
 >(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-): Layer.Layer<ToolExecutor, never, R> =>
+): Layer.Layer<ToolExecutor, never, R | AgentToolSchemaServices<Parameters, SuccessSchema>> =>
   Layer.effect(
     ToolExecutor,
-    Effect.contextWith((context: Context.Context<R>) =>
+    Effect.contextWith((context: Context.Context<R | AgentToolSchemaServices<Parameters, SuccessSchema>>) =>
       Effect.succeed(
         ToolExecutor.of({
           execute: (request) => executeWithClosedToolkit(toolkit, request).pipe(Effect.provideContext(context)),
@@ -318,7 +242,7 @@ const layerClosedToolSet = <R, T extends SchemaTool>(
 /** @experimental */
 export function layerToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-): Layer.Layer<ToolExecutor, never, R>
+): Layer.Layer<ToolExecutor, never, R | AgentToolSchemaServices<Parameters, SuccessSchema>>
 export function layerToolkit<R>(toolkit: ClosedToolSet<R, Tool.Any>): Layer.Layer<ToolExecutor, never, R>
 export function layerToolkit<R, T extends SchemaTool>(
   toolkit: ClosedToolSet<R, T>,
@@ -341,7 +265,11 @@ export function layerToolkit<
 ): Layer.Layer<
   ToolExecutor,
   never,
-  Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]> | R | ToolSchemaServices<T>
+  | Tool.HandlersFor<Tools>
+  | Tool.HandlerServices<Tools[keyof Tools]>
+  | R
+  | ToolSchemaServices<T>
+  | AgentToolSchemaServices<Parameters, SuccessSchema>
 > {
   if ("invoke" in toolkit) return "name" in toolkit ? layerClosedAgentToolkit(toolkit) : layerClosedToolSet(toolkit)
   if ("handle" in toolkit) {
@@ -383,7 +311,7 @@ export function layerToolkit<
 /** @experimental */
 export function routeToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-): Route<R | ToolContext>
+): Route<R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
 export function routeToolkit<R, T extends SchemaTool>(
   toolkit: ClosedToolSet<R, T>,
 ): RouteInput<R | ToolContext | ToolSchemaServices<T>>
@@ -407,12 +335,19 @@ export function routeToolkit<
   | R
   | ToolContext
   | ToolSchemaServices<T>
+  | AgentToolSchemaServices<Parameters, SuccessSchema>
 > {
   if ("invoke" in toolkit) {
+    const tools = Object.keys(toolkit.tools)
+    if ("name" in toolkit) {
+      return route({
+        tools,
+        execute: (request) => executeWithClosedToolkit(toolkit, request),
+      })
+    }
     return route({
-      tools: Object.keys(toolkit.tools),
-      execute: (request) =>
-        "name" in toolkit ? executeWithClosedToolkit(toolkit, request) : executeWithClosedSet(toolkit, request),
+      tools,
+      execute: (request) => executeWithClosedSet(toolkit, request),
     })
   }
   const makeRoute = (handled: Toolkit.WithHandler<Tools>) =>

@@ -6,7 +6,7 @@ import { Url } from "foldkit/url"
 import { CommandMessage } from "@/components/ui/command"
 import { DialogMessage } from "@/components/ui/dialog"
 
-import { SidebarGroups } from "../layout/sidebarStorage"
+import { SidebarGroups } from "../layout/sidebar-storage"
 import { ThemePreference } from "./model"
 
 export const ClickedLink = m("ClickedLink", { request: UrlRequest })

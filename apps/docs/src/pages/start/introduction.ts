@@ -1,5 +1,5 @@
-import evalSource from "../../snippets/quickstart/eval.ts?raw"
-import evalExpected from "../../snippets/quickstart/eval.expected.txt?raw"
+import evalSource from "virtual:source/src/snippets/quickstart/eval.ts"
+import evalExpected from "virtual:source/src/snippets/quickstart/eval.expected.txt"
 import { bullets, code, codeBlock, definePage, h2, link, p } from "../../prose"
 export const introduction = definePage({
   path: "/docs/start/introduction",

@@ -1,7 +1,7 @@
 import { Effect, Queue, Scope, Stream, SynchronizedRef } from "effect"
 import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { Cursor } from "../cursor.js"
-import type { RunEvent } from "../run-event.js"
+import type { RunEvent } from "../run/event.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -36,7 +36,7 @@ export interface EventHub {
   readonly shutdown: Effect.Effect<void>
 }
 
-export const makeEventHub: Effect.Effect<EventHub> = Effect.gen(function* () {
+export const make: Effect.Effect<EventHub> = Effect.gen(function* () {
   const stateRef = yield* SynchronizedRef.make<HubState>({
     nextId: 1,
     byRun: new Map(),

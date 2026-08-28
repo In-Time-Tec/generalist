@@ -1,9 +1,8 @@
-import { Effect, Function, Schema } from "effect"
-import { ProgramHost } from "tenetkit"
-import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable-manifest.js"
-import { RunWait } from "./run-wait.js"
+import { Effect, Function, Predicate, Schema } from "effect"
+import { ModelTelemetry, ProgramHost } from "../core/index.js"
+import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable/manifest.js"
+import { RunWait } from "./run/wait.js"
 import { Cursor } from "./cursor.js"
-import { ModelTelemetry } from "tenetkit"
 import type { ParseOptions } from "effect/SchemaAST"
 import {
   AgentExecutionFailure,
@@ -12,10 +11,12 @@ import {
   ExecutableRegistrationInvalid,
   ExecutableRegistrationMissing,
 } from "./errors.js"
-import { ExecutionResult as ExecutionResultSchema } from "./execution-state.js"
-import type { ExecutionResult as ExecutionResultType } from "./execution-state.js"
-import { TreePolicy } from "./tree-policy.js"
-import { ChildReadiness } from "./child-readiness.js"
+import {
+  ExecutionResult as ExecutionResultSchema,
+  type ExecutionResult as ExecutionResultType,
+} from "./execution/state.js"
+import { TreePolicy } from "./tree/policy.js"
+import { ChildReadiness } from "./child/readiness.js"
 
 export const ExecutionResult = ExecutionResultSchema
 export type ExecutionResult = ExecutionResultType
@@ -42,7 +43,8 @@ export interface RunReceipt {
   readonly duplicate: boolean
 }
 
-interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
+/** @experimental Encoded durable Run receipt. */
+export interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
   readonly runId: typeof RunId.Encoded
 }
 
@@ -67,7 +69,9 @@ export interface RunInspection {
   readonly durability: "ephemeral" | "durable"
 }
 
-interface RunInspectionEncoded extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "wait"> {
+/** @experimental Encoded durable Run inspection. */
+export interface RunInspectionEncoded
+  extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "wait"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
   readonly executableManifest: typeof ExecutableManifest.Encoded
@@ -75,11 +79,12 @@ interface RunInspectionEncoded extends Omit<RunInspection, "runId" | "executable
 }
 
 const hasValidExecutable = (value: {
-  readonly executableRef: unknown
-  readonly executableManifest: unknown
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
 }): boolean => {
   try {
-    decodePinned({ ref: value.executableRef, manifest: value.executableManifest })
+    const pinned = { ref: value.executableRef, manifest: value.executableManifest }
+    decodePinned(pinned)
     return true
   } catch {
     return false
@@ -276,7 +281,8 @@ export interface RunSnapshot {
   readonly compactions: ReadonlyArray<CompactionInspection>
 }
 
-interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions"> {
+/** @experimental Encoded durable Run snapshot. */
+export interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions"> {
   readonly run: RunInspectionEncoded
   readonly cursor: typeof Cursor.Encoded
   readonly outcome?: RunOutcomeEncoded
@@ -308,7 +314,8 @@ export interface Run {
   readonly attempt: number
 }
 
-interface RunEncoded extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "wait"> {
+/** @experimental Encoded durable Run state. */
+export interface RunEncoded extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "wait"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
   readonly executableManifest: typeof ExecutableManifest.Encoded
@@ -339,9 +346,8 @@ export const Run: Schema.Codec<Run, RunEncoded> = Schema.Struct({
 export const isTerminal = (status: RunStatus): status is "succeeded" | "failed" | "cancelled" =>
   status === "succeeded" || status === "failed" || status === "cancelled"
 
-const isParseOptions = (value: unknown): value is ParseOptions =>
-  typeof value === "object" &&
-  value !== null &&
+const isParseOptions = <T>(value: ParseOptions | T): value is ParseOptions =>
+  Predicate.isObject(value) &&
   ("errors" in value ||
     "onExcessProperty" in value ||
     "propertyOrder" in value ||

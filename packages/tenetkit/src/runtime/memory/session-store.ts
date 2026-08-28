@@ -1,10 +1,10 @@
 import { Effect, Schema, SynchronizedRef } from "effect"
-import { Session } from "tenetkit"
-import type { InterruptedSessionEntry } from "../agent-event.js"
+import { Session } from "../../core/index.js"
+import type { InterruptedSessionEntry } from "../execution/agent/event.js"
 import { RuntimeUnavailable } from "../errors.js"
-import type { CompletedSessionEntry } from "../model-response-commit.js"
-import { handoffPayload, type HandoffSessionEntry } from "../handoff-session.js"
-import { terminalToolMessage, type RunTerminalOutcome } from "../session-tool-results.js"
+import type { CompletedSessionEntry } from "../execution/model-response/commit.js"
+import { handoffPayload, type HandoffSessionEntry } from "../session/handoff.js"
+import { terminalToolMessage, type RunTerminalOutcome } from "../session/tool-results.js"
 import type { MemorySession, MemoryState } from "./state.js"
 
 type Entry = Session.Entry
@@ -15,8 +15,11 @@ const storeError = (message: string) => Session.SessionStoreError.make({ message
 const conflict = (reason: Session.SessionConflict["reason"], message: string) =>
   Session.SessionConflict.make({ reason, message })
 
-const entryFromInput = (input: Session.AppendInput, id: string, parentId: string | null): Entry =>
-  ({ ...input, id, parentId }) as Entry
+const entryFromInput = (input: Session.AppendInput, id: string, parentId: string | null): Entry => ({
+  ...input,
+  id,
+  parentId,
+})
 
 const pathTo = (session: MemorySession, leaf: string | null): ReadonlyArray<Entry> | Session.SessionStoreError => {
   if (leaf === null) return []
@@ -37,30 +40,36 @@ const onActivePath = (session: MemorySession, id: string): boolean => {
   return !Schema.is(Session.SessionStoreError)(path) && path.some((entry) => entry.id === id)
 }
 
-const samePayload = (entry: Entry, input: Session.AppendInput): boolean =>
-  payloadEquivalence(entry as Session.EntryPayload, input as Session.EntryPayload)
+const samePayload = (entry: Entry, input: Session.AppendInput): boolean => payloadEquivalence(entry, input)
 
 const isAppendSuccess = (
   value: readonly [Entry, MemorySession] | Session.SessionConflict,
 ): value is readonly [Entry, MemorySession] => Array.isArray(value)
+
+const existingAppend = (
+  session: MemorySession,
+  input: Session.AppendInput,
+  options: Session.AppendOptions,
+): readonly [Entry, MemorySession] | Session.SessionConflict | undefined => {
+  if (options.id === undefined) return undefined
+  const existing = session.entries.get(options.id)
+  if (existing === undefined) return undefined
+  if (existing.parentId !== options.expectedLeafId || !samePayload(existing, input)) {
+    return conflict("entry-id-reused", `Session entry id ${options.id} was reused with different parent or content`)
+  }
+  if (!onActivePath(session, existing.id)) {
+    return conflict("stale-leaf", `Session entry id ${options.id} is not on the active path`)
+  }
+  return [existing, session]
+}
 
 const append = (
   session: MemorySession,
   input: Session.AppendInput,
   options?: Session.AppendOptions,
 ): readonly [Entry, MemorySession] | Session.SessionConflict => {
-  if (options?.id !== undefined) {
-    const existing = session.entries.get(options.id)
-    if (existing !== undefined) {
-      if (existing.parentId !== options.expectedLeafId || !samePayload(existing, input)) {
-        return conflict("entry-id-reused", `Session entry id ${options.id} was reused with different parent or content`)
-      }
-      if (!onActivePath(session, existing.id)) {
-        return conflict("stale-leaf", `Session entry id ${options.id} is not on the active path`)
-      }
-      return [existing, session]
-    }
-  }
+  const existing = options === undefined ? undefined : existingAppend(session, input, options)
+  if (existing !== undefined) return existing
   if (options?.expectedLeafId !== undefined && options.expectedLeafId !== session.leaf) {
     return conflict(
       "stale-leaf",
@@ -305,7 +314,7 @@ const updateSession = <A, E>(
     ),
   )
 
-export const makeMemorySessionStore = (config: {
+export const make = (config: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
   readonly sessionId: string
 }): Session.Interface => {
@@ -359,9 +368,10 @@ export const makeMemorySessionStore = (config: {
             parentId: prepared.parentId,
             projectedHistory: prepared.projectedHistory,
             telemetry: prepared.telemetry,
-            ...(prepared.compactionCommit === undefined ? {} : { compactionCommit: prepared.compactionCommit }),
-            ...(prepared.summary === undefined ? {} : { summary: prepared.summary }),
           }
+          if (prepared.compactionCommit !== undefined)
+            Object.assign(checkpoint, { compactionCommit: prepared.compactionCommit })
+          if (prepared.summary !== undefined) Object.assign(checkpoint, { summary: prepared.summary })
           const next = {
             ...session,
             entries: new Map(session.entries).set(checkpoint.id, checkpoint),

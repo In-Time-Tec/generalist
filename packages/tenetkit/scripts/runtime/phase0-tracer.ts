@@ -1,9 +1,9 @@
 import { Console, Effect, ManagedRuntime, Schema } from "effect"
 import { Runtime, RunStore } from "../../src/runtime/index.js"
-import { assistantAddress, textPrompt } from "../../test/runtime/helpers.js"
-import { sqliteLayer, tempDbPath } from "../../test/runtime/sqlite-helpers.js"
+import { assistantAddress, textPrompt } from "../../test/runtime/execution/fixtures.js"
+import { sqliteLayer, tempDbPath } from "../../test/runtime/sql/scenario.js"
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
+const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
 
 const filename = tempDbPath("phase0-cli")
 
@@ -39,7 +39,7 @@ const runUnknown = (boundary: { readonly runId: string; readonly operationId: st
     return yield* driver.expireRunningOperation({ ...claim, operationId: boundary.operationId })
   })
 const program = Effect.gen(function* () {
-  const externalCounter: { value: number } = { value: 0 }
+  const externalCounter = { value: 0 }
   const boundary = yield* runBoundary(externalCounter)
 
   const unknown = yield* runUnknown(boundary)

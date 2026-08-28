@@ -1,6 +1,7 @@
 import { layer } from "@effect/platform-bun/BunServices"
 import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
+import { CryptoHasher, version as bunVersion } from "bun"
 import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
   catalogVersion,
@@ -21,10 +22,51 @@ class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@tene
 
 const smokeError = (message: string): PackageSmokeFailed => PackageSmokeFailed.make({ message })
 
-const parseJson = (text: string): Record<string, any> =>
-  Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Any)))(text)
+const Dependencies = Schema.Record(Schema.String, Schema.String)
+const ExportTarget = Schema.Struct({
+  types: Schema.optionalKey(Schema.String),
+  import: Schema.optionalKey(Schema.String),
+})
+const PackageManifest = Schema.Struct({
+  name: Schema.String,
+  version: Schema.String,
+  private: Schema.optionalKey(Schema.Boolean),
+  type: Schema.optionalKey(Schema.String),
+  sideEffects: Schema.optionalKey(Schema.Boolean),
+  license: Schema.optionalKey(Schema.String),
+  files: Schema.optionalKey(Schema.Array(Schema.String)),
+  description: Schema.optionalKey(Schema.Json),
+  engines: Schema.optionalKey(Schema.Json),
+  repository: Schema.optionalKey(Schema.Json),
+  homepage: Schema.optionalKey(Schema.Json),
+  bugs: Schema.optionalKey(Schema.Json),
+  exports: Schema.Record(Schema.String, ExportTarget),
+  scripts: Schema.optionalKey(Dependencies),
+  dependencies: Schema.optionalKey(Dependencies),
+  optionalDependencies: Schema.optionalKey(Dependencies),
+  peerDependencies: Schema.optionalKey(Dependencies),
+  bundledDependencies: Schema.optionalKey(Schema.Array(Schema.String)),
+  bundleDependencies: Schema.optionalKey(Schema.Array(Schema.String)),
+})
+const RootManifest = Schema.Struct({
+  version: Schema.String,
+  workspaces: Schema.Struct({
+    catalog: Schema.Record(Schema.String, Schema.String),
+    catalogs: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String))),
+  }),
+})
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
+const parsePackageManifest = Schema.decodeSync(Schema.fromJsonString(PackageManifest))
+const parseRootManifest = Schema.decodeSync(Schema.fromJsonString(RootManifest))
+
+const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
+
+const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
+  Array.from(values).reduce<Array<A>>((result, value) => {
+    const index = result.findIndex((item) => compare(value, item) < 0)
+    result.splice(index < 0 ? result.length : index, 0, value)
+    return result
+  }, [])
 
 const run = Effect.fn("PackageSmoke.run")(function* (
   command: string,
@@ -33,9 +75,8 @@ const run = Effect.fn("PackageSmoke.run")(function* (
   env?: Record<string, string>,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-  const handle = yield* spawner.spawn(
-    ChildProcess.make(command, args, { cwd, ...(env === undefined ? {} : { env, extendEnv: true }) }),
-  )
+  const options: ChildProcess.CommandOptions = env === undefined ? { cwd } : { cwd, env, extendEnv: true }
+  const handle = yield* spawner.spawn(ChildProcess.make(command, args, options))
   const [stdout, stderr, exitCode] = yield* Effect.all(
     [
       Stream.mkString(Stream.decodeText(handle.stdout)),
@@ -54,38 +95,43 @@ const program = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const root = path.resolve(".")
-  const rootManifest = parseJson(yield* fileSystem.readFileString(path.join(root, "package.json")))
-  const version = rootManifest.version as string
-  const effectVersion = catalogVersion({ rootManifest, dependency: "effect", reference: "catalog:" })
-  if (effectVersion === undefined) {
-    return yield* smokeError("root catalog must define effect")
-  }
-  if (!/^\d+\.\d+\.\d+$/.test(version)) {
-    return yield* smokeError(`root version must be canonical semver: ${version}`)
-  }
-  const discovered = (yield* fileSystem.readDirectory(path.join(root, "packages"))).toSorted()
-  if (!Equal.equals(discovered, packages.toSorted())) {
-    return yield* smokeError(`public package set mismatch: ${discovered.join(", ")}`)
-  }
-  const sourceManifests = new Map<string, string>()
-  for (const packageName of packages) {
-    const manifestPath = path.join(root, "packages", packageName, "package.json")
-    const source = yield* fileSystem.readFileString(manifestPath)
-    const manifest = parseJson(source)
-    if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
-      return yield* smokeError(`${manifestPath} does not match canonical name/version`)
+  const rootManifest = parseRootManifest(yield* fileSystem.readFileString(path.join(root, "package.json")))
+  const version = rootManifest.version
+  const validateSourcePackages = Effect.gen(function* () {
+    const effectVersion = catalogVersion({ rootManifest, dependency: "effect", reference: "catalog:" })
+    if (effectVersion === undefined) return yield* smokeError("root catalog must define effect")
+    if (!/^\d+\.\d+\.\d+$/.test(version)) {
+      return yield* smokeError(`root version must be canonical semver: ${version}`)
     }
-    if (
-      manifest.private !== false ||
-      manifest.type !== "module" ||
-      manifest.sideEffects !== false ||
-      manifest.license !== "MIT" ||
-      !Equal.equals(manifest.files, ["dist", "LICENSE", "README.md"])
-    ) {
-      return yield* smokeError(`${manifestPath} does not match the public MIT-licensed ESM package contract`)
+    const discovered: Array<string> = yield* fileSystem.readDirectory(path.join(root, "packages"))
+    discovered.sort()
+    const expectedPackages: Array<string> = [...packages]
+    expectedPackages.sort()
+    if (!Equal.equals(discovered, expectedPackages)) {
+      return yield* smokeError(`public package set mismatch: ${discovered.join(", ")}`)
     }
-    sourceManifests.set(manifestPath, source)
-  }
+    const sourceManifests = new Map<string, string>()
+    for (const packageName of packages) {
+      const manifestPath = path.join(root, "packages", packageName, "package.json")
+      const source = yield* fileSystem.readFileString(manifestPath)
+      const manifest = parsePackageManifest(source)
+      if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
+        return yield* smokeError(`${manifestPath} does not match canonical name/version`)
+      }
+      if (
+        manifest.private !== false ||
+        manifest.type !== "module" ||
+        manifest.sideEffects !== false ||
+        manifest.license !== "MIT" ||
+        !Equal.equals(manifest.files, ["dist", "LICENSE", "README.md"])
+      ) {
+        return yield* smokeError(`${manifestPath} does not match the public MIT-licensed ESM package contract`)
+      }
+      sourceManifests.set(manifestPath, source)
+    }
+    return { effectVersion, sourceManifests }
+  })
+  const { effectVersion, sourceManifests } = yield* validateSourcePackages
   const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-package-smoke-" })
   const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
   const tarballDirectory = Option.match(configuredArtifactDirectory, {
@@ -98,159 +144,190 @@ const program = Effect.gen(function* () {
 
   yield* run("bun", ["run", "build"], root)
 
-  const tarballs: Record<string, string> = {}
-  const packedManifests: Record<string, Record<string, unknown>> = {}
-  for (const packageName of packages) {
-    const packageDirectory = path.join(root, "packages", packageName)
-    const tarball = path.join(tarballDirectory, tarballName({ packageName, version }))
-    yield* run("bun", ["pm", "pack", "--filename", tarball, "--quiet"], packageDirectory)
-    const archive = yield* fileSystem.readFile(tarball)
-    if (archive.byteLength > compressedSizeLimits[packageName]) {
-      return yield* smokeError(
-        `@tenetkit/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
-      )
-    }
-    const listing = yield* run("tar", ["-tzf", tarball], root)
-    const entries = listing.split("\n").filter((entry) => entry.length > 0)
-    const unexpected = entries.filter(
-      (entry) =>
-        entry !== "package/" &&
-        entry !== "package/package.json" &&
-        entry !== "package/LICENSE" &&
-        entry !== "package/README.md" &&
-        entry !== "package/dist/" &&
-        !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
-    )
-    if (unexpected.length > 0) {
-      return yield* smokeError(`@tenetkit/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
-    }
-    if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
-      return yield* smokeError(`@tenetkit/${packageName} contains an unsafe path`)
-    }
-    const verboseListing = yield* run("tar", ["-tvzf", tarball], root)
-    const unsafeTypes = verboseListing
-      .split("\n")
-      .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
-    if (unsafeTypes.length > 0) {
-      return yield* smokeError(`@tenetkit/${packageName} contains a non-regular entry`)
-    }
-    const manifest = parseJson(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
-    if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
-      return yield* smokeError(`packed identity mismatch for ${packageName}`)
-    }
-    if (manifest.peerDependencies?.effect !== effectVersion || manifest.dependencies?.effect !== undefined) {
-      return yield* smokeError(`@tenetkit/${packageName} must expose Effect only as exact peer`)
-    }
-    if (/workspace:|catalog:/.test(encodeJson(manifest))) {
-      return yield* smokeError(`@tenetkit/${packageName} contains an unresolved protocol`)
-    }
-    for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
-      if (manifest.scripts?.[lifecycle] !== undefined) {
-        return yield* smokeError(`@tenetkit/${packageName} contains the ${lifecycle} lifecycle hook`)
-      }
-    }
-    const sourceManifest = parseJson(sourceManifests.get(path.join(packageDirectory, "package.json"))!)
-    for (const field of [
-      "description",
-      "type",
-      "sideEffects",
-      "license",
-      "files",
-      "engines",
-      "repository",
-      "homepage",
-      "bugs",
-    ]) {
-      if (!Equal.equals(manifest[field], sourceManifest[field])) {
-        return yield* smokeError(`@tenetkit/${packageName} changed its packed ${field} metadata`)
-      }
-    }
-    if (!Equal.equals(manifest.exports, sourceManifest.exports)) {
-      return yield* smokeError(`@tenetkit/${packageName} changed its public exports`)
-    }
-    for (const [specifier, target] of Object.entries(manifest.exports) as ReadonlyArray<
-      readonly [string, { readonly types?: string; readonly import?: string }]
-    >) {
-      if (!Equal.equals(Object.keys(target), ["types", "import"])) {
-        return yield* smokeError(`@tenetkit/${packageName}${specifier} must list types before import`)
-      }
-      for (const [condition, value] of Object.entries(target)) {
-        const expectedExtension = condition === "types" ? ".d.ts" : ".js"
-        if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
-          return yield* smokeError(`@tenetkit/${packageName}${specifier} has invalid ${condition} target`)
-        }
-        if (specifier.includes("*")) {
-          const [prefix, suffix] = value.split("*") as [string, string]
-          const matches = entries.filter(
-            (entry) => entry.startsWith(`package/${prefix.slice(2)}`) && entry.endsWith(suffix),
-          )
-          if (matches.length === 0) {
-            return yield* smokeError(`@tenetkit/${packageName}${specifier} resolves to no ${condition} target`)
+  const packAndValidatePackages = Effect.gen(function* () {
+    const tarballs: Record<string, string> = {}
+    const packedManifests: Record<string, typeof PackageManifest.Type> = {}
+    for (const packageName of packages) {
+      const packPackage = Effect.gen(function* () {
+        const packageDirectory = path.join(root, "packages", packageName)
+        const tarball = path.join(tarballDirectory, tarballName({ packageName, version }))
+        yield* run("bun", ["pm", "pack", "--filename", tarball, "--quiet"], packageDirectory)
+        const validateArchive = Effect.gen(function* () {
+          const archive = yield* fileSystem.readFile(tarball)
+          if (archive.byteLength > compressedSizeLimits[packageName]) {
+            return yield* smokeError(
+              `@tenetkit/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
+            )
           }
-        } else if (!entries.includes(`package/${value.slice(2)}`)) {
-          return yield* smokeError(`@tenetkit/${packageName}${specifier} is missing ${value}`)
-        }
-      }
-    }
-    for (const section of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
-      const expected = Object.fromEntries(
-        Object.entries(sourceManifest[section] ?? {}).map(([dependency, dependencyVersion]) => {
-          if (typeof dependencyVersion !== "string") return [dependency, dependencyVersion]
-          if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
-          if (dependencyVersion.startsWith("catalog:")) {
-            const resolvedVersion = catalogVersion({ rootManifest, dependency, reference: dependencyVersion })
-            if (resolvedVersion === undefined) {
-              throw new Error(`${sourceManifest.name} references missing catalog dependency ${dependency}`)
+          const listing = yield* run("tar", ["-tzf", tarball], root)
+          const entries = listing.split("\n").filter((entry) => entry.length > 0)
+          const unexpected = entries.filter(
+            (entry) =>
+              entry !== "package/" &&
+              entry !== "package/package.json" &&
+              entry !== "package/LICENSE" &&
+              entry !== "package/README.md" &&
+              entry !== "package/dist/" &&
+              !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
+          )
+          if (unexpected.length > 0) {
+            return yield* smokeError(`@tenetkit/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
+          }
+          if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
+            return yield* smokeError(`@tenetkit/${packageName} contains an unsafe path`)
+          }
+          const verboseListing = yield* run("tar", ["-tvzf", tarball], root)
+          const unsafeTypes = verboseListing
+            .split("\n")
+            .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
+          if (unsafeTypes.length > 0) {
+            return yield* smokeError(`@tenetkit/${packageName} contains a non-regular entry`)
+          }
+          return entries
+        })
+        const entries = yield* validateArchive
+        const manifest = parsePackageManifest(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
+        const validateManifestIdentity = Effect.gen(function* () {
+          if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
+            return yield* smokeError(`packed identity mismatch for ${packageName}`)
+          }
+          if (manifest.peerDependencies?.effect !== effectVersion || manifest.dependencies?.effect !== undefined) {
+            return yield* smokeError(`@tenetkit/${packageName} must expose Effect only as exact peer`)
+          }
+          if (/workspace:|catalog:/.test(encodeJson(manifest))) {
+            return yield* smokeError(`@tenetkit/${packageName} contains an unresolved protocol`)
+          }
+          for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
+            if (manifest.scripts?.[lifecycle] !== undefined) {
+              return yield* smokeError(`@tenetkit/${packageName} contains the ${lifecycle} lifecycle hook`)
             }
-            return [dependency, resolvedVersion]
           }
-          return [dependency, dependencyVersion]
-        }),
-      )
-      if (!Equal.equals(sortRecord(manifest[section]), sortRecord(expected))) {
-        return yield* smokeError(`@tenetkit/${packageName} changed its packed ${section}`)
-      }
-      for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
-        if ((dependency === "tenetkit" || dependency.startsWith("@tenetkit/")) && dependencyVersion !== version) {
-          return yield* smokeError(
-            `@tenetkit/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
-          )
-        }
-      }
+          const sourceManifestText = sourceManifests.get(path.join(packageDirectory, "package.json"))
+          if (sourceManifestText === undefined) {
+            return yield* smokeError(`source manifest missing for ${packageName}`)
+          }
+          const sourceManifest = parsePackageManifest(sourceManifestText)
+          return sourceManifest
+        })
+        const sourceManifest = yield* validateManifestIdentity
+        const validateManifestExports = Effect.gen(function* () {
+          for (const field of [
+            "description",
+            "type",
+            "sideEffects",
+            "license",
+            "files",
+            "engines",
+            "repository",
+            "homepage",
+            "bugs",
+          ] as const) {
+            if (!Equal.equals(manifest[field], sourceManifest[field])) {
+              return yield* smokeError(`@tenetkit/${packageName} changed its packed ${field} metadata`)
+            }
+          }
+          if (!Equal.equals(manifest.exports, sourceManifest.exports)) {
+            return yield* smokeError(`@tenetkit/${packageName} changed its public exports`)
+          }
+          for (const [specifier, target] of Object.entries(manifest.exports)) {
+            if (!Equal.equals(Object.keys(target), ["types", "import"])) {
+              return yield* smokeError(`@tenetkit/${packageName}${specifier} must list types before import`)
+            }
+            for (const [condition, value] of Object.entries(target)) {
+              const expectedExtension = condition === "types" ? ".d.ts" : ".js"
+              if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
+                return yield* smokeError(`@tenetkit/${packageName}${specifier} has invalid ${condition} target`)
+              }
+              if (specifier.includes("*")) {
+                const wildcardIndex = value.indexOf("*")
+                const prefix = value.slice(0, wildcardIndex)
+                const suffix = value.slice(wildcardIndex + 1)
+                const matches = entries.filter(
+                  (entry) => entry.startsWith(`package/${prefix.slice(2)}`) && entry.endsWith(suffix),
+                )
+                if (matches.length === 0) {
+                  return yield* smokeError(`@tenetkit/${packageName}${specifier} resolves to no ${condition} target`)
+                }
+              } else if (!entries.includes(`package/${value.slice(2)}`)) {
+                return yield* smokeError(`@tenetkit/${packageName}${specifier} is missing ${value}`)
+              }
+            }
+          }
+        })
+        yield* validateManifestExports
+        const validateManifestDependencies = Effect.gen(function* () {
+          const validateDependencySections = Effect.gen(function* () {
+            for (const section of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
+              const expected = Object.fromEntries(
+                Object.entries(sourceManifest[section] ?? {}).map(([dependency, dependencyVersion]) => {
+                  if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
+                  if (dependencyVersion.startsWith("catalog:")) {
+                    const resolvedVersion = catalogVersion({ rootManifest, dependency, reference: dependencyVersion })
+                    if (resolvedVersion === undefined) {
+                      throw new Error(`${sourceManifest.name} references missing catalog dependency ${dependency}`)
+                    }
+                    return [dependency, resolvedVersion]
+                  }
+                  return [dependency, dependencyVersion]
+                }),
+              )
+              if (!Equal.equals(sortRecord(manifest[section]), sortRecord(expected))) {
+                return yield* smokeError(`@tenetkit/${packageName} changed its packed ${section}`)
+              }
+              for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
+                if (
+                  (dependency === "tenetkit" || dependency.startsWith("@tenetkit/")) &&
+                  dependencyVersion !== version
+                ) {
+                  return yield* smokeError(
+                    `@tenetkit/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
+                  )
+                }
+              }
+            }
+          })
+          yield* validateDependencySections
+          if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
+            return yield* smokeError(`@tenetkit/${packageName} must not bundle dependencies`)
+          }
+          for (const dependency of packedEffectDependencies[packageName]) {
+            const dependencyVersion =
+              packageName === "tenetkit" ? manifest.peerDependencies?.[dependency] : manifest.dependencies?.[dependency]
+            if (dependencyVersion !== effectVersion) {
+              return yield* smokeError(
+                `@tenetkit/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
+              )
+            }
+          }
+          if (packageName === "tenetkit") {
+            for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
+              if (manifest.peerDependencies?.[dependency] !== dependencyVersion) {
+                return yield* smokeError(
+                  `tenetkit must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
+                )
+              }
+            }
+          }
+        })
+        yield* validateManifestDependencies
+        return { manifest, tarball }
+      })
+      const { manifest, tarball } = yield* packPackage
+      packedManifests[manifest.name] = manifest
+      tarballs[packageNames[packageName]] = `file:${tarball}`
     }
-    if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
-      return yield* smokeError(`@tenetkit/${packageName} must not bundle dependencies`)
-    }
-    for (const dependency of packedEffectDependencies[packageName]) {
-      const dependencyVersion =
-        packageName === "tenetkit" ? manifest.peerDependencies?.[dependency] : manifest.dependencies?.[dependency]
-      if (dependencyVersion !== effectVersion) {
-        return yield* smokeError(
-          `@tenetkit/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
-        )
-      }
-    }
-    if (packageName === "tenetkit") {
-      for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
-        if (manifest.peerDependencies?.[dependency] !== dependencyVersion) {
-          return yield* smokeError(
-            `tenetkit must pin optional peer ${dependency}@${dependencyVersion}; packed ${String(manifest.peerDependencies?.[dependency])}`,
-          )
-        }
-      }
-    }
-    packedManifests[manifest.name] = manifest
-    tarballs[packageNames[packageName]] = `file:${tarball}`
-  }
 
-  for (const [manifestPath, source] of sourceManifests) {
-    if ((yield* fileSystem.readFileString(manifestPath)) !== source) {
-      return yield* smokeError(`packing mutated ${manifestPath}`)
+    for (const [manifestPath, source] of sourceManifests) {
+      if ((yield* fileSystem.readFileString(manifestPath)) !== source) {
+        return yield* smokeError(`packing mutated ${manifestPath}`)
+      }
     }
-  }
+    return { packedManifests, tarballs }
+  })
+  const { packedManifests, tarballs } = yield* packAndValidatePackages
 
   const integrationPeers = Object.fromEntries(
-    Object.entries((packedManifests.tenetkit?.peerDependencies as Record<string, string> | undefined) ?? {}).filter(
+    Object.entries(packedManifests.tenetkit?.peerDependencies ?? {}).filter(
       ([dependency]) => dependency !== "effect" && dependency !== "foldkit",
     ),
   )
@@ -322,7 +399,7 @@ server.listen(0, "127.0.0.1", () => {
   )
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const registry = yield* spawner.spawn(ChildProcess.make("node", ["server.mjs"], { cwd: registryDirectory }))
-  yield* Effect.addFinalizer(() => registry.kill())
+  yield* Effect.addFinalizer(() => Effect.orDie(registry.kill()))
   const registryOrigin = yield* Stream.runHead(Stream.splitLines(Stream.decodeText(registry.stdout))).pipe(
     Effect.flatMap(Option.match({ onNone: () => smokeError("local registry did not start"), onSome: Effect.succeed })),
   )
@@ -535,50 +612,64 @@ console.log(Runtime.layerMemory)
     return yield* smokeError("npm consumer resolved a TenetKit package from npm")
   }
 
-  const evidencePackages = []
-  for (const packageName of packages) {
-    const filename = tarballName({ packageName, version })
-    const archive = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
-    const manifest = parseJson(
-      yield* run("tar", ["-xOzf", path.join(tarballDirectory, filename), "package/package.json"], root),
-    )
-    evidencePackages.push({
-      name: manifest.name,
-      version,
-      filename,
-      compressedBytes: archive.byteLength,
-      unpackedBytes: Number(
-        (yield* run("tar", ["-tvzf", path.join(tarballDirectory, filename)], root))
+  const writeReleaseEvidence = Effect.gen(function* () {
+    const evidencePackages: Array<{
+      readonly name: string
+      readonly version: string
+      readonly filename: string
+      readonly compressedBytes: number
+      readonly unpackedBytes: number
+      readonly sha256: string
+      readonly dependencies: Readonly<Record<string, string>>
+      readonly peerDependencies: Readonly<Record<string, string>>
+      readonly exports: Readonly<Record<string, typeof ExportTarget.Type>>
+    }> = []
+    for (const packageName of packages) {
+      const filename = tarballName({ packageName, version })
+      const archive = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
+      const manifest = parsePackageManifest(
+        yield* run("tar", ["-xOzf", path.join(tarballDirectory, filename), "package/package.json"], root),
+      )
+      evidencePackages.push({
+        name: manifest.name,
+        version,
+        filename,
+        compressedBytes: archive.byteLength,
+        unpackedBytes: (yield* run("tar", ["-tvzf", path.join(tarballDirectory, filename)], root))
           .split("\n")
           .filter(Boolean)
           .reduce((total, entry) => total + Number(entry.trim().split(/\s+/)[2]), 0),
-      ),
-      sha256: new Bun.CryptoHasher("sha256").update(archive).digest("hex"),
-      dependencies: manifest.dependencies ?? {},
-      peerDependencies: manifest.peerDependencies ?? {},
-      exports: manifest.exports,
-    })
-  }
-  const evidence = {
-    schemaVersion: 1,
-    sourceCommit: (yield* run("git", ["rev-parse", "HEAD"], root)).trim(),
-    tools: {
-      bun: Bun.version,
-      node: (yield* run("node", ["--version"], root)).trim(),
-      typescript: rootManifest.workspaces.catalog.typescript,
-    },
-    packages: evidencePackages.toSorted((left, right) => left.name.localeCompare(right.name)),
-  }
-  const evidencePath = path.join(tarballDirectory, "release-evidence.json")
-  yield* fileSystem.writeFileString(evidencePath, `${encodeJson(evidence)}\n`)
-  const checksumFiles = [...evidencePackages.map(({ filename }) => filename), "release-evidence.json"].toSorted()
-  const checksums = []
-  for (const filename of checksumFiles) {
-    const bytes = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
-    checksums.push(`${new Bun.CryptoHasher("sha256").update(bytes).digest("hex")}  ${filename}`)
-  }
-  yield* fileSystem.writeFileString(path.join(tarballDirectory, "SHA256SUMS"), `${checksums.join("\n")}\n`)
-  for (const item of evidencePackages) yield* Console.log(`${item.name}: ${item.compressedBytes} compressed bytes`)
+        sha256: new CryptoHasher("sha256").update(archive).digest("hex"),
+        dependencies: manifest.dependencies ?? {},
+        peerDependencies: manifest.peerDependencies ?? {},
+        exports: manifest.exports,
+      })
+    }
+    const evidence = {
+      schemaVersion: 1,
+      sourceCommit: (yield* run("git", ["rev-parse", "HEAD"], root)).trim(),
+      tools: {
+        bun: bunVersion,
+        node: (yield* run("node", ["--version"], root)).trim(),
+        typescript: rootManifest.workspaces.catalog.typescript,
+      },
+      packages: sorted(evidencePackages, (left, right) => left.name.localeCompare(right.name)),
+    }
+    const evidencePath = path.join(tarballDirectory, "release-evidence.json")
+    yield* fileSystem.writeFileString(evidencePath, `${encodeJson(evidence)}\n`)
+    const checksumFiles = sorted(
+      [...evidencePackages.map(({ filename }) => filename), "release-evidence.json"],
+      (left, right) => left.localeCompare(right),
+    )
+    const checksums: Array<string> = []
+    for (const filename of checksumFiles) {
+      const bytes = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
+      checksums.push(`${new CryptoHasher("sha256").update(bytes).digest("hex")}  ${filename}`)
+    }
+    yield* fileSystem.writeFileString(path.join(tarballDirectory, "SHA256SUMS"), `${checksums.join("\n")}\n`)
+    for (const item of evidencePackages) yield* Console.log(`${item.name}: ${item.compressedBytes} compressed bytes`)
+  })
+  yield* writeReleaseEvidence
 })
 
 const runtime = ManagedRuntime.make(layer)

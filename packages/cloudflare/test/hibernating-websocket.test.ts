@@ -4,14 +4,18 @@ import { Deferred, Effect, Ref } from "effect"
 import { Wire } from "tenetkit/transport"
 import {
   makeHibernatingWebSocket,
+  type Attachment,
   type HibernatingWebSocket,
   type HibernatingWebSocketState,
 } from "../src/durable-objects/index.js"
-import { event, runtimeLayer } from "../../tenetkit/test/transport/helpers.js"
+import { event, runtimeLayer } from "../../tenetkit/test/transport/fixtures.js"
 import { Runtime } from "tenetkit/runtime"
+import type { Interface as RuntimeInterface } from "tenetkit/runtime/driver/service"
+
+type StoredAttachment = Attachment | { readonly version: number }
 
 class FakeSocket implements HibernatingWebSocket {
-  attachment: unknown
+  attachment: StoredAttachment = { version: 1, state: "unattached" }
   readonly sent: Array<string> = []
   readonly closes: Array<readonly [number | undefined, string | undefined]> = []
   failSend = false
@@ -22,25 +26,28 @@ class FakeSocket implements HibernatingWebSocket {
   close(code?: number, reason?: string): void {
     this.closes.push([code, reason])
   }
-  serializeAttachment(attachment: unknown): void {
+  serializeAttachment(attachment: Attachment): void {
     this.attachment = structuredClone(attachment)
   }
-  deserializeAttachment(): unknown {
+  deserializeAttachment(): StoredAttachment {
     return structuredClone(this.attachment)
+  }
+  setMalformedAttachment(attachment: { readonly version: number }): void {
+    this.attachment = attachment
   }
 }
 
 class FakeState implements HibernatingWebSocketState {
-  readonly sockets: Array<FakeSocket> = []
+  readonly sockets: Array<HibernatingWebSocket> = []
   acceptWebSocket(socket: HibernatingWebSocket): void {
-    this.sockets.push(socket as FakeSocket)
+    this.sockets.push(socket)
   }
   getWebSockets(): ReadonlyArray<HibernatingWebSocket> {
     return this.sockets
   }
 }
 
-const runtime = (layer = runtimeLayer()): Runtime.Interface =>
+const runtime = (layer = runtimeLayer()): RuntimeInterface =>
   Effect.runSync(Runtime.Runtime.pipe(Effect.provide(layer)))
 
 describe("hibernating WebSocket", () => {
@@ -95,7 +102,7 @@ describe("hibernating WebSocket", () => {
     )
     expect(await Effect.runPromise(Ref.get(cancelled))).toEqual(["run-1"])
 
-    socket.attachment = { version: 99 }
+    socket.setMalformedAttachment({ version: 99 })
     await adapter.flushSocket(socket)
     expect(socket.closes.at(-1)).toEqual([1002, "malformed-attachment"])
   })

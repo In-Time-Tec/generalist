@@ -2,7 +2,7 @@
 import { Effect, Layer, Option, Result, Schema } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
 import { capabilityFailurePrefix, normalize, runner, runnerName } from "./source.js"
-import { CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
+import { type CapabilityRpc, CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
 
 const maximumDiagnostic = 160
 const CapabilityFailureResponse = Schema.Struct({
@@ -31,7 +31,7 @@ const safeMessage = (cause: unknown): string => {
 const failExecution = (cause: unknown) =>
   SandboxExecutor.SandboxExecutionFailure.make({ message: `dynamic Worker execution failed: ${safeMessage(cause)}` })
 
-const encodeJson = (value: unknown): string | undefined => {
+const encodeJson = <A>(value: A): string | undefined => {
   try {
     return JSON.stringify(value)
   } catch {
@@ -39,7 +39,7 @@ const encodeJson = (value: unknown): string | undefined => {
   }
 }
 
-const bytes = (value: unknown): number | undefined => {
+const bytes = <A>(value: A): number | undefined => {
   const encoded = encodeJson(value)
   return encoded === undefined ? undefined : new TextEncoder().encode(encoded).byteLength
 }
@@ -78,6 +78,216 @@ const capabilityName = (request: CapabilityRpcRequest): string | undefined => {
   }
 }
 
+type CapabilityGrant = ReadonlyMap<CapabilityRpcRequest["operation"], ReadonlySet<string>>
+
+interface CapabilityInvocation {
+  readonly capabilities: ProgramCapabilities.Interface
+  readonly request: SandboxExecutor.Request
+  readonly grants: CapabilityGrant
+  readonly signal: AbortSignal
+  readonly isActive: () => boolean
+  readonly recordFailure: (failure: ProgramCapabilities.CapabilityFailure) => string
+}
+
+const validateCapabilityRequest = (
+  raw: CapabilityRpcRequest,
+  invocation: CapabilityInvocation,
+): readonly [CapabilityRpcRequest, ReadonlySet<string>] => {
+  let decoded: CapabilityRpcRequest
+  try {
+    decoded = Schema.decodeSync(CapabilityRpcRequest, { onExcessProperty: "error" })(raw)
+  } catch {
+    throw new Error("capability request invalid")
+  }
+  if (
+    decoded.protocolVersion !== invocation.request.protocolVersion ||
+    decoded.requestId !== invocation.request.requestId
+  )
+    throw new Error("capability protocol identity mismatch")
+  const grant = invocation.grants.get(decoded.operation)
+  if (grant === undefined) throw new Error("capability operation denied")
+  const named = capabilityName(decoded)
+  if (named !== undefined && !grant.has(named)) throw new Error("capability name denied")
+  if (decoded.operation === "fanOutAgents" && decoded.input.members.some((member) => !grant.has(member.selection)))
+    throw new Error("capability name denied")
+  const inputSize = decoded.input === undefined ? 0 : bytes(decoded.input)
+  if (inputSize === undefined || inputSize > invocation.request.limits.outputBytes)
+    throw new Error("capability payload denied")
+  return [decoded, grant]
+}
+
+const invokeCapability = async (
+  capabilities: ProgramCapabilities.Interface,
+  request: CapabilityRpcRequest,
+  grant: ReadonlySet<string>,
+  signal: AbortSignal,
+): Promise<Schema.Json> => {
+  let outcome: Result.Result<unknown, ProgramCapabilities.CapabilityFailure>
+  try {
+    switch (request.operation) {
+      case "discoverTools":
+        outcome = await Effect.runPromise(
+          Effect.result(
+            capabilities.discoverTools.pipe(Effect.map((tools) => tools.filter((tool) => grant.has(tool.name)))),
+          ),
+          { signal },
+        )
+        break
+      case "describeTool":
+        outcome = await Effect.runPromise(Effect.result(capabilities.describeTool(request.input)), { signal })
+        break
+      case "callTool":
+        outcome = await Effect.runPromise(Effect.result(capabilities.callTool(request.input)), { signal })
+        break
+      case "callStep":
+        outcome = await Effect.runPromise(Effect.result(capabilities.callStep(request.input)), { signal })
+        break
+      case "runAgent":
+        outcome = await Effect.runPromise(Effect.result(capabilities.runAgent(request.input)), { signal })
+        break
+      case "mapAgents":
+        outcome = await Effect.runPromise(Effect.result(capabilities.mapAgents(request.input)), { signal })
+        break
+      case "fanOutAgents":
+        outcome = await Effect.runPromise(Effect.result(capabilities.fanOutAgents(request.input)), { signal })
+        break
+      case "log":
+        outcome = await Effect.runPromise(Effect.result(capabilities.log(request.input)), { signal })
+        break
+    }
+  } catch {
+    throw new Error("capability invocation failed")
+  }
+  if (Result.isFailure(outcome)) throw outcome.failure
+  try {
+    return Schema.decodeUnknownSync(Schema.Json)(outcome.success)
+  } catch {
+    throw new Error("capability result denied")
+  }
+}
+
+const makeCapabilityRpc = (invocation: CapabilityInvocation): CapabilityRpc => ({
+  call: async (raw) => {
+    if (!invocation.isActive()) throw new Error("request fence closed")
+    const [decoded, grant] = validateCapabilityRequest(raw, invocation)
+    try {
+      const value = await invokeCapability(invocation.capabilities, decoded, grant, invocation.signal)
+      if (!invocation.isActive()) throw new Error("request fence closed")
+      const outputSize = bytes(value)
+      if (outputSize === undefined || outputSize > invocation.request.limits.outputBytes)
+        throw new Error("capability result denied")
+      return value
+    } catch (cause) {
+      if (Schema.is(ProgramCapabilities.CapabilityFailure)(cause)) {
+        throw new Error(`${capabilityFailurePrefix}${invocation.recordFailure(cause)}`, { cause })
+      }
+      throw cause
+    }
+  },
+})
+
+const loaderFailure = (
+  cause: unknown,
+  request: SandboxExecutor.Request,
+  deadlineElapsed: boolean,
+): SandboxExecutor.ExecutionFailure => {
+  if (request.signal.aborted) return SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+  if (deadlineElapsed || Date.now() >= request.deadlineMillis)
+    return SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+  const message = safeMessage(cause)
+  if (/cpu/i.test(message))
+    return SandboxExecutor.SandboxResourceExceeded.make({ resource: "cpu", limit: request.limits.cpuMillis })
+  if (/subrequest/i.test(message))
+    return SandboxExecutor.SandboxResourceExceeded.make({
+      resource: "subrequests",
+      limit: request.limits.subrequests,
+    })
+  return failExecution(cause)
+}
+
+const resultIdentityMatches = (result: SandboxExecutor.Result, request: SandboxExecutor.Request): boolean =>
+  result.protocolVersion === request.protocolVersion &&
+  result.requestId === request.requestId &&
+  result.sourceDigest === request.sourceDigest &&
+  result.inputCodec === request.inputCodec &&
+  result.outputCodec === request.outputCodec
+
+const recoverCapabilityFailure = (
+  response: Response,
+  decoded: Schema.Json,
+  failures: Map<string, ProgramCapabilities.CapabilityFailure>,
+): ProgramCapabilities.CapabilityFailure | undefined => {
+  if (response.status !== 500) return undefined
+  const envelope = Schema.decodeUnknownOption(CapabilityFailureResponse, { onExcessProperty: "error" })(decoded)
+  if (Option.isNone(envelope)) return undefined
+  const failure = failures.get(envelope.value.capabilityFailureId)
+  if (failure !== undefined) failures.delete(envelope.value.capabilityFailureId)
+  return failure
+}
+
+const decodeResponseJson = Schema.decodeOption(Schema.fromJsonString(Schema.Json))
+
+const prepareRequest = (request: SandboxExecutor.Request) =>
+  Effect.gen(function* () {
+    const source = yield* Effect.try({
+      try: () => normalize(request),
+      catch: (cause) => SandboxExecutor.SandboxSourceInvalid.make({ message: safeMessage(cause) }),
+    })
+    if (
+      SandboxExecutor.sourceDigest({
+        modules: source.modules,
+        entrypoint: request.entrypoint,
+        inputCodec: request.inputCodec,
+        outputCodec: request.outputCodec,
+        protocolVersion: request.protocolVersion,
+      }) !== request.sourceDigest
+    )
+      return yield* SandboxExecutor.SandboxSourceInvalid.make({ message: "source digest mismatch" })
+    const encodedInput = encodeJson(request.input)
+    if (encodedInput === undefined)
+      return yield* SandboxExecutor.SandboxInputInvalid.make({ message: "sandbox input is not JSON serializable" })
+    return { source, encodedInput }
+  })
+
+const decodeWorkerResponse = (
+  response: Response,
+  text: string | undefined,
+  request: SandboxExecutor.Request,
+  capabilityFailures: Map<string, ProgramCapabilities.CapabilityFailure>,
+) =>
+  Effect.gen(function* () {
+    if (text === undefined)
+      return yield* SandboxExecutor.SandboxResourceExceeded.make({
+        resource: "output",
+        limit: request.limits.outputBytes,
+      })
+    const decodedOption = decodeResponseJson(text)
+    if (Option.isNone(decodedOption)) {
+      if (!response.ok) return yield* failExecution(`dynamic Worker returned status ${response.status}`)
+      return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON" })
+    }
+    const decoded = decodedOption.value
+    if (!response.ok) {
+      const failure = recoverCapabilityFailure(response, decoded, capabilityFailures)
+      if (failure !== undefined) return yield* Effect.fail(failure)
+      return yield* failExecution(`dynamic Worker returned status ${response.status}`)
+    }
+    const result = yield* Schema.decodeUnknownEffect(SandboxExecutor.Result, { onExcessProperty: "error" })(
+      decoded,
+    ).pipe(Effect.mapError(() => SandboxExecutor.SandboxProtocolViolation.make({ message: "invalid result envelope" })))
+    if (!resultIdentityMatches(result, request))
+      return yield* SandboxExecutor.SandboxProtocolViolation.make({ message: "result identity mismatch" })
+    const resultBytes = bytes(result.output)
+    if (resultBytes === undefined)
+      return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON serializable" })
+    if (resultBytes > request.limits.outputBytes)
+      return yield* SandboxExecutor.SandboxResourceExceeded.make({
+        resource: "output",
+        limit: request.limits.outputBytes,
+      })
+    return result
+  })
+
 /** @experimental Construct a production SandboxExecutor backed by Cloudflare Worker Loader. */
 export const make = (options: Options): SandboxExecutor.Interface =>
   SandboxExecutor.SandboxExecutor.of({
@@ -95,30 +305,7 @@ export const make = (options: Options): SandboxExecutor.Interface =>
           return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
         if (now >= request.deadlineMillis)
           return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-        let source: ReturnType<typeof normalize>
-        try {
-          source = normalize(request)
-          if (
-            SandboxExecutor.sourceDigest({
-              modules: source.modules,
-              entrypoint: request.entrypoint,
-              inputCodec: request.inputCodec,
-              outputCodec: request.outputCodec,
-              protocolVersion: request.protocolVersion,
-            }) !== request.sourceDigest
-          )
-            return yield* SandboxExecutor.SandboxSourceInvalid.make({ message: "source digest mismatch" })
-        } catch (cause) {
-          return yield* SandboxExecutor.SandboxSourceInvalid.make({ message: safeMessage(cause) })
-        }
-        let encodedInput: string
-        try {
-          const encoded = JSON.stringify(request.input)
-          if (encoded === undefined) throw new TypeError("input is not JSON serializable")
-          encodedInput = encoded
-        } catch {
-          return yield* SandboxExecutor.SandboxInputInvalid.make({ message: "sandbox input is not JSON serializable" })
-        }
+        const { source, encodedInput } = yield* prepareRequest(request)
 
         const capabilities = yield* ProgramCapabilities.ProgramCapabilities
         const grants = new Map(request.capabilities.map((grant) => [grant.operation, new Set(grant.names)] as const))
@@ -128,56 +315,18 @@ export const make = (options: Options): SandboxExecutor.Interface =>
         const invocation = new AbortController()
         const cancel = () => invocation.abort()
         let deadlineElapsed = false
-        const rpc = {
-          call: async (raw: CapabilityRpcRequest): Promise<unknown> => {
-            if (!active || request.signal.aborted || Date.now() >= request.deadlineMillis)
-              throw new Error("request fence closed")
-            let decoded: CapabilityRpcRequest
-            try {
-              decoded = Schema.decodeUnknownSync(CapabilityRpcRequest, { onExcessProperty: "error" })(raw)
-            } catch {
-              throw new Error("capability request invalid")
-            }
-            if (decoded.protocolVersion !== request.protocolVersion || decoded.requestId !== request.requestId)
-              throw new Error("capability protocol identity mismatch")
-            const grant = grants.get(decoded.operation)
-            if (grant === undefined) throw new Error("capability operation denied")
-            const named = capabilityName(decoded)
-            if (named !== undefined && !grant.has(named)) throw new Error("capability name denied")
-            if (decoded.operation === "fanOutAgents") {
-              for (const member of decoded.input.members) {
-                if (!grant.has(member.selection)) throw new Error("capability name denied")
-              }
-            }
-            const inputSize = decoded.input === undefined ? 0 : bytes(decoded.input)
-            if (inputSize === undefined || inputSize > request.limits.outputBytes)
-              throw new Error("capability payload denied")
-            const effect =
-              decoded.operation === "discoverTools"
-                ? capabilities.discoverTools.pipe(Effect.map((tools) => tools.filter((tool) => grant.has(tool.name))))
-                : decoded.operation === "describeTool"
-                  ? capabilities.describeTool(decoded.input)
-                  : capabilities[decoded.operation](decoded.input as never)
-            let outcome: Result.Result<unknown, ProgramCapabilities.CapabilityFailure>
-            try {
-              outcome = await Effect.runPromise(Effect.result(effect), { signal: invocation.signal })
-            } catch {
-              throw new Error("capability invocation failed")
-            }
-            if (Result.isFailure(outcome)) {
-              const failureId = `failure-${++nextCapabilityFailure}`
-              capabilityFailures.set(failureId, outcome.failure)
-              throw new Error(`${capabilityFailurePrefix}${failureId}`)
-            }
-            const value = outcome.success
-            if (!active || request.signal.aborted || Date.now() >= request.deadlineMillis)
-              throw new Error("request fence closed")
-            const outputSize = bytes(value)
-            if (outputSize === undefined || outputSize > request.limits.outputBytes)
-              throw new Error("capability result denied")
-            return value
+        const rpc = makeCapabilityRpc({
+          capabilities,
+          request,
+          grants,
+          signal: invocation.signal,
+          isActive: () => active && !request.signal.aborted && Date.now() < request.deadlineMillis,
+          recordFailure: (failure) => {
+            const failureId = `failure-${++nextCapabilityFailure}`
+            capabilityFailures.set(failureId, failure)
+            return failureId
           },
-        }
+        })
         const code: WorkerCode = {
           compatibilityDate: options.compatibilityDate,
           mainModule: runnerName,
@@ -220,22 +369,7 @@ export const make = (options: Options): SandboxExecutor.Interface =>
                   ),
                 abort,
               ]),
-            catch: (cause) =>
-              request.signal.aborted
-                ? SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-                : deadlineElapsed || Date.now() >= request.deadlineMillis
-                  ? SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-                  : /cpu/i.test(safeMessage(cause))
-                    ? SandboxExecutor.SandboxResourceExceeded.make({
-                        resource: "cpu",
-                        limit: request.limits.cpuMillis,
-                      })
-                    : /subrequest/i.test(safeMessage(cause))
-                      ? SandboxExecutor.SandboxResourceExceeded.make({
-                          resource: "subrequests",
-                          limit: request.limits.subrequests,
-                        })
-                      : failExecution(cause),
+            catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
           })
           if (!active || request.signal.aborted)
             return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
@@ -243,69 +377,13 @@ export const make = (options: Options): SandboxExecutor.Interface =>
             return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
           const text = yield* Effect.tryPromise({
             try: () => Promise.race([readBounded(response, request.limits.outputBytes), abort]),
-            catch: (cause) =>
-              request.signal.aborted
-                ? SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-                : deadlineElapsed || Date.now() >= request.deadlineMillis
-                  ? SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-                  : failExecution(cause),
+            catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
           })
           if (!active || request.signal.aborted)
             return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
           if (deadlineElapsed || Date.now() >= request.deadlineMillis)
             return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-          if (text === undefined)
-            return yield* SandboxExecutor.SandboxResourceExceeded.make({
-              resource: "output",
-              limit: request.limits.outputBytes,
-            })
-          let decoded: unknown
-          try {
-            decoded = JSON.parse(text)
-          } catch {
-            if (!response.ok) return yield* failExecution(`dynamic Worker returned status ${response.status}`)
-            return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON" })
-          }
-          if (!response.ok) {
-            if (response.status === 500) {
-              const envelope = Schema.decodeUnknownOption(CapabilityFailureResponse, { onExcessProperty: "error" })(
-                decoded,
-              )
-              if (Option.isSome(envelope)) {
-                const failure = capabilityFailures.get(envelope.value.capabilityFailureId)
-                if (failure !== undefined) {
-                  capabilityFailures.delete(envelope.value.capabilityFailureId)
-                  return yield* Effect.fail(failure)
-                }
-              }
-            }
-            return yield* failExecution(`dynamic Worker returned status ${response.status}`)
-          }
-          const result = yield* Schema.decodeUnknownEffect(SandboxExecutor.Result, { onExcessProperty: "error" })(
-            decoded,
-          ).pipe(
-            Effect.mapError(() =>
-              SandboxExecutor.SandboxProtocolViolation.make({ message: "invalid result envelope" }),
-            ),
-          )
-          if (
-            result.protocolVersion !== request.protocolVersion ||
-            result.requestId !== request.requestId ||
-            result.sourceDigest !== request.sourceDigest ||
-            result.inputCodec !== request.inputCodec ||
-            result.outputCodec !== request.outputCodec
-          )
-            return yield* SandboxExecutor.SandboxProtocolViolation.make({ message: "result identity mismatch" })
-          const resultBytes = bytes(result.output)
-          if (resultBytes === undefined)
-            return yield* SandboxExecutor.SandboxOutputInvalid.make({
-              message: "sandbox output is not JSON serializable",
-            })
-          if (resultBytes > request.limits.outputBytes)
-            return yield* SandboxExecutor.SandboxResourceExceeded.make({
-              resource: "output",
-              limit: request.limits.outputBytes,
-            })
+          const result = yield* decodeWorkerResponse(response, text, request, capabilityFailures)
           if (!active || request.signal.aborted)
             return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
           if (deadlineElapsed || Date.now() >= request.deadlineMillis)

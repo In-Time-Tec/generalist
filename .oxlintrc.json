@@ -1,16 +1,99 @@
 {
   "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "plugins": ["eslint", "typescript", "oxc", "unicorn", "import", "promise", "effecttsgo"],
+  "jsPlugins": [
+    {
+      "name": "anti-slop",
+      "specifier": "./tools/oxlint/anti-slop/index.ts"
+    },
+    {
+      "name": "anti-slop-effect",
+      "specifier": "./tools/oxlint/anti-slop/effect/index.ts"
+    }
+  ],
   "options": {
     "typeAware": true
   },
-  "plugins": ["effecttsgo"],
   "categories": {
     "correctness": "error",
     "perf": "error",
     "suspicious": "error"
   },
-  "ignorePatterns": ["dist", "node_modules", ".turbo"],
   "rules": {
+    "accessor-pairs": "error",
+    "complexity": ["error", 15],
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-case-declarations": "error",
+    "no-constructor-return": "error",
+    "no-duplicate-imports": "error",
+    "no-fallthrough": "error",
+    "no-nested-ternary": "error",
+    "no-new-func": "error",
+    "no-new-wrappers": "error",
+    "no-param-reassign": "error",
+    "no-promise-executor-return": "error",
+    "no-prototype-builtins": "error",
+    "no-regex-spaces": "error",
+    "no-self-compare": "error",
+    "no-sequences": "error",
+    "no-underscore-dangle": "off",
+    "no-useless-return": "error",
+    "object-shorthand": "error",
+    "operator-assignment": "error",
+    "prefer-const": "error",
+    "prefer-exponentiation-operator": "error",
+    "prefer-promise-reject-errors": "error",
+    "radix": "error",
+    "symbol-description": "error",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": "error",
+    "anti-slop/no-shape-in-symbol-names": "error",
+    "anti-slop/no-unknown-parameters": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/no-unknown-type-aliases": "error",
+    "anti-slop/no-unsafe-dictionary-type": "error",
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "error",
+    "anti-slop-effect/no-service-constructor-imports": "error",
+    "import/no-cycle": ["error", { "ignoreTypes": true }],
+    "import/no-unassigned-import": "off",
+    "oxc/no-const-enum": "error",
+    "oxc/no-map-spread": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/consistent-return": "off",
+    "typescript/no-deprecated": "error",
+    "typescript/no-dynamic-delete": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-misused-spread": "off",
+    "typescript/no-mixed-enums": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "off",
+    "typescript/no-unnecessary-type-arguments": "off",
+    "typescript/no-unnecessary-type-parameters": "off",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-ts-expect-error": "error",
+    "typescript/related-getter-setter-pairs": "error",
+    "typescript/require-array-sort-compare": "off",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/unbound-method": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/no-new-array": "off",
+    "unicorn/no-useless-promise-resolve-reject": "error",
+    "unicorn/no-useless-switch-case": "error",
     "effecttsgo/abort-controller-in-effect": "error",
     "effecttsgo/any-unknown-in-error-context": "error",
     "effecttsgo/async-function": "error",
@@ -76,6 +159,7 @@
     "effecttsgo/overridden-schema-constructor": "error",
     "effecttsgo/prefer-schema-over-json": "error",
     "effecttsgo/prefer-schema-type-property": "error",
+    "effecttsgo/prefer-typed-schema-decoder": "error",
     "effecttsgo/prefer-unsafe-constructor": "error",
     "effecttsgo/process-env": "error",
     "effecttsgo/process-env-in-effect": "error",
@@ -104,27 +188,9 @@
     "effecttsgo/unnecessary-pipe": "error",
     "effecttsgo/unnecessary-pipe-chain": "error",
     "effecttsgo/unnecessary-typeof-type": "error",
-    "effecttsgo/unsafe-effect-type-assertion": "error",
-    "no-var": "error",
-    "no-param-reassign": "error",
-    "eslint/no-underscore-dangle": [
-      "error",
-      {
-        "allow": ["_tag", "_response"]
-      }
-    ]
+    "effecttsgo/unsafe-effect-type-assertion": "error"
   },
   "overrides": [
-    {
-      "files": ["packages/tenetkit/src/repl/repl/bun-worker.ts", "packages/tenetkit/src/repl/repl/bun-session.ts"],
-      "rules": {
-        "effecttsgo/async-function": "off",
-        "effecttsgo/global-timers": "off",
-        "effecttsgo/global-timers-in-effect": "off",
-        "effecttsgo/new-promise": "off",
-        "effecttsgo/node-builtin-import": "off"
-      }
-    },
     {
       "files": ["packages/*/src/**/*.ts"],
       "rules": {
@@ -137,6 +203,13 @@
           }
         ]
       }
+    },
+    {
+      "files": ["**/test/**"],
+      "rules": {
+        "no-await-in-loop": "off"
+      }
     }
-  ]
+  ],
+  "ignorePatterns": ["dist", "node_modules", ".turbo", ".agents", "repos", "tools/oxlint/anti-slop"]
 }

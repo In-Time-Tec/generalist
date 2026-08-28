@@ -1,5 +1,5 @@
-import { Context, Function, Layer } from "effect"
-import type { Any as AnyAgent } from "../agent/agent-closure.js"
+import { Context, Function, Layer, Schema } from "effect"
+import type { Any as AnyAgent } from "../agent/closure.js"
 import type { AgentPin } from "../durable/pin.js"
 
 /** One catalog entry. The catalog never provides a target's requirements; `HandoffRequirementsMissing` reports them. */
@@ -9,16 +9,22 @@ export interface HandoffTarget {
   readonly pin?: AgentPin
 }
 
+interface MutableHandoffTarget {
+  name: string
+  agent: AnyAgent
+  pin?: AgentPin
+}
+
 export const target: {
   (pin?: AgentPin): (agent: AnyAgent) => HandoffTarget
   (agent: AnyAgent, pin?: AgentPin): HandoffTarget
 } = Function.dual(
-  (args) => args.length > 1 || typeof args[0] === "object",
-  (agent: AnyAgent, pin?: AgentPin): HandoffTarget => ({
-    name: agent.name,
-    agent,
-    ...(pin === undefined ? {} : { pin }),
-  }),
+  (args) => args.length > 1 || Schema.is(Schema.Struct({ name: Schema.String }))(args[0]),
+  (agent: AnyAgent, pin?: AgentPin): HandoffTarget => {
+    const entry: MutableHandoffTarget = { name: agent.name, agent }
+    if (pin !== undefined) entry.pin = pin
+    return entry
+  },
 )
 
 export interface HandoffCatalogInterface {

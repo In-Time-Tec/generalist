@@ -9,7 +9,7 @@ export const Guardrail = {
   redactInput: Guardrail_redactInput,
   redactOutput: Guardrail_redactOutput,
   filterOutput: Guardrail_filterOutput,
-} as typeof import("./guardrail.js")
+}
 export namespace Guardrail {
   export type validateInput = typeof import("./guardrail.js").validateInput
   export type redactInput = typeof import("./guardrail.js").redactInput

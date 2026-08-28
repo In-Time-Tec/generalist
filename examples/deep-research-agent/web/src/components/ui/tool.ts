@@ -4,8 +4,7 @@ import type { Html } from "foldkit/html"
 import { html } from "@/lib/html"
 
 import { badge } from "@/components/ui/badge"
-import type { SlotConfig } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { cn, type SlotConfig } from "@/lib/styling"
 
 // VIEW
 
@@ -94,20 +93,20 @@ export const toolStatusBadgeVariants = cva("gap-1.5 rounded-full text-xs", {
   },
 })
 
-const statusLabels: Record<ToolStatus, string> = {
+const statusLabels = {
   "input-streaming": "Pending",
   "input-available": "Running",
   "output-available": "Completed",
   "output-error": "Error",
-}
+} satisfies Record<ToolStatus, string>
 
 const statusIcon = <ParentMessage>(status: ToolStatus): Html => {
-  const icons: Record<ToolStatus, () => Html> = {
+  const icons = {
     "input-streaming": () => circleIcon<ParentMessage>(),
     "input-available": () => clockIcon<ParentMessage>(),
     "output-available": () => circleCheckIcon<ParentMessage>(),
     "output-error": () => circleXIcon<ParentMessage>(),
-  }
+  } satisfies Record<ToolStatus, () => Html>
   // Tool-call statuses come from streaming LLM events cast to ToolStatus at
   // that boundary; degrade to the neutral pending icon rather than crashing
   // the render if an unexpected status slips through.

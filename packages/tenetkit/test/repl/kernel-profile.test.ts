@@ -22,7 +22,7 @@ describe("KernelProfile", () => {
 
   it("round-trips through its codec", () => {
     const encoded = Schema.encodeSync(KernelProfile.KernelProfile)(profile)
-    expect(Schema.decodeUnknownSync(KernelProfile.KernelProfile)(encoded)).toEqual(profile)
+    expect(Schema.decodeSync(KernelProfile.KernelProfile)(encoded)).toEqual(profile)
   })
 
   it("rejects a foreign protocol version", () => {
@@ -47,7 +47,7 @@ describe("KernelProfile", () => {
   })
 
   it("declares no secret-bearing field: the encoded profile carries only contract fields", () => {
-    const encoded = Schema.encodeSync(KernelProfile.KernelProfile)(profile) as Record<string, unknown>
+    const encoded = Schema.encodeSync(KernelProfile.KernelProfile)(profile)
     expect(Object.keys(encoded).toSorted()).toEqual([
       "bindingsDigest",
       "contractVersion",
@@ -65,7 +65,7 @@ describe("KernelProfile", () => {
       apiKey: "sk-live-secret",
       env: { ANTHROPIC_API_KEY: "sk-live-secret" },
     }
-    const decoded = Schema.decodeUnknownSync(KernelProfile.KernelProfile)(smuggled)
+    const decoded = Schema.decodeSync(KernelProfile.KernelProfile)(smuggled)
     const text = JSON.stringify(Schema.encodeSync(KernelProfile.KernelProfile)(decoded))
     expect(text).not.toContain("sk-live-secret")
     expect(text).not.toContain("apiKey")
@@ -73,7 +73,7 @@ describe("KernelProfile", () => {
 
   it("keeps a smuggled field out of the digest as well as the encoded form", () => {
     const smuggled = { ...Schema.encodeSync(KernelProfile.KernelProfile)(profile), apiKey: "sk-live-secret" }
-    const decoded = Schema.decodeUnknownSync(KernelProfile.KernelProfile)(smuggled)
+    const decoded = Schema.decodeSync(KernelProfile.KernelProfile)(smuggled)
     expect(KernelProfile.digest(decoded)).toBe(KernelProfile.digest(profile))
   })
 

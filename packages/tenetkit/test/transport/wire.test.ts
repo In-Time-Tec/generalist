@@ -3,9 +3,9 @@ import { Effect, Schema } from "effect"
 import { Cursor } from "tenetkit/runtime"
 import { Response } from "effect/unstable/ai"
 import { Wire } from "../../src/transport/index.js"
-import { event } from "./helpers.js"
+import { event } from "./fixtures.js"
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
+const encodeJson = <A>(value: A): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 describe("Wire", () => {
   it.effect("round-trips canonical RunEvents without wrapping their lifecycle", () =>
@@ -51,8 +51,8 @@ describe("Wire", () => {
   )
 
   it("decodes origin and applied cursors", () => {
-    expect(Schema.decodeUnknownSync(Wire.CursorFromString)("-1")).toBe(Cursor.origin)
-    expect(Schema.decodeUnknownSync(Wire.CursorFromString)("7")).toBe(7)
+    expect(Schema.decodeSync(Wire.CursorFromString)("-1")).toBe(Cursor.origin)
+    expect(Schema.decodeSync(Wire.CursorFromString)("7")).toBe(7)
   })
 
   it.effect("encodes only attach and explicit cancellation commands", () =>

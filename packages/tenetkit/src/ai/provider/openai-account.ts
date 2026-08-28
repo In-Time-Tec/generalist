@@ -1,5 +1,5 @@
 import { OpenAiClient, type OpenAiSchema } from "@effect/ai-openai"
-import { ModelRegistry } from "tenetkit"
+import { ModelRegistry } from "../../core/index.js"
 import { Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
@@ -12,7 +12,7 @@ import {
   openAiLanguageModelLayer,
   toolJsonSchemaCompiler,
 } from "./openai.js"
-import { isAvailabilityFailure } from "../model/model-failure.js"
+import { isAvailabilityFailure } from "../model/failure.js"
 import {
   FetchHttpClient,
   Headers,
@@ -179,7 +179,7 @@ const foldedCreateResponse =
                 : Effect.succeed(terminalResponse(event)),
           ),
           Stream.runFold(
-            () => undefined as FoldedResponse | undefined,
+            (): FoldedResponse | undefined => undefined,
             (found, current) => found ?? current,
           ),
           Effect.flatMap((folded) =>
@@ -246,16 +246,21 @@ export const layerAccountClient = (credentials: OpenAiAccountCredentials) =>
 export const registrationAccount = (
   input: OpenAiAccountInput,
 ): Effect.Effect<ModelRegistry.Registration, never, HttpClient.HttpClient> =>
-  ModelRegistry.registration({
+  ModelRegistry.registration(registrationOptions(input))
+
+const registrationOptions = (input: OpenAiAccountInput) => {
+  const required = {
     provider: "openai",
     model: input.model,
     layer: openAiLanguageModelLayer(input).pipe(Layer.provide(layerAccountClient(input.credentials))),
     classifyFailure,
     toolJsonSchemaCompiler,
     isAvailabilityFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
+  } as const
+  const registered =
+    input.registrationKey === undefined ? required : { ...required, registrationKey: input.registrationKey }
+  return input.metadata === undefined ? registered : { ...registered, metadata: input.metadata }
+}
 
 /** @experimental */
 export const layerAccount = (

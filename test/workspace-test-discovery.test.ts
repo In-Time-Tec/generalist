@@ -35,11 +35,10 @@ layer(bunLayer)("workspace test discovery", (it) => {
       const fileSystem = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const root = path.resolve(".")
-      const discovered = (yield* Effect.forEach(expectedRoots, (directory) =>
+      const discovered: Array<string> = (yield* Effect.forEach(expectedRoots, (directory) =>
         filesUnder(path.join(root, directory), root, fileSystem, path),
-      ))
-        .flat()
-        .toSorted()
+      )).flat()
+      discovered.sort()
       expect(discovered.length).toBeGreaterThan(0)
       expect(discovered).not.toContain(expect.stringContaining("repos/effect"))
       for (const file of discovered) {

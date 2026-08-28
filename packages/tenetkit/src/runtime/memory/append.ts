@@ -3,29 +3,99 @@ import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { isTerminal, type RunStatus } from "../run.js"
-import type { DurableAgentLoopEvent } from "../agent-event.js"
-import type { ExecutionResult } from "../execution-state.js"
-import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run-event.js"
+import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
+import type { ExecutionResult } from "../execution/state.js"
+import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run/event.js"
 import type { MemoryState, StoredRun, SubscriberQueue } from "./state.js"
-import { projectTreeEvent } from "../tree-event.js"
+import { projectTreeEvent } from "../tree/event.js"
 import { appendTerminalToolResults } from "./session-store.js"
 
 const occurredAt = DateTime.now.pipe(Effect.map(DateTime.formatIso))
+type MutableStoredRun = { -readonly [Key in keyof StoredRun]: StoredRun[Key] }
+type EventBaseBuilder = Omit<RunEventBase, "parentRunId" | "causationId" | "attemptId"> & {
+  parentRunId?: string
+  causationId?: string
+  attemptId?: string
+}
+type CancelledTerminal = { _tag: "RunCancelled"; reason?: string }
+type CancellationRequestedInput = { _tag: "RunCancellationRequested"; reason?: string }
+type CancelledInput = { _tag: "RunCancelled"; reason?: string }
 
-const baseFields = (run: StoredRun, sequence: number, occurredAtValue: string): RunEventBase => ({
-  specVersion: "1",
-  eventId: eventIdFor(run.runId, sequence),
-  runId: run.runId,
-  sequence,
-  executableRef: run.executableRef,
-  rootRunId: run.rootRunId,
-  depth: run.depth,
-  occurredAt: occurredAtValue,
-  ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
-  ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
-  ...(run.message.correlationId === undefined ? {} : { correlationId: run.message.correlationId }),
-  ...(run.attempt > 0 ? { attemptId: `${run.runId}:attempt:${run.attempt}` } : {}),
-})
+const baseFields = (run: StoredRun, sequence: number, occurredAtValue: string): RunEventBase => {
+  const base: EventBaseBuilder = {
+    specVersion: "1",
+    eventId: eventIdFor(run.runId, sequence),
+    runId: run.runId,
+    sequence,
+    executableRef: run.executableRef,
+    rootRunId: run.rootRunId,
+    depth: run.depth,
+    occurredAt: occurredAtValue,
+    correlationId: run.message.correlationId,
+  }
+  if (run.parentRunId !== undefined) base.parentRunId = run.parentRunId
+  if (run.message.causationId !== undefined) base.causationId = run.message.causationId
+  if (run.attempt > 0) base.attemptId = `${run.runId}:attempt:${run.attempt}`
+  return base
+}
+
+const terminalReason = (event: RunEvent): "completed" | "failed" | "cancelled" | undefined => {
+  if (event._tag === "RunCompleted") return "completed"
+  if (event._tag === "RunFailed") return "failed"
+  if (event._tag === "RunCancelled") return "cancelled"
+  return undefined
+}
+
+const terminalToolState = (state: MemoryState, runId: string, event: RunEvent) => {
+  if (event._tag === "RunCancelled") {
+    const terminal: CancelledTerminal = { _tag: "RunCancelled" }
+    if (event.reason !== undefined) terminal.reason = event.reason
+    return appendTerminalToolResults({ state, runId, terminal })
+  }
+  if (event._tag === "RunFailed") {
+    return appendTerminalToolResults({ state, runId, terminal: { _tag: "RunFailed", error: event.error } })
+  }
+  if (event._tag === "RunCompleted") {
+    return appendTerminalToolResults({ state, runId, terminal: { _tag: "RunCompleted" } })
+  }
+  return Effect.succeed(state)
+}
+
+const updateWait = (updated: MutableStoredRun, run: StoredRun, event: RunEvent): void => {
+  if (event._tag === "RunWaiting") {
+    updated.activeWaitId = event.wait.waitId
+    updated.wait = event.wait
+  } else if (event._tag === "RunResumed") {
+    delete updated.activeWaitId
+    if (run.wait !== undefined) updated.wait = run.wait
+  } else if (run.activeWaitId !== undefined) {
+    updated.activeWaitId = run.activeWaitId
+  }
+}
+
+const updateOptionalRunFields = (updated: MutableStoredRun, run: StoredRun, event: RunEvent): void => {
+  if (run.parentRunId !== undefined) updated.parentRunId = run.parentRunId
+  if (run.invocationId !== undefined) updated.invocationId = run.invocationId
+  updateWait(updated, run, event)
+  if (event._tag === "RunCancellationRequested") {
+    if (event.reason !== undefined) updated.cancelReason = event.reason
+    else if (run.cancelReason !== undefined) updated.cancelReason = run.cancelReason
+  } else if (run.cancelReason !== undefined) updated.cancelReason = run.cancelReason
+  if (event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed") {
+    updated.terminalEventId = event.eventId
+  } else if (run.terminalEventId !== undefined) updated.terminalEventId = run.terminalEventId
+}
+
+const discardPendingSteering = (
+  run: StoredRun,
+  pendingSteering: StoredRun["steering"],
+  reason: "completed" | "failed" | "cancelled",
+): StoredRun["steering"] =>
+  run.steering.map((entry) =>
+    pendingSteering.some((pending) => pending.entryId === entry.entryId)
+      ? { ...entry, discardedReason: reason }
+      : entry,
+  )
 
 export const appendEvent: {
   (
@@ -40,7 +110,7 @@ export const appendEvent: {
     nextStatus?: RunStatus,
   ): Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable>
 } = Function.dual(
-  (args) => typeof args[0] === "object" && args[0] !== null,
+  (args) => "runs" in Object(args[0]),
   (
     state: MemoryState,
     runId: string,
@@ -58,14 +128,7 @@ export const appendEvent: {
       const sequence = run.lastSequence + 1
       const at = yield* occurredAt
       const event = build(baseFields(run, sequence, at), run)
-      const discardReason =
-        event._tag === "RunCompleted"
-          ? "completed"
-          : event._tag === "RunFailed"
-            ? "failed"
-            : event._tag === "RunCancelled"
-              ? "cancelled"
-              : undefined
+      const discardReason = terminalReason(event)
       const pendingSteering = run.steering.filter(
         (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
       )
@@ -73,11 +136,7 @@ export const appendEvent: {
         const runs = new Map(state.runs)
         runs.set(run.runId, {
           ...run,
-          steering: run.steering.map((entry) =>
-            pendingSteering.some((pending) => pending.entryId === entry.entryId)
-              ? { ...entry, discardedReason: discardReason }
-              : entry,
-          ),
+          steering: discardPendingSteering(run, pendingSteering, discardReason),
         })
         const [, discarded] = yield* appendEvent({ ...state, runs }, runId, (base) => ({
           ...base,
@@ -87,24 +146,13 @@ export const appendEvent: {
         }))
         return yield* appendEvent(discarded, runId, build, nextStatus)
       }
-      const terminalState =
-        event._tag === "RunCancelled"
-          ? yield* appendTerminalToolResults({
-              state,
-              runId,
-              terminal: { _tag: "RunCancelled", ...(event.reason === undefined ? {} : { reason: event.reason }) },
-            })
-          : event._tag === "RunFailed"
-            ? yield* appendTerminalToolResults({ state, runId, terminal: { _tag: "RunFailed", error: event.error } })
-            : event._tag === "RunCompleted"
-              ? yield* appendTerminalToolResults({ state, runId, terminal: { _tag: "RunCompleted" } })
-              : state
+      const terminalState = yield* terminalToolState(state, runId, event)
       const root = terminalState.treeRoots.get(run.rootRunId)
       if (root === undefined) {
         return yield* RuntimeUnavailable.make({ message: `tree root ${run.rootRunId} missing during append` })
       }
       const position = root.lastPosition + 1
-      const updated: StoredRun = {
+      const updated: MutableStoredRun = {
         ...run,
         runId: run.runId,
         status: nextStatus ?? run.status,
@@ -120,32 +168,8 @@ export const appendEvent: {
         children: run.children,
         events: [...run.events, event],
         subscribers: run.subscribers,
-        ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
-        ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
-        ...(event._tag === "RunWaiting"
-          ? { activeWaitId: event.wait.waitId, wait: event.wait }
-          : event._tag === "RunResumed"
-            ? run.wait === undefined
-              ? {}
-              : { wait: run.wait }
-            : run.activeWaitId === undefined
-              ? {}
-              : { activeWaitId: run.activeWaitId }),
-        ...(event._tag === "RunCancellationRequested"
-          ? event.reason === undefined
-            ? run.cancelReason === undefined
-              ? {}
-              : { cancelReason: run.cancelReason }
-            : { cancelReason: event.reason }
-          : run.cancelReason === undefined
-            ? {}
-            : { cancelReason: run.cancelReason }),
-        ...(event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed"
-          ? { terminalEventId: event.eventId }
-          : run.terminalEventId === undefined
-            ? {}
-            : { terminalEventId: run.terminalEventId }),
       }
+      updateOptionalRunFields(updated, run, event)
       const runs = new Map(terminalState.runs)
       if (event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed") {
         const { continuation: _, pendingOutcome: __, suspension: ___, ...withoutTerminalState } = updated
@@ -199,9 +223,9 @@ export const appendLifecycle: {
     nextStatus?: RunStatus,
   ): Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable>
 } = Function.dual(
-  (args) => typeof args[0] === "object" && args[0] !== null,
+  (args) => "runs" in Object(args[0]),
   (state: MemoryState, runId: string, event: LifecycleInput, nextStatus?: RunStatus) =>
-    appendEvent(state, runId, (base) => ({ ...base, ...event }) as RunEvent, nextStatus),
+    appendEvent(state, runId, (base) => ({ ...base, ...event }), nextStatus),
 )
 
 export const appendAgentEvent: {
@@ -218,7 +242,7 @@ export const appendAgentEvent: {
   appendEvent(state, runId, (base) => ({ ...base, ...event })),
 )
 
-export const makeAccepted: {
+export const acceptedEvent: {
   (messageId: string): (address: Address) => Omit<Extract<LifecycleEvent, { _tag: "RunAccepted" }>, keyof RunEventBase>
   (address: Address, messageId: string): Omit<Extract<LifecycleEvent, { _tag: "RunAccepted" }>, keyof RunEventBase>
 } = Function.dual(
@@ -231,29 +255,29 @@ export const makeAccepted: {
     }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunAccepted" }>, keyof RunEventBase>,
 )
 
-export const makeAttemptStarted = (attempt: number) =>
+export const attemptStartedEvent = (attempt: number) =>
   ({
     _tag: "RunAttemptStarted" as const,
     attempt,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunAttemptStarted" }>, keyof RunEventBase>
 
-export const makeWaiting = (wait: import("../run-wait.js").RunWait) =>
+export const waitingEvent = (wait: import("../run/wait.js").RunWait) =>
   ({
     _tag: "RunWaiting" as const,
     wait,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunWaiting" }>, keyof RunEventBase>
 
-export const makeResumed: {
+export const resumedEvent: {
   (
-    resolution: import("../run-wait.js").WaitResolution,
+    resolution: import("../run/wait.js").WaitResolution,
   ): (waitId: string) => Omit<Extract<LifecycleEvent, { _tag: "RunResumed" }>, keyof RunEventBase>
   (
     waitId: string,
-    resolution: import("../run-wait.js").WaitResolution,
+    resolution: import("../run/wait.js").WaitResolution,
   ): Omit<Extract<LifecycleEvent, { _tag: "RunResumed" }>, keyof RunEventBase>
 } = Function.dual(
   2,
-  (waitId: string, resolution: import("../run-wait.js").WaitResolution) =>
+  (waitId: string, resolution: import("../run/wait.js").WaitResolution) =>
     ({
       _tag: "RunResumed" as const,
       waitId,
@@ -270,7 +294,7 @@ export const makeUnknown = (operationId: string) =>
 type ChildLinked = Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
 type ChildLinkedDetails = Pick<ChildLinked, "readiness" | "key" | "label" | "origin">
 
-export const makeChildLinked: {
+export const childLinkedEvent: {
   (
     invocationId: string,
     selection: string,
@@ -287,7 +311,7 @@ export const makeChildLinked: {
     details: ChildLinkedDetails,
   ): ChildLinked
 } = Function.dual(
-  (args) => args.length === 6 || typeof args[2] === "string",
+  (args) => args.length === 6 || "length" in Object(args[2]),
   (
     childRunId: string,
     invocationId: string,
@@ -306,17 +330,17 @@ export const makeChildLinked: {
   }),
 )
 
-export const makeChildReadinessChanged: {
+export const childReadinessChangedEvent: {
   (
-    readiness: import("../child-readiness.js").ChildReadiness,
+    readiness: import("../child/readiness.js").ChildReadiness,
   ): (childRunId: string) => Omit<Extract<LifecycleEvent, { _tag: "ChildReadinessChanged" }>, keyof RunEventBase>
   (
     childRunId: string,
-    readiness: import("../child-readiness.js").ChildReadiness,
+    readiness: import("../child/readiness.js").ChildReadiness,
   ): Omit<Extract<LifecycleEvent, { _tag: "ChildReadinessChanged" }>, keyof RunEventBase>
 } = Function.dual(
   2,
-  (childRunId: string, readiness: import("../child-readiness.js").ChildReadiness) =>
+  (childRunId: string, readiness: import("../child/readiness.js").ChildReadiness) =>
     ({
       _tag: "ChildReadinessChanged" as const,
       childRunId,
@@ -324,7 +348,7 @@ export const makeChildReadinessChanged: {
     }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildReadinessChanged" }>, keyof RunEventBase>,
 )
 
-export const makeChildSettled: {
+export const childSettledEvent: {
   (
     terminalEventId: string,
   ): (childRunId: string) => Omit<Extract<LifecycleEvent, { _tag: "ChildSettled" }>, keyof RunEventBase>
@@ -346,8 +370,8 @@ export const makeFanOutAdmitted = (input: {
   readonly fanOutId: string
   readonly memberCount: number
   readonly concurrency: number
-  readonly join: import("../fan-out.js").FanOutJoin
-  readonly remainder: import("../fan-out.js").FanOutRemainder
+  readonly join: import("../child/fan-out.js").FanOutJoin
+  readonly remainder: import("../child/fan-out.js").FanOutRemainder
 }) =>
   ({
     _tag: "FanOutAdmitted" as const,
@@ -404,7 +428,7 @@ export const makeFanOutJoined: {
     >,
 )
 
-export const makeCompleted = (
+export const completedEvent = (
   result: ExecutionResult,
 ): Omit<Extract<LifecycleEvent, { _tag: "RunCompleted" }>, keyof RunEventBase> =>
   ({
@@ -412,7 +436,7 @@ export const makeCompleted = (
     result,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunCompleted" }>, keyof RunEventBase>
 
-export const makeFailed = (
+export const failedEvent = (
   error: RunFailure,
 ): Omit<Extract<LifecycleEvent, { _tag: "RunFailed" }>, keyof RunEventBase> =>
   ({
@@ -420,17 +444,17 @@ export const makeFailed = (
     error,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunFailed" }>, keyof RunEventBase>
 
-export const makeCancellationRequested = (reason?: string) =>
-  ({
-    _tag: "RunCancellationRequested" as const,
-    ...(reason === undefined ? {} : { reason }),
-  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunCancellationRequested" }>, keyof RunEventBase>
+export const cancellationRequestedEvent = (reason?: string) => {
+  const event: CancellationRequestedInput = { _tag: "RunCancellationRequested" }
+  if (reason !== undefined) event.reason = reason
+  return event
+}
 
-export const makeCancelled = (reason?: string) =>
-  ({
-    _tag: "RunCancelled" as const,
-    ...(reason === undefined ? {} : { reason }),
-  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunCancelled" }>, keyof RunEventBase>
+export const cancelledEvent = (reason?: string) => {
+  const event: CancelledInput = { _tag: "RunCancelled" }
+  if (reason !== undefined) event.reason = reason
+  return event
+}
 
 export const requireOpenRun: {
   (runId: string): (state: MemoryState) => Effect.Effect<StoredRun, RuntimeUnavailable>

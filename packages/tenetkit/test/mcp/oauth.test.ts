@@ -14,11 +14,11 @@ import {
   Schema,
 } from "effect"
 import { beforeEach, vi } from "vitest"
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js"
 import { McpToolSource, OAuth } from "../../src/mcp/index"
 
-const authMock = vi.hoisted(() => vi.fn())
-
-vi.mock("@modelcontextprotocol/sdk/client/auth.js", () => ({ auth: authMock }))
+const fetchMock = vi.fn<typeof fetch>()
+const yieldJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const configuration: OAuth.Configuration = {
   serverUrl: "https://mcp.example/rpc",
@@ -57,26 +57,6 @@ const dynamicOAuthLayer = OAuth.layer(dynamicConfiguration).pipe(
   Layer.provide(Layer.merge(OAuth.layerTokenStoreMemory, cryptoTestLayer)),
 )
 
-interface AsyncProvider {
-  readonly state: () => Promise<string>
-  readonly tokens: () => Promise<
-    | {
-        readonly access_token: string
-        readonly token_type: string
-        readonly refresh_token?: string | undefined
-      }
-    | undefined
-  >
-  readonly saveTokens: (tokens: {
-    readonly access_token: string
-    readonly token_type: string
-    readonly refresh_token?: string | undefined
-  }) => Promise<void>
-  readonly redirectToAuthorization: (url: URL) => Promise<void>
-  readonly saveCodeVerifier: (verifier: string) => Promise<void>
-  readonly codeVerifier: () => Promise<string>
-}
-
 const sdkCallback = <A>(evaluate: () => A | PromiseLike<A>) =>
   Effect.suspend(() => {
     const result = evaluate()
@@ -93,50 +73,42 @@ const dynamicOAuthEffect = <A, E>(name: string, test: () => Effect.Effect<A, E, 
 
 describe("OAuth", () => {
   beforeEach(() => {
-    authMock.mockClear()
-    authMock.mockImplementation((provider: AsyncProvider, options: { readonly authorizationCode?: string }) =>
-      Effect.runPromise(
-        Effect.gen(function* () {
-          if (options.authorizationCode !== undefined) {
-            const verifier = yield* Effect.tryPromise(provider.codeVerifier)
-            if (options.authorizationCode === "fail-secret") {
-              return yield* OAuth.OAuthProviderError.make({
-                server: configuration.serverUrl,
-                operation: "mock exchange",
-                message: "provider included access-token-secret",
-              })
-            }
-            yield* Effect.tryPromise(() =>
-              provider.saveTokens({
-                access_token: `${options.authorizationCode}-${verifier}`,
-                token_type: "Bearer",
-                refresh_token: "refresh",
-              }),
-            )
-            return "AUTHORIZED"
-          }
-
-          const tokens = yield* Effect.tryPromise(provider.tokens)
-          if (tokens?.refresh_token !== undefined) {
-            yield* Effect.tryPromise(() =>
-              provider.saveTokens({
-                access_token: "refreshed-access-token",
-                token_type: "Bearer",
-                refresh_token: tokens.refresh_token,
-              }),
-            )
-            return "AUTHORIZED"
-          }
-
-          const state = yield* Effect.tryPromise(provider.state)
-          yield* Effect.tryPromise(() => provider.saveCodeVerifier("pkce-verifier"))
-          yield* Effect.tryPromise(() =>
-            provider.redirectToAuthorization(new URL(`https://auth.example/authorize?state=${state}`)),
+    fetchMock.mockReset()
+    fetchMock.mockImplementation((input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString())
+      if (url.pathname.includes(".well-known/oauth-protected-resource")) {
+        return Promise.resolve(
+          new Response('{"resource":"https://mcp.example/rpc","authorization_servers":["https://auth.example"]}', {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        )
+      }
+      if (url.pathname.includes(".well-known/oauth-authorization-server")) {
+        return Promise.resolve(
+          new Response(
+            '{"issuer":"https://auth.example","authorization_endpoint":"https://auth.example/authorize","token_endpoint":"https://auth.example/token","response_types_supported":["code"],"code_challenge_methods_supported":["S256"]}',
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        )
+      }
+      if (url.pathname.endsWith("/token")) {
+        return new Request(input, init).text().then((body) => {
+          const code = new URLSearchParams(body).get("code")
+          if (code === "fail-secret") throw new Error("provider included access-token-secret")
+          const accessToken = code === null ? "refreshed-access-token" : `${code}-pkce-verifier`
+          return new Response(
+            yieldJson({ access_token: accessToken, token_type: "Bearer", refresh_token: "refresh" }),
+            {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            },
           )
-          return "REDIRECT"
-        }),
-      ),
-    )
+        })
+      }
+      return Promise.resolve(new Response(undefined, { status: 404 }))
+    })
+    vi.stubGlobal("fetch", fetchMock)
   })
 
   layer(OAuth.layerTokenStoreMemory)((methods) => {
@@ -147,7 +119,8 @@ describe("OAuth", () => {
         yield* store.save("https://mcp.example", tokens)
         const loaded = yield* store.load("https://mcp.example")
         expect(Option.isSome(loaded)).toBe(true)
-        expect(String(Option.getOrThrow(loaded))).not.toContain("secret")
+        const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(Option.getOrThrow(loaded))
+        expect(encoded).not.toContain("secret")
         expect(Redacted.value(Option.getOrThrow(loaded))).toContain("secret")
         yield* store.remove("https://mcp.example")
         expect(Option.isNone(yield* store.load("https://mcp.example"))).toBe(true)
@@ -186,11 +159,10 @@ describe("OAuth", () => {
           }),
         )
         const document = Option.getOrThrow(yield* Ref.get(stored))
-        const decoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(
-          Redacted.value(document),
-        )
+        const decoded = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(Redacted.value(document))
+        const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(document)
 
-        expect(String(document)).not.toContain("secret")
+        expect(encoded).not.toContain("secret")
         expect(decoded).toEqual({
           version: 1,
           tokens: {
@@ -204,7 +176,7 @@ describe("OAuth", () => {
         })
 
         const reconnected = Context.get(yield* Layer.build(makeLayer), OAuth.OAuth)
-        expect(yield* sdkCallback(reconnected.provider.tokens)).toEqual({
+        expect(yield* sdkCallback(() => reconnected.provider.tokens())).toEqual({
           access_token: "versioned-access-secret",
           id_token: "versioned-id-secret",
           token_type: "Bearer",
@@ -235,14 +207,14 @@ describe("OAuth", () => {
           OAuth.OAuth,
         )
 
-        expect(yield* sdkCallback(oauth.provider.tokens)).toEqual({
+        expect(yield* sdkCallback(() => oauth.provider.tokens())).toEqual({
           access_token: "legacy-access-secret",
           token_type: "Bearer",
           expires_in: 3600,
           refresh_token: "legacy-refresh-secret",
         })
         expect(yield* Ref.get(saves)).toBe(1)
-        const decoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(
+        const decoded = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(
           Redacted.value(yield* Ref.get(stored)),
         )
         expect(decoded).toEqual({
@@ -254,7 +226,7 @@ describe("OAuth", () => {
             refresh_token: "legacy-refresh-secret",
           },
         })
-        expect(yield* sdkCallback(oauth.provider.tokens)).toEqual({
+        expect(yield* sdkCallback(() => oauth.provider.tokens())).toEqual({
           access_token: "legacy-access-secret",
           token_type: "Bearer",
           expires_in: 3600,
@@ -287,7 +259,7 @@ describe("OAuth", () => {
               ),
               OAuth.OAuth,
             )
-            const error = yield* oauth.withTransport(sdkCallback(oauth.provider.tokens)).pipe(Effect.flip)
+            const error = yield* oauth.withTransport(sdkCallback(() => oauth.provider.tokens())).pipe(Effect.flip)
             const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)
 
             expect(error).toBeInstanceOf(OAuth.OAuthProviderError)
@@ -325,7 +297,7 @@ describe("OAuth", () => {
           yield* Layer.build(OAuth.layer(configuration).pipe(Layer.provide(Layer.merge(storeLayer, cryptoTestLayer)))),
           OAuth.OAuth,
         )
-        const error = yield* oauth.withTransport(sdkCallback(oauth.provider.tokens)).pipe(Effect.flip)
+        const error = yield* oauth.withTransport(sdkCallback(() => oauth.provider.tokens())).pipe(Effect.flip)
         const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)
 
         expect(error).toEqual(
@@ -356,10 +328,12 @@ describe("OAuth", () => {
       const oauth = yield* OAuth.OAuth
       const authorization = yield* oauth.authorize
 
-      expect(authorization.url).toBe(`https://auth.example/authorize?state=${authorization.state}`)
+      const authorizationUrl = new URL(authorization.url)
+      expect(`${authorizationUrl.origin}${authorizationUrl.pathname}`).toBe("https://auth.example/authorize")
+      expect(authorizationUrl.searchParams.get("state")).toBe(authorization.state)
       yield* oauth.callback(`https://app.example/oauth/callback?code=authorization-code&state=${authorization.state}`)
 
-      const tokens = yield* sdkCallback(oauth.provider.tokens)
+      const tokens = yield* sdkCallback(() => oauth.provider.tokens())
       expect(tokens?.access_token).toBe("authorization-code-pkce-verifier")
 
       const replay = yield* oauth
@@ -377,14 +351,17 @@ describe("OAuth", () => {
       const releaseExchange = yield* Deferred.make<void>()
       const context = yield* Effect.context<never>()
       const runPromise = Effect.runPromiseWith(context)
-      authMock.mockImplementationOnce((provider: AsyncProvider) =>
+      fetchMock.mockImplementationOnce(() =>
         runPromise(
-          Effect.gen(function* () {
-            yield* Effect.tryPromise(provider.codeVerifier)
-            yield* Deferred.succeed(exchangeStarted, undefined)
-            yield* Deferred.await(releaseExchange)
-            return "AUTHORIZED"
-          }),
+          Deferred.succeed(exchangeStarted, undefined).pipe(
+            Effect.andThen(Deferred.await(releaseExchange)),
+            Effect.as(
+              new Response('{"access_token":"authorization-code-pkce-verifier","token_type":"Bearer"}', {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              }),
+            ),
+          ),
         ),
       )
 
@@ -393,7 +370,7 @@ describe("OAuth", () => {
         .pipe(Effect.forkChild)
       yield* Deferred.await(exchangeStarted)
 
-      expect((yield* sdkCallback(oauth.provider.codeVerifier).pipe(Effect.exit))._tag).toBe("Failure")
+      expect((yield* sdkCallback(() => oauth.provider.codeVerifier()).pipe(Effect.exit))._tag).toBe("Failure")
       expect(Option.isNone(yield* oauth.pending)).toBe(true)
 
       yield* Deferred.succeed(releaseExchange, undefined)
@@ -411,7 +388,7 @@ describe("OAuth", () => {
         .pipe(Effect.flip)
       expect(malformed).toBeInstanceOf(OAuth.OAuthDenied)
       expect(Option.isNone(yield* oauth.pending)).toBe(true)
-      expect((yield* sdkCallback(oauth.provider.codeVerifier).pipe(Effect.exit))._tag).toBe("Failure")
+      expect((yield* sdkCallback(() => oauth.provider.codeVerifier()).pipe(Effect.exit))._tag).toBe("Failure")
 
       const replay = yield* oauth
         .callback(`https://app.example/oauth/callback?code=replayed&state=${authorization.state}`)
@@ -440,7 +417,7 @@ describe("OAuth", () => {
         ),
       ).toHaveLength(1)
       expect(Option.isNone(yield* oauth.pending)).toBe(true)
-      expect((yield* sdkCallback(oauth.provider.codeVerifier).pipe(Effect.exit))._tag).toBe("Failure")
+      expect((yield* sdkCallback(() => oauth.provider.codeVerifier()).pipe(Effect.exit))._tag).toBe("Failure")
     }),
   )
 
@@ -448,7 +425,7 @@ describe("OAuth", () => {
     Effect.gen(function* () {
       const oauth = yield* OAuth.OAuth
       if (oauth.provider.state === undefined) return yield* Effect.die("OAuth provider state is missing")
-      const state = yield* sdkCallback(oauth.provider.state)
+      const state = yield* sdkCallback(() => oauth.provider.state!())
       yield* sdkCallback(() => oauth.provider.saveCodeVerifier("transport-pkce-verifier"))
       const url = new URL(`https://auth.example/authorize?state=${state}`)
       yield* sdkCallback(() => oauth.provider.redirectToAuthorization(url))
@@ -463,27 +440,20 @@ describe("OAuth", () => {
   dynamicOAuthEffect("persists dynamic client registration and honors client invalidation", () =>
     Effect.gen(function* () {
       const oauth = yield* OAuth.OAuth
-      expect(yield* sdkCallback(oauth.provider.clientInformation)).toBeUndefined()
+      expect(yield* sdkCallback(() => oauth.provider.clientInformation())).toBeUndefined()
       if (oauth.provider.saveClientInformation === undefined) {
         return yield* Effect.die("OAuth provider cannot save dynamic client registration")
       }
       yield* sdkCallback(() => oauth.provider.saveClientInformation?.({ client_id: "dynamic-client" }))
-      expect(yield* sdkCallback(oauth.provider.clientInformation)).toEqual({ client_id: "dynamic-client" })
+      expect(yield* sdkCallback(() => oauth.provider.clientInformation())).toEqual({ client_id: "dynamic-client" })
       yield* sdkCallback(() => oauth.provider.invalidateCredentials?.("client"))
-      expect(yield* sdkCallback(oauth.provider.clientInformation)).toBeUndefined()
+      expect(yield* sdkCallback(() => oauth.provider.clientInformation())).toBeUndefined()
     }),
   )
 
   oauthEffect("retains discovery state through callback exchange and clears it on invalidation", () =>
     Effect.gen(function* () {
       const oauth = yield* OAuth.OAuth
-      const context = yield* Effect.context<never>()
-      const runPromise = Effect.runPromiseWith(context)
-      const sdk = yield* Effect.tryPromise(() =>
-        vi.importActual<typeof import("@modelcontextprotocol/sdk/client/auth.js")>(
-          "@modelcontextprotocol/sdk/client/auth.js",
-        ),
-      )
       const discovery = {
         authorizationServerUrl: "https://identity.example",
         resourceMetadataUrl: "https://mcp.example/oauth-resource",
@@ -499,34 +469,28 @@ describe("OAuth", () => {
       }
 
       yield* sdkCallback(() => oauth.provider.saveDiscoveryState?.(discovery))
-      expect(yield* sdkCallback(oauth.provider.discoveryState)).toEqual(discovery)
+      expect(yield* sdkCallback(() => oauth.provider.discoveryState!())).toEqual(discovery)
       if (oauth.provider.state === undefined) return yield* Effect.die("OAuth provider state is missing")
-      const state = yield* sdkCallback(oauth.provider.state)
+      const state = yield* sdkCallback(() => oauth.provider.state!())
       yield* sdkCallback(() => oauth.provider.saveCodeVerifier("discovery-verifier"))
       const tokenResponseBody = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
         access_token: "discovered-access-token",
         token_type: "Bearer",
       })
       let tokenEndpoint = ""
-      authMock.mockImplementationOnce((provider, options) =>
-        sdk.auth(provider, {
-          ...options,
-          fetchFn: (url) =>
-            runPromise(
-              Effect.sync(() => {
-                tokenEndpoint = url.toString()
-                return new Response(tokenResponseBody, {
-                  status: 200,
-                  headers: { "content-type": "application/json" },
-                })
-              }),
-            ),
-        }),
-      )
+      fetchMock.mockImplementation((url) => {
+        tokenEndpoint = new Request(url).url
+        return Promise.resolve(
+          new Response(tokenResponseBody, {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        )
+      })
       yield* oauth.callback(`https://app.example/oauth/callback?code=discovered-code&state=${state}`)
       expect(tokenEndpoint).toBe("https://identity.example/custom-token")
       yield* sdkCallback(() => oauth.provider.invalidateCredentials?.("discovery"))
-      expect(yield* sdkCallback(oauth.provider.discoveryState)).toBeUndefined()
+      expect(yield* sdkCallback(() => oauth.provider.discoveryState!())).toBeUndefined()
     }),
   )
 
@@ -543,7 +507,7 @@ describe("OAuth", () => {
       yield* Deferred.await(transportStarted)
       const authorization = yield* oauth.authorize.pipe(Effect.forkChild)
 
-      expect(authMock).not.toHaveBeenCalled()
+      expect(fetchMock).not.toHaveBeenCalled()
       yield* Deferred.succeed(releaseTransport, undefined)
       yield* Fiber.join(transport)
       expect((yield* Fiber.join(authorization)).url).toContain("https://auth.example/authorize")
@@ -555,11 +519,6 @@ describe("OAuth", () => {
       Effect.gen(function* () {
         const context = yield* Effect.context<never>()
         const runPromise = Effect.runPromiseWith(context)
-        const sdk = yield* Effect.tryPromise(() =>
-          vi.importActual<typeof import("@modelcontextprotocol/sdk/client/auth.js")>(
-            "@modelcontextprotocol/sdk/client/auth.js",
-          ),
-        )
         const storedTokens = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
           version: 1,
           tokens: {
@@ -602,7 +561,7 @@ describe("OAuth", () => {
         const error = yield* oauth
           .withTransport(
             Effect.tryPromise(() =>
-              sdk.auth(oauth.provider, {
+              auth(oauth.provider, {
                 serverUrl: configuration.serverUrl,
                 fetchFn: () =>
                   runPromise(
@@ -659,7 +618,7 @@ describe("OAuth", () => {
         ) {
           return yield* Effect.die("OAuth provider session state is missing")
         }
-        const state = yield* sdkCallback(oauth.provider.state)
+        const state = yield* sdkCallback(() => oauth.provider.state!())
         yield* sdkCallback(() => oauth.provider.saveCodeVerifier("clear-verifier"))
         yield* sdkCallback(() =>
           oauth.provider.redirectToAuthorization(new URL(`https://auth.example/authorize?state=${state}`)),
@@ -672,8 +631,8 @@ describe("OAuth", () => {
         const error = yield* oauth.clear.pipe(Effect.flip)
         expect(error).toBeInstanceOf(OAuth.OAuthProviderError)
         expect(Option.isNone(yield* oauth.pending)).toBe(true)
-        expect(yield* sdkCallback(oauth.provider.clientInformation)).toBeUndefined()
-        expect(yield* sdkCallback(oauth.provider.discoveryState)).toBeUndefined()
+        expect(yield* sdkCallback(() => oauth.provider.clientInformation())).toBeUndefined()
+        expect(yield* sdkCallback(() => oauth.provider.discoveryState!())).toBeUndefined()
         const callback = yield* oauth
           .callback(`https://app.example/oauth/callback?code=replay&state=${state}`)
           .pipe(Effect.flip)
@@ -784,18 +743,19 @@ describe("OAuth", () => {
             refresh_token: "refresh",
           }),
         )
-        yield* Effect.tryPromise(() => authMock(firstOAuth.provider, {}))
+        yield* Effect.tryPromise(() => auth(firstOAuth.provider, { serverUrl: configuration.serverUrl }))
 
         const stored = Option.getOrThrow(
           yield* Ref.get(values).pipe(
             Effect.map((entries) => Option.fromUndefinedOr(entries.get(configuration.serverUrl))),
           ),
         )
-        expect(String(stored)).not.toContain("refreshed-access-token")
+        const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(stored)
+        expect(encoded).not.toContain("refreshed-access-token")
         expect(Redacted.value(stored)).toContain("refreshed-access-token")
 
         const reconnectedOAuth = Context.get(yield* Layer.build(makeLayer), OAuth.OAuth)
-        const reloaded = yield* sdkCallback(reconnectedOAuth.provider.tokens)
+        const reloaded = yield* sdkCallback(() => reconnectedOAuth.provider.tokens())
         expect(reloaded?.access_token).toBe("refreshed-access-token")
       }),
     ),

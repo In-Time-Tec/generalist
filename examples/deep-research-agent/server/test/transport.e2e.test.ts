@@ -1,13 +1,13 @@
 import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, layer } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "tenetkit/runtime"
 import { Client } from "tenetkit/transport"
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
+const encodeEvents = (value: ReadonlyArray<{ readonly _tag: string }>): string => JSON.stringify(value)
 
 const RunReceipt = Schema.Struct({
   runId: Schema.String,
@@ -19,7 +19,7 @@ class TransportTestError extends Schema.TaggedError<TransportTestError>()("Trans
   message: Schema.String,
 }) {}
 
-const postJson = (url: string, body: unknown) =>
+const postJson = (url: string, body: Schema.Json) =>
   HttpClient.post(url, { body: HttpBody.jsonUnsafe(body) }).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
 
 const admitRun = (
@@ -48,7 +48,10 @@ const freePort = Effect.callback<number, TransportTestError>((resume) => {
   })
   server.listen(0, "127.0.0.1", () => {
     const address = server.address()
-    const port = typeof address === "object" && address !== null ? address.port : 0
+    const port = Schema.decodeUnknownOption(Schema.Struct({ port: Schema.Finite }))(address).pipe(
+      Option.map((value) => value.port),
+      Option.getOrElse(() => 0),
+    )
     server.close(() => resume(Effect.succeed(port)))
   })
 })
@@ -119,7 +122,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
           const approvalRequested = Array.from(first).find((event) => event._tag === "ApprovalRequested")
           const waiting = Array.from(first).find((event) => event._tag === "RunWaiting")
           if (waiting === undefined || waiting._tag !== "RunWaiting") {
-            return yield* Effect.die(`expected RunWaiting: ${encodeJson(Array.from(first))}`)
+            return yield* Effect.die(`expected RunWaiting: ${encodeEvents(Array.from(first))}`)
           }
 
           yield* postJson(`${baseUrl}/runs/${receipt.runId}/respond`, {

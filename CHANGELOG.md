@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.41.0
+
+- Adopt Rika's repository policy as the workspace baseline: all 16 anti-slop rules, all 95 Effect TSGo rules, and Oxlint's correctness, performance, and suspicious defaults fail the build; Oxlint alone enforces the 500-physical-line package-source limit.
+- Mirror app and package tests to their exact source paths with deterministic names, kebab-case ownership folders, and a maximum of 12 direct files or directories per governed folder.
+- Normalize constructors to the owning module's canonical `make`, `register`, or `start` operation and remove superseded helper aliases. This pre-1.0 release is a clean API break and requires no SQL schema or data migration.
+
 ## 0.40.0
 
 - Emit bounded, typed `HostCall` lifecycle events around every cell host-binding invocation, including local and remotely proxied operations.

@@ -2,7 +2,7 @@ import { Effect, HashSet, MutableRef, Queue, Schema, Stream } from "effect"
 import { Render, Subscription } from "foldkit"
 
 import { pageByPath } from "../content/registry"
-import { toPath } from "../route/route"
+import { toPath } from "../route/match"
 import { ChangedActiveSection, ChangedSystemTheme, PressedSearchShortcut, type Message } from "./message"
 import type { Model } from "./model"
 
@@ -47,7 +47,7 @@ const systemTheme = Subscription.make<Model, Message>()((entry) => ({
               ({ mediaQuery, handler }) => Effect.sync(() => mediaQuery.removeEventListener("change", handler)),
             ).pipe(Effect.flatMap(() => Effect.never)),
           ),
-          Effect.sync(() => isSystemPreference && typeof window.matchMedia === "function"),
+          Effect.sync(() => isSystemPreference && "matchMedia" in window),
         ),
     },
   ),
@@ -70,7 +70,7 @@ const activeSection = Subscription.make<Model, Message>()((entry) => ({
       dependenciesToStream: ({ sections }) =>
         Stream.callback<typeof ChangedActiveSection.Type>((queue) =>
           Effect.gen(function* () {
-            if (sections.length === 0 || typeof IntersectionObserver === "undefined") {
+            if (sections.length === 0 || !("IntersectionObserver" in globalThis)) {
               return yield* Effect.never
             }
 

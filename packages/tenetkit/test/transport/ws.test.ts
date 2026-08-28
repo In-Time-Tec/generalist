@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Function, Layer, Queue, Ref, Scope, Stream } from "effect"
-import { Headers, HttpServerRequest } from "effect/unstable/http"
+import { HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Response } from "effect/unstable/ai"
 import { Errors as RuntimeErrors } from "tenetkit/runtime"
 import { Wire, Ws } from "../../src/transport/index.js"
-import { event, runtimeLayer } from "./helpers.js"
+import { event, runtimeLayer } from "./fixtures.js"
 
 interface FakeSocket {
   readonly socket: Socket.Socket
@@ -52,13 +52,11 @@ const provideScoped = Function.dual<
     Effect.scoped(Effect.flatMap(Layer.build(provided), (context) => effect.pipe(Effect.provideContext(context)))),
 )
 
-const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest =>
-  ({
-    url: "http://test/ws",
-    originalUrl: "http://test/ws",
-    headers: Headers.empty,
-    upgrade: Effect.succeed(socket),
-  }) as unknown as HttpServerRequest.HttpServerRequest
+const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest => {
+  const serverRequest = HttpServerRequest.fromWeb(new Request("http://test/ws"))
+  Object.defineProperty(serverRequest, "upgrade", { value: Effect.succeed(socket) })
+  return serverRequest
+}
 
 const run = (fake: FakeSocket, layer = runtimeLayer()) =>
   provideScoped(
@@ -77,7 +75,8 @@ describe("Ws", () => {
       )
       yield* Queue.offer(fake.inbound, yield* Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 1 }))
       const output = yield* Queue.take(fake.outbound)
-      expect(typeof output === "string" && (yield* Wire.observerCodec.decode(output)).sequence).toBe(2)
+      if (Socket.isCloseEvent(output) || output instanceof Uint8Array) return yield* Effect.die("expected text frame")
+      expect((yield* Wire.observerCodec.decode(output)).sequence).toBe(2)
       expect(yield* Ref.get(cancelled)).toEqual([])
 
       yield* Queue.offer(fake.inbound, yield* Wire.encodeCommand({ _tag: "Cancel", runId: "run-1" }))
@@ -118,7 +117,7 @@ describe("Ws", () => {
       )
       yield* Queue.offer(fake.inbound, yield* Wire.encodeCommand({ _tag: "Attach", runId: "run-1" }))
       const output = yield* Queue.take(fake.outbound)
-      if (typeof output !== "string") return yield* Effect.die("expected text frame")
+      if (Socket.isCloseEvent(output) || output instanceof Uint8Array) return yield* Effect.die("expected text frame")
       const resolved = yield* Wire.observerCodec.decode(output)
       expect(resolved).toEqual({ ...compact, response })
       yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))

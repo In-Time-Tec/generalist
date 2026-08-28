@@ -9,7 +9,7 @@ const key = (usage: Usage, contextRevision: string): string =>
   `${usage.contextTokens}:${usage.contextWindow}:${usage.reserveTokens}:${contextRevision}`
 
 /** @experimental Remembers unchanged threshold passes until their session usage changes. */
-export const makeThresholdState = () => {
+export const make = () => {
   const unchanged = new Map<string, string>()
   return {
     clear: (sessionId: string): void => {

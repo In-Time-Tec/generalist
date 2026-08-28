@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/async-function, no-await-in-loop */
 import { Effect, Option, Schema } from "effect"
 import { Cursor, origin } from "tenetkit/runtime/driver/cursor"
-import { Runtime, type Interface } from "tenetkit/runtime/driver/runtime"
+import { Runtime, type Interface } from "tenetkit/runtime/driver/service"
 import { page } from "tenetkit/transport/replay"
 import { decodeCommand } from "tenetkit/transport/wire"
 
@@ -22,8 +22,8 @@ export type Attachment = typeof Attachment.Type
 export interface HibernatingWebSocket {
   readonly send: (message: string) => void
   readonly close: (code?: number, reason?: string) => void
-  readonly serializeAttachment: (attachment: unknown) => void
-  readonly deserializeAttachment: () => unknown
+  readonly serializeAttachment: (attachment: Attachment) => void
+  readonly deserializeAttachment: () => Schema.Json
 }
 
 /** @experimental Narrow Cloudflare Durable Object hibernation surface. */
@@ -89,7 +89,7 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
           return { sockets: 1, frames, hasMore: false }
         }
         socket.send(frame.data)
-        attachment = { ...attachment, cursor: frame.sequence }
+        attachment = { version: 1, state: "attached", runId: attachment.runId, cursor: frame.sequence }
         if (!persist(socket, attachment)) {
           close(socket, 1009, "attachment-too-large")
           return { sockets: 1, frames: frames + 1, hasMore: false }
@@ -142,7 +142,7 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
       options.state.acceptWebSocket(socket, [tag])
     },
     async webSocketMessage(socket: HibernatingWebSocket, message: string | ArrayBuffer): Promise<void> {
-      if (typeof message !== "string") return close(socket, 1003, "binary-command")
+      if (message instanceof ArrayBuffer) return close(socket, 1003, "binary-command")
       await enqueue(socket, async () => {
         const command = await Effect.runPromiseExit(decodeCommand(message))
         if (command._tag === "Failure") return close(socket, 1002, "malformed-command")
@@ -153,14 +153,15 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
             return close(socket, 1008, "run-mismatch")
           }
           const requestedCursor = command.value.cursor ?? origin
+          const cursor =
+            decodedAttachment.value.state === "attached"
+              ? Math.max(decodedAttachment.value.cursor, requestedCursor)
+              : requestedCursor
           const attachment: Attachment = {
             version: 1,
             state: "attached",
             runId: command.value.runId,
-            cursor:
-              decodedAttachment.value.state === "attached"
-                ? Math.max(decodedAttachment.value.cursor, requestedCursor)
-                : requestedCursor,
+            cursor,
           }
           if (!persist(socket, attachment)) return close(socket, 1009, "attachment-too-large")
           await drainSocket(socket)
@@ -169,10 +170,11 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
         if (decodedAttachment.value.state !== "attached") return close(socket, 1008, "not-attached")
         if (decodedAttachment.value.runId !== command.value.runId) return close(socket, 1008, "run-mismatch")
         await Effect.runPromise(
-          options.runtime.cancel({
-            runId: command.value.runId,
-            ...(command.value.reason === undefined ? {} : { reason: command.value.reason }),
-          }),
+          options.runtime.cancel(
+            command.value.reason === undefined
+              ? { runId: command.value.runId }
+              : { runId: command.value.runId, reason: command.value.reason },
+          ),
         )
       })
     },

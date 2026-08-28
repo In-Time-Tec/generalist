@@ -9,7 +9,7 @@ import {
   ProgramAuthority,
   fromLiveAgent,
   make as makeAgentManifest,
-} from "./durable/agent-manifest.js"
+} from "./durable/manifest/agent-manifest.js"
 import {
   AgentEntry,
   ExecutableEntry,
@@ -20,20 +20,11 @@ import {
   decode as decodeExecutableManifest,
   encode as encodeExecutableManifest,
   make as makeExecutableManifest,
-  makeTest as makeTestExecutableManifest,
+  test as makeTestExecutableManifest,
   validateRef,
   ProgramEntry,
-} from "./durable/executable-manifest.js"
-import {
-  AgentPin,
-  CapabilityPin,
-  ExecutablePin,
-  ModelPin,
-  ProgramPin,
-  makeCapability,
-  makeModel,
-  makeProgram,
-} from "./durable/pin.js"
+} from "./durable/manifest/executable-manifest.js"
+import { AgentPin, CapabilityPin, ExecutablePin, ModelPin, Pin, ProgramPin } from "./durable/pin.js"
 import {
   ProgramBudget,
   ProgramAgentCapability,
@@ -41,40 +32,40 @@ import {
   ProgramManifest as ProgramManifestSchema,
   ProgramSource,
   make as makeProgramManifest,
-} from "./durable/program-manifest.js"
+} from "./durable/manifest/program-manifest.js"
 import { digest } from "./durable/canonical-json.js"
-import { DurableDriver } from "./durable/facade-durableDriver.js"
-import { RunBudget } from "./durable/facade-runBudget.js"
-import { Agent } from "./agent/facade-agent.js"
-import { ActiveModelResponse } from "./model/facade-activeModelResponse.js"
-import { AgentEvent } from "./agent/facade-agentEvent.js"
-import { AgentTool } from "./agent/facade-agentTool.js"
+import { DurableDriver } from "./durable/public/driver.js"
+import { RunBudget } from "./durable/public/run-budget.js"
+import { Agent } from "./agent/public/service.js"
+import { ActiveModelResponse } from "./model/public/active-model-response.js"
+import { AgentEvent } from "./agent/public/event.js"
+import { AgentTool } from "./agent/public/tool.js"
 import { Approvals } from "./policy/facade-approvals.js"
 import { Compaction } from "./turn/facade-compaction.js"
-import { ContextOverflow } from "./model/facade-contextOverflow.js"
+import { ContextOverflow } from "./model/public/context-overflow.js"
 import { Guardrail } from "./policy/facade-guardrail.js"
 import { Handoff } from "./policy/facade-handoff.js"
-import { Instructions } from "./context/facade-instructions.js"
-import { Memory } from "./context/facade-memory.js"
-import { ModelMiddleware } from "./model/facade-modelMiddleware.js"
-import { ModelRegistry } from "./model/facade-modelRegistry.js"
-import { ModelResilience } from "./model/facade-modelResilience.js"
-import { ModelStreamTermination } from "./model/facade-modelStreamTermination.js"
-import { ModelTelemetry } from "./model/facade-modelTelemetry.js"
-import { ModelToolCallValidation } from "./model/facade-modelToolCallValidation.js"
+import { Instructions } from "./context/public/instructions.js"
+import { Memory } from "./context/public/memory.js"
+import { ModelMiddleware } from "./model/public/middleware.js"
+import { ModelRegistry } from "./model/public/registry.js"
+import { ModelResilience } from "./model/public/resilience.js"
+import { ModelStreamTermination } from "./model/public/stream-termination.js"
+import { ModelTelemetry } from "./model/public/telemetry.js"
+import { ModelToolCallValidation } from "./model/public/tool-call-validation.js"
 import { Permissions } from "./policy/facade-permissions.js"
-import { Session } from "./context/facade-session.js"
-import { SessionHistory } from "./context/facade-sessionHistory.js"
-import { SessionSync } from "./context/facade-sessionSync.js"
-import { SkillSource } from "./context/facade-skillSource.js"
+import { Session } from "./context/public/session.js"
+import { SessionHistory } from "./context/public/session-history.js"
+import { SessionSync } from "./context/public/session-sync.js"
+import { SkillSource } from "./context/public/skill-source.js"
 import { Steering } from "./turn/facade-steering.js"
-import { ToolAuthorization } from "./tools/facade-toolAuthorization.js"
-import { NestedOperation } from "./tools/facade-nestedOperation.js"
-import { ToolContext } from "./tools/facade-toolContext.js"
-import { ToolExecutor } from "./tools/facade-toolExecutor.js"
-import { ToolOutput } from "./tools/facade-toolOutput.js"
-import { ToolPlacement } from "./tools/facade-toolPlacement.js"
-import { TurnPolicy } from "./turn/facade-turnPolicy.js"
+import { ToolAuthorization } from "./tools/public/tool-authorization.js"
+import { NestedOperation } from "./tools/public/nested-operation.js"
+import { ToolContext } from "./tools/public/tool-context.js"
+import { ToolExecutor } from "./tools/public/tool-executor.js"
+import { ToolOutput } from "./tools/public/tool-output.js"
+import { ToolPlacement } from "./tools/public/tool-placement.js"
+import { TurnPolicy } from "./turn/facade-turn-policy.js"
 import { make as makeAgentProgram, run as runAgentProgram } from "./program/agent-program.js"
 import {
   CapabilityFailure,
@@ -95,14 +86,14 @@ import {
   ProgramStepFailure,
   ProgramSuspended,
   ProgramToolFailure,
-} from "./program/program-capabilities.js"
+} from "./program/capabilities.js"
 import {
   ProgramReplayPolicy,
   agent as makeProgramAgentBinding,
   make as makeProgramBindings,
   step as makeProgramStepBinding,
   tool as makeProgramToolBinding,
-} from "./program/program-bindings.js"
+} from "./program/bindings.js"
 import {
   ExecutionFailure as ProgramExecutionFailure,
   ProgramBindingMismatch,
@@ -110,7 +101,7 @@ import {
   ProgramIdentityMismatch,
   layerDirect as layerDirectProgramHost,
   validateBindings as validateProgramBindings,
-} from "./program/program-host.js"
+} from "./program/host.js"
 import {
   ExecutionFailure as SandboxExecutionFailureSchema,
   Identity as SandboxIdentity,
@@ -130,8 +121,8 @@ import {
   SandboxSourceInvalid,
   SandboxUnavailable,
   layerTest as layerTestSandboxExecutor,
-  makeRequest as makeSandboxRequest,
-  makeTest as makeTestSandboxExecutor,
+  request as makeSandboxRequest,
+  make as makeTestSandboxExecutor,
   testIdentity as testSandboxIdentity,
 } from "./program/sandbox-executor.js"
 
@@ -142,9 +133,9 @@ export const Pins = {
   CapabilityPin,
   ExecutablePin,
   digest,
-  makeModel,
-  makeCapability,
-  makeProgram,
+  makeModel: Pin.makeModel,
+  makeCapability: Pin.makeCapability,
+  makeProgram: Pin.makeProgram,
 }
 export namespace Pins {
   export type AgentPin = import("./durable/pin.js").AgentPin
@@ -154,7 +145,7 @@ export namespace Pins {
   export type ExecutablePin = import("./durable/pin.js").ExecutablePin
 }
 
-type ProgramManifestFacade = typeof import("./durable/program-manifest.js")
+type ProgramManifestFacade = typeof import("./durable/manifest/program-manifest.js")
 
 export const ProgramManifest = {
   ProgramAgentCapability,
@@ -163,14 +154,14 @@ export const ProgramManifest = {
   ProgramManifest: ProgramManifestSchema,
   ProgramSource,
   make: makeProgramManifest,
-} as ProgramManifestFacade
+} satisfies ProgramManifestFacade
 export namespace ProgramManifest {
-  export type ProgramAgentCapability = import("./durable/program-manifest.js").ProgramAgentCapability
-  export type ProgramBudget = import("./durable/program-manifest.js").ProgramBudget
-  export type ProgramCapabilityManifest = import("./durable/program-manifest.js").ProgramCapabilityManifest
-  export type ProgramManifest = import("./durable/program-manifest.js").ProgramManifest
-  export type ProgramSource = import("./durable/program-manifest.js").ProgramSource
-  export type PinnedProgram = import("./durable/program-manifest.js").PinnedProgram
+  export type ProgramAgentCapability = import("./durable/manifest/program-manifest.js").ProgramAgentCapability
+  export type ProgramBudget = import("./durable/manifest/program-manifest.js").ProgramBudget
+  export type ProgramCapabilityManifest = import("./durable/manifest/program-manifest.js").ProgramCapabilityManifest
+  export type ProgramManifest = import("./durable/manifest/program-manifest.js").ProgramManifest
+  export type ProgramSource = import("./durable/manifest/program-manifest.js").ProgramSource
+  export type PinnedProgram = import("./durable/manifest/program-manifest.js").PinnedProgram
 }
 
 export const AgentProgram = { make: makeAgentProgram, run: runAgentProgram }
@@ -199,20 +190,20 @@ export const ProgramCapabilities = {
   ProgramToolFailure,
 }
 export namespace ProgramCapabilities {
-  export type CapabilityFailure = import("./program/program-capabilities.js").CapabilityFailure
-  export type ProgramSuspended = import("./program/program-capabilities.js").ProgramSuspended
-  export type ProgramBudgetExhausted = import("./program/program-capabilities.js").ProgramBudgetExhausted
-  export type Interface = import("./program/program-capabilities.js").Interface
-  export type ToolCallInput = import("./program/program-capabilities.js").ToolCallInput
-  export type StepCallInput = import("./program/program-capabilities.js").StepCallInput
-  export type AgentRunInput = import("./program/program-capabilities.js").AgentRunInput
-  export type AgentRunResult = import("./program/program-capabilities.js").AgentRunResult
-  export type AgentMapInput = import("./program/program-capabilities.js").AgentMapInput
-  export type AgentFanOutInput = import("./program/program-capabilities.js").AgentFanOutInput
-  export type AgentMemberResult = import("./program/program-capabilities.js").AgentMemberResult
-  export type LogInput = import("./program/program-capabilities.js").LogInput
-  export type ToolSummary = import("./program/program-capabilities.js").ToolSummary
-  export type ToolDescription = import("./program/program-capabilities.js").ToolDescription
+  export type CapabilityFailure = import("./program/capabilities.js").CapabilityFailure
+  export type ProgramSuspended = import("./program/capabilities.js").ProgramSuspended
+  export type ProgramBudgetExhausted = import("./program/capabilities.js").ProgramBudgetExhausted
+  export type Interface = import("./program/capabilities.js").Interface
+  export type ToolCallInput = import("./program/capabilities.js").ToolCallInput
+  export type StepCallInput = import("./program/capabilities.js").StepCallInput
+  export type AgentRunInput = import("./program/capabilities.js").AgentRunInput
+  export type AgentRunResult = import("./program/capabilities.js").AgentRunResult
+  export type AgentMapInput = import("./program/capabilities.js").AgentMapInput
+  export type AgentFanOutInput = import("./program/capabilities.js").AgentFanOutInput
+  export type AgentMemberResult = import("./program/capabilities.js").AgentMemberResult
+  export type LogInput = import("./program/capabilities.js").LogInput
+  export type ToolSummary = import("./program/capabilities.js").ToolSummary
+  export type ToolDescription = import("./program/capabilities.js").ToolDescription
 }
 
 export const ProgramBindings = {
@@ -223,35 +214,23 @@ export const ProgramBindings = {
   tool: makeProgramToolBinding,
 }
 export namespace ProgramBindings {
-  export type Bindings = import("./program/program-bindings.js").Bindings
-  export type TypedTool = import("./program/program-bindings.js").TypedTool
-  export type TypedStep = import("./program/program-bindings.js").TypedStep
-  export type ToolBinding<I, IE, O, OE, E = never> = import("./program/program-bindings.js").ToolBinding<
-    I,
-    IE,
-    O,
-    OE,
-    E
-  >
-  export type StepBinding<I, IE, O, OE, E = never> = import("./program/program-bindings.js").StepBinding<
-    I,
-    IE,
-    O,
-    OE,
-    E
-  >
+  export type Bindings = import("./program/bindings.js").Bindings
+  export type TypedTool = import("./program/bindings.js").TypedTool
+  export type TypedStep = import("./program/bindings.js").TypedStep
+  export type ToolBinding<I, IE, O, OE, E = never> = import("./program/bindings.js").ToolBinding<I, IE, O, OE, E>
+  export type StepBinding<I, IE, O, OE, E = never> = import("./program/bindings.js").StepBinding<I, IE, O, OE, E>
   export type AgentBinding<
     I extends import("effect/unstable/ai").Prompt.RawInput,
     IE,
     E = never,
-  > = import("./program/program-bindings.js").AgentBinding<I, IE, E>
-  export type AnyTool = import("./program/program-bindings.js").AnyTool
-  export type AnyStep = import("./program/program-bindings.js").AnyStep
-  export type AnyAgent = import("./program/program-bindings.js").AnyAgent
-  export type Authorize<I> = import("./program/program-bindings.js").Authorize<I>
-  export type Invocation = import("./program/program-bindings.js").Invocation
-  export type AgentInvocation = import("./program/program-bindings.js").AgentInvocation
-  export type ProgramReplayPolicy = import("./program/program-bindings.js").ProgramReplayPolicy
+  > = import("./program/bindings.js").AgentBinding<I, IE, E>
+  export type AnyTool = import("./program/bindings.js").AnyTool
+  export type AnyStep = import("./program/bindings.js").AnyStep
+  export type AnyAgent = import("./program/bindings.js").AnyAgent
+  export type Authorize<I> = import("./program/bindings.js").Authorize<I>
+  export type Invocation = import("./program/bindings.js").Invocation
+  export type AgentInvocation = import("./program/bindings.js").AgentInvocation
+  export type ProgramReplayPolicy = import("./program/bindings.js").ProgramReplayPolicy
 }
 
 export const ProgramHost = {
@@ -263,10 +242,10 @@ export const ProgramHost = {
   validateBindings: validateProgramBindings,
 }
 export namespace ProgramHost {
-  export type ProgramHost = import("./program/program-host.js").ProgramHost
-  export type Interface = import("./program/program-host.js").Interface
-  export type Request = import("./program/program-host.js").Request
-  export type ExecutionFailure = import("./program/program-host.js").ExecutionFailure
+  export type ProgramHost = import("./program/host.js").ProgramHost
+  export type Interface = import("./program/host.js").Interface
+  export type Request = import("./program/host.js").Request
+  export type ExecutionFailure = import("./program/host.js").ExecutionFailure
 }
 
 export const SandboxExecutor = {
@@ -304,7 +283,7 @@ export namespace SandboxExecutor {
   export type TestExecute = import("./program/sandbox-executor.js").TestExecute
 }
 
-type AgentManifestFacade = typeof import("./durable/agent-manifest.js")
+type AgentManifestFacade = typeof import("./durable/manifest/agent-manifest.js")
 
 export const AgentManifest = {
   AgentManifest: AgentManifestSchema,
@@ -317,20 +296,22 @@ export const AgentManifest = {
   ProgramAuthority,
   fromLiveAgent,
   make: makeAgentManifest,
-} as AgentManifestFacade
+} satisfies AgentManifestFacade
 export namespace AgentManifest {
-  export type AgentManifest = import("./durable/agent-manifest.js").AgentManifest
-  export type PinnedAgent = import("./durable/agent-manifest.js").PinnedAgent
-  export type NamedCapability = import("./durable/agent-manifest.js").NamedCapability
-  export type PinnedContent = import("./durable/agent-manifest.js").PinnedContent
-  export type ChildSelection = import("./durable/agent-manifest.js").ChildSelection
-  export type PolicyIdentity = import("./durable/agent-manifest.js").PolicyIdentity
-  export type CompactionIdentity = import("./durable/agent-manifest.js").CompactionIdentity
-  export type PortablePolicy = import("./durable/agent-manifest.js").PortablePolicy
-  export type ProgramAuthority = import("./durable/agent-manifest.js").ProgramAuthority
+  export type AgentManifest = import("./durable/manifest/agent-manifest.js").AgentManifest
+  export type PinnedAgent = import("./durable/manifest/agent-manifest.js").PinnedAgent
+  export type NamedCapability = import("./durable/manifest/agent-manifest.js").NamedCapability
+  export type PinnedContent = import("./durable/manifest/agent-manifest.js").PinnedContent
+  export type ChildSelection = import("./durable/manifest/agent-manifest.js").ChildSelection
+  export type PolicyIdentity = import("./durable/manifest/agent-manifest.js").PolicyIdentity
+  export type CompactionIdentity = import("./durable/manifest/agent-manifest.js").CompactionIdentity
+  export type PortablePolicy = import("./durable/manifest/agent-manifest.js").PortablePolicy
+  export type ProgramAuthority = import("./durable/manifest/agent-manifest.js").ProgramAuthority
 }
 
-type ExecutableManifestFacade = typeof import("./durable/executable-manifest.js")
+type ExecutableManifestFacade = Omit<typeof import("./durable/manifest/executable-manifest.js"), "test"> & {
+  readonly makeTest: typeof import("./durable/manifest/executable-manifest.js").test
+}
 
 export const ExecutableManifest = {
   AgentEntry,
@@ -345,16 +326,16 @@ export const ExecutableManifest = {
   make: makeExecutableManifest,
   makeTest: makeTestExecutableManifest,
   validateRef,
-} as ExecutableManifestFacade
+} satisfies ExecutableManifestFacade
 export namespace ExecutableManifest {
-  export type ExecutableManifest = import("./durable/executable-manifest.js").ExecutableManifest
-  export type ExecutableRef = import("./durable/executable-manifest.js").ExecutableRef
-  export type PinnedExecutable = import("./durable/executable-manifest.js").PinnedExecutable
-  export type AgentEntry = import("./durable/executable-manifest.js").AgentEntry
-  export type ExecutableEntry = import("./durable/executable-manifest.js").ExecutableEntry
-  export type ProgramEntry = import("./durable/executable-manifest.js").ProgramEntry
-  export type ProfileBinding = import("./durable/executable-manifest.js").ProfileBinding
-  export type ExecutableTarget = import("./durable/executable-manifest.js").ExecutableTarget
+  export type ExecutableManifest = import("./durable/manifest/executable-manifest.js").ExecutableManifest
+  export type ExecutableRef = import("./durable/manifest/executable-manifest.js").ExecutableRef
+  export type PinnedExecutable = import("./durable/manifest/executable-manifest.js").PinnedExecutable
+  export type AgentEntry = import("./durable/manifest/executable-manifest.js").AgentEntry
+  export type ExecutableEntry = import("./durable/manifest/executable-manifest.js").ExecutableEntry
+  export type ProgramEntry = import("./durable/manifest/executable-manifest.js").ProgramEntry
+  export type ProfileBinding = import("./durable/manifest/executable-manifest.js").ProfileBinding
+  export type ExecutableTarget = import("./durable/manifest/executable-manifest.js").ExecutableTarget
 }
 
 export { withCacheBreakpoints } from "./model/prompt-cache.js"
@@ -394,19 +375,19 @@ export {
   TurnPolicy,
 }
 
-export type AgentFacade = typeof import("./agent/agent.js")
-export type AgentEventFacade = typeof import("./agent/agent-event.js")
-export type ModelTelemetryFacade = typeof import("./model/model-telemetry.js")
+export type AgentFacade = typeof import("./agent/service.js")
+export type AgentEventFacade = typeof import("./agent/event.js")
+export type ModelTelemetryFacade = typeof import("./model/telemetry/events.js")
 export type ToolExecutorFacade = typeof import("./tools/tool-executor.js")
-export type TurnPolicyFacade = typeof import("./turn/turn-policy.js")
-export type ModelRegistryFacade = typeof import("./model/model-registry.js")
+export type TurnPolicyFacade = typeof import("./turn/policy.js")
+export type ModelRegistryFacade = typeof import("./model/registry.js")
 export type SkillSourceFacade = typeof import("./context/skill-source.js")
-export type CoreAgent = import("./agent/agent.js").Agent
+export type CoreAgent = import("./agent/service.js").Agent
 export type CoreMemory = import("./context/memory.js").Memory
 export type CoreSkillSource = import("./context/skill-source.js").SkillSource
 export type CoreSkillSourceError = import("./context/skill-source.js").SkillSourceError
-export type CoreModelRegistry = import("./model/model-registry.js").ModelRegistry
-export type CoreModelRegistryRegistration = import("./model/model-registry.js").Registration
+export type CoreModelRegistry = import("./model/registry.js").ModelRegistry
+export type CoreModelRegistryRegistration = import("./model/registry.js").Registration
 
 export {
   AiError,

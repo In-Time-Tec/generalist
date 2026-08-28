@@ -1,3 +1,7 @@
+import "./suites/host-binding-context-suite.js"
+import "./suites/bun-host-binding-no-argument-suite.js"
+import "./suites/bun-host-binding-identity-suite.js"
+import "./suites/bun-host-binding-failure-detail-suite.js"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { HostBindingRegistry } from "../../src/repl/index"
@@ -12,9 +16,14 @@ const read: HostBindingRegistry.AnyOperation = {
   output: ReadOutput,
   failure: ReadFailure,
   handle: (input) =>
-    (input as { readonly path: string }).path === "/missing"
-      ? Effect.fail({ _tag: "NotFound" as const, reason: "missing" })
-      : Effect.succeed({ text: `contents of ${(input as { readonly path: string }).path}` }),
+    Schema.decodeUnknownEffect(ReadInput)(input).pipe(
+      Effect.orDie,
+      Effect.flatMap((decoded) =>
+        decoded.path === "/missing"
+          ? Effect.fail({ _tag: "NotFound" as const, reason: "missing" })
+          : Effect.succeed({ text: `contents of ${decoded.path}` }),
+      ),
+    ),
 }
 
 const broken: HostBindingRegistry.AnyOperation = {
@@ -22,10 +31,13 @@ const broken: HostBindingRegistry.AnyOperation = {
   input: ReadInput,
   output: ReadOutput,
   failure: ReadFailure,
-  handle: () => Effect.succeed({ text: 42 } as never),
+  handle: () => Effect.succeed({ text: 42 }),
 }
 
-const workspace: HostBindingRegistry.Module = { name: "workspace", operations: [read, broken] }
+const workspace: HostBindingRegistry.Module = {
+  name: "workspace",
+  operations: [read, broken],
+}
 
 describe("HostBindingRegistry", () => {
   it.effect("describes the mounted surface without exposing handlers", () =>
@@ -120,7 +132,11 @@ describe("HostBindingRegistry", () => {
 
   it.effect("rejects two operations claiming the same name", () =>
     Effect.gen(function* () {
-      const failure = yield* Effect.flip(HostBindingRegistry.make([{ name: "workspace", operations: [read, read] }]))
+      const duplicate: HostBindingRegistry.Module<never> = {
+        name: "workspace",
+        operations: [read, read],
+      }
+      const failure = yield* Effect.flip(HostBindingRegistry.make([duplicate]))
       expect(Schema.is(HostBindingRegistry.HostBindingConflict)(failure)).toBe(true)
       if (Schema.is(HostBindingRegistry.HostBindingConflict)(failure)) expect(failure.operation).toBe("read")
     }),

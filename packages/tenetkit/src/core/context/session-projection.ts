@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Prompt } from "effect/unstable/ai"
 import { projectTranscript } from "./memory.js"
 import type { Entry, SkillEntry } from "./session.js"
 
@@ -22,7 +22,7 @@ const inspectToolContext = (prompt: Prompt.Prompt) => {
   const calls = new Map<string, ToolCallState>()
   const issues: Array<ContextInvalid["issues"][number]> = []
   for (const message of prompt.content) {
-    if (typeof message.content === "string") continue
+    if (Schema.is(Schema.String)(message.content)) continue
     for (const part of message.content) {
       if (part.type === "tool-call" && part.providerExecuted !== true) {
         const state = calls.get(part.id)
@@ -75,6 +75,29 @@ const memoryMessage = (items: ReadonlyArray<string>): Prompt.Message =>
 const skillMessage = (entry: SkillEntry): Prompt.Message =>
   messageFromText("system", `<skill name="${attributeValue(entry.name)}">\n${entry.body}\n</skill>`)
 
+const messagesFromEntry = (entry: Entry): ReadonlyArray<Prompt.Message> => {
+  switch (entry._tag) {
+    case "Message":
+    case "Steering":
+      return [entry.message]
+    case "ModelResponse":
+      return Prompt.fromResponseParts(entry.content).content
+    case "ToolCall":
+      return [Prompt.makeMessage("assistant", { content: [entry.part] })]
+    case "ToolResult":
+      return [Prompt.makeMessage("tool", { content: [entry.part] })]
+    case "Memory":
+      return [memoryMessage(entry.items)]
+    case "Skill":
+      return [skillMessage(entry)]
+    case "BranchSummary":
+      return [branchSummaryMessage(entry.summary)]
+    case "Handoff":
+    case "Compaction":
+      return []
+  }
+}
+
 const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> => {
   const boundaryIndex = path.findLastIndex((entry) => entry._tag === "Compaction" || entry._tag === "Handoff")
   const boundary = boundaryIndex === -1 ? undefined : path[boundaryIndex]
@@ -83,36 +106,7 @@ const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Mes
   const entries = boundaryIndex === -1 ? path : path.slice(boundaryIndex + 1)
 
   for (const entry of entries) {
-    switch (entry._tag) {
-      case "Message":
-        messages.push(entry.message)
-        break
-      case "ModelResponse":
-        messages.push(...Prompt.fromResponseParts(entry.content as ReadonlyArray<Response.AnyPart>).content)
-        break
-      case "ToolCall":
-        messages.push(Prompt.makeMessage("assistant", { content: [entry.part] }))
-        break
-      case "ToolResult":
-        messages.push(Prompt.makeMessage("tool", { content: [entry.part] }))
-        break
-      case "Memory":
-        messages.push(memoryMessage(entry.items))
-        break
-      case "Skill":
-        messages.push(skillMessage(entry))
-        break
-      case "Steering":
-        messages.push(entry.message)
-        break
-      case "Handoff":
-        break
-      case "BranchSummary":
-        messages.push(branchSummaryMessage(entry.summary))
-        break
-      case "Compaction":
-        break
-    }
+    messages.push(...messagesFromEntry(entry))
   }
 
   return messages
@@ -128,7 +122,7 @@ export const buildMemoryContext = (path: ReadonlyArray<Entry>): Prompt.Prompt =>
       case "Message":
         return [entry.message]
       case "ModelResponse":
-        return Prompt.fromResponseParts(entry.content as ReadonlyArray<Response.AnyPart>).content
+        return Prompt.fromResponseParts(entry.content).content
       case "ToolCall":
         return [Prompt.makeMessage("assistant", { content: [entry.part] })]
       case "ToolResult":

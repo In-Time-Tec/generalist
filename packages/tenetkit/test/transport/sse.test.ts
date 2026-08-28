@@ -3,7 +3,7 @@ import { Effect, Function, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { Sse as SseEncoding } from "effect/unstable/encoding"
 import { Headers, HttpBody, HttpServerRequest } from "effect/unstable/http"
 import { Sse, Wire } from "../../src/transport/index.js"
-import { runtimeLayer } from "./helpers.js"
+import { event, runtimeLayer } from "./fixtures.js"
 
 const provideScoped = Function.dual<
   <A2, E2, R2>(
@@ -23,7 +23,7 @@ const provideScoped = Function.dual<
 )
 
 const request = (url: string, headers: Headers.Input = {}): HttpServerRequest.HttpServerRequest =>
-  ({ url, originalUrl: url, headers: Headers.fromInput(headers) }) as HttpServerRequest.HttpServerRequest
+  HttpServerRequest.fromWeb(new Request(url, { headers: Headers.fromInput(headers) }))
 
 class BodyReadError extends Schema.TaggedError<BodyReadError>()("tenetkit/transport/BodyReadError", {
   message: Schema.String,
@@ -42,8 +42,8 @@ const bodyText = (body: HttpBody.HttpBody): Effect.Effect<string, BodyReadError>
 
 const parse = (text: string): ReadonlyArray<SseEncoding.Event> => {
   const events: Array<SseEncoding.Event> = []
-  const parser = SseEncoding.makeParser((event) => {
-    if (event._tag === "Event") events.push(event)
+  const parser = SseEncoding.makeParser((parsed) => {
+    if (parsed._tag === "Event") events.push(parsed)
   })
   parser.feed(text)
   return events
@@ -86,6 +86,5 @@ describe("Sse", () => {
   })
 })
 
-import { event } from "./helpers.js"
 const runtimeLayerEvents = (cursor: number | undefined) =>
   Stream.fromIterable([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1)))

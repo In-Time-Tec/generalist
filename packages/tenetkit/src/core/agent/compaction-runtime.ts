@@ -1,23 +1,35 @@
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
-import { Chat, Prompt, Tokenizer } from "effect/unstable/ai"
-import { AgentError, MiddlewareViolation } from "./agent-event.js"
+import { AiError, Chat, Prompt, Tokenizer } from "effect/unstable/ai"
+import { AgentError, MiddlewareViolation } from "./event.js"
 import { Compaction, DEFAULT_RESERVE_TOKENS, type Result as CompactionResult, type Usage } from "../turn/compaction.js"
 import { diagnose as diagnoseSessionSync } from "../context/session-sync.js"
-import { SessionSyncInternals } from "./session-sync.js"
-import { checkpointMatches, buildContext } from "../context/session.js"
-import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./agent-message.js"
-import { conversationOnly, withDerivedSystem } from "./session-history.js"
+import { SessionSyncInternals } from "./session/sync.js"
+import {
+  checkpointMatches,
+  buildContext,
+  SessionConflict,
+  SessionStore,
+  type Entry,
+  type SessionStoreError,
+} from "../context/session.js"
+import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./message.js"
+import { conversationOnly, withDerivedSystem } from "./session/history.js"
 import { promptDigest } from "./prompt-identity.js"
-import { cursorFromPath, pathFromCursor, type SessionCursor } from "./session-cursor.js"
-import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model/model-telemetry.js"
-import type { RunError, RunOptions } from "./agent.js"
-import type { AgentRunState } from "./agent-run-state.js"
+import {
+  cursorFromPath,
+  pathFromCursor,
+  SessionCursor,
+  type SessionCursor as SessionCursorType,
+} from "./session/cursor.js"
+import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model/telemetry/events.js"
+import type { RunError, RunOptions } from "./service.js"
+import type { AgentRunState } from "./run-state.js"
 import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
-import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
-import { intercept } from "../durable/driver-run.js"
-import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
-import type { MemoryError } from "../context/memory.js"
+import { intercept } from "../durable/driver/run.js"
+import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
+import type { Key, Memory, MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
+import { CompactionProjection } from "./session/compaction-projection.js"
 type CompactionContext = {
   readonly activeSession: Option.Option<typeof SessionStore.Service>
   readonly sessionService: Option.Option<typeof SessionStore.Service>
@@ -34,21 +46,21 @@ type CompactionContext = {
   readonly state: AgentRunState
   readonly compactionService: Option.Option<typeof Compaction.Service>
   readonly tokenizerService: Option.Option<typeof Tokenizer.Tokenizer.Service>
-  readonly deliverPending: Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed>
+  readonly deliverPending: Effect.Effect<void, import("../model/telemetry/events.js").DeliveryFailed>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
-  readonly emitTelemetry: (event: import("../model/model-telemetry.js").EventPayload) => Effect.Effect<void>
-  readonly prepareTelemetry: (event: import("../model/model-telemetry.js").EventPayload) => ModelTelemetryEvent
+  readonly emitTelemetry: (event: import("../model/telemetry/events.js").EventPayload) => Effect.Effect<void>
+  readonly prepareTelemetry: (event: import("../model/telemetry/events.js").EventPayload) => ModelTelemetryEvent
   readonly publishTelemetry: (event: ModelTelemetryEvent) => void
-  readonly errorMessage: (error: unknown) => string
+  readonly errorMessage: (error: AiError.AiError) => string
   readonly agent: { readonly name: string }
-  readonly memoryRuntime: unknown | undefined
+  readonly memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined
   readonly memoryError: (turn: number, error: MemoryError) => AgentError
   readonly skillError: (turn: number, error: SkillSourceError) => AgentError
   readonly compactionError: (turn: number, error: import("../turn/compaction.js").CompactionError) => AgentError
   readonly sessionError: (turn: number, error: SessionStoreError | SessionConflict) => AgentError
 }
-export const makeCompactionRuntime = (context: CompactionContext) => {
+export const make = (context: CompactionContext) => {
   const {
     activeSession,
     sessionId,
@@ -73,8 +85,31 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
   } = context
   const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
   const { isAppendOnlyDescendant, sessionTranscriptCursor } = SessionSyncInternals
-  const resolveCursor = (turn: number, cursor: unknown) =>
+  const resolveCursor = (turn: number, cursor: SessionCursorType) =>
     pathFromCursor({ turn, cursor, session: activeSession, sessionError })
+  const appendTranscript = (
+    turn: number,
+    transcript: Prompt.Prompt,
+    cursor: number,
+    path: ReadonlyArray<Entry>,
+    session: typeof SessionStore.Service,
+  ) =>
+    Effect.gen(function* () {
+      let expectedLeafId = path.at(-1)?.id ?? null
+      const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+      const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
+      const root = checkpoint === undefined ? "root" : `checkpoint:${checkpoint.id}`
+      for (const [position, message] of transcript.content.entries()) {
+        if (position < cursor || message.role === "system") continue
+        const id = operationKey(logicalId, "model", turn, "session-entry", root, position, message.role)
+        const appended = yield* session.append(
+          { _tag: "Message", message },
+          { ...sessionAppendOptions(expectedLeafId), id },
+        )
+        expectedLeafId = appended.id
+      }
+      return expectedLeafId === (path.at(-1)?.id ?? null) ? path : yield* session.path()
+    })
   const syncSessionBody = (turn: number, transcript: Prompt.Prompt): Effect.Effect<SessionCursor, AgentError> =>
     Option.match(activeSession, {
       onNone: () => Effect.succeed({ leafId: null }),
@@ -91,32 +126,21 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
               yield* savePersisted(turn)
               return cursorFromPath(path)
             }
+            const diagnosticsBase = {
+              sessionId,
+              durableEntryTags: path.map((entry) => entry._tag),
+              projection: projection.content,
+              transcript: transcript.content,
+            }
+            const diagnosticsInput =
+              sessionOwnerToken === undefined ? diagnosticsBase : { ...diagnosticsBase, ownerToken: sessionOwnerToken }
             return yield* AgentError.make({
               message: "Session projection is not a prefix of authoritative Chat history",
               turn,
-              diagnostics: diagnoseSessionSync({
-                sessionId,
-                ...(sessionOwnerToken === undefined ? {} : { ownerToken: sessionOwnerToken }),
-                durableEntryTags: path.map((entry) => entry._tag),
-                projection: projection.content,
-                transcript: transcript.content,
-              }),
+              diagnostics: diagnoseSessionSync(diagnosticsInput),
             })
           }
-          let expectedLeafId = path.at(-1)?.id ?? null
-          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-          const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
-          const root = checkpoint === undefined ? "root" : `checkpoint:${checkpoint.id}`
-          for (const [position, message] of transcript.content.entries()) {
-            if (position < cursor.value || message.role === "system") continue
-            const id = operationKey(logicalId, "model", turn, "session-entry", root, position, message.role)
-            const appended = yield* session.append(
-              { _tag: "Message", message },
-              { ...sessionAppendOptions(expectedLeafId), id },
-            )
-            expectedLeafId = appended.id
-          }
-          if (expectedLeafId !== (path.at(-1)?.id ?? null)) path = yield* session.path()
+          path = yield* appendTranscript(turn, transcript, cursor.value, path, session)
           return cursorFromPath(path)
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
@@ -139,7 +163,15 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         replayPolicy: "pure",
       },
       syncSessionBody(turn, transcript),
-    ).pipe(Effect.flatMap((cursor) => resolveCursor(turn, cursor)))
+    ).pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(SessionCursor)),
+      Effect.mapError((error) =>
+        Schema.is(AgentError)(error)
+          ? error
+          : AgentError.make({ message: `Invalid Session cursor: ${String(error)}`, turn, cause: error }),
+      ),
+      Effect.flatMap((cursor) => resolveCursor(turn, cursor)),
+    )
   }
   const sessionPathForCompaction = (
     turn: number,
@@ -194,51 +226,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       }),
     )
   }
-  const validateCompactionProjection = (turn: number, result: CompactionResult): Effect.Effect<void, AgentError> => {
-    const pending = new Set<string>()
-    const optional = new Set<string>()
-    for (const message of Prompt.concat(result.history, result.prompt).content) {
-      if (typeof message.content === "string") {
-        if (pending.size > 0) {
-          return Effect.fail(
-            AgentError.make({ message: "Compaction projection separates a tool call from its result", turn }),
-          )
-        }
-        optional.clear()
-        continue
-      }
-      const hasResult = message.content.some((part) => part.type === "tool-result")
-      if (pending.size > 0 && !hasResult) {
-        return Effect.fail(
-          AgentError.make({ message: "Compaction projection separates a tool call from its result", turn }),
-        )
-      }
-      if (!hasResult) optional.clear()
-      const responseCalls = new Set<string>()
-      for (const part of message.content) {
-        if (part.type === "tool-call") {
-          if (responseCalls.has(part.id)) {
-            return Effect.fail(
-              AgentError.make({ message: `Compaction projection contains duplicate tool call ${part.id}`, turn }),
-            )
-          }
-          responseCalls.add(part.id)
-          if (part.providerExecuted) optional.add(part.id)
-          else pending.add(part.id)
-        }
-        if (part.type === "tool-result") {
-          if (!pending.delete(part.id) && !optional.delete(part.id)) {
-            return Effect.fail(
-              AgentError.make({ message: `Compaction projection contains orphan tool result ${part.id}`, turn }),
-            )
-          }
-        }
-      }
-    }
-    return pending.size === 0
-      ? Effect.void
-      : Effect.fail(AgentError.make({ message: "Compaction projection contains an unresolved tool call", turn }))
-  }
   const applyCompactionResultBody = (
     turn: number,
     result: CompactionResult,
@@ -278,20 +265,17 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         Effect.gen(function* () {
           const id = yield* session.reserveEntryId
           const telemetryBeforeApplied = Object.freeze([...undeliveredTelemetry])
-          const summaryCall: Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> | undefined =
-            commitData === undefined
-              ? undefined
-              : (telemetryBeforeApplied.findLast(
-                  (event) => event._tag === "ModelCallStarted" && event.compactionId === commitData.compactionId,
-                ) as Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> | undefined)
-          const compactionCommit =
-            commitData === undefined
-              ? undefined
-              : {
-                  ...commitData,
-                  checkpointId: id,
-                  ...(summaryCall?.modelCallId === undefined ? {} : { summaryModelCallId: summaryCall.modelCallId }),
-                }
+          const isSummaryCall = (
+            event: ModelTelemetryEvent,
+          ): event is Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> =>
+            event._tag === "ModelCallStarted" && event.compactionId === commitData?.compactionId
+          const summaryCall = commitData === undefined ? undefined : telemetryBeforeApplied.findLast(isSummaryCall)
+          let compactionCommit: CompactionCommit | undefined
+          if (commitData !== undefined) {
+            const commitBase = { ...commitData, checkpointId: id }
+            compactionCommit =
+              summaryCall === undefined ? commitBase : { ...commitBase, summaryModelCallId: summaryCall.modelCallId }
+          }
           const applied =
             compactionCommit === undefined
               ? undefined
@@ -306,36 +290,32 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                 })
           const telemetry = Object.freeze([...telemetryBeforeApplied, ...(applied === undefined ? [] : [applied])])
           const projectedHistory = conversationOnly(result.history)
+          const checkpointBase = {
+            id,
+            parentId,
+            projectedHistory,
+            telemetry,
+          }
+          const checkpointWithCommit =
+            compactionCommit === undefined ? checkpointBase : { ...checkpointBase, compactionCommit }
+          const expectedCheckpoint =
+            result._tag === "Summarize" ? { ...checkpointWithCommit, summary: result.summary } : checkpointWithCommit
+          const checkpointInput =
+            sessionOwnerToken === undefined
+              ? expectedCheckpoint
+              : { ...expectedCheckpoint, ownerToken: sessionOwnerToken }
           yield* Effect.uninterruptibleMask((restore) =>
             restore(
-              session
-                .appendCheckpoint({
-                  id,
-                  parentId,
-                  projectedHistory,
-                  telemetry,
-                  ...(compactionCommit === undefined ? {} : { compactionCommit }),
-                  ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
-                  ...(sessionOwnerToken === undefined ? {} : { ownerToken: sessionOwnerToken }),
-                })
-                .pipe(
-                  Effect.filterOrFail(
-                    (appended) =>
-                      checkpointMatches(appended.checkpoint, {
-                        id,
-                        parentId,
-                        projectedHistory,
-                        telemetry,
-                        ...(compactionCommit === undefined ? {} : { compactionCommit }),
-                        ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
-                      }),
-                    () =>
-                      SessionConflict.make({
-                        reason: "checkpoint-id-reused",
-                        message: `Session returned a non-matching checkpoint ${id}`,
-                      }),
-                  ),
+              session.appendCheckpoint(checkpointInput).pipe(
+                Effect.filterOrFail(
+                  (appended) => checkpointMatches(appended.checkpoint, expectedCheckpoint),
+                  () =>
+                    SessionConflict.make({
+                      reason: "checkpoint-id-reused",
+                      message: `Session returned a non-matching checkpoint ${id}`,
+                    }),
                 ),
+              ),
             ).pipe(
               Effect.tap(() =>
                 Effect.sync(() => {
@@ -366,17 +346,19 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     onCommitted?: () => void,
   ): Effect.Effect<void, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+    const interceptionBase = {
+      turn,
+      tag: result._tag,
+      applicationIdentity,
+    }
+    const interceptionInput =
+      commitData === undefined ? interceptionBase : { ...interceptionBase, compactionId: commitData.compactionId }
     return intercept(
       {
         kind: "compaction",
         key: operationKey(logicalId, "compaction", "apply", turn, applicationIdentity),
         turn,
-        input: {
-          turn,
-          tag: result._tag,
-          applicationIdentity,
-          ...(commitData === undefined ? {} : { compactionId: commitData.compactionId }),
-        },
+        input: interceptionInput,
         replayPolicy: "pure",
       },
       applyCompactionResultBody(turn, result, parentId, commitData, onCommitted),
@@ -411,20 +393,24 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           )
           const compactionId = yield* generateId
           const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-          const compactEffect = Effect.scoped(
-            compaction.maybeCompact({
-              compactionId,
-              agentName: agent.name,
-              sessionId,
-              turn,
-              history: detachedHistory,
-              prompt: detachedPrompt,
-              path: detachedPath,
-              usage,
-              overflow,
-              ...(options.toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes: options.toolOutputMaxBytes }),
-            }),
-          ).pipe(Effect.mapError((error) => compactionError(turn, error)))
+          const compactBase = {
+            compactionId,
+            agentName: agent.name,
+            sessionId,
+            turn,
+            history: detachedHistory,
+            prompt: detachedPrompt,
+            path: detachedPath,
+            usage,
+            overflow,
+          }
+          const compactInput =
+            options.toolOutputMaxBytes === undefined
+              ? compactBase
+              : { ...compactBase, toolOutputMaxBytes: options.toolOutputMaxBytes }
+          const compactEffect = Effect.scoped(compaction.maybeCompact(compactInput)).pipe(
+            Effect.mapError((error) => compactionError(turn, error)),
+          )
           const compacted = overflow
             ? yield* compactEffect
             : yield* intercept(
@@ -462,25 +448,21 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                 detail: "Compaction must preserve recalled-memory message lineage outside the lossless Session path",
               })
             }
-            yield* validateCompactionProjection(turn, compacted.value)
+            yield* CompactionProjection.validate(turn, compacted.value)
             const after = Prompt.concat(compacted.value.history, compacted.value.prompt)
             const contextTokensAfter = yield* Effect.option(countTokens(turn, after))
-            yield* applyCompactionResult(
-              turn,
-              compacted.value,
-              path.at(-1)?.id ?? null,
+            const commitBase = {
               compactionId,
-              {
-                compactionId,
-                contextTokensBefore: usage.contextTokens,
-                ...(Option.isSome(contextTokensAfter) ? { contextTokensAfter: contextTokensAfter.value } : {}),
-                entriesBefore: Prompt.concat(history, prompt).content.length,
-                entriesAfter: after.content.length,
-              },
-              () => {
-                applicationCommitted = true
-              },
-            )
+              contextTokensBefore: usage.contextTokens,
+              entriesBefore: Prompt.concat(history, prompt).content.length,
+              entriesAfter: after.content.length,
+            }
+            const commit = Option.isSome(contextTokensAfter)
+              ? { ...commitBase, contextTokensAfter: contextTokensAfter.value }
+              : commitBase
+            yield* applyCompactionResult(turn, compacted.value, path.at(-1)?.id ?? null, compactionId, commit, () => {
+              applicationCommitted = true
+            })
             return {
               prompt: Option.isNone(activeSession) ? Prompt.fromMessages([]) : compacted.value.prompt,
               changed: true,

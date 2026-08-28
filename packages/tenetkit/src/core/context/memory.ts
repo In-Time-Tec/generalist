@@ -6,7 +6,9 @@ const provenanceOption = "tenetkit/memory"
 const recallLineage = new WeakMap<Prompt.Message, Prompt.Message>()
 
 /** @experimental */
-export type Metadata = Readonly<Record<string, unknown>>
+export type Metadata = Readonly<Record<string, typeof Schema.Unknown.Type>>
+
+const RecallProvenance = Schema.Struct({ origin: Schema.Literal("memoryRecall") })
 
 /** @experimental */
 export interface Key {
@@ -32,13 +34,7 @@ export const itemFromPromptPart = Option.liftPredicate(
 /** @experimental */
 export const isMessageFromRecall = (message: Prompt.Message): boolean => {
   const provenance = message.options[provenanceOption]
-  return (
-    typeof provenance === "object" &&
-    provenance !== null &&
-    !Array.isArray(provenance) &&
-    "origin" in provenance &&
-    provenance.origin === "memoryRecall"
-  )
+  return Schema.is(RecallProvenance)(provenance)
 }
 
 /** @experimental */

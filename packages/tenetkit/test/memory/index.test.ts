@@ -1,10 +1,9 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { EmbeddingModel, LanguageModel, Prompt } from "effect/unstable/ai"
-import { Memory } from "tenetkit"
+import { Memory } from "../../src/index.js"
 import { expectTypeOf } from "vitest"
-import { layerCombined, VectorStore, WorkingMemory } from "../../src/memory/index"
-import type { CombinedOptions } from "../../src/memory/index"
+import { layerCombined, VectorStore, WorkingMemory, type CombinedOptions } from "../../src/memory/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 

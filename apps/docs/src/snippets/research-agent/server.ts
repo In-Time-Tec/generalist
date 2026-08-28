@@ -53,8 +53,8 @@ const RespondInput = Schema.Struct({
   }),
 })
 
-const errorResponse = (status: number) => (error: unknown) =>
-  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: String(error) }, { status }))
+const errorResponse = (status: number) => (error: Error) =>
+  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: error.message }, { status }))
 
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
@@ -86,16 +86,17 @@ const routesLayer = HttpRouter.use((router) =>
       "/runs",
       HttpRouter.schemaJson(StartRunInput).pipe(
         Effect.flatMap(({ body }) =>
-          Runtime.Runtime.use((runtime) =>
-            runtime.start({
-              ...(body.runId === undefined ? {} : { runId: body.runId }),
+          Runtime.Runtime.use((runtime) => {
+            const input = {
               executable,
               registrations,
               sessionId: body.sessionId,
               idempotencyKey: body.idempotencyKey,
               prompt: body.prompt,
-            }),
-          ),
+            }
+            if (body.runId !== undefined) Object.assign(input, { runId: body.runId })
+            return runtime.start(input)
+          }),
         ),
         Effect.tap((receipt) => (receipt.duplicate ? Effect.void : executeRun(receipt.runId))),
         Effect.map((receipt) => HttpServerResponse.jsonUnsafe(receipt, { status: 202 })),
@@ -119,17 +120,17 @@ const routesLayer = HttpRouter.use((router) =>
   }),
 )
 
-export const approvalsLayer = Approvals.layerTest({
+export const approvalsLayer: Layer.Layer<Approvals.Approvals> = Approvals.layerTest({
   resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
-}) as Layer.Layer<Approvals.Approvals>
+})
 
-export const toolExecutorLayer = Layer.unwrap(
+export const toolExecutorLayer: Layer.Layer<ToolExecutor.ToolExecutor> = Layer.unwrap(
   Effect.gen(function* () {
     const handlers = yield* Layer.build(toolkitLayer)
     const handledToolkit = yield* toolkit.pipe(Effect.provideContext(handlers))
     return ToolExecutor.layerToolkit(handledToolkit)
   }),
-).pipe(Layer.provide(cannedLayer)) as Layer.Layer<ToolExecutor.ToolExecutor>
+).pipe(Layer.provide(cannedLayer))
 
 const persistenceLayer = Chat.layerPersisted({ storeId: "research-agent" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),

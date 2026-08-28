@@ -1,10 +1,9 @@
-import { Context, Effect, Layer, Option, Semaphore } from "effect"
-import { listRuns } from "./store-list.js"
-import type { Scope } from "effect"
+import { Context, Effect, Layer, Option, Semaphore, type Scope } from "effect"
+import { listRuns } from "./store/list.js"
 import { SqlClient } from "effect/unstable/sql"
 import { CursorExpired, RunNotFound } from "../errors.js"
-import type { LayerOptions } from "../runtime.js"
-import { RunStore, type Interface as RunStoreInterface } from "../run-store.js"
+import type { LayerOptions } from "../service.js"
+import { RunStore, type Interface as RunStoreInterface } from "../run/store.js"
 import {
   MultiWorkerUnsupported,
   SchemaChecksumMismatch,
@@ -13,8 +12,8 @@ import {
   SchemaVersionUnsupported,
 } from "./errors.js"
 import { migrate } from "./migrate.js"
-import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store-admit.js"
-import { activateRoot } from "./store-activate.js"
+import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store/admit.js"
+import { activateRoot } from "./store/activate.js"
 import {
   cancel,
   complete,
@@ -26,8 +25,8 @@ import {
   settleAdmittedCancellation,
   signal,
   suspend,
-} from "./store-control.js"
-import { cancelSession } from "./store-session.js"
+} from "./store/control.js"
+import { cancelSession } from "./store/session.js"
 import {
   expireRunningOperation,
   getOperation,
@@ -38,11 +37,11 @@ import {
   acknowledgeOperationCancellation,
   commitModelResponse,
   operationCancellations,
-} from "./store-operations.js"
-import { recoverRunningOperations } from "./store-operation-recovery.js"
-import { resolveOperation } from "./store-operation-resolution.js"
-import { hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
-import { commitInterruptedModelResponse } from "./interrupted-model-response.js"
+} from "./store/operation/operations.js"
+import { recoverRunningOperations } from "./store/operation/recovery.js"
+import { resolveOperation } from "./store/operation/resolution.js"
+import { hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store/statements.js"
+import { commitInterruptedModelResponse } from "./model-response/interrupted-model-response.js"
 import {
   claimExecution,
   loadExecution,
@@ -50,10 +49,10 @@ import {
   requireExecutionClaim,
   retryExecution,
   saveExecution,
-} from "./store-execution.js"
-import { withSql } from "./sql-effect.js"
-import { makeSqliteSessionStore } from "./session-store.js"
-import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
+} from "./store/execution.js"
+import { withSql } from "./effect.js"
+import { make as makeSqliteSessionStore } from "./session/store.js"
+import { admitSteering, readSteering, saveCompletionContinuation } from "./store/steering/service.js"
 import {
   admitMessage,
   deliverPendingMessages,
@@ -62,11 +61,11 @@ import {
   pendingMessages,
   registerAgentName,
   resolveAddress,
-} from "./store-directory.js"
-import { makeEventHub } from "./subscribers.js"
-import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
+} from "./store/directory.js"
+import { make as makeEventHub } from "./subscribers.js"
+import { admitFanOut, inspectFanOut } from "./store/fan-out/service.js"
 import { loadTreeHistory } from "./tree-history.js"
-import { loadRunSnapshot, loadTreeInspection } from "./inspection.js"
+import { loadRunSnapshot, loadTreeInspection } from "./inspection/service.js"
 import {
   admitProgramAgents,
   commitProgramLog,
@@ -77,12 +76,12 @@ import {
   suspendProgramOperation,
   settleProgramOperation,
   startProgramOperation,
-} from "./store-program.js"
-import { ProgramCapabilities } from "tenetkit"
+} from "./store/program.js"
+import { ProgramCapabilities } from "../../core/index.js"
 import { settlementNotifications } from "./settlement-notifications.js"
-import { reconcileCancellationRequested, sessionRoots } from "./session-lifecycle.js"
-import { loadChildReadiness } from "./store-child-capacity.js"
-import { readRunActivations } from "./run-activation.js"
+import { reconcileCancellationRequested, sessionRoots } from "./session/lifecycle.js"
+import { loadChildReadiness } from "./store/child/capacity.js"
+import { readRunActivations } from "./run/activation.js"
 import {
   acknowledge as acknowledgeExternalChild,
   acknowledgeExternalRootSettlement,
@@ -92,8 +91,8 @@ import {
   inspectExternalRoot,
   reserve as reserveExternalChild,
   externalChildSettlement,
-} from "./store-external-child.js"
-import { ExternalChildStore } from "../external-child-store.js"
+} from "./store/child/external.js"
+import { ExternalChildStore } from "../child/external/store.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly source?: string
@@ -133,17 +132,30 @@ const makeSqliteStoreServices = (
       Effect.mapError((error) => SchemaMigrationFailed.make({ source, message: error.message })),
     )
     const eventCommit = yield* Semaphore.make(1)
-    const run = <A, E>(
-      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
-      touched: ReadonlyArray<string> | (() => Iterable<string>) = [],
-    ) =>
+    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>, touched: ReadonlyArray<string> = []) =>
       withSql(
         sql,
         sql.withTransaction(
           Effect.gen(function* () {
             const result = yield* effect
             if (options.activationProjection !== undefined) {
-              const ids = [...new Set(typeof touched === "function" ? touched() : touched)].sort()
+              const ids = [...new Set(touched)].toSorted()
+              const after = yield* readRunActivations(ids)
+              const changes = ids.map((runId) => after.get(runId) ?? { runId, intent: "inactive" as const })
+              if (changes.length > 0) yield* options.activationProjection.applyInTransaction(changes)
+            }
+            return result
+          }),
+        ),
+      )
+    const runProjected = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>, touched: () => Iterable<string>) =>
+      withSql(
+        sql,
+        sql.withTransaction(
+          Effect.gen(function* () {
+            const result = yield* effect
+            if (options.activationProjection !== undefined) {
+              const ids = [...new Set(touched())].toSorted()
               const after = yield* readRunActivations(ids)
               const changes = ids.map((runId) => after.get(runId) ?? { runId, intent: "inactive" as const })
               if (changes.length > 0) yield* options.activationProjection.applyInTransaction(changes)
@@ -160,7 +172,7 @@ const makeSqliteStoreServices = (
       eventCommit.withPermits(1)(
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
-            const events: Array<readonly [string, import("../run-event.js").RunEvent]> = []
+            const events: Array<readonly [string, import("../run/event.js").RunEvent]> = []
             const touchedRuns = new Set(touched)
             const transactionHub: typeof hub = {
               ...hub,
@@ -168,7 +180,7 @@ const makeSqliteStoreServices = (
               publish: (runId, event) => Effect.sync(() => void events.push([runId, event])),
             }
             const result = yield* restore(
-              run(makeEffect(transactionHub), () => [...touchedRuns, ...events.map(([runId]) => runId)]),
+              runProjected(makeEffect(transactionHub), () => [...touchedRuns, ...events.map(([runId]) => runId)]),
             )
             yield* Effect.forEach(events, ([runId, event]) => hub.publish(runId, event), { discard: true })
             return result
@@ -176,7 +188,7 @@ const makeSqliteStoreServices = (
         ),
       )
     const fenced = <A, E>(
-      input: import("../run-store.js").ExecutionClaim,
+      input: import("../run/store.js").ExecutionClaim,
       makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
     ) =>
       runBuffered(
@@ -241,7 +253,7 @@ const makeSqliteStoreServices = (
             if (loaded === undefined) return yield* RunNotFound.make({ runId })
             const activeWait = yield* loadRunWait(runId, loaded.activeWaitId)
             const childReadiness = yield* loadChildReadiness(runId)
-            return {
+            const inspection = {
               runId: loaded.runId,
               status: loaded.status,
               executableRef: loaded.executableRef,
@@ -250,10 +262,11 @@ const makeSqliteStoreServices = (
               treePolicy: loaded.treePolicy,
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
-              ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
-              ...(childReadiness === undefined ? {} : { childReadiness }),
-              ...(activeWait === undefined ? {} : { wait: activeWait }),
             }
+            if (loaded.parentRunId !== undefined) Object.assign(inspection, { parentRunId: loaded.parentRunId })
+            if (childReadiness !== undefined) Object.assign(inspection, { childReadiness })
+            if (activeWait !== undefined) Object.assign(inspection, { wait: activeWait })
+            return inspection
           }),
         ),
       snapshot: (runId) => run(loadRunSnapshot(runId)),
@@ -281,12 +294,12 @@ const makeSqliteStoreServices = (
               Effect.flatMap((continuation) =>
                 continuation === undefined
                   ? complete(transactionHub, input).pipe(
-                      Effect.as({ _tag: "Completed" } as import("../run-store.js").CompletionOutcome),
+                      Effect.as<import("../run/store.js").CompletionOutcome>({ _tag: "Completed" }),
                     )
                   : Effect.succeed({
                       _tag: "SteeringPending",
                       continuation,
-                    } as import("../run-store.js").CompletionOutcome),
+                    }),
               ),
             ),
           [input.runId],

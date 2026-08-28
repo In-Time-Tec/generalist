@@ -7,14 +7,14 @@ import {
   RunClient,
   type Connection,
   type ConnectionStatus,
-} from "tenetkit/transport/client"
-import { TransportError } from "tenetkit/transport/errors"
-import { ObserverRunEvent, type ResolvedRunEvent } from "tenetkit/transport/wire"
+} from "../../transport/client.js"
+import { TransportError } from "../../transport/errors.js"
+import { ObserverRunEvent, type ResolvedRunEvent } from "../../transport/wire.js"
 
 /** @experimental */
-export const ConnectionOpened: CallableTaggedStruct<"ConnectionOpened", {}> = m("ConnectionOpened")
+export const ConnectionOpened: CallableTaggedStruct<"ConnectionOpened", Record<never, never>> = m("ConnectionOpened")
 /** @experimental */
-export const ConnectionLost: CallableTaggedStruct<"ConnectionLost", {}> = m("ConnectionLost")
+export const ConnectionLost: CallableTaggedStruct<"ConnectionLost", Record<never, never>> = m("ConnectionLost")
 /** @experimental */
 export const ConnectionFailed: CallableTaggedStruct<
   "ConnectionFailed",
@@ -151,11 +151,11 @@ export const layerWebSocket = (options: {
 
       const session = ({ sessionId, afterSeq }: { readonly sessionId: string; readonly afterSeq?: number }) =>
         Effect.gen(function* () {
-          const connection = yield* client.connect({
-            url: options.url,
-            runId: sessionId,
-            ...(afterSeq === undefined ? {} : { cursor: afterSeq }),
-          })
+          const connection = yield* client.connect(
+            afterSeq === undefined
+              ? { url: options.url, runId: sessionId }
+              : { url: options.url, runId: sessionId, cursor: afterSeq },
+          )
           const owner = { runId: sessionId, connection }
           yield* Effect.acquireRelease(
             Ref.update(active, (current) => new Map(current).set(sessionId, owner)),

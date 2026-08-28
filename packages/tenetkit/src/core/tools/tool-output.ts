@@ -1,11 +1,14 @@
 import { Cause, Context, Effect, Function, HashMap, Layer, Option, Ref, Schema } from "effect"
-import { type Success } from "./tool-executor.js"
+import type { Success } from "./tool-executor.js"
 import { sha256Text } from "../durable/canonical-json.js"
 /** @experimental A bounded tool result: inline content plus optional spilled overflow references. */
 export interface ToolOutput {
   readonly inline: unknown
   readonly outputPaths?: ReadonlyArray<string>
 }
+
+/** @experimental Content persisted by a tool-output store. */
+export type ToolOutputContent = Success["encodedResult"]
 
 /** @experimental A successful tool result after applying the output bound. */
 export interface BoundedSuccess extends Success {
@@ -14,7 +17,10 @@ export interface BoundedSuccess extends Success {
 
 /** @experimental Stores tool-output overflow out of context. */
 export interface StoreInterface {
-  readonly put: (toolCallId: string, content: unknown) => Effect.Effect<Option.Option<string>, ToolOutputError>
+  readonly put: (
+    toolCallId: string,
+    content: ToolOutputContent,
+  ) => Effect.Effect<Option.Option<string>, ToolOutputError>
 }
 
 /** @experimental */
@@ -56,7 +62,7 @@ export const layerTest = (implementation: StoreInterface): Layer.Layer<ToolOutpu
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-const serialized = (value: unknown): string => {
+const serialized = (value: Success["encodedResult"]): string => {
   const json = JSON.stringify(value)
   return json === undefined ? String(value) : json
 }
@@ -72,46 +78,27 @@ const preview = (value: string, maxBytes: number): string => {
   return decoder.decode(encoded.slice(0, end))
 }
 
-interface BoundedInline {
-  readonly truncated: true
-  readonly bytes: number
-  readonly maxBytes: number
-  readonly digest: string
-  readonly preview: string
-}
+const BoundedInline = Schema.Struct({
+  truncated: Schema.Literal(true),
+  bytes: Schema.Finite.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  maxBytes: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
+  digest: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
+  preview: Schema.String,
+})
+
+type BoundedInline = typeof BoundedInline.Type
 
 interface BoundedToolOutput extends ToolOutput {
   readonly inline: BoundedInline
   readonly outputPaths?: ReadonlyArray<string>
 }
 
-const isBoundedInline = (value: unknown): value is BoundedInline =>
-  typeof value === "object" &&
-  value !== null &&
-  "truncated" in value &&
-  value.truncated === true &&
-  "bytes" in value &&
-  typeof value.bytes === "number" &&
-  Number.isSafeInteger(value.bytes) &&
-  value.bytes >= 0 &&
-  "maxBytes" in value &&
-  typeof value.maxBytes === "number" &&
-  Number.isFinite(value.maxBytes) &&
-  value.maxBytes >= 0 &&
-  "digest" in value &&
-  typeof value.digest === "string" &&
-  /^[0-9a-f]{64}$/.test(value.digest) &&
-  "preview" in value &&
-  typeof value.preview === "string" &&
-  encoder.encode(value.preview).byteLength <= value.maxBytes
+const BoundedToolOutput = Schema.Struct({
+  inline: BoundedInline,
+  outputPaths: Schema.optionalKey(Schema.Array(Schema.String)),
+})
 
-const isToolOutput = (value: unknown): value is BoundedToolOutput =>
-  typeof value === "object" &&
-  value !== null &&
-  "inline" in value &&
-  isBoundedInline(value.inline) &&
-  (!("outputPaths" in value) ||
-    (Array.isArray(value.outputPaths) && value.outputPaths.every((path) => typeof path === "string")))
+const decodeBoundedToolOutput = Schema.decodeUnknownOption(BoundedToolOutput)
 
 const bounded = (inline: BoundedInline, outputPaths: ReadonlyArray<string>): BoundedSuccess => {
   const output: BoundedToolOutput = { inline, outputPaths }
@@ -154,10 +141,14 @@ export const bound: {
   (result: Success, options: { readonly toolCallId: string; readonly maxBytes: number }): Effect.Effect<BoundedSuccess>
 } = Function.dual(2, (result: Success, options: { readonly toolCallId: string; readonly maxBytes: number }) =>
   Effect.gen(function* () {
-    if (isToolOutput(result.encodedResult)) {
-      const output = result.encodedResult
+    const decodedOutput = decodeBoundedToolOutput(result.encodedResult)
+    if (Option.isSome(decodedOutput)) {
+      const output = decodedOutput.value
       const outputPaths = output.outputPaths ?? []
-      if (encoder.encode(output.inline.preview).byteLength <= options.maxBytes) {
+      if (
+        encoder.encode(output.inline.preview).byteLength <= output.inline.maxBytes &&
+        encoder.encode(output.inline.preview).byteLength <= options.maxBytes
+      ) {
         return bounded(output.inline, outputPaths)
       }
       return bounded(

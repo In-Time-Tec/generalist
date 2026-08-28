@@ -1,5 +1,5 @@
-import suspendAndResume from "../../snippets/learn/suspension/suspend-and-resume.ts?raw"
-import suspendAndResumeExpected from "../../snippets/learn/suspension/suspend-and-resume.expected.txt?raw"
+import suspendAndResume from "virtual:source/src/snippets/learn/suspension/suspend-and-resume.ts"
+import suspendAndResumeExpected from "virtual:source/src/snippets/learn/suspension/suspend-and-resume.expected.txt"
 import { code, codeBlock, definePage, h2, link, p, table } from "../../prose"
 export const suspension = definePage({
   path: "/docs/learn/suspension",

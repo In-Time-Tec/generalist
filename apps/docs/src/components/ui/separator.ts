@@ -1,8 +1,7 @@
 import type { Html } from "foldkit/html"
 import { html } from "@/lib/html"
 
-import type { SlotConfig } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { type SlotConfig, cn } from "@/lib/styles"
 
 // VIEW
 

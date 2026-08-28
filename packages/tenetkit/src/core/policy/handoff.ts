@@ -5,15 +5,14 @@ import {
   type Result,
   type RunError,
   type RunOptions,
-  type RunResult,
   type RunRequirements,
-  generate,
   make,
-} from "../agent/agent.js"
-import { AgentError } from "../agent/agent-event.js"
-import { type AgentToolToolkit, asTool } from "../agent/agent-tool.js"
-import { type ClosedToolSet } from "../tools/tool-executor.js"
-import { type TurnPolicy } from "../turn/turn-policy.js"
+} from "../agent/service.js"
+import { AgentError } from "../agent/event.js"
+import type { HandoffAccepted } from "../agent/handoff/state.js"
+import { type AgentToolToolkit, asTool, RegistrationError, type Registration } from "../agent/tool.js"
+import type { ClosedToolSet } from "../tools/tool-executor.js"
+import type { TurnPolicy } from "../turn/policy.js"
 import { HandoffCatalog, layerCatalog, type HandoffTarget } from "./handoff-target.js"
 import { handoffToolSpec } from "./handoff-runtime.js"
 import { registerHandoffToolMeta } from "./handoff-tool-meta.js"
@@ -22,62 +21,6 @@ import type { ContextProjection } from "./handoff-projection.js"
 const defaultDelegateParameters = Schema.Struct({ prompt: Schema.String })
 
 type DefaultDelegateParameters = typeof defaultDelegateParameters
-
-export class RegistrationError extends Schema.TaggedError<RegistrationError>()("tenetkit/core/RegistrationError", {
-  agent: Schema.String,
-  message: Schema.String,
-  cause: Schema.Unknown,
-}) {}
-
-export interface Registration<Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never> {
-  readonly name: string
-  readonly run: <O extends RunOptions>(
-    options: O,
-  ) => Effect.Effect<
-    RunResult<O>,
-    RunError | RegistrationError,
-    Exclude<Exclude<RunRequirements<Tools, R, O>, R>, import("effect/Scope").Scope>
-  >
-  readonly requirements: (value: R) => R
-}
-
-export const register: {
-  <R, E>(
-    layer: Layer.Layer<R, E, never>,
-  ): <Tools extends Record<string, Tool.Any>>(agent: Agent<Tools, R>) => Registration<Tools, R>
-  <Tools extends Record<string, Tool.Any>, R, E>(
-    agent: Agent<Tools, R>,
-    layer: Layer.Layer<R, E, never>,
-  ): Registration<Tools, R>
-} = Function.dual(
-  2,
-  <Tools extends Record<string, Tool.Any>, R, E>(
-    agent: Agent<Tools, R>,
-    layer: Layer.Layer<R, E, never>,
-  ): Registration<Tools, R> => {
-    const registrationLayer = Layer.effectContext(
-      Layer.build(layer).pipe(
-        Effect.mapError((cause) =>
-          RegistrationError.make({
-            agent: agent.name,
-            message: `Failed to build services for agent '${agent.name}'`,
-            cause,
-          }),
-        ),
-      ),
-    )
-    return {
-      name: agent.name,
-      run: (options) =>
-        Effect.scoped(
-          Effect.flatMap(Layer.build(registrationLayer), (services) =>
-            generate(agent, options).pipe(Effect.provideContext(services)),
-          ),
-        ),
-      requirements: (value) => value,
-    }
-  },
-)
 
 export interface DelegateOptions<
   Parameters extends Schema.Top = DefaultDelegateParameters,
@@ -116,6 +59,26 @@ export type FanOutRemainder = "await" | "request-cancel" | "terminate"
 interface FanOutBaseOptions {
   readonly concurrency?: number
   readonly remainder?: FanOutRemainder
+}
+
+interface DelegateToolConfiguration<Parameters extends Schema.Top, Success extends Schema.Top> {
+  name: string
+  description: string
+  parameters?: Parameters
+  success?: Success
+  toPrompt?: (params: Parameters["Type"]) => Prompt.RawInput
+  fromResult?: (result: Result) => Success["Type"]
+}
+interface HandoffMetadata {
+  specialist: string
+  projection?: ContextProjection
+  maxRepeatedEdge?: number
+}
+interface SupervisorAgentOptions {
+  name: string
+  instructions?: string
+  tools: ReadonlyArray<HandoffToolkit["tool"]>
+  policy?: TurnPolicy
 }
 
 export interface FanOutAllSuccessOptions extends FanOutBaseOptions {
@@ -192,18 +155,17 @@ const fanOutDecision = (join: FanOutJoin, members: ReadonlyArray<FanOutMemberRes
   const remaining = members.length - settled
   switch (join._tag) {
     case "AllSuccess":
-      return members.some((member) => member?.status === "failed")
-        ? "failed"
-        : remaining === 0
-          ? "succeeded"
-          : undefined
+      if (members.some((member) => member?.status === "failed")) return "failed"
+      return remaining === 0 ? "succeeded" : undefined
     case "AllSettled":
     case "BestEffort":
       return remaining === 0 ? "succeeded" : undefined
     case "FirstSuccess":
-      return succeeded > 0 ? "succeeded" : remaining === 0 ? "failed" : undefined
+      if (succeeded > 0) return "succeeded"
+      return remaining === 0 ? "failed" : undefined
     case "Quorum":
-      return succeeded >= join.required ? "succeeded" : succeeded + remaining < join.required ? "failed" : undefined
+      if (succeeded >= join.required) return "succeeded"
+      return succeeded + remaining < join.required ? "failed" : undefined
   }
 }
 
@@ -211,11 +173,50 @@ const recordCompletion = (
   members: globalThis.Array<FanOutMemberResult | undefined>,
   completion: FanOutCompletion,
 ): void => {
-  members[completion.ordinal] = Exit.isSuccess(completion.exit)
-    ? { ordinal: completion.ordinal, status: "succeeded", result: completion.exit.value }
-    : Cause.hasInterruptsOnly(completion.exit.cause)
-      ? { ordinal: completion.ordinal, status: "cancelled", cause: completion.exit.cause }
-      : { ordinal: completion.ordinal, status: "failed", cause: completion.exit.cause }
+  if (Exit.isSuccess(completion.exit)) {
+    members[completion.ordinal] = { ordinal: completion.ordinal, status: "succeeded", result: completion.exit.value }
+  } else if (Cause.hasInterruptsOnly(completion.exit.cause)) {
+    members[completion.ordinal] = { ordinal: completion.ordinal, status: "cancelled", cause: completion.exit.cause }
+  } else {
+    members[completion.ordinal] = { ordinal: completion.ordinal, status: "failed", cause: completion.exit.cause }
+  }
+}
+
+const isInvalidQuorum = (join: FanOutJoin, memberCount: number): boolean =>
+  join._tag === "Quorum" && (!Number.isInteger(join.required) || join.required <= 0 || join.required > memberCount)
+
+const shouldStopWaiting = (decision: FanOutDecision, remainder: FanOutRemainder): boolean =>
+  decision === "failed" || (decision === "succeeded" && remainder !== "await")
+
+const finishFanOut = (
+  join: FanOutJoin,
+  decision: FanOutDecision,
+  decisionSettled: number,
+  total: number,
+  outcomes: ReadonlyArray<FanOutMemberResult>,
+): Effect.Effect<
+  ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
+  RunError | RegistrationError | FanOutUnsatisfied
+> => {
+  if (join._tag === "AllSuccess") {
+    const failed = outcomes.find((member) => member.status === "failed")
+    if (failed?.status === "failed") return Effect.failCause(failed.cause)
+    const interrupted = outcomes.find((member) => member.status === "cancelled" && member.cause !== undefined)
+    if (interrupted?.status === "cancelled" && interrupted.cause !== undefined) {
+      return Effect.failCause(interrupted.cause)
+    }
+    return Effect.succeed(outcomes.flatMap((member) => (member.status === "succeeded" ? [member.result] : [])))
+  }
+  if (decision !== "failed" || (join._tag !== "FirstSuccess" && join._tag !== "Quorum")) {
+    return Effect.succeed(outcomes)
+  }
+  return FanOutUnsatisfied.make({
+    join: join._tag,
+    required: join._tag === "Quorum" ? join.required : 1,
+    succeeded: outcomes.filter((member) => member.status === "succeeded").length,
+    settled: decisionSettled,
+    total,
+  })
 }
 
 const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
@@ -229,10 +230,7 @@ const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
   Effect.gen(function* () {
     const concurrency = yield* positiveConcurrency(options.concurrency)
     const join: FanOutJoin = options.join ?? { _tag: "AllSuccess" }
-    if (
-      join._tag === "Quorum" &&
-      (!Number.isInteger(join.required) || join.required <= 0 || join.required > children.length)
-    ) {
+    if (isInvalidQuorum(join, children.length)) {
       return yield* AgentError.make({
         message: "Handoff.fanOut quorum must be a positive integer no greater than the member count",
         turn: 0,
@@ -255,7 +253,8 @@ const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
       ).pipe(
         Effect.flatMap((ordinal) => {
           if (ordinal === undefined) return Effect.void
-          const child = children[ordinal]!
+          const child = children[ordinal]
+          if (child === undefined) return Effect.void
           return Effect.fiberId.pipe(
             Effect.flatMap((workerId) =>
               child.registration.run({ ...child.options, prompt: child.prompt }).pipe(
@@ -279,7 +278,7 @@ const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
     let settled = 0
     let decision = fanOutDecision(join, members)
     while (settled < children.length) {
-      if (decision === "failed" || (decision === "succeeded" && remainder !== "await")) break
+      if (shouldStopWaiting(decision, remainder)) break
       const completion = yield* Queue.take(completions)
       if (members[completion.ordinal] === undefined) settled++
       recordCompletion(members, completion)
@@ -298,34 +297,18 @@ const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
     } else {
       yield* Fiber.joinAll(workers)
     }
-    const outcomes = members as globalThis.Array<FanOutMemberResult>
-    if (join._tag === "AllSuccess") {
-      const failed = outcomes.find((member) => member.status === "failed")
-      if (failed?.status === "failed") return yield* Effect.failCause(failed.cause)
-      const interrupted = outcomes.find((member) => member.status === "cancelled" && member.cause !== undefined)
-      if (interrupted?.status === "cancelled" && interrupted.cause !== undefined) {
-        return yield* Effect.failCause(interrupted.cause)
-      }
-      return outcomes.map((member) => (member as Extract<FanOutMemberResult, { status: "succeeded" }>).result)
-    }
-    if (decision === "failed" && (join._tag === "FirstSuccess" || join._tag === "Quorum")) {
-      return yield* FanOutUnsatisfied.make({
-        join: join._tag,
-        required: join._tag === "Quorum" ? join.required : 1,
-        succeeded: outcomes.filter((member) => member.status === "succeeded").length,
-        settled: decisionSettled,
-        total: children.length,
-      })
-    }
-    return outcomes
+    const outcomes = members.flatMap((member) => (member === undefined ? [] : [member]))
+    return yield* finishFanOut(join, decision, decisionSettled, children.length, outcomes)
   })
 
 type HandoffToolkit = {
   readonly name: string
-  readonly tool: import("../policy/handoff-runtime.js").HandoffToolSpecResult["tool"]
-  readonly tools: Record<string, import("../policy/handoff-runtime.js").HandoffToolSpecResult["tool"]>
-  readonly invoke: (params: unknown) => Effect.Effect<unknown, string>
+  readonly tool: import("./handoff-runtime.js").HandoffToolSpecResult["tool"]
+  readonly tools: Record<string, import("./handoff-runtime.js").HandoffToolSpecResult["tool"]>
+  readonly invoke: (params: HandoffParameters) => Effect.Effect<HandoffAccepted, string>
 }
+
+type HandoffParameters = typeof Schema.Unknown.Type
 
 const mergeHandoffTools = (toolkits: ReadonlyArray<HandoffToolkit>): ClosedToolSet<never, HandoffToolkit["tool"]> => {
   const entries = new Map<string, HandoffToolkit>()
@@ -353,7 +336,12 @@ export const delegateTool: {
     options?: DelegateOptions<Parameters, Success>,
   ): (
     target: Registration<Tools, R>,
-  ) => AgentToolToolkit<string, Parameters, Success, RunRequirements<Tools, R, { prompt: Prompt.RawInput }>>
+  ) => AgentToolToolkit<
+    string,
+    Parameters,
+    Success,
+    RunRequirements<Tools, R, { prompt: Prompt.RawInput }> | Parameters["DecodingServices"]
+  >
   <
     Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>,
     R = never,
@@ -362,7 +350,12 @@ export const delegateTool: {
   >(
     target: Registration<Tools, R>,
     options?: DelegateOptions<Parameters, Success>,
-  ): AgentToolToolkit<string, Parameters, Success, RunRequirements<Tools, R, { prompt: Prompt.RawInput }>>
+  ): AgentToolToolkit<
+    string,
+    Parameters,
+    Success,
+    RunRequirements<Tools, R, { prompt: Prompt.RawInput }> | Parameters["DecodingServices"]
+  >
 } = Function.dual(
   (args) => args.length !== 1 || "run" in args[0],
   <
@@ -373,15 +366,22 @@ export const delegateTool: {
   >(
     registration: Registration<Tools, R>,
     options: DelegateOptions<Parameters, Success> = {},
-  ): AgentToolToolkit<string, Parameters, Success, RunRequirements<Tools, R, { prompt: Prompt.RawInput }>> =>
-    asTool<Tools, R, string, Parameters, Success>(registration, {
+  ): AgentToolToolkit<
+    string,
+    Parameters,
+    Success,
+    RunRequirements<Tools, R, { prompt: Prompt.RawInput }> | Parameters["DecodingServices"]
+  > => {
+    const toolOptions: DelegateToolConfiguration<Parameters, Success> = {
       name: options.nameOverride ?? `delegate_to_${registration.name}`,
       description: options.description ?? `Delegate to ${registration.name} as an inline child run`,
-      ...(options.parameters === undefined ? {} : { parameters: options.parameters }),
-      ...(options.success === undefined ? {} : { success: options.success }),
-      ...(options.toPrompt === undefined ? {} : { toPrompt: options.toPrompt }),
-      ...(options.fromResult === undefined ? {} : { fromResult: options.fromResult }),
-    }),
+    }
+    if (options.parameters !== undefined) toolOptions.parameters = options.parameters
+    if (options.success !== undefined) toolOptions.success = options.success
+    if (options.toPrompt !== undefined) toolOptions.toPrompt = options.toPrompt
+    if (options.fromResult !== undefined) toolOptions.fromResult = options.fromResult
+    return asTool<Tools, R, string, Parameters, Success>(registration, toolOptions)
+  },
 )
 
 export const sameRunHandoffTool: {
@@ -391,11 +391,10 @@ export const sameRunHandoffTool: {
   (args) => args.length > 1 || "agent" in args[0],
   (handoffTarget: HandoffTarget, options: HandoffToolOptions = {}): HandoffToolkit => {
     const spec = handoffToolSpec(handoffTarget, options)
-    registerHandoffToolMeta(spec.tool.name, {
-      specialist: spec.specialist,
-      ...(spec.projection === undefined ? {} : { projection: spec.projection }),
-      ...(spec.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: spec.maxRepeatedEdge }),
-    })
+    const metadata: HandoffMetadata = { specialist: spec.specialist }
+    if (spec.projection !== undefined) metadata.projection = spec.projection
+    if (spec.maxRepeatedEdge !== undefined) metadata.maxRepeatedEdge = spec.maxRepeatedEdge
+    registerHandoffToolMeta(spec.tool.name, metadata)
     return {
       name: spec.tool.name,
       tool: spec.tool,
@@ -454,12 +453,13 @@ export const supervisor = (options: SupervisorOptions) => {
   const specialists = options.specialists
   const handoffTools = specialists.map((specialist) => sameRunHandoffTool(specialist, options.handoffOptions ?? {}))
   const toolkit = mergeHandoffTools(handoffTools)
-  const agent = make({
+  const agentOptions: SupervisorAgentOptions = {
     name: options.name,
-    ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
     tools: Object.values(toolkit.tools),
-    ...(options.policy === undefined ? {} : { policy: options.policy }),
-  })
+  }
+  if (options.instructions !== undefined) agentOptions.instructions = options.instructions
+  if (options.policy !== undefined) agentOptions.policy = options.policy
+  const agent = make(agentOptions)
   type SupervisorAgentR = typeof agent extends Agent<infer _Tools, infer AgentR> ? AgentR : never
   const result: Supervisor<SupervisorAgentR, HandoffToolkit["tool"] extends infer T ? Record<string, T> : never> = {
     agent: {
@@ -486,4 +486,5 @@ export {
   HandoffProjectionInvalid,
 } from "./handoff-projection.js"
 export { executeSameRunHandoff, HandoffRejected } from "./handoff-runtime.js"
-export { HandoffCommit, HandoffControlState } from "../agent/handoff-state.js"
+export { HandoffCommit, HandoffControlState } from "../agent/handoff/state.js"
+export { register, RegistrationError, type Registration } from "../agent/tool.js"

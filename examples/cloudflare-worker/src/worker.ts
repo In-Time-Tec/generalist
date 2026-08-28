@@ -45,7 +45,7 @@ const runPlanner = Effect.fn("CloudflareWorker.runPlanner")(function* () {
   }).pipe(Effect.provideContext(services))
 })
 
-export default make<Record<string, unknown>, never>(() =>
+export default make<Readonly<Record<string, string>>, never>(() =>
   runPlanner().pipe(
     Effect.map((result) => Response.json(result.value)),
     Effect.orDie,

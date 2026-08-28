@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.40.1",
+  "version": "0.41.1",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -84,20 +84,20 @@
       "import": "./dist/test/index.js"
     },
     "./a2a": {
-      "types": "./dist/a2a/index.d.ts",
-      "import": "./dist/a2a/index.js"
+      "types": "./dist/interoperability/a2a/index.d.ts",
+      "import": "./dist/interoperability/a2a/index.js"
     },
     "./ag-ui": {
-      "types": "./dist/ag-ui/index.d.ts",
-      "import": "./dist/ag-ui/index.js"
+      "types": "./dist/interoperability/ag-ui/index.d.ts",
+      "import": "./dist/interoperability/ag-ui/index.js"
     },
     "./repl": {
       "types": "./dist/repl/index.d.ts",
       "import": "./dist/repl/index.js"
     },
     "./ai/catalog": {
-      "types": "./dist/ai/catalog/catalog.d.ts",
-      "import": "./dist/ai/catalog/catalog.js"
+      "types": "./dist/ai/catalog/service.d.ts",
+      "import": "./dist/ai/catalog/service.js"
     },
     "./ai/openai": {
       "types": "./dist/ai/provider/openai.d.ts",
@@ -116,8 +116,8 @@
       "import": "./dist/ai/provider/anthropic.js"
     },
     "./ai/amazon-bedrock": {
-      "types": "./dist/ai/provider/amazon-bedrock.d.ts",
-      "import": "./dist/ai/provider/amazon-bedrock.js"
+      "types": "./dist/ai/provider/bedrock/service.d.ts",
+      "import": "./dist/ai/provider/bedrock/service.js"
     },
     "./ai/openrouter": {
       "types": "./dist/ai/provider/openrouter.d.ts",
@@ -144,48 +144,48 @@
       "import": "./dist/ai/model/embedding.js"
     },
     "./mcp/tools": {
-      "types": "./dist/mcp/mcp/tools.d.ts",
-      "import": "./dist/mcp/mcp/tools.js"
+      "types": "./dist/mcp/tools.d.ts",
+      "import": "./dist/mcp/tools.js"
     },
     "./repl/bun": {
-      "types": "./dist/repl/repl/bun.d.ts",
-      "import": "./dist/repl/repl/bun.js"
+      "types": "./dist/repl/bun/index.d.ts",
+      "import": "./dist/repl/bun/index.js"
     },
     "./transport/client": {
-      "types": "./dist/transport/transport/client.d.ts",
-      "import": "./dist/transport/transport/client.js"
+      "types": "./dist/transport/client.d.ts",
+      "import": "./dist/transport/client.js"
     },
     "./transport/errors": {
-      "types": "./dist/transport/transport/errors.d.ts",
-      "import": "./dist/transport/transport/errors.js"
+      "types": "./dist/transport/errors.d.ts",
+      "import": "./dist/transport/errors.js"
     },
     "./transport/sse": {
-      "types": "./dist/transport/transport/sse.d.ts",
-      "import": "./dist/transport/transport/sse.js"
+      "types": "./dist/transport/sse.d.ts",
+      "import": "./dist/transport/sse.js"
     },
     "./transport/ws": {
-      "types": "./dist/transport/transport/ws.d.ts",
-      "import": "./dist/transport/transport/ws.js"
+      "types": "./dist/transport/ws.d.ts",
+      "import": "./dist/transport/ws.js"
     },
     "./transport/wire": {
-      "types": "./dist/transport/transport/wire.d.ts",
-      "import": "./dist/transport/transport/wire.js"
+      "types": "./dist/transport/wire.d.ts",
+      "import": "./dist/transport/wire.js"
     },
     "./transport/snapshot": {
-      "types": "./dist/transport/transport/snapshot.d.ts",
-      "import": "./dist/transport/transport/snapshot.js"
+      "types": "./dist/transport/snapshot.d.ts",
+      "import": "./dist/transport/snapshot.js"
     },
     "./transport/replay": {
-      "types": "./dist/transport/transport/replay.d.ts",
-      "import": "./dist/transport/transport/replay.js"
+      "types": "./dist/transport/replay.d.ts",
+      "import": "./dist/transport/replay.js"
     },
     "./runtime/external-child-placement": {
-      "types": "./dist/runtime/external-child-placement.d.ts",
-      "import": "./dist/runtime/external-child-placement.js"
+      "types": "./dist/runtime/child/external/placement.d.ts",
+      "import": "./dist/runtime/child/external/placement.js"
     },
     "./runtime/external-child-store": {
-      "types": "./dist/runtime/external-child-store.d.ts",
-      "import": "./dist/runtime/external-child-store.js"
+      "types": "./dist/runtime/child/external/store.d.ts",
+      "import": "./dist/runtime/child/external/store.js"
     },
     "./runtime/driver": {
       "types": "./dist/runtime/driver/index.d.ts",

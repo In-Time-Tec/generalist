@@ -44,9 +44,8 @@ import {
   promptInputStatusOf as Chat_promptInputStatusOf,
   toolStatusOf as Chat_toolStatusOf,
   conversationItems as Chat_conversationItems,
-  update as Chat_update,
-  subscriptions as Chat_subscriptions,
-} from "./chat/chat.js"
+} from "./chat/service.js"
+import { subscriptions as Chat_subscriptions, update as Chat_update } from "./chat/update-logic.js"
 export const Chat = {
   ToolPendingPhase: Chat_ToolPendingPhase,
   ToolOutcome: Chat_ToolOutcome,
@@ -95,56 +94,56 @@ export const Chat = {
   conversationItems: Chat_conversationItems,
   update: Chat_update,
   subscriptions: Chat_subscriptions,
-} as typeof import("./chat/chat.js")
+}
 export namespace Chat {
-  export type ToolPendingPhase = import("./chat/chat.js").ToolPendingPhase
-  export type ToolOutcome = import("./chat/chat.js").ToolOutcome
-  export type UserEntry = typeof import("./chat/chat.js").UserEntry
-  export type AssistantEntry = typeof import("./chat/chat.js").AssistantEntry
-  export type ToolEntry = typeof import("./chat/chat.js").ToolEntry
-  export type ChatEntry = import("./chat/chat.js").ChatEntry
-  export type Idle = typeof import("./chat/chat.js").Idle
-  export type Running = typeof import("./chat/chat.js").Running
-  export type AwaitingApproval = typeof import("./chat/chat.js").AwaitingApproval
-  export type Failed = typeof import("./chat/chat.js").Failed
-  export type RunState = import("./chat/chat.js").RunState
-  export type Model = import("./chat/chat.js").Model
-  export type ReceivedAgent = typeof import("./chat/chat.js").ReceivedAgent
-  export type OpenedSession = typeof import("./chat/chat.js").OpenedSession
-  export type ChangedDraft = typeof import("./chat/chat.js").ChangedDraft
-  export type SubmittedMessage = typeof import("./chat/chat.js").SubmittedMessage
-  export type ClickedCancel = typeof import("./chat/chat.js").ClickedCancel
-  export type ClickedApprove = typeof import("./chat/chat.js").ClickedApprove
-  export type ClickedDeny = typeof import("./chat/chat.js").ClickedDeny
-  export type SentUserMessage = typeof import("./chat/chat.js").SentUserMessage
-  export type ResolvedApproval = typeof import("./chat/chat.js").ResolvedApproval
-  export type CancelledRun = typeof import("./chat/chat.js").CancelledRun
-  export type FailedAgentCommand = typeof import("./chat/chat.js").FailedAgentCommand
-  export type Action = import("./chat/chat.js").Action
-  export type RunCompleted = typeof import("./chat/chat.js").RunCompleted
-  export type ApprovalRequired = typeof import("./chat/chat.js").ApprovalRequired
-  export type RunFailed = typeof import("./chat/chat.js").RunFailed
-  export type Output = import("./chat/chat.js").Output
-  export type MessageAlign = import("./chat/chat.js").MessageAlign
-  export type PromptInputStatus = import("./chat/chat.js").PromptInputStatus
-  export type ToolStatus = import("./chat/chat.js").ToolStatus
-  export type UserConversationItem = typeof import("./chat/chat.js").UserConversationItem
-  export type AssistantConversationItem = typeof import("./chat/chat.js").AssistantConversationItem
-  export type ToolConversationItem = typeof import("./chat/chat.js").ToolConversationItem
-  export type WaitingConversationItem = typeof import("./chat/chat.js").WaitingConversationItem
-  export type ApprovalConversationItem = typeof import("./chat/chat.js").ApprovalConversationItem
-  export type FailureConversationItem = typeof import("./chat/chat.js").FailureConversationItem
-  export type ConversationItem = import("./chat/chat.js").ConversationItem
-  export type initialModel = typeof import("./chat/chat.js").initialModel
-  export type SendUserMessage = typeof import("./chat/chat.js").SendUserMessage
-  export type ResolveApproval = typeof import("./chat/chat.js").ResolveApproval
-  export type CancelRun = typeof import("./chat/chat.js").CancelRun
-  export type promptInputStatusOf = typeof import("./chat/chat.js").promptInputStatusOf
-  export type toolStatusOf = typeof import("./chat/chat.js").toolStatusOf
-  export type conversationItems = typeof import("./chat/chat.js").conversationItems
-  export type update = typeof import("./chat/chat.js").update
-  export type subscriptions = typeof import("./chat/chat.js").subscriptions
-  export type ChatCommand = import("./chat/chat.js").ChatCommand
+  export type ToolPendingPhase = import("./chat/service.js").ToolPendingPhase
+  export type ToolOutcome = import("./chat/service.js").ToolOutcome
+  export type UserEntry = typeof import("./chat/service.js").UserEntry
+  export type AssistantEntry = typeof import("./chat/service.js").AssistantEntry
+  export type ToolEntry = typeof import("./chat/service.js").ToolEntry
+  export type ChatEntry = import("./chat/service.js").ChatEntry
+  export type Idle = typeof import("./chat/service.js").Idle
+  export type Running = typeof import("./chat/service.js").Running
+  export type AwaitingApproval = typeof import("./chat/service.js").AwaitingApproval
+  export type Failed = typeof import("./chat/service.js").Failed
+  export type RunState = import("./chat/service.js").RunState
+  export type Model = import("./chat/service.js").Model
+  export type ReceivedAgent = typeof import("./chat/service.js").ReceivedAgent
+  export type OpenedSession = typeof import("./chat/service.js").OpenedSession
+  export type ChangedDraft = typeof import("./chat/service.js").ChangedDraft
+  export type SubmittedMessage = typeof import("./chat/service.js").SubmittedMessage
+  export type ClickedCancel = typeof import("./chat/service.js").ClickedCancel
+  export type ClickedApprove = typeof import("./chat/service.js").ClickedApprove
+  export type ClickedDeny = typeof import("./chat/service.js").ClickedDeny
+  export type SentUserMessage = typeof import("./chat/service.js").SentUserMessage
+  export type ResolvedApproval = typeof import("./chat/service.js").ResolvedApproval
+  export type CancelledRun = typeof import("./chat/service.js").CancelledRun
+  export type FailedAgentCommand = typeof import("./chat/service.js").FailedAgentCommand
+  export type Action = import("./chat/service.js").Action
+  export type RunCompleted = typeof import("./chat/service.js").RunCompleted
+  export type ApprovalRequired = typeof import("./chat/service.js").ApprovalRequired
+  export type RunFailed = typeof import("./chat/service.js").RunFailed
+  export type Output = import("./chat/service.js").Output
+  export type MessageAlign = import("./chat/service.js").MessageAlign
+  export type PromptInputStatus = import("./chat/service.js").PromptInputStatus
+  export type ToolStatus = import("./chat/service.js").ToolStatus
+  export type UserConversationItem = typeof import("./chat/service.js").UserConversationItem
+  export type AssistantConversationItem = typeof import("./chat/service.js").AssistantConversationItem
+  export type ToolConversationItem = typeof import("./chat/service.js").ToolConversationItem
+  export type WaitingConversationItem = typeof import("./chat/service.js").WaitingConversationItem
+  export type ApprovalConversationItem = typeof import("./chat/service.js").ApprovalConversationItem
+  export type FailureConversationItem = typeof import("./chat/service.js").FailureConversationItem
+  export type ConversationItem = import("./chat/service.js").ConversationItem
+  export type initialModel = typeof import("./chat/service.js").initialModel
+  export type SendUserMessage = typeof import("./chat/service.js").SendUserMessage
+  export type ResolveApproval = typeof import("./chat/service.js").ResolveApproval
+  export type CancelRun = typeof import("./chat/service.js").CancelRun
+  export type promptInputStatusOf = typeof import("./chat/service.js").promptInputStatusOf
+  export type toolStatusOf = typeof import("./chat/service.js").toolStatusOf
+  export type conversationItems = typeof import("./chat/service.js").conversationItems
+  export type update = typeof import("./chat/update-logic.js").update
+  export type subscriptions = typeof import("./chat/update-logic.js").subscriptions
+  export type ChatCommand = import("./chat/service.js").ChatCommand
 }
 import {
   ConnectionOpened as Connection_ConnectionOpened,
@@ -169,7 +168,7 @@ export const Connection = {
   AgentConnection: Connection_AgentConnection,
   layerTest: Connection_layerTest,
   layerWebSocket: Connection_layerWebSocket,
-} as typeof import("./chat/connection.js")
+}
 export namespace Connection {
   export type ConnectionOpened = typeof import("./chat/connection.js").ConnectionOpened
   export type ConnectionLost = typeof import("./chat/connection.js").ConnectionLost

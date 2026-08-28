@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { Memory } from "tenetkit"
+import { Memory } from "../../src/index.js"
 import { VectorStore } from "../../src/memory/index"
 
 const key: Memory.Key = { agent: "agent-a", subject: "subject-a" }

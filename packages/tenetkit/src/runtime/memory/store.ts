@@ -9,29 +9,29 @@ import {
   TreeCursorExpired,
   TreeCursorInvalid,
 } from "../errors.js"
-import { RunStore, type CompletionOutcome } from "../run-store.js"
-import type { LayerOptions } from "../runtime.js"
+import { RunStore, type CompletionOutcome } from "../run/store.js"
+import type { LayerOptions } from "../service.js"
 import { emptyState, idempotencyKey, type MemoryPublication, type MemoryState } from "./state.js"
-import { admitSend, admitSpawn, admitStart } from "./store-admit.js"
-import { activateRoot, activationOf } from "./store-activate.js"
-import { admitProgramChild } from "./store-admit-program-child.js"
-import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
-import { respondApproval } from "./store-approval.js"
+import { admitSend, admitSpawn, admitStart } from "./store/admit.js"
+import { activateRoot, activationOf } from "./store/activate.js"
+import { admitProgramChild } from "./store/child/admit-program-child.js"
+import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store/control.js"
+import { respondApproval } from "./store/approval.js"
 import { isTerminal } from "../run.js"
-import { followEvents, followTreeChanges, inspectRun, shutdownStore, toInspection } from "./store-events.js"
+import { followEvents, followTreeChanges, inspectRun, shutdownStore, toInspection } from "./store/events.js"
 import {
-  expireRunningOperation,
   recordOperation,
   startOperation,
   completeOperation,
   commitModelResponse,
   commitInterruptedModelResponse,
-} from "./store-operations.js"
-import { acknowledgeOperationCancellation, operationCancellations } from "./store-operation-cancellation.js"
-import { getOperation, getOperationByKey } from "./store-operation-inspection.js"
-import { resolveOperation } from "./store-operation-resolution.js"
-import { recoverRunningOperations } from "./store-operation-recovery.js"
-import { cancelSession } from "./store-session.js"
+} from "./store/operation/operations.js"
+import { expireRunningOperation } from "./store/operation/expiry.js"
+import { acknowledgeOperationCancellation, operationCancellations } from "./store/operation/cancellation.js"
+import { getOperation, getOperationByKey } from "./store/operation/inspection.js"
+import { resolveOperation } from "./store/operation/resolution.js"
+import { recoverRunningOperations } from "./store/operation/recovery.js"
+import { cancelSession } from "./store/session.js"
 import {
   claimExecution,
   loadExecution,
@@ -39,8 +39,8 @@ import {
   requireExecutionClaim,
   retryExecution,
   saveExecution,
-} from "./store-execution.js"
-import { admitSteering, readSteering } from "./store-steering.js"
+} from "./store/execution.js"
+import { admitSteering, readSteering } from "./store/steering.js"
 import {
   admitMessage,
   deliverPendingMessages,
@@ -50,14 +50,14 @@ import {
   settlementNotifications,
   registerAgentName,
   resolveAddress,
-} from "./store-directory.js"
+} from "./store/directory.js"
 import { Prompt } from "effect/unstable/ai"
-import { makeMemorySessionStore } from "./session-store.js"
-import { admitFanOut } from "./store-fan-out.js"
-import { inspectFanOut } from "./store-fan-out-inspection.js"
-import { makeCursor } from "../tree-cursor.js"
-import { projectRunSnapshot, projectTreeInspection, type InspectionRun } from "../inspection.js"
-import { decodePinned, equals } from "../executable-manifest.js"
+import { make as makeMemorySessionStore } from "./session-store.js"
+import { admitFanOut } from "./store/fan-out/service.js"
+import { inspectFanOut } from "./store/fan-out/inspection.js"
+import { TreeCursor } from "../tree/cursor.js"
+import { projectRunSnapshot, projectTreeInspection, type InspectionRun } from "../execution/inspection.js"
+import { decodePinned, equals } from "../executable/manifest.js"
 import {
   admitProgramAgents,
   completeProgram,
@@ -67,10 +67,14 @@ import {
   suspendProgramOperation,
   settleProgramOperation,
   startProgramOperation,
-} from "./store-program.js"
-import { externalChildOperations } from "./store-external-child.js"
-import { ExternalChildStore } from "../external-child-store.js"
-import type { RunActivation } from "../run-activation.js"
+} from "./store/program.js"
+import { externalChildOperations } from "./store/child/external.js"
+import { ExternalChildStore } from "../child/external/store.js"
+import type { RunActivation } from "../run/activation.js"
+const makeCursor = (rootRunId: string, position: number) =>
+  TreeCursor.make(
+    `tenetkit-tree:${encodeURIComponent(JSON.stringify({ version: 1, projection: "run-tree", rootRunId, position }))}`,
+  )
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
@@ -104,12 +108,11 @@ const makeStoreServices = (options: LayerOptions) =>
             subscribers.delete(subscriberId)
             const runs = new Map(state.runs)
             runs.set(run.runId, { ...run, subscribers })
-            state = { ...state, runs }
+            state = Object.assign({}, state, { runs })
           }
         }
         return state
       })
-
     const modifyState = <A, E>(
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
     ): Effect.Effect<A, E | RuntimeUnavailable> =>
@@ -121,7 +124,7 @@ const makeStoreServices = (options: LayerOptions) =>
             const touched = new Set<string>()
             for (const [runId, run] of next.runs) if (state.runs.get(runId) !== run) touched.add(runId)
             for (const runId of state.runs.keys()) if (!next.runs.has(runId)) touched.add(runId)
-            const changes = [...touched].sort().map((runId): RunActivation => {
+            const changes = [...touched].toSorted().map((runId): RunActivation => {
               const run = next.runs.get(runId)
               return run === undefined ? { runId, intent: "inactive" } : activationOf(run)
             })
@@ -140,11 +143,11 @@ const makeStoreServices = (options: LayerOptions) =>
         Effect.asVoid,
       )
     const fencedUpdate = <E>(
-      input: import("../run-store.js").ExecutionClaim,
+      input: import("../run/store.js").ExecutionClaim,
       transition: (state: MemoryState) => Effect.Effect<MemoryState, E>,
     ) => update((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
     const fencedModify = <A, E>(
-      input: import("../run-store.js").ExecutionClaim,
+      input: import("../run/store.js").ExecutionClaim,
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
     ) => modifyState((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
     const runStore = RunStore.of({
@@ -228,15 +231,16 @@ const makeStoreServices = (options: LayerOptions) =>
             Effect.gen(function* () {
               const run = state.runs.get(runId)
               if (run === undefined) return yield* RunNotFound.make({ runId })
-              return yield* projectRunSnapshot({
+              const projection = {
                 inspection: toInspection(run),
                 rootRunId: run.rootRunId,
-                ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
-                ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
-                ...(run.terminalEventId === undefined ? {} : { terminalEventId: run.terminalEventId }),
                 events: run.events,
                 firstTreePosition: 0,
-              })
+              }
+              if (run.parentRunId !== undefined) Object.assign(projection, { parentRunId: run.parentRunId })
+              if (run.invocationId !== undefined) Object.assign(projection, { invocationId: run.invocationId })
+              if (run.terminalEventId !== undefined) Object.assign(projection, { terminalEventId: run.terminalEventId })
+              return yield* projectRunSnapshot(projection)
             }),
           ),
         ),
@@ -260,15 +264,17 @@ const makeStoreServices = (options: LayerOptions) =>
               const runs: Array<InspectionRun> = []
               for (const run of state.runs.values()) {
                 if (run.rootRunId !== rootRunId) continue
-                runs.push({
+                const projection = {
                   inspection: toInspection(run),
                   rootRunId,
-                  ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
-                  ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
-                  ...(run.terminalEventId === undefined ? {} : { terminalEventId: run.terminalEventId }),
                   events: run.events,
                   firstTreePosition: first.get(run.runId) ?? -1,
-                })
+                }
+                if (run.parentRunId !== undefined) Object.assign(projection, { parentRunId: run.parentRunId })
+                if (run.invocationId !== undefined) Object.assign(projection, { invocationId: run.invocationId })
+                if (run.terminalEventId !== undefined)
+                  Object.assign(projection, { terminalEventId: run.terminalEventId })
+                runs.push(projection)
               }
               return yield* projectTreeInspection(rootRunId, makeCursor(rootRunId, root.lastPosition), runs)
             }),
@@ -418,10 +424,11 @@ const makeStoreServices = (options: LayerOptions) =>
               const run = resolved.runs.get(input.runId)
               return run === undefined || !run.cancellationRequested || isTerminal(run.status)
                 ? Effect.succeed(resolved)
-                : cancel(resolved, {
-                    runId: input.runId,
-                    ...(run.cancelReason === undefined ? {} : { reason: run.cancelReason }),
-                  })
+                : (() => {
+                    const cancellation = { runId: input.runId }
+                    if (run.cancelReason !== undefined) Object.assign(cancellation, { reason: run.cancelReason })
+                    return cancel(resolved, cancellation)
+                  })()
             }),
           ),
         ),

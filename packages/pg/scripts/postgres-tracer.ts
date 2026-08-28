@@ -1,7 +1,7 @@
-import { Console, Effect, ManagedRuntime } from "effect"
+import { Console, Effect, ManagedRuntime, Schema } from "effect"
 import { RunClaims, Runtime } from "@tenetkit/pg"
-import { assistantAddress, completedResult, textPrompt } from "../../tenetkit/test/runtime/helpers.js"
-import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../test/helpers.js"
+import { assistantAddress, completedResult, textPrompt } from "../../tenetkit/test/runtime/execution/fixtures.js"
+import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../test/postgres/database.js"
 
 if (!postgresAvailable) {
   throw new Error("Set TENETKIT_DATABASE_URL or DATABASE_URL to run the postgres tracer")
@@ -10,7 +10,7 @@ if (!postgresAvailable) {
 const database = postgresDatabase("cli-tracer")
 const url = database.url
 
-const encodeJson = (value: unknown): string => JSON.stringify(value)
+const encodeJson = (value: Schema.Json): string => JSON.stringify(value)
 
 const runTrace = (databaseUrl: string, sessionId: string) =>
   Effect.gen(function* () {

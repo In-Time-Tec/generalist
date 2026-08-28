@@ -19,7 +19,11 @@ describe("Worker", () => {
         Effect.gen(function* () {
           const context = yield* WorkerContext
           context.executionContext.waitUntil(Promise.resolve())
-          return new Response(`${request.method}:${context.bindings.TOKEN}`)
+          const bindings = yield* Schema.decodeUnknownEffect(Schema.Struct({ TOKEN: Schema.String }))(
+            context.bindings,
+          ).pipe(Effect.orDie)
+          const token = bindings.TOKEN
+          return new Response(`${request.method}:${token}`)
         }),
       )
       const response = yield* Effect.promise(() =>

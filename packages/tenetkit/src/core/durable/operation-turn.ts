@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { DriverStateInvalid } from "./durable-driver.js"
+import { DriverStateInvalid } from "./service.js"
 
 const resolveOperationTurn = (checkpointTurn: number, requestedTurn: number | undefined) => {
   const turn = requestedTurn ?? checkpointTurn

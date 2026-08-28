@@ -6,10 +6,9 @@ const entries = [
   ["workers", "packages/cloudflare/src/workers/index.ts"],
   ["durable-objects", "packages/cloudflare/src/durable-objects/index.ts"],
   ["dynamic-workers", "packages/cloudflare/src/dynamic-workers/index.ts"],
-  ["testing", "packages/cloudflare/src/testing/index.ts"],
   ["core", "packages/tenetkit/src/index.ts"],
   ["foldkit", "packages/tenetkit/src/foldkit/index.ts"],
-  ["transport client", "packages/tenetkit/src/transport/transport/client.ts"],
+  ["transport client", "packages/tenetkit/src/transport/client.ts"],
   ["injected SQL store", "packages/tenetkit/src/runtime/sql/store.ts"],
 ] as const
 const forbidden = [

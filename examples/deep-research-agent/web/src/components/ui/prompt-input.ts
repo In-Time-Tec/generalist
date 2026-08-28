@@ -2,15 +2,11 @@ import { Option, Function } from "effect"
 import type { Html } from "foldkit/html"
 import { html } from "@/lib/html"
 
-import type { ButtonConfig } from "@/components/ui/button"
-import { button } from "@/components/ui/button"
-import { item, root } from "@/components/ui/select"
-import type { RootConfig } from "@/components/ui/select"
+import { button, type ButtonConfig } from "@/components/ui/button"
+import { item, root, type RootConfig } from "@/components/ui/select"
 import { spinner } from "@/components/ui/spinner"
-import type { TextareaConfig } from "@/components/ui/textarea"
-import { textarea } from "@/components/ui/textarea"
-import type { SlotConfig } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { textarea, type TextareaConfig } from "@/components/ui/textarea"
+import { cn, type SlotConfig } from "@/lib/styling"
 
 // VIEW
 
@@ -219,12 +215,12 @@ export type PromptInputSubmitConfig<ParentMessage> = ButtonConfig<ParentMessage>
   }>
 
 const statusIcon = <ParentMessage>(status: PromptInputStatus): Html => {
-  const icons: Record<PromptInputStatus, () => Html> = {
+  const icons = {
     idle: () => sendIcon<ParentMessage>(),
     submitted: () => spinner<ParentMessage>({}),
     streaming: () => squareIcon<ParentMessage>(),
     error: () => xIcon<ParentMessage>(),
-  }
+  } satisfies Record<PromptInputStatus, () => Html>
   // The chat status is derived from stream state and cast to PromptInputStatus
   // at the boundary; degrade to the idle send icon rather than crashing the
   // render if an unexpected status slips through.

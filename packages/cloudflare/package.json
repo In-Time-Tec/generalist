@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.40.1",
+  "version": "0.41.1",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -34,10 +34,6 @@
     "./dynamic-workers": {
       "types": "./dist/dynamic-workers/index.d.ts",
       "import": "./dist/dynamic-workers/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "import": "./dist/testing/index.js"
     }
   },
   "scripts": {

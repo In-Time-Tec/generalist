@@ -6,6 +6,8 @@ const fraction = (value: number): number => ((value % 1) * 0x100000000) >>> 0
 const constants = new Uint32Array(primes.map((prime) => fraction(prime ** (1 / 3))))
 const initial = new Uint32Array(primes.slice(0, 8).map((prime) => fraction(Math.sqrt(prime))))
 
+import { Function, Schema } from "effect"
+
 const encoder = new TextEncoder()
 const schedule = new Uint32Array(64)
 let padded = new Uint8Array(1024)
@@ -44,8 +46,10 @@ const reserve = (size: number): void => {
 
 /** Encode text into the reusable buffer with SHA-256 padding and return the padded byte length. */
 const pad = (text: string): number => {
-  reserve(text.length * 3 + 72)
-  const { written } = encoder.encodeInto(text, padded)
+  const encoded = encoder.encode(text)
+  const written = encoded.length
+  reserve(written + 72)
+  padded.set(encoded)
   const size = (((written + 8) >>> 6) + 1) << 6
   padded.fill(0, written, size)
   padded[written] = 0x80
@@ -134,51 +138,15 @@ export const sha256Text = (text: string): string => {
   return text.length < cacheMinimumLength ? hex : remember(text, hex)
 }
 
-const canonicalize = (value: unknown, seen: Set<object>): unknown => {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new TypeError("Unsupported number")
-    return Object.is(value, -0) ? 0 : value
-  }
-  if (typeof value !== "object") throw new TypeError("Unsupported value")
-  if (seen.has(value)) throw new TypeError("Cyclic value")
-  seen.add(value)
-  try {
-    if (Array.isArray(value)) {
-      if (Object.getOwnPropertySymbols(value).length > 0) throw new TypeError("Unsupported symbol property")
-      const descriptors = Object.getOwnPropertyDescriptors(value)
-      for (let index = 0; index < value.length; index += 1) {
-        const descriptor = descriptors[String(index)]
-        if (descriptor === undefined) throw new TypeError("Sparse array")
-        if (!("value" in descriptor) || descriptor.enumerable !== true) {
-          throw new TypeError("Unsupported array property")
-        }
-      }
-      const expected = new Set(["length", ...Array.from({ length: value.length }, (_, index) => String(index))])
-      if (Reflect.ownKeys(descriptors).some((key) => typeof key !== "string" || !expected.has(key))) {
-        throw new TypeError("Unsupported extra array property")
-      }
-      return Array.from(value, (item) => canonicalize(item, seen))
-    }
-    if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
-      throw new TypeError("Unsupported object")
-    }
-    if (Object.getOwnPropertySymbols(value).length > 0) throw new TypeError("Unsupported symbol property")
-    const descriptors = Object.getOwnPropertyDescriptors(value)
-    for (const descriptor of Object.values(descriptors)) {
-      if (!("value" in descriptor) || descriptor.enumerable !== true) {
-        throw new TypeError("Unsupported property")
-      }
-    }
-    return Object.fromEntries(
-      Object.keys(descriptors)
-        .toSorted()
-        .map((key) => [key, canonicalize(descriptors[key]!.value, seen)]),
-    )
-  } finally {
-    seen.delete(value)
-  }
+const canonicalize = (value: Schema.Json): Schema.Json => {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value === null || !Schema.is(Schema.JsonObject)(value)) return Object.is(value, -0) ? 0 : value
+  return Object.fromEntries(
+    Object.keys(value)
+      .toSorted()
+      .map((key) => [key, canonicalize(value[key]!)]),
+  )
 }
 
 /** @experimental Canonical SHA-256 identity for closed JSON values. */
-export const digest = (value: unknown): string => sha256Text(JSON.stringify(canonicalize(value, new Set())))
+export const digest = Function.flow(Schema.decodeUnknownSync(Schema.Json), canonicalize, JSON.stringify, sha256Text)

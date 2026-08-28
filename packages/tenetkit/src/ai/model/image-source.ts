@@ -1,6 +1,6 @@
 import { Effect, Encoding, Layer, Result, Stream } from "effect"
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
-import { ModelMiddleware } from "tenetkit"
+import { ModelMiddleware } from "../../core/index.js"
 
 const imageMediaTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"])
 const base64Pattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
@@ -39,7 +39,7 @@ const normalizePart = (part: Prompt.FilePart) => {
   if (part.data.startsWith("data:") && dataUri === null) {
     return Effect.fail(fail("image data URI must use the canonical data:<MIME>;base64,<data> form"))
   }
-  return Effect.map(decodeBase64(value), (data) => ({ ...part, data }))
+  return Effect.map(decodeBase64(value), (data) => Prompt.makePart("file", { data, mediaType: part.mediaType }))
 }
 
 const normalizePrompt = Effect.fnUntraced(function* (input: Prompt.RawInput) {
@@ -63,7 +63,7 @@ const normalizePrompt = Effect.fnUntraced(function* (input: Prompt.RawInput) {
     for (const part of message.content) {
       content.push(part.type === "file" && isImageMediaType(part.mediaType) ? yield* normalizePart(part) : part)
     }
-    messages.push({ ...message, content })
+    messages.push(Prompt.makeMessage("user", { content }))
   }
   return messages
 })

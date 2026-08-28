@@ -1,5 +1,5 @@
 import { OpenAiClient } from "@effect/ai-openai-compat"
-import { ModelRegistry } from "tenetkit"
+import { ModelRegistry } from "../../core/index.js"
 import { Config, Layer, Redacted } from "effect"
 import type { HttpClient } from "effect/unstable/http"
 import { layer as chatCompletionsLayer, type OpenAiChatCompletionsInput } from "../provider/openai-chat-completions.js"

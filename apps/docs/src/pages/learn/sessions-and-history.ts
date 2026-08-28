@@ -1,5 +1,5 @@
-import projection from "../../snippets/learn/sessions-and-history/projection.ts?raw"
-import projectionExpected from "../../snippets/learn/sessions-and-history/projection.expected.txt?raw"
+import projection from "virtual:source/src/snippets/learn/sessions-and-history/projection.ts"
+import projectionExpected from "virtual:source/src/snippets/learn/sessions-and-history/projection.expected.txt"
 import { code, codeBlock, definePage, h2, link, p, table } from "../../prose"
 export const sessionsAndHistory = definePage({
   path: "/docs/learn/sessions-and-history",

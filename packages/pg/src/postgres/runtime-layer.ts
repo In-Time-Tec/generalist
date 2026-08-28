@@ -1,15 +1,14 @@
 import { Context, Effect, Layer, Redacted } from "effect"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { PgClient } from "@effect/sql-pg"
-import { makeRuntime } from "tenetkit/runtime/driver/memory/runtime-layer"
-import { Runtime } from "tenetkit/runtime/driver/runtime"
-import { RunStore } from "tenetkit/runtime/driver/run-store"
-import { RunClaims } from "tenetkit/runtime/driver/sql/run-claims"
-import { makePostgresServices } from "./store.js"
-import { ExecutionHost, make as makeExecutionHost } from "tenetkit/runtime/driver/execution-host"
-import { layer as activeExecutionsLayer } from "tenetkit/runtime/driver/active-executions"
-import type { LayerOptions } from "tenetkit/runtime/driver/runtime"
-import { layer as modelPreviewLayer } from "tenetkit/runtime/driver/model-preview"
+import { makeRuntime } from "tenetkit/runtime/driver/memory/layer"
+import { Runtime, type LayerOptions } from "tenetkit/runtime/driver/service"
+import { RunStore } from "tenetkit/runtime/driver/run/store"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { postgresServices } from "./store/index.js"
+import { ExecutionHost, make as makeExecutionHost } from "tenetkit/runtime/driver/execution/host"
+import { layer as activeExecutionsLayer } from "tenetkit/runtime/driver/execution/active-executions"
+import { layer as modelPreviewLayer } from "tenetkit/runtime/driver/execution/model-response/preview"
 import {
   SchemaMigrationFailed,
   type SchemaChecksumMismatch,
@@ -46,7 +45,7 @@ export const layerPostgres = (
     }),
   )
   const services = Layer.effectContext(
-    makePostgresServices(options).pipe(
+    postgresServices(options).pipe(
       Effect.map(({ store, claims }) => Context.make(RunStore, store).pipe(Context.add(RunClaims, claims))),
     ),
   ).pipe(Layer.provide(client))

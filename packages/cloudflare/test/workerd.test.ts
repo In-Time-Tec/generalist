@@ -118,7 +118,7 @@ const worker :Workerd.Worker = (
             {
               backend: "sqlite",
               probe: 1,
-              tables: expect.arrayContaining(["tenetkit_runs", "tenetkit_schema_meta"]),
+              tables: responses[0]?.tables,
               committed: 1,
               rolledBack: 0,
               cancellationStoredType: "integer",
@@ -131,7 +131,7 @@ const worker :Workerd.Worker = (
             {
               backend: "sqlite",
               probe: 2,
-              tables: expect.arrayContaining(["tenetkit_runs", "tenetkit_schema_meta"]),
+              tables: responses[1]?.tables,
               committed: 1,
               rolledBack: 0,
               cancellationStoredType: "integer",
@@ -142,6 +142,9 @@ const worker :Workerd.Worker = (
               migrations: [{ id: 1, name: "tenetkit_runtime" }],
             },
           ])
+          for (const response of responses) {
+            expect(response.tables).toEqual(expect.arrayContaining(["tenetkit_runs", "tenetkit_schema_meta"]))
+          }
 
           const agentResponse = yield* HttpClient.get(`http://127.0.0.1:${port}/agent`).pipe(
             Effect.flatMap(HttpClientResponse.filterStatusOk),

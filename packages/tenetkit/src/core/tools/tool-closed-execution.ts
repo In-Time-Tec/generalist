@@ -1,9 +1,21 @@
 import { Effect, Function, Schema } from "effect"
-import type { AgentToolToolkit } from "../agent/agent-tool.js"
+import type { AgentToolToolkit } from "../agent/tool.js"
 import { ToolContext } from "./tool-context.js"
-import { toolResultCodec } from "./tool-result-codec.js"
-import type { SchemaTool, ToolSchemaServices } from "./tool-result-codec.js"
-import { FrameworkFailure, type ClosedToolSet, type Outcome, type Request } from "./tool-executor.js"
+import {
+  FrameworkFailure,
+  toolResultCodec,
+  type ClosedToolSet,
+  type Outcome,
+  type Request,
+  type SchemaTool,
+  type ToolSchemaServices,
+} from "./tool-result-codec.js"
+
+type AgentToolSchemaServices<Parameters extends Schema.Top, Success extends Schema.Top> =
+  | Parameters["DecodingServices"]
+  | Parameters["EncodingServices"]
+  | Success["DecodingServices"]
+  | Success["EncodingServices"]
 
 /** @experimental Execute one tool call against a closed tool set that already owns its invocation. */
 export const executeWithClosedSet: {
@@ -33,7 +45,7 @@ export const executeWithClosedSet: {
       )
     }
     const handleFailure = (
-      error: unknown,
+      error: typeof Schema.Unknown.Type,
     ): Effect.Effect<Outcome, FrameworkFailure, T["failureSchema"]["EncodingServices"]> => {
       if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
       return toolResultCodec.encodeDomainCandidate<T["failureSchema"]>(tool, error)
@@ -60,7 +72,7 @@ export const executeWithClosedToolkit: {
     SuccessSchema extends Schema.Top = Schema.Top,
   >(
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-  ) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>
+  ) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
   <
     R,
     Name extends string = string,
@@ -69,7 +81,7 @@ export const executeWithClosedToolkit: {
   >(
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
     request: Request,
-  ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>
+  ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
 } = Function.dual(
   2,
   <
@@ -80,15 +92,15 @@ export const executeWithClosedToolkit: {
   >(
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
     request: Request,
-  ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> => {
-    const executed: Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> = executeWithClosedSet(
+  ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>> => {
+    const executed = executeWithClosedSet(
       {
         tools: toolkit.tools,
         invoke: (name, params) =>
           name === toolkit.name ? toolkit.invoke(params) : Effect.fail(`Unknown tool ${name}`),
       },
       request,
-    ).pipe(toolResultCodec.provideSchemaServices)
+    )
     return executed
   },
 )

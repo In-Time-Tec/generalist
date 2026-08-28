@@ -54,17 +54,22 @@ const filesystemSkillLayer = SkillLoader.layer({ cwd: ".", roots: ["fixtures/.ag
 const compactionLayer = Compaction.layer({ contextWindow: 64_000, reserveTokens: 1_024, keepRecentTokens: 8_000 })
 
 const chatAgent = ExecutableManifest.makeTest("capstone-assistant", "1").ref
-const runEvent = (sequence: number, fields: Record<string, unknown>): Connection.Incoming =>
-  ({
-    specVersion: "1",
-    eventId: `capstone-run:${sequence}`,
-    runId: "capstone-run",
-    sequence,
-    executableRef: chatAgent,
-    rootRunId: "capstone-run",
-    occurredAt: "2026-08-03T00:00:00.000Z",
-    ...fields,
-  }) as Connection.Incoming
+const runEvent = (sequence: number, fields: Partial<Connection.Incoming>): Connection.Incoming => {
+  const candidate = Object.assign(
+    {
+      specVersion: "1",
+      eventId: `capstone-run:${sequence}`,
+      runId: "capstone-run",
+      sequence,
+      executableRef: chatAgent,
+      rootRunId: "capstone-run",
+      occurredAt: "2026-08-03T00:00:00.000Z",
+    },
+    fields,
+  )
+  if (!Schema.is(Connection.Incoming)(candidate)) throw new Error("invalid test transport event")
+  return candidate
+}
 
 const chatFrames: ReadonlyArray<Connection.Incoming> = [
   runEvent(0, { _tag: "TurnStarted", turn: 0 }),

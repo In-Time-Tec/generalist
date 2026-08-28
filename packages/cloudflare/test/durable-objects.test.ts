@@ -6,15 +6,21 @@ import { makeSqlClient, type DurableObjectStorage } from "../src/durable-objects
 layer(reactivityLayer)("Durable Objects SQLite", (it) => {
   it.effect("constructs transactions from full DurableObjectStorage", () => {
     let transactions = 0
-    const storage = {
+    const storage: DurableObjectStorage = {
       sql: {
-        exec: () => ({ columnNames: [], raw: () => [] }),
+        exec: () => ({
+          columnNames: [],
+          *raw() {},
+          *[Symbol.iterator]() {},
+        }),
       },
-      transaction: (callback: (transaction: { readonly rollback: () => void }) => Promise<unknown>) => {
+      transaction: <A>(callback: (transaction: { readonly rollback: () => void }) => Promise<A>) => {
         transactions += 1
         return callback({ rollback: () => undefined })
       },
-    } as unknown as DurableObjectStorage
+      getAlarm: () => Promise.resolve(null),
+      setAlarm: () => Promise.resolve(),
+    }
 
     return Effect.gen(function* () {
       const sql = yield* makeSqlClient(storage)

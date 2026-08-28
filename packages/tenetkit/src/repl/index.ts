@@ -9,6 +9,7 @@ import {
   Display as Cell_Display,
   DropReason as Cell_DropReason,
   Epoch as Cell_Epoch,
+  HostCall as Cell_HostCall,
   KernelProtocolViolation as Cell_KernelProtocolViolation,
   KernelReady as Cell_KernelReady,
   KernelRestarted as Cell_KernelRestarted,
@@ -30,7 +31,7 @@ import {
   failureTags as Cell_failureTags,
   sequenceOf as Cell_sequenceOf,
   validateSequence as Cell_validateSequence,
-} from "./repl/cell.js"
+} from "./cell.js"
 export const Cell = {
   CellEvent: Cell_CellEvent,
   CellExecutionFailed: Cell_CellExecutionFailed,
@@ -42,6 +43,7 @@ export const Cell = {
   Display: Cell_Display,
   DropReason: Cell_DropReason,
   Epoch: Cell_Epoch,
+  HostCall: Cell_HostCall,
   KernelProtocolViolation: Cell_KernelProtocolViolation,
   KernelReady: Cell_KernelReady,
   KernelRestarted: Cell_KernelRestarted,
@@ -63,26 +65,26 @@ export const Cell = {
   failureTags: Cell_failureTags,
   sequenceOf: Cell_sequenceOf,
   validateSequence: Cell_validateSequence,
-} as typeof import("./repl/cell.js")
+} satisfies typeof import("./cell.js")
 export namespace Cell {
-  export type SequenceRun = import("./repl/cell.js").SequenceRun
-  export type CellEvent = import("./repl/cell.js").CellEvent
-  export type CellExecutionFailed = import("./repl/cell.js").CellExecutionFailed
-  export type CellFailure = import("./repl/cell.js").CellFailure
-  export type CellId = import("./repl/cell.js").CellId
-  export type CellOutcomeUnknown = import("./repl/cell.js").CellOutcomeUnknown
-  export type CellResult = import("./repl/cell.js").CellResult
-  export type Channel = import("./repl/cell.js").Channel
-  export type DropReason = import("./repl/cell.js").DropReason
-  export type Epoch = import("./repl/cell.js").Epoch
-  export type KernelProtocolViolation = import("./repl/cell.js").KernelProtocolViolation
-  export type KernelUnavailable = import("./repl/cell.js").KernelUnavailable
-  export type RestartReason = import("./repl/cell.js").RestartReason
-  export type Sequence = import("./repl/cell.js").Sequence
-  export type SessionId = import("./repl/cell.js").SessionId
-  export type Truncation = import("./repl/cell.js").Truncation
-  export type UnavailableReason = import("./repl/cell.js").UnavailableReason
-  export type UnknownReason = import("./repl/cell.js").UnknownReason
+  export type SequenceRun = import("./cell.js").SequenceRun
+  export type CellEvent = import("./cell.js").CellEvent
+  export type CellExecutionFailed = import("./cell.js").CellExecutionFailed
+  export type CellFailure = import("./cell.js").CellFailure
+  export type CellId = import("./cell.js").CellId
+  export type CellOutcomeUnknown = import("./cell.js").CellOutcomeUnknown
+  export type CellResult = import("./cell.js").CellResult
+  export type Channel = import("./cell.js").Channel
+  export type DropReason = import("./cell.js").DropReason
+  export type Epoch = import("./cell.js").Epoch
+  export type KernelProtocolViolation = import("./cell.js").KernelProtocolViolation
+  export type KernelUnavailable = import("./cell.js").KernelUnavailable
+  export type RestartReason = import("./cell.js").RestartReason
+  export type Sequence = import("./cell.js").Sequence
+  export type SessionId = import("./cell.js").SessionId
+  export type Truncation = import("./cell.js").Truncation
+  export type UnavailableReason = import("./cell.js").UnavailableReason
+  export type UnknownReason = import("./cell.js").UnknownReason
 }
 
 import {
@@ -96,7 +98,7 @@ import {
   digest as KernelProfile_digest,
   make as KernelProfile_make,
   protocolVersion as KernelProfile_protocolVersion,
-} from "./repl/kernel-profile.js"
+} from "./kernel-profile.js"
 export const KernelProfile = {
   KernelProfile: KernelProfile_KernelProfile,
   Limits: KernelProfile_Limits,
@@ -108,30 +110,30 @@ export const KernelProfile = {
   digest: KernelProfile_digest,
   make: KernelProfile_make,
   protocolVersion: KernelProfile_protocolVersion,
-} as typeof import("./repl/kernel-profile.js")
+} satisfies typeof import("./kernel-profile.js")
 export namespace KernelProfile {
-  export type KernelProfile = import("./repl/kernel-profile.js").KernelProfile
-  export type Limits = import("./repl/kernel-profile.js").Limits
-  export type MakeOptions = import("./repl/kernel-profile.js").MakeOptions
-  export type Runtime = import("./repl/kernel-profile.js").Runtime
-  export type TrustMode = import("./repl/kernel-profile.js").TrustMode
-  export type Workspace = import("./repl/kernel-profile.js").Workspace
+  export type KernelProfile = import("./kernel-profile.js").KernelProfile
+  export type Limits = import("./kernel-profile.js").Limits
+  export type MakeOptions = import("./kernel-profile.js").MakeOptions
+  export type Runtime = import("./kernel-profile.js").Runtime
+  export type TrustMode = import("./kernel-profile.js").TrustMode
+  export type Workspace = import("./kernel-profile.js").Workspace
 }
 
-import { KernelPool as KernelPool_KernelPool } from "./repl/kernel-pool.js"
+import { KernelPool as KernelPool_KernelPool } from "./kernel-pool.js"
 export const KernelPool = {
   KernelPool: KernelPool_KernelPool,
-} as typeof import("./repl/kernel-pool.js")
+}
 export namespace KernelPool {
-  export type KernelPool = import("./repl/kernel-pool.js").KernelPool
-  export type Binding = import("./repl/kernel-pool.js").Binding
-  export type ExecuteRequest = import("./repl/kernel-pool.js").ExecuteRequest
-  export type Execution = import("./repl/kernel-pool.js").Execution
-  export type Inspection = import("./repl/kernel-pool.js").Inspection
-  export type InspectRequest = import("./repl/kernel-pool.js").InspectRequest
-  export type Interface = import("./repl/kernel-pool.js").Interface
-  export type Interruption = import("./repl/kernel-pool.js").Interruption
-  export type Restart = import("./repl/kernel-pool.js").Restart
+  export type KernelPool = import("./kernel-pool.js").KernelPool
+  export type Binding = import("./kernel-pool.js").Binding
+  export type ExecuteRequest = import("./kernel-pool.js").ExecuteRequest
+  export type Execution = import("./kernel-pool.js").Execution
+  export type Inspection = import("./kernel-pool.js").Inspection
+  export type InspectRequest = import("./kernel-pool.js").InspectRequest
+  export type Interface = import("./kernel-pool.js").Interface
+  export type Interruption = import("./kernel-pool.js").Interruption
+  export type Restart = import("./kernel-pool.js").Restart
 }
 
 import {
@@ -141,7 +143,7 @@ import {
   Manifest as KernelStateStore_Manifest,
   RestoreKind as KernelStateStore_RestoreKind,
   RestoredBinding as KernelStateStore_RestoredBinding,
-} from "./repl/kernel-state-store.js"
+} from "./kernel-state-store.js"
 export const KernelStateStore = {
   DroppedBinding: KernelStateStore_DroppedBinding,
   KernelStateStore: KernelStateStore_KernelStateStore,
@@ -149,16 +151,16 @@ export const KernelStateStore = {
   Manifest: KernelStateStore_Manifest,
   RestoreKind: KernelStateStore_RestoreKind,
   RestoredBinding: KernelStateStore_RestoredBinding,
-} as typeof import("./repl/kernel-state-store.js")
+} satisfies typeof import("./kernel-state-store.js")
 export namespace KernelStateStore {
-  export type DroppedBinding = import("./repl/kernel-state-store.js").DroppedBinding
-  export type Interface = import("./repl/kernel-state-store.js").Interface
-  export type KernelStateStore = import("./repl/kernel-state-store.js").KernelStateStore
-  export type KernelStateUnavailable = import("./repl/kernel-state-store.js").KernelStateUnavailable
-  export type Manifest = import("./repl/kernel-state-store.js").Manifest
-  export type RestoreKind = import("./repl/kernel-state-store.js").RestoreKind
-  export type RestoredBinding = import("./repl/kernel-state-store.js").RestoredBinding
-  export type Snapshot = import("./repl/kernel-state-store.js").Snapshot
+  export type DroppedBinding = import("./kernel-state-store.js").DroppedBinding
+  export type Interface = import("./kernel-state-store.js").Interface
+  export type KernelStateStore = import("./kernel-state-store.js").KernelStateStore
+  export type KernelStateUnavailable = import("./kernel-state-store.js").KernelStateUnavailable
+  export type Manifest = import("./kernel-state-store.js").Manifest
+  export type RestoreKind = import("./kernel-state-store.js").RestoreKind
+  export type RestoredBinding = import("./kernel-state-store.js").RestoredBinding
+  export type Snapshot = import("./kernel-state-store.js").Snapshot
 }
 
 import {
@@ -169,7 +171,7 @@ import {
   layer as HostBindingRegistry_layer,
   layerTest as HostBindingRegistry_layerTest,
   make as HostBindingRegistry_make,
-} from "./repl/host-binding-registry.js"
+} from "./host-binding-registry.js"
 export const HostBindingRegistry = {
   HostBindingConflict: HostBindingRegistry_HostBindingConflict,
   HostBindingNotFound: HostBindingRegistry_HostBindingNotFound,
@@ -178,20 +180,20 @@ export const HostBindingRegistry = {
   layer: HostBindingRegistry_layer,
   layerTest: HostBindingRegistry_layerTest,
   make: HostBindingRegistry_make,
-} as typeof import("./repl/host-binding-registry.js")
+} satisfies typeof import("./host-binding-registry.js")
 export namespace HostBindingRegistry {
-  export type AnyOperation<R = never> = import("./repl/host-binding-registry.js").AnyOperation<R>
-  export type BindingFailure = import("./repl/host-binding-registry.js").BindingFailure
-  export type Descriptor = import("./repl/host-binding-registry.js").Descriptor
-  export type HostBindingConflict = import("./repl/host-binding-registry.js").HostBindingConflict
-  export type HostBindingNotFound = import("./repl/host-binding-registry.js").HostBindingNotFound
-  export type HostBindingRegistry = import("./repl/host-binding-registry.js").HostBindingRegistry
-  export type HostBindingSchemaFailure = import("./repl/host-binding-registry.js").HostBindingSchemaFailure
-  export type Interface = import("./repl/host-binding-registry.js").Interface
-  export type Module<R = never> = import("./repl/host-binding-registry.js").Module<R>
-  export type Request = import("./repl/host-binding-registry.js").Request
-  export type Response = import("./repl/host-binding-registry.js").Response
-  export type Tagged = import("./repl/host-binding-registry.js").Tagged
+  export type AnyOperation<R = never> = import("./host-binding-registry.js").AnyOperation<R>
+  export type BindingFailure = import("./host-binding-registry.js").BindingFailure
+  export type Descriptor = import("./host-binding-registry.js").Descriptor
+  export type HostBindingConflict = import("./host-binding-registry.js").HostBindingConflict
+  export type HostBindingNotFound = import("./host-binding-registry.js").HostBindingNotFound
+  export type HostBindingRegistry = import("./host-binding-registry.js").HostBindingRegistry
+  export type HostBindingSchemaFailure = import("./host-binding-registry.js").HostBindingSchemaFailure
+  export type Interface = import("./host-binding-registry.js").Interface
+  export type Module<R = never> = import("./host-binding-registry.js").Module<R>
+  export type Request = import("./host-binding-registry.js").Request
+  export type Response = import("./host-binding-registry.js").Response
+  export type Tagged = import("./host-binding-registry.js").Tagged
 }
 
 import {
@@ -204,7 +206,7 @@ import {
   scheduling as CellTool_scheduling,
   tool as CellTool_tool,
   toolkit as CellTool_toolkit,
-} from "./repl/cell-tool.js"
+} from "./cell-tool.js"
 export const CellTool = {
   Parameters: CellTool_Parameters,
   layer: CellTool_layer,
@@ -215,24 +217,9 @@ export const CellTool = {
   scheduling: CellTool_scheduling,
   tool: CellTool_tool,
   toolkit: CellTool_toolkit,
-} as typeof import("./repl/cell-tool.js")
+} satisfies typeof import("./cell-tool.js")
 export namespace CellTool {
-  export type Parameters = import("./repl/cell-tool.js").Parameters
+  export type Parameters = import("./cell-tool.js").Parameters
 }
 
-import {
-  layerMemoryStore as TestKernel_layerMemoryStore,
-  layerTestPool as TestKernel_layerTestPool,
-  makeMemoryStore as TestKernel_makeMemoryStore,
-  makeTest as TestKernel_makeTest,
-} from "./repl/test-kernel.js"
-export const TestKernel = {
-  layerMemoryStore: TestKernel_layerMemoryStore,
-  layerTestPool: TestKernel_layerTestPool,
-  makeMemoryStore: TestKernel_makeMemoryStore,
-  makeTest: TestKernel_makeTest,
-} as typeof import("./repl/test-kernel.js")
-export namespace TestKernel {
-  export type Script = import("./repl/test-kernel.js").Script
-  export type TestPoolOptions = import("./repl/test-kernel.js").TestPoolOptions
-}
+export * as TestKernel from "./test-kernel.js"

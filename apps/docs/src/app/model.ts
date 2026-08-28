@@ -4,8 +4,8 @@ import { Url } from "foldkit/url"
 import { CommandModel } from "@/components/ui/command"
 import { DialogModel } from "@/components/ui/dialog"
 
-import { SidebarGroups } from "../layout/sidebarStorage"
-import { Route } from "../route/route"
+import { SidebarGroups } from "../layout/sidebar-storage"
+import { Route } from "../route/match"
 
 export const ThemePreference = Schema.Literals(["Light", "System", "Dark"])
 export type ThemePreference = typeof ThemePreference.Type
