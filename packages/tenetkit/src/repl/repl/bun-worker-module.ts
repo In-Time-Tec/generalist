@@ -18,4 +18,5 @@ export const workerModule: string = fileURLToPath(new URL(`./bun-worker.${extens
  */
 export const workerSupportModules: ReadonlyArray<string> = [
   fileURLToPath(new URL(`./text-result.${extension}`, import.meta.url)),
+  fileURLToPath(new URL(`./bun-value.${extension}`, import.meta.url)),
 ]

@@ -18,6 +18,7 @@ layer(platform, liveOptions)("Bun kernel worker module", (it) => {
       expect(yield* fileSystem.exists(exportedWorkerModule)).toBe(true)
       expect(workerSupportModules.map((module) => module.slice(module.lastIndexOf("/") + 1))).toEqual([
         exportedWorkerModule.endsWith(".ts") ? "text-result.ts" : "text-result.js",
+        exportedWorkerModule.endsWith(".ts") ? "bun-value.ts" : "bun-value.js",
       ])
       for (const module of workerSupportModules) expect(yield* fileSystem.exists(module)).toBe(true)
     }),
