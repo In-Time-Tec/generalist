@@ -3,6 +3,8 @@ import { Option, Schema } from "effect"
 
 const RuntimeValue = Schema.Unknown
 type RuntimeValue = typeof RuntimeValue.Type
+const UnknownJsonString = Schema.fromJsonString(Schema.Unknown)
+const JsonFromString = Schema.fromJsonString(Schema.Json)
 
 const canonicalize = (value: Schema.Json): Schema.Json => {
   if (Array.isArray(value)) return value.map(canonicalize)
@@ -23,6 +25,8 @@ export const formatValue = (value: RuntimeValue): string => {
 
 export const resultValue = (value: RuntimeValue): string => {
   if (Schema.is(Schema.String)(value) || Error.isError(value)) return formatValue(value)
-  const json = Schema.decodeUnknownOption(Schema.Json)(value)
+  const encoded = Schema.encodeUnknownOption(UnknownJsonString)(value)
+  if (Option.isNone(encoded)) return formatValue(value)
+  const json = Schema.decodeOption(JsonFromString)(encoded.value)
   return Option.isSome(json) ? JSON.stringify(canonicalize(json.value)) : formatValue(value)
 }
