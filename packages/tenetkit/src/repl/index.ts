@@ -15,7 +15,6 @@ import {
   KernelRestarted as Cell_KernelRestarted,
   KernelStarting as Cell_KernelStarting,
   KernelUnavailable as Cell_KernelUnavailable,
-  OutputTruncated as Cell_OutputTruncated,
   RestartReason as Cell_RestartReason,
   Result as Cell_Result,
   Sequence as Cell_Sequence,
@@ -24,7 +23,6 @@ import {
   StateRestored as Cell_StateRestored,
   Stderr as Cell_Stderr,
   Stdout as Cell_Stdout,
-  Truncation as Cell_Truncation,
   UnavailableReason as Cell_UnavailableReason,
   UnknownReason as Cell_UnknownReason,
   eventTags as Cell_eventTags,
@@ -49,7 +47,6 @@ export const Cell = {
   KernelRestarted: Cell_KernelRestarted,
   KernelStarting: Cell_KernelStarting,
   KernelUnavailable: Cell_KernelUnavailable,
-  OutputTruncated: Cell_OutputTruncated,
   RestartReason: Cell_RestartReason,
   Result: Cell_Result,
   Sequence: Cell_Sequence,
@@ -58,7 +55,6 @@ export const Cell = {
   StateRestored: Cell_StateRestored,
   Stderr: Cell_Stderr,
   Stdout: Cell_Stdout,
-  Truncation: Cell_Truncation,
   UnavailableReason: Cell_UnavailableReason,
   UnknownReason: Cell_UnknownReason,
   eventTags: Cell_eventTags,
@@ -82,7 +78,6 @@ export namespace Cell {
   export type RestartReason = import("./cell.js").RestartReason
   export type Sequence = import("./cell.js").Sequence
   export type SessionId = import("./cell.js").SessionId
-  export type Truncation = import("./cell.js").Truncation
   export type UnavailableReason = import("./cell.js").UnavailableReason
   export type UnknownReason = import("./cell.js").UnknownReason
 }

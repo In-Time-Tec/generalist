@@ -28,10 +28,9 @@ export const Workspace = Schema.Struct({
 /** @experimental */
 export type Workspace = typeof Workspace.Type
 
-/** @experimental Ingestion bounds enforced before anything enters the model's context. */
+/** @experimental Source and execution bounds enforced by the kernel. */
 export const Limits = Schema.Struct({
   sourceBytes: PositiveBytes,
-  channelBytes: PositiveBytes,
   cellDeadlineMillis: PositiveBytes,
 })
 /** @experimental */

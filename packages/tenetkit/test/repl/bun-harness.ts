@@ -32,7 +32,6 @@ export const liveOptions = { excludeTestServices: true } as const
  * test that wants eviction shortens it for that test alone.
  */
 export interface PoolOverrides {
-  readonly channelBytes?: number
   readonly sourceBytes?: number
   readonly cellDeadlineMillis?: number
   readonly idleTimeToLive?: Duration.Input
@@ -95,7 +94,6 @@ const profileFor = (input: {
     workspace: { root: input.root, dataRoot: input.dataRoot },
     limits: {
       sourceBytes: input.overrides?.sourceBytes ?? 65_536,
-      channelBytes: input.overrides?.channelBytes ?? 262_144,
       cellDeadlineMillis: input.overrides?.cellDeadlineMillis ?? 5_000,
     },
     trustMode: "trusted-local",

@@ -74,10 +74,7 @@ export const replReference = definePage({
     table(
       ["Type", "Meaning"],
       [
-        [
-          [code("CellResult")],
-          "Formatted value, bounded stdout and stderr, duration, kernel epoch, and per-channel truncation facts",
-        ],
+        [[code("CellResult")], "Complete formatted value, stdout and stderr, duration, and kernel epoch"],
         [[code("CellExecutionFailed")], "The cell threw; the namespace, the kernel, and every prior binding survive"],
         [[code("KernelUnavailable")], "No kernel could run the cell; nothing was evaluated"],
         [[code("KernelProtocolViolation")], "The kernel broke the cell protocol"],
@@ -98,8 +95,6 @@ export const replReference = definePage({
       code("Result"),
       ", ",
       code("Display"),
-      ", ",
-      code("OutputTruncated"),
       ", ",
       code("StateRestored"),
       ", ",

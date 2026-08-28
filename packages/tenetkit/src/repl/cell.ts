@@ -22,19 +22,10 @@ export type Sequence = typeof Sequence.Type
 
 const NonNegative = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
-/** @experimental Bounded output channel of one cell. */
+/** @experimental Output channel of one cell. */
 export const Channel = Schema.Literals(["stdout", "stderr", "result", "display"])
 /** @experimental */
 export type Channel = typeof Channel.Type
-
-/** @experimental Exactly what a channel dropped when it hit its ingestion bound. */
-export const Truncation = Schema.Struct({
-  channel: Channel,
-  droppedBytes: NonNegative,
-  droppedEvents: NonNegative,
-})
-/** @experimental */
-export type Truncation = typeof Truncation.Type
 
 /** @experimental Why a kernel binding did not survive a snapshot restore. */
 export const DropReason = Schema.Literals(["function", "class", "module", "live-handle", "oversized", "unserializable"])
@@ -55,7 +46,6 @@ export const CellResult = Schema.Struct({
   stdout: Schema.String,
   stderr: Schema.String,
   durationMillis: NonNegative,
-  truncation: Schema.Array(Truncation),
 })
 /** @experimental */
 export type CellResult = typeof CellResult.Type
@@ -76,7 +66,6 @@ export class CellExecutionFailed extends Schema.TaggedError<CellExecutionFailed>
     stdout: Schema.String,
     stderr: Schema.String,
     durationMillis: NonNegative,
-    truncation: Schema.Array(Truncation),
   },
 ) {}
 
@@ -152,14 +141,14 @@ export const KernelReady = Schema.TaggedStruct("KernelReady", {
   profileDigest: Schema.String,
 })
 
-/** @experimental Bounded stdout produced by the running cell. */
+/** @experimental Stdout produced by the running cell. */
 export const Stdout = Schema.TaggedStruct("Stdout", {
   cellId: CellId,
   sequence: Sequence,
   text: Schema.String,
 })
 
-/** @experimental Bounded stderr produced by the running cell. */
+/** @experimental Stderr produced by the running cell. */
 export const Stderr = Schema.TaggedStruct("Stderr", {
   cellId: CellId,
   sequence: Sequence,
@@ -194,15 +183,6 @@ export const Display = Schema.TaggedStruct("Display", {
   mediaType: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
   data: Schema.String,
   name: Schema.optionalKey(Schema.String),
-})
-
-/** @experimental A channel hit its ingestion bound and dropped output. */
-export const OutputTruncated = Schema.TaggedStruct("OutputTruncated", {
-  cellId: CellId,
-  sequence: Sequence,
-  channel: Channel,
-  droppedBytes: NonNegative,
-  droppedEvents: NonNegative,
 })
 
 /** @experimental Snapshot restore put these bindings back into the namespace. */
@@ -241,7 +221,6 @@ export const CellEvent = Schema.Union([
   HostCall,
   Result,
   Display,
-  OutputTruncated,
   StateRestored,
   StateLost,
   KernelRestarted,
@@ -258,7 +237,6 @@ export const eventTags: ReadonlyArray<CellEvent["_tag"]> = [
   "HostCall",
   "Result",
   "Display",
-  "OutputTruncated",
   "StateRestored",
   "StateLost",
   "KernelRestarted",

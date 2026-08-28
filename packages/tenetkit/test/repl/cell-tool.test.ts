@@ -11,7 +11,7 @@ const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
   bindingsDigest: KernelProfile.bindingsDigest(["workspace"]),
   workspace: { root: "/workspace", dataRoot: "/data" },
-  limits: { sourceBytes: CellTool.maxSourceBytes, channelBytes: 4096, cellDeadlineMillis: 1000 },
+  limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 1000 },
   trustMode: "trusted-local",
 })
 

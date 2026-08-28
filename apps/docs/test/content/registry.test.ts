@@ -75,7 +75,7 @@ test("the kernel explanation keeps the profile-pin and working-memory contracts"
   }
 })
 
-test("the cell guide keeps the exclusive-barrier, idle-TTL, and failure-taxonomy contracts", () => {
+test("the cell guide keeps the execution and failure contracts", () => {
   for (const marker of [
     "typescript",
     "{ maxConcurrency: 1, parallelSafe: [] }",
@@ -88,8 +88,7 @@ test("the cell guide keeps the exclusive-barrier, idle-TTL, and failure-taxonomy
     "KernelProtocolViolation",
     "CellOutcomeUnknown",
     "limits.sourceBytes",
-    "limits.channelBytes",
-    "OutputTruncated",
+    "returned complete",
   ]) {
     expect(typescriptCells.markdown, marker).toContain(marker)
   }
