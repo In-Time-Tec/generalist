@@ -28,7 +28,6 @@ interface ActiveCell {
     readonly stdout: Deferred.Deferred<void>
     readonly stderr: Deferred.Deferred<void>
   }
-  readonly channelBytes: number
 }
 
 type DisplayEvent = Extract<CellEvent, { readonly _tag: "Display" }>
@@ -44,7 +43,6 @@ export interface Kernel {
     readonly cellId: CellId
     readonly code: string
     readonly deadlineMillis: number
-    readonly channelBytes: number
     readonly sequenceStart: number
   }) => Effect.Effect<
     {
@@ -90,12 +88,6 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
         Effect.asVoid,
       )
 
-    /**
-     * Admit one write to one of a cell's bounded channels and stream what the bound kept. Every
-     * byte a cell produces passes through here — the worker's own `console` frames and the raw
-     * bytes it, a native addon, or one of its subprocesses wrote to the process's real stdout — so
-     * one budget covers them all and no writer can spend another's.
-     */
     const onOutput = (
       cell: ActiveCell,
       input: { readonly channel: "stdout" | "stderr" | "display"; readonly text: string },
@@ -104,7 +96,6 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
         const ingested = ingest(yield* Ref.get(cell.channels), {
           channel: input.channel,
           text: input.text,
-          limit: cell.channelBytes,
         })
         yield* Ref.set(cell.channels, ingested.channels)
         const sequence = yield* Ref.get(cell.sequence)
@@ -120,32 +111,18 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
           const ingested = ingest(yield* Ref.get(cell.channels), {
             channel: "display",
             text: frame.data,
-            limit: cell.channelBytes,
           })
           yield* Ref.set(cell.channels, ingested.channels)
           const sequence = yield* Ref.get(cell.sequence)
-          if (ingested.kept.length === frame.data.length) {
-            const event: MutableDisplayEvent = {
-              _tag: "Display",
-              cellId: frame.cellId,
-              sequence,
-              mediaType: frame.mediaType,
-              data: frame.data,
-            }
-            if (frame.name !== undefined) event.name = frame.name
-            yield* Queue.offer(cell.events, event).pipe(Effect.ignore)
-            yield* Ref.set(cell.sequence, sequence + 1)
-            return
-          }
-          const state = ingested.channels.display
-          yield* Queue.offer(cell.events, {
-            _tag: "OutputTruncated",
+          const event: MutableDisplayEvent = {
+            _tag: "Display",
             cellId: frame.cellId,
             sequence,
-            channel: "display",
-            droppedBytes: state.droppedBytes,
-            droppedEvents: state.droppedEvents,
-          }).pipe(Effect.ignore)
+            mediaType: frame.mediaType,
+            data: frame.data,
+          }
+          if (frame.name !== undefined) event.name = frame.name
+          yield* Queue.offer(cell.events, event).pipe(Effect.ignore)
           yield* Ref.set(cell.sequence, sequence + 1)
           return
         }
@@ -215,12 +192,6 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
       Effect.forkScoped,
     )
 
-    /**
-     * Bytes a cell wrote to the process's own stdout or stderr, metered into the running cell's
-     * channels exactly like the worker's own output frames. A cell that shells out with inherited
-     * descriptors, or writes to the descriptor directly, is the ordinary case in this kernel, so
-     * that output has to reach the model — bounded, and never mistaken for a frame.
-     */
     const rawReader = yield* Queue.take(worker.raw).pipe(
       Effect.flatMap((output) =>
         Ref.get(active).pipe(
@@ -372,7 +343,6 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
               stdout: yield* Deferred.make<void>(),
               stderr: yield* Deferred.make<void>(),
             },
-            channelBytes: input.channelBytes,
           }
           yield* Ref.set(active, cell)
           yield* worker

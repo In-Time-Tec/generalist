@@ -7,7 +7,7 @@ const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
   bindingsDigest: KernelProfile.bindingsDigest([]),
   workspace: { root: "/workspace", dataRoot: "/tmp/tenetkit" },
-  limits: { sourceBytes: CellTool.maxSourceBytes, channelBytes: 262_144, cellDeadlineMillis: 120_000 },
+  limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
   trustMode: "trusted-local",
 })
 
@@ -39,7 +39,7 @@ const program = Effect.gen(function* () {
   const result = Schema.decodeUnknownOption(Cell.CellResult)(outcome.result).pipe(Option.getOrThrow)
   yield* Console.log(`value: ${result.value}`)
   yield* Console.log(`stdout: ${result.stdout.trimEnd()}`)
-  yield* Console.log(`epoch: ${result.epoch}, truncation entries: ${result.truncation.length}`)
+  yield* Console.log(`epoch: ${result.epoch}`)
 })
 
 const layer = CellTool.layer.pipe(

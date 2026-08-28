@@ -4,7 +4,7 @@ import { KernelProfile } from "../../src/repl/index"
 
 const runtime: KernelProfile.Runtime = { name: "bun", version: "1.3.14", digest: "runtime-digest" }
 const workspace: KernelProfile.Workspace = { root: "/workspace", dataRoot: "/data" }
-const limits: KernelProfile.Limits = { sourceBytes: 65_536, channelBytes: 262_144, cellDeadlineMillis: 120_000 }
+const limits: KernelProfile.Limits = { sourceBytes: 65_536, cellDeadlineMillis: 120_000 }
 
 const profile = KernelProfile.make({
   runtime,
@@ -31,11 +31,11 @@ describe("KernelProfile", () => {
   })
 
   it("rejects a non-positive limit", () => {
-    expect(() => KernelProfile.Limits.make({ sourceBytes: 0, channelBytes: 1, cellDeadlineMillis: 1 })).toThrow()
+    expect(() => KernelProfile.Limits.make({ sourceBytes: 0, cellDeadlineMillis: 1 })).toThrow()
   })
 
   it("rejects a fractional limit", () => {
-    expect(() => KernelProfile.Limits.make({ sourceBytes: 1.5, channelBytes: 1, cellDeadlineMillis: 1 })).toThrow()
+    expect(() => KernelProfile.Limits.make({ sourceBytes: 1.5, cellDeadlineMillis: 1 })).toThrow()
   })
 
   it("rejects an empty runtime digest", () => {

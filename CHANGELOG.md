@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.42.0
+
+- Return complete cell stdout, stderr, display payloads, and terminal values; remove output truncation events, accounting, and profile limits.
+
 ## 0.41.4
 
 - Decode PostgreSQL `BIGINT` sequence and tree-position values once at the client boundary, reject out-of-range JavaScript integers, and use the same decoder for runtime, schema, and test clients.
