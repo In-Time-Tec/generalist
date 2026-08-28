@@ -5,7 +5,7 @@ const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
   bindingsDigest: KernelProfile.bindingsDigest([]),
   workspace: { root: "/workspace/cell-agent", dataRoot: "/tmp/cell-agent" },
-  limits: { sourceBytes: CellTool.maxSourceBytes, channelBytes: 262_144, cellDeadlineMillis: 120_000 },
+  limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
   trustMode: "trusted-local",
 })
 

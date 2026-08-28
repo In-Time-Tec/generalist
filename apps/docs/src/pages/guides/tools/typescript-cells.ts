@@ -121,7 +121,7 @@ export const typescriptCells = definePage({
       code("SIGKILL"),
       " that starts a new epoch and reports what was lost.",
     ),
-    h2("bounds-and-truncation", "5. Read the bounds honestly"),
+    h2("execution-bounds", "5. Read the execution bounds honestly"),
     bullets(
       [
         code("limits.sourceBytes"),
@@ -129,19 +129,7 @@ export const typescriptCells = definePage({
         code('KernelUnavailable { reason: "profile-mismatch" }'),
         ".",
       ],
-      [
-        code("limits.channelBytes"),
-        " bounds each output channel in the host, where every byte converges — the kernel's own ",
-        code("console"),
-        ", a direct write to the process's stdout, and a subprocess that inherited the descriptor.",
-      ],
-      [
-        "Truncation is reported, never silent: an ",
-        code("OutputTruncated"),
-        " event is streamed and ",
-        code("CellResult.truncation"),
-        " carries the dropped byte and event counts per channel.",
-      ],
+      ["Cell stdout, stderr, and terminal result values are returned complete."],
     ),
     p(
       "See ",

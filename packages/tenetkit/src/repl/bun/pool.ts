@@ -101,7 +101,6 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
               cellId: `bootstrap-${generation}`,
               code: options.bootstrap,
               deadlineMillis: options.profile.limits.cellDeadlineMillis,
-              channelBytes: options.profile.limits.channelBytes,
               sequenceStart: 0,
             })
             const drained = yield* Effect.forkChild(
@@ -213,7 +212,6 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
               cellId: request.cellId,
               code: request.code,
               deadlineMillis: options.profile.limits.cellDeadlineMillis,
-              channelBytes: options.profile.limits.channelBytes,
               sequenceStart: prelude.length,
             })
             yield* watchAbort(request.signal).pipe(

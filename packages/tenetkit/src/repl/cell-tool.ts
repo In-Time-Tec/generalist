@@ -12,7 +12,7 @@ export const name = "typescript"
 /** @experimental Maximum authored source accepted in one cell. */
 export const maxSourceBytes = 65_536
 
-/** @experimental The single bounded parameter: the cell source. */
+/** @experimental The cell source parameter. */
 export const Parameters = Schema.Struct({
   code: Schema.String.check(Schema.isMaxLength(maxSourceBytes)),
 })
@@ -51,13 +51,7 @@ const frameworkFailure = (stage: ToolExecutor.FrameworkStage, message: string): 
 
 const schemaMessage = (error: { readonly message: string }): string => error.message
 
-/**
- * @experimental Largest encoded cell event carried in one progress record. The kernel already
- * bounds every output channel and reports what it dropped, so this never re-truncates text: an
- * event larger than the bound is withheld whole and reported by size, which keeps the progress
- * stream from carrying a capped `Display` payload into the durable event log without contradicting
- * the kernel's own truncation accounting.
- */
+/** @experimental Largest encoded cell event carried in one progress record. */
 export const maxProgressBytes = 16_384
 
 const encodeEvent = Schema.encodeUnknownEffect(CellEvent)

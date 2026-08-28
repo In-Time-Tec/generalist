@@ -7,7 +7,6 @@ import {
   CellOutcomeUnknown,
   type Channel,
   KernelUnavailable,
-  type Truncation,
 } from "../cell.js"
 import type { Manifest, Snapshot } from "../kernel-state-store.js"
 import type { Interface as HostBindings, Request as HostRequest } from "../host-binding-registry.js"
@@ -148,134 +147,48 @@ export const answerHostRequest: {
     }),
 )
 
-/** @experimental One bounded channel of one cell: what it kept, and exactly what it dropped. */
+/** @experimental One accumulated output channel of one cell. */
 export interface ChannelState {
   readonly text: string
-  readonly bytes: number
-  readonly droppedBytes: number
-  readonly droppedEvents: number
 }
 
-/** @experimental Every bounded channel one cell has produced so far. */
+/** @experimental Every channel one cell has produced so far. */
 export interface Accumulator {
   readonly stdout: ChannelState
   readonly stderr: ChannelState
   readonly display: ChannelState
 }
 
-const emptyChannel: ChannelState = { text: "", bytes: 0, droppedBytes: 0, droppedEvents: 0 }
+const emptyChannel: ChannelState = { text: "" }
 
 /** @experimental The empty channel accumulator one cell starts from. */
 export const emptyAccumulator: Accumulator = { stdout: emptyChannel, stderr: emptyChannel, display: emptyChannel }
 
-/** @experimental One write offered to one bounded channel. */
+/** @experimental One write offered to one channel. */
 export interface IngestRequest {
   readonly channel: Exclude<Channel, "result">
   readonly text: string
-  readonly limit: number
 }
 
-/** @experimental A metered channel: what the bound admitted, and whether this write hit it. */
+/** @experimental One accumulated channel write. */
 export interface Ingested {
   readonly channels: Accumulator
-  readonly kept: string
-  readonly truncated: boolean
+  readonly text: string
 }
 
-/**
- * The largest prefix of `text` that fits in `budget` bytes without splitting a character. Slicing by
- * code unit would admit up to four bytes per unit against a byte bound and could cut a surrogate
- * pair in half, so the prefix is measured in the encoding the bound is stated in.
- */
-const keptWithinBytes = (text: string, budget: number): string => {
-  const encoder = new TextEncoder()
-  let low = 0
-  let high = text.length
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2)
-    if (encoder.encode(text.slice(0, middle)).byteLength <= budget) low = middle
-    else high = middle - 1
-  }
-  const candidate = text.slice(0, low)
-  const lastUnit = candidate.charCodeAt(candidate.length - 1)
-  return lastUnit >= 0xd800 && lastUnit <= 0xdbff ? candidate.slice(0, -1) : candidate
-}
-
-interface MeteredChannel {
-  readonly state: ChannelState
-  readonly kept: string
-}
-
-const metered = (previous: ChannelState, text: string, limit: number): MeteredChannel => {
-  const size = new TextEncoder().encode(text).byteLength
-  if (size === 0) return { state: previous, kept: "" }
-  if (previous.droppedEvents > 0) {
-    return {
-      state: { ...previous, droppedBytes: previous.droppedBytes + size, droppedEvents: previous.droppedEvents + 1 },
-      kept: "",
-    }
-  }
-  const remaining = limit - previous.bytes
-  if (size <= remaining) {
-    return { state: { ...previous, text: previous.text + text, bytes: previous.bytes + size }, kept: text }
-  }
-  if (remaining <= 0) {
-    return {
-      state: { ...previous, droppedBytes: previous.droppedBytes + size, droppedEvents: previous.droppedEvents + 1 },
-      kept: "",
-    }
-  }
-  const kept = keptWithinBytes(text, remaining)
-  const keptBytes = new TextEncoder().encode(kept).byteLength
-  return {
-    state: {
-      text: previous.text + kept,
-      bytes: previous.bytes + keptBytes,
-      droppedBytes: previous.droppedBytes + (size - keptBytes),
-      droppedEvents: previous.droppedEvents + 1,
-    },
-    kept,
-  }
-}
-
-/**
- * @experimental Admit one write to one bounded channel. The host meters every byte a cell produces,
- * whatever wrote it: the kernel's own `console`, a direct write to the process's stdout, a native
- * addon, or a subprocess that inherited the descriptor. Metering in the worker could only ever see
- * the first of those, so the bound the profile advertises is enforced here, where every byte
- * actually arrives.
- */
+/** @experimental Accumulate one output write without altering it. */
 export const ingest: {
   (input: IngestRequest): (previous: Accumulator) => Ingested
   (previous: Accumulator, input: IngestRequest): Ingested
 } = Function.dual(2, (previous: Accumulator, input: IngestRequest): Ingested => {
   const before = previous[input.channel]
-  const { state, kept } = metered(before, input.text, input.limit)
   return {
-    channels: { ...previous, [input.channel]: state },
-    kept,
-    truncated: state.droppedEvents > before.droppedEvents,
+    channels: { ...previous, [input.channel]: { text: before.text + input.text } },
+    text: input.text,
   }
 })
 
-const renderedChannel = (state: ChannelState): string => {
-  if (state.droppedBytes === 0 && state.droppedEvents === 0) return state.text
-  const totalBytes = state.bytes + state.droppedBytes
-  const separator = state.text.length === 0 || state.text.endsWith("\n") ? "" : "\n"
-  return `${state.text}${separator}[truncated: kept first ${state.bytes} of ${totalBytes} bytes — page or narrow the command]`
-}
-
-/** @experimental What every channel of one cell dropped, reported per channel that dropped anything. */
-export const truncationOf = (channels: Accumulator): ReadonlyArray<Truncation> =>
-  (["stdout", "stderr", "display"] as const)
-    .map((channel) => ({
-      channel,
-      droppedBytes: channels[channel].droppedBytes,
-      droppedEvents: channels[channel].droppedEvents,
-    }))
-    .filter((entry) => entry.droppedBytes > 0 || entry.droppedEvents > 0)
-
-/** @experimental One metered write folded into the events a host streams for it. */
+/** @experimental One output write folded into the events a host streams for it. */
 export const outputEvents = (input: {
   readonly cellId: string
   readonly channel: Exclude<Channel, "result">
@@ -283,88 +196,13 @@ export const outputEvents = (input: {
   readonly sequence: number
 }): ReadonlyArray<CellEvent> => {
   const { cellId, channel, ingested } = input
-  const state = ingested.channels[channel]
-  let kept: ReadonlyArray<CellEvent> = []
-  if (ingested.kept.length > 0 && channel === "stderr") {
-    kept = [{ _tag: "Stderr", cellId, sequence: input.sequence, text: ingested.kept }]
-  } else if (ingested.kept.length > 0 && channel === "stdout") {
-    kept = [{ _tag: "Stdout", cellId, sequence: input.sequence, text: ingested.kept }]
+  if (ingested.text.length > 0 && channel === "stderr") {
+    return [{ _tag: "Stderr", cellId, sequence: input.sequence, text: ingested.text }]
   }
-  return ingested.truncated
-    ? [
-        ...kept,
-        {
-          _tag: "OutputTruncated",
-          cellId,
-          sequence: input.sequence + kept.length,
-          channel,
-          droppedBytes: state.droppedBytes,
-          droppedEvents: state.droppedEvents,
-        },
-      ]
-    : kept
-}
-
-/**
- * @experimental Largest formatted result value carried into a cell's terminal events. A cell's
- * result enters the model's context whole, so it is bounded like every other channel; the bytes
- * past the bound are named, and the value itself still lives in the kernel namespace.
- */
-export const maxResultBytes = 16_384
-
-interface BoundedResult {
-  readonly value: string
-  readonly droppedBytes: number
-}
-
-const isJsonArray = Schema.is(Schema.Array(Schema.Json))
-
-const boundedJsonPreview = (value: string): string | undefined => {
-  const decoded = Schema.decodeOption(Schema.fromJsonString(Schema.Json))(value)
-  if (Option.isNone(decoded)) return undefined
-  if (!isJsonArray(decoded.value) && !Schema.is(Schema.JsonObject)(decoded.value)) return undefined
-  const clip = (current: Schema.Json, stringLimit: number, itemLimit: number, depth: number): Schema.Json => {
-    if (Schema.is(Schema.String)(current)) return current.slice(0, stringLimit)
-    if (!isJsonArray(current) && !Schema.is(Schema.JsonObject)(current)) return current
-    if (depth === 0) return isJsonArray(current) ? [] : {}
-    if (isJsonArray(current))
-      return current.slice(0, itemLimit).map((item) => clip(item, stringLimit, itemLimit, depth - 1))
-    return Object.fromEntries(
-      Object.entries(current)
-        .slice(0, itemLimit)
-        .map(([key, item]) => [key, clip(item, stringLimit, itemLimit, depth - 1)]),
-    )
+  if (ingested.text.length > 0 && channel === "stdout") {
+    return [{ _tag: "Stdout", cellId, sequence: input.sequence, text: ingested.text }]
   }
-  for (const [stringLimit, itemLimit] of [
-    [4_096, 64],
-    [2_048, 32],
-    [1_024, 16],
-    [512, 8],
-    [256, 4],
-    [128, 2],
-    [64, 1],
-  ] as const) {
-    const encoded = JSON.stringify(clip(decoded.value, stringLimit, itemLimit, 16))
-    if (new TextEncoder().encode(encoded).byteLength <= maxResultBytes) return encoded
-  }
-  return isJsonArray(decoded.value) ? "[]" : "{}"
-}
-
-const boundResult = (value: string): BoundedResult => {
-  const bytes = new TextEncoder().encode(value).byteLength
-  if (bytes <= maxResultBytes) return { value, droppedBytes: 0 }
-  const jsonPreview = boundedJsonPreview(value)
-  if (jsonPreview !== undefined)
-    return {
-      value: jsonPreview,
-      droppedBytes: bytes - new TextEncoder().encode(jsonPreview).byteLength,
-    }
-  const kept = keptWithinBytes(value, maxResultBytes)
-  const keptBytes = new TextEncoder().encode(kept).byteLength
-  return {
-    value: `${kept}\n[result truncated: kept first ${keptBytes} of ${bytes} bytes — the full value is still in the kernel; bind it to a variable and slice it, or write it to a file]`,
-    droppedBytes: bytes - keptBytes,
-  }
+  return []
 }
 
 /** @experimental Fold one worker frame into the cell event a host streams, if it produces one. */
@@ -377,7 +215,7 @@ export const toCellEvent: {
       _tag: "Result",
       cellId: frame.cellId,
       sequence,
-      value: boundResult(frame.value).value,
+      value: frame.value,
       durationMillis: frame.durationMillis,
     }
   }
@@ -398,23 +236,15 @@ export const terminal: {
   (frame: WorkerFrame, input: TerminalContext): CellOutcome | undefined
 } = Function.dual(2, (frame: WorkerFrame, input: TerminalContext): CellOutcome | undefined => {
   if (frame._tag === "Completed") {
-    const bounded = boundResult(frame.value)
     return {
       result: {
         cellId: frame.cellId,
         epoch: input.epoch,
         sequence: input.sequence,
-        value: bounded.value,
-        stdout: renderedChannel(input.channels.stdout),
-        stderr: renderedChannel(input.channels.stderr),
+        value: frame.value,
+        stdout: input.channels.stdout.text,
+        stderr: input.channels.stderr.text,
         durationMillis: frame.durationMillis,
-        truncation:
-          bounded.droppedBytes === 0
-            ? truncationOf(input.channels)
-            : [
-                ...truncationOf(input.channels),
-                { channel: "result", droppedBytes: bounded.droppedBytes, droppedEvents: 0 },
-              ],
       },
       failure: undefined,
     }
@@ -426,10 +256,9 @@ export const terminal: {
       sequence: input.sequence,
       name: frame.kind === "threw" ? frame.name : `Cell${frame.kind}`,
       message: frame.message,
-      stdout: renderedChannel(input.channels.stdout),
-      stderr: renderedChannel(input.channels.stderr),
+      stdout: input.channels.stdout.text,
+      stderr: input.channels.stderr.text,
       durationMillis: frame.durationMillis,
-      truncation: truncationOf(input.channels),
     }
     return {
       result: undefined,

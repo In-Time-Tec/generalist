@@ -9,7 +9,7 @@ const profile = KernelProfile.make({
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
   bindingsDigest: KernelProfile.bindingsDigest(["workspace"]),
   workspace: { root: "/workspace", dataRoot: "/data" },
-  limits: { sourceBytes: 65_536, channelBytes: 4096, cellDeadlineMillis: 1000 },
+  limits: { sourceBytes: 65_536, cellDeadlineMillis: 1000 },
   trustMode: "trusted-local",
 })
 
@@ -60,7 +60,6 @@ layer(poolLayer)("test KernelPool", (it) => {
       expect(Schema.is(Cell.CellResult)(result)).toBe(true)
       expect(result.value).toBe("1 + 1")
       expect(result.epoch).toBe(0)
-      expect(result.truncation).toEqual([])
     }),
   )
 

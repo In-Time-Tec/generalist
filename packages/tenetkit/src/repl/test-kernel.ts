@@ -114,7 +114,6 @@ export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolInte
               stdout,
               stderr,
               durationMillis,
-              truncation: [],
             })
           } else if (outcome._tag === "Throw") {
             result = Effect.fail(
@@ -127,7 +126,6 @@ export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolInte
                 stdout,
                 stderr,
                 durationMillis,
-                truncation: [],
               }),
             )
           } else {

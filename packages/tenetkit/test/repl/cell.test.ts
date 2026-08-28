@@ -17,7 +17,6 @@ describe("Cell schemas", () => {
       stdout: "hello\n",
       stderr: "",
       durationMillis: 12,
-      truncation: [{ channel: "stdout", droppedBytes: 128, droppedEvents: 2 }],
     }
     const encoded = Schema.encodeSync(Cell.CellResult)(result)
     expect(Schema.decodeSync(Cell.CellResult)(encoded)).toEqual(result)
@@ -33,7 +32,6 @@ describe("Cell schemas", () => {
         stdout: "",
         stderr: "",
         durationMillis: 0,
-        truncation: [],
       }),
     ).toThrow()
   })
@@ -48,7 +46,6 @@ describe("Cell schemas", () => {
         stdout: "",
         stderr: "",
         durationMillis: 0,
-        truncation: [],
       }),
     ).toThrow()
   })
@@ -64,14 +61,13 @@ describe("Cell schemas", () => {
       { _tag: "Stdout", cellId, sequence: 2, text: "out" },
       { _tag: "Stderr", cellId, sequence: 3, text: "err" },
       { _tag: "Display", cellId, sequence: 4, mediaType: "image/png", data: "AAA", name: "chart" },
-      { _tag: "OutputTruncated", cellId, sequence: 5, channel: "stdout", droppedBytes: 10, droppedEvents: 1 },
-      { _tag: "StateRestored", cellId, sequence: 6, epoch: 1, names: ["a"], restoredBySource: ["f"] },
-      { _tag: "StateLost", cellId, sequence: 7, epoch: 1, droppedNames: ["proc"], reason: "live-handle" },
-      { _tag: "KernelRestarted", cellId, sequence: 8, sessionId, epoch: 1, reason: "killed" },
+      { _tag: "StateRestored", cellId, sequence: 5, epoch: 1, names: ["a"], restoredBySource: ["f"] },
+      { _tag: "StateLost", cellId, sequence: 6, epoch: 1, droppedNames: ["proc"], reason: "live-handle" },
+      { _tag: "KernelRestarted", cellId, sequence: 7, sessionId, epoch: 1, reason: "killed" },
       {
         _tag: "HostCall",
         cellId,
-        sequence: 9,
+        sequence: 8,
         requestId: "hr-1",
         module: "workspace",
         operation: "read",
@@ -80,7 +76,7 @@ describe("Cell schemas", () => {
         durationMillis: 4,
         message: '{"text":"a"}',
       },
-      { _tag: "Result", cellId, sequence: 10, value: "42", durationMillis: 5 },
+      { _tag: "Result", cellId, sequence: 9, value: "42", durationMillis: 5 },
     ]
     for (const event of events) {
       const encoded = Schema.encodeSync(Cell.CellEvent)(event)
@@ -93,7 +89,7 @@ describe("Cell schemas", () => {
     expect(() => Schema.decodeUnknownSync(Cell.CellEvent)({ _tag: "Whatever", cellId, sequence: 0 })).toThrow()
   })
 
-  it("rejects an unknown truncation channel", () => {
+  it("rejects an unknown output channel", () => {
     const malformed = Schema.decodeSync(Schema.Unknown)("network")
     expect(() => Schema.decodeUnknownSync(Cell.Channel)(malformed)).toThrow()
   })
@@ -115,7 +111,6 @@ describe("Cell failure taxonomy", () => {
       stdout: "",
       stderr: "boom",
       durationMillis: 1,
-      truncation: [],
     }),
     Cell.KernelUnavailable.make({ sessionId, reason: "start-failed", message: "no kernel" }),
     Cell.KernelProtocolViolation.make({ sessionId, cellId, message: "bad frame" }),
