@@ -9,7 +9,7 @@ layer(platform, liveOptions)("Bun kernel result rendering", (it) => {
    * with the ten methods of its foreign `Object.prototype` appended. The rendered result carries
    * own enumerable properties only.
    */
-  it.effect("renders a plain object without inherited prototype methods", () =>
+  it.effect("renders a plain object as canonical JSON", () =>
     withPool({
       use: ({ pool }) =>
         Effect.gen(function* () {
@@ -17,12 +17,9 @@ layer(platform, liveOptions)("Bun kernel result rendering", (it) => {
             pool,
             sessionId: "s",
             cellId: "c1",
-            code: "[{id: 'x', status: 'running'}]",
+            code: "[{status: 'running', id: 'x'}]",
           })
-          expect(result.value).toContain("id: 'x'")
-          expect(result.value).toContain("status: 'running'")
-          expect(result.value).not.toContain("__defineGetter__")
-          expect(result.value).not.toContain("hasOwnProperty")
+          expect(result.value).toBe('[{"id":"x","status":"running"}]')
         }),
     }),
   )
@@ -54,6 +51,16 @@ layer(platform, liveOptions)("Bun kernel result rendering", (it) => {
             code: "new Error('named boom')",
           })
           expect(result.value).toContain("named boom")
+        }),
+    }),
+  )
+
+  it.effect("falls back to inspection for non-JSON values", () =>
+    withPool({
+      use: ({ pool }) =>
+        Effect.gen(function* () {
+          const result = yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "1n" })
+          expect(result.value).toBe("1n")
         }),
     }),
   )

@@ -139,6 +139,29 @@ const format = (value: unknown): string =>
       ? Bun.inspect(value, { depth: 4, colors: false })
       : utilInspect(value, { depth: 4, colors: false })
 
+const canonicalJson = (value: unknown): string | undefined => {
+  try {
+    const encoded = JSON.stringify(value)
+    if (encoded === undefined) return undefined
+    const sort = (current: unknown): unknown =>
+      Array.isArray(current)
+        ? current.map(sort)
+        : current !== null && typeof current === "object"
+          ? Object.fromEntries(
+              Object.keys(current)
+                .sort()
+                .map((key) => [key, sort((current as Record<string, unknown>)[key])]),
+            )
+          : current
+    return JSON.stringify(sort(JSON.parse(encoded)))
+  } catch {
+    return undefined
+  }
+}
+
+const resultValue = (value: unknown): string =>
+  typeof value === "string" || types.isNativeError(value) ? format(value) : (canonicalJson(value) ?? format(value))
+
 const kernelConsole = {
   log: (...args: ReadonlyArray<unknown>) => emit("stdout", `${args.map(format).join(" ")}\n`),
   info: (...args: ReadonlyArray<unknown>) => emit("stdout", `${args.map(format).join(" ")}\n`),
@@ -289,7 +312,7 @@ const execute = async (cellId: string, code: string, deadlineMillis: number): Pr
     })
     const evaluated = cellScope.run(state, () => evaluate(cellId, code, deadlineMillis))
     const settled = (await Promise.race([Promise.resolve(evaluated), aborted])) as { value?: unknown } | undefined
-    write({ _tag: "Completed", cellId, value: format(settled?.value), durationMillis: elapsed() }, cellId)
+    write({ _tag: "Completed", cellId, value: resultValue(settled?.value), durationMillis: elapsed() }, cellId)
   } catch (error) {
     const failure = error as { name?: string; message?: string; stack?: string } | undefined
     write(
