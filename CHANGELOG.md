@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.40.0
+
+- Emit bounded, typed `HostCall` lifecycle events around every cell host-binding invocation, including local and remotely proxied operations.
+- Encode JSON-representable cell terminal values as canonical JSON and retain inspected text for values JSON cannot represent.
+
 ## 0.39.1
 
 - Retire the exact Bun REPL kernel generation after caller interruption kills its worker, and invalidate the Session's pooled lease before the result settles. Delayed cell effects remain suppressed, while the next execute for the same Session starts a live worker instead of reusing the killed command channel. This release changes no public API and requires no SQL schema or data migration.

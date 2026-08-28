@@ -1,4 +1,4 @@
-import { Effect, Function, Schema } from "effect"
+import { Clock, Effect, Function, Option, Schema } from "effect"
 import {
   CellExecutionFailed,
   type CellEvent,
@@ -26,6 +26,7 @@ export interface HostAnswerOptions {
   readonly worker: Worker
   readonly sessionId?: string
   readonly cellId?: string
+  readonly emitHostCall?: (event: HostCallUpdate) => Effect.Effect<void>
 }
 
 /** @experimental One request an executing cell raised against a mounted host module. */
@@ -34,6 +35,38 @@ export interface HostAsk {
   readonly module: string
   readonly operation: string
   readonly input?: unknown
+}
+
+/** @experimental Host call data before the kernel assigns its cell identity and sequence. */
+export interface HostCallUpdate {
+  readonly requestId: string
+  readonly module: string
+  readonly operation: string
+  readonly inputSummary: string
+  readonly status: "started" | "returned" | "failed"
+  readonly durationMillis?: number
+  readonly message?: string
+}
+
+const hostSummaryLimit = 2_048
+const JsonString = Schema.fromJsonString(Schema.Unknown)
+const Message = Schema.Struct({ message: Schema.String })
+const HostValue = Schema.Unknown
+type HostValue = typeof HostValue.Type
+
+const hostSummary = (value: HostValue): string => {
+  let rendered: string
+  try {
+    rendered = Schema.encodeSync(JsonString)(value)
+  } catch {
+    rendered = String(value)
+  }
+  return rendered.length <= hostSummaryLimit ? rendered : `${rendered.slice(0, hostSummaryLimit - 1)}…`
+}
+
+const failureMessage = (failure: HostValue): string => {
+  const decoded = Schema.decodeUnknownOption(Message)(failure)
+  return Option.isSome(decoded) ? decoded.value.message : hostSummary(failure)
 }
 
 const hostRequest = (options: HostAnswerOptions, request: HostAsk): HostRequest => {
@@ -53,43 +86,66 @@ export const answerHostRequest: {
 } = Function.dual(
   2,
   (options: HostAnswerOptions, request: HostAsk): Effect.Effect<void, KernelUnavailable> =>
-    options.registry === undefined
-      ? options.worker.send({
+    Effect.gen(function* () {
+      const inputSummary = hostSummary(request.input)
+      const startedAt = yield* Clock.currentTimeMillis
+      const emit = (update: Omit<HostCallUpdate, "requestId" | "module" | "operation" | "inputSummary">) =>
+        options.emitHostCall?.({
+          requestId: request.requestId,
+          module: request.module,
+          operation: request.operation,
+          inputSummary,
+          ...update,
+        }) ?? Effect.void
+      yield* emit({ status: "started" })
+      if (options.registry === undefined) {
+        const message = `no host module named ${request.module} is mounted`
+        yield* emit({ status: "failed", durationMillis: (yield* Clock.currentTimeMillis) - startedAt, message })
+        return yield* options.worker.send({
           _tag: "HostResponse",
           requestId: request.requestId,
-          outcome: { _tag: "Rejected", message: `no host module named ${request.module} is mounted` },
+          outcome: { _tag: "Rejected", message },
         })
-      : options.registry.invoke(hostRequest(options, request)).pipe(
-          Effect.matchEffect({
-            onSuccess: (response) =>
-              options.worker.send({
+      }
+      return yield* options.registry.invoke(hostRequest(options, request)).pipe(
+        Effect.matchEffect({
+          onSuccess: (response) =>
+            Effect.gen(function* () {
+              const durationMillis = (yield* Clock.currentTimeMillis) - startedAt
+              yield* emit(
+                response._tag === "Success"
+                  ? { status: "returned", durationMillis, message: hostSummary(response.output) }
+                  : { status: "failed", durationMillis, message: failureMessage(response.failure) },
+              )
+              yield* options.worker.send({
                 _tag: "HostResponse",
                 requestId: request.requestId,
                 outcome:
                   response._tag === "Success"
                     ? { _tag: "Success", output: response.output }
                     : { _tag: "Failure", failure: response.failure },
-              }),
-            onFailure: (failure) =>
-              options.worker.send({
+              })
+            }),
+          onFailure: (failure) =>
+            Effect.gen(function* () {
+              const detail = failureMessage(failure)
+              const message = `${failure._tag}: ${request.module}.${request.operation}${
+                detail.length > 0 ? `: ${detail}` : ""
+              }`
+              yield* emit({
+                status: "failed",
+                durationMillis: (yield* Clock.currentTimeMillis) - startedAt,
+                message,
+              })
+              yield* options.worker.send({
                 _tag: "HostResponse",
                 requestId: request.requestId,
-                /**
-                 * A boundary failure names why it happened, and reporting only the operation left
-                 * a cell to guess which field was wrong. A model that cannot see the reason spends
-                 * turns re-shaping a call that was one field away.
-                 */
-                outcome: {
-                  _tag: "Rejected",
-                  message: `${failure._tag}: ${request.module}.${request.operation}${
-                    Schema.is(Schema.Struct({ message: Schema.String }))(failure) && failure.message.length > 0
-                      ? `: ${failure.message}`
-                      : ""
-                  }`,
-                },
-              }),
-          }),
-        ),
+                outcome: { _tag: "Rejected", message },
+              })
+            }),
+        }),
+      )
+    }),
 )
 
 /** @experimental One bounded channel of one cell: what it kept, and exactly what it dropped. */

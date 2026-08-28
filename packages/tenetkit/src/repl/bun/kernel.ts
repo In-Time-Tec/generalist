@@ -188,7 +188,19 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
               worker,
               sessionId: options.sessionId,
             }
-            if (running !== undefined) input.cellId = running.cellId
+            if (running !== undefined) {
+              input.cellId = running.cellId
+              input.emitHostCall = (event) =>
+                Effect.gen(function* () {
+                  const sequence = yield* Ref.getAndUpdate(running.sequence, (value) => value + 1)
+                  yield* Queue.offer(running.events, {
+                    _tag: "HostCall",
+                    cellId: running.cellId,
+                    sequence,
+                    ...event,
+                  }).pipe(Effect.ignore)
+                })
+            }
             yield* answerHostRequest(input, frame).pipe(Effect.ignore, Effect.forkScoped)
             return
           }

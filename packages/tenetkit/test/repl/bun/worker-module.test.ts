@@ -18,6 +18,7 @@ layer(platform, liveOptions)("Bun kernel worker module", (it) => {
         exportedWorkerModule.endsWith(".ts") ? "command-lines.ts" : "command-lines.js",
         exportedWorkerModule.endsWith(".ts") ? "worker-error.ts" : "worker-error.js",
         exportedWorkerModule.endsWith(".ts") ? "text-result.ts" : "text-result.js",
+        exportedWorkerModule.endsWith(".ts") ? "value.ts" : "value.js",
       ])
       for (const module of workerSupportModules) expect(yield* fileSystem.exists(module)).toBe(true)
     }),

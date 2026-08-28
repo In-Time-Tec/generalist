@@ -20,4 +20,5 @@ export const workerSupportModules: ReadonlyArray<string> = [
   fileURLToPath(new URL(`./command-lines.${extension}`, import.meta.url)),
   fileURLToPath(new URL(`./worker-error.${extension}`, import.meta.url)),
   fileURLToPath(new URL(`../text-result.${extension}`, import.meta.url)),
+  fileURLToPath(new URL(`./value.${extension}`, import.meta.url)),
 ]

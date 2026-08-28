@@ -68,7 +68,19 @@ describe("Cell schemas", () => {
       { _tag: "StateRestored", cellId, sequence: 6, epoch: 1, names: ["a"], restoredBySource: ["f"] },
       { _tag: "StateLost", cellId, sequence: 7, epoch: 1, droppedNames: ["proc"], reason: "live-handle" },
       { _tag: "KernelRestarted", cellId, sequence: 8, sessionId, epoch: 1, reason: "killed" },
-      { _tag: "Result", cellId, sequence: 9, value: "42", durationMillis: 5 },
+      {
+        _tag: "HostCall",
+        cellId,
+        sequence: 9,
+        requestId: "hr-1",
+        module: "workspace",
+        operation: "read",
+        inputSummary: '{"path":"a.ts"}',
+        status: "returned",
+        durationMillis: 4,
+        message: '{"text":"a"}',
+      },
+      { _tag: "Result", cellId, sequence: 10, value: "42", durationMillis: 5 },
     ]
     for (const event of events) {
       const encoded = Schema.encodeSync(Cell.CellEvent)(event)

@@ -106,6 +106,36 @@ layer(platform)("Bun kernel host requests", (it) => {
     }),
   )
 
+  it.effect("emits one host-call lifecycle around the registry bridge", () =>
+    withPool({
+      overrides: { modules: [echoModule] },
+      use: ({ pool }) =>
+        Effect.gen(function* () {
+          const observed = yield* collect({
+            pool,
+            sessionId: "s",
+            cellId: "c1",
+            code: 'await host.echo({ text: "ledger" })',
+          })
+          yield* observed.result
+          const calls = observed.events.filter((event) => event._tag === "HostCall")
+          expect(calls).toHaveLength(2)
+          expect(calls[0]).toMatchObject({
+            module: "host",
+            operation: "echo",
+            inputSummary: '{"text":"ledger"}',
+            status: "started",
+          })
+          expect(calls[1]).toMatchObject({
+            requestId: calls[0]?.requestId,
+            status: "returned",
+            message: '"LEDGER"',
+          })
+          expect(calls[1]?.durationMillis).toBeTypeOf("number")
+        }),
+    }),
+  )
+
   it.effect("keeps a host-answered value in the namespace for later cells", () =>
     withPool({
       overrides: { modules: [echoModule] },
