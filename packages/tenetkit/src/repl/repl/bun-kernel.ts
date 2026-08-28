@@ -190,6 +190,20 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
                 worker,
                 sessionId: options.sessionId,
                 ...(running === undefined ? {} : { cellId: running.cellId }),
+                ...(running === undefined
+                  ? {}
+                  : {
+                      emitHostCall: (event) =>
+                        Effect.gen(function* () {
+                          const sequence = yield* Ref.getAndUpdate(running.sequence, (value) => value + 1)
+                          yield* Queue.offer(running.events, {
+                            _tag: "HostCall",
+                            cellId: running.cellId,
+                            sequence,
+                            ...event,
+                          }).pipe(Effect.ignore)
+                        }),
+                    }),
               },
               frame,
             ).pipe(Effect.ignore, Effect.forkScoped)

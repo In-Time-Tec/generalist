@@ -174,6 +174,19 @@ export const Result = Schema.TaggedStruct("Result", {
   durationMillis: NonNegative,
 })
 
+/** @experimental One lifecycle transition for a host binding invoked by the cell. */
+export const HostCall = Schema.TaggedStruct("HostCall", {
+  cellId: CellId,
+  sequence: Sequence,
+  requestId: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
+  module: Schema.String,
+  operation: Schema.String,
+  inputSummary: Schema.String.check(Schema.isMaxLength(2_048)),
+  status: Schema.Literals(["started", "returned", "failed"]),
+  durationMillis: Schema.optionalKey(NonNegative),
+  message: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(2_048))),
+})
+
 /** @experimental A host-rendered artifact emitted by the cell. */
 export const Display = Schema.TaggedStruct("Display", {
   cellId: CellId,
@@ -225,6 +238,7 @@ export const CellEvent = Schema.Union([
   KernelReady,
   Stdout,
   Stderr,
+  HostCall,
   Result,
   Display,
   OutputTruncated,
@@ -241,6 +255,7 @@ export const eventTags: ReadonlyArray<CellEvent["_tag"]> = [
   "KernelReady",
   "Stdout",
   "Stderr",
+  "HostCall",
   "Result",
   "Display",
   "OutputTruncated",
