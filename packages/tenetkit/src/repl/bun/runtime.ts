@@ -317,19 +317,17 @@ interface BoundedResult {
   readonly droppedBytes: number
 }
 
+const isJsonArray = Schema.is(Schema.Array(Schema.Json))
+
 const boundedJsonPreview = (value: string): string | undefined => {
-  let decoded: unknown
-  try {
-    decoded = JSON.parse(value)
-  } catch {
-    return undefined
-  }
-  if (decoded === null || typeof decoded !== "object") return undefined
-  const clip = (current: unknown, stringLimit: number, itemLimit: number, depth: number): unknown => {
-    if (typeof current === "string") return current.slice(0, stringLimit)
-    if (current === null || typeof current !== "object") return current
-    if (depth === 0) return Array.isArray(current) ? [] : {}
-    if (Array.isArray(current))
+  const decoded = Schema.decodeOption(Schema.fromJsonString(Schema.Json))(value)
+  if (Option.isNone(decoded)) return undefined
+  if (!isJsonArray(decoded.value) && !Schema.is(Schema.JsonObject)(decoded.value)) return undefined
+  const clip = (current: Schema.Json, stringLimit: number, itemLimit: number, depth: number): Schema.Json => {
+    if (Schema.is(Schema.String)(current)) return current.slice(0, stringLimit)
+    if (!isJsonArray(current) && !Schema.is(Schema.JsonObject)(current)) return current
+    if (depth === 0) return isJsonArray(current) ? [] : {}
+    if (isJsonArray(current))
       return current.slice(0, itemLimit).map((item) => clip(item, stringLimit, itemLimit, depth - 1))
     return Object.fromEntries(
       Object.entries(current)
@@ -346,10 +344,10 @@ const boundedJsonPreview = (value: string): string | undefined => {
     [128, 2],
     [64, 1],
   ] as const) {
-    const encoded = JSON.stringify(clip(decoded, stringLimit, itemLimit, 16))
+    const encoded = JSON.stringify(clip(decoded.value, stringLimit, itemLimit, 16))
     if (new TextEncoder().encode(encoded).byteLength <= maxResultBytes) return encoded
   }
-  return Array.isArray(decoded) ? "[]" : "{}"
+  return isJsonArray(decoded.value) ? "[]" : "{}"
 }
 
 const boundResult = (value: string): BoundedResult => {

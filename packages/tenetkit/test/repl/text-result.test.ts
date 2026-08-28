@@ -1,6 +1,6 @@
 import "./suites/bun-result-rendering-suite.js"
 import { expect, it as test, layer } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { maxResultBytes, toCellEvent } from "../../src/repl/bun/runtime.js"
 import { liveOptions, platform, runCell, withPool } from "./bun-harness.js"
 
@@ -68,7 +68,9 @@ test("keeps an oversized structured result valid JSON", () => {
   const event = toCellEvent({ _tag: "Completed", cellId: "cell", value, durationMillis: 0 }, 0)
   expect(event?._tag).toBe("Result")
   if (event?._tag !== "Result") return
-  const decoded = JSON.parse(event.value) as { readonly content: string; readonly tail?: string }
+  const decoded = Schema.decodeSync(
+    Schema.fromJsonString(Schema.Struct({ content: Schema.String, tail: Schema.optionalKey(Schema.String) })),
+  )(event.value)
   expect(decoded.content).toContain("first\nsecond")
   expect(new TextEncoder().encode(event.value).byteLength).toBeLessThanOrEqual(maxResultBytes)
   expect(event.value).not.toContain("[result truncated:")
