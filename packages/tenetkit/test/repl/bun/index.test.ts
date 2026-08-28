@@ -4,12 +4,7 @@ import { workerModule as exportedWorkerModule, workerSupportModules } from "../.
 import { liveOptions, platform, runCell, withPool } from "../bun-harness.js"
 
 layer(platform, liveOptions)("Bun kernel worker module", (it) => {
-  /**
-   * A host composing a pool needs a spawnable path to the worker. The worker is not an importable
-   * entrypoint, so the `./bun` subpath exporting its resolved path is the only supported way to
-   * locate it; without this a downstream host cannot construct a pool at all.
-   */
-  it.effect("exports a worker module path that exists on disk", () =>
+  it.effect("exports the worker and every relocatable dependency from one directory", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem
       expect(exportedWorkerModule.endsWith("worker.js") || exportedWorkerModule.endsWith("worker.ts")).toBe(true)
@@ -20,6 +15,13 @@ layer(platform, liveOptions)("Bun kernel worker module", (it) => {
         exportedWorkerModule.endsWith(".ts") ? "text-result.ts" : "text-result.js",
         exportedWorkerModule.endsWith(".ts") ? "value.ts" : "value.js",
       ])
+      expect(
+        workerSupportModules.every(
+          (module) =>
+            module.slice(0, module.lastIndexOf("/")) ===
+            exportedWorkerModule.slice(0, exportedWorkerModule.lastIndexOf("/")),
+        ),
+      ).toBe(true)
       for (const module of workerSupportModules) expect(yield* fileSystem.exists(module)).toBe(true)
     }),
   )
