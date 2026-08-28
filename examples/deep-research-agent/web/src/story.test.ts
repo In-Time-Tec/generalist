@@ -2,7 +2,8 @@
 
 import { Response } from "tenetkit"
 import { Chat, Connection } from "tenetkit/foldkit"
-import { ExecutableManifest } from "tenetkit/runtime"
+import { Errors, ExecutableManifest } from "tenetkit/runtime"
+import { Schema } from "effect"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
 import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } from "./main"
@@ -10,23 +11,31 @@ import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } 
 const sessionId = "deep-research-story"
 
 const agent = ExecutableManifest.makeTest("deep-research", "1").ref
-const eventFrame = (sequence: number, fields: Record<string, unknown>): Connection.Incoming =>
-  ({
-    specVersion: "1",
-    eventId: `${sessionId}:${sequence}`,
-    runId: sessionId,
-    sequence,
-    executableRef: agent,
-    rootRunId: sessionId,
-    occurredAt: "2026-08-03T00:00:00.000Z",
-    ...fields,
-  }) as Connection.Incoming
+const eventFrame = (sequence: number, fields: Partial<Connection.Incoming>): Connection.Incoming => {
+  const candidate = Object.assign(
+    {
+      specVersion: "1",
+      eventId: `${sessionId}:${sequence}`,
+      runId: sessionId,
+      sequence,
+      executableRef: agent,
+      rootRunId: sessionId,
+      occurredAt: "2026-08-03T00:00:00.000Z",
+    },
+    fields,
+  )
+  if (!Schema.is(Connection.Incoming)(candidate)) throw new Error("invalid test transport event")
+  return candidate
+}
 
 const agentAction = (incoming: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedAgent({ incoming }) })
 
 const readyModel = (): Model => {
   const [model] = update(init()[0], OpenedSession({ sessionId }))
-  return { ...model, session: SessionReady(), chat: { ...model.chat, connection: "open" } }
+  return Object.assign({}, model, {
+    session: SessionReady(),
+    chat: Object.assign({}, model.chat, { connection: "open" as const }),
+  })
 }
 
 const submittedQuestionModel = (): Model => {
@@ -41,7 +50,8 @@ const submittedQuestionModel = (): Model => {
   return submitted
 }
 
-const toolCall = Response.makePart("tool-call", {
+const toolCall = Schema.decodeSync(Response.ToolCallPart("web_search", Schema.Struct({ query: Schema.String })))({
+  type: "tool-call",
   id: "search-1",
   name: "web_search",
   params: { query: "What makes TenetKit standalone?" },
@@ -166,10 +176,11 @@ describe("deep-research-agent web update", () => {
   test("clicking stop dispatches the existing TenetKit cancel command", () => {
     Story.story(
       update,
-      Story.given({
-        ...readyModel(),
-        chat: { ...readyModel().chat, run: Chat.Running({ turn: 0 }) },
-      }),
+      Story.given(
+        Object.assign({}, readyModel(), {
+          chat: Object.assign({}, readyModel().chat, { run: Chat.Running({ turn: 0 }) }),
+        }),
+      ),
       Story.message(GotChatAction({ action: Chat.ClickedCancel() })),
       Story.Command.expectExact(Chat.CancelRun({ sessionId })),
       Story.Command.resolve(Chat.CancelRun({ sessionId }), Chat.CancelledRun()),
@@ -184,8 +195,7 @@ describe("deep-research-agent web update", () => {
       update,
       Story.given({
         ...readyModel(),
-        chat: {
-          ...readyModel().chat,
+        chat: Object.assign({}, readyModel().chat, {
           run: Chat.Running({ turn: 0 }),
           entries: [
             Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
@@ -198,13 +208,13 @@ describe("deep-research-agent web update", () => {
               progress: [],
             }),
           ],
-        },
+        }),
       }),
       Story.message(
         agentAction(
           eventFrame(9, {
             _tag: "RunFailed",
-            error: { message: "model unavailable", turn: 0 },
+            error: Errors.AgentExecutionFailure.make({ message: "model unavailable" }),
           }),
         ),
       ),

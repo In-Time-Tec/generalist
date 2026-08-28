@@ -13,15 +13,15 @@ import {
   incrementEdge,
   fromHandoffControlState,
   toHandoffControlState,
-} from "../agent/handoff-state.js"
-import type { RunOptions } from "../agent/agent.js"
+} from "../agent/handoff/state.js"
+import type { RunOptions } from "../agent/service.js"
 import { assemble, type Candidate } from "../tools/tool-registry.js"
-import { intercept, logicalOperationId } from "../durable/driver-run.js"
-import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
+import { intercept, logicalOperationId } from "../durable/driver/run.js"
+import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
 import { defaultContextProjection, HandoffInput, type ContextProjection } from "./handoff-projection.js"
 import type { HandoffTarget } from "./handoff-target.js"
-import { ModelRegistry } from "../model/model-registry.js"
-import { validateRef } from "../durable/executable-manifest.js"
+import { ModelRegistry } from "../model/registry.js"
+import { validateRef } from "../durable/manifest/executable-manifest.js"
 import { SessionStore } from "../context/session.js"
 
 export class HandoffRejected extends Schema.TaggedError<HandoffRejected>()("tenetkit/core/HandoffRejected", {
@@ -53,7 +53,7 @@ const recordRejected = (
   turn: number,
   handoffId: string,
   reason: string,
-): Effect.Effect<void, import("../agent/agent.js").RunError, DriverInterpreter> =>
+): Effect.Effect<void, import("../agent/service.js").RunError, DriverInterpreter> =>
   intercept(
     {
       kind: "handoff",
@@ -78,6 +78,67 @@ const staticCandidates = (handoffTarget: HandoffTarget): ReadonlyArray<Candidate
     dispatch: "Static" as const,
   }))
 
+const withResolvingToolCalls = (
+  decoded: HandoffInput,
+  resolvingToolCallIds: ReadonlyArray<string> | undefined,
+): HandoffInput => {
+  if (resolvingToolCallIds === undefined || resolvingToolCallIds.length === 0) return decoded
+  return {
+    ...decoded,
+    context: { ...decoded.context, resolvingToolCallIds },
+  }
+}
+
+const verifyTargetModel = (target: HandoffTarget, turn: number, logicalId: string, handoffId: string) => {
+  const model = target.agent.model
+  return model === undefined
+    ? Effect.void
+    : Effect.gen(function* () {
+        const registry = yield* Effect.serviceOption(ModelRegistry)
+        if (Option.isNone(registry)) {
+          return yield* HandoffRequirementsMissing.make({
+            target: target.name,
+            message: "Handoff target requires ModelRegistry in context",
+            turn,
+          })
+        }
+        const available = yield* registry.value.operate(model, Effect.void).pipe(Effect.exit)
+        if (available._tag === "Failure") {
+          yield* recordRejected(logicalId, turn, handoffId, "target model requirements missing")
+          return yield* HandoffRequirementsMissing.make({
+            target: target.name,
+            message: "Handoff target model is not registered",
+            turn,
+          })
+        }
+      })
+}
+
+const verifyPinnedTarget = (target: HandoffTarget, options: RunOptions, handoffId: string, turn: number) =>
+  Effect.gen(function* () {
+    const pinnedRef = options.executableRef
+    if (pinnedRef === undefined) return
+    const pinnedManifest = options.executableManifest
+    if (pinnedManifest === undefined || target.pin === undefined) {
+      return yield* HandoffRejected.make({
+        handoffId,
+        turn,
+        reason: "Pinned handoff requires an executable closure and exact target Agent pin",
+      })
+    }
+    yield* Effect.try({
+      try: () => validateRef(pinnedRef, pinnedManifest),
+      catch: (error) => HandoffRejected.make({ handoffId, turn, reason: String(error) }),
+    })
+    if (!pinnedManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === target.pin)) {
+      return yield* HandoffRejected.make({
+        handoffId,
+        turn,
+        reason: "Handoff target is outside the closure",
+      })
+    }
+  })
+
 export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
   Effect.gen(function* () {
     const decoded = yield* Schema.decodeUnknownEffect(HandoffInput)(input.params).pipe(
@@ -89,18 +150,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
         }),
       ),
     )
-    const handoffInput =
-      input.resolvingToolCallIds === undefined || input.resolvingToolCallIds.length === 0
-        ? decoded
-        : {
-            ...decoded,
-            context: {
-              ...(typeof decoded.context === "object" && decoded.context !== null
-                ? (decoded.context as Record<string, unknown>)
-                : {}),
-              resolvingToolCallIds: input.resolvingToolCallIds,
-            },
-          }
+    const handoffInput = withResolvingToolCalls(decoded, input.resolvingToolCallIds)
     const resolved = input.catalog.resolve(input.specialist)
     if (resolved === undefined) {
       return yield* HandoffTargetMissing.make({ target: input.specialist, turn: input.turn })
@@ -112,60 +162,24 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     const handoffId = operationKey(logicalId, "handoff", input.turn, input.toolCallId, resolved.pin ?? resolved.name)
     const sessionEntryId = `${handoffId}:session-projection`
     const sessionService = yield* Effect.serviceOption(SessionStore)
-    if (resolved.agent.model !== undefined) {
-      const registry = yield* Effect.serviceOption(ModelRegistry)
-      if (Option.isNone(registry)) {
-        return yield* HandoffRequirementsMissing.make({
-          target: resolved.name,
-          message: "Handoff target requires ModelRegistry in context",
-          turn: input.turn,
-        })
-      }
-      const available = yield* registry.value.operate(resolved.agent.model, Effect.void).pipe(Effect.exit)
-      if (available._tag === "Failure") {
-        yield* recordRejected(logicalId, input.turn, handoffId, "target model requirements missing")
-        return yield* HandoffRequirementsMissing.make({
-          target: resolved.name,
-          message: "Handoff target model is not registered",
-          turn: input.turn,
-        })
-      }
-    }
+    yield* verifyTargetModel(resolved, input.turn, logicalId, handoffId)
     const edge = edgeLabel(source, resolved.name)
-    const pinnedRef = input.options.executableRef
-    const pinnedManifest = input.options.executableManifest
-    if (pinnedRef !== undefined) {
-      if (pinnedManifest === undefined || resolved.pin === undefined) {
-        return yield* HandoffRejected.make({
-          handoffId,
-          turn: input.turn,
-          reason: "Pinned handoff requires an executable closure and exact target Agent pin",
-        })
-      }
-      yield* Effect.try({
-        try: () => validateRef(pinnedRef, pinnedManifest),
-        catch: (error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) }),
-      })
-      if (!pinnedManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === resolved.pin)) {
-        return yield* HandoffRejected.make({
-          handoffId,
-          turn: input.turn,
-          reason: "Handoff target is outside the closure",
-        })
-      }
+    yield* verifyPinnedTarget(resolved, input.options, handoffId, input.turn)
+    const requiredCommitInput = {
+      handoffId,
+      turn: input.turn,
+      target: resolved.name,
     }
+    const pinnedCommitInput =
+      resolved.pin === undefined ? requiredCommitInput : { ...requiredCommitInput, targetAgentPin: resolved.pin }
+    const commitInput =
+      decoded.reason === undefined ? pinnedCommitInput : { ...pinnedCommitInput, reason: decoded.reason }
     const commit = yield* intercept(
       {
         kind: "handoff",
         key: handoffId,
         turn: input.turn,
-        input: {
-          handoffId,
-          turn: input.turn,
-          target: resolved.name,
-          ...(resolved.pin === undefined ? {} : { targetAgentPin: resolved.pin }),
-          ...(decoded.reason === undefined ? {} : { reason: decoded.reason }),
-        },
+        input: commitInput,
         replayPolicy: "pure",
       },
       Effect.gen(function* () {
@@ -203,39 +217,33 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
                   HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message }),
                 ),
               )).at(-1)?.id ?? null)
+        const frame =
+          decoded.reason === undefined
+            ? { handoffId, source, target: resolved.name, turn: input.turn }
+            : { handoffId, source, target: resolved.name, turn: input.turn, reason: decoded.reason }
+        const pendingContinuation =
+          resolved.agent.instructions === undefined
+            ? { prompt: projected.prompt }
+            : { prompt: projected.prompt, overrides: { instructions: resolved.agent.instructions } }
         const next: HandoffRunState = {
           root: current.root,
           active: resolved,
-          path: [
-            ...current.path,
-            {
-              handoffId,
-              source,
-              target: resolved.name,
-              turn: input.turn,
-              ...(decoded.reason === undefined ? {} : { reason: decoded.reason }),
-            },
-          ],
+          path: [...current.path, frame],
           edgeCounts: incrementEdge(current.edgeCounts, source, resolved.name),
           handoffCount: current.handoffCount + 1,
-          pendingContinuation: {
-            prompt: projected.prompt,
-            ...(resolved.agent.instructions === undefined
-              ? {}
-              : { overrides: { instructions: resolved.agent.instructions } }),
-          },
+          pendingContinuation,
         }
-        return {
+        const durableCommit = {
           _tag: "HandoffCommit",
           state: toHandoffControlState(next),
           sessionEntryId,
           sessionParentId,
           projectedHistory,
-          ...(resolved.pin === undefined ? {} : { targetAgentPin: resolved.pin }),
         } satisfies HandoffCommit
+        return resolved.pin === undefined ? durableCommit : { ...durableCommit, targetAgentPin: resolved.pin }
       }),
     )
-    const durable = yield* Schema.decodeUnknownEffect(HandoffCommit)(commit).pipe(
+    const durable = yield* Schema.decodeEffect(HandoffCommit)(commit).pipe(
       Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) })),
     )
     const committedTarget = input.catalog.resolve(durable.state.active)
@@ -251,11 +259,13 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
             target: durable.state.active,
             projectedHistory: durable.projectedHistory,
           },
-          {
-            id: durable.sessionEntryId,
-            expectedLeafId: durable.sessionParentId,
-            ...(input.options.sessionOwnerToken === undefined ? {} : { ownerToken: input.options.sessionOwnerToken }),
-          },
+          input.options.sessionOwnerToken === undefined
+            ? { id: durable.sessionEntryId, expectedLeafId: durable.sessionParentId }
+            : {
+                id: durable.sessionEntryId,
+                expectedLeafId: durable.sessionParentId,
+                ownerToken: input.options.sessionOwnerToken,
+              },
         )
         .pipe(Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message })))
     }
@@ -320,19 +330,21 @@ export const handoffToolSpec: {
   ): HandoffToolSpecResult => {
     const name = options.nameOverride ?? `handoff_to_${handoffTarget.name}`
     const tool = Tool.make(name, {
-      ...(options.description === undefined
-        ? { description: `Hand off to ${handoffTarget.name} for subsequent turns in this run` }
-        : { description: options.description }),
+      description: options.description ?? `Hand off to ${handoffTarget.name} for subsequent turns in this run`,
       parameters: HandoffInput,
       success: HandoffAccepted,
       failure: Schema.String,
       failureMode: "return",
     })
-    return {
+    const result = {
       tool,
       specialist: handoffTarget.name,
-      ...(options.projection === undefined ? {} : { projection: options.projection }),
-      ...(options.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: options.maxRepeatedEdge }),
     }
+    if (options.projection === undefined) {
+      return options.maxRepeatedEdge === undefined ? result : { ...result, maxRepeatedEdge: options.maxRepeatedEdge }
+    }
+    return options.maxRepeatedEdge === undefined
+      ? { ...result, projection: options.projection }
+      : { ...result, projection: options.projection, maxRepeatedEdge: options.maxRepeatedEdge }
   },
 )

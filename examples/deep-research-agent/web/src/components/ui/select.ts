@@ -1,11 +1,22 @@
 import { Function, Option } from "effect"
-import { Message, Model, Orientation, OutMessage, Selected, buttonId, create, init } from "@foldkit/ui/listbox"
-import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/listbox"
-import type { Html } from "foldkit/html"
-import { childAttributes } from "foldkit/html"
+import {
+  Message,
+  Model,
+  Orientation,
+  OutMessage,
+  Selected,
+  buttonId,
+  create,
+  init,
+  type AnchorConfig,
+  type GroupHeading,
+  type InitConfig,
+  type ViewInputs,
+} from "@foldkit/ui/listbox"
+import { childAttributes, type Html } from "foldkit/html"
 import { html } from "@/lib/html"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/styling"
 
 // MODEL
 
@@ -136,21 +147,11 @@ export type RootConfig<Item extends string = string> = Readonly<{
 export const root = <Item extends string = string>(config: RootConfig<Item>): ViewInputs<Item, Item> => {
   const h = html<SelectMessage>()
   const sizeClass = config.size === "sm" ? triggerSizeSmallClass : triggerSizeDefaultClass
-  return {
+  const inputs = {
     items: config.items,
     maybeSelectedValue: Option.none(),
     itemToConfig: config.itemToConfig,
-    itemToValue: (item) => item,
-    ...(config.isItemDisabled !== undefined ? { isItemDisabled: config.isItemDisabled } : {}),
-    ...(config.itemToSearchText !== undefined ? { itemToSearchText: config.itemToSearchText } : {}),
-    ...(config.itemGroupKey !== undefined ? { itemGroupKey: config.itemGroupKey } : {}),
-    ...(config.groupToHeading !== undefined ? { groupToHeading: config.groupToHeading } : {}),
-    ...(config.isDisabled !== undefined ? { isDisabled: config.isDisabled } : {}),
-    ...(config.isInvalid !== undefined ? { isInvalid: config.isInvalid } : {}),
-    ...(config.ariaLabel !== undefined ? { ariaLabel: config.ariaLabel } : {}),
-    ...(config.ariaLabelledBy !== undefined ? { ariaLabelledBy: config.ariaLabelledBy } : {}),
-    ...(config.name !== undefined ? { name: config.name } : {}),
-    ...(config.form !== undefined ? { form: config.form } : {}),
+    itemToValue: (item: Item) => item,
     buttonContent: h.div(
       [h.Class("flex w-full items-center justify-between gap-2")],
       [
@@ -171,6 +172,17 @@ export const root = <Item extends string = string>(config: RootConfig<Item>): Vi
     attributes: childAttributes([h.DataAttribute("slot", "select")]),
     anchor: config.anchor ?? DEFAULT_ANCHOR,
   }
+  if (config.isItemDisabled !== undefined) Object.assign(inputs, { isItemDisabled: config.isItemDisabled })
+  if (config.itemToSearchText !== undefined) Object.assign(inputs, { itemToSearchText: config.itemToSearchText })
+  if (config.itemGroupKey !== undefined) Object.assign(inputs, { itemGroupKey: config.itemGroupKey })
+  if (config.groupToHeading !== undefined) Object.assign(inputs, { groupToHeading: config.groupToHeading })
+  if (config.isDisabled !== undefined) Object.assign(inputs, { isDisabled: config.isDisabled })
+  if (config.isInvalid !== undefined) Object.assign(inputs, { isInvalid: config.isInvalid })
+  if (config.ariaLabel !== undefined) Object.assign(inputs, { ariaLabel: config.ariaLabel })
+  if (config.ariaLabelledBy !== undefined) Object.assign(inputs, { ariaLabelledBy: config.ariaLabelledBy })
+  if (config.name !== undefined) Object.assign(inputs, { name: config.name })
+  if (config.form !== undefined) Object.assign(inputs, { form: config.form })
+  return inputs
 }
 
 export type ItemConfig = Readonly<{

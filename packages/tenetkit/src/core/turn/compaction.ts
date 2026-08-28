@@ -3,12 +3,13 @@ import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
 import { ContextRevision } from "./compaction-context-revision.js"
 import { safeCutIndex } from "./compaction-cut.js"
 import { summaryLanguageModel, withCompactionLifecycle } from "./compaction-telemetry.js"
-import { makeThresholdState } from "./compaction-threshold-state.js"
+import { make as makeThresholdState } from "./compaction-threshold-state.js"
 import { estimatePromptTokens } from "./prompt-token-estimate.js"
 import { type Entry, buildContext } from "../context/session.js"
-import { makeSummaryModelProvider } from "../model/summary-model.js"
-import { type Success } from "../tools/tool-executor.js"
+import { make as makeSummaryModelProvider } from "../model/result/summary-model.js"
+import type { Success } from "../tools/tool-executor.js"
 import { bound } from "../tools/tool-output.js"
+
 /** @experimental Default headroom kept for the next model response. */
 export const DEFAULT_RESERVE_TOKENS = 16_384
 /** @experimental Default recent-session suffix target kept verbatim. */
@@ -73,7 +74,7 @@ export interface Request {
 export const withLifecycle =
   (request: Request) =>
   <A extends Result, E, R>(work: Effect.Effect<Option.Option<A>, E, R>): Effect.Effect<Option.Option<Result>, E, R> =>
-    withCompactionLifecycle(work as Effect.Effect<Option.Option<Result>, E, R>, request, request.usage)
+    withCompactionLifecycle(work, request, request.usage)
 /** @experimental Result from tool-output microcompaction. */
 export interface MicrocompactResult {
   readonly _tag: "Microcompact"
@@ -158,9 +159,9 @@ export interface StructuredSummaryOptions {
   readonly summaryPrompt?: string
 }
 
-const serialized = (value: unknown): string => {
+const serialized = (value: Prompt.Prompt["content"]): string => {
   const json = JSON.stringify(value)
-  return json === undefined ? String(value) : json
+  return json ?? ""
 }
 
 const safeNonNegativeInteger = (name: string, value: number): number => {
@@ -215,12 +216,12 @@ const microcompactPrompt = (
     let changed = false
     const messages: Array<Prompt.Message> = []
     for (const message of prompt.content) {
-      if (typeof message.content === "string") {
+      if (Schema.is(Schema.String)(message.content)) {
         messages.push(message)
       } else {
         let messageChanged = false
         const content: Array<Prompt.Part> = []
-        for (const part of message.content as ReadonlyArray<Prompt.Part>) {
+        for (const part of message.content) {
           if (!isPromptToolResult(part)) {
             content.push(part)
           } else {
@@ -230,7 +231,17 @@ const microcompactPrompt = (
             content.push(compacted)
           }
         }
-        messages.push(messageChanged ? ({ ...message, content } as Prompt.Message) : message)
+        if (messageChanged) {
+          const encoded = yield* Schema.encodeEffect(Prompt.Message)(message).pipe(
+            Effect.mapError((cause) => CompactionError.make({ message: String(cause), cause })),
+          )
+          const rebuilt = yield* Schema.decodeEffect(Prompt.Message)(Object.assign(encoded, { content })).pipe(
+            Effect.mapError((cause) => CompactionError.make({ message: String(cause), cause })),
+          )
+          messages.push(rebuilt)
+        } else {
+          messages.push(message)
+        }
       }
     }
     return [changed ? Prompt.fromMessages(messages) : prompt, changed] as const
@@ -305,24 +316,17 @@ export const strategy: {
 } = Function.dual(
   (args) => args.length !== 1 || Array.isArray(args[0]),
   (parts: ReadonlyArray<StrategyPart>, base: Strategy = defaultStrategy()): Strategy =>
-    parts.reduce<Strategy>(
-      (current, part) => ({
+    parts.reduce<Strategy>((current, part) => {
+      const required = {
         shouldCompact: part.shouldCompact ?? current.shouldCompact,
         cut: part.cut ?? current.cut,
         summarize: part.summarize ?? current.summarize,
-        ...(part.toolOutputMaxBytes !== undefined
-          ? { toolOutputMaxBytes: part.toolOutputMaxBytes }
-          : current.toolOutputMaxBytes === undefined
-            ? {}
-            : { toolOutputMaxBytes: current.toolOutputMaxBytes }),
-        ...(part.keepRecentTokens !== undefined
-          ? { keepRecentTokens: part.keepRecentTokens }
-          : current.keepRecentTokens === undefined
-            ? {}
-            : { keepRecentTokens: current.keepRecentTokens }),
-      }),
-      base,
-    ),
+      }
+      const toolOutputMaxBytes = part.toolOutputMaxBytes ?? current.toolOutputMaxBytes
+      const keepRecentTokens = part.keepRecentTokens ?? current.keepRecentTokens
+      const withToolOutput = toolOutputMaxBytes === undefined ? required : { ...required, toolOutputMaxBytes }
+      return keepRecentTokens === undefined ? withToolOutput : { ...withToolOutput, keepRecentTokens }
+    }, base),
 )
 
 /** @experimental Configure lossless successful-tool-result bounding. */
@@ -435,13 +439,16 @@ const compact = (
     )
     if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
 
-    const summary = yield* compactionStrategy.summarize(plan.value, {
+    const summaryRequest: Request = {
       ...input,
       history,
       prompt,
       usage,
-      ...(toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes }),
-    })
+    }
+    const summary = yield* compactionStrategy.summarize(
+      plan.value,
+      toolOutputMaxBytes === undefined ? summaryRequest : { ...summaryRequest, toolOutputMaxBytes },
+    )
     const recent = buildContext(plan.value.recent)
     const [compactedRecent] =
       toolOutputMaxBytes === undefined

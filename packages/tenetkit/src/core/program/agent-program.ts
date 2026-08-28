@@ -1,14 +1,14 @@
 import { Effect, Function, Schema, Scope } from "effect"
-import type { NamedCapability } from "../durable/agent-manifest.js"
+import type { NamedCapability } from "../durable/manifest/agent-manifest.js"
 import {
   make as makeManifest,
   type PinnedProgram,
   type ProgramAgentCapability,
   type ProgramBudget,
-} from "../durable/program-manifest.js"
+} from "../durable/manifest/program-manifest.js"
 import type { CapabilityPin } from "../durable/pin.js"
-import { ProgramSchemaFailure } from "./program-capabilities.js"
-import { ProgramHost, type ExecutionFailure } from "./program-host.js"
+import { ProgramSchemaFailure } from "./capabilities.js"
+import { ProgramHost, type ExecutionFailure } from "./host.js"
 
 /** @experimental An exact Agent Program paired with its input and output codecs. */
 export interface Program<I, IE, O, OE> {

@@ -1,7 +1,6 @@
 import { Option } from "effect"
 import { dual } from "effect/Function"
-import type { Html } from "foldkit/html"
-import { inertHtml as ih } from "foldkit/html"
+import { type Html, inertHtml as ih } from "foldkit/html"
 
 import {
   codeBlock,
@@ -35,11 +34,11 @@ const renderInline = (inline: Inline): Html | string => {
 
 const renderInlines = (content: ReadonlyArray<Inline>): ReadonlyArray<Html | string> => content.map(renderInline)
 
-const calloutToneClass: Record<CalloutTone, string> = {
+const calloutToneClass = {
   info: "border-primary/40 bg-primary/5",
   warning: "border-amber-500/50 bg-amber-500/10",
   inRepo: "border-dashed border-muted-foreground/40 bg-muted/40",
-}
+} satisfies Record<CalloutTone, string>
 
 const renderCode = (node: Extract<Node, { kind: "code" }>, context: RenderContext): Html =>
   h.div(

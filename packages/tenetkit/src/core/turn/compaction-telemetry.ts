@@ -1,13 +1,13 @@
 import { Clock, Effect, Exit, Function, Option } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
-import { type Request, type Result, type Usage } from "./compaction.js"
+import type { Request, Result, Usage } from "./compaction.js"
 import {
   CurrentCompactionId,
   CurrentInstrumentation,
   CurrentPurpose,
   CurrentSummaryCall,
   type SummaryCallCell,
-} from "../model/model-telemetry.js"
+} from "../model/telemetry/events.js"
 
 /** @experimental Emit the compaction lifecycle around one pass that decided to do work. */
 export const withCompactionLifecycle: {
@@ -48,17 +48,17 @@ export const withCompactionLifecycle: {
         Effect.provideService(CurrentCompactionId, compactionId),
         Effect.provideService(CurrentPurpose, "compaction-summary"),
         Effect.provideService(CurrentSummaryCall, summaryCell),
-        Effect.onExit((exit) =>
-          Exit.isSuccess(exit)
-            ? Option.isNone(exit.value)
-              ? Effect.flatMap(Clock.currentTimeMillis, (skippedAt) =>
-                  instrumentation.emit({ _tag: "CompactionSkipped", turn, compactionId, skippedAt }),
-                )
-              : Effect.void
-            : Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
-                instrumentation.emit({ _tag: "CompactionFailed", turn, compactionId, failedAt }),
-              ),
-        ),
+        Effect.onExit((exit) => {
+          if (!Exit.isSuccess(exit)) {
+            return Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
+              instrumentation.emit({ _tag: "CompactionFailed", turn, compactionId, failedAt }),
+            )
+          }
+          if (Option.isSome(exit.value)) return Effect.void
+          return Effect.flatMap(Clock.currentTimeMillis, (skippedAt) =>
+            instrumentation.emit({ _tag: "CompactionSkipped", turn, compactionId, skippedAt }),
+          )
+        }),
       )
     }),
 )

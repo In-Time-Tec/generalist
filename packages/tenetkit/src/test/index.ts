@@ -10,7 +10,7 @@ import {
   make as TestModel_make,
   layer as TestModel_layer,
   layerRegistry as TestModel_layerRegistry,
-} from "./model/test-model.js"
+} from "./model/service.js"
 export const TestModel = {
   text: TestModel_text,
   reasoning: TestModel_reasoning,
@@ -22,31 +22,31 @@ export const TestModel = {
   make: TestModel_make,
   layer: TestModel_layer,
   layerRegistry: TestModel_layerRegistry,
-} as typeof import("./model/test-model.js")
+}
 export namespace TestModel {
-  export type text = typeof import("./model/test-model.js").text
-  export type reasoning = typeof import("./model/test-model.js").reasoning
-  export type toolCall = typeof import("./model/test-model.js").toolCall
-  export type turn = typeof import("./model/test-model.js").turn
-  export type truncated = typeof import("./model/test-model.js").truncated
-  export type failure = typeof import("./model/test-model.js").failure
-  export type make = typeof import("./model/test-model.js").make
-  export type layer = typeof import("./model/test-model.js").layer
-  export type layerRegistry = typeof import("./model/test-model.js").layerRegistry
-  export type FailureStep = import("./model/test-model.js").FailureStep
-  export type Fixture = import("./model/test-model.js").Fixture
-  export type MakeOptions = import("./model/test-model.js").MakeOptions
-  export type ObjectStep = import("./model/test-model.js").ObjectStep
-  export type Operation = import("./model/test-model.js").Operation
-  export type Part = import("./model/test-model.js").Part
-  export type ReasoningPart = import("./model/test-model.js").ReasoningPart
-  export type Request = import("./model/test-model.js").Request
-  export type Step = import("./model/test-model.js").Step
-  export type StepOptions = import("./model/test-model.js").StepOptions
-  export type TextPart = import("./model/test-model.js").TextPart
-  export type ToolCallOptions = import("./model/test-model.js").ToolCallOptions
-  export type ToolCallPart = import("./model/test-model.js").ToolCallPart
-  export type TruncatedStep = import("./model/test-model.js").TruncatedStep
-  export type TruncationPoint = import("./model/test-model.js").TruncationPoint
-  export type TurnStep = import("./model/test-model.js").TurnStep
+  export type text = typeof import("./model/service.js").text
+  export type reasoning = typeof import("./model/service.js").reasoning
+  export type toolCall = typeof import("./model/service.js").toolCall
+  export type turn = typeof import("./model/service.js").turn
+  export type truncated = typeof import("./model/service.js").truncated
+  export type failure = typeof import("./model/service.js").failure
+  export type make = typeof import("./model/service.js").make
+  export type layer = typeof import("./model/service.js").layer
+  export type layerRegistry = typeof import("./model/service.js").layerRegistry
+  export type FailureStep = import("./model/service.js").FailureStep
+  export type Fixture = import("./model/service.js").Fixture
+  export type MakeOptions = import("./model/service.js").MakeOptions
+  export type ObjectStep = import("./model/service.js").ObjectStep
+  export type Operation = import("./model/service.js").Operation
+  export type Part = import("./model/service.js").Part
+  export type ReasoningPart = import("./model/service.js").ReasoningPart
+  export type Request = import("./model/service.js").Request
+  export type Step = import("./model/service.js").Step
+  export type StepOptions = import("./model/service.js").StepOptions
+  export type TextPart = import("./model/service.js").TextPart
+  export type ToolCallOptions = import("./model/service.js").ToolCallOptions
+  export type ToolCallPart = import("./model/service.js").ToolCallPart
+  export type TruncatedStep = import("./model/service.js").TruncatedStep
+  export type TruncationPoint = import("./model/service.js").TruncationPoint
+  export type TurnStep = import("./model/service.js").TurnStep
 }

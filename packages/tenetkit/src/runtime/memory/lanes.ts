@@ -1,9 +1,8 @@
 import { Effect, Function } from "effect"
 import type { Address } from "../address.js"
 import { RuntimeUnavailable } from "../errors.js"
-import type { MemoryState, StoredRun } from "./state.js"
-import { laneKey } from "./state.js"
-import { appendLifecycle, makeAttemptStarted } from "./append.js"
+import { laneKey, type MemoryState, type StoredRun } from "./state.js"
+import { appendLifecycle, attemptStartedEvent } from "./append.js"
 
 interface EnqueueLaneResult {
   readonly state: MemoryState
@@ -56,7 +55,7 @@ export const promoteHead: {
     if (head === undefined || head.status !== "queued") return state
     if (head.cancellationRequested) return state
     const attempt = head.attempt + 1
-    const [, next] = yield* appendLifecycle(state, headId, makeAttemptStarted(attempt), "running")
+    const [, next] = yield* appendLifecycle(state, headId, attemptStartedEvent(attempt), "running")
     return next
   }),
 )

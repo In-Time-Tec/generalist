@@ -1,10 +1,69 @@
-import { Context, Effect, Schema } from "effect"
-import { AiError, Tool } from "effect/unstable/ai"
-import { FrameworkFailure, type FrameworkStage, type DomainFailure, type Success } from "./tool-executor.js"
+import { Effect, Schema } from "effect"
+import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
 
-const resultMessage = (result: unknown): string => {
-  if (typeof result === "string") return result
-  if (result instanceof Error) return `${result.name}: ${result.message}`
+type BoundaryValue = typeof Schema.Unknown.Type
+
+export interface Success {
+  readonly _tag: "Success"
+  readonly result: BoundaryValue
+  readonly encodedResult: BoundaryValue
+}
+
+export interface DomainFailure {
+  readonly _tag: "DomainFailure"
+  readonly failure: BoundaryValue
+  readonly encodedFailure: BoundaryValue
+}
+
+export interface Request {
+  readonly call: Response.ToolCallPart<string, unknown>
+  readonly toolCallBatch: {
+    readonly calls: ReadonlyArray<Response.ToolCallPart<string, unknown>>
+  }
+  readonly turn: number
+  readonly toolCallIndex: number
+  readonly agentName: string
+  readonly sessionId: string
+}
+
+export interface Suspend {
+  readonly _tag: "Suspend"
+  readonly token: string
+}
+
+export type Outcome = Success | DomainFailure | Suspend
+
+export type ReplayPolicy = "never" | "provider-idempotent"
+
+export const FrameworkStage = Schema.Literals([
+  "decode-input",
+  "handler",
+  "encode-success",
+  "encode-domain-failure",
+  "missing-handler",
+  "route",
+  "placement",
+  "authorization",
+])
+export type FrameworkStage = typeof FrameworkStage.Type
+
+export class FrameworkFailure extends Schema.TaggedError<FrameworkFailure>()("tenetkit/core/FrameworkFailure", {
+  stage: FrameworkStage,
+  tool: Schema.String,
+  message: Schema.String,
+}) {}
+
+export class RemoteRetryMisconfigured extends Schema.TaggedError<RemoteRetryMisconfigured>()(
+  "tenetkit/core/RemoteRetryMisconfigured",
+  {
+    reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),
+    message: Schema.String,
+  },
+) {}
+
+const resultMessage = (result: BoundaryValue): string => {
+  if (Schema.is(Schema.String)(result)) return result
+  if (Schema.is(Schema.instanceOf(Error))(result)) return `${result.name}: ${result.message}`
   try {
     const message = JSON.stringify(result)
     return message === undefined ? String(result) : message
@@ -13,16 +72,14 @@ const resultMessage = (result: unknown): string => {
   }
 }
 
-const schemaMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : typeof error === "string" ? error : resultMessage(error)
+const schemaMessage = (error: BoundaryValue): string => {
+  if (Schema.is(Schema.instanceOf(Error))(error)) return error.message
+  if (Schema.is(Schema.String)(error)) return error
+  return resultMessage(error)
+}
 
-const frameworkFailure = (stage: FrameworkStage, tool: string, error: unknown): FrameworkFailure =>
+const frameworkFailure = (stage: FrameworkStage, tool: string, error: BoundaryValue): FrameworkFailure =>
   FrameworkFailure.make({ stage, tool, message: schemaMessage(error) })
-
-class SchemaServicesContext extends Context.Service<SchemaServicesContext, unknown>()(
-  "tenetkit/core/tools/tool-result-codec/SchemaServicesContext",
-) {}
-const schemaServicesContext = Context.make<unknown, unknown>(SchemaServicesContext, undefined)
 
 export type SchemaTool = {
   readonly name: string
@@ -30,22 +87,14 @@ export type SchemaTool = {
   readonly successSchema: Schema.Constraint
   readonly failureSchema: Schema.Constraint
 }
-type SchemaServicesD<S extends Schema.Constraint> = [unknown] extends [S["DecodingServices"]]
-  ? never
-  : S["DecodingServices"]
-type SchemaServicesE<S extends Schema.Constraint> = [unknown] extends [S["EncodingServices"]]
-  ? never
-  : S["EncodingServices"]
-
-/**
- * Read one schema through its codec view. `Schema.Constraint` reports `unknown` services, which would leak into
- * every codec signature; the codec view restates the services the schema was actually built with.
- */
-const codecView = <S extends Schema.Constraint>(
-  schema: S,
-): Schema.Codec<S["Type"], S["Encoded"], SchemaServicesD<S>, SchemaServicesE<S>> =>
-  schema as unknown as Schema.Codec<S["Type"], S["Encoded"], SchemaServicesD<S>, SchemaServicesE<S>>
-
+export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
+export interface ClosedToolSet<R = unknown, T extends SchemaTool = SchemaTool> {
+  readonly tools: Readonly<Record<string, T>>
+  readonly invoke: (
+    name: string,
+    params: typeof Schema.Unknown.Type,
+  ) => Effect.Effect<typeof Schema.Unknown.Type, typeof Schema.Unknown.Type, R>
+}
 export type FailureSchema<T extends SchemaTool> = T["failureSchema"]
 export type ToolSchemaServices<T extends SchemaTool> =
   | T["parametersSchema"]["EncodingServices"]
@@ -56,48 +105,52 @@ export type ToolSchemaServices<T extends SchemaTool> =
   | T["failureSchema"]["DecodingServices"]
 const encodeSuccess = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly successSchema: S },
-  result: unknown,
-): Effect.Effect<Success, FrameworkFailure, SchemaServicesE<S>> =>
-  Schema.encodeUnknownEffect(codecView(tool.successSchema))(result).pipe(
+  result: S["Type"],
+): Effect.Effect<Success, FrameworkFailure, S["EncodingServices"]> =>
+  Schema.encodeEffect(tool.successSchema)(result).pipe(
     Effect.map((encodedResult): Success => ({ _tag: "Success", result, encodedResult })),
     Effect.mapError((error) => frameworkFailure("encode-success", tool.name, error)),
   )
 
 const encodeDomainFailure = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly failureSchema: S },
-  failure: unknown,
-): Effect.Effect<DomainFailure, FrameworkFailure, SchemaServicesE<S>> =>
-  Schema.encodeUnknownEffect(codecView(tool.failureSchema))(failure).pipe(
+  failure: S["Type"],
+): Effect.Effect<DomainFailure, FrameworkFailure, S["EncodingServices"]> =>
+  Schema.encodeEffect(tool.failureSchema)(failure).pipe(
     Effect.map((encodedFailure): DomainFailure => ({ _tag: "DomainFailure", failure, encodedFailure })),
     Effect.mapError((error) => frameworkFailure("encode-domain-failure", tool.name, error)),
   )
 
 const encodeDomainCandidate = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly failureSchema: S },
-  failure: unknown,
-): Effect.Effect<DomainFailure, FrameworkFailure, SchemaServicesE<S>> =>
+  failure: BoundaryValue,
+): Effect.Effect<DomainFailure, FrameworkFailure, S["EncodingServices"]> =>
   !Schema.is(tool.failureSchema)(failure)
     ? Effect.fail(frameworkFailure("handler", tool.name, failure))
     : encodeDomainFailure(tool, failure)
 
 const decodeInput = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly parametersSchema: S },
-  input: unknown,
-): Effect.Effect<S["Type"], FrameworkFailure, SchemaServicesD<S>> =>
-  Schema.decodeUnknownEffect(codecView(tool.parametersSchema))(input).pipe(
+  input: BoundaryValue,
+): Effect.Effect<S["Type"], FrameworkFailure, S["DecodingServices"]> =>
+  Schema.decodeUnknownEffect(tool.parametersSchema)(input).pipe(
     Effect.mapError((error) => frameworkFailure("decode-input", tool.name, error)),
   )
 
 const decodeSuccess = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly successSchema: S },
-  result: unknown,
-): Effect.Effect<Success, FrameworkFailure, SchemaServicesD<S> | SchemaServicesE<S>> =>
-  Schema.decodeUnknownEffect(codecView(tool.successSchema))(result).pipe(
+  result: BoundaryValue,
+): Effect.Effect<Success, FrameworkFailure, S["DecodingServices"] | S["EncodingServices"]> =>
+  Schema.decodeUnknownEffect(tool.successSchema)(result).pipe(
     Effect.mapError((error) => frameworkFailure("encode-success", tool.name, error)),
-    Effect.flatMap((decoded) => encodeSuccess(tool, decoded)),
+    Effect.flatMap((decoded) => encodeSuccess<S>(tool, decoded)),
   )
 
-const aiFrameworkFailure = (tool: Tool.Any, error: AiError.AiError): FrameworkFailure => {
+type AiFailureTool = Pick<SchemaTool, "name" | "successSchema" | "failureSchema"> & {
+  readonly failureMode: Tool.FailureMode
+}
+
+const aiFrameworkFailure = (tool: AiFailureTool, error: AiError.AiError): FrameworkFailure => {
   switch (error.reason._tag) {
     case "ToolParameterValidationError":
       return frameworkFailure("decode-input", tool.name, error)
@@ -110,19 +163,15 @@ const aiFrameworkFailure = (tool: Tool.Any, error: AiError.AiError): FrameworkFa
       const isSuccess = Schema.isSchema(tool.successSchema) && Schema.is(tool.successSchema)(error.reason.toolResult)
       const isDomainFailure =
         Schema.isSchema(tool.failureSchema) && Schema.is(tool.failureSchema)(error.reason.toolResult)
-      return frameworkFailure(
-        isSuccess === isDomainFailure ? "handler" : isDomainFailure ? "encode-domain-failure" : "encode-success",
-        tool.name,
-        error,
-      )
+      let stage: FrameworkStage = "encode-success"
+      if (isSuccess === isDomainFailure) stage = "handler"
+      else if (isDomainFailure) stage = "encode-domain-failure"
+      return frameworkFailure(stage, tool.name, error)
     }
     default:
       return frameworkFailure("handler", tool.name, error)
   }
 }
-
-const provideSchemaServices = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, never> =>
-  effect.pipe(Effect.provideContext(schemaServicesContext))
 
 export const toolResultCodec = {
   aiFrameworkFailure,
@@ -132,7 +181,6 @@ export const toolResultCodec = {
   encodeDomainFailure,
   encodeSuccess,
   frameworkFailure,
-  provideSchemaServices,
   resultMessage,
   schemaMessage,
 }

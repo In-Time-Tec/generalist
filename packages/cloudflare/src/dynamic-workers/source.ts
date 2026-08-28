@@ -6,6 +6,12 @@ const validName = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+\.js$/
 export const runnerName = "__tenetkit_runner.js"
 export const capabilityFailurePrefix = "tenetkit-capability-failure:"
 
+/** @experimental Validated source graph passed to Worker Loader. */
+export interface NormalizedSource {
+  readonly modules: ReadonlyArray<SandboxExecutor.Module>
+  readonly record: Readonly<Record<string, string>>
+}
+
 const resolve = (from: string, specifier: string): string => {
   const parts = from.split("/")
   parts.pop()
@@ -19,15 +25,31 @@ const resolve = (from: string, specifier: string): string => {
 }
 
 /** @experimental Validate and normalize an exact ES module graph before loading it. */
-export const normalize = (
-  request: SandboxExecutor.Request,
-): Readonly<{ modules: ReadonlyArray<SandboxExecutor.Module>; record: Readonly<Record<string, string>> }> => {
+const compareModules = (left: SandboxExecutor.Module, right: SandboxExecutor.Module): number => {
+  if (left.name < right.name) return -1
+  if (left.name > right.name) return 1
+  return 0
+}
+
+const validateImports = (module: SandboxExecutor.Module, names: ReadonlySet<string>): void => {
+  const [imports] = parse(module.source, module.name)
+  for (const imported of imports) {
+    if (imported.t === ImportType.ImportMeta) continue
+    const specifier = imported.n
+    if (specifier === undefined) throw new TypeError("computed imports are unsupported")
+    if (!specifier.startsWith("./") && !specifier.startsWith("../"))
+      throw new TypeError("only relative ES module imports are supported")
+    const target = resolve(module.name, specifier)
+    if (!names.has(target)) throw new TypeError("module import is absent from the source graph")
+  }
+  if (/\brequire\s*\(/.test(module.source)) throw new TypeError("CommonJS imports are unsupported")
+}
+
+export const normalize = (request: SandboxExecutor.Request): NormalizedSource => {
   initSync()
   const names = new Set<string>()
   const folded = new Set<string>()
-  const modules = [...request.modules].toSorted((left, right) =>
-    left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
-  )
+  const modules = [...request.modules].toSorted(compareModules)
   for (const module of modules) {
     if (!validName.test(module.name) || module.name.includes("//") || module.name.startsWith("./"))
       throw new TypeError("invalid module name")
@@ -39,19 +61,7 @@ export const normalize = (
     folded.add(module.name.toLowerCase())
   }
   if (!names.has(request.entrypoint)) throw new TypeError("entrypoint is absent from the module graph")
-  for (const module of modules) {
-    const [imports] = parse(module.source, module.name)
-    for (const imported of imports) {
-      if (imported.t === ImportType.ImportMeta) continue
-      const specifier = imported.n
-      if (specifier === undefined) throw new TypeError("computed imports are unsupported")
-      if (!specifier.startsWith("./") && !specifier.startsWith("../"))
-        throw new TypeError("only relative ES module imports are supported")
-      const target = resolve(module.name, specifier)
-      if (!names.has(target)) throw new TypeError("module import is absent from the source graph")
-    }
-    if (/\brequire\s*\(/.test(module.source)) throw new TypeError("CommonJS imports are unsupported")
-  }
+  for (const module of modules) validateImports(module, names)
   return { modules, record: Object.fromEntries(modules.map((module) => [module.name, module.source])) }
 }
 

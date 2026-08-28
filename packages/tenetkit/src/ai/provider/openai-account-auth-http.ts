@@ -92,7 +92,7 @@ export const layer: Layer.Layer<OpenAiAccountAuthHttp, never, HttpClient.HttpCli
               }
               return decode(response, PermanentRefreshError).pipe(
                 Effect.flatMap((body) => {
-                  const code = typeof body.error === "string" ? body.error : (body.error?.code ?? body.code)
+                  const code = Schema.is(Schema.String)(body.error) ? body.error : (body.error?.code ?? body.code)
                   return Effect.fail(
                     code === "refresh_token_expired" ||
                       code === "refresh_token_reused" ||
@@ -147,15 +147,17 @@ export const layer: Layer.Layer<OpenAiAccountAuthHttp, never, HttpClient.HttpCli
               }),
             ),
           ).pipe(
-            Effect.flatMap((response) =>
-              response.status >= 200 && response.status < 300
-                ? decode(response, DevicePollResponse).pipe(Effect.map(Option.some))
-                : response.status === 403 || response.status === 404
-                  ? discard(response).pipe(Effect.as(Option.none()))
-                  : discard(response).pipe(
-                      Effect.andThen(Effect.fail(failure("network", "OpenAI device authorization failed"))),
-                    ),
-            ),
+            Effect.flatMap((response) => {
+              if (response.status >= 200 && response.status < 300) {
+                return decode(response, DevicePollResponse).pipe(Effect.map(Option.some))
+              }
+              if (response.status === 403 || response.status === 404) {
+                return discard(response).pipe(Effect.as(Option.none()))
+              }
+              return discard(response).pipe(
+                Effect.andThen(Effect.fail(failure("network", "OpenAI device authorization failed"))),
+              )
+            }),
           ),
         ),
     })

@@ -1,5 +1,11 @@
 import { Config, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientError,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "effect/unstable/http"
 
 /** @experimental */
 export class ExaSearchProviderError extends Schema.TaggedError<ExaSearchProviderError>()("ExaSearchProviderError", {
@@ -119,16 +125,8 @@ const exaSearchBody = (query: string) => ({
   contents: { text: { maxCharacters: 1000 } },
 })
 
-const messageOf = (error: unknown): string => {
-  if (typeof error === "object" && error !== null && "_tag" in error) {
-    return String((error as { readonly _tag: unknown })._tag)
-  }
-  if (error instanceof Error) return error.name
-  return "unknown"
-}
-
-const toExaError = (error: unknown) =>
-  ExaSearchProviderError.make({ message: `Exa search failed: ${messageOf(error)}` })
+const toExaError = (error: HttpClientError.HttpClientError | Schema.SchemaError) =>
+  ExaSearchProviderError.make({ message: `Exa search failed: ${String(error)}` })
 
 const snippetFor = (result: ExaResult): string => {
   if (result.text !== undefined && result.text !== null) return result.text

@@ -1,5 +1,5 @@
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Schema, Scope, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import {
   Agent,
@@ -10,12 +10,11 @@ import {
   ProgramBindings,
   ProgramCapabilities,
   SandboxExecutor,
-} from "tenetkit"
+} from "../../src/index.js"
 import { CodeMode, ExecutableResolver, LocalScheduler, RunStore, Runtime } from "../../src/runtime/index.js"
-import type { ExecutionRecord, Interface as RunStoreInterface } from "../../src/runtime/run-store.js"
-import { make as makeExecutionHost } from "../../src/runtime/execution-host.js"
-import { layer as activeExecutionsLayer } from "../../src/runtime/active-executions.js"
-import { tempDbPath } from "./sqlite-helpers.js"
+import { make as makeExecutionHost } from "../../src/runtime/execution/host.js"
+import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
+import { tempDbPath } from "./sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 const sandboxPin = Pins.makeCapability({ sandbox: "code-mode-test-v1" })
@@ -139,6 +138,38 @@ const withLayer =
     Effect.scoped(
       Layer.build(layerValue).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
     )
+
+let codeModeFixtureId = 0
+const makeCodeMode = (authority: AgentManifest.ProgramAuthority) =>
+  Effect.gen(function* () {
+    codeModeFixtureId += 1
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const runId = (yield* runtime.start({
+      executable,
+      registrations,
+      sessionId: `code-mode-fixture:${codeModeFixtureId}`,
+      idempotencyKey: "root",
+      prompt: "fixture",
+    })).runId
+    const claim = yield* store.claimExecution({ runId, ownerId: "code-mode-fixture" })
+    const claimed = yield* store.loadExecution(runId)
+    return CodeMode.make({ claim, claimed, authority, store })
+  })
+
+const manifestWithAuthority = (programAuthority: AgentManifest.ProgramAuthority) =>
+  AgentManifest.make({
+    name: root.manifest.name,
+    model: root.manifest.model,
+    tools: root.manifest.tools,
+    skills: root.manifest.skills,
+    services: root.manifest.services,
+    policy: root.manifest.policy,
+    toolScheduling: root.manifest.toolScheduling,
+    programAuthority,
+    budget: root.manifest.budget,
+    children: root.manifest.children,
+  })
 
 describe("Runtime code_mode Program children", () => {
   for (const backend of ["memory", "sqlite"] as const) {
@@ -268,7 +299,7 @@ describe("Runtime code_mode Program children", () => {
             childRunId = tree.runs.find((run) => run.parentRunId === rootRunId)!.run.runId
           }
           yield* Fiber.interrupt(fiber)
-          yield* Scope.close(scope, Effect.void as never)
+          yield* Scope.close(scope, Exit.succeed(undefined))
         }),
       )
       const reopen = withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(
@@ -376,8 +407,12 @@ describe("Runtime code_mode Program children", () => {
   }
 
   standalone.effect("advertises only exact ProgramAuthority selections and maxima in the model tool schema", () => {
+    const base = root.manifest.programAuthority!
     const authority = {
-      ...root.manifest.programAuthority!,
+      sandbox: base.sandbox,
+      input: base.input,
+      output: base.output,
+      maxSourceBytes: base.maxSourceBytes,
       tools: [{ name: "shell.run", pin: Pins.makeCapability({ tool: "shell.run" }) }],
       agents: [{ selection: "researcher", agent: root.pin, input: inputPin }],
       steps: [{ name: "load.dataset", pin: Pins.makeCapability({ step: "load.dataset" }) }],
@@ -409,14 +444,14 @@ describe("Runtime code_mode Program children", () => {
       budget: authority.budget,
     }
     return Effect.gen(function* () {
-      expect(yield* Schema.decodeUnknownEffect(declaration.parametersSchema)(exact)).toEqual(exact)
+      expect(yield* Schema.decodeEffect(declaration.parametersSchema)(exact)).toEqual(exact)
       const unknownSelection = yield* Effect.flip(
-        Schema.decodeUnknownEffect(declaration.parametersSchema)({ ...exact, tools: ["shell"] }),
+        Schema.decodeEffect(declaration.parametersSchema)({ ...exact, tools: ["shell"] }),
       )
       expect(String(unknownSelection)).toContain('Expected "shell.run"')
       expect(String(unknownSelection)).toContain('["tools"][0]')
       const excessiveBudget = yield* Effect.flip(
-        Schema.decodeUnknownEffect(declaration.parametersSchema)({
+        Schema.decodeEffect(declaration.parametersSchema)({
           ...exact,
           budget: { ...authority.budget, toolCalls: 4 },
         }),
@@ -434,28 +469,24 @@ describe("Runtime code_mode Program children", () => {
       expect(authority.agents).toEqual([])
       expect(authority.steps).toEqual([])
       const declaration = CodeMode.makeTool(authority)
-      const modelSchema = Tool.getJsonSchema(declaration) as Record<string, unknown>
-      const invalid: Array<string> = []
-      const walk = (node: unknown, path: string): void => {
-        if (typeof node !== "object" || node === null) return
-        if (Array.isArray(node)) {
-          node.forEach((child, index) => walk(child, `${path}[${index}]`))
-          return
-        }
-        const schema = node as Record<string, unknown>
-        if ("not" in schema) invalid.push(`${path}.not`)
-        if (schema["type"] === "array") {
-          const items = schema["items"]
-          const typed =
-            typeof items === "object" && items !== null && ("type" in items || "anyOf" in items || "$ref" in items)
-          if (!typed) invalid.push(`${path}.items`)
-        }
-        for (const [key, value] of Object.entries(schema)) walk(value, `${path}.${key}`)
-      }
-      walk(modelSchema, "$")
-      expect(invalid).toEqual([])
+      const modelSchema = Tool.getJsonSchema(declaration)
+      expect(JSON.stringify(modelSchema)).not.toContain('"not"')
+      const selectionSchema = Schema.Struct({
+        type: Schema.Literal("array"),
+        items: Schema.Struct({ type: Schema.Literal("string") }),
+        maxItems: Schema.Literal(0),
+      })
+      const properties = Schema.decodeUnknownSync(
+        Schema.Struct({
+          properties: Schema.Struct({
+            tools: selectionSchema,
+            agents: selectionSchema,
+            steps: selectionSchema,
+          }),
+        }),
+      )(modelSchema).properties
       for (const dimension of ["tools", "agents", "steps"] as const) {
-        expect((modelSchema["properties"] as Record<string, unknown>)[dimension]).toMatchObject({
+        expect(properties[dimension]).toMatchObject({
           type: "array",
           items: { type: "string" },
           maxItems: 0,
@@ -463,10 +494,10 @@ describe("Runtime code_mode Program children", () => {
       }
       const exact = { source: "return input", input: "input", tools: [], agents: [], steps: [], budget }
       return Effect.gen(function* () {
-        expect(yield* Schema.decodeUnknownEffect(declaration.parametersSchema)(exact)).toEqual(exact)
+        expect(yield* Schema.decodeEffect(declaration.parametersSchema)(exact)).toEqual(exact)
         for (const dimension of ["tools", "agents", "steps"] as const) {
           const rejected = yield* Effect.flip(
-            Schema.decodeUnknownEffect(declaration.parametersSchema)({ ...exact, [dimension]: ["anything"] }),
+            Schema.decodeEffect(declaration.parametersSchema)({ ...exact, [dimension]: ["anything"] }),
           )
           expect(String(rejected)).toContain("Expected a value with a length of at most 0")
         }
@@ -479,95 +510,91 @@ describe("Runtime code_mode Program children", () => {
       name: `tool-${index}`,
       pin: Pins.makeCapability({ tool: index }),
     }))
-    const bounded = AgentManifest.make({
-      ...root.manifest,
-      programAuthority: { ...root.manifest.programAuthority!, tools },
-    })
+    const base = root.manifest.programAuthority!
+    const boundedAuthority = {
+      sandbox: base.sandbox,
+      input: base.input,
+      output: base.output,
+      maxSourceBytes: base.maxSourceBytes,
+      agents: base.agents,
+      steps: base.steps,
+      budget: base.budget,
+      tools,
+    }
+    const bounded = manifestWithAuthority(boundedAuthority)
     expect(() =>
-      AgentManifest.make({
-        ...root.manifest,
-        programAuthority: {
-          ...root.manifest.programAuthority!,
-          tools: [...tools, { name: "tool-64", pin: Pins.makeCapability({ tool: 64 }) }],
-        },
+      manifestWithAuthority({
+        ...boundedAuthority,
+        tools: [...tools, { name: "tool-64", pin: Pins.makeCapability({ tool: 64 }) }],
       }),
     ).toThrow()
     expect(() =>
-      AgentManifest.make({
-        ...root.manifest,
-        programAuthority: {
-          ...root.manifest.programAuthority!,
-          tools: [{ name: "x".repeat(129), pin: Pins.makeCapability({ tool: "too-long" }) }],
-        },
+      manifestWithAuthority({
+        ...boundedAuthority,
+        tools: [{ name: "x".repeat(129), pin: Pins.makeCapability({ tool: "too-long" }) }],
       }),
     ).toThrow()
-    const implementation = CodeMode.make({
-      claim: { runId: "root", ownerId: "worker", attemptFence: 1 },
-      claimed: {} as ExecutionRecord,
-      authority: bounded.manifest.programAuthority!,
-      store: {} as RunStoreInterface,
-    })
-    return Effect.gen(function* () {
-      const result = yield* implementation.invoke({
-        source: "return input",
-        input: "input",
-        tools: ["unknown-tool"],
-        agents: [],
-        steps: [],
-        budget,
-        toolCallId: "code-1",
-      })
-      expect(result).toMatchObject({
-        _tag: "DomainFailure",
-        failure: {
-          _tag: "tenetkit/runtime/ProgramAuthorityExceeded",
-          dimension: "tools",
-          requestedId: "unknown-tool",
-          allowedIds: bounded.manifest.programAuthority!.tools.map(({ name }) => name),
-        },
-      })
-    })
+    return withLayer(Runtime.layerMemory({ resolver: fixture().resolver, addresses: [] }))(
+      Effect.gen(function* () {
+        const implementation = yield* makeCodeMode(bounded.manifest.programAuthority!)
+        const result = yield* implementation.invoke({
+          source: "return input",
+          input: "input",
+          tools: ["unknown-tool"],
+          agents: [],
+          steps: [],
+          budget,
+          toolCallId: "code-1",
+        })
+        expect(result).toMatchObject({
+          _tag: "DomainFailure",
+          failure: {
+            _tag: "tenetkit/runtime/ProgramAuthorityExceeded",
+            dimension: "tools",
+            requestedId: "unknown-tool",
+            allowedIds: bounded.manifest.programAuthority!.tools.map(({ name }) => name),
+          },
+        })
+      }),
+    )
   })
 
-  standalone.effect("returns typed failures when source, capabilities, or budgets exceed ProgramAuthority", () => {
-    const implementation = CodeMode.make({
-      claim: { runId: "root", ownerId: "worker", attemptFence: 1 },
-      claimed: {} as ExecutionRecord,
-      authority: root.manifest.programAuthority!,
-      store: {} as RunStoreInterface,
-    })
-    const invoke = (overrides: Partial<CodeMode.Parameters>) =>
-      implementation.invoke({
-        source: "return input",
-        input: "input",
-        tools: [],
-        agents: [],
-        steps: [],
-        budget,
-        toolCallId: "code-1",
-        ...overrides,
-      })
-    return Effect.gen(function* () {
-      const source = yield* invoke({ source: "x".repeat(1_001) })
-      expect(source).toMatchObject({
-        _tag: "DomainFailure",
-        failure: { _tag: "tenetkit/runtime/ProgramAuthorityExceeded", dimension: "sourceBytes" },
-      })
-      const capability = yield* invoke({ tools: ["shell"] })
-      expect(capability).toMatchObject({
-        _tag: "DomainFailure",
-        failure: {
-          _tag: "tenetkit/runtime/ProgramAuthorityExceeded",
-          dimension: "tools",
-          requestedId: "shell",
-          allowedIds: [],
-        },
-      })
-      const overBudget = yield* invoke({ budget: { ...budget, toolCalls: 1 } })
-      expect(overBudget).toMatchObject({
-        _tag: "DomainFailure",
-        failure: { _tag: "tenetkit/runtime/ProgramAuthorityExceeded", dimension: "toolCalls" },
-      })
-    })
-  })
+  standalone.effect("returns typed failures when source, capabilities, or budgets exceed ProgramAuthority", () =>
+    withLayer(Runtime.layerMemory({ resolver: fixture().resolver, addresses: [] }))(
+      Effect.gen(function* () {
+        const implementation = yield* makeCodeMode(root.manifest.programAuthority!)
+        const invoke = (overrides: Partial<CodeMode.Parameters>) =>
+          implementation.invoke({
+            source: "return input",
+            input: "input",
+            tools: [],
+            agents: [],
+            steps: [],
+            budget,
+            toolCallId: "code-1",
+            ...overrides,
+          })
+        const source = yield* invoke({ source: "x".repeat(1_001) })
+        expect(source).toMatchObject({
+          _tag: "DomainFailure",
+          failure: { _tag: "tenetkit/runtime/ProgramAuthorityExceeded", dimension: "sourceBytes" },
+        })
+        const capability = yield* invoke({ tools: ["shell"] })
+        expect(capability).toMatchObject({
+          _tag: "DomainFailure",
+          failure: {
+            _tag: "tenetkit/runtime/ProgramAuthorityExceeded",
+            dimension: "tools",
+            requestedId: "shell",
+            allowedIds: [],
+          },
+        })
+        const overBudget = yield* invoke({ budget: { ...budget, toolCalls: 1 } })
+        expect(overBudget).toMatchObject({
+          _tag: "DomainFailure",
+          failure: { _tag: "tenetkit/runtime/ProgramAuthorityExceeded", dimension: "toolCalls" },
+        })
+      }),
+    ),
+  )
 })

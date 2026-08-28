@@ -3,8 +3,7 @@ import type { Html } from "foldkit/html"
 import { html } from "@/lib/html"
 
 import { Message, Model, content, root, scrollButton, viewport } from "@/components/ui/message-scroller"
-import type { SlotConfig } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { cn, type SlotConfig } from "@/lib/styling"
 
 // VIEW
 

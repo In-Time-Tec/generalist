@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { AiError, EmbeddingModel, Prompt } from "effect/unstable/ai"
-import { Memory } from "tenetkit"
+import { Memory } from "../../src/index.js"
 import { SemanticRecall, VectorStore } from "../../src/memory/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }

@@ -160,7 +160,7 @@ const utf8 = (value: string) =>
   })
 
 /** @experimental */
-export const makePkce = Effect.gen(function* () {
+export const generatePkce = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const verifier = Redacted.make(Encoding.encodeBase64Url(yield* crypto.randomBytes(64)))
   const verifierBytes = yield* utf8(Redacted.value(verifier))
@@ -190,7 +190,7 @@ const authorizationUrlImpl = (challenge: string, state: Redacted.Redacted<string
 export const authorizationUrl: {
   (challenge: string, state: Redacted.Redacted<string>, redirect?: string): URL
   (state: Redacted.Redacted<string>, redirect?: string): (challenge: string) => URL
-} = Function.dual((args) => typeof args[0] === "string", authorizationUrlImpl)
+} = Function.dual((args) => Schema.is(Schema.String)(args[0]), authorizationUrlImpl)
 
 const IdentityClaims = Schema.Struct({
   exp: Schema.optionalKey(Schema.Int),
@@ -209,20 +209,59 @@ const decodeJwt = <S extends Schema.Constraint>(token: string, schema: S) =>
     if (part === undefined) return yield* authError("protocol", "Token payload is malformed")
     const decoded = Encoding.decodeBase64UrlString(part)
     if (Result.isFailure(decoded)) return yield* authError("protocol", "Token payload is malformed")
-    return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(decoded.success).pipe(
+    return yield* Schema.decodeEffect(Schema.fromJsonString(schema))(decoded.success).pipe(
       Effect.mapError(() => authError("protocol", "Token claims are incomplete")),
     )
   })
 
+const tokenValues = (response: TokenResponse, previous?: CredentialDisk) => {
+  const accessToken = response.access_token ?? previous?.accessToken
+  const idToken = response.id_token ?? previous?.idToken
+  const refreshToken = response.refresh_token ?? previous?.refreshToken
+  if (accessToken === undefined || idToken === undefined || refreshToken === undefined) {
+    return Effect.fail(authError("protocol", "Token exchange was incomplete"))
+  }
+  return Effect.succeed({ accessToken, idToken, refreshToken })
+}
+
+const validExpiry = (value: number | undefined) => value === undefined || (value >= 0 && Number.isSafeInteger(value))
+
 const credentialFrom = (crypto: Crypto.Crypto, response: TokenResponse, previous?: CredentialDisk) =>
   Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis
-    const accessToken = response.access_token ?? previous?.accessToken
-    const idToken = response.id_token ?? previous?.idToken
-    const refreshToken = response.refresh_token ?? previous?.refreshToken
-    if (accessToken === undefined || idToken === undefined || refreshToken === undefined) {
-      return yield* authError("protocol", "Token exchange was incomplete")
+    const { accessToken, idToken, refreshToken } = yield* tokenValues(response, previous)
+    const { accountId, fingerprint } = yield* credentialIdentity(crypto, idToken)
+    if (previous !== undefined && fingerprint !== previous.fingerprint) {
+      return yield* authError(
+        "account-mismatch",
+        "Refreshed credentials belong to a different account; login is required",
+      )
     }
+    const accessClaims = yield* decodeJwt(accessToken, ExpiryClaims).pipe(Effect.option)
+    const tokenExpiry = Option.isSome(accessClaims) ? accessClaims.value.exp : undefined
+    if (!validExpiry(response.expires_in) || !validExpiry(tokenExpiry)) {
+      return yield* authError("protocol", "Token expiry is invalid")
+    }
+    const expiresAt = expirationTime(response, tokenExpiry, previous, now)
+    return {
+      formatVersion: credentialFormatVersion,
+      accessToken,
+      idToken,
+      refreshToken,
+      accountId,
+      fingerprint,
+      generation: `${fingerprint}.${Encoding.encodeBase64Url(yield* crypto.randomBytes(16))}`,
+      expiresAt,
+      refreshedAt: now,
+    } satisfies CredentialDisk
+  }).pipe(
+    Effect.mapError((error) =>
+      Schema.is(AuthError)(error) ? error : authError("protocol", "Cryptographic operation failed"),
+    ),
+  )
+
+const credentialIdentity = (crypto: Crypto.Crypto, idToken: string) =>
+  Effect.gen(function* () {
     const claims = yield* decodeJwt(idToken, IdentityClaims)
     const identity = claims["https://api.openai.com/auth"]
     const accountId = identity.chatgpt_account_id
@@ -232,41 +271,29 @@ const credentialFrom = (crypto: Crypto.Crypto, response: TokenResponse, previous
     }
     const identityBytes = yield* utf8(`${accountId}\0${userId}`)
     const fingerprint = Encoding.encodeBase64Url(yield* crypto.digest("SHA-256", identityBytes))
-    if (previous !== undefined && fingerprint !== previous.fingerprint) {
-      return yield* authError(
-        "account-mismatch",
-        "Refreshed credentials belong to a different account; login is required",
-      )
-    }
-    const accessClaims = yield* decodeJwt(accessToken, ExpiryClaims).pipe(Effect.option)
-    const tokenExpiry = Option.isSome(accessClaims) ? accessClaims.value.exp : undefined
-    if (response.expires_in !== undefined && (response.expires_in < 0 || !Number.isSafeInteger(response.expires_in))) {
-      return yield* authError("protocol", "Token expiry is invalid")
-    }
-    if (tokenExpiry !== undefined && (tokenExpiry < 0 || !Number.isSafeInteger(tokenExpiry))) {
-      return yield* authError("protocol", "Token expiry is invalid")
-    }
-    return {
-      formatVersion: credentialFormatVersion,
-      accessToken,
-      idToken,
-      refreshToken,
-      accountId,
-      fingerprint,
-      generation: `${fingerprint}.${Encoding.encodeBase64Url(yield* crypto.randomBytes(16))}`,
-      expiresAt:
-        response.access_token !== undefined && response.expires_in !== undefined
-          ? now + response.expires_in * 1000
-          : tokenExpiry !== undefined
-            ? tokenExpiry * 1000
-            : (previous?.expiresAt ?? now + 8 * 86_400_000),
-      refreshedAt: now,
-    } satisfies CredentialDisk
-  }).pipe(
-    Effect.mapError((error) =>
-      Schema.is(AuthError)(error) ? error : authError("protocol", "Cryptographic operation failed"),
-    ),
-  )
+    return { accountId, fingerprint }
+  })
+
+const expirationTime = (
+  response: TokenResponse,
+  tokenExpiry: number | undefined,
+  previous: CredentialDisk | undefined,
+  now: number,
+): number => {
+  if (response.access_token !== undefined && response.expires_in !== undefined) {
+    return now + response.expires_in * 1000
+  }
+  if (tokenExpiry !== undefined) return tokenExpiry * 1000
+  return previous?.expiresAt ?? now + 8 * 86_400_000
+}
+
+const statusFromEntry = (entry: Option.Option<CredentialDisk>, now: number): Status => {
+  if (Option.isNone(entry)) return { _tag: "Unauthenticated" }
+  if (entry.value.expiresAt <= now + 300_000) {
+    return { _tag: "RefreshRequired", fingerprint: entry.value.fingerprint }
+  }
+  return { _tag: "Present", fingerprint: entry.value.fingerprint }
+}
 
 /** @experimental */
 export type Status =
@@ -339,7 +366,7 @@ export const layer = (options: TimingOptions = {}) =>
       const service: ServiceInterface = {
         loginBrowser: (redirect = redirectUri) =>
           Effect.gen(function* () {
-            const pkce = yield* makePkce.pipe(Effect.provideService(Crypto.Crypto, crypto))
+            const pkce = yield* generatePkce.pipe(Effect.provideService(Crypto.Crypto, crypto))
             const result = yield* host.authorize(authorizationUrl(pkce.challenge, pkce.state, redirect), pkce.state)
             if (Redacted.value(result.state) !== Redacted.value(pkce.state)) {
               return yield* authError("protocol", "Authorization state did not match")
@@ -409,14 +436,7 @@ export const layer = (options: TimingOptions = {}) =>
             Effect.matchEffect({
               onFailure: (error) =>
                 error.kind === "corrupt" ? Effect.succeed<Status>({ _tag: "Corrupt" }) : Effect.fail(error),
-              onSuccess: (entry) =>
-                Effect.succeed<Status>(
-                  Option.isNone(entry)
-                    ? { _tag: "Unauthenticated" }
-                    : entry.value.expiresAt <= now + 300_000
-                      ? { _tag: "RefreshRequired", fingerprint: entry.value.fingerprint }
-                      : { _tag: "Present", fingerprint: entry.value.fingerprint },
-                ),
+              onSuccess: (entry) => Effect.succeed(statusFromEntry(entry, now)),
             }),
           )
         }),

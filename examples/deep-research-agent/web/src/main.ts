@@ -91,7 +91,9 @@ export const OpenSession = define("OpenSession", {
     const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
       body: HttpBody.jsonUnsafe({}),
     }).pipe(Effect.provideContext(httpClient))
-    const body = (yield* httpResponse.json) as { readonly sessionId: string }
+    const body = yield* httpResponse.json.pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(Schema.Struct({ sessionId: Schema.String }))),
+    )
     return OpenedSession({ sessionId: body.sessionId })
   }).pipe(
     Effect.scoped,
@@ -107,13 +109,27 @@ const toggle = (keys: ReadonlyArray<string>, key: string): ReadonlyArray<string>
   keys.includes(key) ? keys.filter((existing) => existing !== key) : [...keys, key]
 
 const asProgramCommands = (
-  commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
-): ReadonlyArray<ProgramCommand> => commands as ReadonlyArray<ProgramCommand>
+  commands: ReadonlyArray<Command<Message, Connection.AgentCommandError, Connection.AgentConnection>>,
+): ReadonlyArray<ProgramCommand> =>
+  commands.map((command) =>
+    Object.assign({}, command, {
+      effect: command.effect.pipe(
+        Effect.catch((error) => Effect.succeed(FailedOpenSession({ reason: error.message }))),
+      ),
+    }),
+  )
 
 const updateModel = (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (currentMessage._tag) {
     case "OpenedSession":
-      return [{ ...model, chat: { ...model.chat, sessionId: currentMessage.sessionId }, session: SessionReady() }, []]
+      return [
+        {
+          ...model,
+          chat: Object.assign({}, model.chat, { sessionId: currentMessage.sessionId }),
+          session: SessionReady(),
+        },
+        [],
+      ]
     case "FailedOpenSession":
       return [{ ...model, session: SessionFailed({ message: currentMessage.reason }) }, []]
     case "GotChatAction": {
@@ -273,12 +289,12 @@ const assistantEntryView = (
     ]),
   ])
 
-interface WebSearchSuccess {
-  readonly results: ReadonlyArray<WebSearchResult>
-}
+const WebSearchSuccess = Schema.Struct({
+  results: Schema.Array(Schema.Struct({ title: Schema.String, url: Schema.String, snippet: Schema.String })),
+})
+type WebSearchSuccess = typeof WebSearchSuccess.Type
 
-const isWebSearchSuccess = (value: unknown): value is WebSearchSuccess =>
-  typeof value === "object" && value !== null && Array.isArray((value as { results?: unknown }).results)
+const isWebSearchSuccess = Schema.is(WebSearchSuccess)
 
 const toolResultBodyView = (outcome: Extract<Chat.ToolOutcome, { _tag: "Completed" }>): Html => {
   const h = html<Message>()
@@ -415,15 +431,15 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
 
 const sessionBannerView = (session: SessionState): Html => {
   const h = html<Message>()
-  const content =
-    session._tag === "SessionOpening"
-      ? h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"])
-      : session._tag === "SessionFailed"
-        ? h.p(
-            [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
-            [`Could not open a session: ${session.message}`],
-          )
-        : h.div([], [])
+  let content: Html = h.div([], [])
+  if (session._tag === "SessionOpening") {
+    content = h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"])
+  } else if (session._tag === "SessionFailed") {
+    content = h.p(
+      [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
+      [`Could not open a session: ${session.message}`],
+    )
+  }
   return h.keyed("div")(session._tag, [], [content])
 }
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Replay, Wire } from "../../src/transport/index.js"
-import { event, runtimeLayer } from "./helpers.js"
+import { event, runtimeLayer } from "./fixtures.js"
 
 describe("Replay", () => {
   it.effect("returns a bounded strict page and preserves the load cursor", () =>

@@ -1,4 +1,4 @@
-import { layerSqlite } from "./sql/runtime-layer.js"
+import { layerSqlite } from "./sql/layer.js"
 import { layerSqliteStore } from "./sql/store.js"
 
 export const Runtime = {
@@ -6,7 +6,7 @@ export const Runtime = {
 } as const
 
 export namespace Runtime {
-  export type Options = import("./sql/runtime-layer.js").BunSqliteStoreOptions
+  export type Options = import("./sql/layer.js").BunSqliteStoreOptions
 }
 
 export const RunStore = {

@@ -1,6 +1,5 @@
 import { Option } from "effect"
-import type { Html } from "foldkit/html"
-import { inertHtml as ih } from "foldkit/html"
+import { type Html, inertHtml as ih } from "foldkit/html"
 
 import {
   codeBlock,
@@ -9,9 +8,9 @@ import {
   codeBlockHeader,
   codeBlockTitle,
 } from "@/components/ui/code-block"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/styles"
 
-import oneTurn from "../snippets/landing/one-turn.ts?raw"
+import oneTurn from "virtual:source/src/snippets/landing/one-turn.ts"
 
 import { ClickedCopyCode } from "../app/message"
 import type { Model } from "../app/model"

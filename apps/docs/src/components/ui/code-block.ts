@@ -1,12 +1,10 @@
-import type { Html } from "foldkit/html"
-import { inertHtml as ih } from "foldkit/html"
+import { type Html, inertHtml as ih } from "foldkit/html"
 import { dual } from "effect/Function"
 
 import { button } from "@/components/ui/button"
 import { html } from "@/lib/html"
 import { highlight } from "@/lib/highlight"
-import type { SlotConfig } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { type SlotConfig, cn } from "@/lib/styles"
 
 // VIEW
 

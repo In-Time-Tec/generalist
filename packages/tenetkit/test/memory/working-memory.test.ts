@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
-import { Context, Deferred, Effect, Fiber, Layer, Ref, Stream } from "effect"
+import { Context, Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, Memory } from "tenetkit"
+import { Agent, Memory } from "../../src/index.js"
 import { expectTypeOf } from "vitest"
 import { WorkingMemory } from "../../src/memory/index"
 
@@ -31,7 +31,7 @@ const itemText = (item: Memory.Item): string =>
 const promptText = (value: Prompt.Prompt): string =>
   value.content
     .map((message) =>
-      typeof message.content === "string"
+      Schema.is(Schema.String)(message.content)
         ? message.content
         : message.content
             .filter((part): part is Prompt.TextPart => part.type === "text")
@@ -262,7 +262,7 @@ layer(
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
 
       expect(summaryCalls).toBe(1)
-      expect(summaryPrompt).toEqual(expect.arrayContaining([expect.objectContaining({ content: expect.anything() })]))
+      expect(summaryPrompt?.some((message) => message.content.length > 0)).toBe(true)
       expect(recalled.map(itemText)).toEqual([
         "<working-memory-summary>\nsummary\n</working-memory-summary>",
         "User: three",

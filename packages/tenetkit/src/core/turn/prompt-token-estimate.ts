@@ -1,28 +1,24 @@
+import { Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import type { Entry } from "../context/session.js"
 
 const APPROX_CHARS_PER_TOKEN = 4
 const IMAGE_TOKEN_ESTIMATE = 1_600
 
-const isImagePart = (value: unknown): value is Prompt.FilePart =>
-  typeof value === "object" &&
-  value !== null &&
-  "type" in value &&
-  value.type === "file" &&
-  "mediaType" in value &&
-  typeof value.mediaType === "string" &&
-  value.mediaType.startsWith("image/")
+type SerializedPromptValue = Prompt.Prompt["content"] | Entry
+type ReplacerValue = Schema.Json | Prompt.FilePart["data"] | undefined
 
-const estimateSerializedTokens = (value: unknown): number => {
+const estimateSerializedTokens = (value: SerializedPromptValue): number => {
   let images = 0
-  const json = JSON.stringify(value, function (key, child: unknown) {
-    if (key === "data" && isImagePart(this)) {
+  const json = JSON.stringify(value, function (key, child: ReplacerValue) {
+    const file = Schema.decodeUnknownOption(Prompt.FilePart)(this)
+    if (key === "data" && Option.isSome(file) && file.value.mediaType.startsWith("image/")) {
       images += 1
       return ""
     }
     return child
   })
-  const text = json === undefined ? String(value) : json
+  const text = json ?? ""
   return Math.ceil(text.length / APPROX_CHARS_PER_TOKEN) + images * IMAGE_TOKEN_ESTIMATE
 }
 

@@ -144,7 +144,7 @@ describe("hosted skill catalogs", () => {
           },
         },
       },
-    ) as HttpCatalog.Options
+    ) satisfies HttpCatalog.Options
     const authorizations: Array<string | undefined> = []
     const urls: Array<string> = []
     const recordingHttp = Layer.succeed(

@@ -14,7 +14,7 @@ const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<Language
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "assistant", delta })
 
-const toolCall = (id: string, name: string, params: unknown) =>
+const toolCall = (id: string, name: string, params: { readonly city: string }) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
 const weatherTool = Tool.make("get_weather", {

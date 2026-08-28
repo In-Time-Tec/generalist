@@ -1,8 +1,8 @@
 import { Cause, Clock, Context, Duration, Effect, Exit, FiberMap, Layer, Ref, Scope } from "effect"
 import type { RuntimeUnavailable } from "../errors.js"
-import { RunClaims, type ClaimedRun } from "./run-claims.js"
-import { ExecutionHost } from "../execution-host.js"
-import { RunStore } from "../run-store.js"
+import { RunClaims, type ClaimedRun } from "./run/claims.js"
+import { ExecutionHost } from "../execution/host.js"
+import { RunStore } from "../run/store.js"
 import { isTerminal } from "../run.js"
 
 export interface WorkerOptions {
@@ -107,13 +107,12 @@ export const makeWorker = (
     const watchCancellation = (runId: string): Effect.Effect<void, RuntimeUnavailable> =>
       Effect.sleep(cancellationInterval).pipe(
         Effect.andThen(store.inspect(runId)),
-        Effect.flatMap((run) =>
-          run.status === "cancelling"
-            ? host.interrupt(runId).pipe(Effect.andThen(watchCancellation(runId)))
-            : isTerminal(run.status)
-              ? Effect.void
-              : watchCancellation(runId),
-        ),
+        Effect.flatMap((run) => {
+          if (run.status === "cancelling") {
+            return host.interrupt(runId).pipe(Effect.andThen(watchCancellation(runId)))
+          }
+          return isTerminal(run.status) ? Effect.void : watchCancellation(runId)
+        }),
         Effect.catchTag("tenetkit/runtime/RunNotFound", () => Effect.void),
       )
 

@@ -1,5 +1,10 @@
-import { Schema } from "effect"
+import { Function, Schema } from "effect"
 import { digest } from "./canonical-json.js"
+
+/** @experimental Closed JSON identity accepted by durable pin constructors. */
+export type PinIdentity = Schema.Json
+
+const decodeIdentity = Schema.decodeUnknownSync(Schema.Json)
 
 const sha256 = "[0-9a-f]{64}"
 
@@ -34,22 +39,21 @@ export const ExecutablePin = pinSchema("executable-pin")
 /** @experimental */
 export type ExecutablePin = typeof ExecutablePin.Type
 
-/** @experimental Pin exact opaque model identity expressed as closed JSON. */
-export const makeModel = (identity: unknown): ModelPin =>
-  Schema.decodeUnknownSync(ModelPin)(`model-pin:v1:sha256:${digest(identity)}`)
-
-/** @experimental Pin exact opaque capability identity expressed as closed JSON. */
-export const makeCapability = (identity: unknown): CapabilityPin =>
-  Schema.decodeUnknownSync(CapabilityPin)(`capability-pin:v1:sha256:${digest(identity)}`)
-
-/** @experimental */
-export const makeAgent = (identity: unknown): AgentPin =>
-  Schema.decodeUnknownSync(AgentPin)(`agent-pin:v1:sha256:${digest(identity)}`)
-
-/** @experimental */
-export const makeProgram = (identity: unknown): ProgramPin =>
-  Schema.decodeUnknownSync(ProgramPin)(`program-pin:v1:sha256:${digest(identity)}`)
-
-/** @experimental */
-export const makeExecutable = (identity: unknown): ExecutablePin =>
-  Schema.decodeUnknownSync(ExecutablePin)(`executable-pin:v1:sha256:${digest(identity)}`)
+/** @experimental Constructors for every durable pin identity. */
+export const Pin = {
+  makeModel: Function.flow(decodeIdentity, (identity) =>
+    Schema.decodeSync(ModelPin)(`model-pin:v1:sha256:${digest(identity)}`),
+  ),
+  makeCapability: Function.flow(decodeIdentity, (identity) =>
+    Schema.decodeSync(CapabilityPin)(`capability-pin:v1:sha256:${digest(identity)}`),
+  ),
+  makeAgent: Function.flow(decodeIdentity, (identity) =>
+    Schema.decodeSync(AgentPin)(`agent-pin:v1:sha256:${digest(identity)}`),
+  ),
+  makeProgram: Function.flow(decodeIdentity, (identity) =>
+    Schema.decodeSync(ProgramPin)(`program-pin:v1:sha256:${digest(identity)}`),
+  ),
+  makeExecutable: Function.flow(decodeIdentity, (identity) =>
+    Schema.decodeSync(ExecutablePin)(`executable-pin:v1:sha256:${digest(identity)}`),
+  ),
+}

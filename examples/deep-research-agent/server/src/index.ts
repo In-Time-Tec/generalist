@@ -56,8 +56,12 @@ const RespondInput = Schema.Struct({
   }),
 })
 
-const errorResponse = (status: number) => (error: unknown) =>
-  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: String(error) }, { status }))
+interface ResponseFailure {
+  readonly message: string
+}
+
+const errorResponse = (status: number) => (error: ResponseFailure) =>
+  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: error.message }, { status }))
 
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
@@ -91,16 +95,16 @@ const routesLayer = HttpRouter.use((router) =>
       "/runs",
       HttpRouter.schemaJson(StartRunInput).pipe(
         Effect.flatMap(({ body }) =>
-          Runtime.Runtime.use((runtime) =>
-            runtime.start({
-              ...(body.runId === undefined ? {} : { runId: body.runId }),
+          Runtime.Runtime.use((runtime) => {
+            const input = {
               executable,
               registrations,
               sessionId: body.sessionId,
               idempotencyKey: body.idempotencyKey,
               prompt: body.prompt,
-            }),
-          ),
+            }
+            return runtime.start(body.runId === undefined ? input : { ...input, runId: body.runId })
+          }),
         ),
         Effect.tap((receipt) => (receipt.duplicate ? Effect.void : executeRun(receipt.runId))),
         Effect.map((receipt) => HttpServerResponse.jsonUnsafe(receipt, { status: 202 })),

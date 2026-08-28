@@ -14,7 +14,7 @@ export const encode: {
   (input: Cursor, options?: import("effect/SchemaAST").ParseOptions): Effect.Effect<number, Schema.SchemaError>
   (options?: import("effect/SchemaAST").ParseOptions): (input: Cursor) => Effect.Effect<number, Schema.SchemaError>
 } = Function.dual(
-  (args) => typeof args[0] === "number",
+  (args) => Schema.is(Cursor)(args[0]),
   (input: Cursor, options?: import("effect/SchemaAST").ParseOptions) => Schema.encodeEffect(Cursor)(input, options),
 )
 
@@ -22,6 +22,6 @@ export const decode: {
   (input: Cursor, options?: import("effect/SchemaAST").ParseOptions): Effect.Effect<number, Schema.SchemaError>
   (options?: import("effect/SchemaAST").ParseOptions): (input: Cursor) => Effect.Effect<number, Schema.SchemaError>
 } = Function.dual(
-  (args) => typeof args[0] === "number",
+  (args) => Schema.is(Cursor)(args[0]),
   (input: Cursor, options?: import("effect/SchemaAST").ParseOptions) => Schema.decodeEffect(Cursor)(input, options),
 )

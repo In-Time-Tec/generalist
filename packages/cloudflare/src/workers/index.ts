@@ -1,5 +1,8 @@
 import { ConfigProvider, Context, Effect, Function, type Scope } from "effect"
 
+/** @experimental Values exposed by Cloudflare Worker bindings. */
+export type BindingValue = string | number | boolean | null | undefined | object
+
 /** @experimental */
 export interface ExecutionContext {
   readonly waitUntil: (promise: Promise<unknown>) => void
@@ -8,7 +11,7 @@ export interface ExecutionContext {
 
 /** @experimental */
 export interface RequestContext {
-  readonly bindings: Readonly<Record<string, unknown>>
+  readonly bindings: object
   readonly executionContext: ExecutionContext
 }
 
@@ -19,16 +22,16 @@ export class WorkerContext extends Context.Service<WorkerContext, RequestContext
 
 /** @experimental */
 export const makeConfigProvider: {
-  <Bindings extends Readonly<Record<string, unknown>>, Key extends keyof Bindings & string>(
+  <Bindings extends object, Key extends keyof Bindings & string>(
     bindings: Bindings,
     keys: ReadonlyArray<Key>,
   ): ConfigProvider.ConfigProvider
-  <Bindings extends Readonly<Record<string, unknown>>, Key extends keyof Bindings & string>(
+  <Bindings extends object, Key extends keyof Bindings & string>(
     keys: ReadonlyArray<Key>,
   ): (bindings: Bindings) => ConfigProvider.ConfigProvider
 } = Function.dual(
   2,
-  <Bindings extends Readonly<Record<string, unknown>>, Key extends keyof Bindings & string>(
+  <Bindings extends object, Key extends keyof Bindings & string>(
     bindings: Bindings,
     keys: ReadonlyArray<Key>,
   ): ConfigProvider.ConfigProvider =>
@@ -36,12 +39,12 @@ export const makeConfigProvider: {
 )
 
 /** @experimental */
-export interface Worker<Bindings extends Readonly<Record<string, unknown>>> {
+export interface Worker<Bindings extends object> {
   readonly fetch: (request: Request, bindings: Bindings, context: ExecutionContext) => Promise<Response>
 }
 
 /** @experimental */
-export const make = <Bindings extends Readonly<Record<string, unknown>>, E>(
+export const make = <Bindings extends object, E>(
   handle: (request: Request) => Effect.Effect<Response, E, WorkerContext | Scope.Scope>,
 ): Worker<Bindings> => ({
   fetch: (request, bindings, executionContext) =>

@@ -50,17 +50,22 @@ interface ResolvedQueuePolicy {
   readonly onFull: OverflowStrategy
 }
 
+type MutableResolvedQueuePolicy = { -readonly [Key in keyof ResolvedQueuePolicy]: ResolvedQueuePolicy[Key] }
+
 interface RuntimeQueue {
   readonly name: QueueName
   readonly queue: Queue.Queue<Input>
   readonly policy: ResolvedQueuePolicy
 }
 
-const resolvePolicy = (policy: QueuePolicy | undefined, mode: DrainMode): ResolvedQueuePolicy => ({
-  mode: policy?.mode ?? mode,
-  ...(policy?.capacity === undefined ? {} : { capacity: policy.capacity }),
-  onFull: policy?.onFull ?? "fail",
-})
+const resolvePolicy = (policy: QueuePolicy | undefined, mode: DrainMode): ResolvedQueuePolicy => {
+  const resolved: MutableResolvedQueuePolicy = {
+    mode: policy?.mode ?? mode,
+    onFull: policy?.onFull ?? "fail",
+  }
+  if (policy?.capacity !== undefined) resolved.capacity = policy.capacity
+  return resolved
+}
 
 const queueStrategy = (strategy: OverflowStrategy): "suspend" | "dropping" | "sliding" => {
   switch (strategy) {

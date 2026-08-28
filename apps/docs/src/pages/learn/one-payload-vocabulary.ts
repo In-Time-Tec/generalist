@@ -1,5 +1,5 @@
-import portableTranscript from "../../snippets/learn/one-payload-vocabulary/portable-transcript.ts?raw"
-import portableTranscriptExpected from "../../snippets/learn/one-payload-vocabulary/portable-transcript.expected.txt?raw"
+import portableTranscript from "virtual:source/src/snippets/learn/one-payload-vocabulary/portable-transcript.ts"
+import portableTranscriptExpected from "virtual:source/src/snippets/learn/one-payload-vocabulary/portable-transcript.expected.txt"
 import { code, codeBlock, definePage, h2, link, p } from "../../prose"
 export const onePayloadVocabulary = definePage({
   path: "/docs/learn/one-payload-vocabulary",

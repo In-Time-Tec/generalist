@@ -1,8 +1,6 @@
 import { Schema } from "effect"
-import { ReplayPolicy } from "./driver-contract.js"
-import { WaitDefinition } from "./driver-contract.js"
-import { DriverOperationKind } from "./driver-contract.js"
-import { HandoffControlState } from "../agent/handoff-state.js"
+import { DriverOperationKind, ReplayPolicy, WaitDefinition } from "./driver/contract.js"
+import { HandoffControlState } from "../agent/handoff/state.js"
 
 /** @experimental Pending operation the interpreter schedules before decide. */
 export const PendingOperation = Schema.Struct({
@@ -40,11 +38,6 @@ export type LoopDriverState = typeof LoopDriverState.Type
 export const modelCallOrdinal = (state: LoopDriverState): number => {
   const pending = state.pending
   if (pending?.kind !== "model" && pending?.kind !== "structured-output") return state.modelCallOrdinal
-  const input = pending.input
-  return typeof input === "object" &&
-    input !== null &&
-    "modelCallOrdinal" in input &&
-    typeof input.modelCallOrdinal === "number"
-    ? input.modelCallOrdinal
-    : state.modelCallOrdinal
+  const input = Schema.decodeUnknownOption(Schema.Struct({ modelCallOrdinal: Schema.Finite }))(pending.input)
+  return input._tag === "Some" ? input.value.modelCallOrdinal : state.modelCallOrdinal
 }

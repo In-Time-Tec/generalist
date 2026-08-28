@@ -1,8 +1,14 @@
 import { Cause, Context, Effect, Function, Layer, Option, Ref, Schema } from "effect"
 import { digest as canonicalDigest } from "../durable/canonical-json.js"
-import { ReplayPolicy } from "../durable/driver-contract.js"
+import { ReplayPolicy } from "../durable/driver/contract.js"
 import { ToolContext } from "./tool-context.js"
 import type { Outcome } from "./tool-executor.js"
+
+const singleFailureReason = <E>(cause: Cause.Cause<E>) => {
+  if (cause.reasons.length !== 1) return undefined
+  const reason = cause.reasons[0]
+  return reason !== undefined && Cause.isFailReason(reason) ? reason : undefined
+}
 
 /** @experimental Replay policy for one nested durable operation. */
 export const NestedReplayPolicy = ReplayPolicy
@@ -77,6 +83,12 @@ export const Progress = Schema.Struct({
 })
 /** @experimental */
 export type Progress = typeof Progress.Type
+type ProgressEncoded = typeof Progress.Encoded
+
+export interface ProgressData {
+  readonly [progressKey]: ProgressEncoded
+  readonly [key: string]: ProgressEncoded
+}
 
 /**
  * @experimental Encodes one progress record under `progressKey`.
@@ -90,31 +102,32 @@ export const progressData = (input: {
   readonly ordinal: number
   readonly status: ProgressStatus
   readonly render?: Render | undefined
-}): Effect.Effect<Record<string, unknown>> =>
+}): Effect.Effect<ProgressData> =>
   Effect.gen(function* () {
+    if (input.render === undefined) {
+      return { [progressKey]: { kind: input.kind, ordinal: input.ordinal, status: input.status } }
+    }
     const encodable = yield* Effect.option(
       Effect.all({
-        serialized: Schema.encodeUnknownEffect(Schema.fromJsonString(Render))(input.render as Render),
-        encoded: Schema.encodeUnknownEffect(Render)(input.render as Render),
+        serialized: Schema.encodeEffect(Schema.fromJsonString(Render))(input.render),
+        encoded: Schema.encodeEffect(Render)(input.render),
       }),
     )
-    const projection = input.render === undefined ? undefined : Option.getOrUndefined(encodable)
+    const projection = Option.getOrUndefined(encodable)
     const byteSize = projection === undefined ? 0 : new TextEncoder().encode(projection.serialized).byteLength
     const withheld = byteSize > maxRenderBytes
-    return {
-      [progressKey]: {
-        kind: input.kind,
-        ordinal: input.ordinal,
-        status: input.status,
-        ...(projection === undefined || withheld ? {} : { render: projection.encoded }),
-        ...(withheld ? { renderWithheldBytes: byteSize } : {}),
-      },
-    }
+    let progress: ProgressEncoded = { kind: input.kind, ordinal: input.ordinal, status: input.status }
+    if (projection !== undefined && !withheld) progress = { ...progress, render: projection.encoded }
+    if (withheld) progress = { ...progress, renderWithheldBytes: byteSize }
+    return { [progressKey]: progress }
   })
-export interface Request<A = unknown> {
+type Payload = typeof Schema.Unknown.Type
+export interface Request<A = unknown, E = unknown> {
   readonly kind: string
-  readonly payload: unknown
+  readonly payload: Payload
   readonly replayPolicy: NestedReplayPolicy
+  readonly success?: Schema.Codec<A, unknown, never, never>
+  readonly failure?: Schema.Codec<E, unknown, never, never>
   readonly approval?: ApprovalRequirement
   readonly render?: (value: A) => Render
 }
@@ -166,7 +179,7 @@ export type Failure =
  */
 export interface Interface {
   readonly run: <A, E, R>(
-    request: Request<A>,
+    request: Request<A, E>,
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | Failure, R | ToolContext>
 }
@@ -178,9 +191,9 @@ export class NestedOperations extends Context.Service<NestedOperations, Interfac
 
 /** @experimental Canonical payload digest shared by every nested-operation implementation. */
 export const payloadDigest: {
-  (payload: unknown): (kind: string) => string
-  (kind: string, payload: unknown): string
-} = Function.dual(2, (kind: string, payload: unknown): string => canonicalDigest({ kind, payload }))
+  (payload: Payload): (kind: string) => string
+  (kind: string, payload: Payload): string
+} = Function.dual(2, (kind: string, payload: Payload): string => canonicalDigest({ kind, payload }))
 
 /** @experimental Derived operation id for one nested operation. */
 export const operationId = (input: { readonly operationKey: string; readonly ordinal: number }): string =>
@@ -190,28 +203,24 @@ export const operationId = (input: { readonly operationKey: string; readonly ord
 export const run: {
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
-  ): (request: Request<A>) => Effect.Effect<A, E | Failure, R | NestedOperations | ToolContext>
+  ): (request: Request<A, E>) => Effect.Effect<A, E | Failure, R | NestedOperations | ToolContext>
   <A, E, R>(
-    request: Request<A>,
+    request: Request<A, E>,
     effect: Effect.Effect<A, E, R>,
   ): Effect.Effect<A, E | Failure, R | NestedOperations | ToolContext>
 } = Function.dual(
   2,
   <A, E, R>(
-    request: Request<A>,
+    request: Request<A, E>,
     effect: Effect.Effect<A, E, R>,
   ): Effect.Effect<A, E | Failure, R | NestedOperations | ToolContext> =>
     Effect.flatMap(NestedOperations, (operations) => operations.run(request, effect)),
 )
 
 /** @experimental Translate a nested-operation approval suspension into the tool executor's Suspend outcome. */
-export const catchSuspension = <E, R>(
-  effect: Effect.Effect<Outcome, E, R>,
-): Effect.Effect<Outcome, Exclude<E, NestedOperationSuspended>, R> =>
-  Effect.catch(effect, (error) =>
-    Schema.is(NestedOperationSuspended)(error)
-      ? Effect.succeed<Outcome>({ _tag: "Suspend", token: error.token })
-      : Effect.fail(error as Exclude<E, NestedOperationSuspended>),
+export const catchSuspension = <E, R>(effect: Effect.Effect<Outcome, E, R>) =>
+  Effect.catchIf(effect, Schema.is(NestedOperationSuspended), (error) =>
+    Effect.succeed<Outcome>({ _tag: "Suspend", token: error.token }),
   )
 
 interface DirectRecord {
@@ -234,7 +243,7 @@ export const layerDirect: Layer.Layer<NestedOperations> = Layer.effect(
     const recordsRef = yield* Ref.make(new Map<string, DirectRecord>())
     const ordinalsRef = yield* Ref.make(new Map<string, number>())
     return NestedOperations.of({
-      run: <A, E, R>(request: Request<A>, effect: Effect.Effect<A, E, R>) =>
+      run: <A, E, R>(request: Request<A, E>, effect: Effect.Effect<A, E, R>) =>
         Effect.gen(function* () {
           const context = yield* ToolContext
           const operationKey = context.operationKey ?? context.toolCallId ?? context.sessionId
@@ -247,7 +256,7 @@ export const layerDirect: Layer.Layer<NestedOperations> = Layer.effect(
           const requestedDigest = payloadDigest(request.kind, request.payload)
           const id = operationId({ operationKey, ordinal })
           const recorded = (yield* Ref.get(recordsRef)).get(id)
-          if (recorded !== undefined) {
+          if (recorded !== undefined && request.success !== undefined && request.failure !== undefined) {
             if (recorded.kind !== request.kind || recorded.payloadDigest !== requestedDigest) {
               return yield* NestedOperationDivergence.make({
                 operationKey,
@@ -259,17 +268,23 @@ export const layerDirect: Layer.Layer<NestedOperations> = Layer.effect(
               })
             }
             return yield* recorded.outcome._tag === "Succeeded"
-              ? Effect.succeed(recorded.outcome.value as A)
-              : Effect.fail(recorded.outcome.error as E)
+              ? Schema.decodeUnknownEffect(request.success)(recorded.outcome.value).pipe(Effect.orDie)
+              : Schema.decodeUnknownEffect(request.failure)(recorded.outcome.error).pipe(Effect.orDie, Effect.flip)
           }
           const exit = yield* Effect.exit(effect)
-          const reason = exit._tag === "Failure" && exit.cause.reasons.length === 1 ? exit.cause.reasons[0] : undefined
-          const outcome: DirectRecord["outcome"] | undefined =
-            exit._tag === "Success"
-              ? { _tag: "Succeeded", value: exit.value }
-              : reason !== undefined && Cause.isFailReason(reason)
-                ? { _tag: "Failed", error: reason.error }
-                : undefined
+          const reason = exit._tag === "Failure" ? singleFailureReason(exit.cause) : undefined
+          let outcome: DirectRecord["outcome"] | undefined
+          if (exit._tag === "Success" && request.success !== undefined) {
+            outcome = {
+              _tag: "Succeeded",
+              value: yield* Schema.encodeEffect(request.success)(exit.value).pipe(Effect.orDie),
+            }
+          } else if (reason !== undefined && request.failure !== undefined) {
+            outcome = {
+              _tag: "Failed",
+              error: yield* Schema.encodeEffect(request.failure)(reason.error).pipe(Effect.orDie),
+            }
+          }
           if (outcome !== undefined) {
             yield* Ref.update(recordsRef, (current) => {
               const next = new Map(current)

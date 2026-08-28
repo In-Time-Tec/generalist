@@ -1,9 +1,8 @@
-import { Effect, Option, Pull, Schedule, Schema, Stream } from "effect"
-import type { ParseOptions } from "effect/SchemaAST"
-import { RunEvent } from "./run-event.js"
+import { Effect, Function, Option, Predicate, Pull, Schedule, Schema, Stream } from "effect"
+import { RunEvent } from "./run/event.js"
 import { CompactionInspection, isTerminal, RawUsageFact, RunInspection, RunOutcome } from "./run.js"
-import { Runtime, type Interface as RuntimeInterface } from "./runtime.js"
-import { TreeCursor, type TreeCursor as TreeCursorType } from "./tree-cursor.js"
+import { Runtime, type Interface as RuntimeInterface } from "./service.js"
+import { TreeCursor, type TreeCursor as TreeCursorType } from "./tree/cursor.js"
 export { TreeCursor }
 
 export interface TreeEvent {
@@ -35,33 +34,44 @@ export const TreeEvent: Schema.Codec<TreeEvent, TreeEventEncoded> = Schema.Struc
   cursor: TreeCursor,
 })
 
-const isParseOptions = (value: unknown): value is ParseOptions =>
-  typeof value === "object" &&
-  value !== null &&
+export const encodeTreeEvent: {
+  (
+    input: TreeEvent,
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): Effect.Effect<TreeEventEncoded, Schema.SchemaError>
+  (
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): (input: TreeEvent) => Effect.Effect<TreeEventEncoded, Schema.SchemaError>
+} = Function.dual(
+  (args) => Schema.is(TreeEvent)(args[0]),
+  (input: TreeEvent, options?: import("effect/SchemaAST").ParseOptions) =>
+    Schema.encodeEffect(TreeEvent)(input, options),
+)
+
+const isParseOptions = (
+  value: TreeEventEncoded | TreePageEncoded | InspectionEncoded | import("effect/SchemaAST").ParseOptions | undefined,
+): value is import("effect/SchemaAST").ParseOptions =>
+  Predicate.isObject(value) &&
   ("errors" in value ||
     "onExcessProperty" in value ||
     "propertyOrder" in value ||
     "disableChecks" in value ||
     "concurrency" in value)
 
-export const encodeTreeEvent: {
-  (input: TreeEvent, options?: ParseOptions): Effect.Effect<TreeEventEncoded, Schema.SchemaError, never>
-  (options?: ParseOptions): (input: TreeEvent) => Effect.Effect<TreeEventEncoded, Schema.SchemaError, never>
-} = (inputOrOptions?: TreeEvent | ParseOptions, maybeOptions?: ParseOptions): any => {
-  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
-    return (input: TreeEvent) => encodeTreeEvent(input, inputOrOptions as ParseOptions)
-  }
-  return Schema.encodeEffect(TreeEvent)(inputOrOptions as TreeEvent, maybeOptions)
-}
-
-export const decodeTreeEvent: {
-  (input: TreeEventEncoded, options?: ParseOptions): Effect.Effect<TreeEvent, Schema.SchemaError, never>
-  (options?: ParseOptions): (input: TreeEventEncoded) => Effect.Effect<TreeEvent, Schema.SchemaError, never>
-} = (inputOrOptions?: TreeEventEncoded | ParseOptions, maybeOptions?: ParseOptions): any => {
-  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
-    return (input: TreeEventEncoded) => decodeTreeEvent(input, inputOrOptions as ParseOptions)
-  }
-  return Schema.decodeEffect(TreeEvent)(inputOrOptions as TreeEventEncoded, maybeOptions)
+export function decodeTreeEvent(
+  input: TreeEventEncoded,
+  options?: import("effect/SchemaAST").ParseOptions,
+): Effect.Effect<TreeEvent, Schema.SchemaError>
+export function decodeTreeEvent(
+  options?: import("effect/SchemaAST").ParseOptions,
+): (input: TreeEventEncoded) => Effect.Effect<TreeEvent, Schema.SchemaError>
+export function decodeTreeEvent(
+  input?: TreeEventEncoded | import("effect/SchemaAST").ParseOptions,
+  options?: import("effect/SchemaAST").ParseOptions,
+) {
+  if (input === undefined || isParseOptions(input))
+    return (event: TreeEventEncoded) => Schema.decodeEffect(TreeEvent)(event, input)
+  return Schema.decodeEffect(TreeEvent)(input, options)
 }
 
 export interface TreePage {
@@ -82,23 +92,32 @@ export const TreePage: Schema.Codec<TreePage, TreePageEncoded> = Schema.Struct({
 })
 
 export const encodeTreePage: {
-  (input: TreePage, options?: ParseOptions): Effect.Effect<TreePageEncoded, Schema.SchemaError, never>
-  (options?: ParseOptions): (input: TreePage) => Effect.Effect<TreePageEncoded, Schema.SchemaError, never>
-} = (inputOrOptions?: TreePage | ParseOptions, maybeOptions?: ParseOptions): any => {
-  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
-    return (input: TreePage) => encodeTreePage(input, inputOrOptions as ParseOptions)
-  }
-  return Schema.encodeEffect(TreePage)(inputOrOptions as TreePage, maybeOptions)
-}
+  (
+    input: TreePage,
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): Effect.Effect<TreePageEncoded, Schema.SchemaError>
+  (
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): (input: TreePage) => Effect.Effect<TreePageEncoded, Schema.SchemaError>
+} = Function.dual(
+  (args) => Schema.is(TreePage)(args[0]),
+  (input: TreePage, options?: import("effect/SchemaAST").ParseOptions) => Schema.encodeEffect(TreePage)(input, options),
+)
 
-export const decodeTreePage: {
-  (input: TreePageEncoded, options?: ParseOptions): Effect.Effect<TreePage, Schema.SchemaError, never>
-  (options?: ParseOptions): (input: TreePageEncoded) => Effect.Effect<TreePage, Schema.SchemaError, never>
-} = (inputOrOptions?: TreePageEncoded | ParseOptions, maybeOptions?: ParseOptions): any => {
-  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
-    return (input: TreePageEncoded) => decodeTreePage(input, inputOrOptions as ParseOptions)
-  }
-  return Schema.decodeEffect(TreePage)(inputOrOptions as TreePageEncoded, maybeOptions)
+export function decodeTreePage(
+  input: TreePageEncoded,
+  options?: import("effect/SchemaAST").ParseOptions,
+): Effect.Effect<TreePage, Schema.SchemaError>
+export function decodeTreePage(
+  options?: import("effect/SchemaAST").ParseOptions,
+): (input: TreePageEncoded) => Effect.Effect<TreePage, Schema.SchemaError>
+export function decodeTreePage(
+  input?: TreePageEncoded | import("effect/SchemaAST").ParseOptions,
+  options?: import("effect/SchemaAST").ParseOptions,
+) {
+  if (input === undefined || isParseOptions(input))
+    return (page: TreePageEncoded) => Schema.decodeEffect(TreePage)(page, input)
+  return Schema.decodeEffect(TreePage)(input, options)
 }
 
 export interface HistoryInput {
@@ -172,23 +191,33 @@ export const Inspection: Schema.Codec<Inspection, InspectionEncoded> = Schema.Un
 ])
 
 export const encodeInspection: {
-  (input: Inspection, options?: ParseOptions): Effect.Effect<InspectionEncoded, Schema.SchemaError, never>
-  (options?: ParseOptions): (input: Inspection) => Effect.Effect<InspectionEncoded, Schema.SchemaError, never>
-} = (inputOrOptions?: Inspection | ParseOptions, maybeOptions?: ParseOptions): any => {
-  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
-    return (input: Inspection) => encodeInspection(input, inputOrOptions as ParseOptions)
-  }
-  return Schema.encodeEffect(Inspection)(inputOrOptions as Inspection, maybeOptions)
-}
+  (
+    input: Inspection,
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): Effect.Effect<InspectionEncoded, Schema.SchemaError>
+  (
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): (input: Inspection) => Effect.Effect<InspectionEncoded, Schema.SchemaError>
+} = Function.dual(
+  (args) => Schema.is(Inspection)(args[0]),
+  (input: Inspection, options?: import("effect/SchemaAST").ParseOptions) =>
+    Schema.encodeEffect(Inspection)(input, options),
+)
 
-export const decodeInspection: {
-  (input: InspectionEncoded, options?: ParseOptions): Effect.Effect<Inspection, Schema.SchemaError, never>
-  (options?: ParseOptions): (input: InspectionEncoded) => Effect.Effect<Inspection, Schema.SchemaError, never>
-} = (inputOrOptions?: InspectionEncoded | ParseOptions, maybeOptions?: ParseOptions): any => {
-  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
-    return (input: InspectionEncoded) => decodeInspection(input, inputOrOptions as ParseOptions)
-  }
-  return Schema.decodeEffect(Inspection)(inputOrOptions as InspectionEncoded, maybeOptions)
+export function decodeInspection(
+  input: InspectionEncoded,
+  options?: import("effect/SchemaAST").ParseOptions,
+): Effect.Effect<Inspection, Schema.SchemaError>
+export function decodeInspection(
+  options?: import("effect/SchemaAST").ParseOptions,
+): (input: InspectionEncoded) => Effect.Effect<Inspection, Schema.SchemaError>
+export function decodeInspection(
+  input?: InspectionEncoded | import("effect/SchemaAST").ParseOptions,
+  options?: import("effect/SchemaAST").ParseOptions,
+) {
+  if (input === undefined || isParseOptions(input))
+    return (inspection: InspectionEncoded) => Schema.decodeEffect(Inspection)(inspection, input)
+  return Schema.decodeEffect(Inspection)(input, options)
 }
 
 export const history = (input: HistoryInput) => Runtime.use((runtime) => runtime.treeHistory(input))
@@ -197,7 +226,7 @@ export const inspect = (rootRunId: string) => Runtime.use((runtime) => runtime.i
 
 export const awaitTerminal = (
   rootRunId: string,
-): Effect.Effect<Extract<Inspection, { readonly _tag: "Terminal" }>, import("./runtime.js").TreeEventsError, Runtime> =>
+): Effect.Effect<Extract<Inspection, { readonly _tag: "Terminal" }>, import("./service.js").TreeEventsError, Runtime> =>
   Effect.suspend(() =>
     inspect(rootRunId).pipe(
       Effect.flatMap((current) =>
@@ -224,7 +253,7 @@ const recoveryWakeups = Stream.fromSchedule(Schedule.spaced("1 second")).pipe(St
 const changes = (runtime: RuntimeInterface, rootRunId: string) =>
   Stream.merge(runtime.treeChanges(rootRunId), recoveryWakeups)
 
-export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./runtime.js").TreeEventsError, Runtime> =>
+export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./service.js").TreeEventsError, Runtime> =>
   Stream.unwrap(
     Runtime.use((runtime) =>
       Effect.gen(function* () {
@@ -235,15 +264,17 @@ export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./r
             state,
           ): Effect.Effect<
             readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; wait: boolean }>],
-            import("./runtime.js").TreeEventsError
+            import("./service.js").TreeEventsError
           > =>
             Effect.gen(function* () {
               if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))
-              const page = yield* runtime.treeHistory({
+              const request: HistoryInput = {
                 rootRunId: input.rootRunId,
-                ...(state.cursor === undefined ? {} : { cursor: state.cursor }),
                 limit: 256,
-              })
+              }
+              const page = yield* runtime.treeHistory(
+                state.cursor === undefined ? request : { ...request, cursor: state.cursor },
+              )
               return [page.events, Option.some({ cursor: page.cursor, wait: !page.hasMore })] as const
             }),
         )
@@ -297,7 +328,7 @@ const isSettled = (inspection: Inspection, settlement: NonNullable<WatchInput["s
   return !inspection.activeRunIds.some((runId) => canProgress(index, runId, memo))
 }
 
-export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./runtime.js").TreeEventsError, Runtime> =>
+export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./service.js").TreeEventsError, Runtime> =>
   Stream.unwrap(
     Runtime.use((runtime) =>
       Effect.gen(function* () {
@@ -309,15 +340,17 @@ export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./run
             state,
           ): Effect.Effect<
             readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; wait: boolean }>],
-            import("./runtime.js").TreeEventsError
+            import("./service.js").TreeEventsError
           > =>
             Effect.gen(function* () {
               if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))
-              const page = yield* runtime.treeHistory({
+              const request: HistoryInput = {
                 rootRunId: input.rootRunId,
-                ...(state.cursor === undefined ? {} : { cursor: state.cursor }),
                 limit: 256,
-              })
+              }
+              const page = yield* runtime.treeHistory(
+                state.cursor === undefined ? request : { ...request, cursor: state.cursor },
+              )
               if (page.hasMore) {
                 return [page.events, Option.some({ cursor: page.cursor, wait: false })] as const
               }

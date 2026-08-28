@@ -1,13 +1,17 @@
 import { inertHtml, type HtmlBuilder } from "foldkit/html"
+import type { Message as AppMessage } from "../main"
 
-let current: HtmlBuilder<unknown> = inertHtml as unknown as HtmlBuilder<unknown>
+let current: HtmlBuilder<AppMessage> | undefined
 
-export const html = <Message>(): HtmlBuilder<Message> => current as unknown as HtmlBuilder<Message>
+export function html<Message>(): HtmlBuilder<Message>
+export function html(): HtmlBuilder<AppMessage> | HtmlBuilder<never> {
+  return current ?? inertHtml
+}
 
 export const htmlScope = {
-  with: <Message, A>(builder: HtmlBuilder<Message>, render: () => A): A => {
+  with: <A>(builder: HtmlBuilder<AppMessage>, render: () => A): A => {
     const previous = current
-    current = builder as unknown as HtmlBuilder<unknown>
+    current = builder
     try {
       return render()
     } finally {

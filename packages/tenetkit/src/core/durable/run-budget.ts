@@ -2,7 +2,11 @@ import { Effect, Function, Schema } from "effect"
 import type { ParseOptions } from "effect/SchemaAST"
 
 /** @experimental Finite resource limits for one run or child grant. */
-const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+const Count = Schema.Finite.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+)
 
 export const BudgetLimits = Schema.Struct({
   modelCalls: Schema.optionalKey(Count),
@@ -85,23 +89,42 @@ const limitDimensions: ReadonlyArray<LimitDimension> = [
   "depth",
 ]
 
+const withLimit = (limits: BudgetLimits, dimension: LimitDimension, value: number): BudgetLimits => {
+  switch (dimension) {
+    case "modelCalls":
+      return { ...limits, modelCalls: value }
+    case "toolCalls":
+      return { ...limits, toolCalls: value }
+    case "totalTokens":
+      return { ...limits, totalTokens: value }
+    case "childRuns":
+      return { ...limits, childRuns: value }
+    case "handoffs":
+      return { ...limits, handoffs: value }
+    case "depth":
+      return { ...limits, depth: value }
+  }
+}
+
+const withDeadline = (limits: BudgetLimits, deadline: string): BudgetLimits => ({ ...limits, deadline })
+
 const mergeRemaining = (left: BudgetLimits, right: BudgetLimits): BudgetLimits => {
-  const next: Record<string, number | string | undefined> = { ...left }
+  let next = left
   for (const dimension of chargeDimensions) {
     const addition = right[dimension]
     if (addition === undefined) continue
-    const current = next[dimension] as number | undefined
-    next[dimension] = current === undefined ? addition : current + addition
+    const current = next[dimension]
+    next = withLimit(next, dimension, current === undefined ? addition : current + addition)
   }
   if (right.childRuns !== undefined) {
-    const current = next.childRuns as number | undefined
-    next.childRuns = current === undefined ? right.childRuns : current + right.childRuns
+    const current = next.childRuns
+    next = withLimit(next, "childRuns", current === undefined ? right.childRuns : current + right.childRuns)
   }
   if (right.handoffs !== undefined) {
-    const current = next.handoffs as number | undefined
-    next.handoffs = current === undefined ? right.handoffs : current + right.handoffs
+    const current = next.handoffs
+    next = withLimit(next, "handoffs", current === undefined ? right.handoffs : current + right.handoffs)
   }
-  return next as BudgetLimits
+  return next
 }
 
 const subtractLimits = (
@@ -109,7 +132,7 @@ const subtractLimits = (
   grant: BudgetLimits,
 ): Effect.Effect<BudgetLimits, RunBudgetExhausted | RunBudgetGrantWidened> =>
   Effect.gen(function* () {
-    const next: Record<string, number | string | undefined> = { ...remaining }
+    let next = remaining
     for (const dimension of chargeDimensions) {
       const grantValue = grant[dimension]
       if (grantValue === undefined) continue
@@ -121,7 +144,8 @@ const subtractLimits = (
           remaining: parentValue,
         })
       }
-      next[dimension] = yield* subtractFinite(parentValue, grantValue, dimension)
+      const value = yield* subtractFinite(parentValue, grantValue, dimension)
+      if (value !== undefined) next = withLimit(next, dimension, value)
     }
     if (grant.depth !== undefined) {
       const parentDepth = remaining.depth
@@ -132,7 +156,7 @@ const subtractLimits = (
           remaining: parentDepth,
         })
       }
-      next.depth = grant.depth
+      next = withLimit(next, "depth", grant.depth)
     }
     if (grant.childRuns !== undefined) {
       const parentChildRuns = remaining.childRuns
@@ -144,10 +168,10 @@ const subtractLimits = (
         })
       }
       const childRunsNext = yield* subtractFinite(parentChildRuns, grant.childRuns, "childRuns")
-      if (childRunsNext !== undefined) next.childRuns = childRunsNext
+      if (childRunsNext !== undefined) next = withLimit(next, "childRuns", childRunsNext)
     }
-    if (grant.deadline !== undefined) next.deadline = grant.deadline
-    return next as BudgetLimits
+    if (grant.deadline !== undefined) next = withDeadline(next, grant.deadline)
+    return next
   })
 
 /** @experimental */
@@ -155,9 +179,9 @@ export const make: {
   (depth?: number): (allocation: BudgetLimits) => RunBudget
   (allocation: BudgetLimits, depth?: number): RunBudget
 } = Function.dual(
-  (args) => args.length > 1 || typeof args[0] === "object",
+  (args) => args.length > 1 || !Schema.is(Schema.Finite)(args[0]),
   (allocation: BudgetLimits, depth = 0): RunBudget => {
-    const validAllocation = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(allocation)
+    const validAllocation = Schema.decodeSync(BudgetLimits, { onExcessProperty: "error" })(allocation)
     const validDepth = Schema.decodeUnknownSync(Count)(depth)
     return { allocation: validAllocation, remaining: { ...validAllocation }, depth: validDepth }
   },
@@ -181,12 +205,12 @@ export const charge: {
   2,
   (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, RunBudgetExhausted> =>
     Effect.gen(function* () {
-      const validUsage = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(usage).pipe(
+      const validUsage = yield* Schema.decodeEffect(BudgetLimits, { onExcessProperty: "error" })(usage).pipe(
         Effect.mapError((error) =>
           RunBudgetExhausted.make({ dimension: "modelCalls", requested: 0, message: error.message }),
         ),
       )
-      const remaining: Record<string, number | string | undefined> = { ...budget.remaining }
+      let remaining = budget.remaining
       /**
        * An unbounded dimension has no key at all. `subtractFinite` returns undefined for it, and
        * assigning that back would create a key present with an undefined value — which
@@ -195,9 +219,9 @@ export const charge: {
        */
       const chargeDimension = function* (dimension: ChargeDimension | "handoffs", amount: number) {
         if (amount === 0) return
-        const next = yield* subtractFinite(limitValue(remaining as BudgetLimits, dimension), amount, dimension)
+        const next = yield* subtractFinite(limitValue(remaining, dimension), amount, dimension)
         if (next === undefined) return
-        remaining[dimension] = next
+        remaining = withLimit(remaining, dimension, next)
       }
       for (const dimension of chargeDimensions) {
         const amount = validUsage[dimension]
@@ -205,7 +229,7 @@ export const charge: {
         yield* chargeDimension(dimension, amount)
       }
       if (validUsage.handoffs !== undefined) yield* chargeDimension("handoffs", validUsage.handoffs)
-      return { ...budget, remaining: remaining as BudgetLimits }
+      return { ...budget, remaining }
     }),
 )
 
@@ -236,7 +260,7 @@ export const reserveChild: {
     RunBudgetExhausted | RunBudgetGrantWidened
   > =>
     Effect.gen(function* () {
-      const validatedGrant = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(grant).pipe(
+      const validatedGrant = yield* Schema.decodeEffect(BudgetLimits, { onExcessProperty: "error" })(grant).pipe(
         Effect.mapError((error) =>
           RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message }),
         ),
@@ -262,13 +286,13 @@ export const reserveChild: {
         parent.remaining.childRuns === undefined
           ? undefined
           : yield* subtractFinite(parent.remaining.childRuns, 1, "childRuns")
+      let parentRemaining = reserved
+      if (childRunsRemaining !== undefined)
+        parentRemaining = withLimit(parentRemaining, "childRuns", childRunsRemaining)
       return {
         parent: {
           ...parent,
-          remaining: {
-            ...reserved,
-            ...(childRunsRemaining === undefined ? {} : { childRuns: childRunsRemaining }),
-          },
+          remaining: parentRemaining,
         },
         child: {
           allocation: validatedGrant,
@@ -287,19 +311,19 @@ const allocationRefund = (allocation: BudgetLimits, narrower: BudgetLimits): Bud
     if (current === undefined || next === undefined) continue
     if (current > next) refunded[dimension] = current - next
   }
-  return refunded as BudgetLimits
+  return refunded
 }
 
 const intersectLimits = (current: BudgetLimits, cap: BudgetLimits): BudgetLimits => {
-  const next: Record<string, number | string | undefined> = { ...current }
+  let next = current
   for (const dimension of limitDimensions) {
     const capValue = cap[dimension]
     if (capValue === undefined) continue
     const currentValue = current[dimension]
-    next[dimension] = currentValue === undefined ? capValue : Math.min(currentValue, capValue)
+    next = withLimit(next, dimension, currentValue === undefined ? capValue : Math.min(currentValue, capValue))
   }
-  if (cap.deadline !== undefined) next.deadline = cap.deadline
-  return next as BudgetLimits
+  if (cap.deadline !== undefined) next = withDeadline(next, cap.deadline)
+  return next
 }
 
 /** @experimental */
@@ -323,9 +347,7 @@ export const narrowChild: {
     narrower: BudgetLimits,
   ): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened> =>
     Effect.gen(function* () {
-      const validatedNarrower = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(
-        narrower,
-      ).pipe(
+      const validatedNarrower = yield* Schema.decodeEffect(BudgetLimits, { onExcessProperty: "error" })(narrower).pipe(
         Effect.mapError((error) =>
           RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message }),
         ),
@@ -407,21 +429,12 @@ export const narrowLimits: {
     override === undefined ? (base ?? {}) : intersectLimits(base ?? {}, override),
 )
 
-const isParseOptions = (value: unknown): value is ParseOptions =>
-  typeof value === "object" &&
-  value !== null &&
-  ("errors" in value ||
-    "onExcessProperty" in value ||
-    "propertyOrder" in value ||
-    "disableChecks" in value ||
-    "concurrency" in value)
-
 /** @experimental */
 export const encode: {
   (input: RunBudget, options?: ParseOptions): Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never>
   (options?: ParseOptions): (input: RunBudget) => Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never>
 } = Function.dual(
-  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (args) => args.length > 1 || (args.length === 1 && Schema.is(RunBudget)(args[0])),
   (input: RunBudget, options?: ParseOptions): Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never> =>
     Schema.encodeEffect(RunBudget)(input, options),
 )
@@ -431,7 +444,7 @@ export const decode: {
   (input: typeof RunBudget.Encoded, options?: ParseOptions): Effect.Effect<RunBudget, Schema.SchemaError, never>
   (options?: ParseOptions): (input: typeof RunBudget.Encoded) => Effect.Effect<RunBudget, Schema.SchemaError, never>
 } = Function.dual(
-  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (args) => args.length > 1 || (args.length === 1 && Schema.is(RunBudget)(args[0])),
   (input: typeof RunBudget.Encoded, options?: ParseOptions): Effect.Effect<RunBudget, Schema.SchemaError, never> =>
     Schema.decodeEffect(RunBudget)(input, options),
 )

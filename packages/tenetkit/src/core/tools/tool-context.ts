@@ -1,10 +1,10 @@
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 
 /** @experimental A progress update emitted by a running tool. */
 export interface Progress {
   readonly toolCallId: string
   readonly message?: string
-  readonly data?: Record<string, unknown>
+  readonly data?: Schema.JsonObject
 }
 
 /** @experimental Ambient context available to a tool handler for the current call. */

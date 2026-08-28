@@ -1,8 +1,8 @@
 import { describe, expect, layer as layerHost } from "@effect/vitest"
 import { ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
-import { HttpClient, HttpClientResponse } from "effect/unstable/http"
+import { HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Service, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/search-provider"
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
+const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
@@ -10,9 +10,9 @@ const httpClientLayer = (
   handler: Parameters<typeof HttpClient.make>[0],
 ): Layer.Layer<HttpClient.HttpClient, never, never> => Layer.succeed(HttpClient.HttpClient, HttpClient.make(handler))
 
-const bodyJson = (body: { readonly toJSON: () => unknown }) => {
-  const value = body.toJSON() as { readonly body?: string }
-  return Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(value.body ?? "{}")
+const bodyJson = (body: HttpBody.HttpBody): Schema.Json => {
+  if (body._tag !== "Uint8Array") return null
+  return Schema.decodeSync(Schema.fromJsonString(Schema.Json))(new TextDecoder().decode(body.body))
 }
 
 describe("SearchProvider", () => {

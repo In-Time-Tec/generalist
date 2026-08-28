@@ -1,8 +1,8 @@
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
-import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
-import { Deferred, type Duration, Effect, type Scope, Schema } from "effect"
+import { Deferred, type Duration, Effect, Option, type Scope, Schema } from "effect"
 import { McpToolSource, OAuth } from "../../src/mcp/index"
 
 export const addInputSchema = {
@@ -19,7 +19,7 @@ export const statsOutputSchema = {
   required: ["sum"],
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
+const AddArguments = Schema.Struct({ a: Schema.Finite, b: Schema.Finite })
 
 export interface Fixture {
   readonly source: McpToolSource.Interface
@@ -60,8 +60,8 @@ export const makeTransportFixture = (options?: {
     const concurrent = { active: 0, max: 0 }
     const runtime = yield* Effect.context<never>()
 
-    const server = new Server({ name: "calc", version: "1.0.0" }, { capabilities: { tools: {} } })
-    server.setRequestHandler(ListToolsRequestSchema, () => ({
+    const server = new McpServer({ name: "calc", version: "1.0.0" }, { capabilities: { tools: {} } })
+    server.server.setRequestHandler(ListToolsRequestSchema, () => ({
       tools: [
         { name: "add", description: "Add two numbers", inputSchema: addInputSchema },
         { name: "barrier_add", description: "Add concurrently", inputSchema: addInputSchema },
@@ -81,12 +81,13 @@ export const makeTransportFixture = (options?: {
         { name: "hang", description: "Never responds", inputSchema: { type: "object" as const, properties: {} } },
       ],
     }))
-    server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
+    server.server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
       if (request.params.name === "add" || request.params.name === "barrier_add") {
-        const args = request.params.arguments
-        if (!isRecord(args) || typeof args.a !== "number" || typeof args.b !== "number") {
+        const decoded = Schema.decodeUnknownOption(AddArguments)(request.params.arguments)
+        if (Option.isNone(decoded)) {
           return { content: [{ type: "text" as const, text: "invalid arguments" }], isError: true }
         }
+        const args = decoded.value
         if (request.params.name === "barrier_add") {
           concurrent.active += 1
           concurrent.max = Math.max(concurrent.max, concurrent.active)

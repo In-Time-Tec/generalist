@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { AgentError } from "../agent/agent-event.js"
-import { FrameworkFailure, RemoteRetryMisconfigured, type ReplayPolicy } from "./tool-executor.js"
+import { AgentError } from "../agent/event.js"
+import { FrameworkFailure, RemoteRetryMisconfigured, type ReplayPolicy } from "./tool-result-codec.js"
 import {
   type Placement,
   type PlacementRequest,
@@ -23,13 +23,13 @@ export function route(options: RouteOptions<ToolContext>): Route<ToolContext>
 export function route<R>(options: RouteOptions<R>): Route<R>
 export function route<R>(options: RouteOptions<R>): Route<R> {
   const routedTools = options.tools ?? []
-  return {
+  const base: Route<R> = {
     tools: routedTools,
     matches: (request) => routedTools.includes(request.call.name) || options.matches?.(request) === true,
-    ...(options.replayPolicy === undefined ? {} : { replayPolicy: options.replayPolicy }),
     execute: options.execute,
-    ...(options.cancel === undefined ? {} : { cancel: options.cancel }),
   }
+  const withReplay = options.replayPolicy === undefined ? base : { ...base, replayPolicy: options.replayPolicy }
+  return options.cancel === undefined ? withReplay : { ...withReplay, cancel: options.cancel }
 }
 
 const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
@@ -68,8 +68,8 @@ const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
 const remoteRetryError = (reason: RemoteRetryMisconfigured["reason"], message: string): RemoteRetryMisconfigured =>
   RemoteRetryMisconfigured.make({ reason, message })
 
-const validateOperationKey = (operationKey: unknown): Effect.Effect<string, RemoteRetryMisconfigured> =>
-  typeof operationKey !== "string" || operationKey.trim().length === 0
+const validateOperationKey = (operationKey: string): Effect.Effect<string, RemoteRetryMisconfigured> =>
+  operationKey.trim().length === 0
     ? Effect.fail(remoteRetryError("missing-operation-key", "Remote retry operation key must be non-empty"))
     : Effect.succeed(operationKey)
 
@@ -83,7 +83,7 @@ const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
         remoteRetryError("invalid-max-retries", "Remote retry maxRetries must be a non-negative finite integer"),
       )
     }
-    const operationKey = typeof options.operationKey === "function" ? options.operationKey(request) : undefined
+    const operationKey = options.operationKey(request)
     return validateOperationKey(operationKey).pipe(
       Effect.flatMap((stableKey) => {
         let attempt = 0
@@ -106,17 +106,13 @@ const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
                 PlacementResponse | RemoteRetryMisconfigured,
                 E,
                 ToolContext | PlacementSchemaServices<Tools>
-              > =>
-                typeof validatedKey !== "string"
-                  ? Effect.succeed(validatedKey)
-                  : validatedKey === stableKey
-                    ? options.execute({ ...request, operationKey: stableKey })
-                    : Effect.succeed(
-                        remoteRetryError(
-                          "changed-operation-key",
-                          "Remote retry operation key changed between attempts",
-                        ),
-                      ),
+              > => {
+                if (Schema.is(RemoteRetryMisconfigured)(validatedKey)) return Effect.succeed(validatedKey)
+                if (validatedKey === stableKey) return options.execute({ ...request, operationKey: stableKey })
+                return Effect.succeed(
+                  remoteRetryError("changed-operation-key", "Remote retry operation key changed between attempts"),
+                )
+              },
             ),
           )
         })
@@ -148,11 +144,9 @@ export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFail
   options.idempotent === true
     ? placementRoute(
         "remote",
-        {
-          toolkit: options.toolkit,
-          ...(options.tools === undefined ? {} : { tools: options.tools }),
-          execute: (request) => retryRemote(options, request),
-        },
+        options.tools === undefined
+          ? { toolkit: options.toolkit, execute: (request) => retryRemote(options, request) }
+          : { toolkit: options.toolkit, tools: options.tools, execute: (request) => retryRemote(options, request) },
         "provider-idempotent",
       )
     : placementRoute("remote", options)

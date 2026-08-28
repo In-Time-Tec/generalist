@@ -1,7 +1,7 @@
-import { Array, Effect, HashMap, Option } from "effect"
+import { Array, Effect, HashMap, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import { ToolNameCollision, type ToolOrigin } from "../agent/agent-event.js"
+import { ToolNameCollision, type ToolOrigin } from "../agent/event.js"
 
 /** @experimental */
 export type Dispatch = "Static" | "Builtin" | "Skill" | "Handoff"
@@ -23,8 +23,9 @@ export interface Registry {
 const makeToolkit = (entries: ReadonlyArray<Candidate>): Toolkit.Toolkit<Record<string, Tool.Any>> => {
   const toolkit = Toolkit.make(...entries.map((candidate) => candidate.tool))
   for (const entry of entries) {
-    if (!Object.hasOwn(toolkit.tools, entry.tool.name)) {
-      Object.defineProperty(toolkit.tools, entry.tool.name, {
+    const name = Schema.decodeUnknownSync(Schema.String)(entry.tool.name)
+    if (!Object.hasOwn(toolkit.tools, name)) {
+      Object.defineProperty(toolkit.tools, name, {
         configurable: true,
         enumerable: true,
         value: entry.tool,
@@ -37,14 +38,18 @@ const makeToolkit = (entries: ReadonlyArray<Candidate>): Toolkit.Toolkit<Record<
 
 /** @experimental */
 export const assemble = (candidates: ReadonlyArray<Candidate>): Effect.Effect<Registry, ToolNameCollision> => {
-  const grouped = Array.groupBy(candidates, (candidate) => `tool:${candidate.tool.name}`)
-  for (const candidate of candidates) {
-    const conflicts = grouped[`tool:${candidate.tool.name}`]
+  const named = candidates.map((candidate) => ({
+    candidate,
+    name: Schema.decodeUnknownSync(Schema.String)(candidate.tool.name),
+  }))
+  const grouped = Array.groupBy(named, ({ name }) => `tool:${name}`)
+  for (const { name } of named) {
+    const conflicts = grouped[`tool:${name}`]
     if (conflicts !== undefined && conflicts.length > 1) {
       return Effect.fail(
         ToolNameCollision.make({
-          name: candidate.tool.name,
-          origins: Array.map(conflicts, (conflict) => conflict.origin),
+          name,
+          origins: Array.map(conflicts, ({ candidate: conflict }) => conflict.origin),
         }),
       )
     }
@@ -52,7 +57,9 @@ export const assemble = (candidates: ReadonlyArray<Candidate>): Effect.Effect<Re
   const entries = [...candidates]
   return Effect.succeed({
     entries,
-    byName: HashMap.fromIterable(entries.map((candidate) => [candidate.tool.name, candidate] as const)),
+    byName: HashMap.fromIterable(
+      entries.map((candidate) => [Schema.decodeUnknownSync(Schema.String)(candidate.tool.name), candidate] as const),
+    ),
     toolkit: makeToolkit(entries),
   })
 }
@@ -70,10 +77,14 @@ export const select: {
   (names: ReadonlyArray<string>): (registry: Registry) => Registry
   (registry: Registry, names: ReadonlyArray<string>): Registry
 } = dual(2, (registry: Registry, names: ReadonlyArray<string>): Registry => {
-  const entries = registry.entries.filter((entry) => names.includes(entry.tool.name))
+  const entries = registry.entries.filter((entry) =>
+    names.includes(Schema.decodeUnknownSync(Schema.String)(entry.tool.name)),
+  )
   return {
     entries,
-    byName: HashMap.fromIterable(entries.map((candidate) => [candidate.tool.name, candidate] as const)),
+    byName: HashMap.fromIterable(
+      entries.map((candidate) => [Schema.decodeUnknownSync(Schema.String)(candidate.tool.name), candidate] as const),
+    ),
     toolkit: makeToolkit(entries),
   }
 })

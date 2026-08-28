@@ -1,9 +1,9 @@
 import { Clock, Effect } from "effect"
 import { SqlClient, SqlError } from "effect/unstable/sql"
-import { ExecutionHost } from "tenetkit/runtime/driver/execution-host"
+import { ExecutionHost } from "tenetkit/runtime/driver/execution/host"
 import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import { LocalScheduler } from "tenetkit/runtime/driver/local-scheduler"
-import { RunStore } from "tenetkit/runtime/driver/run-store"
+import { LocalScheduler } from "tenetkit/runtime/driver/execution/local-scheduler"
+import { RunStore } from "tenetkit/runtime/driver/run/store"
 import type { Rearm } from "./activations.js"
 
 export interface DrainOptions {
@@ -86,10 +86,11 @@ export const drain = (
     const due = yield* sql<{
       due_at_millis: number | null
     }>`SELECT MIN(due_at_millis) AS due_at_millis FROM tenetkit_activations`
-    return {
+    const result: DrainResult = {
       processed: selected.length,
       hasMore: candidates.length > fuel,
       outcomes,
-      ...(due[0]?.due_at_millis == null ? {} : { nextDueAt: Number(due[0].due_at_millis) }),
     }
+    if (due[0]?.due_at_millis != null) return { ...result, nextDueAt: due[0].due_at_millis }
+    return result
   })

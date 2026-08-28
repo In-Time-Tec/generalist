@@ -1,16 +1,16 @@
-import { Effect, Exit, Layer, Schema } from "effect"
+import { Effect, Exit, Layer, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions, Tool, Toolkit } from "tenetkit"
 import { decodeConfig as decodeOpenRouterConfig } from "tenetkit/ai/openrouter"
 import { TestModel } from "tenetkit/test"
 import { SqlClient } from "effect/unstable/sql"
-import { makeTest } from "tenetkit/runtime/driver/executable-manifest"
-import { make as makeMessage } from "tenetkit/runtime/driver/message"
+import { test } from "tenetkit/runtime/driver/executable/manifest"
+import { make as makeMessage } from "tenetkit/runtime/driver/messaging/message"
 import { Address } from "tenetkit/runtime/driver/address"
-import type { Interface as RuntimeInterface } from "tenetkit/runtime/driver/runtime"
-import type { RunEvent } from "tenetkit/runtime/driver/run-event"
+import type { Interface as RuntimeInterface } from "tenetkit/runtime/driver/service"
 import { AgentExecutionFailure, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import { RunStore } from "tenetkit/runtime/driver/run-store"
+import type { RunEvent } from "tenetkit/runtime/driver/run/event"
+import { RunStore } from "tenetkit/runtime/driver/run/store"
 import {
   layerRunStore,
   layerSqlClient,
@@ -19,14 +19,24 @@ import {
   schema as activationSchema,
   type DurableObjectStorage,
 } from "@tenetkit/cloudflare/durable-objects"
-import { WorkerContext, make } from "@tenetkit/cloudflare/workers"
 
-interface ObjectNamespace {
-  readonly idFromName: (name: string) => unknown
-  readonly get: (id: unknown) => { readonly fetch: (request: Request) => Promise<Response> }
+declare global {
+  var WebSocketPair: new () => SocketPair
+  interface ResponseInit {
+    webSocket?: WebSocket
+  }
 }
 
-interface Env extends Readonly<Record<string, unknown>> {
+interface ObjectId {
+  readonly name: string
+}
+
+interface ObjectNamespace {
+  readonly idFromName: (name: string) => ObjectId
+  readonly get: (id: ObjectId) => { readonly fetch: (request: Request) => Promise<Response> }
+}
+
+interface Env {
   readonly SQL_OBJECTS: ObjectNamespace
   readonly REPLAY_OBJECTS: ObjectNamespace
 }
@@ -74,6 +84,14 @@ const failClosed = Permissions.layerRuleset({
   rules: [{ pattern: "lookup", level: "allow" }],
   fallback: "deny",
 })
+
+const decodeProbeRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ requests: Schema.Finite })]))
+const decodeCountRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ count: Schema.Finite })]))
+const decodeRequestedRow = Schema.decodeUnknownSync(
+  Schema.Tuple([Schema.Struct({ cancellation_requested: Schema.Unknown, storage_type: Schema.String })]),
+)
+const decodeTerminalRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ status: Schema.String })]))
+const decodeSchemaRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ version: Schema.Finite })]))
 
 const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(function* () {
   let lookupExecutions = 0
@@ -148,28 +166,59 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
   })
 })
 
-const replayExecutable = makeTest("workerd-replay", "1")
-const replayEvents = [0, 1].map(
-  (sequence) =>
-    ({
-      _tag: "RunAttemptStarted",
-      specVersion: "1",
-      eventId: `replay-run:${sequence}`,
-      runId: "replay-run",
-      sequence,
-      executableRef: replayExecutable.ref,
-      rootRunId: "replay-run",
-      depth: 0,
-      occurredAt: "2026-08-19T00:00:00.000Z",
-      attempt: 1,
-    }) as RunEvent,
+const replayExecutable = test("workerd-replay", "1")
+const replayEvents: ReadonlyArray<RunEvent> = [0, 1].map(
+  (sequence): RunEvent => ({
+    _tag: "RunAttemptStarted",
+    specVersion: "1",
+    eventId: `replay-run:${sequence}`,
+    runId: "replay-run",
+    sequence,
+    executableRef: replayExecutable.ref,
+    rootRunId: "replay-run",
+    depth: 0,
+    occurredAt: "2026-08-19T00:00:00.000Z",
+    attempt: 1,
+  }),
 )
-const replayRuntime = {
-  history: ({ cursor }: { readonly cursor?: number }) =>
-    Effect.succeed(replayEvents.filter((event) => event.sequence > (cursor ?? -1))),
-  resolveModelResponse: () => Effect.die("model response not used"),
+const unusedEffect = () => Effect.die("unused Runtime operation")
+const unusedStream = () => Stream.die("unused Runtime operation")
+const replayRuntime: RuntimeInterface = {
+  start: unusedEffect,
+  admit: unusedEffect,
+  activate: unusedEffect,
+  send: unusedEffect,
+  spawn: unusedEffect,
+  events: unusedStream,
+  previews: unusedStream,
+  snapshot: unusedEffect,
+  history: ({ cursor }) => Effect.succeed(replayEvents.filter((event) => event.sequence > (cursor ?? -1))),
+  sessionEntry: unusedEffect,
+  resolveModelResponse: unusedEffect,
+  treeHistory: unusedEffect,
+  treeChanges: unusedStream,
+  inspectTree: unusedEffect,
+  list: unusedEffect,
+  respond: unusedEffect,
+  respondApproval: unusedEffect,
+  signal: unusedEffect,
   cancel: () => Effect.void,
-} as unknown as RuntimeInterface
+  cancelSession: unusedEffect,
+  awaitSessionTerminal: unusedEffect,
+  steer: unusedEffect,
+  sendMessage: unusedEffect,
+  messages: unusedEffect,
+  childSettlements: unusedEffect,
+  childSettlementChanges: unusedStream,
+  awaitChildSettlement: unusedEffect,
+  directory: unusedEffect,
+  registerAgentName: unusedEffect,
+  resolveOperation: unusedEffect,
+  inspect: unusedEffect,
+  fanOut: unusedEffect,
+  inspectFanOut: unusedEffect,
+  awaitFanOut: unusedEffect,
+}
 
 interface SocketPair {
   readonly 0: WebSocket
@@ -187,10 +236,9 @@ export class ReplayObject {
     if (new URL(request.url).pathname.endsWith("/flush")) {
       return this.replay.flush("replay-run").then((result) => Response.json(result))
     }
-    const Pair = (globalThis as unknown as { readonly WebSocketPair: new () => SocketPair }).WebSocketPair
-    const pair = new Pair()
+    const pair = new WebSocketPair()
     this.replay.accept(pair[1])
-    return Promise.resolve(new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit))
+    return Promise.resolve(new Response(null, { status: 101, webSocket: pair[0] }))
   }
 
   webSocketMessage(
@@ -235,8 +283,8 @@ export class SqlObject {
           yield* sql.unsafe("INSERT OR IGNORE INTO workerd_probe (id, requests) VALUES (1, 0)")
           yield* sql.unsafe("UPDATE workerd_probe SET requests = requests + 1 WHERE id = 1")
           const probeCount = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
-          const cancellationRunId = `workerd-cancellation-${Number(probeCount[0]?.requests ?? 0)}`
-          const cancellationExecutable = makeTest("workerd-cancellation", "1")
+          const cancellationRunId = `workerd-cancellation-${probeCount[0]?.requests ?? 0}`
+          const cancellationExecutable = test("workerd-cancellation", "1")
           const cancellationMessage = makeMessage({
             id: cancellationRunId,
             to: Address.make("agent:test"),
@@ -333,18 +381,24 @@ export class SqlObject {
           const migrations = yield* sql<{ readonly id: number; readonly name: string }>`
             SELECT migration_id AS id, name FROM tenetkit_sql_migrations ORDER BY migration_id
           `
+          const [probeRow] = decodeProbeRow(probe)
+          const [committedRow] = decodeCountRow(committed)
+          const [rolledBackRow] = decodeCountRow(rolledBack)
+          const [requestedRow] = decodeRequestedRow(requested)
+          const [terminalRow] = decodeTerminalRow(cancellationTerminal)
+          const [schemaRow] = decodeSchemaRow(schemaMeta)
           const info = yield* store.info
           return Response.json({
             backend: info.backend,
-            probe: Number(probe[0]?.requests ?? 0),
+            probe: probeRow.requests,
             tables: tables.map((row) => row.name),
-            committed: Number(committed[0]?.count ?? 0),
-            rolledBack: Number(rolledBack[0]?.count ?? 0),
-            cancellationStoredType: requested[0]?.storage_type ?? "missing",
-            cancellationStoredValue: Number(requested[0]?.cancellation_requested ?? Number.NaN),
-            cancellationTerminalStatus: cancellationTerminal[0]?.status ?? "missing",
+            committed: committedRow.count,
+            rolledBack: rolledBackRow.count,
+            cancellationStoredType: requestedRow.storage_type,
+            cancellationStoredValue: Number(requestedRow.cancellation_requested),
+            cancellationTerminalStatus: terminalRow.status,
             alarm: yield* Effect.promise(() => storage.getAlarm()),
-            schemaVersion: Number(schemaMeta[0]?.version ?? 0),
+            schemaVersion: schemaRow.version,
             migrations,
           })
         }).pipe(Effect.provideContext(context)),
@@ -354,15 +408,13 @@ export class SqlObject {
   }
 }
 
-export default make<Env, never>((request) =>
-  new URL(request.url).pathname === "/agent"
-    ? agentConformance().pipe(Effect.orDie)
-    : Effect.gen(function* () {
-        const context = yield* WorkerContext
-        const bindings = context.bindings as Env
-        const replay = new URL(request.url).pathname.startsWith("/replay")
-        const namespace = replay ? bindings.REPLAY_OBJECTS : bindings.SQL_OBJECTS
-        const id = namespace.idFromName("default")
-        return yield* Effect.promise(() => namespace.get(id).fetch(request))
-      }),
-)
+export default {
+  fetch(request: Request, bindings: Env): Promise<Response> {
+    if (new URL(request.url).pathname === "/agent") {
+      return Effect.runPromise(Effect.scoped(agentConformance().pipe(Effect.orDie)))
+    }
+    const replay = new URL(request.url).pathname.startsWith("/replay")
+    const namespace = replay ? bindings.REPLAY_OBJECTS : bindings.SQL_OBJECTS
+    return namespace.get(namespace.idFromName("default")).fetch(request)
+  },
+}

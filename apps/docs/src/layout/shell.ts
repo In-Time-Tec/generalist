@@ -15,12 +15,12 @@ import {
   type Message,
 } from "../app/message"
 import type { Model } from "../app/model"
-import { SearchCommand, searchResultsFor } from "../app/searchPalette"
+import { SearchCommand, searchResultsFor } from "../app/search-palette"
 import { navGroups, type SearchResult } from "../content/registry"
-import { toPath } from "../route/route"
+import { toPath } from "../route/match"
 import { brandLockup, betaBadge, mark } from "./brand"
 import { close, github, menu, search } from "./icon"
-import { themeSelector } from "./themeSelector"
+import { themeSelector } from "./theme-selector"
 
 const h = html<Message>()
 
@@ -68,7 +68,7 @@ const searchPalette = (model: Model): Html => {
   return h.submodel({
     slotId: "search-dialog",
     model: model.searchDialog,
-    view: view,
+    view,
     viewInputs: dialogContent(commandDialog({ showCloseButton: false, class: "gap-0" }), () => [
       title({ model: model.searchDialog, class: "sr-only" }, ["Search"]),
       description({ model: model.searchDialog, class: "sr-only" }, ["Search the documentation."]),

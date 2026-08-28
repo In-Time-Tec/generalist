@@ -1,16 +1,43 @@
 {
   "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "plugins": ["effecttsgo"],
+  "jsPlugins": [
+    {
+      "name": "anti-slop",
+      "specifier": "./tools/oxlint/anti-slop/index.ts"
+    },
+    {
+      "name": "anti-slop-effect",
+      "specifier": "./tools/oxlint/anti-slop/effect/index.ts"
+    }
+  ],
   "options": {
     "typeAware": true
   },
-  "plugins": ["effecttsgo"],
   "categories": {
     "correctness": "error",
     "perf": "error",
     "suspicious": "error"
   },
-  "ignorePatterns": ["dist", "node_modules", ".turbo"],
   "rules": {
+    "no-nested-ternary": "error",
+    "no-underscore-dangle": "off",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": "error",
+    "anti-slop/no-shape-in-symbol-names": "error",
+    "anti-slop/no-unknown-parameters": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/no-unknown-type-aliases": "error",
+    "anti-slop/no-unsafe-dictionary-type": "error",
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "error",
+    "anti-slop-effect/no-service-constructor-imports": "error",
     "effecttsgo/abort-controller-in-effect": "error",
     "effecttsgo/any-unknown-in-error-context": "error",
     "effecttsgo/async-function": "error",
@@ -76,6 +103,7 @@
     "effecttsgo/overridden-schema-constructor": "error",
     "effecttsgo/prefer-schema-over-json": "error",
     "effecttsgo/prefer-schema-type-property": "error",
+    "effecttsgo/prefer-typed-schema-decoder": "error",
     "effecttsgo/prefer-unsafe-constructor": "error",
     "effecttsgo/process-env": "error",
     "effecttsgo/process-env-in-effect": "error",
@@ -104,27 +132,9 @@
     "effecttsgo/unnecessary-pipe": "error",
     "effecttsgo/unnecessary-pipe-chain": "error",
     "effecttsgo/unnecessary-typeof-type": "error",
-    "effecttsgo/unsafe-effect-type-assertion": "error",
-    "no-var": "error",
-    "no-param-reassign": "error",
-    "eslint/no-underscore-dangle": [
-      "error",
-      {
-        "allow": ["_tag", "_response"]
-      }
-    ]
+    "effecttsgo/unsafe-effect-type-assertion": "error"
   },
   "overrides": [
-    {
-      "files": ["packages/tenetkit/src/repl/repl/bun-worker.ts", "packages/tenetkit/src/repl/repl/bun-session.ts"],
-      "rules": {
-        "effecttsgo/async-function": "off",
-        "effecttsgo/global-timers": "off",
-        "effecttsgo/global-timers-in-effect": "off",
-        "effecttsgo/new-promise": "off",
-        "effecttsgo/node-builtin-import": "off"
-      }
-    },
     {
       "files": ["packages/*/src/**/*.ts"],
       "rules": {
@@ -137,6 +147,13 @@
           }
         ]
       }
+    },
+    {
+      "files": ["**/test/**"],
+      "rules": {
+        "no-await-in-loop": "off"
+      }
     }
-  ]
+  ],
+  "ignorePatterns": ["dist", "node_modules", ".turbo", ".agents", "repos", "tools/oxlint/anti-slop"]
 }

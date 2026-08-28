@@ -1,8 +1,7 @@
 import { OpenAiClient } from "@effect/ai-openai"
-import { ModelRegistry } from "tenetkit"
+import { ModelRegistry } from "../../core/index.js"
 import { Config, Effect, Layer, Option, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { HttpClient } from "effect/unstable/http"
 import { registration as registerOpenAi, type LayerOptions, type RegistrationOptions } from "./openai.js"
 
 const deterministicUsage = Response.Usage.make({
@@ -38,16 +37,21 @@ export interface DeterministicInput extends RegistrationOptions {
   readonly model?: string
 }
 
-/** @experimental */
-export const registration = (input: DeterministicInput = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
-  ModelRegistry.registration({
+const deterministicRegistrationOptions = (input: DeterministicInput) => {
+  const required = {
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
     layer: deterministicModelLayer,
     isAvailabilityFailure: () => false,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
+  } as const
+  const registered =
+    input.registrationKey === undefined ? required : { ...required, registrationKey: input.registrationKey }
+  return input.metadata === undefined ? registered : { ...registered, metadata: input.metadata }
+}
+
+/** @experimental */
+export const registration = (input: DeterministicInput = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
+  ModelRegistry.registration(deterministicRegistrationOptions(input))
 
 /** @experimental */
 export const layer = (input: DeterministicInput = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
@@ -78,12 +82,7 @@ export const layerOpenAi = (options: OpenAiFallbackOptions) =>
             }),
           ).pipe(
             Effect.flatMap((context) =>
-              registerOpenAi({
-                model: options.model,
-                ...(options.config === undefined ? {} : { config: options.config }),
-                ...(options.registrationKey === undefined ? {} : { registrationKey: options.registrationKey }),
-                ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
-              }).pipe(Effect.provide(context)),
+              registerOpenAi(openAiRegistrationOptions(options)).pipe(Effect.provide(context)),
             ),
             Effect.asSome,
           ),
@@ -93,4 +92,12 @@ export const layerOpenAi = (options: OpenAiFallbackOptions) =>
         ...(Option.isSome(openAiRegistration) ? [Effect.succeed(openAiRegistration.value)] : []),
       ])
     }),
-  ) as Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient>
+  )
+
+const openAiRegistrationOptions = (options: OpenAiFallbackOptions) => {
+  const required = { model: options.model }
+  const configured = options.config === undefined ? required : { ...required, config: options.config }
+  const registered =
+    options.registrationKey === undefined ? configured : { ...configured, registrationKey: options.registrationKey }
+  return options.metadata === undefined ? registered : { ...registered, metadata: options.metadata }
+}

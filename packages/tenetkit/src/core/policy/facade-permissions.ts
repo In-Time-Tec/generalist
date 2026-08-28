@@ -25,7 +25,7 @@ export const Permissions = {
   layerRuleStoreMemory: Permissions_layerRuleStoreMemory,
   layerRuleStoreTest: Permissions_layerRuleStoreTest,
   layerTest: Permissions_layerTest,
-} as typeof import("./permissions.js")
+}
 export namespace Permissions {
   export type PermissionError = import("./permissions.js").PermissionError
   export type Permissions = import("./permissions.js").Permissions

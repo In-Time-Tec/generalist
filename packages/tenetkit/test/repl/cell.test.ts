@@ -1,3 +1,4 @@
+import "./suites/bun-cell-failure-suite.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { Cell } from "../../src/repl/index"
@@ -19,12 +20,12 @@ describe("Cell schemas", () => {
       truncation: [{ channel: "stdout", droppedBytes: 128, droppedEvents: 2 }],
     }
     const encoded = Schema.encodeSync(Cell.CellResult)(result)
-    expect(Schema.decodeUnknownSync(Cell.CellResult)(encoded)).toEqual(result)
+    expect(Schema.decodeSync(Cell.CellResult)(encoded)).toEqual(result)
   })
 
   it("rejects a negative sequence", () => {
     expect(() =>
-      Schema.decodeUnknownSync(Cell.CellResult)({
+      Schema.decodeSync(Cell.CellResult)({
         cellId,
         epoch: 0,
         sequence: -1,
@@ -39,7 +40,7 @@ describe("Cell schemas", () => {
 
   it("rejects a fractional epoch", () => {
     expect(() =>
-      Schema.decodeUnknownSync(Cell.CellResult)({
+      Schema.decodeSync(Cell.CellResult)({
         cellId,
         epoch: 1.5,
         sequence: 0,
@@ -53,7 +54,7 @@ describe("Cell schemas", () => {
   })
 
   it("rejects an empty cell identity", () => {
-    expect(() => Schema.decodeUnknownSync(Cell.CellId)("")).toThrow()
+    expect(() => Schema.decodeSync(Cell.CellId)("")).toThrow()
   })
 
   it("round-trips every cell event tag", () => {
@@ -71,7 +72,7 @@ describe("Cell schemas", () => {
     ]
     for (const event of events) {
       const encoded = Schema.encodeSync(Cell.CellEvent)(event)
-      expect(Schema.decodeUnknownSync(Cell.CellEvent)(encoded)).toEqual(event)
+      expect(Schema.decodeSync(Cell.CellEvent)(encoded)).toEqual(event)
     }
     expect(new Set(events.map((event) => event._tag))).toEqual(new Set(Cell.eventTags))
   })
@@ -81,7 +82,8 @@ describe("Cell schemas", () => {
   })
 
   it("rejects an unknown truncation channel", () => {
-    expect(() => Schema.decodeUnknownSync(Cell.Channel)("network")).toThrow()
+    const malformed = Schema.decodeSync(Schema.Unknown)("network")
+    expect(() => Schema.decodeUnknownSync(Cell.Channel)(malformed)).toThrow()
   })
 
   it("exposes the cell-local ordinal of every event", () => {
@@ -116,7 +118,7 @@ describe("Cell failure taxonomy", () => {
   it("round-trips every failure through the union codec", () => {
     for (const failure of failures) {
       const encoded = Schema.encodeUnknownSync(Cell.CellFailure)(failure)
-      const decoded = Schema.decodeUnknownSync(Cell.CellFailure)(encoded)
+      const decoded = Schema.decodeSync(Cell.CellFailure)(encoded)
       expect(decoded._tag).toBe(failure._tag)
       expect(Schema.encodeUnknownSync(Cell.CellFailure)(decoded)).toEqual(encoded)
     }
@@ -146,29 +148,29 @@ describe("Cell sequence monotonicity", () => {
   })
 
   it("accepts a run of strictly increasing sequences from zero", () => {
-    expect(Cell.validateSequence({ sessionId: sessionId, events: [stdout(0), stdout(1), stdout(2)] })).toBeUndefined()
+    expect(Cell.validateSequence({ sessionId, events: [stdout(0), stdout(1), stdout(2)] })).toBeUndefined()
   })
 
   it("accepts an empty event run", () => {
-    expect(Cell.validateSequence({ sessionId: sessionId, events: [] })).toBeUndefined()
+    expect(Cell.validateSequence({ sessionId, events: [] })).toBeUndefined()
   })
 
   it("rejects a run that does not start at zero", () => {
-    const violation = Cell.validateSequence({ sessionId: sessionId, events: [stdout(1)] })
+    const violation = Cell.validateSequence({ sessionId, events: [stdout(1)] })
     expect(violation?.message).toContain("expected sequence 0")
   })
 
   it("rejects a gap", () => {
-    const violation = Cell.validateSequence({ sessionId: sessionId, events: [stdout(0), stdout(2)] })
+    const violation = Cell.validateSequence({ sessionId, events: [stdout(0), stdout(2)] })
     expect(violation?.message).toContain("expected sequence 1")
   })
 
   it("rejects a repeated sequence", () => {
-    expect(Cell.validateSequence({ sessionId: sessionId, events: [stdout(0), stdout(0)] })).toBeDefined()
+    expect(Cell.validateSequence({ sessionId, events: [stdout(0), stdout(0)] })).toBeDefined()
   })
 
   it("rejects events from a second cell", () => {
-    const violation = Cell.validateSequence({ sessionId: sessionId, events: [stdout(0), stdout(1, "cell-b")] })
+    const violation = Cell.validateSequence({ sessionId, events: [stdout(0), stdout(1, "cell-b")] })
     expect(violation?.message).toContain("expected cell cell-a")
   })
 })

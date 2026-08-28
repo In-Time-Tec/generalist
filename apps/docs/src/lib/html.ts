@@ -1,17 +1,12 @@
+import { Schema } from "effect"
 import { inertHtml, type HtmlBuilder } from "foldkit/html"
 
-let current: HtmlBuilder<unknown> = inertHtml as unknown as HtmlBuilder<unknown>
+const HtmlBuilderSchema = <Message>() =>
+  Schema.declare((input): input is HtmlBuilder<Message> => Object.is(input, inertHtml))
 
-export const html = <Message>(): HtmlBuilder<Message> => current as unknown as HtmlBuilder<Message>
+export const html = <Message>(): HtmlBuilder<Message> =>
+  Schema.decodeUnknownSync(HtmlBuilderSchema<Message>())(inertHtml)
 
 export const htmlScope = {
-  with: <Message, A>(builder: HtmlBuilder<Message>, render: () => A): A => {
-    const previous = current
-    current = builder as unknown as HtmlBuilder<unknown>
-    try {
-      return render()
-    } finally {
-      current = previous
-    }
-  },
+  with: <Message, A>(_builder: HtmlBuilder<Message>, render: () => A): A => render(),
 } as const

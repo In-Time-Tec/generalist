@@ -11,8 +11,8 @@ const program = Effect.gen(function* () {
     plugin({
       name: "raw-imports",
       setup(build) {
-        build.onResolve({ filter: /\?raw$/ }, (args) => ({
-          path: `${path.resolve(path.dirname(args.importer), args.path.slice(0, -"?raw".length))}?raw-text`,
+        build.onResolve({ filter: /^virtual:source\// }, (args) => ({
+          path: `${path.resolve(import.meta.dir, "..", args.path.slice("virtual:source/".length))}?raw-text`,
         }))
         build.onLoad({ filter: /\?raw-text$/ }, (args) =>
           Effect.runPromiseWith(context)(

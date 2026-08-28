@@ -38,7 +38,7 @@ layer(poolLayer)("test KernelPool", (it) => {
       const execution = yield* execute("1 + 1", "cell-1")
       const events = yield* Stream.runCollect(execution.events)
       expect(events.map((event) => event.sequence)).toEqual([0, 1, 2])
-      expect(Cell.validateSequence({ sessionId: sessionId, events: events })).toBeUndefined()
+      expect(Cell.validateSequence({ sessionId, events })).toBeUndefined()
       expect(events.map((event) => event._tag)).toEqual(["KernelReady", "Stdout", "Result"])
     }),
   )
@@ -219,7 +219,7 @@ describe("snapshot manifest", () => {
   standalone("round-trips through its codec", () => {
     const manifest = snapshot(sessionId).manifest
     const encoded = Schema.encodeSync(KernelStateStore.Manifest)(manifest)
-    expect(Schema.decodeUnknownSync(KernelStateStore.Manifest)(encoded)).toEqual(manifest)
+    expect(Schema.decodeSync(KernelStateStore.Manifest)(encoded)).toEqual(manifest)
   })
 
   standalone("rejects an unknown restore kind", () => {

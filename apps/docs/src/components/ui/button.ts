@@ -3,7 +3,7 @@ import { type VariantProps, cva } from "class-variance-authority"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
 import { html } from "@/lib/html"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/styles"
 import { dual } from "effect/Function"
 
 // VIEW

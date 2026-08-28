@@ -36,6 +36,6 @@ const toolkit = Toolkit.make(...tools)
 
 const handlers = Object.fromEntries(
   names.map((name) => [name, () => Effect.die(`Unexpected toolkit handler: ${name}`)]),
-) as unknown as Toolkit.HandlersFrom<typeof toolkit.tools>
+)
 
 export const unusedToolHandlerLayer = toolkit.toLayer(handlers)

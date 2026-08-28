@@ -1,8 +1,8 @@
 import { OpenAiClient } from "@effect/ai-openai"
-import { ModelRegistry } from "tenetkit"
+import { ModelRegistry } from "../../core/index.js"
 import { Config, Layer, Redacted } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { isAvailabilityFailure } from "../model/model-failure.js"
+import { isAvailabilityFailure } from "../model/failure.js"
 import {
   decodeConfig,
   layerConfig as openAiLayerConfig,
@@ -27,29 +27,32 @@ export interface LayerOptions extends OpenAiResponsesInput {
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey" | "apiUrl">
 }
 
+const registrationOptions = (input: LayerOptions) => {
+  const required = {
+    provider: input.provider ?? "openai-responses",
+    model: input.model,
+    layer: openAiLanguageModelLayer(input),
+    toolJsonSchemaCompiler,
+    isAvailabilityFailure,
+  } as const
+  const classified =
+    input.classifyFailure === undefined ? required : { ...required, classifyFailure: input.classifyFailure }
+  const registered =
+    input.registrationKey === undefined ? classified : { ...classified, registrationKey: input.registrationKey }
+  return input.metadata === undefined ? registered : { ...registered, metadata: input.metadata }
+}
+
+const clientOptions = (input: LayerOptions) => {
+  const configured = input.apiKey === undefined ? input.clientConfig : { ...input.clientConfig, apiKey: input.apiKey }
+  return input.baseUrl === undefined ? configured : { ...configured, apiUrl: Config.succeed(input.baseUrl) }
+}
+
 /** @experimental */
 export const layer = (
   input: LayerOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([
-    ModelRegistry.registration({
-      provider: input.provider ?? "openai-responses",
-      model: input.model,
-      layer: openAiLanguageModelLayer(input),
-      toolJsonSchemaCompiler,
-      isAvailabilityFailure,
-      ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
-      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-    }),
-  ]).pipe(
-    Layer.provide(
-      openAiLayerConfig({
-        ...input.clientConfig,
-        ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
-        ...(input.baseUrl === undefined ? {} : { apiUrl: Config.succeed(input.baseUrl) }),
-      }),
-    ),
+  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+    Layer.provide(openAiLayerConfig(clientOptions(input))),
   )
 
 /** @experimental */

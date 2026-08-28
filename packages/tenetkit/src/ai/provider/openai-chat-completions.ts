@@ -1,6 +1,6 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
-import { ModelRegistry } from "tenetkit"
-import { isAvailabilityFailure } from "../model/model-failure.js"
+import { ModelRegistry } from "../../core/index.js"
+import { isAvailabilityFailure } from "../model/failure.js"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
@@ -27,8 +27,8 @@ const ConfigSchema = Schema.Record(Schema.String, Schema.Json).pipe(
 )
 
 /** @experimental Decodes persisted OpenAI-compatible Chat Completions request configuration. */
-export const decodeConfig = (options: unknown): Config =>
-  Schema.decodeUnknownSync(ConfigSchema)(options ?? {}) as Config
+type ConfigInput = typeof Schema.Unknown.Type
+export const decodeConfig = (options: ConfigInput): Config => Schema.decodeUnknownSync(ConfigSchema)(options ?? {})
 
 /** @experimental */
 export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
@@ -51,34 +51,39 @@ export interface LayerOptions extends OpenAiChatCompletionsInput {
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey" | "apiUrl">
 }
 
+const modelLayer = (input: LayerOptions) =>
+  layerImageSources(
+    input.config === undefined
+      ? OpenAiLanguageModel.layer({ model: input.model })
+      : OpenAiLanguageModel.layer({ model: input.model, config: input.config }),
+  )
+
+const registrationOptions = (input: LayerOptions) => {
+  const required = {
+    provider: input.provider ?? "openai-chat-completions",
+    model: input.model,
+    layer: modelLayer(input),
+    toolJsonSchemaCompiler,
+    isAvailabilityFailure,
+  } as const
+  const classified =
+    input.classifyFailure === undefined ? required : { ...required, classifyFailure: input.classifyFailure }
+  const registered =
+    input.registrationKey === undefined ? classified : { ...classified, registrationKey: input.registrationKey }
+  return input.metadata === undefined ? registered : { ...registered, metadata: input.metadata }
+}
+
+const clientOptions = (input: LayerOptions) => {
+  const configured = input.apiKey === undefined ? input.clientConfig : { ...input.clientConfig, apiKey: input.apiKey }
+  return input.baseUrl === undefined ? configured : { ...configured, apiUrl: Config.succeed(input.baseUrl) }
+}
+
 /** @experimental */
 export const layer = (
   input: LayerOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([
-    ModelRegistry.registration({
-      provider: input.provider ?? "openai-chat-completions",
-      model: input.model,
-      layer: layerImageSources(
-        OpenAiLanguageModel.layer({
-          model: input.model,
-          ...(input.config === undefined ? {} : { config: input.config }),
-        }),
-      ),
-      toolJsonSchemaCompiler,
-      isAvailabilityFailure,
-      ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
-      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-    }),
-  ]).pipe(
-    Layer.provide(
-      OpenAiClient.layerConfig({
-        ...input.clientConfig,
-        ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
-        ...(input.baseUrl === undefined ? {} : { apiUrl: Config.succeed(input.baseUrl) }),
-      }),
-    ),
+  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+    Layer.provide(OpenAiClient.layerConfig(clientOptions(input))),
   )
 
 /** @experimental */

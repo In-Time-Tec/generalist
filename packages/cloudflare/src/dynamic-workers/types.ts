@@ -7,8 +7,23 @@ export interface WorkerCode {
   readonly mainModule: string
   readonly modules: Readonly<Record<string, string>>
   readonly globalOutbound: null
-  readonly env: Readonly<Record<string, unknown>>
+  readonly env: WorkerEnvironment
   readonly limits: { readonly cpuMs: number; readonly subrequests: number }
+}
+
+/** @experimental Values injected into the generated protocol Worker. */
+export interface WorkerEnvironment {
+  readonly TENET_CAPABILITIES: CapabilityBinding
+  readonly TENET_PROTOCOL_VERSION: string
+  readonly TENET_REQUEST_ID: string
+  readonly TENET_SOURCE_DIGEST: string
+  readonly TENET_INPUT_CODEC: string
+  readonly TENET_OUTPUT_CODEC: string
+}
+
+/** @experimental Worker Loader capability binding value. */
+export interface CapabilityBinding {
+  readonly call: (request: CapabilityRpcRequest) => Promise<Schema.Json>
 }
 
 /** @experimental Minimal loaded Worker fetch entrypoint. */
@@ -76,7 +91,7 @@ export const CapabilityRpcRequest = Schema.Union([
       operation,
       level: ProgramCapabilities.LogLevel,
       message: Schema.String,
-      data: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+      data: Schema.optionalKey(Schema.JsonObject),
     }),
   }),
 ])
@@ -85,12 +100,12 @@ export type CapabilityRpcRequest = typeof CapabilityRpcRequest.Type
 
 /** @experimental Request-scoped capability RPC implementation. */
 export interface CapabilityRpc {
-  readonly call: (request: CapabilityRpcRequest) => Promise<unknown>
+  readonly call: (request: CapabilityRpcRequest) => Promise<Schema.Json>
 }
 
 /** @experimental Cloudflare Worker Loader adapter construction options. */
 export interface Options {
   readonly loader: WorkerLoader
   readonly compatibilityDate: string
-  readonly capabilityBinding: (rpc: CapabilityRpc) => unknown
+  readonly capabilityBinding: (rpc: CapabilityRpc) => CapabilityBinding
 }

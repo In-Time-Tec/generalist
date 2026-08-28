@@ -1,18 +1,20 @@
 import { Effect, Function, Layer, Option, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { Agent, AgentEvent, ExecutableManifest, Pins, ProgramManifest, ToolContext, ToolExecutor } from "tenetkit"
-import type { AgentManifest } from "tenetkit"
+import { Agent, ExecutableManifest, Pins, ProgramManifest, type AgentManifest } from "../core/index.js"
+import { AgentEvent } from "../core/agent/public/event.js"
+import { ToolContext } from "../core/tools/public/tool-context.js"
+import { ToolExecutor } from "../core/tools/public/tool-executor.js"
 import type {
   AdmitProgramChildInput,
   ExecutionClaim,
   ExecutionRecord,
   Interface as RunStoreInterface,
-} from "./run-store.js"
-import type { ExecutionCheckpoint } from "./execution-state.js"
-import type { ExecutionContinuation } from "./steering.js"
+} from "./run/store.js"
+import type { ExecutionCheckpoint } from "./execution/state.js"
+import type { ExecutionContinuation } from "./run/steering.js"
 import { make as makeAddress } from "./address.js"
-import { make as makeMessage } from "./message.js"
-import { narrow as narrowRegistrations } from "./executable-registration.js"
+import { make as makeMessage } from "./messaging/message.js"
+import { narrow as narrowRegistrations } from "./executable/registration.js"
 import { normalizePrompt } from "./memory/prompt.js"
 import { supportsCancellation } from "../core/tools/tool-executor-cancellation.js"
 
@@ -174,13 +176,15 @@ const narrowBudget = (
     }
   })
 
+interface ExecutableClosure {
+  readonly entries: ReadonlyArray<Extract<ExecutableManifest.ExecutableEntry, { readonly _tag: "Agent" }>>
+  readonly profiles: ReadonlyArray<ExecutableManifest.ProfileBinding>
+}
+
 const closureFor = (
   manifest: ExecutableManifest.ExecutableManifest,
   roots: ReadonlyArray<string>,
-): {
-  readonly entries: ReadonlyArray<Extract<ExecutableManifest.ExecutableEntry, { readonly _tag: "Agent" }>>
-  readonly profiles: ReadonlyArray<ExecutableManifest.ProfileBinding>
-} => {
+): ExecutableClosure => {
   const byPin = new Map<string, ExecutableManifest.ExecutableEntry>(
     manifest.entries.map((entry) => [entry.pin, entry] as const),
   )
@@ -295,12 +299,9 @@ export const make = (input: {
         registrations,
       } satisfies AdmitProgramChildInput
     })
-  const admissionFailure = (failure: unknown) =>
+  const admissionFailure = (failure: { readonly message?: string }) =>
     ProgramAdmissionFailed.make({
-      message:
-        typeof failure === "object" && failure !== null && "message" in failure
-          ? String(failure.message)
-          : String(failure),
+      message: failure.message ?? "program admission failed",
     })
   return {
     parameters,
@@ -313,7 +314,7 @@ export const make = (input: {
             Schema.is(ProgramAuthorityExceeded)(failure) || Schema.is(ProgramAuthorityMissing)(failure)
               ? failure
               : ProgramAdmissionFailed.make({
-                  message: "message" in failure ? String(failure.message) : String(failure),
+                  message: "message" in failure ? failure.message : String(failure),
                 })
           return Effect.succeed({ _tag: "DomainFailure" as const, failure: typed, encodedFailure: typed })
         }),
@@ -362,7 +363,7 @@ export const withTool: {
 )
 
 /** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
-export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
+const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
   readonly agent: Agent.Agent<Tools, R>
   readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
   readonly implementation: Interface
@@ -377,41 +378,43 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
           cancel: (request: ToolExecutor.CancellationRequest) => upstream.cancel!(request),
         }
       : {}
+  const replayPolicy: ToolExecutor.Interface["replayPolicy"] = (request) => {
+    if (request.call.name === options.implementation.tool.name) return "never"
+    return Option.isSome(options.upstream) ? (options.upstream.value.replayPolicy?.(request) ?? "never") : "never"
+  }
+  const execute: ToolExecutor.Interface["execute"] = (request) => {
+    if (request.call.name === options.implementation.tool.name) {
+      return Schema.decodeUnknownEffect(options.implementation.parameters, { onExcessProperty: "error" })(
+        request.call.params,
+      ).pipe(
+        Effect.flatMap((parameters) => options.implementation.invoke({ ...parameters, toolCallId: request.call.id })),
+        Effect.mapError(() =>
+          ToolExecutor.FrameworkFailure.make({
+            stage: "decode-input",
+            tool: options.implementation.tool.name,
+            message: "code_mode input does not match its schema",
+          }),
+        ),
+      )
+    }
+    if (Option.isSome(options.upstream)) return options.upstream.value.execute(request)
+    return Effect.flatMap(Effect.context<ToolContext.ToolContext>(), (context) =>
+      Effect.scoped(
+        Effect.flatMap(Layer.build(options.environment), (environment) =>
+          ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
+            Effect.provideContext(context),
+            Effect.provideContext(environment),
+          ),
+        ),
+      ),
+    )
+  }
   return ToolExecutor.ToolExecutor.of({
-    replayPolicy: (request) =>
-      request.call.name === options.implementation.tool.name
-        ? "never"
-        : Option.isSome(options.upstream)
-          ? (options.upstream.value.replayPolicy?.(request) ?? "never")
-          : "never",
-    execute: (request) =>
-      request.call.name === options.implementation.tool.name
-        ? Schema.decodeUnknownEffect(options.implementation.parameters, { onExcessProperty: "error" })(
-            request.call.params,
-          ).pipe(
-            Effect.flatMap((parameters) =>
-              options.implementation.invoke({ ...parameters, toolCallId: request.call.id }),
-            ),
-            Effect.mapError(() =>
-              ToolExecutor.FrameworkFailure.make({
-                stage: "decode-input",
-                tool: options.implementation.tool.name,
-                message: "code_mode input does not match its schema",
-              }),
-            ),
-          )
-        : Option.isSome(options.upstream)
-          ? options.upstream.value.execute(request)
-          : Effect.flatMap(Effect.context<ToolContext.ToolContext>(), (context) =>
-              Effect.scoped(
-                Effect.flatMap(Layer.build(options.environment), (environment) =>
-                  ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
-                    Effect.provideContext(context),
-                    Effect.provideContext(environment),
-                  ),
-                ),
-              ),
-            ),
+    replayPolicy,
+    execute,
     ...upstreamCancellation,
   })
 }
+
+/** @experimental Tool executor that owns the code_mode route. */
+export const Executor = { make: makeExecutor }

@@ -1,7 +1,7 @@
 import { Clock, Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import type { RunActivationProjection } from "tenetkit/runtime/driver/run-activation"
+import type { RunActivationProjection } from "tenetkit/runtime/driver/run/activation"
 
 /** @experimental Transaction-local callback which arms the shared host alarm. */
 export type Rearm = Effect.Effect<void, RuntimeUnavailable>

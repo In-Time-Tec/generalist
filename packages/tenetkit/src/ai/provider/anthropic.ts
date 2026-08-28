@@ -1,11 +1,11 @@
 import { AnthropicClient, AnthropicLanguageModel, Generated } from "@effect/ai-anthropic"
-import { ContextOverflow, ModelRegistry } from "tenetkit"
-import type { ModelRegistryFacade } from "tenetkit"
-import { Config as EffectConfig, Effect, Layer, Redacted, Schema } from "effect"
+import { ContextOverflow, type ModelRegistryFacade } from "../../core/index.js"
+import { ModelRegistry } from "../../core/model/public/registry.js"
+import { Config as EffectConfig, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { AiError, AnthropicStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
-import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/model-failure.js"
+import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
@@ -39,75 +39,95 @@ const ConfigSchema = Schema.Struct({
 })
 
 /** @experimental Decodes persisted provider options into Anthropic request configuration. */
-export const decodeConfig = (options: unknown): Config =>
-  Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {}) as Config
+type ConfigInput = typeof Schema.Unknown.Type
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+export const decodeConfig = (options: ConfigInput): Config => {
+  const decoded = Schema.decodeSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {})
+  // SAFETY: Anthropic's generated schema and request builder accept every BetaEffortLevel, but the dependency's Config service type omits the newer `max` literal.
+  return decoded as Config
+}
 
-const boundedDescription = (value: unknown, fallback: string): string =>
-  typeof value === "string" && value.length > 0 ? value.slice(0, 2_048) : fallback
-
-const boundedMetadata = (value: unknown): string | null => (typeof value === "string" ? value.slice(0, 256) : null)
+const FailureEventSchema = Schema.Struct({
+  type: Schema.optionalKey(Schema.String),
+  message: Schema.optionalKey(Schema.String),
+})
+const FailureMetadataSchema = Schema.Struct({ requestId: Schema.optionalKey(Schema.String) })
 
 const anthropicRequestId = (metadata: FailureInput["metadata"]): string | null => {
-  const anthropic = metadata.anthropic
-  return isRecord(anthropic) ? boundedMetadata(anthropic.requestId) : null
+  const anthropic = Option.getOrUndefined(Schema.decodeUnknownOption(FailureMetadataSchema)(metadata.anthropic))
+  return anthropic?.requestId?.slice(0, 256) ?? null
+}
+
+const anthropicReason = (
+  type: string | null,
+  message: string,
+  metadata: { readonly anthropic: { readonly errorType: string | null; readonly requestId: string | null } },
+): AiError.AiErrorReason => {
+  if (type === "api_error" || type === "overloaded_error" || type === "timeout_error") {
+    return AiError.InternalProviderError.make({ description: message, metadata })
+  }
+  if (type === "rate_limit_error") {
+    return AiError.RateLimitError.make({
+      metadata: {
+        anthropic: {
+          ...metadata.anthropic,
+          requestsLimit: null,
+          requestsRemaining: null,
+          requestsReset: null,
+          tokensLimit: null,
+          tokensRemaining: null,
+          tokensReset: null,
+        },
+      },
+    })
+  }
+  if (type === "billing_error") return AiError.QuotaExhaustedError.make({ metadata })
+  if (type === "authentication_error") return AiError.AuthenticationError.make({ kind: "InvalidKey", metadata })
+  if (type === "permission_error") {
+    return AiError.AuthenticationError.make({ kind: "InsufficientPermissions", metadata })
+  }
+  if (type === "invalid_request_error" || type === "not_found_error") {
+    return AiError.InvalidRequestError.make({ description: message, metadata })
+  }
+  return AiError.UnknownError.make({ description: message, metadata })
 }
 
 const resolveAnthropicFailure = ({ error, metadata: partMetadata, method }: FailureInput): AiError.AiError => {
   if (AiError.isAiError(error)) return error
-  const event = isRecord(error) ? error : undefined
-  const type = boundedMetadata(event?.type)
-  const message = boundedDescription(event?.message, "Anthropic response failed")
+  const event = Option.getOrUndefined(Schema.decodeUnknownOption(FailureEventSchema)(error))
+  const type = event?.type?.slice(0, 256) ?? null
+  const message =
+    event?.message === undefined || event.message.length === 0
+      ? "Anthropic response failed"
+      : event.message.slice(0, 2_048)
   const metadata = { anthropic: { errorType: type, requestId: anthropicRequestId(partMetadata) } }
-  const make = (reason: AiError.AiErrorReason) => AiError.make({ module: "AnthropicLanguageModel", method, reason })
-  if (type === "api_error" || type === "overloaded_error" || type === "timeout_error") {
-    return make(AiError.InternalProviderError.make({ description: message, metadata }))
-  }
-  if (type === "rate_limit_error") {
-    return make(
-      AiError.RateLimitError.make({
-        metadata: {
-          anthropic: {
-            ...metadata.anthropic,
-            requestsLimit: null,
-            requestsRemaining: null,
-            requestsReset: null,
-            tokensLimit: null,
-            tokensRemaining: null,
-            tokensReset: null,
-          },
-        },
-      }),
-    )
-  }
-  if (type === "billing_error") return make(AiError.QuotaExhaustedError.make({ metadata }))
-  if (type === "authentication_error") {
-    return make(AiError.AuthenticationError.make({ kind: "InvalidKey", metadata }))
-  }
-  if (type === "permission_error") {
-    return make(AiError.AuthenticationError.make({ kind: "InsufficientPermissions", metadata }))
-  }
-  if (type === "invalid_request_error" || type === "not_found_error") {
-    return make(AiError.InvalidRequestError.make({ description: message, metadata }))
-  }
-  return make(AiError.UnknownError.make({ description: message, metadata }))
+  return AiError.make({ module: "AnthropicLanguageModel", method, reason: anthropicReason(type, message, metadata) })
 }
 
 /** @experimental Effective Anthropic request config; callers opt into top-level automatic caching. */
-export const resolvedConfig = (input: AnthropicInput): Config => input.config ?? decodeConfig({})
+export const resolvedConfig = (input: AnthropicInput): Config => input.config ?? {}
 
-const anthropicLanguageModelLayer = (input: AnthropicInput) =>
-  layerModelFailures(
-    layerImageSources(
-      AnthropicLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
-    ),
-    resolveAnthropicFailure,
-  )
+const anthropicLanguageModelLayer = (input: AnthropicInput) => {
+  const options = input.config === undefined ? { model: input.model } : { model: input.model, config: input.config }
+  return layerModelFailures(layerImageSources(AnthropicLanguageModel.layer(options)), resolveAnthropicFailure)
+}
+
+const registrationOptions = (input: AnthropicInput) => {
+  const required = {
+    provider: "anthropic",
+    model: input.model,
+    layer: anthropicLanguageModelLayer(input),
+    classifyFailure,
+    toolJsonSchemaCompiler,
+    isAvailabilityFailure,
+  }
+  if (input.registrationKey !== undefined && input.metadata !== undefined) {
+    return { ...required, registrationKey: input.registrationKey, metadata: input.metadata }
+  }
+  if (input.registrationKey !== undefined) return { ...required, registrationKey: input.registrationKey }
+  if (input.metadata !== undefined) return { ...required, metadata: input.metadata }
+  return required
+}
 
 /** @experimental */
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
@@ -136,31 +156,13 @@ export interface LayerOptions extends AnthropicInput {
 export const layer = (
   input: LayerOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, EffectConfig.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([
-    ModelRegistry.registration({
-      provider: "anthropic",
-      model: input.model,
-      layer: anthropicLanguageModelLayer(input),
-      classifyFailure,
-      toolJsonSchemaCompiler,
-      isAvailabilityFailure,
-      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-    }),
-  ]).pipe(Layer.provide(AnthropicClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
+  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+    Layer.provide(AnthropicClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
+  )
 
 /** @experimental Bare registration effect; the consumer provides the Anthropic client (see layerConfig). */
 export const registration = (input: AnthropicInput): ReturnType<ModelRegistryFacade["registration"]> =>
-  ModelRegistry.registration({
-    provider: "anthropic",
-    model: input.model,
-    layer: anthropicLanguageModelLayer(input),
-    classifyFailure,
-    toolJsonSchemaCompiler,
-    isAvailabilityFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
+  ModelRegistry.registration(registrationOptions(input))
 
 /** @experimental */
 export const layerConfig = AnthropicClient.layerConfig

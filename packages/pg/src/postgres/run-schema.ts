@@ -9,7 +9,7 @@ import {
   SchemaUpgradeRequired,
   SchemaVersionUnsupported,
 } from "tenetkit/runtime/driver/sql/errors"
-import { mapSqlError } from "tenetkit/runtime/driver/sql/sql-effect"
+import { mapSqlError } from "tenetkit/runtime/driver/sql/effect"
 import {
   MIGRATION_NAME,
   MIGRATIONS_TABLE,
@@ -28,10 +28,10 @@ export interface SchemaPlan {
   readonly upgradeRequired: boolean
 }
 
-const migrationFailure = (source: string, fallback: string) => (error: unknown) =>
+const migrationFailure = (source: string, fallback: string) => (error: SqlError | SchemaMigrationFailed) =>
   SchemaMigrationFailed.make({
     source,
-    message: typeof error === "object" && error !== null && "message" in error ? String(error.message) : fallback,
+    message: error.message || fallback,
   })
 
 const readMeta = (source: string) =>
@@ -50,13 +50,13 @@ const readMeta = (source: string) =>
       `
       const row = rows[0]
       if (row === undefined) return { version: 0, checksum: "", dirty: false, present: false as const }
-      return { version: Number(row.version), checksum: row.checksum, dirty: row.dirty, present: true as const }
+      return { version: row.version, checksum: row.checksum, dirty: row.dirty, present: true as const }
     }),
   ).pipe(
     Effect.mapError((error) =>
       SchemaMigrationFailed.make({
         source,
-        message: "message" in error ? String(error.message) : "schema meta read failed",
+        message: "message" in error ? error.message : "schema meta read failed",
       }),
     ),
   )
@@ -133,7 +133,7 @@ export const apply = (source: string) =>
       SELECT COUNT(*) AS present FROM information_schema.tables
       WHERE table_schema = current_schema() AND table_name IN ${sql.in(SCHEMA_TABLES)}
     `
-    if (Number(existing[0]?.present ?? 0) > 0) {
+    if ((existing[0]?.present ?? 0) > 0) {
       return yield* SchemaMigrationFailed.make({
         source,
         message: "cannot create the baseline over an existing TenetKit schema",
@@ -157,7 +157,7 @@ export const markDirty = (source: string): Effect.Effect<void, SchemaMigrationFa
     Effect.mapError((error) =>
       SchemaMigrationFailed.make({
         source,
-        message: "message" in error ? String(error.message) : "failed to mark schema dirty",
+        message: "message" in error ? error.message : "failed to mark schema dirty",
       }),
     ),
   )

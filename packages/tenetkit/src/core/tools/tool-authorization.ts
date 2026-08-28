@@ -1,10 +1,11 @@
 import { Cause, Context, Effect, Layer, Schema } from "effect"
-import { type Prompt, type Response, type Tool } from "effect/unstable/ai"
-import { AgentSuspended, type ApprovalRequest } from "../agent/agent-event.js"
-import { canonicalSuspensionCall } from "../agent/agent-suspension.js"
+import type { Prompt, Response, Tool } from "effect/unstable/ai"
+import { AgentSuspended, type ApprovalRequest } from "../agent/event.js"
+import { canonicalSuspensionCall } from "../agent/suspension.js"
 import { PermissionError, evaluateWithRules, type RuleStoreInterface } from "../policy/permissions.js"
 
 type Approvals = import("../policy/approvals.js").Interface
+type PendingApproval = import("../policy/approvals.js").Pending
 type Permissions = import("../policy/permissions.js").Interface
 
 /** @experimental The common identity and context of one authorization attempt. */
@@ -77,7 +78,7 @@ const authorizationError = (error: PermissionError): AuthorizationError =>
 const approvalRequired = (request: Request): Effect.Effect<boolean> => {
   const needsApproval = request.tool?.needsApproval
   if (needsApproval === undefined) return Effect.succeed(false)
-  if (typeof needsApproval === "boolean") return Effect.succeed(needsApproval)
+  if (Schema.is(Schema.Boolean)(needsApproval)) return Effect.succeed(needsApproval)
   return Effect.suspend(() => {
     const result = needsApproval(request.call.params, {
       toolCallId: request.call.id,
@@ -113,14 +114,23 @@ export const make = (options: Options): ToolAuthorizer => ({
       if (decision._tag === "Deny") return deny(decision.reason ?? "Permission denied")
       const required = decision._tag === "Ask" || (yield* approvalRequired(request))
       if (!required) return { _tag: "Execute" }
-      const pending = {
-        _tag: "Pending" as const,
-        token: decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`,
-        call: request.call,
-        agentName: request.agentName,
-        turn: request.turn,
-        ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
-      }
+      const pending: PendingApproval =
+        request.sessionId === undefined
+          ? {
+              _tag: "Pending",
+              token: decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`,
+              call: request.call,
+              agentName: request.agentName,
+              turn: request.turn,
+            }
+          : {
+              _tag: "Pending",
+              token: decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`,
+              call: request.call,
+              agentName: request.agentName,
+              turn: request.turn,
+              sessionId: request.sessionId,
+            }
       yield* request.onApprovalRequired({
         approvalId: pending.token,
         operation: request.call.id,

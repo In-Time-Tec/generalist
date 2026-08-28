@@ -1,5 +1,5 @@
-import fourLayers from "../../snippets/learn/seams-as-services/four-layers.ts?raw"
-import fourLayersExpected from "../../snippets/learn/seams-as-services/four-layers.expected.txt?raw"
+import fourLayers from "virtual:source/src/snippets/learn/seams-as-services/four-layers.ts"
+import fourLayersExpected from "virtual:source/src/snippets/learn/seams-as-services/four-layers.expected.txt"
 import { code, codeBlock, definePage, h2, link, p, table } from "../../prose"
 export const seamsAsServices = definePage({
   path: "/docs/learn/seams-as-services",

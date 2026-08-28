@@ -1,20 +1,22 @@
-import { Clock, Effect, Function } from "effect"
+import { Clock, Effect, Function, Option, Schema } from "effect"
 import type { Json } from "effect/Schema"
 import { Prompt } from "effect/unstable/ai"
-import type { ModelCallPurpose } from "./model-telemetry.js"
+import type { ModelCallPurpose } from "./telemetry/events.js"
+import type { SendClock } from "./send-clock.js"
 
 const maximumBreakpoints = 4
 
-const jsonRecord = (value: unknown): Record<string, Json> =>
-  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, Json>) : {}
+const JsonRecord = Schema.Record(Schema.String, Schema.Json)
+
+const jsonRecord = (value: Json | null | undefined): Record<string, Json> =>
+  Schema.decodeUnknownOption(JsonRecord)(value).pipe(Option.getOrElse(() => ({})))
+
+const cacheControl = (ttl: "1h" | undefined) => (ttl === undefined ? { type: "ephemeral" } : { type: "ephemeral", ttl })
 
 const markSystemOptions = (options: Prompt.ProviderOptions, ttl: "1h" | undefined): Prompt.ProviderOptions => {
   const anthropic = jsonRecord(options.anthropic)
   const amazonBedrock = jsonRecord(options.amazonBedrock)
-  const markedAnthropic =
-    "cacheControl" in anthropic
-      ? anthropic
-      : { ...anthropic, cacheControl: { type: "ephemeral", ...(ttl === undefined ? {} : { ttl }) } }
+  const markedAnthropic = "cacheControl" in anthropic ? anthropic : { ...anthropic, cacheControl: cacheControl(ttl) }
   const markedBedrock = amazonBedrock.cachePoint === true ? amazonBedrock : { ...amazonBedrock, cachePoint: true }
   return markedAnthropic === anthropic && markedBedrock === amazonBedrock
     ? options
@@ -24,57 +26,62 @@ const markSystemOptions = (options: Prompt.ProviderOptions, ttl: "1h" | undefine
 const markPartOptions = (options: Prompt.ProviderOptions, ttl: "1h" | undefined): Prompt.ProviderOptions => {
   const anthropic = jsonRecord(options.anthropic)
   const amazonBedrock = jsonRecord(options.amazonBedrock)
-  const markedAnthropic =
-    "cacheControl" in anthropic
-      ? anthropic
-      : { ...anthropic, cacheControl: { type: "ephemeral", ...(ttl === undefined ? {} : { ttl }) } }
+  const markedAnthropic = "cacheControl" in anthropic ? anthropic : { ...anthropic, cacheControl: cacheControl(ttl) }
   const markedBedrock = amazonBedrock.cachePoint === true ? amazonBedrock : { ...amazonBedrock, cachePoint: true }
   return markedAnthropic === anthropic && markedBedrock === amazonBedrock
     ? options
     : { ...options, anthropic: markedAnthropic, amazonBedrock: markedBedrock }
 }
 
-const lastIndex = <A>(values: ReadonlyArray<A>, predicate: (value: A) => boolean): number => {
-  for (let index = values.length - 1; index >= 0; index -= 1) {
-    if (predicate(values[index] as A)) return index
-  }
-  return -1
-}
+const lastIndex = <A>(values: ReadonlyArray<A>, predicate: (value: A) => boolean): number =>
+  values.findLastIndex(predicate)
 
-const isUserLike = (message: Prompt.Message): boolean => message.role === "user" || message.role === "tool"
+const isUserLike = (message: Prompt.Message): message is Prompt.UserMessage | Prompt.ToolMessage =>
+  message.role === "user" || message.role === "tool"
 
-const markLastPart = (message: Prompt.Message, ttl: "1h" | undefined): Prompt.Message | undefined => {
-  if (message.content.length === 0) return undefined
+const markLastPart = (
+  message: Prompt.UserMessage | Prompt.ToolMessage,
+  ttl: "1h" | undefined,
+): Prompt.UserMessage | Prompt.ToolMessage | undefined => {
   const last = message.content.length - 1
-  const part = message.content[last] as Prompt.Part
+  if (message.role === "user") {
+    const part = message.content.at(-1)
+    if (part === undefined) return undefined
+    const options = markPartOptions(part.options, ttl)
+    if (options === part.options) return undefined
+    const marked =
+      part.type === "text"
+        ? Prompt.makePart("text", { text: part.text, options })
+        : Prompt.makePart("file", { data: part.data, mediaType: part.mediaType, fileName: part.fileName, options })
+    const content = message.content.map((current, index) => (index === last ? marked : current))
+    return Prompt.makeMessage("user", { content, options: message.options })
+  }
+  const part = message.content.at(-1)
+  if (part === undefined) return undefined
   const options = markPartOptions(part.options, ttl)
   if (options === part.options) return undefined
-  const marked = Prompt.makePart(part.type, { ...(part as unknown as Record<string, unknown>), options } as never)
-  return Prompt.makeMessage(message.role, {
-    content: [...message.content.slice(0, last), marked],
-    options: message.options,
-  } as never)
+  const marked =
+    part.type === "tool-result"
+      ? Prompt.makePart("tool-result", {
+          id: part.id,
+          name: part.name,
+          isFailure: part.isFailure,
+          result: part.result,
+          providerExecuted: part.providerExecuted,
+          options,
+        })
+      : Prompt.makePart("tool-approval-response", {
+          approvalId: part.approvalId,
+          approved: part.approved,
+          reason: part.reason,
+          options,
+        })
+  const content = message.content.map((current, index) => (index === last ? marked : current))
+  return Prompt.makeMessage("tool", { content, options: message.options })
 }
 
 /** @experimental The last-send gap above which the conversation boundary escalates to the one-hour cache. */
 export const conversationEscalationMillis = 5 * 60 * 1_000
-
-/** @experimental Mutable last-send clock driving conversation cache escalation. */
-export interface SendClock {
-  readonly idleSince: (now: number) => number | undefined
-}
-
-/** @experimental One run's last-send tracker; gaps above the escalation threshold move the conversation boundary to one hour. */
-export const makeSendClock = (): SendClock => {
-  let lastSendAtMillis: number | undefined
-  return {
-    idleSince: (now: number): number | undefined => {
-      const idle = lastSendAtMillis === undefined ? undefined : now - lastSendAtMillis
-      lastSendAtMillis = now
-      return idle
-    },
-  }
-}
 
 /** @experimental Mark one wire send with provider cache breakpoints derived from the run's send clock. */
 export const withWireCache: {

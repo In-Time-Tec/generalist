@@ -1,6 +1,6 @@
 import { Context, Effect, Function, Layer, Schema, Scope } from "effect"
 import { digest } from "../durable/canonical-json.js"
-import { CapabilityFailure, type ProgramCapabilities } from "./program-capabilities.js"
+import { CapabilityFailure, type ProgramCapabilities } from "./capabilities.js"
 
 const positiveInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
 const moduleName = Schema.String.pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(256)))
@@ -156,14 +156,18 @@ export const sourceDigest = (input: {
     protocolVersion: input.protocolVersion ?? protocolVersion,
     modules: input.modules
       .map(({ name, source }) => [name, source] as const)
-      .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)),
+      .toSorted(([left], [right]) => {
+        if (left < right) return -1
+        if (left > right) return 1
+        return 0
+      }),
     entrypoint: input.entrypoint,
     inputCodec: input.inputCodec,
     outputCodec: input.outputCodec,
   })
 
 /** @experimental Synthesize the canonical single-module request used by current Program manifests. */
-export const makeRequest = (input: {
+export const request = (input: {
   readonly requestId: string
   readonly source: string
   readonly inputCodec: string
@@ -220,25 +224,25 @@ export type TestExecute = (
 ) => Effect.Effect<unknown, ExecutionFailure, ProgramCapabilities | Scope.Scope>
 
 /** @experimental Trusted fixture executor for tests only. */
-export const makeTest: {
+export const make: {
   (identity?: Identity): (execute: TestExecute) => Interface
   (execute: TestExecute, identity?: Identity): Interface
 } = Function.dual(
-  (args) => args.length > 1 || typeof args[0] === "function",
+  (args) => args.length > 1 || !Schema.is(Identity)(args[0]),
   (execute: TestExecute, identity: Identity = testIdentity): Interface =>
     SandboxExecutor.of({
       identity: Object.freeze({ ...identity }),
-      execute: (request) =>
-        execute(request).pipe(
+      execute: (sandboxRequest) =>
+        execute(sandboxRequest).pipe(
           Effect.map((value) =>
             Schema.is(Result)(value)
               ? value
               : {
-                  protocolVersion: request.protocolVersion,
-                  requestId: request.requestId,
-                  sourceDigest: request.sourceDigest,
-                  inputCodec: request.inputCodec,
-                  outputCodec: request.outputCodec,
+                  protocolVersion: sandboxRequest.protocolVersion,
+                  requestId: sandboxRequest.requestId,
+                  sourceDigest: sandboxRequest.sourceDigest,
+                  inputCodec: sandboxRequest.inputCodec,
+                  outputCodec: sandboxRequest.outputCodec,
                   output: value,
                 },
           ),
@@ -251,7 +255,7 @@ export const layerTest: {
   (identity?: Identity): (execute: TestExecute) => Layer.Layer<SandboxExecutor>
   (execute: TestExecute, identity?: Identity): Layer.Layer<SandboxExecutor>
 } = Function.dual(
-  (args) => args.length > 1 || typeof args[0] === "function",
+  (args) => args.length > 1 || !Schema.is(Identity)(args[0]),
   (execute: TestExecute, identity?: Identity): Layer.Layer<SandboxExecutor> =>
-    Layer.succeed(SandboxExecutor, makeTest(execute, identity)),
+    Layer.succeed(SandboxExecutor, make(execute, identity)),
 )

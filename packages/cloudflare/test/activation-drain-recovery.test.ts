@@ -1,12 +1,14 @@
 import { expect, it } from "@effect/vitest"
 import { Clock, Effect, Exit, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { ExecutionHost } from "tenetkit/runtime/driver/execution-host"
-import { LocalScheduler } from "tenetkit/runtime/driver/local-scheduler"
-import { RunStore } from "tenetkit/runtime/driver/run-store"
-import type { RunActivation, RunActivationProjection } from "tenetkit/runtime/driver/run-activation"
+import { ExecutionHost } from "tenetkit/runtime/driver/execution/host"
+import { LocalScheduler } from "tenetkit/runtime/driver/execution/local-scheduler"
+import { RunStore } from "tenetkit/runtime/driver/run/store"
+import type { RunActivation, RunActivationProjection } from "tenetkit/runtime/driver/run/activation"
 import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
+import { make as makeMessage } from "tenetkit/runtime/driver/messaging/message"
+import { defaultTreePolicy } from "tenetkit/runtime/driver/tree/policy"
 import { ExecutableResolver, Runtime } from "../../tenetkit/src/runtime/index.js"
 import {
   drain,
@@ -16,31 +18,33 @@ import {
   schema,
 } from "../src/durable-objects/index.js"
 import {
+  assistant,
   assistantAddress,
   assistantRef,
   completedResult,
   registrationsFor,
   textPrompt,
-} from "../../tenetkit/test/runtime/helpers.js"
-import { tempDbPath } from "../../tenetkit/test/runtime/sqlite-helpers.js"
-import { closedTestAgent } from "../../tenetkit/test/runtime/identity.js"
-import { assistant } from "../../tenetkit/test/runtime/helpers.js"
+} from "../../tenetkit/test/runtime/execution/fixtures.js"
+import { tempDbPath } from "../../tenetkit/test/runtime/sql/scenario.js"
+import { closedTestAgent } from "../../tenetkit/test/runtime/run/identity.js"
 import { layer as sqliteClientLayer } from "../../tenetkit/src/runtime/sql/bun-client.js"
 import { makeSqliteRunStore } from "../../tenetkit/src/runtime/sql/store.js"
-import { makeRuntime } from "../../tenetkit/src/runtime/memory/runtime-layer.js"
-import { layer as activeExecutionsLayer } from "../../tenetkit/src/runtime/active-executions.js"
+import { makeRuntime } from "../../tenetkit/src/runtime/memory/layer.js"
+import { layer as activeExecutionsLayer } from "../../tenetkit/src/runtime/execution/active-executions.js"
 
-import { Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
-const options = (filename: string, projection?: RunActivationProjection) => ({
-  filename,
-  resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-  addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-  ...(projection === undefined ? {} : { activationProjection: projection }),
-  scheduler: { pollInterval: "1 day" as const },
-})
+import { Runtime as SqliteRuntime } from "../../tenetkit/src/runtime/sqlite-bun.js"
+const options = (filename: string, projection?: RunActivationProjection) => {
+  const value = {
+    filename,
+    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+    scheduler: { pollInterval: "1 day" as const },
+  }
+  return projection === undefined ? value : { ...value, activationProjection: projection }
+}
 
-const withLayer = <A, E, R, E2>(layer: Layer.Layer<R, E>, effect: Effect.Effect<A, E2, R>) =>
-  Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => Effect.provide(effect, context)))
+const withLayer = <A, E, R, E2, R2>(layer: Layer.Layer<R, E, R2>, effect: Effect.Effect<A, E2, R>) =>
+  Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
 const runtimeLayer = (projection?: RunActivationProjection) => {
   const filename = tempDbPath("cloudflare-activation")
@@ -220,10 +224,9 @@ it.live("rearms a shared host alarm from final transaction state and lets earlie
         const host = yield* sql<{ readonly due_at_millis: number }>`
           SELECT MIN(due_at_millis) AS due_at_millis FROM host_ready_work
         `
-        observed.push({
-          ...(tenetkit === undefined ? {} : { tenetkit }),
-          shared: Math.min(tenetkit ?? Number.POSITIVE_INFINITY, Number(host[0]!.due_at_millis)),
-        })
+        const shared = Math.min(tenetkit ?? Number.POSITIVE_INFINITY, host[0]!.due_at_millis)
+        const observation = tenetkit === undefined ? { shared } : { tenetkit, shared }
+        observed.push(observation)
       }).pipe(
         Effect.provideService(SqlClient.SqlClient, sql),
         Effect.mapError(() => RuntimeUnavailable.make({ message: "shared alarm rearm failed" })),
@@ -253,12 +256,43 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
         ('a', 'execute', 0, 0, 'queued'),
         ('future', 'execute', ${future}, 0, 'queued')`
       const claimed: Array<string> = []
+      const liveStore = yield* RunStore
+      const liveHost = yield* ExecutionHost
+      const liveScheduler = yield* LocalScheduler
       const store = RunStore.of({
+        ...liveStore,
         claimExecution: ({ runId }: { readonly runId: string }) =>
-          Effect.sync(() => claimed.push(runId)).pipe(Effect.as({ runId })),
-      } as never)
-      const host = ExecutionHost.of({ execute: () => Effect.void } as never)
-      const scheduler = LocalScheduler.of({ reconcileCancellation: () => Effect.void } as never)
+          Effect.sync(() => claimed.push(runId)).pipe(
+            Effect.as({
+              runId,
+              rootRunId: runId,
+              depth: 0,
+              treePolicy: defaultTreePolicy,
+              activeChildCount: 0,
+              ownerId: "owner",
+              admittedAt: "2026-08-27T00:00:00.000Z",
+              message: makeMessage({
+                id: runId,
+                to: assistantAddress,
+                sessionId: "drain",
+                prompt: textPrompt(runId),
+                idempotencyKey: runId,
+                correlationId: runId,
+              }),
+              executableRef: assistantRef.ref,
+              executableManifest: assistantRef.manifest,
+              attempt: 1,
+              attemptFence: 1,
+              cancellationRequested: false,
+              registrations: registrationsFor(assistantRef),
+            }),
+          ),
+      })
+      const host = ExecutionHost.of({ ...liveHost, execute: () => Effect.void })
+      const scheduler = LocalScheduler.of({
+        ...liveScheduler,
+        reconcileCancellation: () => Effect.succeed("inactive"),
+      })
       const result = yield* drain({ ownerId: "owner", fuel: 1, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, store),
         Effect.provideService(ExecutionHost, host),
@@ -273,9 +307,10 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
       expect(claimed).toEqual(["a"])
 
       const harmless = RunStore.of({
+        ...liveStore,
         claimExecution: ({ runId }: { readonly runId: string }) =>
           Effect.fail(StaleClaim.make({ runId, workerId: "owner", attemptFence: 0 })),
-      } as never)
+      })
       const stale = yield* drain({ ownerId: "owner", fuel: 5, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, harmless),
         Effect.provideService(ExecutionHost, host),

@@ -16,6 +16,6 @@ describe("Address", () => {
 
   it("rejects empty addresses", () => {
     expect(() => Address.make("")).toThrow()
-    expect(Schema.decodeUnknownExit(Address.Address)("")).toMatchObject({ _tag: "Failure" })
+    expect(Schema.decodeExit(Address.Address)("")).toMatchObject({ _tag: "Failure" })
   })
 })

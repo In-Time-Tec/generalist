@@ -1,5 +1,6 @@
 import { Effect, FileSystem, ManagedRuntime, Path, Schema } from "effect"
 import { layer } from "@effect/platform-bun/BunServices"
+import { version as bunVersion } from "bun"
 
 class InstallPreflightFailed extends Schema.TaggedError<InstallPreflightFailed>()(
   "@tenetkit/scripts/InstallPreflightFailed",
@@ -8,22 +9,29 @@ class InstallPreflightFailed extends Schema.TaggedError<InstallPreflightFailed>(
 
 const preflightError = (message: string): InstallPreflightFailed => InstallPreflightFailed.make({ message })
 
-const parseJson = (text: string): Record<string, any> =>
-  Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Any)))(text)
+const RootManifest = Schema.Struct({
+  workspaces: Schema.optionalKey(Schema.Struct({ packages: Schema.optionalKey(Schema.Array(Schema.String)) })),
+})
+const PackageManifest = Schema.Struct({
+  name: Schema.optionalKey(Schema.String),
+  dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  devDependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  peerDependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+})
 
 const program = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  if (!/^1\.[3-9]\./.test(Bun.version)) {
-    return yield* preflightError(`Bun >=1.3 is required (found ${Bun.version})`)
+  if (!/^1\.[3-9]\./.test(bunVersion)) {
+    return yield* preflightError(`Bun >=1.3 is required (found ${bunVersion})`)
   }
   const root = path.resolve(".")
   if (!(yield* fileSystem.exists(path.join(root, "bun.lock")))) {
     return yield* preflightError("bun.lock is required")
   }
-  const rootManifest = parseJson(yield* fileSystem.readFileString(path.join(root, "package.json"))) as {
-    readonly workspaces?: { readonly packages?: ReadonlyArray<string> }
-  }
+  const rootManifest = yield* Schema.decodeEffect(Schema.fromJsonString(RootManifest))(
+    yield* fileSystem.readFileString(path.join(root, "package.json")),
+  )
   if (rootManifest.workspaces?.packages?.includes("packages/*") !== true) {
     return yield* preflightError("root workspace must include packages/*")
   }
@@ -33,12 +41,7 @@ const program = Effect.gen(function* () {
     const manifestPath = path.join(packageDirectory, packageName, "package.json")
     if (!(yield* fileSystem.exists(manifestPath))) continue
     const source = yield* fileSystem.readFileString(manifestPath)
-    const manifest = parseJson(source) as {
-      readonly name?: string
-      readonly dependencies?: Readonly<Record<string, string>>
-      readonly devDependencies?: Readonly<Record<string, string>>
-      readonly peerDependencies?: Readonly<Record<string, string>>
-    }
+    const manifest = yield* Schema.decodeEffect(Schema.fromJsonString(PackageManifest))(source)
     if (manifest.name !== `@tenetkit/${packageName}`) {
       return yield* preflightError(`${manifestPath} has a non-canonical package name`)
     }
@@ -50,7 +53,7 @@ const program = Effect.gen(function* () {
       }
     }
   }
-  yield* Effect.logInfo(`install preflight passed for Bun ${Bun.version}`)
+  yield* Effect.logInfo(`install preflight passed for Bun ${bunVersion}`)
 })
 
 const runtime = ManagedRuntime.make(layer)

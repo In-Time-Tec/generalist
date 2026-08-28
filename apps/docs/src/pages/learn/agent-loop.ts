@@ -1,5 +1,5 @@
-import eventTrace from "../../snippets/learn/agent-loop/event-trace.ts?raw"
-import eventTraceExpected from "../../snippets/learn/agent-loop/event-trace.expected.txt?raw"
+import eventTrace from "virtual:source/src/snippets/learn/agent-loop/event-trace.ts"
+import eventTraceExpected from "virtual:source/src/snippets/learn/agent-loop/event-trace.expected.txt"
 import { code, codeBlock, definePage, h2, link, p } from "../../prose"
 export const agentLoop = definePage({
   path: "/docs/learn/agent-loop",

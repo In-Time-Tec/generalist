@@ -7,8 +7,7 @@ import { defineStream, mapMessage } from "foldkit/mount"
 import { evo } from "foldkit/struct"
 
 import { button } from "@/components/ui/button"
-import type { SlotConfig } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { cn, type SlotConfig } from "@/lib/styling"
 
 // MODEL
 

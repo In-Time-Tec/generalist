@@ -1,7 +1,6 @@
-import type { Html } from "foldkit/html"
-import { inertHtml as ih } from "foldkit/html"
+import { type Html, inertHtml as ih } from "foldkit/html"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/styles"
 
 const h = ih
 

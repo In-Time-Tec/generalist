@@ -5,11 +5,11 @@ import { Url } from "foldkit/url"
 import { dialogInit } from "@/components/ui/dialog"
 
 import { legacyRedirects } from "../content/registry"
-import { toPath, urlToRoute } from "../route/route"
+import { toPath, urlToRoute } from "../route/match"
 import type { Message } from "./message"
 import type { Model } from "./model"
 import { LoadSidebarGroups, LoadThemePreference, RedirectLegacy } from "./update"
-import { initialSearchCommand } from "./searchPalette"
+import { initialSearchCommand } from "./search-palette"
 
 export const init: Runtime.RoutingApplicationInit<Model, Message> = (url: Url) => {
   const route = urlToRoute(url)

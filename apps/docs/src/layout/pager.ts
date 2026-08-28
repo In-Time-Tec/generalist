@@ -1,5 +1,4 @@
-import type { Html } from "foldkit/html"
-import { inertHtml as ih } from "foldkit/html"
+import { type Html, inertHtml as ih } from "foldkit/html"
 
 import { navGroups } from "../content/registry"
 import type { DocsPage } from "../prose/page"

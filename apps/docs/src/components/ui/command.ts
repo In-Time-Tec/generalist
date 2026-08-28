@@ -1,14 +1,22 @@
-import { Message, Model, OutMessage, Selected, create, init } from "@foldkit/ui/combobox"
-import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/combobox"
-import type { Html } from "foldkit/html"
-import { childAttributes } from "foldkit/html"
+import {
+  Message,
+  Model,
+  OutMessage,
+  Selected,
+  create,
+  init,
+  type AnchorConfig,
+  type GroupHeading,
+  type InitConfig,
+  type ViewInputs,
+} from "@foldkit/ui/combobox"
+import { type Html, childAttributes } from "foldkit/html"
 import { html } from "@/lib/html"
 import { Option } from "effect"
 import { dual } from "effect/Function"
 
 import type { ContentConfig } from "@/components/ui/dialog"
-import type { SlotConfig } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { type SlotConfig, cn } from "@/lib/styles"
 
 // MODEL
 
@@ -121,19 +129,13 @@ export type RootConfig<Item extends string = string> = Readonly<{
  */
 export const root = <Item extends string = string>(config: RootConfig<Item>): ViewInputs<Item> => {
   const h = html<CommandMessage>()
-  return {
+  const inputs = {
     items: config.items,
     restingInputValue: "",
     maybeSelectedValue: Option.none(),
     itemToConfig: config.itemToConfig,
-    itemToValue: (item) => item,
-    itemToDisplayText: config.itemToDisplayText ?? ((item) => item),
-    ...(config.isItemDisabled !== undefined ? { isItemDisabled: config.isItemDisabled } : {}),
-    ...(config.itemGroupKey !== undefined ? { itemGroupKey: config.itemGroupKey } : {}),
-    ...(config.groupToHeading !== undefined ? { groupToHeading: config.groupToHeading } : {}),
-    ...(config.placeholder !== undefined ? { inputPlaceholder: config.placeholder } : {}),
-    ...(config.isDisabled !== undefined ? { isDisabled: config.isDisabled } : {}),
-    ...(config.openOnFocus !== undefined ? { openOnFocus: config.openOnFocus } : {}),
+    itemToValue: (item: Item) => item,
+    itemToDisplayText: config.itemToDisplayText ?? ((item: Item) => item),
     inputClassName: cn(inputClass, config.inputClass),
     inputAttributes: childAttributes([
       h.DataAttribute("slot", "command-input"),
@@ -153,6 +155,13 @@ export const root = <Item extends string = string>(config: RootConfig<Item>): Vi
     attributes: childAttributes([h.DataAttribute("slot", "command")]),
     anchor: config.anchor ?? DEFAULT_ANCHOR,
   }
+  if (config.isItemDisabled !== undefined) Object.assign(inputs, { isItemDisabled: config.isItemDisabled })
+  if (config.itemGroupKey !== undefined) Object.assign(inputs, { itemGroupKey: config.itemGroupKey })
+  if (config.groupToHeading !== undefined) Object.assign(inputs, { groupToHeading: config.groupToHeading })
+  if (config.placeholder !== undefined) Object.assign(inputs, { inputPlaceholder: config.placeholder })
+  if (config.isDisabled !== undefined) Object.assign(inputs, { isDisabled: config.isDisabled })
+  if (config.openOnFocus !== undefined) Object.assign(inputs, { openOnFocus: config.openOnFocus })
+  return inputs
 }
 
 export type ItemConfig = Readonly<{
@@ -216,7 +225,8 @@ export type CommandDialogConfig = Readonly<{
  * its children. The padding is stripped so the command input row sits flush
  * against the dialog frame, matching shadcn's `CommandDialog`.
  */
-export const commandDialog = (config: CommandDialogConfig = {}): ContentConfig => ({
-  class: cn("overflow-hidden p-0", config.class),
-  ...(config.showCloseButton !== undefined ? { showCloseButton: config.showCloseButton } : {}),
-})
+export const commandDialog = (config: CommandDialogConfig = {}): ContentConfig => {
+  const content = { class: cn("overflow-hidden p-0", config.class) }
+  if (config.showCloseButton !== undefined) Object.assign(content, { showCloseButton: config.showCloseButton })
+  return content
+}

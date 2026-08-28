@@ -1,8 +1,8 @@
 import { Effect, Equal } from "effect"
-import type { RespondInput } from "../approval.js"
+import type { RespondInput } from "../operation/approval.js"
 import { ApprovalMismatch, ApprovalStale, RunNotFound } from "../errors.js"
 import { isTerminal } from "../run.js"
-import { loadRun, loadRunWait } from "./store-helpers.js"
+import { loadRun, loadRunWait } from "./store/statements.js"
 
 export type ApprovalResponse = { readonly _tag: "Duplicate" } | { readonly _tag: "Respond"; readonly waitId: string }
 

@@ -1,11 +1,11 @@
-import { Pins } from "tenetkit"
-import { Function } from "effect"
-import type { Message } from "../message.js"
-import type { ExecutableRef } from "../executable-manifest.js"
-import type { AdmitStartInput } from "../run-store.js"
-import { defaultTreePolicy, type TreePolicy } from "../tree-policy.js"
-import type { FanOutMemberOrigin } from "../fan-out.js"
-import { promptDigestValue } from "../prompt-digest.js"
+import { Pins } from "../../core/index.js"
+import { Function, Predicate } from "effect"
+import type { Message } from "../messaging/message.js"
+import type { ExecutableRef } from "../executable/manifest.js"
+import type { AdmitStartInput } from "../run/store.js"
+import { defaultTreePolicy, type TreePolicy } from "../tree/policy.js"
+import type { FanOutMemberOrigin } from "../child/fan-out.js"
+import { promptDigestValue } from "../run/prompt-digest.js"
 
 interface ChildDigestDetails {
   readonly parentRunId?: string
@@ -37,7 +37,7 @@ export const childDigest: {
   (executableRef: ExecutableRef, details?: ChildDigestDetails): (message: Message) => string
   (message: Message, executableRef: ExecutableRef, details?: ChildDigestDetails): string
 } = Function.dual(
-  (args) => args.length >= 2 && typeof args[0] === "object" && "id" in args[0],
+  (args) => args.length >= 2 && Predicate.hasProperty(args[0], "id"),
   (message: Message, executableRef: ExecutableRef, details?: ChildDigestDetails): string =>
     Pins.digest([messageDigest(message), executableRef, details ?? null]),
 )

@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { Snapshot } from "../../src/transport/index.js"
-import { runtimeLayer } from "./helpers.js"
+import { runtimeLayer } from "./fixtures.js"
 
 layer(runtimeLayer())("Snapshot", (it) => {
   it.effect("returns inspection state and a recovery cursor without a synthetic event", () =>

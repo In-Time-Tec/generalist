@@ -1,12 +1,15 @@
 import type { Html } from "foldkit/html"
+import { Match, Schema } from "effect"
 import { dual } from "effect/Function"
 
 import type { CalloutTone, Inline, Node } from "./node"
 
 export type InlineInput = string | Inline
 
-export const toInline = (input: InlineInput): Inline =>
-  typeof input === "string" ? { kind: "text", text: input } : input
+export const toInline = Match.type<InlineInput>().pipe(
+  Match.when(Match.string, (text) => ({ kind: "text" as const, text })),
+  Match.orElse((input) => input),
+)
 
 export const toInlines = (inputs: ReadonlyArray<InlineInput>): ReadonlyArray<Inline> => inputs.map(toInline)
 
@@ -33,9 +36,15 @@ export const lead = (text: string): Node => ({ kind: "lead", text })
 
 export const p = (...content: ReadonlyArray<InlineInput>): Node => ({ kind: "para", content: toInlines(content) })
 
+const inlineGroup = (item: InlineInput | ReadonlyArray<InlineInput>): ReadonlyArray<Inline> => {
+  if (Schema.is(Schema.String)(item)) return [toInline(item)]
+  if ("kind" in item) return [item]
+  return item.map(toInline)
+}
+
 export const bullets = (...items: ReadonlyArray<InlineInput | ReadonlyArray<InlineInput>>): Node => ({
   kind: "bullets",
-  items: items.map((item) => (Array.isArray(item) ? toInlines(item) : [toInline(item as InlineInput)])),
+  items: items.map(inlineGroup),
 })
 
 export type CodeInput = Readonly<{
@@ -45,13 +54,17 @@ export type CodeInput = Readonly<{
   expectedOutput?: string
 }>
 
-export const codeBlock = (input: CodeInput): Node => ({
-  kind: "code",
-  label: input.label,
-  language: input.language ?? "typescript",
-  source: input.source.replace(/\n+$/, ""),
-  ...(input.expectedOutput === undefined ? {} : { expectedOutput: input.expectedOutput.replace(/\n+$/, "") }),
-})
+export const codeBlock = (input: CodeInput): Node => {
+  const node = {
+    kind: "code",
+    label: input.label,
+    language: input.language ?? "typescript",
+    source: input.source.replace(/\n+$/, ""),
+  } as const
+  return input.expectedOutput === undefined
+    ? node
+    : { ...node, expectedOutput: input.expectedOutput.replace(/\n+$/, "") }
+}
 
 export const command: {
   (label: string, source: string): Node
@@ -76,9 +89,7 @@ export const table: {
   ): Node => ({
     kind: "table",
     head,
-    rows: rows.map((row) =>
-      row.map((cell) => (Array.isArray(cell) ? toInlines(cell) : [toInline(cell as InlineInput)])),
-    ),
+    rows: rows.map((row) => row.map(inlineGroup)),
   }),
 )
 

@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 
 import { Chat } from "tenetkit/foldkit"
-import { Option } from "effect"
+import { Option, Schema } from "effect"
 import { Scene } from "foldkit"
+import type { Html } from "foldkit/html"
 import { describe, expect, test } from "vitest"
 import {
   CompletedScrollToBottom,
@@ -14,26 +15,27 @@ import {
 } from "./components/ui/message-scroller"
 import { GotScrollerMessage, SessionReady, init, type Model, update, view } from "./main"
 
-const baseModel = (): Model => ({
-  ...init()[0],
-  session: SessionReady(),
-  chat: { ...Chat.initialModel("deep-research-scene"), connection: "open" },
-})
+const baseModel = (): Model =>
+  Object.assign({}, init()[0], {
+    session: SessionReady(),
+    chat: Object.assign({}, Chat.initialModel("deep-research-scene"), { connection: "open" as const }),
+  })
 
-const renderedText = (node: unknown): string => {
-  if (typeof node === "string") return node
-  if (node === null || typeof node !== "object") return ""
-  const text = "text" in node && typeof node.text === "string" ? node.text : ""
-  const children =
-    "children" in node && Array.isArray(node.children) ? node.children.map((child) => renderedText(child)).join("") : ""
+const renderedText = (node: Html | string): string => {
+  if (Schema.is(Schema.String)(node)) return node
+  if (node === null) return ""
+  const text = node.text ?? ""
+  const children = node.children?.map((child) => renderedText(child)).join("") ?? ""
   return `${text}${children}`
 }
 
 const resolveViewportMount = Scene.Mount.resolve(
+  // SAFETY: the resolver supplies the parent message that maps this child mount's output into GotScrollerMessage.
   TrackViewportScroll as Scene.AnyMount,
   GotScrollerMessage({ message: ScrolledViewport({ isAtBottom: true }) }),
 )
 const resolveContentMount = Scene.Mount.resolve(
+  // SAFETY: the resolver supplies the parent message that maps this child mount's output into GotScrollerMessage.
   ObserveContentGrowth as Scene.AnyMount,
   GotScrollerMessage({ message: GrewContent() }),
 )
@@ -61,8 +63,7 @@ describe("deep-research-agent web view", () => {
       { update, view },
       Scene.given({
         ...baseModel(),
-        chat: {
-          ...baseModel().chat,
+        chat: Object.assign({}, baseModel().chat, {
           run: Chat.Running({ turn: 0 }),
           entries: [
             Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
@@ -75,7 +76,7 @@ describe("deep-research-agent web view", () => {
               progress: [],
             }),
           ],
-        },
+        }),
         expandedToolCallIds: ["search-1"],
       }),
       resolveViewportMount,
@@ -96,11 +97,10 @@ describe("deep-research-agent web view", () => {
       { update, view },
       Scene.given({
         ...baseModel(),
-        chat: {
-          ...baseModel().chat,
+        chat: Object.assign({}, baseModel().chat, {
           run: Chat.Running({ turn: 0 }),
           entries: [Chat.UserEntry({ text: "What makes TenetKit standalone?" })],
-        },
+        }),
       }),
       resolveViewportMount,
       resolveContentMount,
@@ -117,8 +117,7 @@ describe("deep-research-agent web view", () => {
       { update, view },
       Scene.given({
         ...baseModel(),
-        chat: {
-          ...baseModel().chat,
+        chat: Object.assign({}, baseModel().chat, {
           run: Chat.Idle(),
           entries: [
             Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
@@ -149,7 +148,7 @@ describe("deep-research-agent web view", () => {
             }),
             Chat.AssistantEntry({ text: "Final cited answer\n\nSources:\n[1] TenetKit docs", reasoning: null }),
           ],
-        },
+        }),
         expandedToolCallIds: ["search-1-sources"],
       }),
       resolveViewportMount,
@@ -171,8 +170,7 @@ describe("deep-research-agent web view", () => {
       { update, view },
       Scene.given({
         ...baseModel(),
-        chat: {
-          ...baseModel().chat,
+        chat: Object.assign({}, baseModel().chat, {
           run: Chat.Idle(),
           entries: [
             Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
@@ -181,7 +179,7 @@ describe("deep-research-agent web view", () => {
               reasoning: "Compare transport frames. Check the loop state.",
             }),
           ],
-        },
+        }),
         expandedToolCallIds: ["reasoning-1"],
       }),
       resolveViewportMount,
@@ -197,8 +195,7 @@ describe("deep-research-agent web view", () => {
       { update, view },
       Scene.given({
         ...baseModel(),
-        chat: {
-          ...baseModel().chat,
+        chat: Object.assign({}, baseModel().chat, {
           run: Chat.Idle(),
           entries: [
             Chat.ToolEntry({
@@ -216,7 +213,7 @@ describe("deep-research-agent web view", () => {
               progress: [],
             }),
           ],
-        },
+        }),
         expandedToolCallIds: ["search-1"],
       }),
       resolveViewportMount,
@@ -237,11 +234,10 @@ describe("deep-research-agent web view", () => {
       { update, view },
       Scene.given({
         ...baseModel(),
-        chat: {
-          ...baseModel().chat,
+        chat: Object.assign({}, baseModel().chat, {
           run: Chat.Failed({ message: "model unavailable" }),
           draft: "retry later",
-        },
+        }),
       }),
       resolveViewportMount,
       resolveContentMount,

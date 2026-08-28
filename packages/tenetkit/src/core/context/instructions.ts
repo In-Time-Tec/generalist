@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Option } from "effect"
 import { dual } from "effect/Function"
-import { AgentError } from "../agent/agent-event.js"
+import { AgentError } from "../agent/event.js"
 /** @experimental Context available while rendering instruction sources. */
 export interface RenderContext {
   readonly agentName: string

@@ -1,18 +1,16 @@
 /* oxlint-disable effecttsgo/node-builtin-import -- counting live workers must not depend on the
    async child-process path this harness is verifying; a synchronous `ps` cannot lose its own completion. */
 import { execFileSync } from "node:child_process"
-import { Context, Duration, Effect, FileSystem, Layer, Path, Scope, Stream } from "effect"
-import { layer as bunLayer } from "@effect/platform-bun/BunServices"
-import type { BunServices } from "@effect/platform-bun/BunServices"
-import type { PlatformError } from "effect"
-import type { CellEvent, CellFailure, CellResult } from "../../src/repl/repl/cell.js"
-import type { Execution, Interface as KernelPoolInterface } from "../../src/repl/repl/kernel-pool.js"
-import { KernelStateStore } from "../../src/repl/repl/kernel-state-store.js"
+import { layer as bunLayer, type BunServices } from "@effect/platform-bun/BunServices"
+import { Context, Duration, Effect, FileSystem, Layer, Path, type PlatformError, Scope, Stream } from "effect"
+import type { CellEvent, CellFailure, CellResult } from "../../src/repl/cell.js"
+import type { Execution, Interface as KernelPoolInterface } from "../../src/repl/kernel-pool.js"
+import { KernelStateStore } from "../../src/repl/kernel-state-store.js"
 import { HostBindingRegistry, KernelProfile } from "../../src/repl/index.js"
-import { BunKernelPool, BunKernelStateStore } from "../../src/repl/repl/bun.js"
+import { BunKernelPool, BunKernelStateStore } from "../../src/repl/bun/index.js"
 
 /** The kernel worker module a real-worker test spawns. */
-export const workerModule = new URL("../../src/repl/repl/bun-worker.ts", import.meta.url).pathname
+export const workerModule = new URL("../../src/repl/bun/worker.ts", import.meta.url).pathname
 
 /** The TenetKit workspace root cells resolve imports and `require` against. */
 export const workspaceRoot = new URL("../../..", import.meta.url).pathname
@@ -109,6 +107,22 @@ export interface PoolRequest<A, E, R> {
   readonly use: (harness: Harness) => Effect.Effect<A, E, R>
 }
 
+const makePool = (profile: KernelProfile.KernelProfile, overrides: PoolOverrides | undefined) => {
+  const options = {
+    profile,
+    runtimeCommand: "bun",
+    workerModule: overrides?.workerModuleOverride ?? workerModule,
+    startTimeoutMillis: overrides?.startTimeoutMillis ?? 20_000,
+    interruptGraceMillis: overrides?.interruptGraceMillis ?? 250,
+    maxConcurrentBoots: overrides?.maxConcurrentBoots ?? 4,
+    idleTimeToLive: overrides?.idleTimeToLive ?? Duration.minutes(5),
+    environment: {},
+  }
+  return overrides?.bootstrap === undefined
+    ? BunKernelPool.make(options)
+    : BunKernelPool.make({ ...options, bootstrap: overrides.bootstrap })
+}
+
 /**
  * One Server-scoped pool over real Bun kernel child processes, on a temporary data root that the
  * test scope removes. Every kernel, pipe, and snapshot file this creates is released when the
@@ -123,17 +137,7 @@ export const withPool = <A, E, R>(
     const overrides = request.overrides
     const profile = profileFor({ root: overrides?.workspaceRoot ?? workspaceRoot, dataRoot, overrides })
     const store = yield* BunKernelStateStore.make({ dataRoot })
-    const pool = yield* BunKernelPool.make({
-      profile,
-      runtimeCommand: "bun",
-      workerModule: overrides?.workerModuleOverride ?? workerModule,
-      startTimeoutMillis: overrides?.startTimeoutMillis ?? 20_000,
-      ...(overrides?.bootstrap === undefined ? {} : { bootstrap: overrides.bootstrap }),
-      interruptGraceMillis: overrides?.interruptGraceMillis ?? 250,
-      maxConcurrentBoots: overrides?.maxConcurrentBoots ?? 4,
-      idleTimeToLive: overrides?.idleTimeToLive ?? Duration.minutes(5),
-      environment: {},
-    }).pipe(
+    const pool = yield* makePool(profile, overrides).pipe(
       Effect.provideService(KernelStateStore, store),
       Effect.provideContext(yield* registryContext(overrides?.modules)),
     )
@@ -172,7 +176,7 @@ export const collect = (request: CellRequest): Effect.Effect<Observed, CellFailu
   submit(request).pipe(
     Effect.flatMap((execution) =>
       Stream.runCollect(execution.events).pipe(
-        Effect.map((events): Observed => ({ events: events as ReadonlyArray<CellEvent>, result: execution.result })),
+        Effect.map((events): Observed => ({ events: Array.from(events), result: execution.result })),
       ),
     ),
   )
@@ -188,7 +192,7 @@ export const collectAfterResult = (request: CellRequest): Effect.Effect<Observed
     Effect.flatMap((execution) =>
       Effect.exit(execution.result).pipe(
         Effect.andThen(Stream.runCollect(execution.events)),
-        Effect.map((events): Observed => ({ events: events as ReadonlyArray<CellEvent>, result: execution.result })),
+        Effect.map((events): Observed => ({ events: Array.from(events), result: execution.result })),
       ),
     ),
   )

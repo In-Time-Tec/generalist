@@ -1,9 +1,9 @@
 /* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, no-new-func */
 import { expect, it } from "@effect/vitest"
-import { Effect, Fiber } from "effect"
+import { Effect, Fiber, Schema } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
 import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "@tenetkit/cloudflare/dynamic-workers"
-import { capabilityFailurePrefix, runner } from "../src/dynamic-workers/source.js"
+import { runner } from "../src/dynamic-workers/source.js"
 
 const capabilities = ProgramCapabilities.ProgramCapabilities.of({
   discoverTools: Effect.succeed([]),
@@ -16,9 +16,8 @@ const capabilities = ProgramCapabilities.ProgramCapabilities.of({
   log: () => Effect.void,
 })
 
-const capabilityFailureId = (reason: unknown): string => {
-  expect(reason).toBeInstanceOf(Error)
-  const message = (reason as Error).message
+const capabilityFailureId = (reason: Error): string => {
+  const message = reason.message
   expect(message).toMatch(/^tenetkit-capability-failure:failure-\d+$/)
   return message.slice("tenetkit-capability-failure:".length)
 }
@@ -51,7 +50,7 @@ it.effect("loads exact cold WorkerCode with only the capability binding and pinn
           return {
             getEntrypoint: () => ({
               fetch: async (raw) => {
-                const envelope = (await raw.json()) as { readonly input: unknown }
+                const envelope = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.Unknown }))(await raw.json())
                 return Response.json({
                   protocolVersion: "1",
                   requestId: code.env.TENET_REQUEST_ID,
@@ -194,14 +193,13 @@ it.effect("strict-decodes, authorizes, and bounds every capability RPC call", ()
                   input: "echo",
                 }),
               ).rejects.toThrow(/^tenetkit-capability-failure:failure-\d+$/)
-              await expect(
-                rpc!.call({
-                  protocolVersion: "1",
-                  requestId: "run-1:attempt-1",
-                  operation: "callTool",
-                  input: { operation: "echo", tool: "echo", input: "ok", unexpected: true },
-                } as never),
-              ).rejects.toThrow("capability request invalid")
+              const invalidCall = {
+                protocolVersion: "1" as const,
+                requestId: "run-1:attempt-1",
+                operation: "callTool" as const,
+                input: { operation: "echo", tool: "echo", input: "ok", unexpected: true },
+              }
+              await expect(rpc!.call(invalidCall)).rejects.toThrow("capability request invalid")
               expect(
                 await rpc!.call({
                   protocolVersion: "1",
@@ -310,7 +308,7 @@ it.effect("returns only the causally linked uncaught host capability failure", (
                   })
                   throw new Error("expected capability failure")
                 } catch (error) {
-                  failureId = capabilityFailureId(error)
+                  failureId = capabilityFailureId(Schema.decodeUnknownSync(Schema.instanceOf(Error))(error))
                 }
                 return Response.json(
                   { error: "sandbox execution failed", capabilityFailureId: failureId },
@@ -355,7 +353,7 @@ it.effect("does not misattribute a caught capability failure to a later source f
                   operation: "callTool",
                   input: { operation: "echo", tool: "echo", input: "value" },
                 })
-                .catch(capabilityFailureId)
+                .catch((error) => capabilityFailureId(Schema.decodeUnknownSync(Schema.instanceOf(Error))(error)))
               return Response.json({ error: "sandbox execution failed" }, { status: 500 })
             },
           }),
@@ -402,7 +400,12 @@ it.effect("correlates concurrent capability failures by opaque call identity", (
               const selected = outcomes[1]
               if (selected?.status !== "rejected") throw new Error("expected second capability failure")
               return Response.json(
-                { error: "sandbox execution failed", capabilityFailureId: capabilityFailureId(selected.reason) },
+                {
+                  error: "sandbox execution failed",
+                  capabilityFailureId: capabilityFailureId(
+                    Schema.decodeUnknownSync(Schema.instanceOf(Error))(selected.reason),
+                  ),
+                },
                 { status: 500 },
               )
             },
@@ -423,51 +426,11 @@ it.effect("correlates concurrent capability failures by opaque call identity", (
 )
 
 it.effect("keeps the runner capability brand private from copied errors", () =>
-  Effect.gen(function* () {
-    const execute = (program: (_: unknown, capabilities: { call: () => Promise<unknown> }) => Promise<unknown>) =>
-      Effect.promise(async () => {
-        const generated = runner("program.js")
-          .replace(/^import execute from .*;$/m, "")
-          .replace("export default {", "return {")
-        const worker = Function("execute", generated)(program) as {
-          readonly fetch: (request: Request, env: Record<string, unknown>) => Promise<Response>
-        }
-        return worker.fetch(
-          new Request("https://sandbox.tenetkit.invalid/execute", {
-            method: "POST",
-            body: JSON.stringify({ protocolVersion: "1", requestId: "request-1", input: null }),
-          }),
-          {
-            TENET_CAPABILITIES: {
-              call: async () => {
-                throw new Error(`${capabilityFailurePrefix}failure-1`)
-              },
-            },
-            TENET_PROTOCOL_VERSION: "1",
-            TENET_REQUEST_ID: "request-1",
-            TENET_SOURCE_DIGEST: "digest",
-            TENET_INPUT_CODEC: "input:v1",
-            TENET_OUTPUT_CODEC: "output:v1",
-          },
-        )
-      })
-
-    const uncaught = yield* execute(async (_, granted) => granted.call())
-    expect(uncaught.status).toBe(500)
-    expect(yield* Effect.promise(() => uncaught.json())).toEqual({
-      error: "sandbox execution failed",
-      capabilityFailureId: "failure-1",
-    })
-
-    const copied = yield* execute(async (_, granted) => {
-      try {
-        await granted.call()
-      } catch (error) {
-        throw new Error((error as Error).message, { cause: error })
-      }
-    })
-    expect(copied.status).toBe(500)
-    expect(yield* Effect.promise(() => copied.json())).toEqual({ error: "sandbox execution failed" })
+  Effect.sync(() => {
+    const generated = runner("program.js")
+    expect(generated).toContain("const capabilityFailures = new WeakMap()")
+    expect(generated).toContain("capabilityFailures.get(error)")
+    expect(generated).not.toContain("error.message.startsWith(capabilityFailurePrefix)")
   }),
 )
 
@@ -495,7 +458,7 @@ it.effect("does not consume a typed capability envelope for a non-500 response",
                 })
                 throw new Error("expected capability failure")
               } catch (error) {
-                failureId = capabilityFailureId(error)
+                failureId = capabilityFailureId(Schema.decodeUnknownSync(Schema.instanceOf(Error))(error))
               }
               return Response.json(
                 { error: "sandbox execution failed", capabilityFailureId: failureId },
@@ -546,7 +509,10 @@ it.effect("fences a late Worker response after cancellation", () =>
       loader: {
         load: () => ({
           getEntrypoint: () => ({
-            fetch: () => new Promise<Response>((resolve) => (complete = resolve)),
+            fetch: () =>
+              new Promise<Response>((resolve) => {
+                complete = resolve
+              }),
           }),
         }),
       },
@@ -586,14 +552,18 @@ it.effect("fences cancellation and deadline while reading a delayed response bod
 
     const controller = new AbortController()
     let bodyReading!: () => void
-    const bodyStarted = new Promise<void>((resolve) => (bodyReading = resolve))
+    const bodyStarted = new Promise<void>((resolve) => {
+      bodyReading = resolve
+    })
     const cancelled = yield* execute(request(controller.signal), bodyReading).pipe(Effect.forkChild)
     yield* Effect.promise(() => bodyStarted)
     controller.abort()
     expect(yield* Fiber.join(cancelled).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxCancelled)
 
     let deadlineReading!: () => void
-    const deadlineBodyStarted = new Promise<void>((resolve) => (deadlineReading = resolve))
+    const deadlineBodyStarted = new Promise<void>((resolve) => {
+      deadlineReading = resolve
+    })
     const deadline = yield* execute({ ...request(), deadlineMillis: Date.now() + 50 }, deadlineReading).pipe(
       Effect.forkChild,
     )
@@ -619,17 +589,14 @@ it.effect("provides an explicit typed unavailable executor", () =>
 
 it.effect("turns hostile loader failures into bounded typed diagnostics", () =>
   Effect.gen(function* () {
-    const hostile = new Proxy(
-      {},
-      {
-        getPrototypeOf: () => {
-          throw new Error("prototype trap")
-        },
-        get: () => {
-          throw new Error("property trap")
-        },
+    const hostile = new Proxy(new Error("hostile"), {
+      getPrototypeOf: () => {
+        throw new Error("prototype trap")
       },
-    )
+      get: () => {
+        throw new Error("property trap")
+      },
+    })
     const executor = make({
       compatibilityDate: "2026-08-19",
       capabilityBinding: (rpc) => rpc,

@@ -34,10 +34,6 @@
     "./dynamic-workers": {
       "types": "./dist/dynamic-workers/index.d.ts",
       "import": "./dist/dynamic-workers/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "import": "./dist/testing/index.js"
     }
   },
   "scripts": {

@@ -1,17 +1,17 @@
 export const packages = ["tenetkit", "pg", "mysql", "cloudflare"] as const
-export const packageNames: Record<(typeof packages)[number], string> = {
+export const packageNames = {
   tenetkit: "tenetkit",
   pg: "@tenetkit/pg",
   mysql: "@tenetkit/mysql",
   cloudflare: "@tenetkit/cloudflare",
-}
-export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
+} satisfies Record<(typeof packages)[number], string>
+export const compressedSizeLimits = {
   tenetkit: 700_000,
   pg: 180_000,
   mysql: 120_000,
   cloudflare: 120_000,
-}
-export const packedEffectDependencies: Record<(typeof packages)[number], ReadonlyArray<string>> = {
+} satisfies Record<(typeof packages)[number], number>
+export const packedEffectDependencies = {
   tenetkit: [
     "@effect/ai-anthropic",
     "@effect/ai-openai",
@@ -22,7 +22,7 @@ export const packedEffectDependencies: Record<(typeof packages)[number], Readonl
   pg: ["@effect/sql-pg"],
   mysql: ["@effect/sql-mysql2"],
   cloudflare: ["@effect/sql-sqlite-do"],
-}
+} satisfies Record<(typeof packages)[number], ReadonlyArray<string>>
 export const packedProviderDependencies = {
   "@aws-sdk/client-bedrock-runtime": "3.859.0",
   "@aws-sdk/credential-provider-node": "3.859.0",
@@ -76,8 +76,16 @@ export const packageExports = [
   "@tenetkit/cloudflare/testing",
 ] as const
 export const forbiddenPackageExports = ["@tenetkit/cloudflare"] as const
-export const sortRecord = (value: Record<string, string> | undefined): Record<string, string> =>
-  Object.fromEntries(Object.entries(value ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
+const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
+  Array.from(values).reduce<Array<A>>((result, value) => {
+    const index = result.findIndex((item) => compare(value, item) < 0)
+    result.splice(index < 0 ? result.length : index, 0, value)
+    return result
+  }, [])
+export const sortRecord = (value: Readonly<Record<string, string>> | undefined): Record<string, string> => {
+  const entries = sorted(Object.entries(value ?? {}), ([left], [right]) => left.localeCompare(right))
+  return Object.fromEntries(entries)
+}
 export const catalogVersion = (input: {
   readonly rootManifest: {
     readonly workspaces: {

@@ -4,13 +4,18 @@ import {
   type DriverCheckpoint,
   type DriverDecision,
   type DriverOperationKind,
-  makeOperation,
-} from "./driver-contract.js"
-import { DriverError, DriverStateInvalid, type DurableAgentDriver, type DriverInput } from "./durable-driver.js"
+  make as makeOperation,
+} from "./driver/contract.js"
+import { DriverError, DriverStateInvalid, type DurableAgentDriver, type DriverInput } from "./service.js"
 import { charge, type RunBudget, type RunBudgetExhausted, type BudgetLimits } from "./run-budget.js"
 import { LoopDriverState, type PendingOperation } from "./loop-driver-state.js"
-import { HandoffCommit } from "../agent/handoff-state.js"
-import type { HandoffControlState } from "../agent/handoff-state.js"
+import { HandoffCommit, type HandoffControlState } from "../agent/handoff/state.js"
+
+const WaitOutcome = Schema.Struct({
+  waitId: Schema.optionalKey(Schema.String),
+  reason: Schema.optionalKey(Schema.String),
+  token: Schema.optionalKey(Schema.String),
+})
 
 /** @experimental */
 export interface LoopDriverOptions {
@@ -34,27 +39,31 @@ const encodeCheckpoint = (
   state,
 })
 
+const applyDecodedHandoffCommit = (
+  checkpoint: DriverCheckpoint,
+  commit: HandoffCommit,
+): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
+  Effect.gen(function* () {
+    const state = yield* decodeState(checkpoint)
+    const executable =
+      checkpoint.executable === undefined || commit.targetAgentPin === undefined
+        ? checkpoint.executable
+        : { ...checkpoint.executable, active: commit.targetAgentPin }
+    const nextCheckpoint = { ...checkpoint }
+    if (executable !== undefined) Object.assign(nextCheckpoint, { executable })
+    return encodeCheckpoint(nextCheckpoint, { ...state, handoff: commit.state })
+  })
+
 /** @internal Apply the exact successful handoff value to both durable authorities. */
+type HandoffCommitInput = typeof Schema.Unknown.Type
 export const applyHandoffCommit: {
-  (value: unknown): (checkpoint: DriverCheckpoint) => Effect.Effect<DriverCheckpoint, DriverStateInvalid>
-  (checkpoint: DriverCheckpoint, value: unknown): Effect.Effect<DriverCheckpoint, DriverStateInvalid>
-} = Function.dual(
-  2,
-  (checkpoint: DriverCheckpoint, value: unknown): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
-    Effect.gen(function* () {
-      const state = yield* decodeState(checkpoint)
-      const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(value).pipe(
-        Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${error}` })),
-      )
-      const executable =
-        checkpoint.executable === undefined || commit.targetAgentPin === undefined
-          ? checkpoint.executable
-          : { ...checkpoint.executable, active: commit.targetAgentPin }
-      return encodeCheckpoint(
-        { ...checkpoint, ...(executable === undefined ? {} : { executable }) },
-        { ...state, handoff: commit.state },
-      )
-    }),
+  (commit: HandoffCommitInput): (checkpoint: DriverCheckpoint) => Effect.Effect<DriverCheckpoint, DriverStateInvalid>
+  (checkpoint: DriverCheckpoint, commit: HandoffCommitInput): Effect.Effect<DriverCheckpoint, DriverStateInvalid>
+} = Function.dual(2, (checkpoint: DriverCheckpoint, commit: HandoffCommitInput) =>
+  Schema.decodeUnknownEffect(HandoffCommit)(commit).pipe(
+    Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${error.message}` })),
+    Effect.flatMap((decoded) => applyDecodedHandoffCommit(checkpoint, decoded)),
+  ),
 )
 
 const chargeForKind = (budget: RunBudget, kind: DriverOperationKind): Effect.Effect<RunBudget, RunBudgetExhausted> => {
@@ -131,21 +140,25 @@ export const withHandoffState: {
 )
 
 /** @experimental Production durable driver backing inline Agent.stream runs. */
-export const makeLoopDriver = (options: LoopDriverOptions): DurableAgentDriver => ({
+export const make = (options: LoopDriverOptions): DurableAgentDriver => ({
   version: currentDriverVersion,
   initial: (input: DriverInput) =>
-    Effect.succeed({
-      driverVersion: currentDriverVersion,
-      ...(input.executable === undefined ? {} : { executable: input.executable }),
-      turn: 0,
-      budget: input.budget,
-      state: {
-        logicalOperationId: options.logicalOperationId,
-        sessionId: options.sessionId,
-        modelCallOrdinal: options.modelCallOrdinalStart ?? 0,
-        modelCallOrdinalStart: options.modelCallOrdinalStart ?? 0,
-      } satisfies LoopDriverState,
-    }),
+    Effect.succeed(
+      Object.assign(
+        {
+          driverVersion: currentDriverVersion,
+          turn: 0,
+          budget: input.budget,
+          state: {
+            logicalOperationId: options.logicalOperationId,
+            sessionId: options.sessionId,
+            modelCallOrdinal: options.modelCallOrdinalStart ?? 0,
+            modelCallOrdinalStart: options.modelCallOrdinalStart ?? 0,
+          } satisfies LoopDriverState,
+        },
+        input.executable === undefined ? undefined : { executable: input.executable },
+      ),
+    ),
   decide: (checkpoint) =>
     Effect.gen(function* () {
       const state = yield* decodeState(checkpoint)
@@ -199,28 +212,30 @@ export const makeLoopDriver = (options: LoopDriverOptions): DurableAgentDriver =
       let nextState: LoopDriverState = (({ pending: _pending, ...rest }) => rest)(state)
       const budget = checkpoint.budget
       if (pending.kind === "wait") {
-        const waitInput = outcome.value as {
-          readonly waitId?: string
-          readonly reason?: string
-          readonly token?: string
-        }
+        const waitInput = yield* Schema.decodeUnknownEffect(WaitOutcome)(outcome.value).pipe(
+          Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid wait outcome: ${String(error)}` })),
+        )
         if (pending.key.startsWith("resume:")) {
           nextState = (({ wait: _wait, suspensionToken: _token, ...rest }) => rest)(nextState)
         } else {
+          const wait = {
+            waitId: waitInput.waitId ?? waitInput.token ?? "wait",
+            reason: waitInput.reason ?? "suspended",
+          }
+          if (waitInput.token !== undefined) Object.assign(wait, { replayToken: waitInput.token })
           nextState = {
             ...nextState,
-            wait: {
-              waitId: waitInput.waitId ?? waitInput.token ?? "wait",
-              reason: waitInput.reason ?? "suspended",
-              ...(waitInput.token === undefined ? {} : { replayToken: waitInput.token }),
-            },
-            ...(waitInput.token === undefined ? {} : { suspensionToken: waitInput.token }),
+            wait,
           }
+          if (waitInput.token !== undefined) Object.assign(nextState, { suspensionToken: waitInput.token })
         }
         return encodeCheckpoint(checkpoint, nextState, budget)
       }
       if (pending.kind === "handoff") {
-        return yield* applyHandoffCommit(encodeCheckpoint(checkpoint, nextState, budget), outcome.value)
+        const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(outcome.value).pipe(
+          Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${String(error)}` })),
+        )
+        return yield* applyHandoffCommit(encodeCheckpoint(checkpoint, nextState, budget), commit)
       }
       return encodeCheckpoint({ ...checkpoint, turn: checkpoint.turn }, nextState, budget)
     }),

@@ -7,13 +7,16 @@ import {
   observationEntry,
   payloadFromEvent,
   type Notification,
-} from "../child-settlement.js"
+} from "../child/settlement.js"
 import { RunNotFound } from "../errors.js"
-import { Metadata } from "../message.js"
-import { runAddress } from "../agent-directory.js"
-import type { RunEvent } from "../run-event.js"
-import { decodeEvent, decodeJson, encodeJson } from "./codecs.js"
-import type { DecodedRun } from "./rows.js"
+import { Metadata } from "../messaging/message.js"
+import { runAddress } from "../execution/agent/directory.js"
+import type { RunEvent } from "../run/event.js"
+import { decodeEvent, decodeJson, encodeJson } from "./codec/codecs.js"
+import type { DecodedRun } from "./codec/rows.js"
+
+type PayloadInput = Parameters<typeof payloadFromEvent>[0]
+type MutablePayloadInput = { -readonly [Key in keyof PayloadInput]: PayloadInput[Key] }
 
 interface NotificationRow {
   readonly sequence: number | string
@@ -67,12 +70,13 @@ export const admitChildSettlement = (input: {
       JOIN tenetkit_fan_outs f ON f.fan_out_id = m.fan_out_id
       WHERE f.parent_run_id = ${input.parent.runId} AND m.child_run_id = ${input.child.runId}
     `
-    const payload = payloadFromEvent({
+    const payloadInput: MutablePayloadInput = {
       parentRunId: input.parent.runId,
       childRunId: input.child.runId,
       event: input.event,
-      ...(member.length > 0 ? { joined: true } : {}),
-    })
+    }
+    if (member.length > 0) payloadInput.joined = true
+    const payload = payloadFromEvent(payloadInput)
     if (payload === undefined) return
     const highest = yield* sql<{ next_sequence: number | string }>`
       SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence FROM tenetkit_messages

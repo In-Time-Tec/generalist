@@ -2,13 +2,13 @@ import { describe, expect, it } from "@effect/vitest"
 import { Agent, Approvals, ModelMiddleware, Response, ToolContext, ToolExecutor } from "tenetkit"
 import { TestModel } from "tenetkit/test"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
-import { layerToolkit, route, toolkit } from "../../src/mcp/mcp/tools"
+import { layerToolkit, route, toolkit } from "../../src/mcp/tools.js"
 import { McpToolSource } from "../../src/mcp/index"
 import { makeFixture, makeTransportFixture } from "./fixture"
 
 describe("mcp tools adapter", () => {
   it("exports the complete scoped route", () => {
-    expect(typeof route).toBe("function")
+    expect(Schema.is(Schema.declare((value): value is typeof route => value === route))(route)).toBe(true)
   })
 
   it.effect("exposes discovered tools as a toolkit", () =>
@@ -120,13 +120,19 @@ describe("mcp tools adapter", () => {
         const tools = yield* route({ name: "calc", transport: fixture.transport })
         const services = yield* Layer.build(Layer.mergeAll(tools.executorLayer, ToolContext.layerDefault))
         const executor = Context.get(services, ToolExecutor.ToolExecutor)
-        const call1 = Response.makePart("tool-call", {
+        const call1 = yield* Schema.decodeEffect(
+          Response.ToolCallPart("calc_barrier_add", Schema.Struct({ a: Schema.Finite, b: Schema.Finite })),
+        )({
+          type: "tool-call",
           id: "add-1",
           name: "calc_barrier_add",
           params: { a: 20, b: 22 },
           providerExecuted: false,
         })
-        const call2 = Response.makePart("tool-call", {
+        const call2 = yield* Schema.decodeEffect(
+          Response.ToolCallPart("calc_barrier_add", Schema.Struct({ a: Schema.Finite, b: Schema.Finite })),
+        )({
+          type: "tool-call",
           id: "add-2",
           name: "calc_barrier_add",
           params: { a: 19, b: 23 },

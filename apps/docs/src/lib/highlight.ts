@@ -74,6 +74,42 @@ const isIdentStart = (c: string) => /[A-Za-z_$]/.test(c)
 const isIdent = (c: string) => /[\w$]/.test(c)
 const isDigit = (c: string) => c >= "0" && c <= "9"
 const isInlineSpace = (c: string) => c === " " || c === "\t"
+const isLineComment = (code: string, index: number) => code[index] === "/" && code[index + 1] === "/"
+const isBlockComment = (code: string, index: number) => code[index] === "/" && code[index + 1] === "*"
+const isNumberStart = (code: string, index: number) =>
+  isDigit(code[index] ?? "") || (code[index] === "." && isDigit(code[index + 1] ?? ""))
+const isWhitespace = (character: string) => isInlineSpace(character) || character === "\n"
+
+const scanWhile = (code: string, start: number, accepts: (character: string, index: number) => boolean): number => {
+  let end = start
+  while (end < code.length && accepts(code[end] ?? "", end)) end += 1
+  return end
+}
+
+const scanQuoted = (code: string, start: number, quote: string, stopAtNewline: boolean): number => {
+  let end = start + 1
+  while (end < code.length) {
+    if (code[end] === quote || (stopAtNewline && code[end] === "\n")) break
+    if (code[end] === "\\") end += 1
+    end += 1
+  }
+  return Math.min(code.length, end + 1)
+}
+
+const scanBlockComment = (code: string, start: number): number => {
+  let end = start + 2
+  while (end < code.length && !(code[end] === "*" && code[end + 1] === "/")) end += 1
+  return Math.min(code.length, end + 2)
+}
+
+const identifierClass = (word: string, previous: string, next: string): string => {
+  if (KEYWORDS.has(word)) return "hl-keyword"
+  if (CONSTANTS.has(word)) return "hl-constant"
+  if (previous === ".") return next === "(" ? "hl-func" : "hl-property"
+  if (/^[A-Z]/.test(word)) return "hl-type"
+  if (next === "(") return "hl-func"
+  return "hl-plain"
+}
 
 const tokenize = (code: string): ReadonlyArray<Token> => {
   const out: Array<Token> = []
@@ -89,75 +125,53 @@ const tokenize = (code: string): ReadonlyArray<Token> => {
   while (i < length) {
     const c = code[i] ?? ""
 
-    if (c === "/" && code[i + 1] === "/") {
-      let j = i + 2
-      while (j < length && code[j] !== "\n") j += 1
+    if (isLineComment(code, i)) {
+      const j = scanWhile(code, i + 2, (character) => character !== "\n")
       emit(code.slice(i, j), "hl-comment")
       i = j
       continue
     }
 
-    if (c === "/" && code[i + 1] === "*") {
-      let j = i + 2
-      while (j < length && !(code[j] === "*" && code[j + 1] === "/")) j += 1
-      j = Math.min(length, j + 2)
+    if (isBlockComment(code, i)) {
+      const j = scanBlockComment(code, i)
       emit(code.slice(i, j), "hl-comment")
       i = j
       continue
     }
 
     if (c === "`") {
-      let j = i + 1
-      while (j < length && code[j] !== "`") {
-        if (code[j] === "\\") j += 1
-        j += 1
-      }
-      emit(code.slice(i, Math.min(length, j + 1)), "hl-string")
-      i = Math.min(length, j + 1)
+      const j = scanQuoted(code, i, "`", false)
+      emit(code.slice(i, j), "hl-string")
+      i = j
       continue
     }
 
     if (c === '"' || c === "'") {
-      let j = i + 1
-      while (j < length && code[j] !== c && code[j] !== "\n") {
-        if (code[j] === "\\") j += 1
-        j += 1
-      }
-      emit(code.slice(i, Math.min(length, j + 1)), "hl-string")
-      i = Math.min(length, j + 1)
+      const j = scanQuoted(code, i, c, true)
+      emit(code.slice(i, j), "hl-string")
+      i = j
       continue
     }
 
-    if (isDigit(c) || (c === "." && isDigit(code[i + 1] ?? ""))) {
-      let j = i + 1
-      while (j < length && /[0-9a-fA-F_.xXoObB]/.test(code[j] ?? "")) j += 1
+    if (isNumberStart(code, i)) {
+      const j = scanWhile(code, i + 1, (character) => /[0-9a-fA-F_.xXoObB]/.test(character))
       emit(code.slice(i, j), "hl-number")
       i = j
       continue
     }
 
     if (isIdentStart(c)) {
-      let j = i + 1
-      while (j < length && isIdent(code[j] ?? "")) j += 1
+      const j = scanWhile(code, i + 1, isIdent)
       const word = code.slice(i, j)
-      let k = j
-      while (k < length && isInlineSpace(code[k] ?? "")) k += 1
+      const k = scanWhile(code, j, isInlineSpace)
       const next = code[k] ?? ""
-      let cls: string
-      if (KEYWORDS.has(word)) cls = "hl-keyword"
-      else if (CONSTANTS.has(word)) cls = "hl-constant"
-      else if (previous === ".") cls = next === "(" ? "hl-func" : "hl-property"
-      else if (/^[A-Z]/.test(word)) cls = "hl-type"
-      else if (next === "(") cls = "hl-func"
-      else cls = "hl-plain"
-      emit(word, cls)
+      emit(word, identifierClass(word, previous, next))
       i = j
       continue
     }
 
-    if (isInlineSpace(c) || c === "\n") {
-      let j = i + 1
-      while (j < length && (isInlineSpace(code[j] ?? "") || code[j] === "\n")) j += 1
+    if (isWhitespace(c)) {
+      const j = scanWhile(code, i + 1, isWhitespace)
       out.push({ text: code.slice(i, j), cls: "hl-plain" })
       i = j
       continue

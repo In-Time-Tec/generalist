@@ -1,50 +1,51 @@
 import { describe, expect, layer } from "@effect/vitest"
-import { Effect, Fiber, Layer, Schedule, Stream } from "effect"
+import { Effect, Fiber, Layer, Schedule, Schema, Stream } from "effect"
 import { Socket } from "effect/unstable/socket"
 import { Client, Wire } from "../../src/transport/index.js"
-import { event } from "./helpers.js"
+import { event } from "./fixtures.js"
 
-class FakeWebSocket {
+class FakeWebSocket extends EventTarget implements WebSocket {
+  readonly CONNECTING = WebSocket.CONNECTING
+  readonly OPEN = WebSocket.OPEN
+  readonly CLOSING = WebSocket.CLOSING
+  readonly CLOSED = WebSocket.CLOSED
+  readonly extensions = ""
+  readonly protocol = ""
   readonly sent: Array<string | Uint8Array> = []
-  readyState = 0
+  readyState: 0 | 1 | 2 | 3 = WebSocket.CONNECTING
   binaryType: BinaryType = "blob"
-  private readonly listeners = new Map<string, Array<(event: unknown) => void>>()
+  bufferedAmount = 0
+  onclose: WebSocket["onclose"] = null
+  onerror: WebSocket["onerror"] = null
+  onmessage: WebSocket["onmessage"] = null
+  onopen: WebSocket["onopen"] = null
 
-  constructor(readonly url: string) {}
-
-  addEventListener(type: string, listener: (event: unknown) => void): void {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener])
+  constructor(readonly url: string) {
+    super()
   }
 
-  removeEventListener(type: string, listener: (event: unknown) => void): void {
-    this.listeners.set(
-      type,
-      (this.listeners.get(type) ?? []).filter((candidate) => candidate !== listener),
-    )
-  }
-
-  send(data: string | Uint8Array): void {
-    this.sent.push(data)
+  send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
+    this.sent.push(Schema.decodeUnknownSync(Schema.Union([Schema.String, Schema.Uint8Array]))(data))
   }
 
   close(code = 1000, reason?: string): void {
     this.readyState = 3
-    this.emit("close", { code, reason })
+    const init: CloseEventInit = { code }
+    if (reason !== undefined) init.reason = reason
+    this.dispatchEvent(new CloseEvent("close", init))
   }
 
   open(): void {
     this.readyState = 1
-    this.emit("open", {})
+    this.dispatchEvent(new Event("open"))
   }
 
   message(data: string): void {
-    this.emit("message", { data })
-  }
-
-  private emit(type: string, value: unknown): void {
-    for (const listener of this.listeners.get(type) ?? []) listener(value)
+    this.dispatchEvent(new MessageEvent("message", { data }))
   }
 }
+
+const sentText = (value: string | Uint8Array | undefined): string => Schema.decodeUnknownSync(Schema.String)(value)
 
 const socketAt = (sockets: ReadonlyArray<FakeWebSocket>, index: number): Effect.Effect<FakeWebSocket> =>
   Effect.suspend(() => {
@@ -58,9 +59,9 @@ describe("Client", () => {
   {
     const sockets: Array<FakeWebSocket> = []
     const constructor = Layer.succeed(Socket.WebSocketConstructor, (url) => {
-      const socket = new FakeWebSocket(String(url))
+      const socket = new FakeWebSocket(url)
       sockets.push(socket)
-      return socket as unknown as WebSocket
+      return socket
     })
     layer(Client.layerWebSocket.pipe(Layer.provide(constructor)), { excludeTestServices: true })(
       "reconnects from the last RunEvent admitted to its bounded queue",
@@ -79,7 +80,7 @@ describe("Client", () => {
               const first = yield* socketAt(sockets, 0)
               first.open()
               yield* Effect.yieldNow
-              expect(yield* Wire.decodeCommand(first.sent[0] as string)).toEqual({ _tag: "Attach", runId: "run-1" })
+              expect(yield* Wire.decodeCommand(sentText(first.sent[0]))).toEqual({ _tag: "Attach", runId: "run-1" })
 
               const received = connection.events.pipe(Stream.take(1), Stream.runCollect, Effect.forkChild)
               first.message(yield* Wire.producerCodec.encode(event(7)))
@@ -89,14 +90,14 @@ describe("Client", () => {
               const second = yield* socketAt(sockets, 1)
               second.open()
               yield* Effect.yieldNow
-              expect(yield* Wire.decodeCommand(second.sent[0] as string)).toEqual({
+              expect(yield* Wire.decodeCommand(sentText(second.sent[0]))).toEqual({
                 _tag: "Attach",
                 runId: "run-1",
                 cursor: 7,
               })
 
               yield* connection.cancel("user")
-              expect(yield* Wire.decodeCommand(second.sent[1] as string)).toEqual({
+              expect(yield* Wire.decodeCommand(sentText(second.sent[1]))).toEqual({
                 _tag: "Cancel",
                 runId: "run-1",
                 reason: "user",

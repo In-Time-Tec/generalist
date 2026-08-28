@@ -1,9 +1,10 @@
 import { OpenAiClient, OpenAiLanguageModel, OpenAiSchema } from "@effect/ai-openai"
-import { ContextOverflow, ModelRegistry } from "tenetkit"
+import { ContextOverflow } from "../../core/index.js"
+import { ModelRegistry } from "../../core/model/public/registry.js"
 import { Config, Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
-import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/model-failure.js"
+import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 
 /** @experimental */
@@ -41,8 +42,10 @@ const ConfigSchema = Schema.Struct({
 })
 
 /** @experimental Decodes persisted provider options into OpenAI request configuration. */
-export const decodeConfig = (options: unknown): Config =>
-  Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {}) as Config
+const decodeConfigInput = Schema.decodeUnknownSync(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
+type ConfigInput = typeof Schema.Unknown.Type
+
+export const decodeConfig = (options: ConfigInput): Config => decodeConfigInput(options ?? null) ?? {}
 
 const serverFailureCodes = new Set([
   "internal_server_error",
@@ -75,17 +78,61 @@ const invalidRequestCodes = new Set([
   "unsupported_image_media_type",
 ])
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const NullableString = Schema.NullOr(Schema.String)
+const OpenAiErrorPayload = Schema.Struct({
+  code: Schema.optionalKey(NullableString),
+  message: Schema.optionalKey(Schema.String),
+  param: Schema.optionalKey(NullableString),
+  type: Schema.optionalKey(NullableString),
+})
+const decodeOpenAiError = Schema.decodeUnknownOption(OpenAiErrorPayload)
 
-const boundedDescription = (value: unknown, fallback: string): string =>
-  typeof value === "string" && value.length > 0 ? value.slice(0, 2_048) : fallback
+type OpenAiErrorPayload = typeof OpenAiErrorPayload.Type
 
-const boundedMetadata = (value: unknown): string | null => (typeof value === "string" ? value.slice(0, 256) : null)
+const boundedDescription = (value: string | undefined, fallback: string): string =>
+  value !== undefined && value.length > 0 ? value.slice(0, 2_048) : fallback
+
+const boundedMetadata = (value: string | null | undefined): string | null => value?.slice(0, 256) ?? null
 
 const openAiRequestId = (metadata: FailureInput["metadata"]): string | null => {
-  const openai = metadata.openai
-  return isRecord(openai) ? boundedMetadata(openai.requestId) : null
+  const decoded = Schema.decodeUnknownOption(Schema.Struct({ requestId: Schema.optionalKey(Schema.String) }))(
+    metadata.openai,
+  )
+  return Option.isSome(decoded) ? boundedMetadata(decoded.value.requestId) : null
+}
+
+const openAiReasonForCode = (
+  code: string,
+  message: string,
+  parameter: string | null,
+  metadata: {
+    readonly openai: {
+      readonly errorCode: string
+      readonly errorType: string | null
+      readonly requestId: string | null
+    }
+  },
+): AiError.AiErrorReason | undefined => {
+  if (serverFailureCodes.has(code)) return AiError.InternalProviderError.make({ description: message, metadata })
+  if (rateLimitCodes.has(code)) {
+    return AiError.RateLimitError.make({
+      metadata: {
+        openai: { ...metadata.openai, limit: null, remaining: null, resetRequests: null, resetTokens: null },
+      },
+    })
+  }
+  if (quotaCodes.has(code)) return AiError.QuotaExhaustedError.make({ metadata })
+  if (authenticationCodes.has(code)) return AiError.AuthenticationError.make({ kind: "InvalidKey", metadata })
+  if (permissionCodes.has(code)) {
+    return AiError.AuthenticationError.make({ kind: "InsufficientPermissions", metadata })
+  }
+  if (contentPolicyCodes.has(code)) return AiError.ContentPolicyError.make({ description: message, metadata })
+  if (code === "context_length_exceeded" || invalidRequestCodes.has(code)) {
+    return AiError.InvalidRequestError.make(
+      parameter === null ? { description: message, metadata } : { description: message, parameter, metadata },
+    )
+  }
+  return undefined
 }
 
 /** @internal Classify one decoded OpenAI error payload; shared by every OpenAI transport. */
@@ -93,10 +140,11 @@ export const openAiFailureReason = ({
   error,
   requestId,
 }: {
-  readonly error: unknown
+  readonly error: FailureInput["error"]
   readonly requestId: string | null
 }): AiError.AiErrorReason => {
-  const event = isRecord(error) ? error : undefined
+  const decoded = decodeOpenAiError(error)
+  const event: OpenAiErrorPayload = Option.isSome(decoded) ? decoded.value : {}
   const code = boundedMetadata(event?.code)
   const message = boundedDescription(event?.message, "OpenAI response failed")
   const parameter = boundedMetadata(event?.param)
@@ -107,40 +155,12 @@ export const openAiFailureReason = ({
       requestId,
     },
   }
-  if (code !== null && serverFailureCodes.has(code)) {
-    return AiError.InternalProviderError.make({ description: message, metadata })
-  }
-  if (code !== null && rateLimitCodes.has(code)) {
-    return AiError.RateLimitError.make({
-      metadata: {
-        openai: {
-          ...metadata.openai,
-          limit: null,
-          remaining: null,
-          resetRequests: null,
-          resetTokens: null,
-        },
-      },
-    })
-  }
-  if (code !== null && quotaCodes.has(code)) {
-    return AiError.QuotaExhaustedError.make({ metadata })
-  }
-  if (code !== null && authenticationCodes.has(code)) {
-    return AiError.AuthenticationError.make({ kind: "InvalidKey", metadata })
-  }
-  if (code !== null && permissionCodes.has(code)) {
-    return AiError.AuthenticationError.make({ kind: "InsufficientPermissions", metadata })
-  }
-  if (code !== null && contentPolicyCodes.has(code)) {
-    return AiError.ContentPolicyError.make({ description: message, metadata })
-  }
-  if (code === "context_length_exceeded" || (code !== null && invalidRequestCodes.has(code))) {
-    return AiError.InvalidRequestError.make({
-      description: message,
-      ...(parameter === null ? {} : { parameter }),
-      metadata,
-    })
+  if (code !== null) {
+    const classifiedMetadata = { openai: { ...metadata.openai, errorCode: code } }
+    return (
+      openAiReasonForCode(code, message, parameter, classifiedMetadata) ??
+      AiError.UnknownError.make({ description: message, metadata: classifiedMetadata })
+    )
   }
   return AiError.UnknownError.make({ description: message, metadata })
 }
@@ -158,10 +178,9 @@ const resolveOpenAiFailure = ({ error, metadata: partMetadata, method }: Failure
 export const openAiLanguageModelLayer = (input: OpenAiInput) =>
   layerModelFailures(
     layerImageSources(
-      OpenAiLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
+      OpenAiLanguageModel.layer(
+        input.config === undefined ? { model: input.model } : { model: input.model, config: input.config },
+      ),
     ),
     resolveOpenAiFailure,
   )
@@ -193,68 +212,84 @@ export interface LayerOptions extends OpenAiInput {
 export const layer = (
   input: LayerOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([
-    ModelRegistry.registration({
-      provider: "openai",
-      model: input.model,
-      layer: openAiLanguageModelLayer(input),
-      classifyFailure,
-      toolJsonSchemaCompiler,
-      isAvailabilityFailure,
-      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-    }),
-  ]).pipe(Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
+  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+    Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
+  )
 
 /** @experimental Bare registration effect; the consumer provides the OpenAi client (see layerConfig). */
 export const registration = (
   input: OpenAiInput,
 ): Effect.Effect<ModelRegistry.Registration, never, OpenAiClient.OpenAiClient> =>
-  ModelRegistry.registration({
+  ModelRegistry.registration(registrationOptions(input))
+
+const registrationOptions = (input: OpenAiInput) => {
+  const required = {
     provider: "openai",
     model: input.model,
     layer: openAiLanguageModelLayer(input),
     classifyFailure,
     toolJsonSchemaCompiler,
     isAvailabilityFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
+  } as const
+  if (input.registrationKey === undefined) {
+    return input.metadata === undefined ? required : { ...required, metadata: input.metadata }
+  }
+  return input.metadata === undefined
+    ? { ...required, registrationKey: input.registrationKey }
+    : { ...required, registrationKey: input.registrationKey, metadata: input.metadata }
+}
 
 const stringifyJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const parseJsonOption = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
+const SseErrorPayload = Schema.Struct({
+  code: Schema.optionalKey(NullableString),
+  error: Schema.optionalKey(OpenAiErrorPayload),
+  message: Schema.optionalKey(Schema.String),
+  response: Schema.optionalKey(Schema.Struct({ error: Schema.optionalKey(OpenAiErrorPayload) })),
+  sequence_number: Schema.optionalKey(Schema.Finite),
+  type: Schema.optionalKey(Schema.String),
+})
+const decodeSseErrorPayload = Schema.decodeUnknownOption(SseErrorPayload)
 const dataLinePrefix = /^data: ?/
 const frameSeparator = /(\r?\n\r?\n)/
 const lineSeparator = /(\r?\n)/
 
 const isResponsesUrl = (url: string) => url.split(/[?#]/)[0]!.replace(/\/+$/, "").endsWith("/responses")
 
+const stringifyFlattenedError = (
+  details: OpenAiErrorPayload,
+  message: string | undefined,
+  sequenceNumber: number,
+): string =>
+  stringifyJson({
+    type: "error",
+    code: boundedMetadata(details.code) ?? boundedMetadata(details.type),
+    message: boundedDescription(details.message ?? message, "OpenAI response failed"),
+    param: boundedMetadata(details.param),
+    sequence_number: sequenceNumber,
+  })
+
 const flattenErrorPayload = (payload: string): string | undefined => {
   const decoded = parseJsonOption(payload)
-  if (Option.isNone(decoded) || !isRecord(decoded.value)) return undefined
-  const record = decoded.value
-  if (record.type === "error" && typeof record.message === "string" && "code" in record) return undefined
-  const response = record.type === "response.failed" && isRecord(record.response) ? record.response : undefined
+  if (Option.isNone(decoded)) return undefined
+  const parsed = decodeSseErrorPayload(decoded.value)
+  if (Option.isNone(parsed)) return undefined
+  const record = parsed.value
+  if (record.type === "error" && record.message !== undefined && record.code !== undefined) return undefined
+  const response = record.type === "response.failed" ? record.response : undefined
   if (record.type !== "error" && response === undefined) return undefined
   const details = response?.error ?? record.error
-  if (!isRecord(details)) {
+  if (details === undefined) {
     if (response === undefined) return undefined
     return stringifyJson({
       type: "error",
       code: null,
       message: "OpenAI response failed",
       param: null,
-      sequence_number: typeof record.sequence_number === "number" ? record.sequence_number : 0,
+      sequence_number: record.sequence_number ?? 0,
     })
   }
-  const message = typeof details.message === "string" ? details.message : record.message
-  return stringifyJson({
-    type: "error",
-    code: boundedMetadata(details.code) ?? boundedMetadata(details.type),
-    message: boundedDescription(message, "OpenAI response failed"),
-    param: boundedMetadata(details.param),
-    sequence_number: typeof record.sequence_number === "number" ? record.sequence_number : 0,
-  })
+  return stringifyFlattenedError(details, record.message, record.sequence_number ?? 0)
 }
 
 const rewriteFrame = (frame: string): string => {
@@ -320,14 +355,3 @@ export const layerConfig = (options?: Parameters<typeof OpenAiClient.layerConfig
         ? normalizeResponsesSse(client)
         : client.pipe(normalizeResponsesSse, options.transformClient),
   })
-
-export {
-  OpenAiAccountCredentialError,
-  credentialsFromAccountAuth,
-  layerAccount,
-  layerAccountClient,
-  registrationAccount,
-  type OpenAiAccountCredential,
-  type OpenAiAccountCredentials,
-  type OpenAiAccountInput,
-} from "./openai-account.js"

@@ -33,7 +33,7 @@ export const Compaction = {
   layer: Compaction_layer,
   truncate: Compaction_truncate,
   layerTest: Compaction_layerTest,
-} as typeof import("./compaction.js")
+}
 export namespace Compaction {
   export type DEFAULT_RESERVE_TOKENS = typeof import("./compaction.js").DEFAULT_RESERVE_TOKENS
   export type DEFAULT_KEEP_RECENT_TOKENS = typeof import("./compaction.js").DEFAULT_KEEP_RECENT_TOKENS

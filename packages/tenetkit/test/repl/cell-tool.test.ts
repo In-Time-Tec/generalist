@@ -1,3 +1,4 @@
+import "./suites/bun-cell-isolation-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { ToolContext, ToolExecutor } from "tenetkit"
@@ -14,8 +15,18 @@ const profile = KernelProfile.make({
   trustMode: "trusted-local",
 })
 
-const toolCall = (name: string, params: unknown) =>
-  Response.makePart("tool-call", { id: "call-1", name, params, providerExecuted: false })
+interface ToolCallParams {
+  readonly code?: string
+}
+
+const toolCall = (name: string, params: ToolCallParams): Response.ToolCallPart<string, unknown> =>
+  Schema.decodeSync(Response.ToolCallPart(name, Schema.Unknown))({
+    type: "tool-call",
+    id: "call-1",
+    name,
+    params,
+    providerExecuted: false,
+  })
 
 const request = (code: string): ToolExecutor.Request => {
   const call = toolCall(CellTool.name, { code })
@@ -71,9 +82,9 @@ describe("cell tool schema", () => {
 
   standalone("rejects any additional parameter", () => {
     expect(() => Schema.decodeUnknownSync(CellTool.Parameters)({ code: "1", timeout: 5 })).not.toThrow()
-    expect(
-      Schema.encodeSync(CellTool.Parameters)(Schema.decodeUnknownSync(CellTool.Parameters)({ code: "1" })),
-    ).toEqual({ code: "1" })
+    expect(Schema.encodeSync(CellTool.Parameters)(Schema.decodeSync(CellTool.Parameters)({ code: "1" }))).toEqual({
+      code: "1",
+    })
   })
 
   standalone("succeeds with CellResult and fails with CellFailure", () => {
@@ -103,9 +114,10 @@ layer(executorLayer)("cell tool route", (it) => {
       const outcome = yield* executor.execute(request("1 + 1"))
       expect(outcome._tag).toBe("Success")
       if (outcome._tag !== "Success") return
-      expect((outcome.result as Cell.CellResult).value).toBe("1 + 1")
-      expect((outcome.result as Cell.CellResult).stdout).toBe("out")
-      expect(Schema.is(Cell.CellResult)(outcome.result)).toBe(true)
+      const result = yield* Schema.decodeUnknownEffect(Cell.CellResult)(outcome.result)
+      expect(result.value).toBe("1 + 1")
+      expect(result.stdout).toBe("out")
+      expect(Schema.is(Cell.CellResult)(result)).toBe(true)
     }),
   )
 
@@ -150,7 +162,7 @@ layer(executorLayer)("cell tool route", (it) => {
       expect(stdout.length).toBeGreaterThan(0)
       expect(stdout.map((item) => item.data?.["text"])).toEqual(["out"])
       const sequences = collected.map((item) => item.data?.["sequence"])
-      expect(sequences).toEqual([...sequences].sort((left, right) => Number(left) - Number(right)))
+      expect(sequences).toEqual(sequences.toSorted((left, right) => Number(left) - Number(right)))
     }),
   )
 

@@ -9,7 +9,7 @@ export const Approvals = {
   layerAutoApprove: Approvals_layerAutoApprove,
   layerDenyAll: Approvals_layerDenyAll,
   layerTest: Approvals_layerTest,
-} as typeof import("./approvals.js")
+}
 export namespace Approvals {
   export type Approvals = import("./approvals.js").Approvals
   export type layerAutoApprove = typeof import("./approvals.js").layerAutoApprove

@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Option, Schema } from "effect"
 import { ToolContext, ToolExecutor } from "tenetkit"
 import { Response } from "effect/unstable/ai"
 import { Cell, CellTool, HostBindingRegistry, KernelProfile, TestKernel } from "tenetkit/repl"
@@ -16,7 +16,9 @@ const workspace: HostBindingRegistry.Module = {
       output: Schema.Struct({ text: Schema.String }),
       failure: NotFound,
       handle: (input) => {
-        const { path } = input as { readonly path: string }
+        const { path } = Schema.decodeUnknownOption(Schema.Struct({ path: Schema.String }))(input).pipe(
+          Option.getOrThrow,
+        )
         return path === "/README.md" ? Effect.succeed({ text: "# cell-agent" }) : Effect.fail(NotFound.make({ path }))
       },
     },
@@ -37,12 +39,14 @@ const profile = KernelProfile.make({
  */
 const script = (): TestKernel.Script => ({ _tag: "Value", value: '"# cell-agent"' })
 
-const call = Response.makePart("tool-call", {
-  id: "call-1",
-  name: CellTool.name,
-  params: { code: 'const file = await workspace.read({ path: "/README.md" }); file.text' },
-  providerExecuted: false,
-})
+const call = Schema.decodeSync(Response.ToolCallPart(CellTool.name, Schema.Struct({ code: Schema.String })))(
+  Response.makePart("tool-call", {
+    id: "call-1",
+    name: CellTool.name,
+    params: { code: 'const file = await workspace.read({ path: "/README.md" }); file.text' },
+    providerExecuted: false,
+  }),
+)
 
 const program = Effect.gen(function* () {
   const registry = yield* HostBindingRegistry.HostBindingRegistry
@@ -61,7 +65,8 @@ const program = Effect.gen(function* () {
   })
   yield* Console.log(`outcome: ${outcome._tag}`)
   if (outcome._tag === "Success") {
-    yield* Console.log(`value: ${(outcome.result as Cell.CellResult).value}`)
+    const result = Schema.decodeUnknownOption(Cell.CellResult)(outcome.result).pipe(Option.getOrThrow)
+    yield* Console.log(`value: ${result.value}`)
   }
 })
 

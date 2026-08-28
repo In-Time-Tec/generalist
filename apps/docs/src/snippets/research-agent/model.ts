@@ -1,18 +1,19 @@
 import { OpenRouter } from "tenetkit/ai"
-import { Config, Effect, Layer, Option, Stream } from "effect"
+import { Config, Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
 import { FetchHttpClient } from "effect/unstable/http"
 
-interface WebSearchSuccess {
-  readonly results: ReadonlyArray<{ readonly title: string; readonly url: string; readonly snippet: string }>
-}
+const WebSearchSuccess = Schema.Struct({
+  results: Schema.Array(Schema.Struct({ title: Schema.String, url: Schema.String, snippet: Schema.String })),
+})
+type WebSearchSuccess = typeof WebSearchSuccess.Type
 
 const findWebSearchResult = (prompt: Prompt.Prompt): WebSearchSuccess | undefined => {
   for (const message of prompt.content) {
     if (message.role !== "tool") continue
     for (const part of message.content) {
       if (part.type === "tool-result" && part.name === "web_search" && !part.isFailure) {
-        return part.result as WebSearchSuccess
+        return Schema.decodeUnknownOption(WebSearchSuccess)(part.result).pipe(Option.getOrUndefined)
       }
     }
   }

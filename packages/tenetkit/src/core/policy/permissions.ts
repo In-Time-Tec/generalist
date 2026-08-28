@@ -71,39 +71,51 @@ interface Projection {
   readonly complete: boolean
 }
 
-const isTextLeaf = (value: unknown): value is string | number | boolean | bigint =>
-  typeof value === "string" || typeof value === "number" || typeof value === "boolean" || typeof value === "bigint"
+type PolicyParameters = typeof Schema.Unknown.Type
 
-const collectCandidates = (value: unknown, visiting: Set<object>, out: Array<string>): boolean => {
-  if (typeof value === "string") {
-    out.push(value)
-    return true
-  }
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    out.push(String(value))
+const unknownArray = Schema.Array(Schema.Unknown)
+const unknownRecord = Schema.Record(Schema.String, Schema.Unknown)
+
+const textLeaf = (value: PolicyParameters): Option.Option<string> => {
+  if (Schema.is(Schema.String)(value)) return Option.some(value)
+  if (Schema.is(Schema.Finite)(value)) return Option.some(String(value))
+  if (Schema.is(Schema.Boolean)(value)) return Option.some(String(value))
+  if (Schema.is(Schema.BigInt)(value)) return Option.some(String(value))
+  return Option.none()
+}
+
+const collectCandidates = (value: PolicyParameters, visiting: Set<object>, out: Array<string>): boolean => {
+  const leaf = textLeaf(value)
+  if (Option.isSome(leaf)) {
+    out.push(leaf.value)
     return true
   }
   if (value === null || value === undefined) return true
-  if (typeof value !== "object") return false
-  if (visiting.has(value)) return false
-  visiting.add(value)
-  let complete = true
-  if (Array.isArray(value)) {
-    const joined = value.filter(isTextLeaf).map(String)
+  const array = Schema.decodeUnknownOption(unknownArray)(value)
+  if (Option.isSome(array)) {
+    if (visiting.has(array.value)) return false
+    visiting.add(array.value)
+    const joined = array.value.flatMap((element) => Option.toArray(textLeaf(element)))
     if (joined.length > 0) out.push(joined.join(" "))
-    for (const element of value) {
+    let complete = true
+    for (const element of array.value) {
       complete = collectCandidates(element, visiting, out) && complete
     }
-  } else {
-    for (const propValue of Object.values(value)) {
-      complete = collectCandidates(propValue, visiting, out) && complete
-    }
+    visiting.delete(array.value)
+    return complete
   }
-  visiting.delete(value)
+  const record = Schema.decodeUnknownOption(unknownRecord)(value)
+  if (Option.isNone(record) || visiting.has(record.value)) return false
+  visiting.add(record.value)
+  let complete = true
+  for (const propValue of Object.values(record.value)) {
+    complete = collectCandidates(propValue, visiting, out) && complete
+  }
+  visiting.delete(record.value)
   return complete
 }
 
-const serializedParams = (params: unknown): string => {
+const serializedParams = (params: PolicyParameters): string => {
   try {
     const json = JSON.stringify(params)
     return json === undefined ? String(params) : json
@@ -112,7 +124,7 @@ const serializedParams = (params: unknown): string => {
   }
 }
 
-const project = (params: unknown): Projection => {
+const project = (params: PolicyParameters): Projection => {
   const candidates: Array<string> = []
   const complete = collectCandidates(params, new Set(), candidates)
   candidates.push(serializedParams(params))
@@ -131,13 +143,13 @@ const matchesProjection = (pattern: string, tool: string, projection: Projection
 
 /** @experimental Match a permission pattern against a tool call. */
 export const matches: {
-  (tool: string, params: unknown): (pattern: string) => boolean
-  (pattern: string, tool: string, params: unknown): boolean
-} = dual(3, (pattern: string, tool: string, params: unknown): boolean =>
+  (tool: string, params: PolicyParameters): (pattern: string) => boolean
+  (pattern: string, tool: string, params: PolicyParameters): boolean
+} = dual(3, (pattern: string, tool: string, params: PolicyParameters): boolean =>
   matchesProjection(pattern, tool, project(params), false),
 )
 
-const matchingRule = (ruleset: Ruleset, tool: string, params: unknown): Rule | undefined => {
+const matchingRule = (ruleset: Ruleset, tool: string, params: PolicyParameters): Rule | undefined => {
   const projection = project(params)
   let matched: Rule | undefined
   for (const rule of ruleset.rules) {
@@ -148,21 +160,21 @@ const matchingRule = (ruleset: Ruleset, tool: string, params: unknown): Rule | u
 
 /** @experimental Find the last matching rule without applying a fallback. */
 export const matchRule: {
-  (tool: string, params: unknown): (ruleset: Ruleset) => Option.Option<Rule>
-  (ruleset: Ruleset, tool: string, params: unknown): Option.Option<Rule>
+  (tool: string, params: PolicyParameters): (ruleset: Ruleset) => Option.Option<Rule>
+  (ruleset: Ruleset, tool: string, params: PolicyParameters): Option.Option<Rule>
 } = dual(
   3,
-  (ruleset: Ruleset, tool: string, params: unknown): Option.Option<Rule> =>
+  (ruleset: Ruleset, tool: string, params: PolicyParameters): Option.Option<Rule> =>
     Option.fromNullishOr(matchingRule(ruleset, tool, params)),
 )
 
 /** @experimental Evaluate a ruleset with last-match semantics. */
 export const evaluate: {
-  (tool: string, params: unknown): (ruleset: Ruleset) => Level
-  (ruleset: Ruleset, tool: string, params: unknown): Level
+  (tool: string, params: PolicyParameters): (ruleset: Ruleset) => Level
+  (ruleset: Ruleset, tool: string, params: PolicyParameters): Level
 } = dual(
   3,
-  (ruleset: Ruleset, tool: string, params: unknown): Level =>
+  (ruleset: Ruleset, tool: string, params: PolicyParameters): Level =>
     matchingRule(ruleset, tool, params)?.level ?? ruleset.fallback ?? "ask",
 )
 
@@ -175,7 +187,7 @@ const decisionFor = (ruleset: Ruleset, request: AccessRequest): Decision => {
     case "allow":
       return { _tag: "Allow" }
     case "deny":
-      return { _tag: "Deny", ...(rule?.reason === undefined ? {} : { reason: rule.reason }) }
+      return rule?.reason === undefined ? { _tag: "Deny" } : { _tag: "Deny", reason: rule.reason }
     case "ask":
       return { _tag: "Ask", token: tokenFor(request) }
   }
@@ -198,7 +210,7 @@ export const evaluateWithRules: {
         case "allow":
           return { _tag: "Allow" }
         case "deny":
-          return { _tag: "Deny", ...(rule.reason === undefined ? {} : { reason: rule.reason }) }
+          return rule.reason === undefined ? { _tag: "Deny" } : { _tag: "Deny", reason: rule.reason }
         case "ask":
           return { _tag: "Ask", token: tokenFor(request) }
       }
