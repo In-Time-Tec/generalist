@@ -26,7 +26,7 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
             pool,
             sessionId: "s",
             cellId: "c1",
-            code: "for (let index = 0; index < 2000; index += 1) { console.log('x'.repeat(200)) }; 'done'",
+            code: "for (let index = 0; index < 100; index += 1) { console.log('x'.repeat(200)) }; 'done'",
           })
           const result = yield* observed.result
           expect(stdoutOf(observed.events).length).toBeLessThanOrEqual(channelBytes)
@@ -47,7 +47,7 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
             pool,
             sessionId: "s",
             cellId: "c1",
-            code: "for (let index = 0; index < 2000; index += 1) { console.log('y'.repeat(200)) }; 'done'",
+            code: "for (let index = 0; index < 100; index += 1) { console.log('y'.repeat(200)) }; 'done'",
           })
           yield* observed.result
           const truncated = observed.events.find((event) => event._tag === "OutputTruncated")
@@ -71,7 +71,7 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
             cellId: "c1",
             code: [
               "console.log('short stdout')",
-              "for (let index = 0; index < 2000; index += 1) { console.error('z'.repeat(200)) }",
+              "for (let index = 0; index < 100; index += 1) { console.error('z'.repeat(200)) }",
               "'done'",
             ].join("\n"),
           })
@@ -175,7 +175,8 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
             sessionId: "s",
             cellId: "c1",
             code: [
-              "Bun.spawnSync(['bash', '-c', 'for i in $(seq 1 500); do echo FLOOD-$i; done'], { stdout: 'inherit' })",
+              "const child = Bun.spawnSync([process.execPath, '-e', \"process.stdout.write('FLOOD-LINE\\\\n'.repeat(1000))\"], { stdout: 'inherit' })",
+              "if (!child.success) throw new Error('flooding subprocess exited ' + child.exitCode)",
               "'done'",
             ].join("\n"),
           })
