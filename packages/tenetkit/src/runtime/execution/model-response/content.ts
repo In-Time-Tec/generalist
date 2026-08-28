@@ -1,11 +1,11 @@
 import { Session } from "../../../core/context/public/session.js"
 import { Schema } from "effect"
-import { Response } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 
 export const decodeAuthoredModelResponseContent = (
   input: typeof Session.ModelResponseContent.Encoded,
-): Session.ModelResponseEntry["content"] =>
-  Schema.decodeSync(Session.ModelResponseContent)(input).map((part) => {
+): Session.ModelResponseEntry["content"] => {
+  const content = Schema.decodeSync(Session.ModelResponseContent)(input).map((part) => {
     if (part.type === "tool-call") {
       return Response.makePart("tool-call", {
         id: part.id,
@@ -29,3 +29,9 @@ export const decodeAuthoredModelResponseContent = (
     }
     return part
   })
+  const prompt = Prompt.fromResponseParts(content)
+  if (prompt.content.length !== 1 || prompt.content[0]?.role !== "assistant") {
+    throw new TypeError("model response did not project one assistant message")
+  }
+  return content
+}

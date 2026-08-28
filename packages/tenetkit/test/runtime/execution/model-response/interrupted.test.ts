@@ -26,7 +26,7 @@ const interrupted = (
   text = "retained partial",
   reason: "cancel" | "failure" = "failure",
 ) => {
-  const response = { content: [Response.makePart("text", { text })] }
+  const response = { content: text === "" ? [] : [Response.makePart("text", { text })] }
   const identity = {
     turn: 0,
     operationKey,
@@ -84,6 +84,20 @@ const directCommit = (backend: "memory" | "sqlite") => {
         _tag: "Message",
         message: textPrompt("durable input").content[0]!,
       })
+      const empty = interrupted(operationKey, prefix.id, "")
+      const rejectedEmpty = yield* Effect.exit(
+        store.commitInterruptedModelResponse({
+          ...claim,
+          operationId: operation.operationId,
+          outcome: failedOutcome,
+          event: empty,
+        }),
+      )
+      expect(rejectedEmpty._tag).toBe("Failure")
+      expect(yield* session.value.path()).toEqual([prefix])
+      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
+        "running",
+      )
       const exact = interrupted(operationKey, prefix.id)
       yield* store.commitInterruptedModelResponse({
         ...claim,

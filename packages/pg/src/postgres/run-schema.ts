@@ -1,7 +1,6 @@
-import { Cause, DateTime, Effect, Layer, Redacted } from "effect"
+import { Cause, DateTime, Effect } from "effect"
 import { Migrator, SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { PgClient } from "@effect/sql-pg"
 import {
   SchemaChecksumMismatch,
   SchemaDirty,
@@ -19,6 +18,7 @@ import {
   SCHEMA_VERSION,
   schemaChecksum,
 } from "./schema.js"
+import { layerClient as postgresClient } from "./client.js"
 
 export interface SchemaPlan {
   readonly current: number
@@ -164,5 +164,5 @@ export const markDirty = (source: string): Effect.Effect<void, SchemaMigrationFa
 
 export const RunSchema = { plan, check, apply, markDirty } as const
 
-export const layerClient = (url: string): Layer.Layer<SqlClient.SqlClient | PgClient.PgClient, SqlError> =>
-  PgClient.layer({ url: Redacted.make(url) })
+export const layerClient = (options: { readonly url: string; readonly maxConnections?: number }) =>
+  postgresClient(options)

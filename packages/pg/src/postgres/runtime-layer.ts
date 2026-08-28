@@ -1,6 +1,5 @@
-import { Context, Effect, Layer, Redacted } from "effect"
+import { Context, Effect, Layer } from "effect"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { PgClient } from "@effect/sql-pg"
 import { makeRuntime } from "tenetkit/runtime/driver/memory/layer"
 import { Runtime, type LayerOptions } from "tenetkit/runtime/driver/service"
 import { RunStore } from "tenetkit/runtime/driver/run/store"
@@ -16,6 +15,7 @@ import {
   type SchemaUpgradeRequired,
   type SchemaVersionUnsupported,
 } from "tenetkit/runtime/driver/sql/errors"
+import { layerClient } from "./client.js"
 
 export interface PostgresStoreOptions extends LayerOptions {
   readonly url: string
@@ -41,7 +41,7 @@ export const layerPostgres = (
           message: "PostgreSQL maxConnections must be a positive integer",
         })
       }
-      return PgClient.layer({ url: Redacted.make(options.url), maxConnections })
+      return layerClient({ url: options.url, maxConnections })
     }),
   )
   const services = Layer.effectContext(

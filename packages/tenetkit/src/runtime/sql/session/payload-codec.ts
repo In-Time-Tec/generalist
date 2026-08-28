@@ -117,7 +117,9 @@ const payloadIdentity = (value: EncodedValue, seen: Set<EncodedValue>): PayloadI
 }
 
 const payloadOnly = (value: Session.EntryPayload): EncodedRecord =>
-  Object.fromEntries(Object.entries(decodeEncodedRecord(value)).filter(([key]) => key !== "id" && key !== "parentId"))
+  Object.fromEntries(
+    Object.entries(decodeEncodedRecord(encodeEntry(value))).filter(([key]) => key !== "id" && key !== "parentId"),
+  )
 
 const sessionPayloadEquivalenceImpl = (self: Session.EntryPayload, that: Session.EntryPayload): boolean =>
   Equal.equals(payloadIdentity(payloadOnly(self), new Set()), payloadIdentity(payloadOnly(that), new Set()))

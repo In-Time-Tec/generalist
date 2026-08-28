@@ -68,6 +68,12 @@ it("compares transformed Session payloads through their durable representation",
   const payload: Session.EntryPayload = {
     _tag: "ModelResponse",
     content: [
+      Response.makePart("tool-call", {
+        id: "tool-call-equivalence",
+        name: "equivalent_tool",
+        params: {},
+        providerExecuted: false,
+      }),
       Response.makePart("response-metadata", {
         id: "response-equivalence",
         modelId: "model-equivalence",
