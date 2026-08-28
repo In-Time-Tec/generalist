@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.41.4
+
+- Decode PostgreSQL `BIGINT` sequence and tree-position values once at the client boundary, reject out-of-range JavaScript integers, and use the same decoder for runtime, schema, and test clients.
+- Compare Session payloads through their canonical durable encoding and reject empty interrupted model responses before committing them, restoring cross-host retry and cancellation behavior for PostgreSQL and MySQL.
+
 ## 0.41.0
 
 - Adopt Rika's repository policy as the workspace baseline: all 16 anti-slop rules, all 95 Effect TSGo rules, and Oxlint's correctness, performance, and suspicious defaults fail the build; Oxlint alone enforces the 500-physical-line package-source limit.

@@ -210,7 +210,7 @@
     },
     "packages/cloudflare": {
       "name": "@tenetkit/cloudflare",
-      "version": "0.41.3",
+      "version": "0.41.4",
       "dependencies": {
         "@effect/sql-sqlite-do": "catalog:",
         "es-module-lexer": "catalog:",
@@ -231,7 +231,7 @@
     },
     "packages/mysql": {
       "name": "@tenetkit/mysql",
-      "version": "0.41.3",
+      "version": "0.41.4",
       "dependencies": {
         "@effect/sql-mysql2": "catalog:",
         "tenetkit": "workspace:*",
@@ -249,7 +249,7 @@
     },
     "packages/pg": {
       "name": "@tenetkit/pg",
-      "version": "0.41.3",
+      "version": "0.41.4",
       "dependencies": {
         "@effect/sql-pg": "catalog:",
         "pg": "catalog:",
@@ -269,7 +269,7 @@
     },
     "packages/tenetkit": {
       "name": "tenetkit",
-      "version": "0.41.3",
+      "version": "0.41.4",
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",
