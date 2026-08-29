@@ -13,6 +13,16 @@ The packed-artifact smoke suite bundles and executes these public entrypoints un
 
 Construct MCP Streamable HTTP transports at `tenetkit/mcp/client/http`. `tenetkit/mcp/client/stdio` is the explicit Node/Bun-only transport. Bun SQLite stays at `tenetkit/runtime/sqlite-bun`; SQL claims and hosted worker loops stay at `tenetkit/runtime/driver/sql/run/claims` and `tenetkit/runtime/driver/sql/worker`. Optional model providers remain exact opt-in `tenetkit/ai/*` imports.
 
+## TypeScript REPL kernels
+
+`tenetkit/repl` defines one persistent, ordered TypeScript namespace per Session. `KernelPool` exposes only `execute`, `inspect`, `interrupt`, `restart`, and `close`. It is intentionally separate from `SandboxExecutor`, whose Agent Program executions are fresh and stateless.
+
+`KernelProfile` pins the provider, exact runtime and runtime/image/template identity, physical isolation, checkpoint capabilities, host bindings, workspace, and limits for one epoch. Its content-addressed digest excludes credentials, ownership generations, and mutable provider resource IDs. Recovery reports one exact kind: `live-process`, `filesystem`, `namespace`, or `restart-only`.
+
+`tenetkit/repl/bun` is the trusted-local child-process implementation. Hosted providers are explicit Layers and use the host-owned `KernelResourceStore` authority to fence every command by Session, ownership generation, epoch, profile digest, resource, and cell identity. Provider create/pause/resume details do not enter `KernelPool`; uncertain admitted source is never replayed, and failed cleanup remains visible until exact deletion is proven.
+
+Provider packages can register the reusable `KernelProviderConformance.kernelProviderConformance` suite from `tenetkit/test`. It covers the common Bun lifecycle and deterministic remote ownership, reconnection, recovery, uncertainty, pause, and cleanup semantics. Deterministic fixtures do not prove a hosted vendor's isolation or billing deletion; those require live provider tests.
+
 ## Durable tool cancellation
 
 An executor or route opts into Runtime-owned semantic cancellation by defining `cancel`. A direct executor may additionally define `cancellable(request)` to narrow which execute requests are admitted as cancellable. `layerRouter` uses the same first matching route for execute and cancel.

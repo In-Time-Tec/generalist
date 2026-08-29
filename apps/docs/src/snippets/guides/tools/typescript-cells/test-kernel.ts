@@ -4,11 +4,14 @@ import { Response } from "effect/unstable/ai"
 import { Cell, CellTool, KernelProfile, TestKernel } from "tenetkit/repl"
 
 const profile = KernelProfile.make({
+  provider: "bun-local",
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
+  image: { kind: "runtime", reference: "bun@1.3.14", digest: "runtime-digest" },
+  isolation: "host-process",
+  checkpoints: { liveProcess: false, filesystem: true, namespace: true },
   bindingsDigest: KernelProfile.bindingsDigest([]),
   workspace: { root: "/workspace", dataRoot: "/tmp/tenetkit" },
   limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
-  trustMode: "trusted-local",
 })
 
 const script = (request: { readonly code: string }): TestKernel.Script =>

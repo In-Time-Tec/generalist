@@ -89,14 +89,17 @@ const profileFor = (input: {
   readonly overrides: PoolOverrides | undefined
 }): KernelProfile.KernelProfile =>
   KernelProfile.make({
+    provider: "bun-local",
     runtime: { name: "bun", version: Bun.version, digest: "test-digest" },
+    image: { kind: "runtime", reference: `bun@${Bun.version}`, digest: "test-digest" },
+    isolation: "host-process",
+    checkpoints: { liveProcess: false, filesystem: true, namespace: true },
     bindingsDigest: KernelProfile.bindingsDigest([]),
     workspace: { root: input.root, dataRoot: input.dataRoot },
     limits: {
       sourceBytes: input.overrides?.sourceBytes ?? 65_536,
       cellDeadlineMillis: input.overrides?.cellDeadlineMillis ?? 5_000,
     },
-    trustMode: "trusted-local",
   })
 
 /** One real-worker test: what it needs, and what it does with it. */
@@ -121,6 +124,22 @@ const makePool = (profile: KernelProfile.KernelProfile, overrides: PoolOverrides
     : BunKernelPool.make({ ...options, bootstrap: overrides.bootstrap })
 }
 
+/** One scoped real Bun provider harness. Callers own and close the surrounding Scope. */
+export const makeHarness = (
+  overrides?: PoolOverrides,
+): Effect.Effect<Harness, PlatformError.PlatformError, Scope.Scope | BunServices | Path.Path> =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem
+    const dataRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-kernel-" })
+    const profile = profileFor({ root: overrides?.workspaceRoot ?? workspaceRoot, dataRoot, overrides })
+    const store = yield* BunKernelStateStore.make({ dataRoot })
+    const pool = yield* makePool(profile, overrides).pipe(
+      Effect.provideService(KernelStateStore, store),
+      Effect.provideContext(yield* registryContext(overrides?.modules)),
+    )
+    return { pool, dataRoot, profile, ownWorkers }
+  })
+
 /**
  * One Server-scoped pool over real Bun kernel child processes, on a temporary data root that the
  * test scope removes. Every kernel, pipe, and snapshot file this creates is released when the
@@ -129,18 +148,7 @@ const makePool = (profile: KernelProfile.KernelProfile, overrides: PoolOverrides
 export const withPool = <A, E, R>(
   request: PoolRequest<A, E, R>,
 ): Effect.Effect<A, E | PlatformError.PlatformError, Exclude<R, Scope.Scope> | BunServices | Path.Path> =>
-  Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem
-    const dataRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-kernel-" })
-    const overrides = request.overrides
-    const profile = profileFor({ root: overrides?.workspaceRoot ?? workspaceRoot, dataRoot, overrides })
-    const store = yield* BunKernelStateStore.make({ dataRoot })
-    const pool = yield* makePool(profile, overrides).pipe(
-      Effect.provideService(KernelStateStore, store),
-      Effect.provideContext(yield* registryContext(overrides?.modules)),
-    )
-    return yield* request.use({ pool, dataRoot, profile, ownWorkers })
-  }).pipe(Effect.scoped)
+  Effect.scoped(Effect.flatMap(makeHarness(request.overrides), request.use))
 
 /** One cell submitted to a session of a live pool. */
 export interface CellRequest {

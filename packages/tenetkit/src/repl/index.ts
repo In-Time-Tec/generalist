@@ -83,10 +83,13 @@ export namespace Cell {
 }
 
 import {
+  CheckpointCapabilities as KernelProfile_CheckpointCapabilities,
+  CheckpointKind as KernelProfile_CheckpointKind,
+  Image as KernelProfile_Image,
+  Isolation as KernelProfile_Isolation,
   KernelProfile as KernelProfile_KernelProfile,
   Limits as KernelProfile_Limits,
   Runtime as KernelProfile_Runtime,
-  TrustMode as KernelProfile_TrustMode,
   Workspace as KernelProfile_Workspace,
   bindingsDigest as KernelProfile_bindingsDigest,
   contractVersion as KernelProfile_contractVersion,
@@ -95,10 +98,13 @@ import {
   protocolVersion as KernelProfile_protocolVersion,
 } from "./kernel-profile.js"
 export const KernelProfile = {
+  CheckpointCapabilities: KernelProfile_CheckpointCapabilities,
+  CheckpointKind: KernelProfile_CheckpointKind,
+  Image: KernelProfile_Image,
+  Isolation: KernelProfile_Isolation,
   KernelProfile: KernelProfile_KernelProfile,
   Limits: KernelProfile_Limits,
   Runtime: KernelProfile_Runtime,
-  TrustMode: KernelProfile_TrustMode,
   Workspace: KernelProfile_Workspace,
   bindingsDigest: KernelProfile_bindingsDigest,
   contractVersion: KernelProfile_contractVersion,
@@ -107,11 +113,14 @@ export const KernelProfile = {
   protocolVersion: KernelProfile_protocolVersion,
 } satisfies typeof import("./kernel-profile.js")
 export namespace KernelProfile {
+  export type CheckpointCapabilities = import("./kernel-profile.js").CheckpointCapabilities
+  export type CheckpointKind = import("./kernel-profile.js").CheckpointKind
+  export type Image = import("./kernel-profile.js").Image
+  export type Isolation = import("./kernel-profile.js").Isolation
   export type KernelProfile = import("./kernel-profile.js").KernelProfile
   export type Limits = import("./kernel-profile.js").Limits
   export type MakeOptions = import("./kernel-profile.js").MakeOptions
   export type Runtime = import("./kernel-profile.js").Runtime
-  export type TrustMode = import("./kernel-profile.js").TrustMode
   export type Workspace = import("./kernel-profile.js").Workspace
 }
 
@@ -130,6 +139,12 @@ export namespace KernelPool {
   export type Interruption = import("./kernel-pool.js").Interruption
   export type Restart = import("./kernel-pool.js").Restart
 }
+
+/** @experimental Host-only remote kernel ownership authority. */
+export * as KernelResourceStore from "./kernel-resource-store.js"
+
+/** @experimental Claim-bound remote KernelPool command and response schemas. */
+export * as RemoteKernelProtocol from "./remote-protocol.js"
 
 import {
   DroppedBinding as KernelStateStore_DroppedBinding,

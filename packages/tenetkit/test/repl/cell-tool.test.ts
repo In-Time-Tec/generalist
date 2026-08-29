@@ -8,11 +8,14 @@ import { Cell, CellTool, KernelProfile, TestKernel } from "../../src/repl/index"
 const sessionId = "session-a"
 
 const profile = KernelProfile.make({
+  provider: "bun-local",
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
+  image: { kind: "runtime", reference: "bun@1.3.14", digest: "runtime-digest" },
+  isolation: "host-process",
+  checkpoints: { liveProcess: false, filesystem: true, namespace: true },
   bindingsDigest: KernelProfile.bindingsDigest(["workspace"]),
   workspace: { root: "/workspace", dataRoot: "/data" },
   limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 1000 },
-  trustMode: "trusted-local",
 })
 
 interface ToolCallParams {

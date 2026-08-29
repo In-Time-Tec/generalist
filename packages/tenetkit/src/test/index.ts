@@ -53,3 +53,6 @@ export namespace TestModel {
 
 export { providerConformance as sandboxExecutorConformance } from "./sandbox-executor.js"
 export type { Options as SandboxExecutorConformanceOptions } from "./sandbox-executor.js"
+
+/** @experimental Reusable KernelPool provider lifecycle and remote ownership conformance. */
+export * as KernelProviderConformance from "./repl/kernel-provider.js"

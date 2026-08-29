@@ -145,10 +145,15 @@ export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolInte
           const state = yield* stateOf(request.sessionId)
           if (state.closed) return yield* unavailable(request.sessionId, "closed")
           const selected = request.name === undefined ? bindings : bindings.filter((b) => b.name === request.name)
+          const recovery =
+            state.epoch > 0 && options.profile.checkpoints.namespace
+              ? ("namespace" as const)
+              : ("restart-only" as const)
           const inspection: Inspection = {
             sessionId: request.sessionId,
             epoch: state.epoch,
             profile: options.profile,
+            recovery,
             bindings: selected,
           }
           return inspection
@@ -174,6 +179,7 @@ export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolInte
             sessionId,
             epoch,
             reason,
+            recovery: options.profile.checkpoints.namespace ? "namespace" : "restart-only",
             restoredNames: bindings.filter((binding) => binding.snapshotable).map((binding) => binding.name),
             droppedNames: bindings.filter((binding) => !binding.snapshotable).map((binding) => binding.name),
           }
@@ -216,3 +222,5 @@ export const makeMemoryStore: Effect.Effect<KernelStateStoreInterface> = Effect.
 
 /** @experimental */
 export const layerMemoryStore: Layer.Layer<KernelStateStore> = Layer.effect(KernelStateStore, makeMemoryStore)
+
+export * from "./test-kernel-resource-store.js"

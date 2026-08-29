@@ -2,11 +2,14 @@ import { Console, Effect } from "effect"
 import { CellTool, KernelProfile } from "tenetkit/repl"
 
 const profile = KernelProfile.make({
+  provider: "bun-local",
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
+  image: { kind: "runtime", reference: "bun@1.3.14", digest: "runtime-digest" },
+  isolation: "host-process",
+  checkpoints: { liveProcess: false, filesystem: true, namespace: true },
   bindingsDigest: KernelProfile.bindingsDigest([]),
   workspace: { root: "/workspace/cell-agent", dataRoot: "/tmp/cell-agent" },
   limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
-  trustMode: "trusted-local",
 })
 
 const program = Effect.gen(function* () {

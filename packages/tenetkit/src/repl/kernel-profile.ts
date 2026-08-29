@@ -5,7 +5,7 @@ import { Pins } from "../core/index.js"
 export const protocolVersion = 1
 
 /** @experimental Version of the KernelProfile contract itself. */
-export const contractVersion = 1
+export const contractVersion = 2
 
 const Identifier = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255))
 const Digest = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
@@ -19,6 +19,15 @@ export const Runtime = Schema.Struct({
 })
 /** @experimental */
 export type Runtime = typeof Runtime.Type
+
+/** @experimental Immutable runtime, image, or template reconstructed for one kernel epoch. */
+export const Image = Schema.Struct({
+  kind: Schema.Literals(["runtime", "image", "template"]),
+  reference: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(4096)),
+  digest: Digest,
+})
+/** @experimental */
+export type Image = typeof Image.Type
 
 /** @experimental Where cells resolve imports, `require`, and relative paths. */
 export const Workspace = Schema.Struct({
@@ -36,13 +45,24 @@ export const Limits = Schema.Struct({
 /** @experimental */
 export type Limits = typeof Limits.Type
 
-/**
- * @experimental The kernel's authority posture. `trusted-local` runs with the host user's OS
- * permissions and is a lifecycle boundary, not a sandbox.
- */
-export const TrustMode = Schema.Literals(["trusted-local", "trusted-workspace"])
+/** @experimental Physical process boundary supplied to a kernel. This is a fact, not a security rating. */
+export const Isolation = Schema.Literals(["host-process", "container", "microvm"])
 /** @experimental */
-export type TrustMode = typeof TrustMode.Type
+export type Isolation = typeof Isolation.Type
+
+/** @experimental Distinct state a provider can restore after its live kernel stops or pauses. */
+export const CheckpointCapabilities = Schema.Struct({
+  liveProcess: Schema.Boolean,
+  filesystem: Schema.Boolean,
+  namespace: Schema.Boolean,
+})
+/** @experimental */
+export type CheckpointCapabilities = typeof CheckpointCapabilities.Type
+
+/** @experimental What actually continued when a kernel resource was recovered. */
+export const CheckpointKind = Schema.Literals(["live-process", "filesystem", "namespace", "restart-only"])
+/** @experimental */
+export type CheckpointKind = typeof CheckpointKind.Type
 
 /**
  * @experimental Everything a kernel epoch is reconstructed from. The profile declares no
@@ -55,22 +75,28 @@ export type TrustMode = typeof TrustMode.Type
 export const KernelProfile = Schema.Struct({
   contractVersion: Schema.Literal(contractVersion),
   protocolVersion: Schema.Literal(protocolVersion),
+  provider: Identifier,
   runtime: Runtime,
+  image: Image,
+  isolation: Isolation,
+  checkpoints: CheckpointCapabilities,
   bindingsDigest: Digest,
   workspace: Workspace,
   limits: Limits,
-  trustMode: TrustMode,
 })
 /** @experimental */
 export type KernelProfile = typeof KernelProfile.Type
 
 /** @experimental */
 export interface MakeOptions {
+  readonly provider: string
   readonly runtime: Runtime
+  readonly image: Image
+  readonly isolation: Isolation
+  readonly checkpoints: CheckpointCapabilities
   readonly bindingsDigest: string
   readonly workspace: Workspace
   readonly limits: Limits
-  readonly trustMode: TrustMode
 }
 
 /** @experimental Construct one profile at the current contract and protocol version. */
@@ -78,11 +104,14 @@ export const make = (options: MakeOptions): KernelProfile =>
   KernelProfile.make({
     contractVersion,
     protocolVersion,
+    provider: options.provider,
     runtime: options.runtime,
+    image: options.image,
+    isolation: options.isolation,
+    checkpoints: options.checkpoints,
     bindingsDigest: options.bindingsDigest,
     workspace: options.workspace,
     limits: options.limits,
-    trustMode: options.trustMode,
   })
 
 /**

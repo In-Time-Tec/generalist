@@ -6,11 +6,14 @@ const sessionId = "session-a"
 const otherSession = "session-b"
 
 const profile = KernelProfile.make({
+  provider: "bun-local",
   runtime: { name: "bun", version: "1.3.14", digest: "runtime-digest" },
+  image: { kind: "runtime", reference: "bun@1.3.14", digest: "runtime-digest" },
+  isolation: "host-process",
+  checkpoints: { liveProcess: false, filesystem: true, namespace: true },
   bindingsDigest: KernelProfile.bindingsDigest(["workspace"]),
   workspace: { root: "/workspace", dataRoot: "/data" },
   limits: { sourceBytes: 65_536, cellDeadlineMillis: 1000 },
-  trustMode: "trusted-local",
 })
 
 const bindings: ReadonlyArray<KernelPool.Binding> = [

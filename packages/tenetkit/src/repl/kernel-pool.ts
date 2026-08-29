@@ -1,6 +1,6 @@
 import { Context, Effect, Stream } from "effect"
 import type { CellEvent, CellFailure, CellId, CellResult, Epoch, RestartReason, SessionId } from "./cell.js"
-import type { KernelProfile } from "./kernel-profile.js"
+import type { CheckpointKind, KernelProfile } from "./kernel-profile.js"
 
 /** @experimental One cell submitted to the kernel owning a Session. */
 export interface ExecuteRequest {
@@ -34,6 +34,8 @@ export interface Inspection {
   readonly sessionId: SessionId
   readonly epoch: Epoch
   readonly profile: KernelProfile
+  /** @experimental What actually continued when this epoch was most recently recovered. */
+  readonly recovery: CheckpointKind
   readonly bindings: ReadonlyArray<Binding>
 }
 
@@ -49,6 +51,8 @@ export interface Restart {
   readonly sessionId: SessionId
   readonly epoch: Epoch
   readonly reason: RestartReason
+  /** @experimental The checkpoint used for the replacement epoch, never a generic persistence claim. */
+  readonly recovery: CheckpointKind
   readonly restoredNames: ReadonlyArray<string>
   readonly droppedNames: ReadonlyArray<string>
 }

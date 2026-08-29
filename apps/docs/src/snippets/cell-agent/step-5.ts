@@ -9,11 +9,14 @@ declare const dataRoot: string
 declare const bunVersion: string
 
 const profile = KernelProfile.make({
+  provider: "bun-local",
   runtime: { name: "bun", version: bunVersion, digest: "runtime-digest" },
+  image: { kind: "runtime", reference: `bun@${bunVersion}`, digest: "runtime-digest" },
+  isolation: "host-process",
+  checkpoints: { liveProcess: false, filesystem: true, namespace: true },
   bindingsDigest: KernelProfile.bindingsDigest(["workspace"]),
   workspace: { root: "/workspace/cell-agent", dataRoot },
   limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
-  trustMode: "trusted-local",
 })
 
 const kernelPool = BunKernelPool.layer({

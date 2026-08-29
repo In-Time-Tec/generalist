@@ -12,7 +12,7 @@ import {
 } from "../kernel-pool.js"
 import { KernelStateStore } from "../kernel-state-store.js"
 import { HostBindingRegistry, type Interface as HostBindings } from "../host-binding-registry.js"
-import { type KernelProfile, digest } from "../kernel-profile.js"
+import { type CheckpointKind, type KernelProfile, digest } from "../kernel-profile.js"
 import { type Kernel, make as makeKernel } from "./kernel.js"
 import { toSnapshot, unavailable } from "./runtime.js"
 
@@ -38,10 +38,11 @@ interface Lease {
 
 interface SessionState {
   readonly epoch: number
+  readonly recovery: CheckpointKind
   readonly lease: Lease | undefined
 }
 
-const initialState: SessionState = { epoch: 0, lease: undefined }
+const initialState: SessionState = { epoch: 0, recovery: "restart-only", lease: undefined }
 
 /**
  * @experimental One live Bun kernel per Session, owned by a Server-scoped reference-counted map.
@@ -86,8 +87,10 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
           })
           yield* kernel.mount
           const snapshot = yield* store.load(sessionId).pipe(Effect.orElseSucceed(() => undefined))
+          let recovery: CheckpointKind = "restart-only"
           if (snapshot !== undefined) {
-            yield* kernel.restore(new TextDecoder().decode(snapshot.payload)).pipe(Effect.ignore)
+            const restored = yield* kernel.restore(new TextDecoder().decode(snapshot.payload)).pipe(Effect.option)
+            if (restored._tag === "Some" && restored.value.failure === undefined) recovery = "namespace"
           }
           /**
            * A host assembles the mounted surface into whatever shape its cells are written
@@ -110,7 +113,7 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
             yield* Fiber.await(drained).pipe(Effect.ignore)
           }
           const lease: Lease = { kernel, generation }
-          yield* putState(sessionId, { ...state, lease })
+          yield* putState(sessionId, { ...state, recovery, lease })
           yield* Effect.addFinalizer(() =>
             Effect.flatMap(stateOf(sessionId), (current) =>
               current.lease?.generation === generation
@@ -265,6 +268,7 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
               sessionId: request.sessionId,
               epoch: state.epoch,
               profile: options.profile,
+              recovery: state.recovery,
               bindings: request.name === undefined ? bound : bound.filter((b) => b.name === request.name),
             }
             return inspection
@@ -284,13 +288,15 @@ export const make = (options: Options): Effect.Effect<KernelPoolInterface, never
           if (state.lease !== undefined) yield* capture(sessionId, state.lease)
           const snapshot = yield* store.load(sessionId).pipe(Effect.orElseSucceed(() => undefined))
           const epoch = state.epoch + 1
-          yield* putState(sessionId, { epoch, lease: undefined })
+          const recovery: CheckpointKind = snapshot === undefined ? "restart-only" : "namespace"
+          yield* putState(sessionId, { epoch, recovery, lease: undefined })
           if (state.lease !== undefined) yield* state.lease.kernel.kill.pipe(Effect.ignore)
           yield* RcMap.invalidate(kernels, sessionId)
           const restart: Restart = {
             sessionId,
             epoch,
             reason,
+            recovery,
             restoredNames: snapshot === undefined ? [] : snapshot.manifest.restored.map((binding) => binding.name),
             droppedNames: snapshot === undefined ? [] : snapshot.manifest.dropped.map((binding) => binding.name),
           }
