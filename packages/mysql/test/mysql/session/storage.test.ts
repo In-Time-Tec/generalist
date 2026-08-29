@@ -3,7 +3,8 @@ import { Effect, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect
 import { SqlClient } from "effect/unstable/sql"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Handoff, Pins, Session } from "tenetkit"
-import { Errors, RunClaims, RunEvent, Runtime, RunStore } from "tenetkit/runtime"
+import { Errors, RunEvent, Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import {
   assistant,
   assistantAddress,
@@ -23,7 +24,7 @@ const scopedWith =
   <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
-const withRuntime = <A, E, R extends Runtime.Runtime | RunStore.RunStore | RunClaims.RunClaims | Scope.Scope>(
+const withRuntime = <A, E, R extends Runtime.Runtime | RunStore.RunStore | RunClaims | Scope.Scope>(
   effect: Effect.Effect<A, E, R>,
 ) => scopedWith(runtimeLayer)(effect)
 
@@ -94,7 +95,7 @@ const scheduleModel = (sessionId: string, label: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
-    const claims = yield* RunClaims.RunClaims
+    const claims = yield* RunClaims
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId,
@@ -458,7 +459,7 @@ describeMysql("mysql Session authority", () => {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const claims = yield* RunClaims.RunClaims
+          const claims = yield* RunClaims
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId,

@@ -3,7 +3,8 @@ import { Config, Effect, Layer, Option } from "effect"
 import { provideScoped } from "../../../tenetkit/test/runtime/execution/scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { ExecutableResolver, RuntimeWorker } from "tenetkit/runtime"
+import { ExecutableResolver } from "tenetkit/runtime"
+import { layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import type { PostgresStoreError } from "../../src/postgres/runtime-layer.js"
 import {
   analyst,
@@ -87,7 +88,7 @@ export interface PostgresWorkerOptions {
 }
 
 export const postgresWithWorker = (options: PostgresWorkerOptions): PostgresWorkerLayer =>
-  RuntimeWorker.layerWorker({
+  layerWorker({
     workerId: options.workerId,
     concurrency: options.concurrency ?? 4,
     lease: "5 seconds",

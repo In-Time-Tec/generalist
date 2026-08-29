@@ -4,7 +4,9 @@ import { Effect, Exit, Layer, Redacted, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { MysqlRunSchema } from "@tenetkit/mysql"
-import { Errors, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
+import { Errors, Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
   alternateAssistantRef,
@@ -93,7 +95,7 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("complete-unknown-cancel"),
@@ -248,7 +250,7 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("direct-resume"),
@@ -307,7 +309,7 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("terminal-parent"),
@@ -339,7 +341,7 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("steering"),
@@ -405,7 +407,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipts = yield* Effect.all(
           Array.from({ length: 6 }, (_, index) =>
             runtime.send({
@@ -435,7 +437,7 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("release-execution"),
@@ -536,7 +538,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("fifo")
         const head = yield* runtime.send({ to: assistantAddress, sessionId, idempotencyKey: "a", prompt: "a" })
         const next = yield* runtime.send({ to: assistantAddress, sessionId, idempotencyKey: "b", prompt: "b" })
@@ -582,7 +584,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("cross-address")
         const head = yield* runtime.send({
           to: assistantAddress,
@@ -620,7 +622,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const worker = yield* RuntimeWorker.RuntimeWorker
+        const worker = yield* RuntimeWorker
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("worker"),
@@ -631,7 +633,7 @@ describeMysql("mysql run store", () => {
         const claimed = first.find((item) => item.run.runId === receipt.runId)!
         expect(claimed).toBeDefined()
         expect(
-          yield* (yield* RunClaims.RunClaims).refreshLease({
+          yield* (yield* RunClaims).refreshLease({
             runId: receipt.runId,
             workerId: "mysql-worker",
             attemptFence: claimed.attemptFence,
@@ -641,7 +643,7 @@ describeMysql("mysql run store", () => {
         ).toBe(true)
         yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
         expect(
-          yield* (yield* RunClaims.RunClaims).refreshLease({
+          yield* (yield* RunClaims).refreshLease({
             runId: receipt.runId,
             workerId: "mysql-worker",
             attemptFence: claimed.attemptFence,
@@ -651,7 +653,7 @@ describeMysql("mysql run store", () => {
         ).toBe(false)
       }).pipe(
         scopedWith(
-          RuntimeWorker.layerWorker({
+          layerWorker({
             workerId: "mysql-worker",
             concurrency: 2,
             lease: "5 seconds",
@@ -708,7 +710,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("codecs"),
@@ -736,7 +738,7 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("wait-op"),
@@ -824,7 +826,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("child"),
@@ -858,7 +860,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("fan-out"),
@@ -927,7 +929,7 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("pending-fan-out"),
@@ -981,7 +983,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("terminal-parent-fan-out"),
@@ -1025,7 +1027,7 @@ describeMysql("mysql run store", () => {
         }).pipe(scopedWith(mysqlLayer(url)))
         const observed = yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const claims = yield* RunClaims.RunClaims
+          const claims = yield* RunClaims
           yield* Effect.forkScoped(
             Effect.sleep("50 millis").pipe(
               Effect.andThen(claims.claimReadyRuns({ workerId: "other-node", limit: 1 })),

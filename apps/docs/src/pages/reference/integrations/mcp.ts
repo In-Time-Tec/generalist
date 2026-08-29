@@ -22,6 +22,10 @@ export const mcpReference = definePage({
       ["Subpath", "Contents"],
       [
         [[code(".")], ["Namespace ", code("McpToolSource")]],
+        [[code("./client")], ["Transport-neutral source API over an MCP SDK ", code("Transport")]],
+        [[code("./client/http")], ["Worker-safe Streamable HTTP ", code("make"), ", ", code("layer")]],
+        [[code("./client/stdio")], ["Node/Bun-only stdio ", code("make"), ", ", code("layer")]],
+        [[code("./oauth")], ["Worker-safe OAuth service, errors, and token-store layers"]],
         [
           [code("./tools")],
           [code("route(options)"), ", ", code("toolkit(source)"), " and ", code("layerToolkit(source)")],
@@ -44,8 +48,8 @@ export const mcpReference = definePage({
       ["Export", "Notes"],
       [
         [
-          [code("McpTransport")],
-          [code('{ kind: "stdio", command, args?, env? }'), " or ", code('{ kind: "http", url, headers? }')],
+          [code("Options.transport")],
+          ["A raw ", code("@modelcontextprotocol/sdk"), " Transport constructed by an exact client subpath"],
         ],
         [
           [code("layer({ name, transport, callTimeout? })")],
@@ -65,6 +69,12 @@ export const mcpReference = definePage({
           [code("{ server, message }"), " and ", code("{ server, tool, message }")],
         ],
       ],
+    ),
+    p(
+      code("tenetkit/mcp/client/http"),
+      " accepts ",
+      code("requestInit"),
+      " and OAuth at the process/request boundary. Resolve secret references and construct bearer headers there; never persist raw credentials in executable identity or registration configuration.",
     ),
     p(
       code("callTool"),

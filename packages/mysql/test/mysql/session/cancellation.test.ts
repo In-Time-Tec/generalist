@@ -4,7 +4,9 @@ import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "tenetkit"
-import { Address, Errors, ExecutableResolver, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
+import { Address, Errors, ExecutableResolver, Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import { closedTestAgent, testExecutable } from "../../../../tenetkit/test/runtime/run/identity.js"
 import {
   assistant,
@@ -53,7 +55,7 @@ describeMysql("mysql worker cancellation", () => {
         suite.effect("rejects a stale worker commit after a replacement worker claims the Run", () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const receipt = yield* runtime.send({
               to: assistantAddress,
               sessionId: uniqueSession("stale-worker"),
@@ -144,14 +146,14 @@ describeMysql("mysql worker cancellation", () => {
               addresses: [{ address, executable, registrations: registrationsFor(executable) }],
             }
             yield* provideScoped(
-              RuntimeWorker.layerWorker({
+              layerWorker({
                 workerId: "mysql-model-worker",
                 cancellationInterval: "10 millis",
                 lease: "30 seconds",
               }).pipe(Layer.provideMerge(layerMysql(options))),
               Effect.gen(function* () {
                 const runtime = yield* Runtime.Runtime
-                const worker = yield* RuntimeWorker.RuntimeWorker
+                const worker = yield* RuntimeWorker
                 const sessionId = uniqueSession("cancel-model")
                 const receipt = yield* runtime.send({
                   to: address,
@@ -232,7 +234,7 @@ describeMysql("mysql worker cancellation", () => {
             addresses: [{ address, executable, registrations: registrationsFor(executable) }],
           }
           yield* provideScoped(
-            RuntimeWorker.layerWorker({
+            layerWorker({
               workerId: "mysql-tool-worker",
               cancellationInterval: "10 millis",
               lease: "30 seconds",
@@ -240,7 +242,7 @@ describeMysql("mysql worker cancellation", () => {
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
               const store = yield* RunStore.RunStore
-              const worker = yield* RuntimeWorker.RuntimeWorker
+              const worker = yield* RuntimeWorker
               const receipt = yield* runtime.send({
                 to: address,
                 sessionId: uniqueSession("cancel-tool"),

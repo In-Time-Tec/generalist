@@ -45,6 +45,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
@@ -60,6 +64,22 @@
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",
       "import": "./dist/mcp/index.js"
+    },
+    "./mcp/client": {
+      "types": "./dist/mcp/tool-source.d.ts",
+      "import": "./dist/mcp/tool-source.js"
+    },
+    "./mcp/client/http": {
+      "types": "./dist/mcp/client/http.d.ts",
+      "import": "./dist/mcp/client/http.js"
+    },
+    "./mcp/client/stdio": {
+      "types": "./dist/mcp/client/stdio.d.ts",
+      "import": "./dist/mcp/client/stdio.js"
+    },
+    "./mcp/oauth": {
+      "types": "./dist/mcp/oauth.d.ts",
+      "import": "./dist/mcp/oauth.js"
     },
     "./skills": {
       "types": "./dist/skills/index.d.ts",

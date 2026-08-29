@@ -1,5 +1,6 @@
 import { Effect } from "effect"
-import { RunClaims, Runtime } from "../../../src/runtime/index.js"
+import { Runtime } from "../../../src/runtime/index.js"
+import { RunClaims } from "../../../src/runtime/sql/run/claims.js"
 
 /**
  * Brings a freshly admitted Run to `running` on the SQL backends.
@@ -10,10 +11,10 @@ import { RunClaims, Runtime } from "../../../src/runtime/index.js"
  */
 export const claimReadyWorker =
   (workerId: string) =>
-  (runId: string): Effect.Effect<void, never, Runtime.Runtime | RunClaims.RunClaims> =>
+  (runId: string): Effect.Effect<void, never, Runtime.Runtime | RunClaims> =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const claims = yield* RunClaims.RunClaims
+      const claims = yield* RunClaims
       while ((yield* runtime.inspect(runId)).status === "queued") {
         const claimed = yield* claims.claimReadyRuns({ workerId, limit: 16, lease: "60 seconds" })
         if (claimed.length === 0) return yield* Effect.die(`Run ${runId} could not be activated`)

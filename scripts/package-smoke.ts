@@ -2,6 +2,7 @@ import { layer } from "@effect/platform-bun/BunServices"
 import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CryptoHasher, version as bunVersion } from "bun"
+import { builtinModules } from "node:module"
 import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
   catalogVersion,
@@ -14,6 +15,7 @@ import {
   packageNames,
   sortRecord,
   tarballName,
+  workerSafePackageExports,
 } from "./package-smoke-config.js"
 
 class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@tenetkit/scripts/PackageSmokeFailed", {
@@ -55,9 +57,19 @@ const RootManifest = Schema.Struct({
     catalogs: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String))),
   }),
 })
+const WranglerMetafile = Schema.Struct({
+  inputs: Schema.Record(Schema.String, Schema.Unknown),
+  outputs: Schema.Record(
+    Schema.String,
+    Schema.Struct({
+      imports: Schema.optionalKey(Schema.Array(Schema.Struct({ path: Schema.String }))),
+    }),
+  ),
+})
 
 const parsePackageManifest = Schema.decodeSync(Schema.fromJsonString(PackageManifest))
 const parseRootManifest = Schema.decodeSync(Schema.fromJsonString(RootManifest))
+const parseWranglerMetafile = Schema.decodeSync(Schema.fromJsonString(WranglerMetafile))
 
 const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
 
@@ -89,6 +101,121 @@ const run = Effect.fn("PackageSmoke.run")(function* (
     return yield* smokeError(`${command} ${args.join(" ")} failed\n${stdout}\n${stderr}`)
   }
   return stdout
+})
+
+const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints")(function* (input: {
+  readonly root: string
+  readonly consumerDirectory: string
+}) {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const workerDirectory = path.join(input.consumerDirectory, "worker-safe")
+  const wrangler = path.join(input.root, "examples/cloudflare-worker/node_modules/.bin/wrangler")
+  const workerd = path.join(input.root, "packages/cloudflare/node_modules/.bin/workerd")
+  const workerdVersion = (yield* run(workerd, ["--version"], input.root)).trim()
+  const workerGroups = [
+    {
+      name: "neutral",
+      specifiers: workerSafePackageExports.filter((specifier) => specifier !== "tenetkit/ai/openrouter"),
+      forbidProviders: true,
+    },
+    { name: "openrouter", specifiers: ["tenetkit/ai/openrouter"], forbidProviders: false },
+  ] as const
+  const nodeBuiltins = new Set(builtinModules.map((specifier) => specifier.replace(/^node:/, "").split("/")[0]))
+  yield* fileSystem.makeDirectory(workerDirectory)
+  for (const group of workerGroups) {
+    const sourceName = `${group.name}.ts`
+    const bundleName = `${group.name}.js`
+    const source = group.specifiers
+      .map((specifier, index) => `import * as Entry${index} from ${JSON.stringify(specifier)}`)
+      .join("\n")
+    const entries = group.specifiers.map((_, index) => `Entry${index}`).join(", ")
+    yield* fileSystem.writeFileString(
+      path.join(workerDirectory, sourceName),
+      `${source}
+const loaded = [${entries}].map((entry) => Object.keys(entry).length)
+if (loaded.some((count) => count === 0)) throw new Error("Worker-safe entrypoint was empty")
+export default { test: () => void loaded }
+`,
+    )
+    const wranglerConfig = path.join(workerDirectory, `${group.name}.wrangler.json`)
+    const bundleDirectory = path.join(workerDirectory, `${group.name}-out`)
+    const metafile = path.join(workerDirectory, `${group.name}.meta.json`)
+    yield* fileSystem.writeFileString(
+      wranglerConfig,
+      encodeJson({
+        name: `tenetkit-worker-safe-${group.name}`,
+        main: sourceName,
+        compatibility_date: "2026-08-19",
+      }),
+    )
+    yield* run(
+      wrangler,
+      ["deploy", "--config", wranglerConfig, "--dry-run", "--outdir", bundleDirectory, "--metafile", metafile],
+      input.consumerDirectory,
+    )
+    const metadata = parseWranglerMetafile(yield* fileSystem.readFileString(metafile))
+    const graph = new Set<string>(Object.keys(metadata.inputs))
+    for (const output of Object.values(metadata.outputs)) {
+      for (const item of output.imports ?? []) graph.add(item.path)
+    }
+    const forbidden = sorted(
+      Array.from(graph).filter((item) => {
+        const normalized = item.replaceAll("\\", "/").toLowerCase()
+        const bare = normalized.replace(/^node:/, "").split("/")[0] ?? normalized
+        if (normalized.startsWith("node:") || normalized.startsWith("bun:") || nodeBuiltins.has(bare)) return true
+        if (
+          [
+            "node-built-in-modules:",
+            "unenv/runtime/node/",
+            "@effect/sql-",
+            "@effect+sql-",
+            "@aws-sdk",
+            "@smithy",
+            "bedrock",
+            "/client/stdio.",
+            "/shared/stdio.",
+            "cross-spawn",
+            "path-key",
+            "/runtime/sqlite-bun.",
+            "/repl/bun/",
+          ].some((marker) => normalized.includes(marker))
+        ) {
+          return true
+        }
+        if (normalized.includes("/tenetkit/dist/runtime/sql/")) {
+          return (
+            !normalized.endsWith("/errors.js") &&
+            !normalized.endsWith("/operations.js") &&
+            !normalized.endsWith("/codec/codecs.js")
+          )
+        }
+        return group.forbidProviders && (normalized.includes("@effect/ai-") || normalized.includes("@effect+ai-"))
+      }),
+      (left, right) => left.localeCompare(right),
+    )
+    if (forbidden.length > 0) {
+      return yield* smokeError(
+        `${group.name} Worker entrypoints contain forbidden runtime modules:\n${forbidden.join("\n")}`,
+      )
+    }
+    const workerdConfig = path.join(workerDirectory, `${group.name}.capnp`)
+    yield* fileSystem.writeFileString(
+      workerdConfig,
+      `using Workerd = import "/workerd/workerd.capnp";
+
+const config :Workerd.Config = (services = [(name = "main", worker = .worker)]);
+const worker :Workerd.Worker = (
+  compatibilityDate = "2026-08-19",
+  modules = [(name = ${encodeJson(bundleName)}, esModule = embed ${encodeJson(`${group.name}-out/${bundleName}`)})],
+);
+`,
+    )
+    yield* run(workerd, ["test", workerdConfig, "--no-verbose"], workerDirectory)
+    yield* Console.log(
+      `${group.specifiers.length} ${group.name} Worker-safe entrypoints: ${graph.size} graph entries, 0 forbidden; ${workerdVersion} passed without compatibility flags`,
+    )
+  }
 })
 
 const program = Effect.gen(function* () {
@@ -449,6 +576,7 @@ const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import(
 const { VectorStore } = await import("tenetkit/memory")
 const { HarnessState, HarnessStore } = await import("tenetkit/harness")
 const { McpToolSource } = await import("tenetkit/mcp")
+const McpHttpClient = await import("tenetkit/mcp/client/http")
 const { Catalog } = await import("tenetkit/ai")
 const OpenAi = await import("tenetkit/ai/openai")
 const skills = await import("tenetkit/skills")
@@ -468,7 +596,10 @@ const layers = [
   Session.layerMemory,
   Catalog.layer(),
   TestModel.layer([TestModel.text("identity")]),
-  McpToolSource.layer({ name: "identity", transport: { kind: "http", url: "https://mcp.example/rpc" } }),
+  McpToolSource.layer({
+    name: "identity",
+    transport: McpHttpClient.make({ url: "https://mcp.example/rpc" }),
+  }),
 ]
 if (layers.some((value) => !Layer.isLayer(value))) throw new Error("TenetKit layer does not use the root Effect identity")
 if (!Layer.isLayer(OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
@@ -515,6 +646,8 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
   if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@tenetkit")) {
     return yield* smokeError("Bun consumer resolved a TenetKit package from npm")
   }
+
+  yield* verifyWorkerEntrypoints({ root, consumerDirectory })
 
   const coreConsumerDirectory = path.join(directory, "core-consumer")
   yield* fileSystem.makeDirectory(coreConsumerDirectory)

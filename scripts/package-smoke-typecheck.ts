@@ -17,6 +17,7 @@ import { A2A } from "tenetkit/a2a"
 import { AgUi } from "tenetkit/ag-ui"
 import { VectorStore } from "tenetkit/memory"
 import { OAuth, McpToolSource } from "tenetkit/mcp"
+import { make as makeMcpHttpTransport } from "tenetkit/mcp/client/http"
 import { route as mcpRoute, type McpTools, type Options as McpRouteOptions } from "tenetkit/mcp/tools"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
 import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
@@ -156,17 +157,17 @@ const oauthLayer = OAuth.layer({
 const proof = Effect.gen(function* () {
   const oauth = yield* OAuth.OAuth
   yield* oauth.pending
-  const transport: McpToolSource.McpTransport = { kind: "http", url: "https://mcp.example/rpc", oauth }
+  const transport = makeMcpHttpTransport({ url: "https://mcp.example/rpc", oauth })
   return transport
 }).pipe(Effect.provide(oauthLayer))
 void proof
 const routeOptions: McpRouteOptions = {
   name: "package-smoke",
-  transport: { kind: "http", url: "https://mcp.example/rpc" },
+  transport: makeMcpHttpTransport({ url: "https://mcp.example/rpc" }),
 }
 const routed: Effect.Effect<
   McpTools,
-  McpToolSource.McpConnectionFailed | OAuth.OAuthPending | OAuth.OAuthProviderError,
+  McpToolSource.McpConnectionFailed | OAuth.OAuthProviderError,
   Scope.Scope
 > = mcpRoute(routeOptions)
 void routed

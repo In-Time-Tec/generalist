@@ -1,7 +1,7 @@
 import { layerPostgres } from "@tenetkit/pg"
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RunClaims } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { provideScoped } from "../../../../tenetkit/test/runtime/execution/scoped-provide.js"
 import { operationRecoverySuite } from "../../../../tenetkit/test/runtime/operation/suites/recovery.js"
 import { toolCancellationSuite } from "../../../../tenetkit/test/runtime/operation/suites/tool-cancellation.js"
@@ -23,7 +23,7 @@ operationRecoverySuite({
     ),
   claim: (runId, ownerId) =>
     Effect.gen(function* () {
-      const claims = yield* RunClaims.RunClaims
+      const claims = yield* RunClaims
       const batch = yield* claims.claimReadyRuns({ workerId: ownerId, limit: 10, lease: "10 seconds" })
       const claimed = batch.find((item) => item.run.runId === runId)
       yield* Effect.forEach(
@@ -63,7 +63,7 @@ toolCancellationSuite({
     ),
   claim: (runId, ownerId) =>
     Effect.gen(function* () {
-      const claims = yield* RunClaims.RunClaims
+      const claims = yield* RunClaims
       const batch = yield* claims.claimReadyRuns({ workerId: ownerId, limit: 10, lease: "10 seconds" })
       const claimed = batch.find((item) => item.run.runId === runId)
       yield* Effect.forEach(

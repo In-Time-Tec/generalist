@@ -1,8 +1,8 @@
 # MCP
 
-`tenetkit/mcp` owns remote discovery, tool-call adaptation, and OAuth protocol mechanics. Hosts own browser and callback UI, client configuration, and secure token persistence.
+`tenetkit/mcp` owns remote discovery, tool-call adaptation, and OAuth protocol mechanics. `tenetkit/mcp/client` accepts an SDK `Transport`; `tenetkit/mcp/client/http` constructs the Worker-safe Streamable HTTP transport; and `tenetkit/mcp/client/stdio` is an explicit Node/Bun-only opt-in. `tenetkit/mcp/oauth` exposes OAuth without loading stdio. Hosts own browser and callback UI, client configuration, and secure token persistence.
 
-Remote discovery schemas and structured results decode as `Schema.Json` on typed error channels. OAuth state uses platform cryptography; one synchronized flow owns state, PKCE, discovery, callback exchange, refresh, and invalidation. Callback attempts consume matching state even when malformed, denied, or failed. Token stores receive redacted, versioned, schema-validated documents and never expose secrets in public errors.
+Remote discovery schemas and structured results decode as `Schema.Json` on typed error channels. OAuth state uses platform cryptography; one synchronized flow owns state, PKCE, discovery, callback exchange, refresh, and invalidation. Callback attempts consume matching state even when malformed, denied, or failed. Token stores receive redacted, versioned, schema-validated documents and never expose secrets in public errors. HTTP `requestInit.headers` are constructed at the process or request boundary. Raw bearer credentials are not executable identity or persisted registration configuration; persisted reconstruction data carries only the host-owned secret reference needed to resolve them at that boundary.
 
 `route` scopes one MCP connection, one discovered toolkit, its handlers, and the matching TenetKit executor. Releasing the scope closes the connection. Calls preserve interruption and optional finite timeouts; the route adds no detached work, queue, or retry policy.
 

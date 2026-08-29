@@ -1,4 +1,5 @@
-import { RunClaims, Runtime } from "tenetkit/runtime"
+import { Runtime } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { assistantRef, registrationsFor, textPrompt } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
@@ -21,7 +22,7 @@ describePostgres("postgres staged root scheduler admission", () => {
       workerStoreLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.admit({
           runId: "run:staged:postgres:worker-gate",
           executable: assistantRef,

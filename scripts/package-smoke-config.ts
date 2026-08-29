@@ -28,12 +28,24 @@ export const packedProviderDependencies = {
   "@aws-sdk/credential-provider-node": "3.859.0",
   "@smithy/types": "4.3.1",
 } as const
+
+export const workerSafePackageExports = [
+  "tenetkit/core",
+  "tenetkit/mcp",
+  "tenetkit/mcp/client",
+  "tenetkit/mcp/client/http",
+  "tenetkit/mcp/oauth",
+  "tenetkit/mcp/tools",
+  "tenetkit/ai/openrouter",
+  "tenetkit/runtime",
+] as const
+
 export const packageExports = [
   "tenetkit",
-  "tenetkit/runtime",
+  ...workerSafePackageExports,
   "tenetkit/runtime/sqlite-bun",
   "tenetkit/ai",
-  "tenetkit/mcp",
+  "tenetkit/mcp/client/stdio",
   "tenetkit/skills",
   "tenetkit/memory",
   "tenetkit/harness",
@@ -57,7 +69,6 @@ export const packageExports = [
   "tenetkit/ai/presets",
   "tenetkit/ai/openai-embedding",
   "tenetkit/ai/openai-compatible-embedding",
-  "tenetkit/mcp/tools",
   "tenetkit/repl/bun",
   "tenetkit/transport/client",
   "tenetkit/transport/errors",
@@ -72,6 +83,8 @@ export const packageExports = [
   "tenetkit/runtime/driver/sql",
   "tenetkit/runtime/driver/run/store",
   "tenetkit/runtime/driver/sql/store",
+  "tenetkit/runtime/driver/sql/run/claims",
+  "tenetkit/runtime/driver/sql/worker",
   "@tenetkit/cloudflare/workers",
   "@tenetkit/cloudflare/durable-objects",
   "@tenetkit/cloudflare/dynamic-workers",

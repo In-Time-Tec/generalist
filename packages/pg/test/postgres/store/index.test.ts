@@ -10,12 +10,12 @@ import {
   Errors,
   ExecutionHost,
   ExecutableResolver,
-  RunClaims,
   Runtime,
-  RuntimeWorker,
   RunStore,
   RunTree,
 } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/postgres/schema.js"
 import {
   alternateAssistantRef,
@@ -65,7 +65,7 @@ const admitWaitForCancellation = (waitId: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
-    const claims = yield* RunClaims.RunClaims
+    const claims = yield* RunClaims
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId: uniqueSession(`cancelled-wait-${waitId}`),
@@ -167,7 +167,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const root = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("tree-checkpoint"),
@@ -284,7 +284,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("complete-unknown-cancel"),
@@ -437,7 +437,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("direct-resume"),
@@ -489,7 +489,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("steering"),
@@ -615,7 +615,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("terminal-parent"),
@@ -646,7 +646,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("fifo")
         const head = yield* runtime.send({
           to: assistantAddress,
@@ -684,7 +684,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("cross-address")
         const head = yield* runtime.send({
           to: assistantAddress,
@@ -722,7 +722,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipts = yield* Effect.all(
           Array.from({ length: 6 }, (_, index) =>
             runtime.send({
@@ -749,7 +749,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("release-execution"),
@@ -831,7 +831,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("stale")
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -873,7 +873,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("agent-event-takeover"),
@@ -963,7 +963,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const worker = yield* RuntimeWorker.RuntimeWorker
+        const worker = yield* RuntimeWorker
         const sessionId = uniqueSession("worker")
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -978,7 +978,7 @@ describePostgres("PostgreSQL run store", () => {
         expect(yield* worker.poll).toEqual([])
         yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
         expect(
-          yield* (yield* RunClaims.RunClaims).refreshLease({
+          yield* (yield* RunClaims).refreshLease({
             runId: receipt.runId,
             workerId: "tick-worker",
             attemptFence: claim.attemptFence,
@@ -996,7 +996,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const driver = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("ops")
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -1047,7 +1047,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("operation-takeover"),
@@ -1147,7 +1147,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const driver = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("wait")
         const waiting = yield* runtime.send({
           to: assistantAddress,
@@ -1240,7 +1240,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const host = yield* ExecutionHost.ExecutionHost
         const sessionId = uniqueSession("cross-process-cancel")
         const receipt = yield* runtime.send({
@@ -1313,14 +1313,14 @@ describePostgres("PostgreSQL run store", () => {
           resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
-        const workerLayer = RuntimeWorker.layerWorker({
+        const workerLayer = layerWorker({
           workerId: "postgres-model-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
         }).pipe(Layer.provideMerge(layerPostgres(options)))
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const worker = yield* RuntimeWorker.RuntimeWorker
+          const worker = yield* RuntimeWorker
           const receipt = yield* runtime.send({
             to: address,
             sessionId: uniqueSession("cross-process-model"),
@@ -1401,7 +1401,7 @@ describePostgres("PostgreSQL run store", () => {
           resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
-        const workerLayer = RuntimeWorker.layerWorker({
+        const workerLayer = layerWorker({
           workerId: "postgres-tool-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
@@ -1409,7 +1409,7 @@ describePostgres("PostgreSQL run store", () => {
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const worker = yield* RuntimeWorker.RuntimeWorker
+          const worker = yield* RuntimeWorker
           const receipt = yield* runtime.send({
             to: address,
             sessionId: uniqueSession("cross-process-tool"),
@@ -1445,7 +1445,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const driver = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
 
         for (const attempt of [0, 1, 2, 3, 4, 5, 6, 7]) {
           const sessionId = uniqueSession(`race-${attempt}`)
@@ -1531,7 +1531,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const sessionId = uniqueSession("child")
         const parent = yield* runtime.send({
           to: assistantAddress,
@@ -1578,7 +1578,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("fan-out"),
@@ -1647,7 +1647,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("program-fan-out-completion"),
@@ -1697,7 +1697,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("terminal-parent-fan-out"),
@@ -1733,7 +1733,7 @@ describePostgres("PostgreSQL run store", () => {
         const sessionId = uniqueSession("replay")
         const runId = yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const claims = yield* RunClaims.RunClaims
+          const claims = yield* RunClaims
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId,

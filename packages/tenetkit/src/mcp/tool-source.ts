@@ -1,31 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js"
-import {
-  StreamableHTTPClientTransport,
-  type StreamableHTTPClientTransportOptions,
-} from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Context, Duration, Effect, Function, Layer, Option, Ref, Schema, Scope } from "effect"
 import type { JsonSchema } from "effect/JsonSchema"
 import { Tool } from "effect/unstable/ai"
-import { OAuthPending, OAuthProviderError } from "./oauth.js"
+import { OAuthProviderError } from "./oauth.js"
 /** @experimental */
 export type JsonValue = Schema.Json
-
-/** @experimental */
-export type McpTransport =
-  | {
-      readonly kind: "stdio"
-      readonly command: string
-      readonly args?: ReadonlyArray<string>
-      readonly env?: Record<string, string>
-    }
-  | {
-      readonly kind: "http"
-      readonly url: string
-      readonly headers?: Record<string, string>
-      readonly oauth?: import("./oauth.js").Interface
-    }
 
 /** @experimental */
 export interface CallOptions {
@@ -88,9 +68,6 @@ const errorDetails = Schema.Struct({ name: Schema.String, message: Schema.String
 
 const formatErrorDetails = (details: Option.Option<typeof errorDetails.Type>, fallback: string): string =>
   Option.isSome(details) ? `${details.value.name}: ${details.value.message}` : fallback
-
-const sanitizedConnectionError = (server: string): McpConnectionFailed =>
-  McpConnectionFailed.make({ server, message: "MCP connection failed" })
 
 const textContent = Schema.Struct({ type: Schema.Literal("text"), text: Schema.String })
 const Content = Schema.Array(Schema.Unknown)
@@ -249,127 +226,35 @@ export const fromTransport: {
     }),
 )
 
-const adaptHttpTransport = (http: StreamableHTTPClientTransport): Transport => {
-  const adapted: Transport = {
-    start: () =>
-      http.start().then(() => {
-        if (http.sessionId !== undefined) adapted.sessionId = http.sessionId
-        return undefined
-      }),
-    send: (message, options) => {
-      if (options === undefined) return http.send(message)
-      if (options.resumptionToken === undefined) {
-        return options.onresumptiontoken === undefined
-          ? http.send(message)
-          : http.send(message, { onresumptiontoken: options.onresumptiontoken })
-      }
-      return options.onresumptiontoken === undefined
-        ? http.send(message, { resumptionToken: options.resumptionToken })
-        : http.send(message, {
-            resumptionToken: options.resumptionToken,
-            onresumptiontoken: options.onresumptiontoken,
-          })
-    },
-    close: () => http.close(),
-    setProtocolVersion: (version) => http.setProtocolVersion(version),
-  }
-  Object.assign(http, {
-    onclose: () => adapted.onclose?.(),
-    onerror: (error: Error) => adapted.onerror?.(error),
-    onmessage: (message: Parameters<NonNullable<Transport["onmessage"]>>[0]) => adapted.onmessage?.(message),
-  })
-  return adapted
-}
-
-const buildTransport = (server: string, transport: McpTransport): Effect.Effect<Transport, McpConnectionFailed> =>
-  Effect.try({
-    try: (): Transport => {
-      if (transport.kind === "stdio") {
-        const options: StdioServerParameters = {
-          command: transport.command,
-        }
-        if (transport.args !== undefined) options.args = [...transport.args]
-        if (transport.env !== undefined) options.env = transport.env
-        return new StdioClientTransport(options)
-      }
-      const options: StreamableHTTPClientTransportOptions = {}
-      if (transport.headers !== undefined) options.requestInit = { headers: transport.headers }
-      if (transport.oauth !== undefined) options.authProvider = transport.oauth.provider
-      return adaptHttpTransport(new StreamableHTTPClientTransport(new URL(transport.url), options))
-    },
-    catch: (error) =>
-      McpConnectionFailed.make({
-        server,
-        message: formatErrorDetails(Schema.decodeUnknownOption(errorDetails)(error), String(error)),
-      }),
-  })
-
-const makeInterface = (options: {
+/** @experimental */
+export interface Options {
   readonly name: string
-  readonly transport: McpTransport
+  readonly transport: Transport
   readonly callTimeout?: Duration.Input
-}): Effect.Effect<Interface, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> => {
-  const connect = buildTransport(options.name, options.transport).pipe(
-    Effect.flatMap((transport) => {
-      if (options.callTimeout === undefined) return fromTransport(options.name, transport)
-      return fromTransport(options.name, transport, { callTimeout: options.callTimeout })
-    }),
-  )
-  const oauth = options.transport.kind === "http" ? options.transport.oauth : undefined
-  if (oauth === undefined) return connect
-  return oauth.withTransport(
-    Effect.gen(function* () {
-      const before = yield* oauth.pending
-      return yield* connect.pipe(
-        Effect.catchTag("tenetkit/mcp/McpConnectionFailed", () =>
-          oauth.pending.pipe(
-            Effect.flatMap((current): Effect.Effect<never, McpConnectionFailed | OAuthPending> => {
-              if (Option.isNone(current)) return Effect.fail(sanitizedConnectionError(options.name))
-              if (Option.isSome(before) && before.value.url === current.value.url) {
-                return Effect.fail(sanitizedConnectionError(options.name))
-              }
-              return Effect.fail(OAuthPending.make({ authorizationUrl: current.value.url }))
-            }),
-          ),
-        ),
-      )
-    }),
-  )
 }
+
+const makeInterface = (
+  options: Options,
+): Effect.Effect<Interface, McpConnectionFailed | OAuthProviderError, Scope.Scope> =>
+  options.callTimeout === undefined
+    ? fromTransport(options.name, options.transport)
+    : fromTransport(options.name, options.transport, { callTimeout: options.callTimeout })
 
 /** @experimental */
-export const layer = (options: {
-  readonly name: string
-  readonly transport: McpTransport
-  readonly callTimeout?: Duration.Input
-}): Layer.Layer<McpToolSource, McpConnectionFailed | OAuthPending | OAuthProviderError> =>
+export const layer = (options: Options): Layer.Layer<McpToolSource, McpConnectionFailed | OAuthProviderError> =>
   Layer.effect(McpToolSource, makeInterface(options))
 
 /** @experimental */
 export const layerTagged: {
-  (options: {
-    readonly name: string
-    readonly transport: McpTransport
-    readonly callTimeout?: Duration.Input
-  }): <Identifier>(
+  (
+    options: Options,
+  ): <Identifier>(
     tag: Context.Key<Identifier, Interface>,
-  ) => Layer.Layer<Identifier, McpConnectionFailed | OAuthPending | OAuthProviderError>
+  ) => Layer.Layer<Identifier, McpConnectionFailed | OAuthProviderError>
   <Identifier>(
     tag: Context.Key<Identifier, Interface>,
-    options: {
-      readonly name: string
-      readonly transport: McpTransport
-      readonly callTimeout?: Duration.Input
-    },
-  ): Layer.Layer<Identifier, McpConnectionFailed | OAuthPending | OAuthProviderError>
-} = Function.dual(
-  2,
-  <Identifier>(
-    tag: Context.Key<Identifier, Interface>,
-    options: {
-      readonly name: string
-      readonly transport: McpTransport
-      readonly callTimeout?: Duration.Input
-    },
-  ) => Layer.effect(tag, makeInterface(options)),
+    options: Options,
+  ): Layer.Layer<Identifier, McpConnectionFailed | OAuthProviderError>
+} = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Interface>, options: Options) =>
+  Layer.effect(tag, makeInterface(options)),
 )

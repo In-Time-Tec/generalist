@@ -1,5 +1,6 @@
 import { Console, Effect, ManagedRuntime, Schema, Stream } from "effect"
-import { RunClaims, Runtime } from "@tenetkit/mysql"
+import { Runtime } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { assistantAddress, completedResult } from "../../tenetkit/test/runtime/execution/fixtures.js"
 import { mysqlAvailable, mysqlDatabase, mysqlLayer, uniqueSession } from "../test/mysql/runtime/environment.js"
 
@@ -13,7 +14,7 @@ const url = database.url
 const runTrace = (databaseUrl: string, sessionId: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const claims = yield* RunClaims.RunClaims
+    const claims = yield* RunClaims
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId,

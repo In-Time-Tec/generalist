@@ -1,7 +1,8 @@
 import { beforeAll } from "vitest"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
-import { RunClaims, Runtime } from "tenetkit/runtime"
+import { Runtime } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { assistantAddress, completedResult } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
 import { mysqlAvailable, mysqlDatabase, mysqlLayer, uniqueSession } from "../runtime/environment.js"
 
@@ -17,7 +18,7 @@ describeMysql("mysql tracer", () => {
       suite.effect("traces admit, multi-worker claim, commit, and replay", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const claims = yield* RunClaims.RunClaims
+          const claims = yield* RunClaims
           const first = yield* runtime.send({
             to: assistantAddress,
             sessionId: uniqueSession("trace-a"),

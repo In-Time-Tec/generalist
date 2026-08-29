@@ -1,7 +1,8 @@
 import { expect } from "@effect/vitest"
 import { Clock, Effect, Option } from "effect"
 import { Pins, ProgramCapabilities } from "../../../src/index.js"
-import { Errors, ExecutionHost, RunClaims, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Errors, ExecutionHost, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { RunClaims } from "../../../src/runtime/sql/run/claims.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../src/runtime/run/store.js"
 import type { ProgramStoreFailure } from "../../../src/runtime/program/store.js"
 import { program, programAddress } from "./fixture.js"
@@ -37,7 +38,7 @@ const reserve = (
 const claimExistingProgram = (runId: string, label: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
-    const claims = yield* Effect.serviceOption(RunClaims.RunClaims)
+    const claims = yield* Effect.serviceOption(RunClaims)
     if (Option.isNone(claims)) {
       return yield* store.claimExecution({ runId, ownerId: `program-contract-${label}` })
     }

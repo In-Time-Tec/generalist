@@ -1,6 +1,7 @@
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
-import { RunClaims, Runtime, RunStore } from "tenetkit/runtime"
+import { Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import {
   assistantAddress,
   completedResult,
@@ -22,7 +23,7 @@ describePostgres("PostgreSQL process tracer", () => {
         Effect.gen(function* () {
           const sessionId = uniqueSession("tracer")
           const runtime = yield* Runtime.Runtime
-          const claims = yield* RunClaims.RunClaims
+          const claims = yield* RunClaims
           const driver = yield* RunStore.RunStore
           const first = yield* runtime.send({
             to: assistantAddress,

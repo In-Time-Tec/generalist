@@ -2,7 +2,8 @@ import { layerMysql } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { ExecutionHost, RunClaims, Runtime, RunStore } from "tenetkit/runtime"
+import { ExecutionHost, Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { registrationsFor } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
 import { agentMapProgramFixture } from "../../../../tenetkit/test/runtime/program/fixture.js"
 import { mysqlAvailable, mysqlDatabase } from "./environment.js"
@@ -35,7 +36,7 @@ describeMysql("mysql runtime layer Program registration", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const root = yield* runtime.send({
               to: fixture.address,

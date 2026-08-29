@@ -1,7 +1,8 @@
 import { layerPostgres } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
-import { ExecutableResolver, RunClaims, Runtime, RunStore } from "tenetkit/runtime"
+import { ExecutableResolver, Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import {
   assistant,
   assistantAddress,
@@ -46,7 +47,7 @@ describePostgres("PostgreSQL event stream catch-up", () => {
           idempotencyKey: "event-stream",
           prompt: textPrompt("hello"),
         })
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const [claim] = yield* claims.claimReadyRuns({
           workerId: "event-stream",
           limit: 1,

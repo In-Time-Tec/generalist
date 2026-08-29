@@ -16,6 +16,7 @@ import {
 import { beforeEach, vi } from "vitest"
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js"
 import { McpToolSource, OAuth } from "../../src/mcp/index"
+import { layer as layerMcpHttpClient } from "../../src/mcp/client/http.js"
 
 const fetchMock = vi.fn<typeof fetch>()
 const yieldJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
@@ -646,9 +647,9 @@ describe("OAuth", () => {
       const oauth = yield* OAuth.OAuth
       yield* oauth.authorize
       const error = yield* Layer.build(
-        McpToolSource.layer({
+        layerMcpHttpClient({
           name: "invalid",
-          transport: { kind: "http", url: "not a URL", oauth },
+          transport: { url: "not a URL", oauth },
         }),
       ).pipe(Effect.flip)
 
@@ -679,9 +680,9 @@ describe("OAuth", () => {
           clear: Effect.void,
         }
         const error = yield* Layer.build(
-          McpToolSource.layer({
+          layerMcpHttpClient({
             name: "pending",
-            transport: { kind: "http", url: "not a URL", oauth },
+            transport: { url: "not a URL", oauth },
           }),
         ).pipe(Effect.flip)
 

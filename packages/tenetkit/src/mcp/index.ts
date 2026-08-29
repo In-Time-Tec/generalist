@@ -29,7 +29,7 @@ export namespace McpToolSource {
   export type Interface = import("./tool-source.js").Interface
   export type JsonValue = import("./tool-source.js").JsonValue
   export type McpAiTool = import("./tool-source.js").McpAiTool
-  export type McpTransport = import("./tool-source.js").McpTransport
+  export type Options = import("./tool-source.js").Options
 }
 import {
   OAuthPending as OAuth_OAuthPending,

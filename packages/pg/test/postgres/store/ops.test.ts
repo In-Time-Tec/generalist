@@ -3,7 +3,9 @@ import { describe, expect, layer } from "@effect/vitest"
 import { Clock, Effect, Layer } from "effect"
 import { Pins } from "tenetkit"
 import { SqlClient } from "effect/unstable/sql"
-import { Errors, ExecutionHost, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
+import { Errors, ExecutionHost, Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -74,7 +76,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: programAddress,
@@ -102,7 +104,7 @@ describePostgres("PostgreSQL Program store contract", () => {
   {
     const database = postgresDatabase("program-exact-root-worker")
     const fixture = programFixture()
-    const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "postgres-exact-root-worker" }).pipe(
+    const runtimeLayer = layerWorker({ workerId: "postgres-exact-root-worker" }).pipe(
       Layer.provideMerge(
         layerPostgres({
           url: database.url,
@@ -118,7 +120,7 @@ describePostgres("PostgreSQL Program store contract", () => {
         it.effect("claims and executes a running parentless exact root without a lane", () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const worker = yield* RuntimeWorker.RuntimeWorker
+            const worker = yield* RuntimeWorker
             const receipt = yield* runtime.start({
               executable: programExecutable,
               registrations: registrationsFor(programExecutable),
@@ -156,7 +158,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: programAddress,
@@ -195,7 +197,7 @@ describePostgres("PostgreSQL Program store contract", () => {
                 Effect.gen(function* () {
                   const runtime = yield* Runtime.Runtime
                   const store = yield* RunStore.RunStore
-                  const claims = yield* RunClaims.RunClaims
+                  const claims = yield* RunClaims
                   const host = yield* ExecutionHost.ExecutionHost
                   const receipt = { runId }
                   const [resumed] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
@@ -240,7 +242,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: programAddress,
@@ -304,7 +306,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: fixture.address,
@@ -412,7 +414,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: programAddress,

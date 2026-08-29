@@ -4,6 +4,7 @@ import { TestModel } from "tenetkit/test"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { layerToolkit, route, toolkit } from "../../src/mcp/tools.js"
 import { McpToolSource } from "../../src/mcp/index"
+import { layer } from "../../src/mcp/client/http.js"
 import { makeFixture, makeTransportFixture } from "./fixture"
 
 describe("mcp tools adapter", () => {
@@ -163,21 +164,20 @@ describe("mcp tools adapter", () => {
     ),
   )
 
-  it.effect("recognizes a custom SDK transport before declarative kind metadata", () =>
+  it.effect("accepts a custom SDK transport", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const fixture = yield* makeTransportFixture()
-        const transport = Object.assign(fixture.transport, { kind: "http" as const })
-        const tools = yield* route({ name: "calc", transport })
+        const tools = yield* route({ name: "calc", transport: fixture.transport })
 
         expect(Object.keys(tools.toolkit.tools)).toContain("calc_add")
       }),
     ),
   )
 
-  it.effect("keeps transport construction failures typed on route acquisition", () =>
+  it.effect("keeps HTTP transport construction failures typed on layer acquisition", () =>
     Effect.gen(function* () {
-      const error = yield* route({ name: "broken", transport: { kind: "http", url: "://invalid" } }).pipe(
+      const error = yield* Layer.build(layer({ name: "broken", transport: { url: "://invalid" } })).pipe(
         Effect.scoped,
         Effect.flip,
       )

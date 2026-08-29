@@ -2,7 +2,8 @@ import { layerPostgres } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { ExecutableResolver, RunClaims, Runtime } from "tenetkit/runtime"
+import { ExecutableResolver, Runtime } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import {
   assistant,
   assistantAddress,
@@ -39,7 +40,7 @@ describePostgres("PostgreSQL RuntimeWorker wakeups", () => {
     scopedWith(layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const listening = yield* Deferred.make<void>()
         const changes = yield* claims.changes.pipe(
           Stream.tap(() => Deferred.succeed(listening, undefined)),
@@ -64,7 +65,7 @@ describePostgres("PostgreSQL RuntimeWorker wakeups", () => {
   it.effect("surfaces listener loss and reacquires a fresh listener on resubscribe", () =>
     scopedWith(layer)(
       Effect.gen(function* () {
-        const claims = yield* RunClaims.RunClaims
+        const claims = yield* RunClaims
         const listening = yield* Deferred.make<void>()
         const listener = yield* claims.changes.pipe(
           Stream.tap(() => Deferred.succeed(listening, undefined)),

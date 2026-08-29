@@ -1,6 +1,6 @@
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { ToolExecutor } from "../core/index.js"
-import { Context, type Duration, Effect, Layer, Schema, type Scope } from "effect"
+import { type Duration, Effect, Layer, Schema, type Scope } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import {
   fromTransport,
@@ -9,28 +9,14 @@ import {
   McpConnectionFailed,
   type McpAiTool,
   type McpToolFailure,
-  McpToolSource,
-  type McpTransport,
-  layer,
 } from "./tool-source.js"
-import type { OAuthPending, OAuthProviderError } from "./oauth.js"
+import type { OAuthProviderError } from "./oauth.js"
 
 /** @experimental */
 export interface Options {
   readonly name: string
-  readonly transport: McpTransport | Transport
+  readonly transport: Transport
   readonly callTimeout?: Duration.Input
-}
-
-const McpTransportSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("stdio"), command: Schema.String }),
-  Schema.Struct({ kind: Schema.Literal("http"), url: Schema.String }),
-])
-
-interface LayerOptions {
-  name: string
-  transport: McpTransport
-  callTimeout?: Duration.Input
 }
 
 /** @experimental */
@@ -82,25 +68,12 @@ export const layerToolkit = (source: Interface): Layer.Layer<Tool.Handler<string
     }),
   )
 
-const isMcpTransport = Schema.is(McpTransportSchema)
-
-const acquire = (
-  options: Options,
-): Effect.Effect<Interface, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
-  !isMcpTransport(options.transport)
-    ? fromTransport(
-        options.name,
-        options.transport,
-        options.callTimeout === undefined ? undefined : { callTimeout: options.callTimeout },
-      )
-    : (() => {
-        const layerOptions: LayerOptions = {
-          name: options.name,
-          transport: options.transport,
-        }
-        if (options.callTimeout !== undefined) layerOptions.callTimeout = options.callTimeout
-        return Layer.build(layer(layerOptions)).pipe(Effect.map((services) => Context.get(services, McpToolSource)))
-      })()
+const acquire = (options: Options): Effect.Effect<Interface, McpConnectionFailed | OAuthProviderError, Scope.Scope> =>
+  fromTransport(
+    options.name,
+    options.transport,
+    options.callTimeout === undefined ? undefined : { callTimeout: options.callTimeout },
+  )
 
 /**
  * Acquires one MCP connection and assembles its complete TenetKit tool integration.
@@ -109,7 +82,7 @@ const acquire = (
  */
 export const route = (
   options: Options,
-): Effect.Effect<McpTools, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
+): Effect.Effect<McpTools, McpConnectionFailed | OAuthProviderError, Scope.Scope> =>
   Effect.gen(function* () {
     const source = yield* acquire(options)
     const mcpToolkit = yield* toolkit(source)

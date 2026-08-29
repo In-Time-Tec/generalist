@@ -2,7 +2,9 @@ import { layerMysql } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Errors, ExecutionHost, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
+import { Errors, ExecutionHost, Runtime, RunStore } from "tenetkit/runtime"
+import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -60,7 +62,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = programFixture()
-    const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "mysql-exact-root-worker" }).pipe(
+    const runtimeLayer = layerWorker({ workerId: "mysql-exact-root-worker" }).pipe(
       Layer.provideMerge(
         layerMysql({
           url,
@@ -77,7 +79,7 @@ describeMysql("mysql Program store contract", () => {
           Effect.gen(function* () {
             yield* database.truncated
             const runtime = yield* Runtime.Runtime
-            const worker = yield* RuntimeWorker.RuntimeWorker
+            const worker = yield* RuntimeWorker
             const receipt = yield* runtime.start({
               executable: programExecutable,
               registrations: registrationsFor(programExecutable),
@@ -135,7 +137,7 @@ describeMysql("mysql Program store contract", () => {
             yield* database.truncated
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: programAddress,
@@ -182,7 +184,7 @@ describeMysql("mysql Program store contract", () => {
             yield* database.truncated
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: programAddress,
@@ -221,7 +223,7 @@ describeMysql("mysql Program store contract", () => {
                 Effect.gen(function* () {
                   const runtime = yield* Runtime.Runtime
                   const store = yield* RunStore.RunStore
-                  const claims = yield* RunClaims.RunClaims
+                  const claims = yield* RunClaims
                   const host = yield* ExecutionHost.ExecutionHost
                   const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program-resume", limit: 1 })
                   yield* host.execute({ runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
@@ -255,7 +257,7 @@ describeMysql("mysql Program store contract", () => {
             yield* database.truncated
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: programAddress,
@@ -311,7 +313,7 @@ describeMysql("mysql Program store contract", () => {
             yield* database.truncated
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims.RunClaims
+            const claims = yield* RunClaims
             const host = yield* ExecutionHost.ExecutionHost
             const receipt = yield* runtime.send({
               to: fixture.address,

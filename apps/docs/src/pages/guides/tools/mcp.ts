@@ -22,7 +22,11 @@ export const mcp = definePage({
     h2("connect-to-a-server", "1. Connect to a server"),
     p(
       code("McpToolSource.layer"),
-      " remains the lower-level source API. The usual ",
+      " remains the lower-level source API for a raw MCP SDK transport. Construct Streamable HTTP transports with ",
+      code("tenetkit/mcp/client/http"),
+      " in browsers and Workers, or opt into the Node/Bun-only ",
+      code("tenetkit/mcp/client/stdio"),
+      ". The usual ",
       code("route"),
       " API opens the connection, lists the tools once, and closes the client when its Effect scope ends. Discovered tool names are prefixed with the source name: a ",
       code("search"),
@@ -36,11 +40,14 @@ export const mcp = definePage({
     table(
       ["Transport", "Fields"],
       [
-        [[code('{ kind: "stdio" }')], [code("command"), ", optional ", code("args"), " and ", code("env")]],
-        [[code('{ kind: "http" }')], [code("url"), ", optional ", code("headers")]],
+        [[code("tenetkit/mcp/client/http")], [code("make({ url, requestInit?, oauth? })"), "; Worker-safe"]],
+        [[code("tenetkit/mcp/client/stdio")], [code("make({ command, args?, env? })"), "; Node/Bun only"]],
       ],
     ),
     p(
+      "Construct bearer headers in HTTP ",
+      code("requestInit"),
+      " only after resolving the host's secret reference; do not persist the raw credential in executable registration data. ",
       "Hosts that run several servers side by side register each under its own tag with ",
       code("McpToolSource.layerTagged"),
       ".",
