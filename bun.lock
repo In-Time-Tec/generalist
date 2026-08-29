@@ -210,7 +210,7 @@
     },
     "packages/cloudflare": {
       "name": "@tenetkit/cloudflare",
-      "version": "0.42.0",
+      "version": "0.43.0",
       "dependencies": {
         "@effect/sql-sqlite-do": "catalog:",
         "es-module-lexer": "catalog:",
@@ -231,7 +231,7 @@
     },
     "packages/mysql": {
       "name": "@tenetkit/mysql",
-      "version": "0.42.0",
+      "version": "0.43.0",
       "dependencies": {
         "@effect/sql-mysql2": "catalog:",
         "tenetkit": "workspace:*",
@@ -249,7 +249,7 @@
     },
     "packages/pg": {
       "name": "@tenetkit/pg",
-      "version": "0.42.0",
+      "version": "0.43.0",
       "dependencies": {
         "@effect/sql-pg": "catalog:",
         "pg": "catalog:",
@@ -269,7 +269,7 @@
     },
     "packages/tenetkit": {
       "name": "tenetkit",
-      "version": "0.42.0",
+      "version": "0.43.0",
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",
@@ -300,10 +300,12 @@
         "@effect/ai-openai-compat": "catalog:",
         "@effect/ai-openrouter": "catalog:",
         "@effect/sql-sqlite-bun": "catalog:",
+        "@effect/vitest": "catalog:",
         "@modelcontextprotocol/sdk": "catalog:",
         "@smithy/types": "catalog:",
         "effect": "catalog:",
         "foldkit": "catalog:peer",
+        "vitest": "catalog:",
       },
       "optionalPeers": [
         "@a2a-js/sdk",
@@ -315,9 +317,11 @@
         "@effect/ai-openai-compat",
         "@effect/ai-openrouter",
         "@effect/sql-sqlite-bun",
+        "@effect/vitest",
         "@modelcontextprotocol/sdk",
         "@smithy/types",
         "foldkit",
+        "vitest",
       ],
     },
   },
