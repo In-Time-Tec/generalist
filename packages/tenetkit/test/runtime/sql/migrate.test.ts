@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite"
+import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import {
@@ -7,14 +8,13 @@ import {
   SchemaMigrationFailed,
   SchemaVersionUnsupported,
 } from "../../../src/runtime/sql/errors.js"
-import { layer as sqliteClientLayer } from "../../../src/runtime/sql/bun-client.js"
 import { migrate } from "../../../src/runtime/sql/migrate.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/runtime/sql/codec/schema.js"
 import { tempDbPath } from "./scenario.js"
 
 const apply = (filename: string) =>
   Effect.scoped(
-    Effect.flatMap(Layer.build(sqliteClientLayer({ filename })), (context) =>
+    Effect.flatMap(Layer.build(SqliteClient.layer({ filename })), (context) =>
       migrate(filename).pipe(Effect.provideContext(context)),
     ),
   )

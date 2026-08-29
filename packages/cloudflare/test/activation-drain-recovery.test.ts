@@ -1,4 +1,5 @@
 import { expect, it } from "@effect/vitest"
+import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient"
 import { Clock, Effect, Exit, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { ExecutionHost } from "tenetkit/runtime/driver/execution/host"
@@ -27,7 +28,6 @@ import {
 } from "../../tenetkit/test/runtime/execution/fixtures.js"
 import { tempDbPath } from "../../tenetkit/test/runtime/sql/scenario.js"
 import { closedTestAgent } from "../../tenetkit/test/runtime/run/identity.js"
-import { layer as sqliteClientLayer } from "../../tenetkit/src/runtime/sql/bun-client.js"
 import { makeSqliteRunStore } from "../../tenetkit/src/runtime/sql/store.js"
 import { makeRuntime } from "../../tenetkit/src/runtime/memory/layer.js"
 import { layer as activeExecutionsLayer } from "../../tenetkit/src/runtime/execution/active-executions.js"
@@ -48,13 +48,13 @@ const withLayer = <A, E, R, E2, R2>(layer: Layer.Layer<R, E, R2>, effect: Effect
 
 const runtimeLayer = (projection?: RunActivationProjection) => {
   const filename = tempDbPath("cloudflare-activation")
-  return Layer.merge(SqliteRuntime.layerSqlite(options(filename, projection)), sqliteClientLayer({ filename }))
+  return Layer.merge(SqliteRuntime.layerSqlite(options(filename, projection)), SqliteClient.layer({ filename }))
 }
 
 const projectedRuntimeLayer = (rearm: Effect.Effect<void, RuntimeUnavailable>) => {
   const filename = tempDbPath("cloudflare-promotion-activation")
   const runtimeOptions = options(filename)
-  const client = sqliteClientLayer({ filename })
+  const client = SqliteClient.layer({ filename })
   const store = Layer.effect(
     RunStore,
     Effect.gen(function* () {

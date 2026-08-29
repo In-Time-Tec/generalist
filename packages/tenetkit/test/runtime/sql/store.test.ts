@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite"
+import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
@@ -24,7 +25,6 @@ import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/a
 import { make as makeExecutionHost } from "../../../src/runtime/execution/host.js"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/runtime/sql/codec/schema.js"
 import { markDirty } from "../../../src/runtime/sql/migrate.js"
-import { layer as sqliteClientLayer } from "../../../src/runtime/sql/bun-client.js"
 import {
   alternateAssistantAddress,
   alternateAssistantRef,
@@ -270,7 +270,7 @@ it.live("rejects dirty schema and checksum mismatch", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("dirty")
     yield* scopedWith(sqliteLayer(filename))(Effect.void)
-    yield* scopedWith(sqliteClientLayer({ filename }))(markDirty(filename))
+    yield* scopedWith(SqliteClient.layer({ filename }))(markDirty(filename))
     const dirty = yield* Effect.exit(scopedWith(sqliteLayer(filename))(Effect.void))
     expect(Exit.isFailure(dirty)).toBe(true)
 
