@@ -45,7 +45,8 @@ const ChatStreamChunk = Schema.Struct({
   provider: Schema.optionalKey(Schema.String),
 })
 const decodeChatStreamChunk = Schema.decodeUnknownEffect(Schema.fromJsonString(ChatStreamChunk))
-const openRouterStreamError = (error: unknown): AiError.AiError => {
+type OpenRouterStreamError = HttpClientError.HttpClientError | Schema.SchemaError | Sse.Retry | Sse.SseError
+const openRouterStreamError = (error: OpenRouterStreamError): AiError.AiError => {
   if (HttpClientError.isHttpClientError(error)) {
     switch (error.reason._tag) {
       case "TransportError":
@@ -239,11 +240,10 @@ export interface LayerOptions extends OpenRouterInput {
 /** @experimental */
 export const layer = (
   input: LayerOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> => {
-  return ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
+  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
     Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
-}
 
 const registrationOptions = (input: OpenRouterInput) => {
   const required = {
