@@ -17,12 +17,16 @@ import { groupIdFromSuspension, resultFromInspection } from "tenetkit/runtime/dr
 import { inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
 import { ExecutionCheckpoint, ExecutionSuspension } from "tenetkit/runtime/driver/execution/state"
 import { loadTerminalEvent, reconcileChildWaitWith } from "tenetkit/runtime/driver/sql/store/child/settlement"
+import { revokeSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 
 type SuspendEffect = Effect.Effect<
   undefined,
   RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | StaleClaim,
   SqlClient.SqlClient
 >
+
+const suspensionChild = (token: string | undefined) =>
+  token === undefined ? Effect.succeed(Option.none()) : requireRun(token).pipe(Effect.option)
 
 export const suspend: {
   (input: Parameters<RunStoreInterface["suspend"]>[0]): (hub: EventHub) => SuspendEffect
@@ -62,10 +66,7 @@ export const suspend: {
         status = 'open', reason = EXCLUDED.reason, response_json = NULL, opened_at = EXCLUDED.opened_at, closed_at = NULL
     `
     yield* appendEvent(hub, loaded, { _tag: "RunWaiting", wait: input.wait }, "waiting")
-    const child =
-      input.suspension.token === undefined
-        ? Option.none()
-        : yield* requireRun(input.suspension.token).pipe(Effect.option)
+    const child = yield* suspensionChild(input.suspension.token)
     if (child._tag === "Some" && child.value.terminalEventId !== undefined) {
       const terminalEvent = yield* loadTerminalEvent(child.value.terminalEventId)
       if (terminalEvent !== undefined) {
@@ -107,5 +108,8 @@ export const suspend: {
       }
     }
     yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
+    if (!(yield* revokeSessionWriteClaim(input.session))) {
+      return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} Session write binding was not revoked` })
+    }
   }),
 )

@@ -23,7 +23,7 @@ const claim: ClaimExecution = (services, { runId, workerId }) => {
     if (claimed === undefined || claimed.run.runId !== runId) {
       return yield* Effect.die(`PostgreSQL did not claim conformance Run ${runId}`)
     }
-    return { runId, ownerId: claimed.workerId, attemptFence: claimed.attemptFence }
+    return { runId, ownerId: claimed.workerId, attemptFence: claimed.attemptFence, session: claimed.session }
   }).pipe(Effect.orDie)
 }
 

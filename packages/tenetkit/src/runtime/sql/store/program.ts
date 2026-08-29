@@ -31,6 +31,7 @@ import {
   digest as resolutionDigest,
 } from "../../operation/resolution.js"
 import type { WorkerMutationError } from "../../run/store.js"
+import { revokeRunSessionWriteClaim } from "../session/claim.js"
 
 interface StateRow {
   readonly run_id: string
@@ -362,6 +363,12 @@ const resolveProgramOperationEffect = (
       pg: () => sql`cancellation_requested`,
       mysql: () => sql`cancellation_requested = 1`,
       orElse: () => sql`cancellation_requested IN (1, 'true')`,
+    })
+    yield* revokeRunSessionWriteClaim({
+      sessionId: run.sessionId,
+      runId: run.runId,
+      ownerId: run.ownerWorkerId,
+      runAttemptFence: run.attemptFence,
     })
     if (clearLease) {
       yield* sql`

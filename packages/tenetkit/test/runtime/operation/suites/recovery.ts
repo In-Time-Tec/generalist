@@ -233,7 +233,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
           const completed = history.find((event) => event._tag === "ToolExecutionCompleted")
           if (completed?._tag !== "ToolExecutionCompleted") return yield* Effect.die("tool completion missing")
-          const session = yield* store.sessionStore(sessionId)
+          const session = yield* store.sessionReader(sessionId)
           if (session._tag === "None") return yield* Effect.die("Session store missing")
           const context = Session.buildContext(yield* session.value.path())
           let sessionResult: Prompt.ToolResultPart | undefined

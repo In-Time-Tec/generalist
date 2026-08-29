@@ -33,10 +33,8 @@ import { CompactionProjection } from "./session/compaction-projection.js"
 type CompactionContext = {
   readonly activeSession: Option.Option<SessionStore>
   readonly sessionId: string
-  readonly sessionOwnerToken: string | undefined
   readonly sessionAppendOptions: (expectedLeafId: string | null) => {
     readonly expectedLeafId: string | null
-    readonly ownerToken?: string
   }
   readonly chat: Chat.Service
   readonly system: string | undefined
@@ -61,7 +59,6 @@ export const make = (context: CompactionContext) => {
   const {
     activeSession,
     sessionId,
-    sessionOwnerToken,
     sessionAppendOptions,
     chat,
     system,
@@ -121,18 +118,16 @@ export const make = (context: CompactionContext) => {
               yield* Ref.set(chat.history, withDerivedSystem({ system, projection }))
               return cursorFromPath(path)
             }
-            const diagnosticsBase = {
+            const diagnostics = {
               sessionId,
               durableEntryTags: path.map((entry) => entry._tag),
               projection: projection.content,
               transcript: transcript.content,
             }
-            const diagnosticsInput =
-              sessionOwnerToken === undefined ? diagnosticsBase : { ...diagnosticsBase, ownerToken: sessionOwnerToken }
             return yield* AgentError.make({
               message: "Session projection is not a prefix of live Chat history",
               turn,
-              diagnostics: diagnoseSessionSync(diagnosticsInput),
+              diagnostics: diagnoseSessionSync(diagnostics),
             })
           }
           path = yield* appendTranscript(turn, transcript, cursor.value, path, session)
@@ -295,13 +290,9 @@ export const make = (context: CompactionContext) => {
             compactionCommit === undefined ? checkpointBase : { ...checkpointBase, compactionCommit }
           const expectedCheckpoint =
             result._tag === "Summarize" ? { ...checkpointWithCommit, summary: result.summary } : checkpointWithCommit
-          const checkpointInput =
-            sessionOwnerToken === undefined
-              ? expectedCheckpoint
-              : { ...expectedCheckpoint, ownerToken: sessionOwnerToken }
           yield* Effect.uninterruptibleMask((restore) =>
             restore(
-              session.appendCheckpoint(checkpointInput).pipe(
+              session.appendCheckpoint(expectedCheckpoint).pipe(
                 Effect.filterOrFail(
                   (appended) => checkpointMatches(appended.checkpoint, expectedCheckpoint),
                   () =>

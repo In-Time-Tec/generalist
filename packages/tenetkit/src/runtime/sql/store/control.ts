@@ -24,12 +24,13 @@ import { afterTerminal, appendEvent, loadRun, loadRunWait, nowIso, settleParent 
 import type { EventHub } from "../subscribers.js"
 import type { DecodedRun } from "../codec/rows.js"
 import { reconcileProgramCancellation } from "./program.js"
-import { PendingRunOutcome } from "../../run/store.js"
+import { PendingRunOutcome, type ExecutionClaim } from "../../run/store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../../child/group.js"
 import { inspectFanOut } from "./fan-out/service.js"
 import { approvalResponse } from "../respond-approval.js"
 import { hasPendingCancellationWork, loadTerminalEvent, reconcileChildWaitWith } from "./child/settlement.js"
 import { markOperationCancellations } from "./operation/operations.js"
+import { revokeExecutionSessionWriteClaim } from "../session/claim.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(
@@ -57,8 +58,8 @@ type ResumeEffect = Effect.Effect<
   ResponseConflict | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | WaitNotOpen,
   SqlClient.SqlClient
 >
-type CompleteInput = { readonly runId: string; readonly result: ExecutionResult }
-type FailInput = { readonly runId: string; readonly error: RunFailure }
+type CompleteInput = ExecutionClaim & { readonly runId: string; readonly result: ExecutionResult }
+type FailInput = ExecutionClaim & { readonly runId: string; readonly error: RunFailure }
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
 type AgentEventInput = { readonly runId: string; readonly event: EmittableAgentLoopEvent }
 type SuspendInput = Parameters<import("../../run/store.js").Interface["suspend"]>[0]
@@ -273,6 +274,7 @@ export const complete: {
       `
       if (running.length > 0 || (yield* hasPendingCancellationWork(run.runId))) {
         yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
+        yield* revokeExecutionSessionWriteClaim(input)
         return
       }
       const event = yield* appendEvent(
@@ -284,6 +286,7 @@ export const complete: {
       const settled = (yield* loadRun(run.runId))!
       yield* settleParent(hub, settled, event.eventId)
       yield* afterTerminal(hub, settled)
+      yield* revokeExecutionSessionWriteClaim(input)
       return
     }
     const running = yield* sql<{ fan_out_id: string }>`
@@ -295,12 +298,14 @@ export const complete: {
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result: input.result })}
         WHERE run_id = ${run.runId}
       `
+      yield* revokeExecutionSessionWriteClaim(input)
       return
     }
     const event = yield* appendEvent(hub, run, { _tag: "RunCompleted", result: input.result }, "succeeded")
     const settled = (yield* loadRun(run.runId))!
     yield* settleParent(hub, settled, event.eventId)
     yield* afterTerminal(hub, settled)
+    yield* revokeExecutionSessionWriteClaim(input)
   }),
 )
 export const fail: {
@@ -317,6 +322,7 @@ export const fail: {
       `
       if (running.length > 0 || (yield* hasPendingCancellationWork(run.runId))) {
         yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
+        yield* revokeExecutionSessionWriteClaim(input)
         return
       }
       const event = yield* appendEvent(
@@ -328,6 +334,7 @@ export const fail: {
       const settled = (yield* loadRun(run.runId))!
       yield* settleParent(hub, settled, event.eventId)
       yield* afterTerminal(hub, settled)
+      yield* revokeExecutionSessionWriteClaim(input)
       return
     }
     const running = yield* sql<{ fan_out_id: string }>`
@@ -339,12 +346,14 @@ export const fail: {
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
         WHERE run_id = ${run.runId}
       `
+      yield* revokeExecutionSessionWriteClaim(input)
       return
     }
     const event = yield* appendEvent(hub, run, { _tag: "RunFailed", error: input.error }, "failed")
     const settled = (yield* loadRun(run.runId))!
     yield* settleParent(hub, settled, event.eventId)
     yield* afterTerminal(hub, settled)
+    yield* revokeExecutionSessionWriteClaim(input)
   }),
 )
 export const suspend: {
@@ -427,6 +436,7 @@ export const suspend: {
       }
     }
     yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
+    yield* revokeExecutionSessionWriteClaim(input)
   })
 })
 export const resume: {

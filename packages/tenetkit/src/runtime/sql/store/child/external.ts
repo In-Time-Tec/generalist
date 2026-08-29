@@ -159,7 +159,11 @@ export const reserve: {
         ${input.parentSuspension === undefined ? null : suspensionIdentity(input.parentSuspension)},
         ${sqlBool(sql, parent.cancellationRequested)}, ${createdAt})`
     if (input.parentSuspension !== undefined) {
-      yield* suspend(hub, { ...input, ...input.parentSuspension })
+      yield* suspend(hub, {
+        ...input,
+        session: input.session,
+        ...input.parentSuspension,
+      })
     }
     return (yield* load(input.placementId))!
   }),

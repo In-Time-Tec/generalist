@@ -6,14 +6,17 @@ import type { CompletedSessionEntry } from "tenetkit/runtime/driver/execution/mo
 import type { InterruptedSessionEntry } from "tenetkit/runtime/driver/execution/agent/event"
 import { handoffPayload, type HandoffSessionEntry } from "tenetkit/runtime/driver/session/handoff"
 import type { RunFn } from "../transaction/events.js"
-import type { EntryRow, SessionRow } from "tenetkit/runtime/driver/sql/session/store"
+import type { EntryRow, SessionRow } from "tenetkit/runtime/driver/sql/session/storage"
 import { MysqlSessionStorage } from "./storage.js"
+import type { ExecutionClaim } from "tenetkit/runtime/driver/run/store"
+import { StaleSessionClaim } from "tenetkit/runtime/driver/sql/errors"
 
 const {
   advanceSession,
   entryPayloadEquivalence,
   insertEntry,
   loadEntries,
+  lockClaimedSession,
   lockSession,
   pathFromRows,
   requireActive,
@@ -269,22 +272,27 @@ export const verifyHandoffSessionEntry = (
   })
 
 const mapSessionError = <A, E>(effect: Effect.Effect<A, E>) =>
-  Effect.mapError(effect, (error) =>
-    Schema.is(Session.SessionConflict)(error) || Schema.is(Session.SessionStoreError)(error)
-      ? error
-      : storeError(String(error)),
-  )
+  Effect.mapError(effect, (error) => {
+    if (Schema.is(StaleSessionClaim)(error)) return storeError("Session write claim is stale")
+    if (Schema.is(Session.SessionConflict)(error) || Schema.is(Session.SessionStoreError)(error)) return error
+    return storeError(String(error))
+  })
 
 const mapReadError = <A, E>(effect: Effect.Effect<A, E>) =>
-  Effect.mapError(effect, (error) => (Schema.is(Session.SessionStoreError)(error) ? error : storeError(String(error))))
+  Effect.mapError(effect, (error) => {
+    if (Schema.is(StaleSessionClaim)(error)) return storeError("Session write claim is stale")
+    if (Schema.is(Session.SessionStoreError)(error)) return error
+    return storeError(String(error))
+  })
 
-/** Dialect-native durable MySQL Session authority bound to one session identity. */
+/** Dialect-native durable MySQL Session authority bound to one storage-issued claim. */
 export const mysqlSessionStore = (options: {
-  readonly sessionId: string
+  readonly claim: ExecutionClaim
   readonly run: RunFn
   readonly runNoTxn: RunFn
 }): Session.Interface => {
-  const { sessionId, run, runNoTxn } = options
+  const { claim, run, runNoTxn } = options
+  const sessionId = claim.session.sessionId
 
   const existingAppend = (
     entry: AppendInput,
@@ -327,7 +335,7 @@ export const mysqlSessionStore = (options: {
 
   const append = (entry: AppendInput, appendOptions?: AppendOptions) =>
     Effect.gen(function* () {
-      const session = yield* lockSession(sessionId)
+      const session = yield* lockClaimedSession(claim.session)
       if (appendOptions?.id !== undefined) {
         const persisted = yield* existingAppend(entry, appendOptions, session)
         if (persisted !== undefined) return persisted
@@ -353,7 +361,6 @@ export const mysqlSessionStore = (options: {
         sessionId,
         leafId: id,
         nextSeq: appendOptions?.id === undefined ? generatedSequence + 1 : session.next_seq + 1,
-        ...(appendOptions?.ownerToken === undefined ? undefined : { ownerToken: appendOptions.ownerToken }),
       })
       return { ...entry, id, parentId: session.leaf_id }
     })
@@ -361,7 +368,7 @@ export const mysqlSessionStore = (options: {
   const appendCheckpoint = (prepared: Session.PreparedCheckpoint) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const session = yield* lockSession(sessionId)
+      const session = yield* lockClaimedSession(claim.session)
       const rows = yield* sql<EntryRow>`
         SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
         WHERE session_id = ${sessionId} AND entry_id = ${prepared.id}
@@ -421,7 +428,6 @@ export const mysqlSessionStore = (options: {
         sessionId,
         leafId: checkpoint.id,
         nextSeq: session.next_seq + 1,
-        ...(prepared.ownerToken === undefined ? undefined : { ownerToken: prepared.ownerToken }),
       })
       return { _tag: "Appended", checkpoint, leafId: checkpoint.id } satisfies CheckpointAppend
     })
@@ -430,7 +436,7 @@ export const mysqlSessionStore = (options: {
     reserveEntryId: run(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
-        const session = yield* lockSession(sessionId)
+        const session = yield* lockClaimedSession(claim.session)
         let sequence = session.next_seq
         while (true) {
           const collision = yield* sql<{ readonly entry_id: string }>`
@@ -451,7 +457,8 @@ export const mysqlSessionStore = (options: {
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           const sessions = yield* sql<SessionRow>`
-            SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${sessionId}
+            SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+            FROM tenetkit_sessions WHERE session_id = ${sessionId}
           `
           return { target: leaf ?? sessions[0]?.leaf_id ?? null, rows: yield* loadEntries(sessionId) }
         }).pipe(
@@ -465,7 +472,7 @@ export const mysqlSessionStore = (options: {
       run(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* lockSession(sessionId)
+          yield* lockClaimedSession(claim.session)
           if (id !== null) {
             const rows = yield* sql<{ readonly entry_id: string }>`
               SELECT entry_id FROM tenetkit_session_entries WHERE session_id = ${sessionId} AND entry_id = ${id}
@@ -480,7 +487,8 @@ export const mysqlSessionStore = (options: {
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           const rows = yield* sql<SessionRow>`
-            SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${sessionId}
+            SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+            FROM tenetkit_sessions WHERE session_id = ${sessionId}
           `
           return rows[0]?.leaf_id ?? null
         }),

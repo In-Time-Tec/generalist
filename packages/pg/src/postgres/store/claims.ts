@@ -13,7 +13,7 @@ import {
 import { isTerminal } from "tenetkit/runtime/driver/run"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import { claimReadyRuns, refreshLease, releaseClaim } from "../runs/claims.js"
+import { claimReadyRuns, refreshLease } from "../runs/claims.js"
 import { RunClaims, type Interface as ClaimsInterface } from "tenetkit/runtime/driver/sql/run/claims"
 import { afterTerminal, appendEvent, completeRun, loadEventsAfter, loadRun, settleParent } from "./runtime.js"
 import { lockRunHierarchy } from "../runs/locks.js"
@@ -21,6 +21,8 @@ import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
 import { ExecutionResult } from "tenetkit/runtime/driver/execution/state"
 import { NOTIFY_CHANNEL } from "../schema.js"
 import { notifyRun } from "../events/transaction-events.js"
+import { releaseExecution, requireExecutionClaim } from "tenetkit/runtime/driver/sql/store/execution"
+import { revokeSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 export type RunFn = <A, E>(
@@ -122,21 +124,35 @@ export const postgresClaims = (input: {
       ),
     refreshLease: (leaseInput) =>
       run(
-        refreshLease({
+        requireExecutionClaim({
           runId: leaseInput.runId,
-          workerId: leaseInput.workerId,
+          ownerId: leaseInput.workerId,
           attemptFence: leaseInput.attemptFence,
-          cancellationRequested: leaseInput.cancellationRequested,
-          lease: leaseInput.lease ?? "30 seconds",
-        }),
+          session: leaseInput.session,
+        }).pipe(
+          Effect.flatMap(() =>
+            refreshLease({
+              runId: leaseInput.runId,
+              workerId: leaseInput.workerId,
+              attemptFence: leaseInput.attemptFence,
+              cancellationRequested: leaseInput.cancellationRequested,
+              lease: leaseInput.lease ?? "30 seconds",
+            }),
+          ),
+          Effect.catchTag(
+            ["tenetkit/runtime/RunNotFound", "tenetkit/runtime/StaleClaim", "tenetkit/runtime/StaleSessionClaim"],
+            () => Effect.succeed(false),
+          ),
+        ),
       ),
     releaseClaim: (releaseInput) =>
       run(
         Effect.gen(function* () {
-          yield* releaseClaim({
+          yield* releaseExecution({
             runId: releaseInput.runId,
-            workerId: releaseInput.workerId,
+            ownerId: releaseInput.workerId,
             attemptFence: releaseInput.attemptFence,
+            session: releaseInput.session,
           })
           yield* notifyRun(releaseInput.runId)
         }),
@@ -145,6 +161,12 @@ export const postgresClaims = (input: {
       run(
         Effect.gen(function* () {
           yield* lockRunHierarchy(commitInput.runId)
+          yield* requireExecutionClaim({
+            runId: commitInput.runId,
+            ownerId: commitInput.workerId,
+            attemptFence: commitInput.attemptFence,
+            session: commitInput.session,
+          })
           const loaded = yield* loadRun(commitInput.runId)
           if (
             loaded === undefined ||
@@ -159,6 +181,11 @@ export const postgresClaims = (input: {
           }
           if (commitInput.transition === "cancel") {
             yield* cancelRun(commitInput.runId, commitInput.reason)
+            if (!(yield* revokeSessionWriteClaim(commitInput.session))) {
+              return yield* RuntimeUnavailable.make({
+                message: `Run ${commitInput.runId} Session write binding was not revoked`,
+              })
+            }
             return
           }
           if (isTerminal(loaded.status)) {
@@ -169,6 +196,11 @@ export const postgresClaims = (input: {
               Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
             )
             yield* completeRun(hub, loaded, result)
+            if (!(yield* revokeSessionWriteClaim(commitInput.session))) {
+              return yield* RuntimeUnavailable.make({
+                message: `Run ${commitInput.runId} Session write binding was not revoked`,
+              })
+            }
             return
           }
           const event = yield* appendEvent(
@@ -183,6 +215,11 @@ export const postgresClaims = (input: {
           const settled = (yield* loadRun(loaded.runId))!
           yield* settleParent(hub, settled, event.eventId)
           yield* afterTerminal(hub, settled)
+          if (!(yield* revokeSessionWriteClaim(commitInput.session))) {
+            return yield* RuntimeUnavailable.make({
+              message: `Run ${commitInput.runId} Session write binding was not revoked`,
+            })
+          }
         }),
       ),
   })

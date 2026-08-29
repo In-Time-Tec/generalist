@@ -85,7 +85,12 @@ describePostgres("PostgreSQL Program store contract", () => {
               prompt: "run",
             })
             const [claim] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
-            yield* host.execute({ runId: receipt.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+            yield* host.execute({
+              runId: receipt.runId,
+              ownerId: claim!.workerId,
+              attemptFence: claim!.attemptFence,
+              session: claim!.session,
+            })
             const runId = receipt.runId
             expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
             expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
@@ -172,6 +177,7 @@ describePostgres("PostgreSQL Program store contract", () => {
               runId: receipt.runId,
               ownerId: first!.workerId,
               attemptFence: first!.attemptFence,
+              session: first!.session,
             })
             yield* Effect.all(
               [
@@ -209,6 +215,7 @@ describePostgres("PostgreSQL Program store contract", () => {
                     runId: receipt.runId,
                     ownerId: resumed!.workerId,
                     attemptFence: resumed!.attemptFence,
+                    session: resumed!.session,
                   })
                   expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
                   expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
@@ -251,7 +258,12 @@ describePostgres("PostgreSQL Program store contract", () => {
               prompt: "run",
             })
             const [claim] = yield* claims.claimReadyRuns({ workerId: "postgres-program-cancelled-approval", limit: 1 })
-            yield* host.execute({ runId: receipt.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+            yield* host.execute({
+              runId: receipt.runId,
+              ownerId: claim!.workerId,
+              attemptFence: claim!.attemptFence,
+              session: claim!.session,
+            })
             const operation = yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })
             if (operation?.waitId === undefined) return yield* Effect.die("Program approval wait is missing")
             yield* provideScoped(
@@ -319,6 +331,7 @@ describePostgres("PostgreSQL Program store contract", () => {
               runId: receipt.runId,
               ownerId: parentAdmission!.workerId,
               attemptFence: parentAdmission!.attemptFence,
+              session: parentAdmission!.session,
             })
             const admitted = yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })
             expect(admitted).toMatchObject({ status: "waiting" })
@@ -327,7 +340,12 @@ describePostgres("PostgreSQL Program store contract", () => {
             yield* Effect.forEach(
               firstChildren,
               (claim) =>
-                host.execute({ runId: claim.run.runId, ownerId: claim.workerId, attemptFence: claim.attemptFence }),
+                host.execute({
+                  runId: claim.run.runId,
+                  ownerId: claim.workerId,
+                  attemptFence: claim.attemptFence,
+                  session: claim.session,
+                }),
               { concurrency: "unbounded", discard: true },
             )
             const [thirdChild] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
@@ -335,6 +353,7 @@ describePostgres("PostgreSQL Program store contract", () => {
               runId: thirdChild!.run.runId,
               ownerId: thirdChild!.workerId,
               attemptFence: thirdChild!.attemptFence,
+              session: thirdChild!.session,
             })
             expect(fixture.counts().childFinalizers).toBe(3)
             const [resumedParent] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
@@ -343,6 +362,7 @@ describePostgres("PostgreSQL Program store contract", () => {
               runId: receipt.runId,
               ownerId: resumedParent!.workerId,
               attemptFence: resumedParent!.attemptFence,
+              session: resumedParent!.session,
             })
             expect((yield* runtime.snapshot(receipt.runId)).outcome).toMatchObject({
               _tag: "Succeeded",
@@ -360,6 +380,7 @@ describePostgres("PostgreSQL Program store contract", () => {
               runId: cancelled.runId,
               ownerId: cancelAdmission!.workerId,
               attemptFence: cancelAdmission!.attemptFence,
+              session: cancelAdmission!.session,
             })
             const cancelledOperation = yield* store.getProgramOperation({
               runId: cancelled.runId,
@@ -423,7 +444,12 @@ describePostgres("PostgreSQL Program store contract", () => {
               prompt: "run",
             })
             const [initial] = yield* claims.claimReadyRuns({ workerId: "postgres-program-crash", limit: 1 })
-            const claim = { runId: receipt.runId, ownerId: initial!.workerId, attemptFence: initial!.attemptFence }
+            const claim = {
+              runId: receipt.runId,
+              ownerId: initial!.workerId,
+              attemptFence: initial!.attemptFence,
+              session: initial!.session,
+            }
             const request = { operation: "echo", tool: "echo", input: "value" }
             yield* store.reserveProgramOperation({
               ...claim,
@@ -452,6 +478,7 @@ describePostgres("PostgreSQL Program store contract", () => {
               runId: receipt.runId,
               ownerId: recovery!.workerId,
               attemptFence: recovery!.attemptFence,
+              session: recovery!.session,
             })
             expect((yield* runtime.snapshot(receipt.runId)).outcome).toMatchObject({
               _tag: "Succeeded",

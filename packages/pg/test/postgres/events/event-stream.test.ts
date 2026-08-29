@@ -59,6 +59,7 @@ describePostgres("PostgreSQL event stream catch-up", () => {
             runId: receipt.runId,
             ownerId: claim.workerId,
             attemptFence: claim.attemptFence,
+            session: claim.session,
             event: { _tag: "TurnStarted", turn },
           })
 

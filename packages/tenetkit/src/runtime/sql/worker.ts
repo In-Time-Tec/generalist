@@ -167,6 +167,7 @@ export const makeWorker = (
             runId: item.run.runId,
             workerId: options.workerId,
             attemptFence: item.attemptFence,
+            session: item.session,
             cancellationRequested: item.run.cancellationRequested,
             lease,
           }),
@@ -174,7 +175,12 @@ export const makeWorker = (
         Effect.flatMap((refreshed) => (refreshed ? renew : Effect.void)),
       )
       const hosted = host
-        .execute({ runId: item.run.runId, ownerId: options.workerId, attemptFence: item.attemptFence })
+        .execute({
+          runId: item.run.runId,
+          ownerId: options.workerId,
+          attemptFence: item.attemptFence,
+          session: item.session,
+        })
         .pipe(Effect.raceFirst(renew))
       return (
         item.run.cancellationRequested ? hosted : hosted.pipe(Effect.raceFirst(watchCancellation(item.run.runId)))
@@ -228,6 +234,7 @@ export const makeWorker = (
                         runId: item.run.runId,
                         workerId: options.workerId,
                         attemptFence: item.attemptFence,
+                        session: item.session,
                       })
                       .pipe(Effect.ensuring(removeClaim.pipe(Effect.andThen(Queue.offer(wakeups, undefined)))))
                   : Effect.void,

@@ -14,13 +14,11 @@ describe("SessionSync.diagnose", () => {
   it("reports full structural counts for a divergent projection", () => {
     const diagnostics = SessionSync.diagnose({
       sessionId: "session-a",
-      ownerToken: "owner-1",
       durableEntryTags: ["Message", "Compaction"],
       projection: [user("shared"), user("durable-only")],
       transcript: [user("shared"), user("authoritative-only"), user("tail")],
     })
     expect(diagnostics.sessionId).toBe("session-a")
-    expect(diagnostics.ownerToken).toBe("owner-1")
     expect(diagnostics.durableEntryCount).toBe(2)
     expect(diagnostics.durableMessageCount).toBe(2)
     expect(diagnostics.authoritativeMessageCount).toBe(3)
@@ -45,7 +43,6 @@ describe("SessionSync.diagnose", () => {
     })
     const encoded = Json.stringify(diagnostics)
     expect(encoded).not.toContain("secret")
-    expect(diagnostics.ownerToken).toBeUndefined()
   })
 
   it("counts ambiguous alignments instead of divergence when the projection matches twice", () => {

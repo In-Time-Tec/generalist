@@ -560,7 +560,7 @@ it.live("atomically imports SQLite handoff projections with exact retry and dive
       ...completion,
       outcome: { _tag: "Succeeded" as const, value: commit },
     }
-    const session = yield* store.sessionStore("session:sqlite-handoff-projection")
+    const session = yield* store.claimedSessionStore(claim)
     if (Option.isNone(session)) return yield* Effect.die("expected SQLite Session")
     yield* session.value.append({ _tag: "Message", message: Prompt.make("descendant").content[0]! })
     const beforeDivergence = yield* session.value.path()
@@ -585,7 +585,7 @@ it.live("atomically imports SQLite handoff projections with exact retry and dive
   const reopen = Effect.gen(function* () {
     const store = yield* RunStore.RunStore
     expect((yield* store.getOperation({ runId, operationId })).status).toBe("succeeded")
-    const session = yield* store.sessionStore("session:sqlite-handoff-projection")
+    const session = yield* store.sessionReader("session:sqlite-handoff-projection")
     if (Option.isNone(session)) return yield* Effect.die("expected reopened SQLite Session")
     expect(Session.buildContext(yield* session.value.path())).toEqual(
       Prompt.concat(projectedHistory, Prompt.make("descendant")),
@@ -718,7 +718,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
         runId: receipt.runId,
         operationKey: checkpointState?.handoff?.path[0]?.handoffId ?? "missing",
       })
-      const session = yield* store.sessionStore("session:durable-handoff")
+      const session = yield* store.sessionReader("session:durable-handoff")
       if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
       const sessionPath = yield* session.value.path()
       return { runId: receipt.runId, fiber, execution, operation, sessionPath }
@@ -792,7 +792,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const host = yield* ExecutionHost.ExecutionHost
-      const session = yield* store.sessionStore("session:durable-handoff")
+      const session = yield* store.sessionReader("session:durable-handoff")
       if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
       const conversationBeforeContinuation = Session.buildContext(yield* session.value.path())
       const claim = yield* store.claimExecution({ runId: committedResult.runId, ownerId: "after-reopen" })
@@ -1279,6 +1279,8 @@ layer(sqliteLayer(tempDbPath("ops")))("expired non-idempotent running operations
         attempt: 1,
       })
       const operationClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+      const staleSession = Option.getOrThrow(yield* driver.claimedSessionStore(operationClaim))
+      yield* staleSession.append({ _tag: "Message", message: textPrompt("before resolution").content[0]! })
       yield* driver.startOperation({ ...operationClaim, operationId: recorded.operationId })
       const expired = yield* driver.expireRunningOperation({
         ...operationClaim,
@@ -1303,6 +1305,11 @@ layer(sqliteLayer(tempDbPath("ops")))("expired non-idempotent running operations
           error: { details: { source: "operator", recoverable: false }, message: "uncertain" },
         },
       })
+      expect(
+        yield* Effect.flip(
+          staleSession.append({ _tag: "Message", message: textPrompt("stale after resolution").content[0]! }),
+        ),
+      ).toMatchObject({ message: "Session write claim is stale" })
       yield* runtime.resolveOperation({
         runId: receipt.runId,
         operationId: recorded.operationId,
@@ -1322,6 +1329,12 @@ layer(sqliteLayer(tempDbPath("ops")))("expired non-idempotent running operations
         .pipe(Effect.flip)
       expect(conflict).toBeInstanceOf(Errors.OperationResolutionConflict)
       const resolvedClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+      expect(BigInt(resolvedClaim.session.epoch)).toBeGreaterThan(BigInt(operationClaim.session.epoch))
+      const replacementSession = Option.getOrThrow(yield* driver.claimedSessionStore(resolvedClaim))
+      yield* replacementSession.append({
+        _tag: "Message",
+        message: textPrompt("replacement after resolution").content[0]!,
+      })
       const consumed = yield* driver.recordOperation({
         ...resolvedClaim,
         runId: receipt.runId,
@@ -1374,7 +1387,7 @@ layer(sqliteLayer(tempDbPath("terminal")))("first terminal wins", (suite) => {
       const again = yield* driver
         .fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "nope" }) })
         .pipe(Effect.flip)
-      expect(again).toBeInstanceOf(Errors.RunTerminal)
+      expect(again).toBeInstanceOf(Errors.StaleClaim)
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
     }),
   )

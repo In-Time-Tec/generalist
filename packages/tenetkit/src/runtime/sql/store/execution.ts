@@ -3,7 +3,7 @@ import { SqlClient, SqlError } from "effect/unstable/sql"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../../run/store.js"
-import { StaleClaim } from "../errors.js"
+import { StaleClaim, StaleSessionClaim } from "../errors.js"
 import { appendEvent, loadRun, loadRunWait, nowIso } from "./statements.js"
 import type { DecodedRun } from "../codec/rows.js"
 import { checkpointRef } from "../../executable/manifest.js"
@@ -12,16 +12,38 @@ import { loadRegistrations } from "../executable/registrations.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution/state.js"
 import type { EventHub } from "../subscribers.js"
 import { activeChildCount } from "./child/capacity.js"
+import { acquireSessionWriteClaim, requireSessionWriteClaim, revokeSessionWriteClaim } from "../session/claim.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
 
+/** Lock ordering authority: every combined transaction acquires Run before Session. */
+const lockRun = (runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql.onDialectOrElse({
+      pg: () => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`,
+      mysql: () => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`,
+      orElse: () => Effect.void,
+    })
+  })
+
 export const requireExecutionClaim = (input: ExecutionClaim) =>
   Effect.gen(function* () {
+    yield* lockRun(input.runId)
     const run = yield* requireRun(input.runId)
     if (run.ownerWorkerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
       return yield* StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence })
     }
+    if (
+      input.session.runId !== input.runId ||
+      input.session.ownerId !== input.ownerId ||
+      input.session.runAttemptFence !== input.attemptFence ||
+      input.session.sessionId !== run.sessionId
+    ) {
+      return yield* StaleSessionClaim.make(input.session)
+    }
+    yield* requireSessionWriteClaim(input.session)
   })
 
 const executionRecord = (
@@ -66,12 +88,49 @@ export const loadExecution = (runId: string) =>
 export const releaseExecution = (input: ExecutionClaim) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`
-      UPDATE tenetkit_runs SET owner_worker_id = NULL
-      WHERE run_id = ${input.runId}
-        AND owner_worker_id = ${input.ownerId}
-        AND attempt_fence = ${input.attemptFence}
-    `
+    yield* lockRun(input.runId)
+    const run = yield* loadRun(input.runId)
+    if (run === undefined || run.ownerWorkerId !== input.ownerId || run.attemptFence !== input.attemptFence) return
+    yield* requireSessionWriteClaim(input.session).pipe(
+      Effect.mapError(() => RuntimeUnavailable.make({ message: `Run ${input.runId} lost its Session write binding` })),
+    )
+    const updated = yield* nowIso
+    const released = yield* sql.onDialectOrElse({
+      mysql: () =>
+        Effect.gen(function* () {
+          yield* sql`
+            UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL, updated_at = ${updated}
+            WHERE run_id = ${input.runId}
+              AND owner_worker_id = ${input.ownerId}
+              AND attempt_fence = ${input.attemptFence}
+          `
+          const rows = yield* sql<{ readonly affected: number | string }>`SELECT ROW_COUNT() AS affected`
+          return Number(rows[0]?.affected ?? 0)
+        }),
+      pg: () =>
+        sql<{ readonly run_id: string }>`
+          UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL, updated_at = ${updated}
+          WHERE run_id = ${input.runId}
+            AND owner_worker_id = ${input.ownerId}
+            AND attempt_fence = ${input.attemptFence}
+          RETURNING run_id
+        `.pipe(Effect.map((rows) => rows.length)),
+      orElse: () =>
+        sql<{ readonly run_id: string }>`
+          UPDATE tenetkit_runs SET owner_worker_id = NULL, updated_at = ${updated}
+          WHERE run_id = ${input.runId}
+            AND owner_worker_id = ${input.ownerId}
+            AND attempt_fence = ${input.attemptFence}
+          RETURNING run_id
+        `.pipe(Effect.map((rows) => rows.length)),
+    })
+    if (released !== 1) {
+      return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} execution claim was not released` })
+    }
+    const revoked = yield* revokeSessionWriteClaim(input.session)
+    if (!revoked) {
+      return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} Session write binding was not revoked` })
+    }
   })
 
 export const claimExecution: {
@@ -80,13 +139,14 @@ export const claimExecution: {
     hub: EventHub,
     input: { readonly runId: string; readonly ownerId: string },
   ): Effect.Effect<
-    ExecutionRecord & { readonly ownerId: string },
+    ExecutionRecord & ExecutionClaim,
     RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim,
     SqlClient.SqlClient
   >
 } = Function.dual(2, (hub: EventHub, input: { readonly runId: string; readonly ownerId: string }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    yield* lockRun(input.runId)
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     if (run.status === "waiting" || run.status === "needs-resolution") {
@@ -121,6 +181,12 @@ export const claimExecution: {
     if (claimed.ownerWorkerId !== input.ownerId || claimed.attemptFence !== nextAttemptFence) {
       return yield* StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: run.attemptFence })
     }
+    const session = yield* acquireSessionWriteClaim({
+      sessionId: claimed.sessionId,
+      runId: claimed.runId,
+      ownerId: input.ownerId,
+      runAttemptFence: claimed.attemptFence,
+    })
     if (run.status === "queued") {
       yield* appendEvent(hub, claimed, { _tag: "RunAttemptStarted", attempt: claimed.attempt }, "running")
     }
@@ -130,6 +196,7 @@ export const claimExecution: {
     return {
       ...executionRecord(started, yield* activeChildCount(input.runId), registrations, wait?.resolution),
       ownerId: input.ownerId,
+      session,
     }
   }),
 )
@@ -148,13 +215,14 @@ export const retryExecution: {
   Effect.gen(function* () {
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.status !== "running" || run.ownerWorkerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+    if (run.status !== "running") {
       return yield* StaleClaim.make({
         runId: input.runId,
         workerId: input.ownerId,
         attemptFence: input.attemptFence,
       })
     }
+    yield* requireExecutionClaim(input)
     const attempt = run.attempt + 1
     yield* appendEvent(hub, { ...run, attempt }, { _tag: "RunAttemptStarted", attempt }, "running")
     return yield* loadExecution(input.runId)
@@ -169,6 +237,7 @@ export const saveExecution = (
 ) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    yield* requireExecutionClaim(input)
     const run = yield* requireRun(input.runId)
     const executableRef = yield* Effect.try({
       try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),

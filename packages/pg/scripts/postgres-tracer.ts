@@ -32,6 +32,7 @@ const runTrace = (databaseUrl: string, sessionId: string) =>
       runId: receipt.runId,
       workerId: "cli-worker",
       attemptFence: claimed[0]!.attemptFence,
+      session: claimed[0]!.session,
       transition: "complete",
       result: completedResult("ok"),
     })

@@ -38,6 +38,7 @@ import {
   loadExecution,
   releaseExecution,
   requireExecutionClaim,
+  revokeSession,
   retryExecution,
   saveExecution,
 } from "./store/execution.js"
@@ -53,7 +54,7 @@ import {
   resolveAddress,
 } from "./store/directory.js"
 import { Prompt } from "effect/unstable/ai"
-import { make as makeMemorySessionStore } from "./session-store.js"
+import { claimedStore as memorySessionStore, reader as memorySessionReader } from "./session-store.js"
 import { admitFanOut } from "./store/fan-out/service.js"
 import { inspectFanOut } from "./store/fan-out/inspection.js"
 import { make as makeTreeCursor } from "../tree/cursor.js"
@@ -72,7 +73,6 @@ import {
 import { externalChildOperations } from "./store/child/external.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import type { RunActivation } from "../run/activation.js"
-
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
@@ -150,7 +150,8 @@ const makeStoreServices = (options: LayerOptions) =>
     ) => modifyState((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
     const runStore = RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
-      sessionStore: (sessionId) => Effect.succeed(Option.some(makeMemorySessionStore({ stateRef, sessionId }))),
+      sessionReader: (sessionId) => Effect.succeed(Option.some(memorySessionReader({ stateRef, sessionId }))),
+      claimedSessionStore: (claim) => Effect.succeed(Option.some(memorySessionStore({ stateRef, claim }))),
       hasAdmission: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>
@@ -186,7 +187,7 @@ const makeStoreServices = (options: LayerOptions) =>
         fencedModify(input, (state) =>
           Effect.gen(function* () {
             const [receipt, admitted] = yield* admitProgramChild(state, input)
-            return [receipt, yield* suspend(admitted, input)] as const
+            return [receipt, revokeSession(yield* suspend(admitted, input), input)] as const
           }),
         ),
       events: (input) => followEvents(stateRef, input),
@@ -384,13 +385,15 @@ const makeStoreServices = (options: LayerOptions) =>
                   const { continuation: _, ...withoutContinuation } = run
                   runs.set(run.runId, withoutContinuation)
                   const outcome: CompletionOutcome = { _tag: "Completed" }
-                  return [outcome, yield* complete({ ...state, runs }, input)] as const
+                  return [outcome, revokeSession(yield* complete({ ...state, runs }, input), input)] as const
                 }))(),
             ),
           ),
         ),
-      fail: (input) => fencedUpdate(input, (state) => fail(state, input)),
-      suspend: (input) => fencedUpdate(input, (state) => suspend(state, input)),
+      fail: (input) =>
+        fencedUpdate(input, (state) => fail(state, input).pipe(Effect.map((next) => revokeSession(next, input)))),
+      suspend: (input) =>
+        fencedUpdate(input, (state) => suspend(state, input).pipe(Effect.map((next) => revokeSession(next, input)))),
       resume: (input) => update((state) => resume(state, input)),
       emitAgentEvent: (input) => fencedUpdate(input, (state) => emitAgentEvent(state, input)),
       recordOperation: (input) => fencedModify(input, (state) => recordOperation(state, input)),

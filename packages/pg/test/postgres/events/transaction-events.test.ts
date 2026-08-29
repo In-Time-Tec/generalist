@@ -50,6 +50,7 @@ describePostgres("PostgreSQL process tracer", () => {
             runId: first.runId,
             ownerId: "tracer-a",
             attemptFence: a[0]!.attemptFence,
+            session: a[0]!.session,
             wait: openWait({ waitId: "gate", reason: "external" }),
             suspension: suspension({ waitId: "gate" }),
           })
@@ -59,6 +60,7 @@ describePostgres("PostgreSQL process tracer", () => {
             runId: first.runId,
             workerId: "tracer-a",
             attemptFence: resumed[0]!.attemptFence,
+            session: resumed[0]!.session,
             transition: "complete",
             result: completedResult("done"),
           })
@@ -68,6 +70,7 @@ describePostgres("PostgreSQL process tracer", () => {
             runId: second.runId,
             workerId: "tracer-b",
             attemptFence: b[0]!.attemptFence,
+            session: b[0]!.session,
             transition: "complete",
             result: completedResult("done-2"),
           })

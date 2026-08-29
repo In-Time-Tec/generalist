@@ -148,24 +148,17 @@ export class SessionStoreError extends Schema.TaggedError<SessionStoreError>()("
 }) {}
 /** @experimental Session append conflict with the active path or entry identity. */
 export class SessionConflict extends Schema.TaggedError<SessionConflict>()("tenetkit/core/SessionConflict", {
-  reason: Schema.Literals([
-    "stale-leaf",
-    "entry-id-reused",
-    "checkpoint-id-reused",
-    "checkpoint-not-on-active-path",
-    "fenced",
-  ]),
+  reason: Schema.Literals(["stale-leaf", "entry-id-reused", "checkpoint-id-reused", "checkpoint-not-on-active-path"]),
   message: Schema.String,
 }) {}
-type AppendOptionsBase = { readonly ownerToken?: string }
 /** @experimental Expected active leaf for a store-assigned Session entry identity. */
-export type GeneratedAppendOptions = AppendOptionsBase & {
+export type GeneratedAppendOptions = {
   readonly id?: never
   readonly expectedLeafId?: EntryId | null
 }
 /** @experimental Exact identity and parent for an idempotent normal Session append. */
-export type StableAppendOptions = AppendOptionsBase & { readonly id: EntryId; readonly expectedLeafId: EntryId | null }
-/** @experimental Identity, expected active leaf, and host write-ownership token for a normal Session append. */
+export type StableAppendOptions = { readonly id: EntryId; readonly expectedLeafId: EntryId | null }
+/** @experimental Identity and expected active leaf for a normal Session append. */
 export type AppendOptions = GeneratedAppendOptions | StableAppendOptions
 /** @experimental Exact idempotent projection. Atomically persist projection, telemetry, and commit; remote failure is ambiguous. */
 export interface PreparedCheckpoint {
@@ -175,7 +168,6 @@ export interface PreparedCheckpoint {
   readonly telemetry: ReadonlyArray<ModelTelemetryEvent>
   readonly compactionCommit?: CompactionCommit
   readonly summary?: string
-  readonly ownerToken?: string
 }
 /** @experimental Authoritative result of an idempotent checkpoint append. */
 export interface CheckpointAppend {
@@ -217,7 +209,7 @@ const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
 const telemetryEquivalence = Schema.toEquivalence(Schema.Array(ModelTelemetryEvent))
 const commitEquivalence = Schema.toEquivalence(CompactionCommit)
 
-/** @experimental Canonical exact checkpoint equivalence, excluding the write-owner token. */
+/** @experimental Canonical exact checkpoint equivalence. */
 export const checkpointMatches: {
   (prepared: PreparedCheckpoint): (entry: CompactionEntry) => boolean
   (entry: CompactionEntry, prepared: PreparedCheckpoint): boolean

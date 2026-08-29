@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const MIGRATION_NAME = "tenetkit_runtime"
 export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
 export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
@@ -249,8 +249,13 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   session_id TEXT PRIMARY KEY,
   leaf_id TEXT,
   next_seq BIGINT NOT NULL DEFAULT 0,
-  owner_token TEXT,
-  updated_at TIMESTAMPTZ NOT NULL
+  writer_epoch BIGINT NOT NULL DEFAULT 0,
+  writer_run_id TEXT,
+  writer_owner_id TEXT,
+  writer_attempt_fence INTEGER,
+  updated_at TIMESTAMPTZ NOT NULL,
+  CHECK ((writer_run_id IS NULL AND writer_owner_id IS NULL AND writer_attempt_fence IS NULL)
+    OR (writer_run_id IS NOT NULL AND writer_owner_id IS NOT NULL AND writer_attempt_fence IS NOT NULL))
 )`,
   `CREATE TABLE IF NOT EXISTS tenetkit_session_entries (
   session_id TEXT NOT NULL,

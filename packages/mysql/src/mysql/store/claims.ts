@@ -10,6 +10,8 @@ import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import { cancel, complete, fail } from "tenetkit/runtime/driver/sql/store/control"
 import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
 import { ExecutionResult } from "tenetkit/runtime/driver/execution/state"
+import { acquireSessionWriteClaim, revokeSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
+import { releaseExecution, requireExecutionClaim } from "tenetkit/runtime/driver/sql/store/execution"
 
 export type RunFn = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlClient.SqlClient>,
@@ -55,32 +57,46 @@ export const mysqlClaims = (input: {
           const leaseMicros = Duration.toMillis(claimInput.lease ?? "30 seconds") * 1_000
           const scanLimit = Math.max(claimInput.limit, Math.min(4096, claimInput.limit * 64))
           const candidates = yield* sql<{ run_id: string }>`
-            SELECT r.run_id FROM tenetkit_runs r
-            WHERE (
-                (r.cancellation_requested = 1 AND r.status = 'cancelling')
-                OR (
-                  r.cancellation_requested = 0
-                  AND (
-                    (
-                      r.parent_run_id IS NULL
-                      AND (
-                        r.status = 'running'
-                        OR EXISTS (
-                          SELECT 1 FROM tenetkit_lanes l
-                          WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
+            SELECT ranked.run_id
+            FROM (
+              SELECT
+                r.run_id,
+                r.accepted_sequence,
+                ROW_NUMBER() OVER (PARTITION BY r.session_id ORDER BY r.accepted_sequence ASC) AS session_rank
+              FROM tenetkit_runs r
+              WHERE (
+                  (r.cancellation_requested = 1 AND r.status = 'cancelling')
+                  OR (
+                    r.cancellation_requested = 0
+                    AND (
+                      (
+                        r.parent_run_id IS NULL
+                        AND (
+                          r.status = 'running'
+                          OR EXISTS (
+                            SELECT 1 FROM tenetkit_lanes l
+                            WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
+                          )
                         )
                       )
-                    )
-                    OR EXISTS (
-                      SELECT 1 FROM tenetkit_run_links link
-                      WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
+                      OR EXISTS (
+                        SELECT 1 FROM tenetkit_run_links link
+                        WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
+                      )
                     )
                   )
                 )
-              )
-              AND r.status IN ('queued', 'running', 'cancelling')
-              AND (r.owner_worker_id IS NULL OR r.lease_expires_at IS NULL OR r.lease_expires_at < NOW(3))
-            ORDER BY r.accepted_sequence ASC
+                AND r.status IN ('queued', 'running', 'cancelling')
+                AND (r.owner_worker_id IS NULL OR r.lease_expires_at IS NULL OR r.lease_expires_at < NOW(3))
+                AND NOT EXISTS (
+                  SELECT 1 FROM tenetkit_sessions s
+                  WHERE s.session_id = r.session_id
+                    AND s.writer_run_id IS NOT NULL
+                    AND s.writer_run_id <> r.run_id
+                )
+            ) ranked
+            WHERE ranked.session_rank = 1
+            ORDER BY ranked.accepted_sequence ASC
             LIMIT ${sql.literal(String(Math.max(0, Math.floor(scanLimit))))}
           `
           const claimed: Array<ClaimedRun> = []
@@ -107,6 +123,12 @@ export const mysqlClaims = (input: {
               WHERE run_id = ${row.run_id}
             `
             let fresh = (yield* loadRun(row.run_id))!
+            const session = yield* acquireSessionWriteClaim({
+              sessionId: fresh.sessionId,
+              runId: fresh.runId,
+              ownerId: claimInput.workerId,
+              runAttemptFence: fresh.attemptFence,
+            })
             if (wasQueued) {
               yield* appendEvent(hub, fresh, { _tag: "RunAttemptStarted", attempt: fresh.attempt }, "running")
               fresh = (yield* loadRun(row.run_id))!
@@ -115,6 +137,7 @@ export const mysqlClaims = (input: {
               run: fresh,
               workerId: claimInput.workerId,
               attemptFence: fresh.attemptFence,
+              session,
               leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(fresh.leaseExpiresAt!)),
             })
           }
@@ -134,6 +157,19 @@ export const mysqlClaims = (input: {
             FOR UPDATE
           `
           if (rows.length === 0) return false
+          const currentSession = yield* requireExecutionClaim({
+            runId: leaseInput.runId,
+            ownerId: leaseInput.workerId,
+            attemptFence: leaseInput.attemptFence,
+            session: leaseInput.session,
+          }).pipe(
+            Effect.as(true),
+            Effect.catchTag(
+              ["tenetkit/runtime/RunNotFound", "tenetkit/runtime/StaleClaim", "tenetkit/runtime/StaleSessionClaim"],
+              () => Effect.succeed(false),
+            ),
+          )
+          if (!currentSession) return false
           yield* sql`
             UPDATE tenetkit_runs
             SET lease_expires_at = DATE_ADD(NOW(3), INTERVAL ${sql.literal(String(leaseMicros))} MICROSECOND), updated_at = NOW(3)
@@ -144,11 +180,12 @@ export const mysqlClaims = (input: {
       ),
     releaseClaim: (releaseInput) =>
       run(
-        sql`
-        UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW(3)
-        WHERE run_id = ${releaseInput.runId} AND owner_worker_id = ${releaseInput.workerId}
-          AND attempt_fence = ${releaseInput.attemptFence}
-      `.pipe(Effect.asVoid),
+        releaseExecution({
+          runId: releaseInput.runId,
+          ownerId: releaseInput.workerId,
+          attemptFence: releaseInput.attemptFence,
+          session: releaseInput.session,
+        }),
       ),
     commitWithClaim: (commitInput) =>
       run(
@@ -166,20 +203,40 @@ export const mysqlClaims = (input: {
               attemptFence: commitInput.attemptFence,
             })
           yield* lockParent(commitInput.runId)
+          yield* requireExecutionClaim({
+            runId: commitInput.runId,
+            ownerId: commitInput.workerId,
+            attemptFence: commitInput.attemptFence,
+            session: commitInput.session,
+          })
           if (commitInput.transition === "cancel") {
             const cancellation = {
               runId: commitInput.runId,
               ...(commitInput.reason === undefined ? undefined : { reason: commitInput.reason }),
             }
             yield* cancel(hub, cancellation)
+            if (!(yield* revokeSessionWriteClaim(commitInput.session))) {
+              return yield* RuntimeUnavailable.make({
+                message: `Run ${commitInput.runId} Session write binding was not revoked`,
+              })
+            }
           } else if (commitInput.transition === "complete") {
             const result = yield* Schema.decodeUnknownEffect(ExecutionResult)(commitInput.result).pipe(
               Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
             )
-            yield* complete(hub, { runId: commitInput.runId, result })
+            yield* complete(hub, {
+              runId: commitInput.runId,
+              ownerId: commitInput.workerId,
+              attemptFence: commitInput.attemptFence,
+              session: commitInput.session,
+              result,
+            })
           } else {
             yield* fail(hub, {
               runId: commitInput.runId,
+              ownerId: commitInput.workerId,
+              attemptFence: commitInput.attemptFence,
+              session: commitInput.session,
               error: AgentExecutionFailure.make({ message: failureMessage(commitInput.error?.message ?? "failed") }),
             })
           }

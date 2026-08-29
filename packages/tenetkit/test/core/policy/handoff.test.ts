@@ -74,7 +74,6 @@ layer(Layer.empty)("Handoff", (it) => {
         sessionId: "session-1",
         logicalOperationId: "operation-1",
         modelCallOrdinalStart: 3,
-        sessionOwnerToken: "owner-1",
         toolProgress: { _tag: "Backpressure", capacity: 4 },
         compaction: { contextWindow: 1024 },
       })

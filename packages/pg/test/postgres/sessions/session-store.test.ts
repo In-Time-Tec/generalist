@@ -4,7 +4,6 @@ import { SqlClient } from "effect/unstable/sql"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Handoff, Pins, Session } from "tenetkit"
 import { Errors, RunEvent, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import {
   assistant,
   assistantAddress,
@@ -24,19 +23,9 @@ const scopedWith =
   <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
-const withRuntime = <A, E, R extends Runtime.Runtime | RunStore.RunStore | RunClaims | Scope.Scope>(
+const withRuntime = <A, E, R extends Runtime.Runtime | RunStore.RunStore | Scope.Scope>(
   effect: Effect.Effect<A, E, R>,
 ) => scopedWith(runtimeLayer)(effect)
-
-const withSession = <A, E>(sessionId: string, body: (session: Session.Interface) => Effect.Effect<A, E>) =>
-  withRuntime(
-    Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
-      const session = yield* store.sessionStore(sessionId)
-      if (Option.isNone(session)) return yield* Effect.die("expected PostgreSQL Session authority")
-      return yield* body(session.value)
-    }),
-  )
 
 const jsonValue = Schema.decodeUnknownSync(Schema.Json)
 
@@ -92,14 +81,13 @@ const scheduleModel = (sessionId: string, label: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
-    const claims = yield* RunClaims
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId,
       idempotencyKey: label,
       prompt: textPrompt("answer"),
     })
-    yield* claims.claimReadyRuns({ workerId: `${label}:ready`, limit: 1, lease: "10 seconds" })
+    yield* store.activate({ runId: receipt.runId })
     const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: label })
     const operationKey = `${receipt.runId}:model:0`
     const operation = yield* store.recordOperation({
@@ -112,7 +100,7 @@ const scheduleModel = (sessionId: string, label: string) =>
       attempt: 0,
     })
     yield* store.startOperation({ ...claim, operationId: operation.operationId })
-    const maybeSession = yield* store.sessionStore(sessionId)
+    const maybeSession = yield* store.claimedSessionStore(claim)
     if (Option.isNone(maybeSession)) return yield* Effect.die("expected PostgreSQL Session authority")
     const prefix = yield* maybeSession.value.append({
       _tag: "Message",
@@ -162,71 +150,90 @@ describePostgres("PostgreSQL Session authority", () => {
   it.live("implements stable retry, branching, checkpoint, takeover, reopen, and Run-independent paths", () =>
     Effect.gen(function* () {
       const sessionId = uniqueSession("session-contract")
-      const runId = yield* withRuntime(
+      const result = yield* withRuntime(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId,
             idempotencyKey: "session-contract-run",
             prompt: textPrompt("journal only"),
           })
-          return receipt.runId
-        }),
-      )
-      const first = yield* withSession(sessionId, (session) =>
-        Effect.gen(function* () {
-          const id = yield* session.reserveEntryId
+          yield* store.activate({ runId: receipt.runId })
+          const claimA = yield* store.claimExecution({ runId: receipt.runId, ownerId: "owner-a" })
+          const sessionA = Option.getOrThrow(yield* store.claimedSessionStore(claimA))
+          const id = yield* sessionA.reserveEntryId
           const input = { _tag: "Message" as const, message: textPrompt("first").content[0]! }
-          const appended = yield* session.append(input, { id, expectedLeafId: null, ownerToken: "owner-a" })
-          expect(yield* session.append(input, { id, expectedLeafId: null, ownerToken: "owner-b" })).toEqual(appended)
-          return appended
-        }),
-      )
-      const second = yield* withSession(sessionId, (session) =>
-        session.append(
-          { _tag: "Message", message: textPrompt("second").content[0]! },
-          { id: "stable-second", expectedLeafId: first.id, ownerToken: "owner-b" },
-        ),
-      )
-      const stale = yield* withSession(sessionId, (session) =>
-        Effect.flip(
-          session.append(
-            { _tag: "Message", message: textPrompt("stale").content[0]! },
-            { id: "stale-writer", expectedLeafId: first.id, ownerToken: "owner-a" },
-          ),
-        ),
-      )
-      expect(stale).toMatchObject({ reason: "stale-leaf" })
-      yield* withSession(sessionId, (session) => session.setLeaf(first.id))
-      const branch = yield* withSession(sessionId, (session) =>
-        session.append(
-          { _tag: "Message", message: textPrompt("branch").content[0]! },
-          { id: "branch", expectedLeafId: first.id, ownerToken: "owner-c" },
-        ),
-      )
-      const inactiveRetry = yield* withSession(sessionId, (session) =>
-        Effect.flip(
-          session.append(
+          const first = yield* sessionA.append(input, { id, expectedLeafId: null })
+          expect(yield* sessionA.append(input, { id, expectedLeafId: null })).toEqual(first)
+
+          const claimB = yield* store.claimExecution({ runId: receipt.runId, ownerId: "owner-b" })
+          const sessionB = Option.getOrThrow(yield* store.claimedSessionStore(claimB))
+          expect(BigInt(claimB.session.epoch)).toBeGreaterThan(BigInt(claimA.session.epoch))
+          expect(yield* Effect.flip(sessionA.append(input, { id, expectedLeafId: null }))).toMatchObject({
+            message: "Session write claim is stale",
+          })
+          expect(yield* sessionB.append(input, { id, expectedLeafId: null })).toEqual(first)
+          const takeoverCheckpoint = {
+            id: "takeover-checkpoint",
+            parentId: first.id,
+            projectedHistory: Prompt.make("takeover checkpoint"),
+            telemetry: [],
+          }
+          expect((yield* sessionB.appendCheckpoint(takeoverCheckpoint))._tag).toBe("Appended")
+          expect(yield* Effect.flip(sessionA.appendCheckpoint(takeoverCheckpoint))).toMatchObject({
+            message: "Session write claim is stale",
+          })
+          expect((yield* sessionB.appendCheckpoint(takeoverCheckpoint))._tag).toBe("AlreadyPresent")
+          const reader = Option.getOrThrow(yield* store.sessionReader(sessionId))
+          expect((yield* reader.path(takeoverCheckpoint.id)).map((entry) => entry.id)).toEqual([
+            first.id,
+            takeoverCheckpoint.id,
+          ])
+          expect(yield* Effect.flip(sessionA.reserveEntryId)).toMatchObject({
+            message: "Session write claim is stale",
+          })
+          expect(yield* sessionB.reserveEntryId).toBe("3")
+          expect(yield* Effect.flip(sessionA.setLeaf(first.id))).toMatchObject({
+            message: "Session write claim is stale",
+          })
+          yield* sessionB.setLeaf(first.id)
+          const second = yield* sessionB.append(
             { _tag: "Message", message: textPrompt("second").content[0]! },
-            { id: second.id, expectedLeafId: first.id },
-          ),
-        ),
-      )
-      expect(inactiveRetry).toMatchObject({ reason: "stale-leaf" })
-      const prepared = {
-        id: "checkpoint",
-        parentId: branch.id,
-        projectedHistory: Prompt.make("projected"),
-        telemetry: [],
-        ownerToken: "owner-d",
-      }
-      yield* withSession(sessionId, (session) =>
-        Effect.gen(function* () {
-          expect((yield* session.appendCheckpoint(prepared))._tag).toBe("Appended")
-          expect((yield* session.appendCheckpoint({ ...prepared, ownerToken: "owner-e" }))._tag).toBe("AlreadyPresent")
+            { id: "stable-second", expectedLeafId: first.id },
+          )
+          const stale = yield* Effect.flip(
+            sessionB.append(
+              { _tag: "Message", message: textPrompt("stale").content[0]! },
+              { id: "stale-writer", expectedLeafId: first.id },
+            ),
+          )
+          expect(stale).toMatchObject({ reason: "stale-leaf" })
+          yield* sessionB.setLeaf(first.id)
+          const branch = yield* sessionB.append(
+            { _tag: "Message", message: textPrompt("branch").content[0]! },
+            { id: "branch", expectedLeafId: first.id },
+          )
+          const inactiveRetry = yield* Effect.flip(
+            sessionB.append(
+              { _tag: "Message", message: textPrompt("second").content[0]! },
+              { id: second.id, expectedLeafId: first.id },
+            ),
+          )
+          expect(inactiveRetry).toMatchObject({ reason: "stale-leaf" })
+          const prepared = {
+            id: "checkpoint",
+            parentId: branch.id,
+            projectedHistory: Prompt.make("projected"),
+            telemetry: [],
+          }
+          expect((yield* sessionB.appendCheckpoint(prepared))._tag).toBe("Appended")
+          expect((yield* sessionB.appendCheckpoint(prepared))._tag).toBe("AlreadyPresent")
+          return { runId: receipt.runId, first, branch }
         }),
       )
+      const { runId, first, branch } = result
 
       // Drop the Run journal itself. Session tables have no Run FK and the complete active path survives.
       yield* scopedWith(database.client)(
@@ -249,7 +256,13 @@ describePostgres("PostgreSQL Session authority", () => {
           expect(Number(foreignKeys[0]!.count)).toBe(0)
         }),
       )
-      const reopened = yield* withSession(sessionId, (session) => session.path())
+      const reopened = yield* withRuntime(
+        Effect.gen(function* () {
+          const store = yield* RunStore.RunStore
+          const session = Option.getOrThrow(yield* store.sessionReader(sessionId))
+          return yield* session.path()
+        }),
+      )
       expect(reopened.map((entry) => entry.id)).toEqual([first.id, branch.id, "checkpoint"])
       expect(Session.buildContext(reopened)).toEqual(Prompt.make("projected"))
     }),
@@ -283,10 +296,30 @@ describePostgres("PostgreSQL Session authority", () => {
             Stream.runCollect,
             Effect.forkChild({ startImmediately: true }),
           )
+        const replacement = yield* state.store.claimExecution({
+          runId: state.receipt.runId,
+          ownerId: "completed-replacement",
+        })
+        expect(
+          (yield* Effect.exit(
+            state.store.commitModelResponse({
+              ...state.claim,
+              operationId: state.operation.operationId,
+              checkpoint,
+              continuation,
+              ...exact,
+            }),
+          ))._tag,
+        ).toBe("Failure")
+        expect(
+          (yield* state.store.getOperation({ runId: state.receipt.runId, operationId: state.operation.operationId }))
+            .status,
+        ).toBe("running")
+        expect(yield* state.session.path()).toHaveLength(1)
         yield* installFailureTrigger("fail_completed_session_commit", "ModelResponseCommitted")
         const failed = yield* Effect.exit(
           state.store.commitModelResponse({
-            ...state.claim,
+            ...replacement,
             operationId: state.operation.operationId,
             checkpoint,
             continuation,
@@ -305,14 +338,14 @@ describePostgres("PostgreSQL Session authority", () => {
         expect(yield* Ref.get(seen)).toEqual([])
         yield* removeFailureTrigger("fail_completed_session_commit")
         yield* state.store.commitModelResponse({
-          ...state.claim,
+          ...replacement,
           operationId: state.operation.operationId,
           checkpoint,
           continuation,
           ...exact,
         })
         yield* state.store.commitModelResponse({
-          ...state.claim,
+          ...replacement,
           operationId: state.operation.operationId,
           checkpoint,
           continuation,
@@ -322,7 +355,7 @@ describePostgres("PostgreSQL Session authority", () => {
         expect(
           (yield* Effect.exit(
             state.store.commitModelResponse({
-              ...state.claim,
+              ...replacement,
               operationId: state.operation.operationId,
               ...divergent,
             }),
@@ -386,7 +419,10 @@ describePostgres("PostgreSQL Session authority", () => {
             Stream.runCollect,
             Effect.forkChild({ startImmediately: true }),
           )
-        yield* installFailureTrigger("fail_interrupted_session_commit", "ModelResponseInterrupted")
+        const replacement = yield* state.store.claimExecution({
+          runId: state.receipt.runId,
+          ownerId: "interrupted-replacement",
+        })
         expect(
           (yield* Effect.exit(
             state.store.commitInterruptedModelResponse({
@@ -402,16 +438,32 @@ describePostgres("PostgreSQL Session authority", () => {
             .status,
         ).toBe("running")
         expect(yield* state.session.path()).toHaveLength(1)
+        yield* installFailureTrigger("fail_interrupted_session_commit", "ModelResponseInterrupted")
+        expect(
+          (yield* Effect.exit(
+            state.store.commitInterruptedModelResponse({
+              ...replacement,
+              operationId: state.operation.operationId,
+              outcome,
+              event: exact,
+            }),
+          ))._tag,
+        ).toBe("Failure")
+        expect(
+          (yield* state.store.getOperation({ runId: state.receipt.runId, operationId: state.operation.operationId }))
+            .status,
+        ).toBe("running")
+        expect(yield* state.session.path()).toHaveLength(1)
         expect(yield* Ref.get(seen)).toEqual([])
         yield* removeFailureTrigger("fail_interrupted_session_commit")
         yield* state.store.commitInterruptedModelResponse({
-          ...state.claim,
+          ...replacement,
           operationId: state.operation.operationId,
           outcome,
           event: exact,
         })
         yield* state.store.commitInterruptedModelResponse({
-          ...state.claim,
+          ...replacement,
           operationId: state.operation.operationId,
           outcome,
           event: exact,
@@ -420,7 +472,7 @@ describePostgres("PostgreSQL Session authority", () => {
         expect(
           (yield* Effect.exit(
             state.store.commitInterruptedModelResponse({
-              ...state.claim,
+              ...replacement,
               operationId: state.operation.operationId,
               outcome,
               event: divergent,
@@ -436,7 +488,7 @@ describePostgres("PostgreSQL Session authority", () => {
           ),
         ).toHaveLength(1)
         expect(yield* state.session.path()).toHaveLength(2)
-        yield* state.store.fail({ ...state.claim, error: outcome.error })
+        yield* state.store.fail({ ...replacement, error: outcome.error })
         const settled = yield* state.runtime.history({ runId: state.receipt.runId, limit: 100 })
         expect(settled.findIndex((event) => event._tag === "ModelResponseInterrupted")).toBeLessThan(
           settled.findIndex((event) => event._tag === "RunFailed"),
@@ -478,7 +530,6 @@ describePostgres("PostgreSQL Session authority", () => {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const claims = yield* RunClaims
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId,
@@ -486,7 +537,7 @@ describePostgres("PostgreSQL Session authority", () => {
             prompt: textPrompt("supervisor sentinel"),
           })
           runId = receipt.runId
-          yield* claims.claimReadyRuns({ workerId: "handoff-projection:ready", limit: 1, lease: "10 seconds" })
+          yield* store.activate({ runId })
           const claim = yield* store.claimExecution({ runId, ownerId: "handoff-projection" })
           const operation = yield* store.recordOperation({
             ...claim,
@@ -499,7 +550,16 @@ describePostgres("PostgreSQL Session authority", () => {
           })
           operationId = operation.operationId
           yield* store.startOperation({ ...claim, operationId })
-          const complete = { ...claim, operationId, outcome: { _tag: "Succeeded" as const, value: commit }, checkpoint }
+          const staleComplete = {
+            ...claim,
+            operationId,
+            outcome: { _tag: "Succeeded" as const, value: commit },
+            checkpoint,
+          }
+          const replacement = yield* store.claimExecution({ runId, ownerId: "handoff-projection-replacement" })
+          expect((yield* Effect.exit(store.completeOperation(staleComplete)))._tag).toBe("Failure")
+          expect((yield* store.getOperation({ runId, operationId })).status).toBe("running")
+          const complete = { ...staleComplete, ...replacement }
           const invalid = yield* Effect.exit(
             store.completeOperation({
               ...complete,
@@ -518,7 +578,7 @@ describePostgres("PostgreSQL Session authority", () => {
           expect((yield* store.getOperation({ runId, operationId })).status).toBe("running")
           yield* store.completeOperation(complete)
           yield* store.completeOperation(complete)
-          const session = yield* store.sessionStore(sessionId)
+          const session = yield* store.claimedSessionStore(replacement)
           if (Option.isNone(session)) return yield* Effect.die("expected PostgreSQL Session authority")
           yield* session.value.append({ _tag: "Message", message: Prompt.make("descendant").content[0]! })
           yield* store.completeOperation(complete)
@@ -544,7 +604,7 @@ describePostgres("PostgreSQL Session authority", () => {
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
           expect((yield* store.getOperation({ runId, operationId })).status).toBe("succeeded")
-          const session = yield* store.sessionStore(sessionId)
+          const session = yield* store.sessionReader(sessionId)
           if (Option.isNone(session)) return yield* Effect.die("expected reopened PostgreSQL Session")
           expect(Session.buildContext(yield* session.value.path())).toEqual(
             Prompt.concat(projectedHistory, Prompt.make("descendant")),

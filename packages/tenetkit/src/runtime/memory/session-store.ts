@@ -6,10 +6,18 @@ import type { CompletedSessionEntry } from "../execution/model-response/commit.j
 import { handoffPayload, type HandoffSessionEntry } from "../session/handoff.js"
 import { terminalToolMessage, type RunTerminalOutcome } from "../session/tool-results.js"
 import type { MemorySession, MemoryState } from "./state.js"
+import type { ExecutionClaim, SessionReader } from "../run/store.js"
+import { StaleSessionClaim } from "../sql/errors.js"
 
 type Entry = Session.Entry
 
-const emptySession = (): MemorySession => ({ entries: new Map(), order: [], leaf: null, counter: 0 })
+const emptySession = (): MemorySession => ({
+  entries: new Map(),
+  order: [],
+  leaf: null,
+  counter: 0,
+  writerEpoch: 0n,
+})
 const payloadEquivalence = Schema.toEquivalence(Session.EntryPayload)
 const storeError = (message: string) => Session.SessionStoreError.make({ message })
 const conflict = (reason: Session.SessionConflict["reason"], message: string) =>
@@ -84,6 +92,7 @@ const append = (
   return [
     entry,
     {
+      ...session,
       entries,
       order: [...session.order, id],
       leaf: id,
@@ -249,6 +258,15 @@ export const appendInterruptedSessionEntry = (input: {
     return { ...state, sessions: new Map(state.sessions).set(interrupted.sessionId, nextSession) }
   })
 
+const writerBelongsToRun = (
+  session: MemorySession,
+  run: { readonly runId: string; readonly ownerId?: string; readonly attemptFence: number },
+) =>
+  session.writer === undefined ||
+  (session.writer.runId === run.runId &&
+    session.writer.ownerId === run.ownerId &&
+    session.writer.runAttemptFence === run.attemptFence)
+
 export const appendTerminalToolResults = (input: {
   readonly state: MemoryState
   readonly runId: string
@@ -257,8 +275,33 @@ export const appendTerminalToolResults = (input: {
   Effect.gen(function* () {
     const run = input.state.runs.get(input.runId)
     if (run === undefined) return input.state
-    const session = input.state.sessions.get(run.message.sessionId)
-    if (session === undefined) return input.state
+    const initialSession = input.state.sessions.get(run.message.sessionId)
+    if (initialSession === undefined) return input.state
+    let state = input.state
+    let session = initialSession
+    let shortLived = false
+    const ownsSession = writerBelongsToRun(session, run)
+    if (session.writer === undefined) {
+      const writerEpoch = session.writerEpoch + 1n
+      session = {
+        ...session,
+        writerEpoch,
+        writer: {
+          runId: run.runId,
+          ownerId: `${run.runId}:terminal:${run.lastSequence + 1}`,
+          runAttemptFence: run.attemptFence,
+        },
+      }
+      state = { ...state, sessions: new Map(state.sessions).set(run.message.sessionId, session) }
+      shortLived = true
+    }
+    const finish = (next: MemoryState): MemoryState => {
+      if (!shortLived) return next
+      const current = next.sessions.get(run.message.sessionId)
+      if (current === undefined || current.writerEpoch !== session.writerEpoch) return next
+      const { writer: _, ...revoked } = current
+      return { ...next, sessions: new Map(next.sessions).set(run.message.sessionId, revoked) }
+    }
     const id = `${input.runId}:terminal-tool-results`
     const existing = session.entries.get(id)
     const parentId = existing === undefined ? session.leaf : existing.parentId
@@ -267,7 +310,7 @@ export const appendTerminalToolResults = (input: {
       return yield* RuntimeUnavailable.make({ message: path.message })
     }
     const operations = new Map(
-      [...input.state.operations.values()]
+      [...state.operations.values()]
         .filter((operation) => operation.runId === input.runId)
         .map((operation) => [operation.operationId, operation] as const),
     )
@@ -278,7 +321,12 @@ export const appendTerminalToolResults = (input: {
       operations: [...operations.values()],
       terminal: input.terminal,
     })
-    if (message === undefined) return input.state
+    if (message === undefined) return finish(state)
+    if (!ownsSession) {
+      return yield* RuntimeUnavailable.make({
+        message: `Run ${run.runId} does not own its terminal Session projection`,
+      })
+    }
     const payload = {
       _tag: "Message" as const,
       message,
@@ -288,16 +336,13 @@ export const appendTerminalToolResults = (input: {
       if (!samePayload(existing, payload) || !onActivePath(session, existing.id)) {
         return yield* RuntimeUnavailable.make({ message: `Terminal Session entry ${id} conflicts with its retry` })
       }
-      return input.state
+      return finish(state)
     }
     const result = append(session, payload, { id, expectedLeafId: session.leaf })
     if (!isAppendSuccess(result)) {
       return yield* RuntimeUnavailable.make({ message: result.message })
     }
-    return {
-      ...input.state,
-      sessions: new Map(input.state.sessions).set(run.message.sessionId, result[1]),
-    }
+    return finish({ ...state, sessions: new Map(state.sessions).set(run.message.sessionId, result[1]) })
   })
 
 const updateSession = <A, E>(
@@ -314,24 +359,66 @@ const updateSession = <A, E>(
     ),
   )
 
-export const make = (config: {
+const requireClaim = (session: MemorySession, claim: ExecutionClaim) =>
+  session.writerEpoch.toString() === claim.session.epoch &&
+  claim.session.runId === claim.runId &&
+  claim.session.ownerId === claim.ownerId &&
+  claim.session.runAttemptFence === claim.attemptFence &&
+  session.writer?.runId === claim.runId &&
+  session.writer.ownerId === claim.ownerId &&
+  session.writer.runAttemptFence === claim.attemptFence
+    ? Effect.void
+    : Effect.fail(StaleSessionClaim.make(claim.session))
+
+const claimedUpdate = <A, E>(
+  stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
+  claim: ExecutionClaim,
+  transition: (session: MemorySession) => Effect.Effect<readonly [A, MemorySession], E>,
+) =>
+  updateSession(stateRef, claim.session.sessionId, (session) =>
+    requireClaim(session, claim).pipe(Effect.andThen(transition(session))),
+  ).pipe(
+    Effect.mapError((error) =>
+      Schema.is(StaleSessionClaim)(error) ? storeError("Session write claim is stale") : error,
+    ),
+  )
+
+export const reader = (config: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
   readonly sessionId: string
+}): SessionReader => ({
+  path: (leaf) =>
+    SynchronizedRef.get(config.stateRef).pipe(
+      Effect.flatMap((state) => {
+        const session = state.sessions.get(config.sessionId) ?? emptySession()
+        const path = pathTo(session, leaf ?? session.leaf)
+        return Schema.is(Session.SessionStoreError)(path) ? Effect.fail(path) : Effect.succeed(path)
+      }),
+    ),
+  leaf: SynchronizedRef.get(config.stateRef).pipe(
+    Effect.map((state) => state.sessions.get(config.sessionId)?.leaf ?? null),
+  ),
+})
+
+export const claimedStore = (config: {
+  readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
+  readonly claim: ExecutionClaim
 }): Session.Interface => {
-  const { stateRef, sessionId } = config
+  const { stateRef, claim } = config
+  const sessionId = claim.session.sessionId
   return {
-    reserveEntryId: updateSession(stateRef, sessionId, (session) => {
+    reserveEntryId: claimedUpdate(stateRef, claim, (session) => {
       let counter = session.counter
       while (session.entries.has(String(counter))) counter += 1
       return Effect.succeed([String(counter), { ...session, counter: counter + 1 }] as const)
     }),
     append: (input, options) =>
-      updateSession<Session.Entry, Session.SessionConflict>(stateRef, sessionId, (session) => {
+      claimedUpdate<Session.Entry, Session.SessionConflict>(stateRef, claim, (session) => {
         const result = append(session, input, options)
         return isAppendSuccess(result) ? Effect.succeed(result) : Effect.fail(result)
       }),
     appendCheckpoint: (prepared) =>
-      updateSession<Session.CheckpointAppend, Session.SessionConflict>(stateRef, sessionId, (session) =>
+      claimedUpdate<Session.CheckpointAppend, Session.SessionConflict>(stateRef, claim, (session) =>
         Effect.gen(function* () {
           if (prepared.compactionCommit !== undefined && prepared.compactionCommit.checkpointId !== prepared.id) {
             return yield* conflict("checkpoint-id-reused", "Compaction commit checkpoint identity diverges")
@@ -384,20 +471,13 @@ export const make = (config: {
           ] as const
         }),
       ),
-    path: (leaf) =>
-      SynchronizedRef.get(stateRef).pipe(
-        Effect.flatMap((state) => {
-          const session = state.sessions.get(sessionId) ?? emptySession()
-          const path = pathTo(session, leaf ?? session.leaf)
-          return Schema.is(Session.SessionStoreError)(path) ? Effect.fail(path) : Effect.succeed(path)
-        }),
-      ),
+    path: reader({ stateRef, sessionId }).path,
     setLeaf: (id) =>
-      updateSession(stateRef, sessionId, (session) =>
+      claimedUpdate(stateRef, claim, (session) =>
         id !== null && !session.entries.has(id)
           ? Effect.fail(storeError(`Session entry ${id} does not exist`))
           : Effect.succeed([undefined, { ...session, leaf: id }] as const),
       ),
-    leaf: SynchronizedRef.get(stateRef).pipe(Effect.map((state) => state.sessions.get(sessionId)?.leaf ?? null)),
+    leaf: reader({ stateRef, sessionId }).leaf,
   }
 }

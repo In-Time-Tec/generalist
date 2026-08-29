@@ -34,6 +34,7 @@ import {
   sameHandoffCheckpoint,
   sameHandoffCommit,
 } from "tenetkit/runtime/driver/session/handoff"
+import { revokeRunSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 import { lockRunHierarchy } from "../runs/locks.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
@@ -58,7 +59,11 @@ export const postgresOperations = (input: {
     claim: import("tenetkit/runtime/driver/run/store").ExecutionClaim,
   ) => Effect.Effect<
     void,
-    import("tenetkit/runtime/driver/sql/errors").StaleClaim | RunNotFound | RuntimeUnavailable | SqlError,
+    | import("tenetkit/runtime/driver/sql/errors").StaleClaim
+    | import("tenetkit/runtime/driver/sql/errors").StaleSessionClaim
+    | RunNotFound
+    | RuntimeUnavailable
+    | SqlError,
     SqlR
   >
   readonly nextId: (prefix: string) => Effect.Effect<string>
@@ -468,6 +473,12 @@ export const postgresOperations = (input: {
             (unresolved[0]?.unresolved ?? 0) > 0
               ? sql`'needs-resolution'`
               : sql`CASE WHEN cancellation_requested THEN 'cancelling' ELSE 'queued' END`
+          yield* revokeRunSessionWriteClaim({
+            sessionId: loaded.sessionId,
+            runId: loaded.runId,
+            ownerId: loaded.ownerWorkerId,
+            runAttemptFence: loaded.attemptFence,
+          })
           yield* sql`
             UPDATE tenetkit_runs SET status = ${runStatus}, owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW()
             WHERE run_id = ${op.runId} AND status = 'needs-resolution'

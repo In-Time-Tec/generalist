@@ -17,7 +17,7 @@ export const readEntry =
     input: SessionEntryInput,
   ): Effect.Effect<Session.Entry, SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable> =>
     Effect.gen(function* () {
-      const session = yield* store.sessionStore(input.sessionId)
+      const session = yield* store.sessionReader(input.sessionId)
       if (Option.isNone(session)) {
         return yield* RuntimeUnavailable.make({ message: `Session ${input.sessionId} is unavailable` })
       }
@@ -54,7 +54,7 @@ export const resolveModelResponse = (store: RunStoreInterface) => (event: ModelR
         message: "Session model response entry identity does not match its Run operation",
       })
     }
-    const session = yield* store.sessionStore(event.sessionId)
+    const session = yield* store.sessionReader(event.sessionId)
     if (Option.isNone(session)) {
       return yield* RuntimeUnavailable.make({ message: `Session ${event.sessionId} is unavailable` })
     }

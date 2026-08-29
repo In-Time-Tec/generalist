@@ -43,9 +43,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const progressPolicy = yield* SetupOptions.validate(options, agent)
 
     const sessionId = options.sessionId ?? "local"
-    const sessionOwnerToken = options.sessionOwnerToken
-    const sessionAppendOptions = (expectedLeafId: string | null) =>
-      sessionOwnerToken === undefined ? { expectedLeafId } : { expectedLeafId, ownerToken: sessionOwnerToken }
+    const sessionAppendOptions = (expectedLeafId: string | null) => ({ expectedLeafId })
 
     const promptContext = yield* setupPromptContext({ agent, options, activeSession, resumeChat, staticCandidates })
     const {
@@ -236,7 +234,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       activeModelResponse,
       progressPolicy,
       sessionId,
-      sessionOwnerToken,
       sessionAppendOptions,
       instructionsService,
       skillSourceService,

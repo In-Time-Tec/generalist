@@ -7,11 +7,58 @@ import { terminalToolMessage, type RunTerminalOutcome, type ToolOperation } from
 import { decodeEvent, decodeJsonValue } from "../codec/codecs.js"
 import { RunFailure } from "../../run/event.js"
 import type { DecodedRun, EventRow, OperationRow } from "../codec/rows.js"
-import { type EntryRow, type SessionRow, SessionStorage } from "./store.js"
+import { type EntryRow, type SessionRow, SessionStorage } from "./storage.js"
+import { acquireUnboundSessionWriteClaim, requireSessionWriteClaim, revokeSessionWriteClaim } from "./claim.js"
+import type { SessionWriteClaim } from "../../run/store.js"
 
 const { encodePayload, entryPayloadEquivalence, pathFromRows, requireActive, toEntry } = SessionStorage
 
 const unavailable = (message: string) => RuntimeUnavailable.make({ message })
+
+const terminalClaim = (run: DecodedRun, session: SessionRow) =>
+  Effect.gen(function* () {
+    const bound =
+      session.writer_run_id !== null && session.writer_owner_id !== null && session.writer_attempt_fence !== null
+    if (bound) {
+      const claim: SessionWriteClaim = {
+        sessionId: run.sessionId,
+        runId: session.writer_run_id,
+        ownerId: session.writer_owner_id,
+        runAttemptFence: session.writer_attempt_fence,
+        epoch: String(session.writer_epoch),
+      }
+      if (
+        claim.runId !== run.runId ||
+        claim.ownerId !== run.ownerWorkerId ||
+        claim.runAttemptFence !== run.attemptFence
+      ) {
+        return undefined
+      }
+      yield* requireSessionWriteClaim(claim).pipe(
+        Effect.mapError(() => unavailable(`Run ${run.runId} lost its terminal Session write binding`)),
+      )
+      return { claim, shortLived: false } as const
+    }
+    if (session.writer_run_id !== null || session.writer_owner_id !== null || session.writer_attempt_fence !== null) {
+      return yield* unavailable(`Session ${run.sessionId} has an incomplete write binding`)
+    }
+    const claim = yield* acquireUnboundSessionWriteClaim({
+      sessionId: run.sessionId,
+      runId: run.runId,
+      ownerId: `${run.runId}:terminal:${run.lastSequence + 1}`,
+      runAttemptFence: run.attemptFence,
+    })
+    return { claim, shortLived: true } as const
+  })
+
+const revokeTerminalClaim = (claim: SessionWriteClaim, shortLived: boolean) =>
+  shortLived
+    ? revokeSessionWriteClaim(claim).pipe(
+        Effect.flatMap((revoked) =>
+          revoked ? Effect.void : unavailable(`Run ${claim.runId} terminal Session write binding was not revoked`),
+        ),
+      )
+    : Effect.void
 
 const toToolOperation = (row: OperationRow): ToolOperation => {
   const operation: ToolOperation = {
@@ -38,14 +85,13 @@ export const appendTerminalToolResults = (input: {
 }): Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`
-      UPDATE tenetkit_sessions SET updated_at = updated_at WHERE session_id = ${input.run.sessionId}
-    `
     const sessionRows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.run.sessionId}
+      SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+      FROM tenetkit_sessions WHERE session_id = ${input.run.sessionId}
     `
     const session = sessionRows[0]
     if (session === undefined) return
+    const authority = yield* terminalClaim(input.run, session)
     const id = `${input.run.runId}:terminal-tool-results`
     const entries = yield* sql<EntryRow>`
       SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
@@ -80,7 +126,12 @@ export const appendTerminalToolResults = (input: {
       operations,
       terminal: input.terminal,
     })
-    if (message === undefined) return
+    if (message === undefined) {
+      return authority === undefined ? undefined : yield* revokeTerminalClaim(authority.claim, authority.shortLived)
+    }
+    if (authority === undefined) {
+      return yield* unavailable(`Run ${input.run.runId} does not own its terminal Session projection`)
+    }
     const payload: Session.AppendInput = {
       _tag: "Message",
       message,
@@ -92,7 +143,7 @@ export const appendTerminalToolResults = (input: {
       }
       const conflict = requireActive(entries, session.leaf_id, id)
       if (conflict !== undefined) return yield* unavailable(conflict.message)
-      return
+      return yield* revokeTerminalClaim(authority.claim, authority.shortLived)
     }
     const created = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     yield* sql`
@@ -104,6 +155,7 @@ export const appendTerminalToolResults = (input: {
       UPDATE tenetkit_sessions SET leaf_id = ${id}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
       WHERE session_id = ${input.run.sessionId}
     `
+    yield* revokeTerminalClaim(authority.claim, authority.shortLived)
   })
 
 export const appendTerminalToolResultsForEvent = (input: {

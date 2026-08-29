@@ -12,6 +12,7 @@ import {
   ExecutableResolver,
 } from "../../../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
+import type { ExecutionClaim } from "../../../../src/runtime/run/store.js"
 import {
   assistant,
   assistantAddress,
@@ -57,10 +58,7 @@ const suite = <E>(
   const provide = <A, Failure>(
     effect: Effect.Effect<A, Failure, Runtime.Runtime | RunStore.RunStore | ExternalChildStore.ExternalChildStore>,
   ) => provideScoped(layer, effect)
-  const placement = (
-    claim: { readonly runId: string; readonly ownerId: string; readonly attemptFence: number },
-    placementId: string,
-  ) => ({
+  const placement = (claim: ExecutionClaim, placementId: string) => ({
     ...claim,
     placementId,
     ref: { partition: "openwork:west", runId: `remote:${placementId}` },

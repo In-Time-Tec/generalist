@@ -16,7 +16,7 @@ const ConformanceResponse = Schema.Struct({
   cancellationStoredValue: Schema.Literal(1),
   cancellationTerminalStatus: Schema.Literal("cancelled"),
   alarm: Schema.Literal(4_000_000_000_000),
-  schemaVersion: Schema.Literal(1),
+  schemaVersion: Schema.Literal(2),
   migrations: Schema.Array(Schema.Struct({ id: Schema.Finite, name: Schema.String })),
 })
 
@@ -125,7 +125,7 @@ const worker :Workerd.Worker = (
               cancellationStoredValue: 1,
               cancellationTerminalStatus: "cancelled",
               alarm: 4_000_000_000_000,
-              schemaVersion: 1,
+              schemaVersion: 2,
               migrations: [{ id: 1, name: "tenetkit_runtime" }],
             },
             {
@@ -138,7 +138,7 @@ const worker :Workerd.Worker = (
               cancellationStoredValue: 1,
               cancellationTerminalStatus: "cancelled",
               alarm: 4_000_000_000_000,
-              schemaVersion: 1,
+              schemaVersion: 2,
               migrations: [{ id: 1, name: "tenetkit_runtime" }],
             },
           ])

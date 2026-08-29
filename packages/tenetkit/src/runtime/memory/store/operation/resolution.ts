@@ -3,6 +3,7 @@ import { OperationResolutionConflict, RunNotFound, RuntimeUnavailable } from "..
 import { digest as resolutionDigest, type ResolveOperationInput } from "../../../operation/resolution.js"
 import type { OperationRecord } from "../../../sql/operations.js"
 import { operationKeyMapKey, operationMapKey, type MemoryState } from "../../state.js"
+import { revokeRunSession } from "../execution.js"
 
 const getRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -61,6 +62,6 @@ export const resolveOperation: {
     if (hasUnknown) status = "needs-resolution"
     else if (run.cancellationRequested) status = "cancelling"
     runs.set(run.runId, { ...withoutOwner, status })
-    return { ...state, operations, runs }
+    return { ...revokeRunSession(state, run.runId), operations, runs }
   }),
 )

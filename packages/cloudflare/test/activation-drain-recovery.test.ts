@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { layer } from "@effect/sql-sqlite-bun/SqliteClient"
-import { Clock, Effect, Exit, Layer } from "effect"
+import { Clock, Effect, Exit, Layer, Option } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { ExecutionHost } from "tenetkit/runtime/driver/execution/host"
 import { LocalScheduler } from "tenetkit/runtime/driver/execution/local-scheduler"
@@ -261,7 +261,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
       const liveScheduler = yield* LocalScheduler
       const store = RunStore.of({
         ...liveStore,
-        claimExecution: ({ runId }: { readonly runId: string }) =>
+        claimExecution: ({ runId, ownerId }: { readonly runId: string; readonly ownerId: string }) =>
           Effect.sync(() => claimed.push(runId)).pipe(
             Effect.as({
               runId,
@@ -269,7 +269,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
               depth: 0,
               treePolicy: defaultTreePolicy,
               activeChildCount: 0,
-              ownerId: "owner",
+              ownerId,
               admittedAt: "2026-08-27T00:00:00.000Z",
               message: makeMessage({
                 id: runId,
@@ -283,6 +283,13 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
               executableManifest: assistantRef.manifest,
               attempt: 1,
               attemptFence: 1,
+              session: {
+                sessionId: "drain",
+                runId,
+                ownerId,
+                runAttemptFence: 1,
+                epoch: "1",
+              },
               cancellationRequested: false,
               registrations: registrationsFor(assistantRef),
             }),
@@ -364,16 +371,15 @@ it.live("recovers stale running and cancelling claims by status, raises fences, 
       const admit = (key: string) =>
         runtime.send({
           to: assistantAddress,
-          sessionId: "recovery",
+          sessionId: `recovery:${key}`,
           idempotencyKey: key,
           prompt: textPrompt(key),
         })
       const running = yield* admit("running")
       const cancelling = yield* admit("cancelling")
-      yield* sql`UPDATE tenetkit_runs SET status = 'running', owner_worker_id = 'old', attempt_fence = 5
-        WHERE run_id IN (${running.runId}, ${cancelling.runId})`
+      const runningClaim = yield* store.claimExecution({ runId: running.runId, ownerId: "old" })
+      yield* store.claimExecution({ runId: cancelling.runId, ownerId: "old" })
       yield* runtime.cancel({ runId: cancelling.runId, reason: "replace host" })
-      const runningClaim = { runId: running.runId, ownerId: "old", attemptFence: 5 }
 
       const recovered = yield* makeExclusiveExecutionRecovery(sql, projection).recoverClaims({
         newOwnerId: "new",
@@ -385,14 +391,26 @@ it.live("recovers stale running and cancelling claims by status, raises fences, 
       expect((yield* runtime.inspect(cancelling.runId)).status).toBe("cancelled")
       expect(projected).toEqual(
         expect.arrayContaining([
-          { runId: running.runId, intent: "execute", attemptFence: 6, runStatus: "running" },
+          {
+            runId: running.runId,
+            intent: "execute",
+            attemptFence: runningClaim.attemptFence + 1,
+            runStatus: "running",
+          },
           { runId: cancelling.runId, intent: "inactive" },
         ]),
       )
 
+      const staleWriter = Option.getOrThrow(yield* store.claimedSessionStore(runningClaim))
+      expect((yield* staleWriter.reserveEntryId.pipe(Effect.flip)).message).toContain("stale")
       const replacement = yield* store.claimExecution({ runId: running.runId, ownerId: "new" })
+      expect(BigInt(replacement.session.epoch)).toBeGreaterThan(BigInt(runningClaim.session.epoch))
       yield* store.releaseExecution(runningClaim)
-      expect(yield* store.loadExecution(running.runId)).toMatchObject(replacement)
+      expect(yield* store.loadExecution(running.runId)).toMatchObject({
+        runId: replacement.runId,
+        ownerId: replacement.ownerId,
+        attemptFence: replacement.attemptFence,
+      })
     }),
   ),
 )

@@ -1,6 +1,6 @@
 import { beforeAll } from "vitest"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Layer, Redacted, Schema, Scope, Stream } from "effect"
+import { Effect, Exit, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { MysqlRunSchema } from "@tenetkit/mysql"
@@ -108,6 +108,7 @@ describeMysql("mysql run store", () => {
           runId: receipt.runId,
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
+          session: claimed.session,
         }
         const operation = yield* store.recordOperation({
           ...claim,
@@ -262,6 +263,7 @@ describeMysql("mysql run store", () => {
           runId: receipt.runId,
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
+          session: claimed.session,
           wait: openWait({ waitId: "wait:direct-resume" }),
           suspension: suspension({ waitId: "wait:direct-resume" }),
         })
@@ -321,6 +323,7 @@ describeMysql("mysql run store", () => {
           runId: parent.runId,
           ownerId: claim!.workerId,
           attemptFence: claim!.attemptFence,
+          session: claim!.session,
           result: completedResult("done"),
         })
         const failure = yield* runtime
@@ -355,7 +358,12 @@ describeMysql("mysql run store", () => {
         expect(second.entryId).not.toBe(first.entryId)
         const [claim] = yield* claims.claimReadyRuns({ workerId: "steering", limit: 1, lease: "10 seconds" })
         expect(claim).toBeDefined()
-        const executionClaim = { runId: claim!.run.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence }
+        const executionClaim = {
+          runId: claim!.run.runId,
+          ownerId: claim!.workerId,
+          attemptFence: claim!.attemptFence,
+          session: claim!.session,
+        }
         const entries = yield* store.readSteering(executionClaim)
         expect(entries.map((entry) => entry.entryId)).toEqual([first.entryId, second.entryId])
         expect(entries.map((entry) => JSON.stringify(entry.prompt))).toEqual([
@@ -450,6 +458,7 @@ describeMysql("mysql run store", () => {
           runId: receipt.runId,
           ownerId: claimedA.workerId,
           attemptFence: claimedA.attemptFence,
+          session: claimedA.session,
         }
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
@@ -493,6 +502,7 @@ describeMysql("mysql run store", () => {
           runId: receipt.runId,
           ownerId: claimedB.workerId,
           attemptFence: claimedB.attemptFence,
+          session: claimedB.session,
         }
         const replacement = yield* readClaim()
         expect(replacement).toMatchObject({
@@ -556,6 +566,7 @@ describeMysql("mysql run store", () => {
             runId: head.runId,
             workerId: "owner-a",
             attemptFence: first[0]!.attemptFence,
+            session: first[0]!.session,
             transition: "complete",
             result: completedResult("late"),
           })
@@ -565,6 +576,7 @@ describeMysql("mysql run store", () => {
           runId: head.runId,
           workerId: "owner-b",
           attemptFence: second[0]!.attemptFence,
+          session: second[0]!.session,
           transition: "complete",
           result: completedResult("ok"),
         })
@@ -608,6 +620,7 @@ describeMysql("mysql run store", () => {
           runId: head.runId,
           workerId: claimedHead!.workerId,
           attemptFence: claimedHead!.attemptFence,
+          session: claimedHead!.session,
           transition: "complete",
           result: completedResult("assistant"),
         })
@@ -637,6 +650,7 @@ describeMysql("mysql run store", () => {
             runId: receipt.runId,
             workerId: "mysql-worker",
             attemptFence: claimed.attemptFence,
+            session: claimed.session,
             cancellationRequested: false,
             lease: "10 seconds",
           }),
@@ -647,6 +661,7 @@ describeMysql("mysql run store", () => {
             runId: receipt.runId,
             workerId: "mysql-worker",
             attemptFence: claimed.attemptFence,
+            session: claimed.session,
             cancellationRequested: false,
             lease: "10 seconds",
           }),
@@ -746,7 +761,12 @@ describeMysql("mysql run store", () => {
           prompt: "wait-op",
         })
         const claimed = (yield* claims.claimReadyRuns({ workerId: "wait-worker", limit: 1 }))[0]!
-        const suspending = { runId: receipt.runId, ownerId: "wait-worker", attemptFence: claimed.attemptFence }
+        const suspending = {
+          runId: receipt.runId,
+          ownerId: "wait-worker",
+          attemptFence: claimed.attemptFence,
+          session: claimed.session,
+        }
         const approvalWait = openWait({ waitId: "approval", reason: "approval" })
         yield* store.suspend({
           ...suspending,
@@ -760,7 +780,12 @@ describeMysql("mysql run store", () => {
         })
         yield* runtime.respond({ runId: receipt.runId, waitId: "approval", resolution: { _tag: "Approved" } })
         const reclaimed = (yield* claims.claimReadyRuns({ workerId: "wait-worker", limit: 1 }))[0]!
-        const claim = { runId: receipt.runId, ownerId: "wait-worker", attemptFence: reclaimed.attemptFence }
+        const claim = {
+          runId: receipt.runId,
+          ownerId: "wait-worker",
+          attemptFence: reclaimed.attemptFence,
+          session: reclaimed.session,
+        }
         const recorded = yield* store.recordOperation({
           ...claim,
           operationKey: "tool:external",
@@ -797,6 +822,8 @@ describeMysql("mysql run store", () => {
           attempt: 1,
         })
         yield* store.startOperation({ ...claim, operationId: unknown.operationId })
+        const staleSession = Option.getOrThrow(yield* store.claimedSessionStore(claim))
+        yield* staleSession.append({ _tag: "Message", message: textPrompt("before resolution").content[0]! })
         yield* store.completeOperation({
           ...claim,
           operationId: unknown.operationId,
@@ -812,9 +839,27 @@ describeMysql("mysql run store", () => {
           idempotencyKey: "resolve:mysql",
           resolution: { _tag: "Succeeded", value: "recovered" },
         })
+        expect(
+          yield* Effect.flip(
+            staleSession.append({ _tag: "Message", message: textPrompt("stale after resolution").content[0]! }),
+          ),
+        ).toMatchObject({ message: "Session write claim is stale" })
         expect((yield* store.loadExecution(receipt.runId)).checkpoint).toEqual(checkpoint)
         const resumed = (yield* claims.claimReadyRuns({ workerId: "resumed", limit: 1 }))[0]!
         expect(resumed.run.runId).toBe(receipt.runId)
+        expect(BigInt(resumed.session.epoch)).toBeGreaterThan(BigInt(claim.session.epoch))
+        const replacementSession = Option.getOrThrow(
+          yield* store.claimedSessionStore({
+            runId: receipt.runId,
+            ownerId: resumed.workerId,
+            attemptFence: resumed.attemptFence,
+            session: resumed.session,
+          }),
+        )
+        yield* replacementSession.append({
+          _tag: "Message",
+          message: textPrompt("replacement after resolution").content[0]!,
+        })
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).result).toBe(
           "recovered",
         )
@@ -846,6 +891,7 @@ describeMysql("mysql run store", () => {
           runId: child.runId,
           workerId: "child-worker",
           attemptFence: claim!.attemptFence,
+          session: claim!.session,
           transition: "complete",
           result: completedResult("child"),
         })
@@ -915,6 +961,7 @@ describeMysql("mysql run store", () => {
           runId: first[0]!.run.runId,
           workerId: "fan-out",
           attemptFence: first[0]!.attemptFence,
+          session: first[0]!.session,
           transition: "complete",
           result: completedResult("first"),
         })
@@ -951,6 +998,7 @@ describeMysql("mysql run store", () => {
           runId: parent.runId,
           ownerId: parentClaim!.workerId,
           attemptFence: parentClaim!.attemptFence,
+          session: parentClaim!.session,
           result: { _tag: "Program", value: "preserved" },
         })
         yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
@@ -967,6 +1015,7 @@ describeMysql("mysql run store", () => {
           runId: childClaim!.run.runId,
           workerId: childClaim!.workerId,
           attemptFence: childClaim!.attemptFence,
+          session: childClaim!.session,
           transition: "complete",
           result: completedResult("reviewed"),
         })
@@ -995,6 +1044,7 @@ describeMysql("mysql run store", () => {
           runId: parent.runId,
           workerId: "parent",
           attemptFence: claim!.attemptFence,
+          session: claim!.session,
           transition: "complete",
           result: completedResult("done"),
         })
@@ -1036,6 +1086,7 @@ describeMysql("mysql run store", () => {
                   runId,
                   workerId: "other-node",
                   attemptFence: items[0]!.attemptFence,
+                  session: items[0]!.session,
                   transition: "complete",
                   result: completedResult("done"),
                 }),

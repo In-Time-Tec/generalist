@@ -86,6 +86,7 @@ describeMysql("mysql worker cancellation", () => {
                   runId: receipt.runId,
                   workerId: staleClaim!.workerId,
                   attemptFence: staleClaim!.attemptFence,
+                  session: staleClaim!.session,
                   transition: "complete",
                   result: completedResult("stale result"),
                 })

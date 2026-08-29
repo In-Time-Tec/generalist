@@ -42,7 +42,12 @@ describePostgres("PostgreSQL Program registration parity", () => {
               prompt: "run",
             })
             const [claim] = yield* claims.claimReadyRuns({ workerId: "registration-parity", limit: 1 })
-            yield* host.execute({ runId: root.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+            yield* host.execute({
+              runId: root.runId,
+              ownerId: claim!.workerId,
+              attemptFence: claim!.attemptFence,
+              session: claim!.session,
+            })
             const rootRegistrations = (yield* store.loadExecution(root.runId)).registrations
             const children = (yield* runtime.treeCheckpoint(root.runId)).inspection.runs.filter(
               (run) => run.parentRunId === root.runId,

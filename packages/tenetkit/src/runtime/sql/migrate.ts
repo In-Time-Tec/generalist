@@ -46,7 +46,7 @@ export const verifySchema = (
         return yield* SchemaMigrationFailed.make({ source, message: "schema meta missing after migration" })
       }
       if (row.dirty === 1) return yield* SchemaDirty.make({ source, version: row.version })
-      if (row.version > SCHEMA_VERSION) {
+      if (row.version !== SCHEMA_VERSION) {
         return yield* SchemaVersionUnsupported.make({
           source,
           version: row.version,
@@ -54,7 +54,7 @@ export const verifySchema = (
         })
       }
       const expected = schemaChecksum()
-      if (row.version !== SCHEMA_VERSION || row.checksum !== expected) {
+      if (row.checksum !== expected) {
         return yield* SchemaChecksumMismatch.make({ source, expected, actual: row.checksum })
       }
       const migrations = yield* sql<{ migration_id: number; name: string }>`

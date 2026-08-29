@@ -2,7 +2,8 @@ import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { RunStore } from "../../../../../src/runtime/index.js"
+import { Runtime, RunStore } from "../../../../../src/runtime/index.js"
+import { assistantAddress, textPrompt } from "../../../execution/fixtures.js"
 import { sqliteLayer, tempDbPath } from "../../scenario.js"
 
 const user = (text: string): Prompt.Message =>
@@ -15,10 +16,25 @@ const withDb =
       Layer.build(sqliteLayer(filename)).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
     )
 
-const sessionStore = (sessionId: string) =>
+const claimedSession = (sessionId: string, ownerId: string) =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const runStore = yield* RunStore.RunStore
+    const receipt = yield* runtime.send({
+      to: assistantAddress,
+      sessionId,
+      idempotencyKey: `${sessionId}:session-store-contract`,
+      prompt: textPrompt("Session store contract"),
+    })
+    const claim = yield* runStore.claimExecution({ runId: receipt.runId, ownerId })
+    const store = Option.getOrThrow(yield* runStore.claimedSessionStore(claim))
+    return { runStore, claim, store }
+  })
+
+const sessionReader = (sessionId: string) =>
   Effect.gen(function* () {
     const runStore = yield* RunStore.RunStore
-    return Option.getOrThrow(yield* runStore.sessionStore(sessionId))
+    return Option.getOrThrow(yield* runStore.sessionReader(sessionId))
   })
 
 it.live("round-trips undefined fields without colliding with authored Session values", () =>
@@ -34,14 +50,14 @@ it.live("round-trips undefined fields without colliding with authored Session va
 
     yield* withDb(filename)(
       Effect.gen(function* () {
-        const store = yield* sessionStore(sessionId)
+        const { store } = yield* claimedSession(sessionId, "undefined-codec")
         yield* store.append({ _tag: "Message", message: user("tenetkit/runtime/undefined"), metadata })
       }),
     )
 
     yield* withDb(filename)(
       Effect.gen(function* () {
-        const store = yield* sessionStore(sessionId)
+        const store = yield* sessionReader(sessionId)
         const entry = (yield* store.path())[0]
         expect(entry?._tag).toBe("Message")
         if (entry?._tag !== "Message") return
@@ -64,12 +80,12 @@ it.live("retries an ambiguously committed stable Session append across SQLite re
     const options = {
       id: "logical:model:0:session-entry:0:user",
       expectedLeafId: null,
-      ownerToken: "worker-1:1",
     }
 
     yield* withDb(filename)(
       Effect.gen(function* () {
-        const store = yield* sessionStore(sessionId)
+        const first = yield* claimedSession(sessionId, "worker-1")
+        const store = first.store
         const committed = yield* Deferred.make<void>()
         const append = store.append(entry, options).pipe(
           Effect.tap(() => Deferred.succeed(committed, undefined)),
@@ -79,14 +95,44 @@ it.live("retries an ambiguously committed stable Session append across SQLite re
 
         yield* Deferred.await(committed)
         yield* Fiber.interrupt(fiber)
-        const retried = yield* store.append(entry, { ...options, ownerToken: "worker-2:2" })
+        const replacement = yield* first.runStore.claimExecution({
+          runId: first.claim.runId,
+          ownerId: "worker-2",
+        })
+        const replacementStore = Option.getOrThrow(yield* first.runStore.claimedSessionStore(replacement))
+        const staleRetry = yield* Effect.flip(store.append(entry, options))
+        const retried = yield* replacementStore.append(entry, options)
+        const prepared = {
+          id: "takeover-checkpoint",
+          parentId: retried.id,
+          projectedHistory: Prompt.make("takeover checkpoint"),
+          telemetry: [],
+        }
+        expect((yield* replacementStore.appendCheckpoint(prepared))._tag).toBe("Appended")
+        const staleCheckpoint = yield* Effect.flip(store.appendCheckpoint(prepared))
+        expect(staleCheckpoint).toMatchObject({ message: "Session write claim is stale" })
+        expect((yield* replacementStore.appendCheckpoint(prepared))._tag).toBe("AlreadyPresent")
+        expect((yield* (yield* sessionReader(sessionId)).path(prepared.id)).map((candidate) => candidate.id)).toEqual([
+          options.id,
+          prepared.id,
+        ])
+
+        const staleReservation = yield* Effect.flip(store.reserveEntryId)
+        expect(staleReservation).toMatchObject({ message: "Session write claim is stale" })
+        expect(yield* replacementStore.reserveEntryId).toBe("2")
+
+        const staleLeaf = yield* Effect.flip(store.setLeaf(retried.id))
+        expect(staleLeaf).toMatchObject({ message: "Session write claim is stale" })
+        yield* replacementStore.setLeaf(retried.id)
         const divergentPayload = yield* Effect.flip(
-          store.append({ ...entry, message: user("different digest") }, options),
+          replacementStore.append({ ...entry, message: user("different digest") }, options),
         )
         const divergentParent = yield* Effect.flip(
-          store.append(entry, { ...options, expectedLeafId: "different-parent" }),
+          replacementStore.append(entry, { ...options, expectedLeafId: "different-parent" }),
         )
 
+        expect(staleRetry).toMatchObject({ message: "Session write claim is stale" })
+        expect(BigInt(replacement.session.epoch)).toBeGreaterThan(BigInt(first.claim.session.epoch))
         expect(retried.id).toBe(options.id)
         expect(divergentPayload._tag).toBe("tenetkit/core/SessionConflict")
         expect(divergentParent._tag).toBe("tenetkit/core/SessionConflict")
@@ -96,7 +142,7 @@ it.live("retries an ambiguously committed stable Session append across SQLite re
         if (divergentParent._tag === "tenetkit/core/SessionConflict") {
           expect(divergentParent.reason).toBe("entry-id-reused")
         }
-        expect((yield* store.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)
+        expect((yield* replacementStore.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)
       }),
     )
 
@@ -108,23 +154,24 @@ it.live("retries an ambiguously committed stable Session append across SQLite re
           [string]
         >("SELECT COUNT(*) AS count FROM tenetkit_session_entries WHERE session_id = ?")
         .get(sessionId),
-    ).toEqual({ count: 1 })
+    ).toEqual({ count: 2 })
     expect(
       database
         .query<{ next_seq: number }, [string]>("SELECT next_seq FROM tenetkit_sessions WHERE session_id = ?")
         .get(sessionId),
-    ).toEqual({ next_seq: 1 })
+    ).toEqual({ next_seq: 3 })
     database.close()
 
     yield* withDb(filename)(
       Effect.gen(function* () {
-        const store = yield* sessionStore(sessionId)
-        const reopenedRetry = yield* store.append(entry, { ...options, ownerToken: "worker-3:3" })
+        const { claim, store } = yield* claimedSession(sessionId, "worker-3")
+        expect(BigInt(claim.session.epoch)).toBeGreaterThan(2n)
+        const reopenedRetry = yield* store.append(entry, options)
         expect(reopenedRetry.id).toBe(options.id)
         expect((yield* store.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)
 
         const next = yield* store.append({ _tag: "Message", message: user("next") })
-        expect(next.id).toBe("1")
+        expect(next.id).toBe("3")
         expect((yield* store.append(entry, options)).id).toBe(options.id)
         expect(yield* store.path()).toHaveLength(2)
       }),
@@ -137,7 +184,7 @@ it.live("rejects a stable SQLite append retry after its branch is abandoned", ()
     const filename = tempDbPath("stable-session-branch")
     yield* withDb(filename)(
       Effect.gen(function* () {
-        const store = yield* sessionStore("sqlite:stable-session-branch")
+        const { store } = yield* claimedSession("sqlite:stable-session-branch", "branch-worker")
         const entry = { _tag: "Message" as const, message: user("old branch") }
         const options = { id: "logical:model:0:session-entry:0:user", expectedLeafId: null }
         yield* store.append(entry, options)

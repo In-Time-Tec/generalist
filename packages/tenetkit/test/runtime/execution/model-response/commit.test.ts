@@ -60,8 +60,7 @@ const schedule = (runId: string) =>
       attempt: 0,
     })
     yield* store.startOperation({ ...claim, operationId: operation.operationId })
-    const execution = yield* store.loadExecution(runId)
-    const maybeSession = yield* store.sessionStore(execution.message.sessionId)
+    const maybeSession = yield* store.claimedSessionStore(claim)
     if (Option.isNone(maybeSession)) return yield* Effect.die("expected Session store")
     const prefix = yield* maybeSession.value.append({
       _tag: "Message",
@@ -72,7 +71,7 @@ const schedule = (runId: string) =>
 
 const sessionPath = (store: RunStore.Interface, sessionId: string) =>
   Effect.gen(function* () {
-    const maybeSession = yield* store.sessionStore(sessionId)
+    const maybeSession = yield* store.sessionReader(sessionId)
     if (Option.isNone(maybeSession)) return yield* Effect.die("expected Session store")
     return yield* maybeSession.value.path()
   })

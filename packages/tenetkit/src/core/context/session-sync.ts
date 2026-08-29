@@ -19,7 +19,6 @@ export type Divergence = typeof Divergence.Type
 /** @experimental Bounded structural evidence for a Session/Chat divergence. Carries counts, roles, part types, and digests only — never raw prompt, message, or tool payload text. */
 export const Diagnostics = Schema.Struct({
   sessionId: Schema.String,
-  ownerToken: Schema.optionalKey(Schema.String),
   durableEntryCount: Schema.Finite,
   durableMessageCount: Schema.Finite,
   authoritativeMessageCount: Schema.Finite,
@@ -150,7 +149,6 @@ const commonPrefixLength = (
 /** @experimental Computes bounded divergence diagnostics for a failed Session synchronization. */
 export const diagnose = (input: {
   readonly sessionId: string
-  readonly ownerToken?: string
   readonly durableEntryTags: ReadonlyArray<string>
   readonly projection: ReadonlyArray<Prompt.Message>
   readonly transcript: ReadonlyArray<Prompt.Message>
@@ -168,7 +166,6 @@ export const diagnose = (input: {
     alignmentCount: alignment,
     commonPrefixLength: prefixLength,
   }
-  if (input.ownerToken !== undefined) Object.assign(diagnostics, { ownerToken: input.ownerToken })
   if (lastDurableEntryTag !== undefined) Object.assign(diagnostics, { lastDurableEntryTag })
   if (durable === undefined && authoritative === undefined) return diagnostics
   const firstDivergence: Divergence = {

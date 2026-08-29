@@ -81,11 +81,11 @@ export const check = (source: string) =>
     const meta = yield* readMeta(source)
     if (!meta.present) return yield* SchemaUpgradeRequired.make({ source, current: 0, required: SCHEMA_VERSION })
     if (meta.dirty) return yield* SchemaDirty.make({ source, version: meta.version })
-    if (meta.version > SCHEMA_VERSION) {
+    if (meta.version !== SCHEMA_VERSION) {
       return yield* SchemaVersionUnsupported.make({ source, version: meta.version, supported: SCHEMA_VERSION })
     }
     const expected = schemaChecksum()
-    if (meta.version !== SCHEMA_VERSION || meta.checksum !== expected) {
+    if (meta.checksum !== expected) {
       return yield* SchemaChecksumMismatch.make({ source, expected, actual: meta.checksum })
     }
     const sql = yield* SqlClient.SqlClient

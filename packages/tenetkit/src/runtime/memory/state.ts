@@ -85,6 +85,12 @@ export interface MemorySession {
   readonly order: ReadonlyArray<string>
   readonly leaf: string | null
   readonly counter: number
+  readonly writerEpoch: bigint
+  readonly writer?: {
+    readonly runId: string
+    readonly ownerId: string
+    readonly runAttemptFence: number
+  }
 }
 
 export interface MemoryState {

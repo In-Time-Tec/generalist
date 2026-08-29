@@ -80,29 +80,29 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
 /** @experimental Bind one hosted Run to exactly one durable Session store. */
 export const sessionBinding = (input: {
   readonly store: RunStoreInterface
-  readonly sessionId: string
+  readonly claim: import("../run/store.js").ExecutionClaim
 }): Effect.Effect<{
   readonly session: Option.Option<Session.Interface>
   readonly context: Context.Context<Session.SessionDirectory>
 }> =>
-  input.store.sessionStore(input.sessionId).pipe(
+  input.store.claimedSessionStore(input.claim).pipe(
     Effect.map((session) => ({
       session,
       context: Context.make(
         Session.SessionDirectory,
         Session.SessionDirectory.of({
           acquire: (sessionId) =>
-            sessionId !== input.sessionId
+            sessionId !== input.claim.session.sessionId
               ? Effect.fail(
                   Session.SessionStoreError.make({
-                    message: `Hosted Run Session ${input.sessionId} cannot acquire Session ${sessionId}`,
+                    message: `Hosted Run Session ${input.claim.session.sessionId} cannot acquire Session ${sessionId}`,
                   }),
                 )
               : Option.match(session, {
                   onNone: () =>
                     Effect.fail(
                       Session.SessionStoreError.make({
-                        message: `Runtime store does not provide Session ${input.sessionId}`,
+                        message: `Runtime store does not provide Session ${input.claim.session.sessionId}`,
                       }),
                     ),
                   onSome: Effect.succeed,

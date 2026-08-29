@@ -173,22 +173,36 @@ describe("ExecutionHost", () => {
   it.effect("keeps a valid conversation after every execution record is dropped", () =>
     Effect.gen(function* () {
       const filename = tempDbPath("session-record-independence")
-      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+      const agent = Agent.make({ name: "session-record-independence" })
+      const executable = testExecutable(agent, "1")
+      const resolver = ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      let runId: string | undefined
 
-      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+      const withWriter = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const session = yield* store.sessionStore("thread:independence")
+            if (runId === undefined) {
+              runId = (yield* runtime.start({
+                executable,
+                registrations: registrationsFor(executable),
+                sessionId: "thread:independence",
+                idempotencyKey: "session-record-independence",
+                prompt: "write Session",
+              })).runId
+            }
+            const claim = yield* store.claimExecution({ runId, ownerId: "session-record-independence" })
+            const session = yield* store.claimedSessionStore(claim)
             if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
             return yield* body(session.value)
           }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
         )
 
-      yield* withSession((session) => session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie))
-      yield* withSession((session) => session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie))
+      yield* withWriter((session) => session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie))
+      yield* withWriter((session) => session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie))
 
       // Conversation and execution are separate logs. Dropping the execution journal must leave the
       // conversation whole; if this fails, orchestration state leaked into conversation state.
@@ -208,7 +222,12 @@ describe("ExecutionHost", () => {
       }
       database.close()
 
-      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+      const path = yield* Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        const session = yield* store.sessionReader("thread:independence")
+        if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
+        return yield* session.value.path().pipe(Effect.orDie)
+      }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped)
       expect(path).toHaveLength(2)
       expect(Session.buildContext(path).content).toHaveLength(2)
     }),
@@ -217,15 +236,29 @@ describe("ExecutionHost", () => {
   it.effect("round-trips a checkpoint whose telemetry carries absent usage fields", () =>
     Effect.gen(function* () {
       const filename = tempDbPath("session-usage-roundtrip")
-      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+      const agent = Agent.make({ name: "session-usage-roundtrip" })
+      const executable = testExecutable(agent, "1")
+      const resolver = ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      let runId: string | undefined
 
-      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+      const withWriter = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const session = yield* store.sessionStore("thread:usage")
+            if (runId === undefined) {
+              runId = (yield* runtime.start({
+                executable,
+                registrations: registrationsFor(executable),
+                sessionId: "thread:usage",
+                idempotencyKey: "session-usage-roundtrip",
+                prompt: "write Session",
+              })).runId
+            }
+            const claim = yield* store.claimExecution({ runId, ownerId: "session-usage-roundtrip" })
+            const session = yield* store.claimedSessionStore(claim)
             if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
             return yield* body(session.value)
           }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
@@ -253,13 +286,18 @@ describe("ExecutionHost", () => {
         },
       ]
 
-      const id = yield* withSession((session) => session.reserveEntryId.pipe(Effect.orDie))
-      yield* withSession((session) =>
+      const id = yield* withWriter((session) => session.reserveEntryId.pipe(Effect.orDie))
+      yield* withWriter((session) =>
         session
           .appendCheckpoint({ id, parentId: null, projectedHistory: Prompt.fromMessages([user("kept")]), telemetry })
           .pipe(Effect.orDie),
       )
-      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+      const path = yield* Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        const session = yield* store.sessionReader("thread:usage")
+        if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
+        return yield* session.value.path().pipe(Effect.orDie)
+      }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped)
       const checkpoint = path.at(-1)
 
       expect(checkpoint?._tag).toBe("Compaction")
@@ -273,27 +311,46 @@ describe("ExecutionHost", () => {
   it.effect("appends and reads one durable Session across store reopens", () =>
     Effect.gen(function* () {
       const filename = tempDbPath("durable-session-store")
-      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+      const agent = Agent.make({ name: "durable-session-store" })
+      const executable = testExecutable(agent, "1")
+      const resolver = ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
+      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      let runId: string | undefined
 
-      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+      const withWriter = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const session = yield* store.sessionStore("thread:direct")
+            if (runId === undefined) {
+              runId = (yield* runtime.start({
+                executable,
+                registrations: registrationsFor(executable),
+                sessionId: "thread:direct",
+                idempotencyKey: "durable-session-store",
+                prompt: "write Session",
+              })).runId
+            }
+            const claim = yield* store.claimExecution({ runId, ownerId: "durable-session-store" })
+            const session = yield* store.claimedSessionStore(claim)
             if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
             return yield* body(session.value)
           }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
         )
 
-      const first = yield* withSession((session) =>
+      const first = yield* withWriter((session) =>
         session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie),
       )
-      const second = yield* withSession((session) =>
+      const second = yield* withWriter((session) =>
         session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie),
       )
-      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+      const path = yield* Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        const session = yield* store.sessionReader("thread:direct")
+        if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
+        return yield* session.value.path().pipe(Effect.orDie)
+      }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped)
 
       expect(first.parentId).toBeNull()
       expect(second.parentId).toBe(first.id)
@@ -390,7 +447,7 @@ describe("ExecutionHost", () => {
 
       const projection = yield* Effect.gen(function* () {
         const store = yield* RunStore.RunStore
-        const session = yield* store.sessionStore("thread:durable-continuity")
+        const session = yield* store.sessionReader("thread:durable-continuity")
         if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
         return Session.buildContext(yield* session.value.path())
       }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped)
@@ -1002,7 +1059,7 @@ describe("ExecutionHost", () => {
         expect(persisted.checkpoint.driverVersion).toBe("1")
         expect(persisted.checkpoint.turn).toBe(9)
         expect(persisted.checkpoint.executable).toEqual(ref.ref)
-        const durableSession = yield* store.sessionStore("session:durable")
+        const durableSession = yield* store.sessionReader("session:durable")
         expect(Option.isSome(durableSession)).toBe(true)
         if (Option.isSome(durableSession)) {
           expect(Session.buildContext(yield* durableSession.value.path()).content.length).toBeGreaterThan(0)
@@ -1593,7 +1650,7 @@ describe("ExecutionHost", () => {
       expect(encodedResult).not.toContain("must not execute")
       expect(committed[0]).not.toHaveProperty("content")
 
-      const session = yield* store.sessionStore("session:token-overrun")
+      const session = yield* store.sessionReader("session:token-overrun")
       expect(Option.isSome(session)).toBe(true)
       if (Option.isNone(session)) return expect.unreachable()
       const path = yield* session.value.path()
@@ -2086,6 +2143,11 @@ describe("ExecutionHost", () => {
         prompt: "fence",
       })
       const first = yield* store.claimExecution({ runId: receipt.runId, ownerId: "worker-a" })
+      const firstSession = Option.getOrThrow(yield* store.claimedSessionStore(first))
+      const firstEntry = yield* firstSession.append({
+        _tag: "Message",
+        message: Prompt.make("fenced Session").content[0]!,
+      })
       const operation = yield* store.recordOperation({
         ...first,
         operationKey: "tool:fenced",
@@ -2096,12 +2158,32 @@ describe("ExecutionHost", () => {
         attempt: 1,
       })
       yield* store.startOperation({ ...first, operationId: operation.operationId })
-      yield* store.claimExecution({ runId: receipt.runId, ownerId: "worker-b" })
+      const replacement = yield* store.claimExecution({ runId: receipt.runId, ownerId: "worker-b" })
+      const replacementSession = Option.getOrThrow(yield* store.claimedSessionStore(replacement))
+      const checkpoint = {
+        id: "fenced-checkpoint",
+        parentId: firstEntry.id,
+        projectedHistory: Prompt.make("checkpoint"),
+        telemetry: [],
+      }
+      expect((yield* replacementSession.appendCheckpoint(checkpoint))._tag).toBe("Appended")
+      expect(yield* Effect.flip(firstSession.appendCheckpoint(checkpoint))).toMatchObject({
+        message: "Session write claim is stale",
+      })
+      expect(yield* Effect.flip(firstSession.reserveEntryId)).toMatchObject({
+        message: "Session write claim is stale",
+      })
+      expect(yield* replacementSession.reserveEntryId).toMatch(/^\d+$/)
+      expect(yield* Effect.flip(firstSession.setLeaf(firstEntry.id))).toMatchObject({
+        message: "Session write claim is stale",
+      })
+      yield* replacementSession.setLeaf(firstEntry.id)
+      expect(
+        (yield* (yield* store.sessionReader("session:fence")).pipe(Option.getOrThrow).path()).map((entry) => entry.id),
+      ).toEqual([firstEntry.id])
       const stale = yield* store
         .saveExecution({
-          runId: receipt.runId,
-          ownerId: "worker-a",
-          attemptFence: first.attemptFence,
+          ...first,
         })
         .pipe(Effect.flip)
       expect(stale._tag).toBe("tenetkit/runtime/StaleClaim")
@@ -2272,7 +2354,7 @@ describe("ExecutionHost", () => {
       expect((yield* store.loadExecution(receipt.runId)).executableRef).toEqual(assistantRef.ref)
       yield* store.completeOperation(completion)
       yield* store.completeOperation(completion)
-      const session = yield* store.sessionStore("session:memory-handoff-projection")
+      const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected memory Session")
       yield* session.value.append({ _tag: "Message", message: Prompt.make("descendant").content[0]! })
       yield* store.completeOperation(completion)

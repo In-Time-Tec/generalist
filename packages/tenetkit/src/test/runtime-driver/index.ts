@@ -4,24 +4,23 @@ import { AgentSuspended } from "../../core/agent/event.js"
 import type { Address } from "../../runtime/address.js"
 import { IdempotencyConflict, RunIdConflict } from "../../runtime/errors.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
-import { RunStore, type Interface as RunStoreInterface } from "../../runtime/run/store.js"
+import {
+  RunStore,
+  type ExecutionClaim,
+  type Interface as RunStoreInterface,
+  type SessionWriteClaim,
+} from "../../runtime/run/store.js"
 import { Runtime, type Interface as RuntimeInterface } from "../../runtime/service.js"
 import { StaleClaim } from "../../runtime/sql/errors.js"
 import { RunClaims, type Interface as RunClaimsInterface } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
-
-/** @experimental The minimum claim identity shared by Runtime store and multi-worker claim APIs. */
-export interface ExecutionClaim {
-  readonly runId: string
-  readonly ownerId: string
-  readonly attemptFence: number
-}
 
 /** @experimental A multi-worker claim without the driver's decoded persisted Run representation. */
 export interface WorkerClaim {
   readonly runId: string
   readonly workerId: string
   readonly attemptFence: number
+  readonly session: SessionWriteClaim
 }
 
 /** @experimental Runtime services passed to driver-specific conformance operations. */
@@ -144,10 +143,12 @@ const workerClaim = (claim: {
   readonly run: { readonly runId: string }
   readonly workerId: string
   readonly attemptFence: number
+  readonly session: SessionWriteClaim
 }): WorkerClaim => ({
   runId: claim.run.runId,
   workerId: claim.workerId,
   attemptFence: claim.attemptFence,
+  session: claim.session,
 })
 
 const registerAdmission = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>) => {
@@ -426,6 +427,7 @@ const registerMultiWorkerClaims = <LayerError, ClaimsLayerError>(
             runId: second.run.runId,
             workerId: second.workerId,
             attemptFence: second.attemptFence,
+            session: second.session,
             transition: "complete",
             result: completedResult(id.sessionId, "fresh"),
           })

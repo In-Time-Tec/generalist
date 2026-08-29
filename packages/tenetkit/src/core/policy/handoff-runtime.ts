@@ -260,13 +260,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
             target: durable.state.active,
             projectedHistory: durable.projectedHistory,
           },
-          input.options.sessionOwnerToken === undefined
-            ? { id: durable.sessionEntryId, expectedLeafId: durable.sessionParentId }
-            : {
-                id: durable.sessionEntryId,
-                expectedLeafId: durable.sessionParentId,
-                ownerToken: input.options.sessionOwnerToken,
-              },
+          { id: durable.sessionEntryId, expectedLeafId: durable.sessionParentId },
         )
         .pipe(Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message })))
     }

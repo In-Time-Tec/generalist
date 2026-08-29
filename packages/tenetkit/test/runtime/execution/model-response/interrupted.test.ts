@@ -78,7 +78,7 @@ const directCommit = (backend: "memory" | "sqlite") => {
         attempt: 0,
       })
       yield* store.startOperation({ ...claim, operationId: operation.operationId })
-      const session = yield* store.sessionStore(`session:interrupted-direct:${backend}`)
+      const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected Session store")
       const prefix = yield* session.value.append({
         _tag: "Message",
@@ -229,7 +229,7 @@ it.live("rolls back SQLite outcome, Session entry, event, and subscriber notific
       expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
         "running",
       )
-      const session = yield* store.sessionStore("session:interrupted-rollback")
+      const session = yield* store.sessionReader("session:interrupted-rollback")
       expect(Option.isSome(session) ? yield* session.value.path() : []).toEqual([])
       expect(yield* Ref.get(seen)).toEqual([])
       database.run("DROP TRIGGER fail_interrupted_commit_after_event")
@@ -460,7 +460,7 @@ it.effect("fails an empty model operation without writing an interrupted event o
           operationKey: `${receipt.runId}:model:0:0:conversation`,
         }))?.status,
       ).toBe("failed")
-      const session = yield* store.sessionStore("session:interrupted-empty")
+      const session = yield* store.sessionReader("session:interrupted-empty")
       const path = Option.isSome(session) ? yield* session.value.path() : []
       expect(
         path.some(
@@ -566,7 +566,7 @@ it.live("rejects mutated interrupted model response references and Session stora
         attempt: 0,
       })
       yield* store.startOperation({ ...claim, operationId: operation.operationId })
-      const session = yield* store.sessionStore(sessionId)
+      const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected Session store")
       const prefix = yield* session.value.append({
         _tag: "Message",

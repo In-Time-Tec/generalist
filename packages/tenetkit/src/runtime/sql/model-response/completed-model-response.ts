@@ -3,7 +3,7 @@ import { Session } from "../../../core/index.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { CompletedSessionEntry } from "../../execution/model-response/commit.js"
 import { handoffPayload, type HandoffSessionEntry } from "../../session/handoff.js"
-import { type EntryRow, type SessionRow, SessionStorage } from "../session/store.js"
+import { type EntryRow, type SessionRow, SessionStorage } from "../session/storage.js"
 
 const { encodePayload, entryPayloadEquivalence, storeError, toEntry } = SessionStorage
 
@@ -23,7 +23,8 @@ export const verifyCompletedSessionEntry = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const sessions = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
+      SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+      FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
     `
     const rows = yield* sql<EntryRow>`
       SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
@@ -70,12 +71,9 @@ export const appendCompletedSessionEntry = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const created = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-    yield* sql`
-      INSERT OR IGNORE INTO tenetkit_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
-      VALUES (${input.sessionId}, NULL, 0, NULL, ${created})
-    `
     const sessionRows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
+      SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+      FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
     `
     const session = sessionRows[0]
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
@@ -117,7 +115,8 @@ export const verifyHandoffSessionEntry = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const sessions = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
+      SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+      FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
     `
     const rows = yield* sql<EntryRow>`
       SELECT entry_id, parent_id, seq, tag, payload_json FROM tenetkit_session_entries
@@ -162,12 +161,9 @@ export const appendHandoffSessionEntry = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const created = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-    yield* sql`
-      INSERT OR IGNORE INTO tenetkit_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
-      VALUES (${input.sessionId}, NULL, 0, NULL, ${created})
-    `
     const sessionRows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
+      SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+      FROM tenetkit_sessions WHERE session_id = ${input.sessionId}
     `
     const session = sessionRows[0]
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)

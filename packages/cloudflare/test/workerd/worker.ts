@@ -353,9 +353,7 @@ export class SqlObject {
             FROM tenetkit_runs WHERE run_id = ${cancellationRunId}
           `
           yield* store.fail({
-            runId: cancellationRunId,
-            ownerId: claim.ownerId,
-            attemptFence: claim.attemptFence,
+            ...claim,
             error: AgentExecutionFailure.make({ message: "execution interrupted" }),
           })
           const cancellationTerminal = yield* sql<{ readonly status: string }>`

@@ -150,6 +150,7 @@ describeMysql("mysql Program store contract", () => {
               runId: receipt.runId,
               ownerId: claim!.workerId,
               attemptFence: claim!.attemptFence,
+              session: claim!.session,
             })
             const runId = receipt.runId
             expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
@@ -198,6 +199,7 @@ describeMysql("mysql Program store contract", () => {
               runId: receipt.runId,
               ownerId: first!.workerId,
               attemptFence: first!.attemptFence,
+              session: first!.session,
             })
             yield* Effect.all(
               [
@@ -226,7 +228,12 @@ describeMysql("mysql Program store contract", () => {
                   const claims = yield* RunClaims
                   const host = yield* ExecutionHost.ExecutionHost
                   const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program-resume", limit: 1 })
-                  yield* host.execute({ runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+                  yield* host.execute({
+                    runId,
+                    ownerId: claim!.workerId,
+                    attemptFence: claim!.attemptFence,
+                    session: claim!.session,
+                  })
                   expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
                     status: "succeeded",
                   })
@@ -270,6 +277,7 @@ describeMysql("mysql Program store contract", () => {
               runId: receipt.runId,
               ownerId: claim!.workerId,
               attemptFence: claim!.attemptFence,
+              session: claim!.session,
             })
             const operation = yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })
             if (operation?.waitId === undefined) return yield* Effect.die("Program approval wait is missing")
@@ -326,6 +334,7 @@ describeMysql("mysql Program store contract", () => {
               runId: receipt.runId,
               ownerId: parentAdmission!.workerId,
               attemptFence: parentAdmission!.attemptFence,
+              session: parentAdmission!.session,
             })
             expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })).toMatchObject({
               status: "waiting",
@@ -335,7 +344,12 @@ describeMysql("mysql Program store contract", () => {
             yield* Effect.forEach(
               firstChildren,
               (claim) =>
-                host.execute({ runId: claim.run.runId, ownerId: claim.workerId, attemptFence: claim.attemptFence }),
+                host.execute({
+                  runId: claim.run.runId,
+                  ownerId: claim.workerId,
+                  attemptFence: claim.attemptFence,
+                  session: claim.session,
+                }),
               { concurrency: "unbounded", discard: true },
             )
             const [thirdChild] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
@@ -343,6 +357,7 @@ describeMysql("mysql Program store contract", () => {
               runId: thirdChild!.run.runId,
               ownerId: thirdChild!.workerId,
               attemptFence: thirdChild!.attemptFence,
+              session: thirdChild!.session,
             })
             expect(fixture.counts().childFinalizers).toBe(3)
             const [resumedParent] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
@@ -351,6 +366,7 @@ describeMysql("mysql Program store contract", () => {
               runId: receipt.runId,
               ownerId: resumedParent!.workerId,
               attemptFence: resumedParent!.attemptFence,
+              session: resumedParent!.session,
             })
             expect((yield* runtime.snapshot(receipt.runId)).outcome).toMatchObject({
               _tag: "Succeeded",
@@ -368,6 +384,7 @@ describeMysql("mysql Program store contract", () => {
               runId: cancelled.runId,
               ownerId: cancelAdmission!.workerId,
               attemptFence: cancelAdmission!.attemptFence,
+              session: cancelAdmission!.session,
             })
             const cancelledOperation = yield* store.getProgramOperation({
               runId: cancelled.runId,

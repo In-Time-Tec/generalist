@@ -1,4 +1,3 @@
-import "./suites/session-fencing-suite.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"

@@ -117,7 +117,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               Effect.gen(function* () {
                 const nested = yield* makeNestedOperations({ claim, claimed, store })
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
-                const boundSession = yield* sessionBinding({ store, sessionId: claimed.message.sessionId })
+                const boundSession = yield* sessionBinding({ store, claim })
                 const baseContext = Context.mergeAll(
                   yield* hostContext({ agent, environment, store, codeMode, nested }),
                   boundSession.context,

@@ -1,6 +1,6 @@
 import { layerPostgres, RunSchema } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "tenetkit"
@@ -78,6 +78,7 @@ const admitWaitForCancellation = (waitId: string) =>
       runId: receipt.runId,
       ownerId: parentClaim.workerId,
       attemptFence: parentClaim.attemptFence,
+      session: parentClaim.session,
       wait: openWait({ waitId }),
       suspension: suspension({ waitId }),
     })
@@ -85,15 +86,16 @@ const admitWaitForCancellation = (waitId: string) =>
       const sql = yield* SqlClient.SqlClient
       yield* sql`
         UPDATE tenetkit_runs
-        SET status = 'running', owner_worker_id = ${parentClaim.workerId}
+        SET status = 'running', owner_worker_id = NULL, lease_expires_at = NULL
         WHERE run_id = ${receipt.runId}
       `
     }).pipe(scopedWith(postgresClient(url)))
+    const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: parentClaim.workerId })
     return {
       runtime,
       store,
       runId: receipt.runId,
-      claim: { runId: receipt.runId, ownerId: parentClaim.workerId, attemptFence: parentClaim.attemptFence },
+      claim,
     }
   })
 
@@ -179,6 +181,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: root.runId,
           ownerId: claimed!.workerId,
           attemptFence: claimed!.attemptFence,
+          session: claimed!.session,
         }
         const [checkpoint] = yield* Effect.all(
           [
@@ -297,6 +300,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: receipt.runId,
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
+          session: claimed.session,
         }
         const operation = yield* store.recordOperation({
           ...claim,
@@ -449,6 +453,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: receipt.runId,
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
+          session: claimed.session,
           wait: openWait({ waitId: "wait:direct-resume" }),
           suspension: suspension({ waitId: "wait:direct-resume" }),
         })
@@ -503,7 +508,12 @@ describePostgres("PostgreSQL run store", () => {
         expect(second.entryId).not.toBe(first.entryId)
         const [claim] = yield* claims.claimReadyRuns({ workerId: "steering", limit: 1, lease: "10 seconds" })
         expect(claim).toBeDefined()
-        const executionClaim = { runId: claim!.run.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence }
+        const executionClaim = {
+          runId: claim!.run.runId,
+          ownerId: claim!.workerId,
+          attemptFence: claim!.attemptFence,
+          session: claim!.session,
+        }
         const entries = yield* store.readSteering(executionClaim)
         expect(entries.map((entry) => entry.entryId)).toEqual([first.entryId, second.entryId])
         expect(entries.map((entry) => JSON.stringify(entry.prompt))).toEqual([
@@ -627,6 +637,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: parent.runId,
           ownerId: claim!.workerId,
           attemptFence: claim!.attemptFence,
+          session: claim!.session,
           result: completedResult("done"),
         })
         const failure = yield* runtime
@@ -670,6 +681,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: head.runId,
           workerId: "w1",
           attemptFence: claimed[0]!.attemptFence,
+          session: claimed[0]!.session,
           transition: "complete",
           result: completedResult("done"),
         })
@@ -708,6 +720,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: head.runId,
           workerId: claimedHead!.workerId,
           attemptFence: claimedHead!.attemptFence,
+          session: claimedHead!.session,
           transition: "complete",
           result: completedResult("assistant"),
         })
@@ -762,6 +775,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: receipt.runId,
           ownerId: claimedA.workerId,
           attemptFence: claimedA.attemptFence,
+          session: claimedA.session,
         }
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
@@ -806,6 +820,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: receipt.runId,
           ownerId: claimedB.workerId,
           attemptFence: claimedB.attemptFence,
+          session: claimedB.session,
         }
         const replacement = yield* readClaim()
         expect(replacement).toMatchObject({
@@ -851,6 +866,7 @@ describePostgres("PostgreSQL run store", () => {
             runId: receipt.runId,
             workerId: "owner-a",
             attemptFence: fenceA,
+            session: first[0]!.session,
             transition: "complete",
             result: completedResult("late"),
           })
@@ -860,6 +876,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: receipt.runId,
           workerId: "owner-b",
           attemptFence: second[0]!.attemptFence,
+          session: second[0]!.session,
           transition: "complete",
           result: completedResult("ok"),
         })
@@ -885,6 +902,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: receipt.runId,
           ownerId: claimed!.workerId,
           attemptFence: claimed!.attemptFence,
+          session: claimed!.session,
         }
         const locked = yield* Deferred.make<void>()
         const takeover = Effect.gen(function* () {
@@ -982,6 +1000,7 @@ describePostgres("PostgreSQL run store", () => {
             runId: receipt.runId,
             workerId: "tick-worker",
             attemptFence: claim.attemptFence,
+            session: claim.session,
             cancellationRequested: false,
             lease: "10 seconds",
           }),
@@ -1016,6 +1035,8 @@ describePostgres("PostgreSQL run store", () => {
           attempt: 1,
         })
         const operationClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+        const staleSession = Option.getOrThrow(yield* driver.claimedSessionStore(operationClaim))
+        yield* staleSession.append({ _tag: "Message", message: textPrompt("before resolution").content[0]! })
         yield* driver.startOperation({ ...operationClaim, operationId: recorded.operationId })
         const expired = yield* driver.expireRunningOperation({
           ...operationClaim,
@@ -1023,6 +1044,7 @@ describePostgres("PostgreSQL run store", () => {
         })
         expect(expired.outcome).toBe("unknown")
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+        expect((yield* driver.loadExecution(receipt.runId)).ownerId).toBe("test")
         expect(yield* claims.claimReadyRuns({ workerId: "blocked", limit: 1, lease: "10 seconds" })).toEqual([])
         expect(
           (yield* driver.claimExecution({ runId: receipt.runId, ownerId: "blocked" }).pipe(Effect.flip))._tag,
@@ -1033,8 +1055,26 @@ describePostgres("PostgreSQL run store", () => {
           idempotencyKey: "resolve:postgres",
           resolution: { _tag: "Succeeded", value: "recovered" },
         })
+        expect(
+          yield* Effect.flip(
+            staleSession.append({ _tag: "Message", message: textPrompt("stale after resolution").content[0]! }),
+          ),
+        ).toMatchObject({ message: "Session write claim is stale" })
         const [resumed] = yield* claims.claimReadyRuns({ workerId: "resumed", limit: 1, lease: "10 seconds" })
         expect(resumed?.run.runId).toBe(receipt.runId)
+        expect(BigInt(resumed!.session.epoch)).toBeGreaterThan(BigInt(operationClaim.session.epoch))
+        const replacementSession = Option.getOrThrow(
+          yield* driver.claimedSessionStore({
+            runId: receipt.runId,
+            ownerId: resumed!.workerId,
+            attemptFence: resumed!.attemptFence,
+            session: resumed!.session,
+          }),
+        )
+        yield* replacementSession.append({
+          _tag: "Message",
+          message: textPrompt("replacement after resolution").content[0]!,
+        })
         expect((yield* driver.getOperation({ runId: receipt.runId, operationId: recorded.operationId })).result).toBe(
           "recovered",
         )
@@ -1059,6 +1099,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: receipt.runId,
           ownerId: claimed!.workerId,
           attemptFence: claimed!.attemptFence,
+          session: claimed!.session,
         }
         const operation = yield* store.recordOperation({
           ...claim,
@@ -1129,10 +1170,9 @@ describePostgres("PostgreSQL run store", () => {
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
           "running",
         )
+        const replacement = yield* store.claimExecution({ runId: receipt.runId, ownerId: "owner-b" })
         const completed = yield* store.completeOperation({
-          runId: receipt.runId,
-          ownerId: "owner-b",
-          attemptFence: claim.attemptFence + 1,
+          ...replacement,
           operationId: operation.operationId,
           outcome: { _tag: "Succeeded", value: { owner: "owner-b" } },
           checkpoint,
@@ -1162,7 +1202,12 @@ describePostgres("PostgreSQL run store", () => {
           prompt: textPrompt("next"),
         })
         const claimed = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
-        let claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: claimed[0]!.attemptFence }
+        let claim = {
+          runId: waiting.runId,
+          ownerId: "wait-w",
+          attemptFence: claimed[0]!.attemptFence,
+          session: claimed[0]!.session,
+        }
         yield* driver.suspend({
           ...claim,
           wait: openWait({ waitId: "approval", reason: "approval" }),
@@ -1172,7 +1217,12 @@ describePostgres("PostgreSQL run store", () => {
         yield* runtime.respond({ runId: waiting.runId, waitId: "approval", resolution: { _tag: "Approved" } })
         expect((yield* runtime.inspect(waiting.runId)).status).toBe("running")
         const [approvalResume] = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
-        claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: approvalResume!.attemptFence }
+        claim = {
+          runId: waiting.runId,
+          ownerId: "wait-w",
+          attemptFence: approvalResume!.attemptFence,
+          session: approvalResume!.session,
+        }
         yield* driver.suspend({
           ...claim,
           wait: openWait({ waitId: "signal-me", reason: "signal" }),
@@ -1180,7 +1230,12 @@ describePostgres("PostgreSQL run store", () => {
         })
         yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })
         const [signalResume] = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
-        claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: signalResume!.attemptFence }
+        claim = {
+          runId: waiting.runId,
+          ownerId: "wait-w",
+          attemptFence: signalResume!.attemptFence,
+          session: signalResume!.session,
+        }
         const checkpoint = {
           driverVersion: "1" as const,
           executable: assistantRef.ref,
@@ -1210,14 +1265,13 @@ describePostgres("PostgreSQL run store", () => {
           runId: waiting.runId,
           workerId: "wait-w",
           attemptFence: claim.attemptFence,
+          session: claim.session,
           transition: "complete",
           result: completedResult("done"),
         })
         const again = yield* driver
           .fail({
-            runId: waiting.runId,
-            ownerId: "wait-w",
-            attemptFence: claim.attemptFence,
+            ...claim,
             error: Errors.AgentExecutionFailure.make({ message: "nope" }),
           })
           .pipe(Effect.flip)
@@ -1229,6 +1283,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: successor.runId,
           workerId: "wait-w",
           attemptFence: nextClaim[0]!.attemptFence,
+          session: nextClaim[0]!.session,
         })
         yield* runtime.cancel({ runId: successor.runId, reason: "stop" })
         expect((yield* runtime.inspect(successor.runId)).status).toBe("cancelled")
@@ -1254,7 +1309,12 @@ describePostgres("PostgreSQL run store", () => {
 
         // Model one worker holding the Run while a separate connection persists cancellation.
         const executing = yield* host
-          .execute({ runId: receipt.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+          .execute({
+            runId: receipt.runId,
+            ownerId: claim!.workerId,
+            attemptFence: claim!.attemptFence,
+            session: claim!.session,
+          })
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* runtime.cancel({ runId: receipt.runId, reason: "cross-process" })
         yield* Fiber.join(executing)
@@ -1266,6 +1326,7 @@ describePostgres("PostgreSQL run store", () => {
             runId: receipt.runId,
             workerId: claim!.workerId,
             attemptFence: claim!.attemptFence,
+            session: claim!.session,
             cancellationRequested: false,
             lease: "5 seconds",
           }),
@@ -1460,6 +1521,7 @@ describePostgres("PostgreSQL run store", () => {
             runId: admitted.runId,
             ownerId: "race-w",
             attemptFence: claimed!.attemptFence,
+            session: claimed!.session,
             wait: openWait({ waitId: "approval", reason: "approval" }),
             suspension: suspension({ waitId: "approval", reason: "approval" }),
           })
@@ -1552,6 +1614,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: child.runId,
           workerId: "child-w",
           attemptFence: childClaim!.attemptFence,
+          session: childClaim!.session,
           transition: "complete",
           result: completedResult("child-done"),
         })
@@ -1566,6 +1629,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: parent.runId,
           workerId: "parent-w",
           attemptFence: parentClaim!.attemptFence,
+          session: parentClaim!.session,
         })
         yield* runtime.cancel({ runId: parent.runId, reason: "parent-stop" })
         expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
@@ -1633,6 +1697,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: first[0]!.run.runId,
           workerId: "fan-out",
           attemptFence: first[0]!.attemptFence,
+          session: first[0]!.session,
           transition: "complete",
           result: completedResult("first"),
         })
@@ -1667,6 +1732,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: parent.runId,
           ownerId: parentClaim!.workerId,
           attemptFence: parentClaim!.attemptFence,
+          session: parentClaim!.session,
           output: "program-output",
           outputBytes: 14,
           outputLimit: 100,
@@ -1681,6 +1747,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: childClaim!.run.runId,
           workerId: childClaim!.workerId,
           attemptFence: childClaim!.attemptFence,
+          session: childClaim!.session,
           transition: "complete",
           result: completedResult("reviewed"),
         })
@@ -1709,6 +1776,7 @@ describePostgres("PostgreSQL run store", () => {
           runId: parent.runId,
           workerId: "parent",
           attemptFence: claim!.attemptFence,
+          session: claim!.session,
           transition: "complete",
           result: completedResult("done"),
         })
@@ -1745,6 +1813,7 @@ describePostgres("PostgreSQL run store", () => {
             runId: receipt.runId,
             workerId: "n1",
             attemptFence: claimed[0]!.attemptFence,
+            session: claimed[0]!.session,
             transition: "complete",
             result: completedResult("ok"),
           })

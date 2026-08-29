@@ -31,7 +31,6 @@ export * as SqlStoreInitialFanOuts from "../sql/store/fan-out/initial-services.j
 export * as SqlStoreList from "../sql/store/list.js"
 export * as SqlStoreOperations from "../sql/store/operation/operations.js"
 export * as SqlStoreProgram from "../sql/store/program.js"
-export * as SqlStoreReleaseLeased from "../sql/store/release-leased.js"
 export * as SqlStoreSession from "../sql/store/session.js"
 export * as SqlStoreSteering from "../sql/store/steering/service.js"
 export * as SqlStoreSteeringDisposition from "../sql/store/steering/disposition.js"

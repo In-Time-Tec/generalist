@@ -233,6 +233,7 @@ export const appendEvent: {
            continuation_json = NULL,
            pending_outcome_json = NULL,
            suspension_json = NULL,
+          owner_worker_id = NULL,
            updated_at = ${updated}
         WHERE run_id = ${run.runId}
           AND last_sequence = ${run.lastSequence}

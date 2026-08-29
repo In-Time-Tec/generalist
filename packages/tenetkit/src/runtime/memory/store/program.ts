@@ -23,6 +23,7 @@ import type {
 import type { CompletionOutcome } from "../../run/store.js"
 import { complete, suspend } from "./control.js"
 import type { MemoryState } from "../state.js"
+import { revokeRunSession, revokeSession } from "./execution.js"
 
 const isTerminalStatus = (status: import("../../run.js").RunStatus): status is "succeeded" | "failed" | "cancelled" =>
   status === "succeeded" || status === "failed" || status === "cancelled"
@@ -209,7 +210,7 @@ export const resolveProgramOperation: {
     const runs = new Map(state.runs)
     const { ownerId: _, ...withoutOwner } = run
     runs.set(run.runId, { ...withoutOwner, status: run.cancellationRequested ? "cancelling" : "running" })
-    return { ...state, programOperations, runs }
+    return { ...revokeRunSession(state, run.runId), programOperations, runs }
   }),
 )
 
@@ -323,7 +324,7 @@ export const admitProgramAgents: {
       { ...admittedState, programOperations },
       { ...input, suspension: input.suspension, wait: input.wait, checkpoint: { _tag: "Program", version: "1" } },
     )
-    return [record, waitingState] as const
+    return [record, revokeSession(waitingState, input)] as const
   }),
 )
 
@@ -360,7 +361,7 @@ export const suspendProgramOperation: {
         wait: input.wait,
       },
     )
-    return [record, waiting] as const
+    return [record, revokeSession(waiting, input)] as const
   }),
 )
 
@@ -452,6 +453,6 @@ export const completeProgram: {
         limit: input.outputLimit,
       })
     const next = yield* complete(state, { runId: input.runId, result: { _tag: "Program", value: input.output } })
-    return [{ _tag: "Completed" } satisfies CompletionOutcome, next] as const
+    return [{ _tag: "Completed" } satisfies CompletionOutcome, revokeSession(next, input)] as const
   }),
 )

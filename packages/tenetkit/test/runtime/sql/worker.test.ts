@@ -49,6 +49,13 @@ const claimed = {
   run: decodedRun,
   workerId: "worker-a",
   attemptFence: 1,
+  session: {
+    sessionId: decodedRun.sessionId,
+    runId: decodedRun.runId,
+    ownerId: "worker-a",
+    runAttemptFence: 1,
+    epoch: "1",
+  },
   leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(0)),
 } satisfies ClaimedRun
 
@@ -177,6 +184,7 @@ it.effect("refills capacity while another Run remains active", () =>
       const run = (runId: string): ClaimedRun => ({
         ...claimed,
         run: { ...claimed.run, runId },
+        session: { ...claimed.session, runId },
       })
       const claims = RunClaims.of({
         changes: quietChanges,

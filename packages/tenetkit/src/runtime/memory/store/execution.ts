@@ -1,8 +1,8 @@
 import { Effect, Function } from "effect"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
-import type { ExecutionClaim, ExecutionRecord } from "../../run/store.js"
-import { StaleClaim } from "../../sql/errors.js"
+import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../run/store.js"
+import { StaleClaim, StaleSessionClaim } from "../../sql/errors.js"
 import { activeChildCount } from "./child/capacity.js"
 import type { MemoryState } from "../state.js"
 import { checkpointRef } from "../../executable/manifest.js"
@@ -54,13 +54,106 @@ export const loadExecution: {
 )
 
 export const requireExecutionClaim: {
-  (input: ExecutionClaim): (state: MemoryState) => Effect.Effect<void, never, never> | StaleClaim
-  (state: MemoryState, input: ExecutionClaim): Effect.Effect<void, never, never> | StaleClaim
+  (input: ExecutionClaim): (state: MemoryState) => Effect.Effect<void, StaleClaim | StaleSessionClaim>
+  (state: MemoryState, input: ExecutionClaim): Effect.Effect<void, StaleClaim | StaleSessionClaim>
 } = Function.dual(2, (state: MemoryState, input: ExecutionClaim) => {
   const run = state.runs.get(input.runId)
-  return run !== undefined && run.ownerId === input.ownerId && run.attemptFence === input.attemptFence
+  if (run === undefined || run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+    return Effect.fail(
+      StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence }),
+    )
+  }
+  const session = state.sessions.get(input.session.sessionId)
+  return session !== undefined &&
+    input.session.runId === input.runId &&
+    input.session.ownerId === input.ownerId &&
+    input.session.runAttemptFence === input.attemptFence &&
+    session.writerEpoch.toString() === input.session.epoch &&
+    session.writer?.runId === input.runId &&
+    session.writer.ownerId === input.ownerId &&
+    session.writer.runAttemptFence === input.attemptFence
     ? Effect.void
-    : StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence })
+    : Effect.fail(StaleSessionClaim.make(input.session))
+})
+
+const acquireSession = (
+  state: MemoryState,
+  input: {
+    readonly sessionId: string
+    readonly runId: string
+    readonly ownerId: string
+    readonly attemptFence: number
+  },
+): readonly [SessionWriteClaim, MemoryState] => {
+  const current = state.sessions.get(input.sessionId) ?? {
+    entries: new Map(),
+    order: [],
+    leaf: null,
+    counter: 0,
+    writerEpoch: 0n,
+  }
+  const writerEpoch = current.writerEpoch + 1n
+  const session: SessionWriteClaim = {
+    sessionId: input.sessionId,
+    runId: input.runId,
+    ownerId: input.ownerId,
+    runAttemptFence: input.attemptFence,
+    epoch: writerEpoch.toString(),
+  }
+  return [
+    session,
+    {
+      ...state,
+      sessions: new Map(state.sessions).set(input.sessionId, {
+        ...current,
+        writerEpoch,
+        writer: {
+          runId: input.runId,
+          ownerId: input.ownerId,
+          runAttemptFence: input.attemptFence,
+        },
+      }),
+    },
+  ]
+}
+
+export const revokeSession: {
+  (claim: ExecutionClaim): (state: MemoryState) => MemoryState
+  (state: MemoryState, claim: ExecutionClaim): MemoryState
+} = Function.dual(2, (state: MemoryState, claim: ExecutionClaim): MemoryState => {
+  if (state.runs.get(claim.runId)?.ownerId !== undefined) return state
+  const current = state.sessions.get(claim.session.sessionId)
+  if (
+    current === undefined ||
+    current.writerEpoch.toString() !== claim.session.epoch ||
+    current.writer?.runId !== claim.runId ||
+    current.writer.ownerId !== claim.ownerId ||
+    current.writer.runAttemptFence !== claim.attemptFence
+  ) {
+    return state
+  }
+  const { writer: _, ...revoked } = current
+  return { ...state, sessions: new Map(state.sessions).set(claim.session.sessionId, revoked) }
+})
+
+export const revokeRunSession: {
+  (runId: string): (state: MemoryState) => MemoryState
+  (state: MemoryState, runId: string): MemoryState
+} = Function.dual(2, (state: MemoryState, runId: string): MemoryState => {
+  const run = state.runs.get(runId)
+  if (run?.ownerId === undefined) return state
+  const sessionId = run.message.sessionId
+  const current = state.sessions.get(sessionId)
+  if (
+    current === undefined ||
+    current.writer?.runId !== run.runId ||
+    current.writer.ownerId !== run.ownerId ||
+    current.writer.runAttemptFence !== run.attemptFence
+  ) {
+    return state
+  }
+  const { writer: _, ...revoked } = current
+  return { ...state, sessions: new Map(state.sessions).set(sessionId, revoked) }
 })
 
 export const releaseExecution: {
@@ -75,7 +168,7 @@ export const releaseExecution: {
   const { ownerId: _, ...released } = run
   const runs = new Map(state.runs)
   runs.set(run.runId, released)
-  return Effect.succeed([undefined, { ...state, runs }] as const)
+  return Effect.succeed([undefined, revokeSession({ ...state, runs }, input)] as const)
 })
 
 export const claimExecution: {
@@ -110,6 +203,12 @@ export const claimExecution: {
         return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting child capacity` })
       }
     }
+    const activeSession = state.sessions.get(run.message.sessionId)
+    if (activeSession?.writer !== undefined && activeSession.writer.runId !== run.runId) {
+      return yield* RuntimeUnavailable.make({
+        message: `Session ${run.message.sessionId} is already bound to Run ${activeSession.writer.runId}`,
+      })
+    }
     const claimed = {
       ...run,
       status: run.cancellationRequested ? ("cancelling" as const) : ("running" as const),
@@ -125,7 +224,13 @@ export const claimExecution: {
         ? (yield* appendLifecycle(claimedState, run.runId, attemptStartedEvent(claimed.attempt), "running"))[1]
         : claimedState
     const loaded = started.runs.get(run.runId)!
-    return [{ ...executionRecord(started, loaded), ownerId: input.ownerId }, started] as const
+    const [session, withSession] = acquireSession(started, {
+      sessionId: loaded.message.sessionId,
+      runId: loaded.runId,
+      ownerId: input.ownerId,
+      attemptFence: loaded.attemptFence,
+    })
+    return [{ ...executionRecord(withSession, loaded), ownerId: input.ownerId, session }, withSession] as const
   }),
 )
 
@@ -136,23 +241,27 @@ export const retryExecution: {
     state: MemoryState,
   ) => Effect.Effect<
     readonly [ExecutionRecord, MemoryState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim
+    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim | StaleSessionClaim
   >
   (
     state: MemoryState,
     input: ExecutionClaim,
-  ): Effect.Effect<readonly [ExecutionRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim>
+  ): Effect.Effect<
+    readonly [ExecutionRecord, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim | StaleSessionClaim
+  >
 } = Function.dual(2, (state: MemoryState, input: ExecutionClaim) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.status !== "running" || run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+    if (run.status !== "running") {
       return yield* StaleClaim.make({
         runId: input.runId,
         workerId: input.ownerId,
         attemptFence: input.attemptFence,
       })
     }
+    yield* requireExecutionClaim(state, input)
     const nextAttempt = run.attempt + 1
     const [_, next] = yield* appendLifecycle(state, run.runId, attemptStartedEvent(nextAttempt), "running")
     return [executionRecord(next, next.runs.get(run.runId)!), next] as const

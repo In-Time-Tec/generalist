@@ -51,7 +51,7 @@ import {
   saveExecution,
 } from "./store/execution.js"
 import { withSql } from "./effect.js"
-import { make as makeSqliteSessionStore } from "./session/store.js"
+import { claimedStore as sqliteClaimedSessionStore, reader as sqliteSessionReader } from "./session/store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store/steering/service.js"
 import {
   admitMessage,
@@ -198,8 +198,10 @@ const makeSqliteStoreServices = (
 
     const runStore = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
-      sessionStore: (sessionId: string) =>
-        withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie, Effect.map(Option.some)),
+      sessionReader: (sessionId: string) =>
+        withSql(sql, sqliteSessionReader(sessionId)).pipe(Effect.orDie, Effect.map(Option.some)),
+      claimedSessionStore: (claim) =>
+        withSql(sql, sqliteClaimedSessionStore({ claim })).pipe(Effect.orDie, Effect.map(Option.some)),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => runBuffered((transactionHub) => admitSend(transactionHub, addressBindings, input)),
       admitStart: (input, startOptions) =>

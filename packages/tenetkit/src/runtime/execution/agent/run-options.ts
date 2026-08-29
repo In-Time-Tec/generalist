@@ -36,7 +36,6 @@ export const make = (input: {
       attempt: input.attempt,
       admittedAt: input.execution.admittedAt,
     },
-    sessionOwnerToken: `${input.claim.ownerId}:${input.claim.attemptFence}`,
     executableRef: input.execution.executableRef,
     executableManifest: input.execution.executableManifest,
     budget: input.budget,

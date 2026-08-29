@@ -53,3 +53,12 @@ export class StaleClaim extends Schema.TaggedError<StaleClaim>()("tenetkit/runti
   workerId: Schema.String,
   attemptFence: Schema.Finite,
 }) {}
+
+/** @experimental An exact Runtime Session write binding has been revoked or replaced. */
+export class StaleSessionClaim extends Schema.TaggedError<StaleSessionClaim>()("tenetkit/runtime/StaleSessionClaim", {
+  sessionId: Schema.String,
+  runId: Schema.String,
+  ownerId: Schema.String,
+  runAttemptFence: Schema.Finite,
+  epoch: Schema.String,
+}) {}

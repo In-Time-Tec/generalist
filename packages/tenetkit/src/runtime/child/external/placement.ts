@@ -31,6 +31,13 @@ export const ReserveInput = Schema.Struct({
   runId: Schema.String,
   ownerId: Schema.String,
   attemptFence: Schema.Int,
+  session: Schema.Struct({
+    sessionId: Schema.String,
+    runId: Schema.String,
+    ownerId: Schema.String,
+    runAttemptFence: Schema.Finite,
+    epoch: Schema.String,
+  }),
   ref: ExternalRunRef,
   invocationId: Schema.String,
   requestDigest: Schema.String,

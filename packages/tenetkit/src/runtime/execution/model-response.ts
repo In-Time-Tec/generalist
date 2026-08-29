@@ -80,7 +80,7 @@ export const hydratePersistedModelOperation = (input: {
     const reference = completedOperationRefValue(input.value)
     if (reference === undefined)
       return yield* RuntimeUnavailable.make({ message: "persisted model result is not a reference" })
-    const session = yield* input.store.sessionStore(reference.sessionId)
+    const session = yield* input.store.sessionReader(reference.sessionId)
     if (Option.isNone(session)) {
       return yield* RuntimeUnavailable.make({ message: `Session ${reference.sessionId} is unavailable` })
     }
@@ -106,6 +106,7 @@ export const verifyCommittedModelEvent = (input: {
   | RuntimeUnavailable
   | import("../errors.js").RunNotFound
   | import("../sql/errors.js").StaleClaim
+  | import("../sql/errors.js").StaleSessionClaim
   | import("effect/unstable/sql/SqlError").SqlError
   | import("../errors.js").RunTerminal
 > =>

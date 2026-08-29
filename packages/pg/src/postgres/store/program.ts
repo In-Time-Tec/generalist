@@ -21,6 +21,7 @@ import { suspend } from "./suspend.js"
 import { admitProgramChild } from "tenetkit/runtime/driver/sql/store/admit"
 import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
 import type { SqlError } from "effect/unstable/sql/SqlError"
+import { revokeSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 export type Run = <A, E>(
@@ -82,6 +83,11 @@ export const programStoreMethods = (input: {
             })
           const loaded = yield* requireRun(operation.runId)
           yield* completeRun(input.hub, loaded, { _tag: "Program", value: operation.output })
+          if (!(yield* revokeSessionWriteClaim(operation.session))) {
+            return yield* RuntimeUnavailable.make({
+              message: `Run ${operation.runId} Session write binding was not revoked`,
+            })
+          }
           return { _tag: "Completed" as const }
         }),
       ),

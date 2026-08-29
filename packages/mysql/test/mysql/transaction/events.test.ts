@@ -37,6 +37,7 @@ describeMysql("mysql tracer", () => {
             runId: first.runId,
             workerId: "trace-a",
             attemptFence: a[0]!.attemptFence,
+            session: a[0]!.session,
             transition: "complete",
             result: completedResult("a"),
           })
@@ -44,6 +45,7 @@ describeMysql("mysql tracer", () => {
             runId: second.runId,
             workerId: "trace-b",
             attemptFence: b[0]!.attemptFence,
+            session: b[0]!.session,
             transition: "complete",
             result: completedResult("b"),
           })

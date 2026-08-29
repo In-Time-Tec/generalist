@@ -44,7 +44,7 @@ const claimExistingProgram = (runId: string, label: string) =>
     }
     const [claim] = yield* claims.value.claimReadyRuns({ workerId: `program-contract-${label}`, limit: 1 })
     if (claim?.run.runId !== runId) return yield* Effect.die(`Program Run ${runId} was not claimable`)
-    return { runId, ownerId: claim.workerId, attemptFence: claim.attemptFence }
+    return { runId, ownerId: claim.workerId, attemptFence: claim.attemptFence, session: claim.session }
   })
 
 const claimProgram = (label: string) =>

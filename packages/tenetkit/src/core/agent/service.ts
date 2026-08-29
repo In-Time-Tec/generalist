@@ -296,8 +296,6 @@ export interface RunOptions {
   readonly executableRef?: import("../durable/manifest/executable-manifest.js").ExecutableRef
   /** @experimental Complete pinned closure used to resolve same-run handoffs exactly. */
   readonly executableManifest?: import("../durable/manifest/executable-manifest.js").ExecutableManifest
-  /** @experimental Opaque host-assigned write-ownership token, forwarded on every Session append and checkpoint so durable hosts can fence stale writers. */
-  readonly sessionOwnerToken?: string
   readonly toolOutputMaxBytes?: number
   /** @experimental Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64. */
   readonly toolProgress?: ProgressOverflowPolicy

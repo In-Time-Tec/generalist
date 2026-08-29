@@ -81,7 +81,7 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
         prompt: textPrompt("run both children"),
       })
       const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "terminalization-test" })
-      const session = yield* store.sessionStore(sessionId)
+      const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected Session store")
       const prefix = yield* session.value.append({
         _tag: "Message",
@@ -300,7 +300,7 @@ it.effect("rejects successful Run settlement while its Session still has an unre
         prompt: textPrompt("run child"),
       })
       const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "terminalization-test" })
-      const session = yield* store.sessionStore("session:reject-unresolved-completion")
+      const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected Session store")
       const prefix = yield* session.value.append({ _tag: "Message", message: textPrompt("run child").content[0]! })
       const operationKey = `${receipt.runId}:model:0:0:conversation`
@@ -349,7 +349,7 @@ it.live("rolls back terminal Session results when SQLite Run settlement fails", 
         prompt: textPrompt("run child"),
       })
       const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "terminalization-test" })
-      const session = yield* store.sessionStore(sessionId)
+      const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected Session store")
       const prefix = yield* session.value.append({ _tag: "Message", message: textPrompt("run child").content[0]! })
       const operationKey = `${receipt.runId}:model:0:0:conversation`

@@ -21,6 +21,7 @@ import type { ExecutionContinuation } from "./steering.js"
 import type { ExecutableRegistration } from "../executable/registration.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { InitialFanOutInput } from "../child/fan-out.js"
+import type { Session } from "../../core/index.js"
 
 export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
@@ -149,10 +150,23 @@ export interface ExecutionRecord {
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
+/** @experimental Storage-issued authority for one exact Runtime Session writer. */
+export interface SessionWriteClaim {
+  readonly sessionId: string
+  readonly runId: string
+  readonly ownerId: string
+  readonly runAttemptFence: number
+  readonly epoch: string
+}
+
+/** @experimental Read-only Session history capability. */
+export type SessionReader = Pick<Session.Interface, "path" | "leaf">
+
 export interface ExecutionClaim {
   readonly runId: string
   readonly ownerId: string
   readonly attemptFence: number
+  readonly session: SessionWriteClaim
 }
 
 export type WorkerMutationError =
@@ -160,4 +174,5 @@ export type WorkerMutationError =
   | RunTerminal
   | RuntimeUnavailable
   | import("../sql/errors.js").StaleClaim
+  | import("../sql/errors.js").StaleSessionClaim
   | import("effect/unstable/sql/SqlError").SqlError

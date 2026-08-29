@@ -88,7 +88,11 @@ const reserve = (state: MemoryState, input: ReserveInput) =>
     const next =
       input.parentSuspension === undefined
         ? reserved
-        : yield* suspend(reserved, { ...input, ...input.parentSuspension })
+        : yield* suspend(reserved, {
+            ...input,
+            session: input.session,
+            ...input.parentSuspension,
+          })
     return [placement, next] as const
   })
 

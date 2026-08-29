@@ -195,6 +195,7 @@ it.live("rolls back a failed baseline and reports a typed migration failure", ()
 it.live.each([
   ["dirty", "UPDATE tenetkit_schema_meta SET dirty = 1 WHERE id = 1", SchemaDirty],
   ["checksum", "UPDATE tenetkit_schema_meta SET checksum = 'wrong' WHERE id = 1", SchemaChecksumMismatch],
+  ["old", `UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION - 1} WHERE id = 1`, SchemaVersionUnsupported],
   ["future", `UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`, SchemaVersionUnsupported],
 ] as const)("rejects a %s SQLite schema", ([, update, expected]) =>
   Effect.gen(function* () {

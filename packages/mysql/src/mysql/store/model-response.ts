@@ -86,7 +86,11 @@ export const mysqlModelResponseOperations = (input: {
     claim: import("tenetkit/runtime/driver/run/store").ExecutionClaim,
   ) => Effect.Effect<
     void,
-    import("tenetkit/runtime/driver/sql/errors").StaleClaim | RunNotFound | RuntimeUnavailable | SqlError,
+    | import("tenetkit/runtime/driver/sql/errors").StaleClaim
+    | import("tenetkit/runtime/driver/sql/errors").StaleSessionClaim
+    | RunNotFound
+    | RuntimeUnavailable
+    | SqlError,
     SqlR
   >
 }): Pick<RunStoreInterface, "commitModelResponse" | "commitInterruptedModelResponse"> => {

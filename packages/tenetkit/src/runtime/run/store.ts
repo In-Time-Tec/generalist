@@ -78,6 +78,8 @@ import type {
   OperationCompletionOutcome,
   RecordOperationInput,
   ResolveAddressError,
+  SessionReader,
+  SessionWriteClaim,
   StoreBackend,
   StoreInfo,
   WorkerMutationError,
@@ -98,6 +100,8 @@ export type {
   OperationCompletionOutcome,
   RecordOperationInput,
   ResolveAddressError,
+  SessionReader,
+  SessionWriteClaim,
   StoreBackend,
   StoreInfo,
   WorkerMutationError,
@@ -111,13 +115,10 @@ export type PendingRunOutcome = typeof PendingRunOutcome.Type
 
 export interface Interface {
   readonly info: Effect.Effect<StoreInfo>
-  /**
-   * @experimental Durable conversation history for one session identity.
-   *
-   * Session is the authority for model-facing history, so the store that owns durability owns it too.
-   * A store without durable Session returns undefined and its Runs fall back to process-bound history.
-   */
-  readonly sessionStore: (sessionId: string) => Effect.Effect<Option.Option<Session.Interface>>
+  /** @experimental Read-only durable conversation history for one Session identity. */
+  readonly sessionReader: (sessionId: string) => Effect.Effect<Option.Option<SessionReader>>
+  /** @experimental Session writer bound to one storage-issued execution claim. */
+  readonly claimedSessionStore: (claim: ExecutionClaim) => Effect.Effect<Option.Option<Session.Interface>>
   readonly hasAdmission: (input: {
     readonly address: Address
     readonly sessionId: string
@@ -180,6 +181,7 @@ export interface Interface {
     | RunIdConflict
     | RuntimeUnavailable
     | import("../sql/errors.js").StaleClaim
+    | import("../sql/errors.js").StaleSessionClaim
     | ChildDepthExceeded
     | ChildLimitExceeded
   >
@@ -193,6 +195,7 @@ export interface Interface {
     | RunIdConflict
     | RuntimeUnavailable
     | import("../sql/errors.js").StaleClaim
+    | import("../sql/errors.js").StaleSessionClaim
     | ChildDepthExceeded
     | ChildLimitExceeded
   >
@@ -384,7 +387,13 @@ export interface Interface {
       readonly checkpoint?: ExecutionCheckpoint
       readonly suspension?: ExecutionSuspension
     },
-  ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | import("../sql/errors.js").StaleClaim>
+  ) => Effect.Effect<
+    void,
+    | RunNotFound
+    | RuntimeUnavailable
+    | import("../sql/errors.js").StaleClaim
+    | import("../sql/errors.js").StaleSessionClaim
+  >
   readonly retryExecution: (input: ExecutionClaim) => Effect.Effect<ExecutionRecord, WorkerMutationError>
   readonly admitFanOut: (
     input: AdmitFanOutInput,

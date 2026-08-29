@@ -33,11 +33,12 @@ operationRecoverySuite({
             runId: item.run.runId,
             workerId: item.workerId,
             attemptFence: item.attemptFence,
+            session: item.session,
           }),
         { discard: true },
       )
       if (claimed === undefined) return yield* Effect.die(`claim missing for ${runId} (${ownerId})`)
-      return { runId, ownerId, attemptFence: claimed.attemptFence }
+      return { runId, ownerId, attemptFence: claimed.attemptFence, session: claimed.session }
     }),
   expireClaim: (runId) =>
     provideScoped(
@@ -73,11 +74,12 @@ toolCancellationSuite({
             runId: item.run.runId,
             workerId: item.workerId,
             attemptFence: item.attemptFence,
+            session: item.session,
           }),
         { discard: true },
       )
       if (claimed === undefined) return yield* Effect.die(`claim missing for ${runId} (${ownerId})`)
-      return { runId, ownerId, attemptFence: claimed.attemptFence }
+      return { runId, ownerId, attemptFence: claimed.attemptFence, session: claimed.session }
     }),
   expireClaim: (runId) =>
     provideScoped(

@@ -1,5 +1,4 @@
 import { Duration, Effect, Option, Ref, Schedule, Stream, type Scope } from "effect"
-
 import { SqlClient } from "effect/unstable/sql"
 import {
   admitProgramAgents,
@@ -43,6 +42,7 @@ import { resolveOperation } from "tenetkit/runtime/driver/sql/store/operation/re
 import {
   claimExecution,
   loadExecution,
+  releaseExecution,
   requireExecutionClaim,
   retryExecution,
 } from "tenetkit/runtime/driver/sql/store/execution"
@@ -53,7 +53,6 @@ import {
   loadRun,
   nowIso,
 } from "tenetkit/runtime/driver/sql/store/statements"
-import { releaseLeasedExecution as releaseExecution } from "tenetkit/runtime/driver/sql/store/release-leased"
 import { make as makeEventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import {
   admitSteering,
@@ -80,7 +79,6 @@ import { check as checkSchema } from "../schema/migrations.js"
 import { inspectionStoreMethods } from "./inspection.js"
 import { initializeReadCommitted, mysqlClaims } from "./claims.js"
 import { admitFanOut, inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
-
 import { encodeExecutableRef, encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
 import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
 import { ProgramCapabilities } from "tenetkit"
@@ -90,19 +88,28 @@ import { ExecutionCheckpoint, ExecutionSuspension } from "tenetkit/runtime/drive
 import { transactionRunner } from "../transaction/events.js"
 import { settlementNotifications } from "tenetkit/runtime/driver/sql/settlement-notifications"
 import { mysqlSessionStore } from "../session/entries.js"
+import { mysqlSessionReader } from "../session/reader.js"
 import { reconcileCancellationRequested } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { cancelSessionRuns } from "../session/cancellation.js"
 import { mysqlModelResponseOperationsWithDefaults } from "./model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
 import { loadTerminalEvent } from "tenetkit/runtime/driver/sql/store/child/settlement"
 import { reconcileChildWait } from "../session/reconcile-child-wait.js"
-
+import { revokeExecutionSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
   readonly maxConnections?: number
   readonly pollInterval?: Duration.Input
 }
+const suspensionChild = (token: string | undefined) =>
+  Effect.gen(function* () {
+    if (token === undefined) return {}
+    const child = yield* loadRun(token)
+    if (child?.terminalEventId === undefined) return { child }
+    return { child, terminalEvent: yield* loadTerminalEvent(child.terminalEventId) }
+  })
+
 export type MysqlStoreError =
   | SchemaDirty
   | SchemaChecksumMismatch
@@ -213,9 +220,7 @@ export const mysqlServices = (
           { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } },
           "waiting",
         )
-        const child = input.suspension.token === undefined ? undefined : yield* loadRun(input.suspension.token)
-        const terminalEvent =
-          child?.terminalEventId === undefined ? undefined : yield* loadTerminalEvent(child.terminalEventId)
+        const { child, terminalEvent } = yield* suspensionChild(input.suspension.token)
         if (child !== undefined && terminalEvent !== undefined) {
           yield* reconcileChildWait({
             hub: transactionHub,
@@ -256,6 +261,7 @@ export const mysqlServices = (
         yield* sql`
           UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}
         `
+        yield* revokeExecutionSessionWriteClaim(input)
       })
     const saveExecution = (input: Parameters<RunStoreInterface["saveExecution"]>[0]) =>
       Effect.gen(function* () {
@@ -278,7 +284,8 @@ export const mysqlServices = (
     const modelResponseOperations = mysqlModelResponseOperationsWithDefaults({ sql, hub: transactionHub, run })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "mysql", multiWorker: true }),
-      sessionStore: (sessionId) => Effect.succeed(Option.some(mysqlSessionStore({ sessionId, run, runNoTxn }))),
+      sessionReader: (sessionId) => Effect.succeed(Option.some(mysqlSessionReader({ sessionId, runNoTxn }))),
+      claimedSessionStore: (claim) => Effect.succeed(Option.some(mysqlSessionStore({ claim, run, runNoTxn }))),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) =>
         run(

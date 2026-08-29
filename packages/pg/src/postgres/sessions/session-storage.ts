@@ -2,7 +2,9 @@ import { Effect } from "effect"
 import { Session } from "tenetkit"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { type EntryRow, type SessionRow, SessionStorage } from "tenetkit/runtime/driver/sql/session/store"
+import { type EntryRow, type SessionRow, SessionStorage } from "tenetkit/runtime/driver/sql/session/storage"
+import type { SessionWriteClaim } from "tenetkit/runtime/driver/run/store"
+import { StaleSessionClaim } from "tenetkit/runtime/driver/sql/errors"
 
 const { encodePayload, entryPayloadEquivalence, pathFromRows, requireActive, storeError, toEntry } = SessionStorage
 
@@ -11,18 +13,32 @@ const lockSession = (
 ): Effect.Effect<SessionRow, Session.SessionStoreError | SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`
-      INSERT INTO tenetkit_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
-      VALUES (${sessionId}, NULL, 0, NULL, NOW())
-      ON CONFLICT (session_id) DO NOTHING
-    `
     const rows = yield* sql<SessionRow>`
-      SELECT leaf_id, next_seq, owner_token FROM tenetkit_sessions
+      SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+      FROM tenetkit_sessions
       WHERE session_id = ${sessionId}
       FOR UPDATE
     `
     const row = rows[0]
     return row === undefined ? yield* storeError(`Session ${sessionId} could not be initialized`) : row
+  })
+
+const lockClaimedSession = (
+  claim: SessionWriteClaim,
+): Effect.Effect<SessionRow, StaleSessionClaim | SqlError, SqlClient.SqlClient> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<SessionRow>`
+      SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
+      FROM tenetkit_sessions
+      WHERE session_id = ${claim.sessionId}
+        AND writer_epoch = ${claim.epoch}
+        AND writer_run_id = ${claim.runId}
+        AND writer_owner_id = ${claim.ownerId}
+        AND writer_attempt_fence = ${claim.runAttemptFence}
+      FOR UPDATE
+    `
+    return rows[0] ?? (yield* StaleSessionClaim.make(claim))
   })
 
 const loadEntries = (sessionId: string): Effect.Effect<ReadonlyArray<EntryRow>, SqlError, SqlClient.SqlClient> =>
@@ -55,22 +71,13 @@ const advanceSession = (input: {
   readonly sessionId: string
   readonly leafId: string | null
   readonly nextSeq: number
-  readonly ownerToken?: string
 }): Effect.Effect<void, SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    if (input.ownerToken === undefined) {
-      yield* sql`
-        UPDATE tenetkit_sessions SET leaf_id = ${input.leafId}, next_seq = ${input.nextSeq}, updated_at = NOW()
-        WHERE session_id = ${input.sessionId}
-      `
-    } else {
-      yield* sql`
-        UPDATE tenetkit_sessions SET leaf_id = ${input.leafId}, next_seq = ${input.nextSeq},
-          owner_token = ${input.ownerToken}, updated_at = NOW()
-        WHERE session_id = ${input.sessionId}
-      `
-    }
+    yield* sql`
+      UPDATE tenetkit_sessions SET leaf_id = ${input.leafId}, next_seq = ${input.nextSeq}, updated_at = NOW()
+      WHERE session_id = ${input.sessionId}
+    `
   })
 
 interface PostgresSessionStorage {
@@ -81,6 +88,9 @@ interface PostgresSessionStorage {
   readonly lockSession: (
     sessionId: string,
   ) => Effect.Effect<SessionRow, Session.SessionStoreError | SqlError, SqlClient.SqlClient>
+  readonly lockClaimedSession: (
+    claim: SessionWriteClaim,
+  ) => Effect.Effect<SessionRow, StaleSessionClaim | SqlError, SqlClient.SqlClient>
   readonly loadEntries: (sessionId: string) => Effect.Effect<ReadonlyArray<EntryRow>, SqlError, SqlClient.SqlClient>
   readonly pathFromRows: (
     rows: ReadonlyArray<EntryRow>,
@@ -102,6 +112,7 @@ export const PostgresSessionStorage: PostgresSessionStorage = {
   storeError,
   toEntry,
   lockSession,
+  lockClaimedSession,
   loadEntries,
   pathFromRows,
   requireActive,

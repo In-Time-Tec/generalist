@@ -10,6 +10,7 @@ import {
 import { decodeJson, encodeJsonValue } from "../../codec/codecs.js"
 import type { OperationRow } from "../../codec/rows.js"
 import { loadRun, nowIso } from "../statements.js"
+import { revokeRunSessionWriteClaim } from "../../session/claim.js"
 
 type ResolveOperationEffect = Effect.Effect<
   undefined,
@@ -103,6 +104,12 @@ const resolveOperationEffect = (
       WHERE run_id = ${input.runId} AND status = 'unknown'
     `
     const runStatus = resolvedRunStatus(sql, unresolved[0]?.unresolved ?? 0, claimableStatus)
+    yield* revokeRunSessionWriteClaim({
+      sessionId: run.sessionId,
+      runId: run.runId,
+      ownerId: run.ownerWorkerId,
+      runAttemptFence: run.attemptFence,
+    })
     if (clearLease) {
       yield* sql`
         UPDATE tenetkit_runs SET status = ${runStatus}, owner_worker_id = NULL, lease_expires_at = NULL,

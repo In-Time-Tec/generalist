@@ -236,7 +236,7 @@ const executeScale = (scale: number) =>
           })
           yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: `linear-storage:${scale}` }))
           expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "succeeded" })
-          const session = yield* store.sessionStore(`session:linear-storage:${scale}`)
+          const session = yield* store.sessionReader(`session:linear-storage:${scale}`)
           if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
           expect(yield* session.value.path()).not.toHaveLength(0)
         }),

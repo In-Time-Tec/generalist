@@ -4,6 +4,7 @@ import { SqlClient } from "effect/unstable/sql"
 import {
   claimExecution,
   loadExecution,
+  releaseExecution,
   requireExecutionClaim,
   retryExecution,
   saveExecution,
@@ -38,7 +39,6 @@ import { transactionRunner, nextId } from "../events/transaction-events.js"
 import { eventStream } from "../events/event-stream.js"
 import { postgresClaims } from "./claims.js"
 import { postgresOperations, type RunFn } from "./ops.js"
-import { releaseLeasedExecution as releaseExecution } from "tenetkit/runtime/driver/sql/store/release-leased"
 import { hasAdmission, loadRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import { WaitResolution } from "tenetkit/runtime/driver/run/wait"
 import { fanOutStoreMethods } from "./fan-out.js"
@@ -78,8 +78,11 @@ import { settlementNotifications } from "tenetkit/runtime/driver/sql/settlement-
 import { reconcileCancellationRequested } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { cancelSessionRuns } from "../sessions/session-cancellation.js"
 import { postgresSessionStore } from "../sessions/session-store.js"
+import { postgresSessionReader } from "../sessions/session-reader.js"
 import { readinessForAdmission } from "tenetkit/runtime/driver/sql/store/child/capacity"
 import { hasPendingOperationCancellation } from "tenetkit/runtime/driver/sql/store/child/settlement"
+import { revokeExecutionSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
+
 export const postgresServices = (options: PostgresOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
@@ -106,7 +109,8 @@ export const postgresServices = (options: PostgresOptions) =>
     })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
-      sessionStore: (sessionId) => Effect.succeed(Option.some(postgresSessionStore({ sessionId, run, runNoTxn }))),
+      sessionReader: (sessionId) => Effect.succeed(Option.some(postgresSessionReader({ sessionId, runNoTxn }))),
+      claimedSessionStore: (claim) => Effect.succeed(Option.some(postgresSessionStore({ claim, run, runNoTxn }))),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
       admitStart: (input, startOptions) =>
@@ -364,6 +368,7 @@ export const postgresServices = (options: PostgresOptions) =>
             const continuation = yield* saveCompletionContinuation(input.runId, input.result)
             if (continuation !== undefined) return { _tag: "SteeringPending" as const, continuation }
             yield* completeRun(transactionHub, loaded, input.result)
+            yield* revokeExecutionSessionWriteClaim(input)
             return { _tag: "Completed" as const }
           }),
         ),
@@ -380,8 +385,14 @@ export const postgresServices = (options: PostgresOptions) =>
               if (
                 (yield* deferCancelledFanOutParent(sql, loaded.runId)) ||
                 (yield* hasPendingOperationCancellation(loaded.runId))
-              )
+              ) {
+                yield* sql`
+                  UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL
+                  WHERE run_id = ${loaded.runId}
+                `
+                yield* revokeExecutionSessionWriteClaim(input)
                 return
+              }
               const event = yield* appendEvent(
                 transactionHub,
                 loaded,
@@ -394,6 +405,7 @@ export const postgresServices = (options: PostgresOptions) =>
               const settled = (yield* loadRun(loaded.runId))!
               yield* settleParent(transactionHub, settled, event.eventId)
               yield* afterTerminal(transactionHub, settled)
+              yield* revokeExecutionSessionWriteClaim(input)
               return
             }
             const runningFanOut = yield* sql<{ fan_out_id: string }>`
@@ -406,6 +418,7 @@ export const postgresServices = (options: PostgresOptions) =>
                   pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
                 WHERE run_id = ${loaded.runId}
               `
+              yield* revokeExecutionSessionWriteClaim(input)
               return
             }
             const event = yield* appendEvent(
@@ -417,6 +430,7 @@ export const postgresServices = (options: PostgresOptions) =>
             const settled = (yield* loadRun(loaded.runId))!
             yield* settleParent(transactionHub, settled, event.eventId)
             yield* afterTerminal(transactionHub, settled)
+            yield* revokeExecutionSessionWriteClaim(input)
           }),
         ),
       suspend: (input) => run(suspend(transactionHub, input)),

@@ -47,6 +47,13 @@ const claim = (runId: string): ClaimedRun => ({
   run: { ...decodedRun, runId },
   workerId: "worker-wakeup",
   attemptFence: 1,
+  session: {
+    sessionId: decodedRun.sessionId,
+    runId,
+    ownerId: "worker-wakeup",
+    runAttemptFence: 1,
+    epoch: "1",
+  },
   leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(0)),
 })
 
