@@ -98,6 +98,7 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
       yield* store.startOperation({ ...claim, operationId: modelOperation.operationId })
       const calls = [
         { id: "call-completed-child", name: "run_child" },
+        { id: "call-operation-fallback-child", name: "run_child" },
         { id: "call-unknown-child", name: "run_child" },
         { id: "call-not-started-child", name: "run_child" },
       ] as const
@@ -130,7 +131,7 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
         },
       })
       const operations = []
-      for (const call of calls.slice(0, 2)) {
+      for (const call of calls.slice(0, 3)) {
         const operation = yield* store.recordOperation({
           ...claim,
           operationKey: `${receipt.runId}:tool:0:${call.id}:${call.name}`,
@@ -149,6 +150,29 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
         outcome: {
           _tag: "Succeeded",
           value: { _tag: "Success", result: "operation result", encodedResult: "operation encoded result" },
+        },
+      })
+      const boundedOperationResult = {
+        inline: {
+          truncated: true as const,
+          bytes: 61_442,
+          maxBytes: 51_200,
+          digest: "a".repeat(64),
+          preview: "bounded operation fallback",
+        },
+        outputPaths: [] as ReadonlyArray<string>,
+      }
+      yield* store.completeOperation({
+        ...claim,
+        operationId: operations[1]!.operationId,
+        outcome: {
+          _tag: "Succeeded",
+          value: {
+            _tag: "Success",
+            result: boundedOperationResult,
+            encodedResult: boundedOperationResult,
+            outputPaths: [],
+          },
         },
       })
       const completedCall = yield* Schema.decodeEffect(
@@ -177,7 +201,7 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
           }),
         },
       })
-      yield* store.expireRunningOperation({ ...claim, operationId: operations[1]!.operationId })
+      yield* store.expireRunningOperation({ ...claim, operationId: operations[2]!.operationId })
       const terminalFailure = Errors.AgentExecutionFailure.make({ message: "execution failed" })
       if (terminal === "cancelled") {
         yield* runtime.cancel({ runId: receipt.runId, reason: "user cancelled" })
@@ -196,7 +220,7 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
         if (Schema.is(Schema.String)(message.content)) return []
         return message.content.filter((part) => part.type === "tool-result")
       })
-      expect(results).toHaveLength(3)
+      expect(results).toHaveLength(4)
       expect(results[0]).toMatchObject({
         id: calls[0].id,
         isFailure: false,
@@ -204,11 +228,16 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
       })
       expect(results[1]).toMatchObject({
         id: calls[1].id,
-        isFailure: true,
-        result: { _tag: "Unknown", operationId: operations[1]!.operationId },
+        isFailure: false,
+        result: boundedOperationResult,
       })
       expect(results[2]).toMatchObject({
         id: calls[2].id,
+        isFailure: true,
+        result: { _tag: "Unknown", operationId: operations[2]!.operationId },
+      })
+      expect(results[3]).toMatchObject({
+        id: calls[3].id,
         isFailure: true,
         result:
           terminal === "cancelled"

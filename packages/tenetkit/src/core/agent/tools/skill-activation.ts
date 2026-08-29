@@ -25,7 +25,11 @@ interface SkillActivationContext {
 /** @internal Resolve one `activate_skill` call, registering the skill's tools and body in the run's tool state. */
 export const make =
   (context: SkillActivationContext) =>
-  (turn: number, call: AnyToolCall): Effect.Effect<Outcome, AgentError | ToolNameCollision | FrameworkFailure> =>
+  (
+    turn: number,
+    call: AnyToolCall,
+    restoredBody?: string,
+  ): Effect.Effect<Outcome, AgentError | ToolNameCollision | FrameworkFailure> =>
     Effect.gen(function* () {
       const { skillRuntime, toolState } = context
       if (skillRuntime === undefined) {
@@ -68,7 +72,7 @@ export const make =
             }),
           ),
         ])
-        body = yield* skill.body
+        body = restoredBody ?? (yield* skill.body)
         const activatedSkillBodies = new Map(current.activatedSkillBodies)
         activatedSkillBodies.set(skill.frontmatter.name, body)
         yield* Ref.set(toolState, { registry, activatedSkillBodies })

@@ -1581,6 +1581,83 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "restores activated skill state after replaying its bounded durable outcome", () => {
+    let modelCalls = 0
+    let bodyReads = 0
+    let executorCalls = 0
+    const replayTool = Tool.make("replayed_skill_tool", { parameters: Schema.Unknown, success: Schema.Unknown })
+    const skill: SkillSource.Skill = {
+      ...testSkill("replayed", "Contributes a replayed tool", "unused"),
+      body: Effect.sync(() => {
+        bodyReads += 1
+        return "REPLAYED SKILL BODY"
+      }),
+      tools: [replayTool],
+    }
+    const bounded = {
+      inline: {
+        truncated: true as const,
+        bytes: 4_096,
+        maxBytes: 64,
+        digest: "0".repeat(64),
+        preview: "bounded activation",
+      },
+      outputPaths: [] as ReadonlyArray<string>,
+    }
+    const replayed: DurableDriver.OperationOutcome = {
+      _tag: "Succeeded",
+      value: { _tag: "Success", result: bounded, encodedResult: bounded, outputPaths: [] },
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.make(toolCallPart("replayed-activation", "activate_skill", { name: "replayed" }))
+          }
+          if (modelCalls === 2) {
+            expect(modelToolNames(options.tools)).toContain("replayed_skill_tool")
+            return Stream.make(toolCallPart("replayed-tool", "replayed_skill_tool", {}))
+          }
+          return Stream.make(textDelta("done"))
+        }),
+        SkillSource.layerSkills([skill]),
+        ToolExecutor.layerTest({
+          execute: (request) =>
+            Effect.sync(() => {
+              executorCalls += 1
+              expect(request.call.name).toBe("replayed_skill_tool")
+              return { _tag: "Success" as const, result: "replayed", encodedResult: "replayed" }
+            }),
+        }),
+      ),
+      Effect.gen(function* () {
+        const journal: DurableDriver.DriverJournal = {
+          onScheduled: (operation) =>
+            operation.kind === "tool" &&
+            typeof operation.input === "object" &&
+            operation.input !== null &&
+            "name" in operation.input &&
+            operation.input.name === "activate_skill"
+              ? Effect.succeed(replayed)
+              : Effect.void,
+          onCompleted: () => Effect.void,
+          onCheckpoint: () => Effect.void,
+        }
+        const agent = Agent.make({ name: "replayed-skill-agent" })
+
+        const events = yield* Agent.stream(agent, {
+          prompt: "replay activation",
+          logicalOperationId: "replayed-skill-run",
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, journal))
+
+        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(bodyReads).toBe(1)
+        expect(executorCalls).toBe(1)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "rejects a static and activated-skill collision before another model request", () => {
     let modelCalls = 0
     let bodyReads = 0
@@ -1755,17 +1832,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "restores activated tool metadata before resuming its suspended call", () => {
+  ItLayer.make(it, "restores an activated skill from its original call when the persisted result is bounded", () => {
     let modelCalls = 0
     let executorCalls = 0
     let bodyReads = 0
     let suspendedTranscript: Prompt.Prompt | undefined
+    const skillBody = `checkpointed body ${"x".repeat(4 * 1024)}`
     const resumableTool = Tool.make("resumable_skill_tool", { parameters: Schema.Unknown, success: Schema.Unknown })
     const skill: SkillSource.Skill = {
       ...testSkill("resumable", "Contributes a resumable tool", "unused"),
       body: Effect.sync(() => {
         bodyReads += 1
-        return "checkpointed body"
+        return skillBody
       }),
       tools: [resumableTool],
     }
@@ -1791,7 +1869,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resumable-skill-agent" })
-        const failure = yield* Agent.stream(agent, { prompt: "activate resumable" }).pipe(
+        const failure = yield* Agent.stream(agent, { prompt: "activate resumable", toolOutputMaxBytes: 256 }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") suspendedTranscript = event.transcript
@@ -1805,18 +1883,22 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         if (failure._tag !== "tenetkit/core/AgentSuspended" || suspendedTranscript === undefined) {
           return yield* Effect.die("missing activated skill checkpoint")
         }
+        const persisted = Json.stringify(suspendedTranscript.content)
+        expect(persisted).toContain('"truncated":true')
+        expect(persisted).not.toContain(skillBody)
 
         const resumed = yield* Stream.runCollect(
           Agent.stream(agent, {
             prompt: "ignored",
             history: suspendedTranscript,
             resume: { suspension: failure },
+            toolOutputMaxBytes: 256,
           }),
         )
 
         expect(resumed.at(-1)?._tag).toBe("Completed")
         expect(executorCalls).toBe(2)
-        expect(bodyReads).toBe(1)
+        expect(bodyReads).toBe(2)
       }),
     ] as const
   })
@@ -5142,7 +5224,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
   ItLayer.make(it, "spills large successful tool results by default before re-feeding them", () => {
     let calls = 0
     let stored: { readonly toolCallId: string; readonly content: unknown } | undefined
+    let journalOutcome: DurableDriver.OperationOutcome | undefined
     let secondPrompt = ""
+    const order: Array<string> = []
     const largeOutput = "x".repeat(60 * 1024)
     return [
       Layer.mergeAll(
@@ -5155,10 +5239,15 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("after spill"))
         }),
         ToolExecutor.layerTest({
-          execute: () => Effect.succeed({ _tag: "Success", result: largeOutput, encodedResult: largeOutput }),
+          execute: () =>
+            Effect.sync(() => {
+              order.push("execute")
+              return { _tag: "Success" as const, result: largeOutput, encodedResult: largeOutput }
+            }),
         }),
         ToolOutput.layerTest({
           put: (toolCallId, content) => {
+            order.push("spill")
             stored = { toolCallId, content }
             return Effect.succeed(Option.some(`mem:${toolCallId}`))
           },
@@ -5168,9 +5257,30 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "spill-agent", toolkit: Toolkit.make(echoTool) })
+        const tracing = testTracer()
+        const journal: DurableDriver.DriverJournal = {
+          onScheduled: () => Effect.void,
+          onCompleted: (operation, outcome) =>
+            operation.kind !== "tool"
+              ? Effect.void
+              : Effect.sync(() => {
+                  order.push("journal")
+                  journalOutcome = outcome
+                }),
+          onCheckpoint: () => Effect.void,
+        }
 
-        const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "use big tool", sessionId: "spill-session" }),
+        const events = yield* Agent.stream(agent, { prompt: "use big tool", sessionId: "spill-session" }).pipe(
+          Stream.tap((event) =>
+            event._tag === "ToolExecutionCompleted"
+              ? Effect.sync(() => {
+                  order.push("event")
+                })
+              : Effect.void,
+          ),
+          Stream.runCollect,
+          Effect.provideService(DurableDriver.DriverJournalService, journal),
+          Effect.provideService(Tracer.Tracer, tracing.tracer),
         )
 
         const completed = events.find((event) => event._tag === "ToolExecutionCompleted")
@@ -5185,6 +5295,27 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           })
           expect(Json.stringify(completed.result.encodedResult)).not.toContain(largeOutput)
         }
+        expect(journalOutcome).toMatchObject({
+          _tag: "Succeeded",
+          value: {
+            _tag: "Success",
+            encodedResult: {
+              inline: { truncated: true, maxBytes: 50 * 1024 },
+              outputPaths: ["mem:tool-call-spill"],
+            },
+          },
+        })
+        expect(Json.stringify(journalOutcome)).not.toContain(largeOutput)
+        expect(order).toEqual(["execute", "spill", "journal", "event"])
+        const toolSpan = tracing.spans.find((span) => span.name === "TenetKit.Agent.tool")
+        expect(toolSpan?.attributes.get("tenetkit.tool.output.original_bytes")).toBe(60 * 1024 + 2)
+        expect(toolSpan?.attributes.get("tenetkit.tool.output.max_bytes")).toBe(50 * 1024)
+        expect(toolSpan?.attributes.get("tenetkit.tool.output.truncated")).toBe(true)
+        expect(toolSpan?.attributes.get("tenetkit.tool.output.spill")).toBe("stored")
+        expect(toolSpan?.attributes.get("tenetkit.tool.output.path_count")).toBe(1)
+        expect(toolSpan?.attributes.get("tenetkit.tool.output.digest")).toMatch(/^[0-9a-f]{64}$/)
+        expect(toolSpan?.events.at(-1)?.[0]).toBe("tenetkit.tool.output.bound")
+        expect(Json.stringify(toolSpan?.events.at(-1)?.[2])).not.toContain(largeOutput)
         expect(secondPrompt).toContain("mem:tool-call-spill")
         expect(secondPrompt).not.toContain(largeOutput)
       }),

@@ -11,7 +11,6 @@ import {
   type Outcome,
   type Request,
   RemoteRetryMisconfigured,
-  type Success,
   ToolExecutor,
   executeToolkit,
 } from "../../tools/tool-executor.js"
@@ -21,6 +20,7 @@ import { type Registry, get } from "../../tools/tool-registry.js"
 import { ToolContext, type Progress } from "../../tools/tool-context.js"
 import { canonicalSuspensionCall, suspended } from "../suspension.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
+import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillSourceError } from "../../context/skill-source.js"
 import { intercept } from "../../durable/driver/run.js"
 import { operationKey } from "../../durable/driver/interpreter.js"
@@ -81,10 +81,10 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
   } = inputContext
   const toolNames = (registry: Registry): ReadonlyArray<string> =>
     registry.entries.map((entry) => Schema.decodeUnknownSync(Schema.String)(entry.tool.name))
-  const boundedSuccessResult = (call: AnyToolCall, outcome: Success): Effect.Effect<PendingToolResult> =>
-    bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes ?? 50 * 1024 }).pipe(
-      Effect.map((bounded) => successResult(call, bounded)),
-    )
+  const boundOutcome = (call: AnyToolCall, outcome: Outcome): Effect.Effect<Outcome> =>
+    outcome._tag === "Success"
+      ? bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes ?? 50 * 1024 })
+      : Effect.succeed(outcome)
 
   const outcomeEvent = (
     turn: number,
@@ -103,11 +103,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
       })
     switch (outcome._tag) {
       case "Success":
-        return (
-          isSkillActivationCall(call, registry)
-            ? Effect.succeed(successResult(call, outcome))
-            : boundedSuccessResult(call, outcome)
-        ).pipe(Effect.flatMap(completed))
+        return completed(successResult(call, outcome))
       case "DomainFailure":
         return completed(domainFailureResult(call, outcome))
       case "Suspend":
@@ -321,7 +317,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
             handoffExecution,
             requestExecutor,
             skillActivation,
-          )
+          ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome)))
           const execution = intercept(
             {
               kind: "tool",
@@ -331,6 +327,14 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
               replayPolicy,
             },
             executionBase,
+          ).pipe(
+            Effect.tap((outcome) =>
+              Effect.gen(function* () {
+                if (!skillActivation || outcome._tag !== "Success") return
+                const activation = Schema.decodeUnknownOption(activateSkillSuccess)(outcome.result)
+                yield* activateSkillOutcome(turn, call, Option.isSome(activation) ? activation.value.body : undefined)
+              }),
+            ),
           )
           const toolBody = Effect.uninterruptibleMask((restore) =>
             restore(execution.pipe(Effect.provideService(ToolContext, toolContext))).pipe(
@@ -342,7 +346,16 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
                 ),
               ),
             ),
-          ).pipe(Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)))
+          ).pipe(
+            Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
+            Effect.withSpan("TenetKit.Agent.tool", {
+              attributes: {
+                "tenetkit.turn": turn,
+                "tenetkit.tool.call_id": call.id,
+                "tenetkit.tool.name": call.name,
+              },
+            }),
+          )
           const fiber = yield* Effect.acquireRelease(Effect.forkDetach(toolBody, { startImmediately: true }), teardown)
           return Stream.concat(Stream.fromQueue(progressQueue), Stream.fromEffect(Fiber.join(fiber)))
         }),
@@ -472,7 +485,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
     )
   }
   return {
-    boundedSuccessResult,
+    boundOutcome,
     outcomeEvent,
     defaultExecute,
     makeProgressQueue,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Config, Deferred, Effect, Fiber, Layer, Redacted, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
-import { Agent, ToolContext, ToolExecutor } from "../../../../src/index.js"
+import { Agent, Session, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { layer } from "../../../../src/ai/provider/openrouter.js"
 import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
@@ -137,6 +137,131 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           expect(tags).toContain("ModelResponseInterrupted")
           expect(tags).toContain("RunFailed")
           expect(tags).not.toContain("OperationUnknown")
+        }),
+      )
+    })
+
+    it.live("persists one bounded tool outcome across operation, event, Session, and provider input", () => {
+      const raw = `raw-tool-sentinel:${"x".repeat(60 * 1024)}`
+      const tool = Tool.make("large_result", { parameters: Schema.Struct({}), success: Schema.String })
+      const toolkit = Toolkit.make(tool)
+      const agent = Agent.make({ name: `bounded-tool-outcome-${options.name}`, toolkit })
+      const executable = testExecutable(agent, `bounded-tool-outcome-${options.name}-v1`)
+      const address = Address.make(`agent:bounded-tool-outcome-${options.name}`)
+      const sessionId = `session:bounded-tool-outcome:${options.name}`
+      let modelCalls = 0
+      let toolCalls = 0
+      let secondPrompt = ""
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: (request) => {
+            modelCalls += 1
+            if (modelCalls === 1) {
+              return Stream.fromIterable<Response.StreamPartEncoded>([
+                Response.makePart("tool-call", {
+                  id: "large-result-call",
+                  name: "large_result",
+                  params: {},
+                  providerExecuted: false,
+                }),
+                finish,
+              ])
+            }
+            secondPrompt = JSON.stringify(request.prompt.content)
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("text-delta", { id: "done", delta: "done" }),
+              finish,
+            ])
+          },
+        }),
+      )
+      const executor = ToolExecutor.layerTest({
+        execute: () =>
+          Effect.sync(() => {
+            toolCalls += 1
+            return { _tag: "Success" as const, result: raw, encodedResult: raw }
+          }),
+      })
+      const handlers = toolkit.toLayer({
+        large_result: () => Effect.die("ToolExecutor test layer owns execution"),
+      })
+      const resolver = ExecutableResolver.makeStatic([
+        { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+      ])
+
+      return provideScoped(
+        options.makeLayer({
+          resolver,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 hour" },
+        }),
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const host = yield* ExecutionHost.ExecutionHost
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId,
+            idempotencyKey: `bounded-tool-outcome:${options.name}`,
+            prompt: textPrompt("return a large result"),
+          })
+          yield* host.execute(yield* claim(receipt.runId, `bounded-tool-outcome-${options.name}`))
+
+          const operation = yield* store.getOperationByKey({
+            runId: receipt.runId,
+            operationKey: `${receipt.runId}:tool:0:large-result-call:large_result`,
+          })
+          const outcome = yield* Schema.decodeUnknownEffect(
+            Schema.Struct({
+              _tag: Schema.Literal("Success"),
+              result: Schema.Unknown,
+              encodedResult: Schema.Struct({
+                inline: Schema.Struct({
+                  truncated: Schema.Literal(true),
+                  bytes: Schema.Finite,
+                  maxBytes: Schema.Finite,
+                  digest: Schema.String,
+                  preview: Schema.String,
+                }),
+                outputPaths: Schema.Array(Schema.String),
+              }),
+              outputPaths: Schema.Array(Schema.String),
+            }),
+          )(operation?.result)
+          const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+          const completed = history.find((event) => event._tag === "ToolExecutionCompleted")
+          if (completed?._tag !== "ToolExecutionCompleted") return yield* Effect.die("tool completion missing")
+          const session = yield* store.sessionStore(sessionId)
+          if (session._tag === "None") return yield* Effect.die("Session store missing")
+          const context = Session.buildContext(yield* session.value.path())
+          let sessionResult: Prompt.ToolResultPart | undefined
+          for (const message of context.content) {
+            if (!Array.isArray(message.content)) continue
+            sessionResult = message.content.find(
+              (part): part is Prompt.ToolResultPart => part.type === "tool-result" && part.id === "large-result-call",
+            )
+            if (sessionResult !== undefined) break
+          }
+
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+          expect(modelCalls).toBe(2)
+          expect(toolCalls).toBe(1)
+          expect(operation).toMatchObject({ kind: "tool", status: "succeeded" })
+          expect(outcome.encodedResult.inline).toMatchObject({
+            truncated: true,
+            bytes: raw.length + 2,
+            maxBytes: 50 * 1024,
+          })
+          expect(outcome.encodedResult.outputPaths).toEqual([])
+          expect(completed.result.encodedResult).toEqual(outcome.encodedResult)
+          expect(sessionResult?.result).toEqual(outcome.encodedResult)
+          expect(secondPrompt).toContain(outcome.encodedResult.inline.digest)
+          expect(JSON.stringify(operation)).not.toContain(raw)
+          expect(JSON.stringify(completed)).not.toContain(raw)
+          expect(JSON.stringify(context.content)).not.toContain(raw)
+          expect(secondPrompt).not.toContain(raw)
         }),
       )
     })

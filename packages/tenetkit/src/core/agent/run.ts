@@ -3,12 +3,12 @@ import { Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, ToolNameCollision } from "./event.js"
 import { type Item, type MemoryError, projectTranscript } from "../context/memory.js"
 import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext } from "../context/session.js"
-import { type Candidate, assemble, get, type Registry } from "../tools/tool-registry.js"
+import { get, type Registry } from "../tools/tool-registry.js"
 import type { CompactionError } from "../turn/compaction.js"
 import type { SkillSourceError } from "../context/skill-source.js"
 import type { Agent, RunError, RunOptions } from "./service.js"
 import { withSystem } from "./message.js"
-import { activateSkillSuccess, activateSkillToolName } from "./skill-tool.js"
+import { activateSkillFailure, activateSkillSuccess, activateSkillToolName } from "./skill-tool.js"
 import { suspensionCheckpointOption, unresolvedToolCall } from "./suspension.js"
 import type { AnyToolCall, PendingToolResult } from "./tools/result.js"
 import { type AgentRunState, make as makeProviderOutputState } from "./model-turn/provider-output-state.js"
@@ -16,6 +16,7 @@ import { make as makeModelTurn } from "./model-turn/index.js"
 import { replayModelMessages } from "./session/history.js"
 import { AgentPin } from "../durable/pin.js"
 import { make as makeToolExecution } from "./tools/execution.js"
+import { make as makeSkillActivation } from "./tools/skill-activation.js"
 import { make as makeCompactionRuntime } from "./compaction-runtime.js"
 import { setupRun } from "./lifecycle/setup.js"
 import { make as makeRunLoop } from "./loop/service.js"
@@ -221,44 +222,35 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
           ? makeHandoffStateRef(agent, activePin, restoredHandoff)
           : Effect.as(Effect.void, undefined)
       const handoffStateRef = yield* initializeHandoff()
+      const skillError = (turn: number, error: SkillSourceError): AgentError =>
+        AgentError.make({ message: error.message, turn, cause: error })
+      const restoreSkill = makeSkillActivation({ skillRuntime, toolState, skillError })
       const restoreActivatedSkills = (history: Prompt.Prompt): Effect.Effect<void, AgentError | ToolNameCollision> =>
         Effect.gen(function* () {
+          const completed = new Set<string>()
+          const restoredBodies = new Map<string, string>()
           for (const message of history.content) {
             if (!Array.isArray(message.content)) continue
             for (const part of message.content) {
-              const toolResult = Schema.decodeUnknownOption(Prompt.ToolResultPart)(part)
-              if (Option.isNone(toolResult)) continue
-              if (toolResult.value.name !== activateSkillToolName || toolResult.value.isFailure === true) continue
-              const activation = Schema.decodeUnknownOption(activateSkillSuccess)(toolResult.value.result)
-              if (Option.isNone(activation)) continue
-              if (skillRuntime === undefined) {
+              if (part.type === "tool-result" && part.name === activateSkillToolName && !part.isFailure) {
+                completed.add(part.id)
+                const activation = Schema.decodeUnknownOption(activateSkillSuccess)(part.result)
+                if (Option.isSome(activation)) restoredBodies.set(part.id, activation.value.body)
+              }
+            }
+          }
+          for (const message of history.content) {
+            if (!Array.isArray(message.content)) continue
+            for (const part of message.content) {
+              if (part.type !== "tool-call" || part.name !== activateSkillToolName || !completed.has(part.id)) continue
+              const outcome = yield* restoreSkill(0, part, restoredBodies.get(part.id))
+              if (outcome._tag === "DomainFailure") {
                 return yield* AgentError.make({
-                  message: "Resuming activated skill tools requires SkillSource in context",
+                  message: Schema.decodeUnknownSync(activateSkillFailure)(outcome.failure).message,
                   turn: 0,
+                  cause: outcome.failure,
                 })
               }
-              const skill = yield* skillRuntime.source.get(activation.value.name)
-              if (skill === undefined) {
-                return yield* AgentError.make({
-                  message: `Skill not found while restoring resume state: ${activation.value.name}`,
-                  turn: 0,
-                })
-              }
-              const current = yield* Ref.get(toolState)
-              if (current.activatedSkillBodies.has(skill.frontmatter.name)) continue
-              const registry = yield* assemble([
-                ...current.registry.entries,
-                ...skill.tools.map(
-                  (tool: Tool.Any): Candidate => ({
-                    tool,
-                    origin: { _tag: "Skill", skill: skill.frontmatter.name },
-                    dispatch: "Skill",
-                  }),
-                ),
-              ])
-              const activatedSkillBodies = new Map(current.activatedSkillBodies)
-              activatedSkillBodies.set(skill.frontmatter.name, activation.value.body)
-              yield* Ref.set(toolState, { registry, activatedSkillBodies })
             }
           }
         }).pipe(
@@ -278,8 +270,6 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       const compactionError = (turn: number, error: CompactionError): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
       const memoryError = (turn: number, error: MemoryError): AgentError =>
-        AgentError.make({ message: error.message, turn, cause: error })
-      const skillError = (turn: number, error: SkillSourceError): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
       const isSkillActivationCall = (call: AnyToolCall, registry: Registry): boolean =>
         get(registry, call.name)?.dispatch === "Builtin" && skillRuntime !== undefined

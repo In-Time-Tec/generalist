@@ -160,12 +160,11 @@ Rika
 2. Make Session sync return and replay a cursor while callers resolve the path from `SessionStore`.
 3. Commit model response content once, persist operation/event references, and hydrate replay from the referenced Session path without provider contact.
 4. Replace transcript-bearing Runtime turn/terminal results with Session cursors; load recovery history from Session.
-5. Bound/externalize large tool outputs through the existing `ToolOutputStore` seam.
-6. Update SQLite, PostgreSQL, MySQL, and memory stores with identical atomic and idempotent behavior.
-7. Release TenetKit and verify packages, checksums, isolated Bun/npm installs, restart, child resume, failure settlement, and linear byte growth.
-8. Pin the published TenetKit train in Rika. Resolve response references in the TenetKit adapter.
-9. Replace repeated `ThreadView.apply(snapshot, patch)` work with a private indexed accumulator that materializes a snapshot only at wire/render boundaries.
-10. Run the four-child forty-turn product proof, package native targets, verify isolated installation, and publish Rika.
+5. Update SQLite, PostgreSQL, MySQL, and memory stores with identical atomic and idempotent behavior.
+6. Release TenetKit and verify packages, checksums, isolated Bun/npm installs, restart, child resume, failure settlement, and linear byte growth.
+7. Pin the published TenetKit train in Rika. Resolve response references in the TenetKit adapter.
+8. Replace repeated `ThreadView.apply(snapshot, patch)` work with a private indexed accumulator that materializes a snapshot only at wire/render boundaries.
+9. Run the four-child forty-turn product proof, package native targets, verify isolated installation, and publish Rika.
 
 ## Proof Matrix
 
