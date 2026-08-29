@@ -106,7 +106,11 @@ export const coreAgentReference = definePage({
           [code("Resume"), " (optional)"],
           ["Re-entry after ", code("AgentSuspended"), ": verify and execute the checkpointed call"],
         ],
-        [[code("sessionId")], [code("string"), " (optional)"], "Opaque host-assigned identity for this run/session"],
+        [
+          [code("sessionId")],
+          [code("string"), " (optional)"],
+          "Sole host-assigned Session identity; omission means no persistent Session",
+        ],
         [
           [code("toolOutputMaxBytes")],
           [code("number"), " (optional)"],

@@ -15,7 +15,7 @@ const { appendInstructionFragment, errorMessage } = SetupHelpers
 export const setupPromptContext = <T extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(args: {
   readonly agent: Agent<T, R>
   readonly options: RunOptions
-  readonly activeSession: Option.Option<typeof import("../../context/session.js").SessionStore.Service>
+  readonly activeSession: Option.Option<import("../../context/session.js").Interface>
   readonly resumeChat: import("effect/unstable/ai").Chat.Service | undefined
   readonly staticCandidates: ReadonlyArray<Candidate>
 }) =>

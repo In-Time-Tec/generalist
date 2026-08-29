@@ -77,22 +77,37 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
     )
   })
 
-/**
- * @experimental Bind one Run to the durable conversation for its session identity.
- *
- * Session owns model-facing history, so a durable store hands each Run its session and a Run
- * continues the conversation instead of starting empty. A store without durable Session returns
- * undefined and the Run falls back to whatever Session its environment provides.
- */
-export const sessionContext = (input: {
+/** @experimental Bind one hosted Run to exactly one durable Session store. */
+export const sessionBinding = (input: {
   readonly store: RunStoreInterface
   readonly sessionId: string
-}): Effect.Effect<Context.Context<never> | Context.Context<Session.SessionStore>> =>
+}): Effect.Effect<{
+  readonly session: Option.Option<Session.Interface>
+  readonly context: Context.Context<Session.SessionDirectory>
+}> =>
   input.store.sessionStore(input.sessionId).pipe(
-    Effect.map(
-      Option.match({
-        onNone: () => Context.empty(),
-        onSome: (session) => Context.make(Session.SessionStore, session),
-      }),
-    ),
+    Effect.map((session) => ({
+      session,
+      context: Context.make(
+        Session.SessionDirectory,
+        Session.SessionDirectory.of({
+          acquire: (sessionId) =>
+            sessionId !== input.sessionId
+              ? Effect.fail(
+                  Session.SessionStoreError.make({
+                    message: `Hosted Run Session ${input.sessionId} cannot acquire Session ${sessionId}`,
+                  }),
+                )
+              : Option.match(session, {
+                  onNone: () =>
+                    Effect.fail(
+                      Session.SessionStoreError.make({
+                        message: `Runtime store does not provide Session ${input.sessionId}`,
+                      }),
+                    ),
+                  onSome: Effect.succeed,
+                }),
+        }),
+      ),
+    })),
   )

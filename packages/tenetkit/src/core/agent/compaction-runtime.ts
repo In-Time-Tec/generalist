@@ -8,8 +8,8 @@ import {
   checkpointMatches,
   buildContext,
   SessionConflict,
-  SessionStore,
   type Entry,
+  type Interface as SessionStore,
   type SessionStoreError,
 } from "../context/session.js"
 import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./message.js"
@@ -31,8 +31,7 @@ import type { Key, Memory, MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
 import { CompactionProjection } from "./session/compaction-projection.js"
 type CompactionContext = {
-  readonly activeSession: Option.Option<typeof SessionStore.Service>
-  readonly sessionService: Option.Option<typeof SessionStore.Service>
+  readonly activeSession: Option.Option<SessionStore>
   readonly sessionId: string
   readonly sessionOwnerToken: string | undefined
   readonly sessionAppendOptions: (expectedLeafId: string | null) => {
@@ -92,7 +91,7 @@ export const make = (context: CompactionContext) => {
     transcript: Prompt.Prompt,
     cursor: number,
     path: ReadonlyArray<Entry>,
-    session: typeof SessionStore.Service,
+    session: SessionStore,
   ) =>
     Effect.gen(function* () {
       let expectedLeafId = path.at(-1)?.id ?? null

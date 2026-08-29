@@ -319,7 +319,7 @@ export const make = (config: {
   readonly sessionId: string
 }): Session.Interface => {
   const { stateRef, sessionId } = config
-  return Session.SessionStore.of({
+  return {
     reserveEntryId: updateSession(stateRef, sessionId, (session) => {
       let counter = session.counter
       while (session.entries.has(String(counter))) counter += 1
@@ -399,5 +399,5 @@ export const make = (config: {
           : Effect.succeed([undefined, { ...session, leaf: id }] as const),
       ),
     leaf: SynchronizedRef.get(stateRef).pipe(Effect.map((state) => state.sessions.get(sessionId)?.leaf ?? null)),
-  })
+  }
 }

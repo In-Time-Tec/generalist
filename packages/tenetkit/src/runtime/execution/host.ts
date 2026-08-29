@@ -12,7 +12,7 @@ import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode.js"
-import { hostContext, sessionContext } from "./context.js"
+import { hostContext, sessionBinding } from "./context.js"
 import { make as makeNestedOperations } from "../operation/nested-operations.js"
 import { make as makeExecutionInterruption } from "./interruption.js"
 import { executeProgram } from "./execute-program.js"
@@ -116,9 +116,10 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               Effect.gen(function* () {
                 const nested = yield* makeNestedOperations({ claim, claimed, store })
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
+                const boundSession = yield* sessionBinding({ store, sessionId: claimed.message.sessionId })
                 const baseContext = Context.mergeAll(
                   yield* hostContext({ agent, environment, store, codeMode, nested }),
-                  yield* sessionContext({ store, sessionId: claimed.message.sessionId }),
+                  boundSession.context,
                   interruption.context,
                 )
                 const executionRetry = yield* makeExecutionRetry(claimed.attempt)
@@ -347,8 +348,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                             return yield* preview.discard
                           }
                           if (event._tag === "Completed") {
-                            const session = yield* store.sessionStore(claimed.message.sessionId)
-                            const leafId = yield* Option.match(session, {
+                            const leafId = yield* Option.match(boundSession.session, {
                               onNone: () => Effect.succeed(null),
                               onSome: (service) => service.leaf.pipe(Effect.orDie),
                             })

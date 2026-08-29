@@ -599,10 +599,13 @@ describe("Compaction", () => {
         }),
       ),
       Effect.gen(function* () {
-        const store = yield* Session.SessionStore
-        yield* store.append({ _tag: "Message", message: user("old goal") })
-        yield* store.append({ _tag: "Message", message: user("recent tail") })
-        const path = yield* store.path()
+        const path = yield* Effect.scoped(
+          Session.acquire("session").pipe(
+            Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") })),
+            Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") })),
+            Effect.flatMap((store) => store.path()),
+          ),
+        )
         const service = Compaction.make(Compaction.defaultStrategy(), {
           contextWindow: 10,
           reserveTokens: 1,
@@ -826,14 +829,19 @@ describe("Compaction", () => {
           modelLayer(() => Effect.succeed([{ type: "text", text: "checkpoint summary" }])),
         ),
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
-          yield* store.append({
-            _tag: "Message",
-            message: Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
-          })
-          yield* store.append({ _tag: "Message", message: user("old goal") })
-          yield* store.append({ _tag: "Message", message: user("recent tail") })
-          const path = yield* store.path()
+          const path = yield* Effect.scoped(
+            Session.acquire("session").pipe(
+              Effect.tap((store) =>
+                store.append({
+                  _tag: "Message",
+                  message: Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
+                }),
+              ),
+              Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") })),
+              Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") })),
+              Effect.flatMap((store) => store.path()),
+            ),
+          )
           const service = Compaction.make(Compaction.defaultStrategy(), {
             contextWindow: 10,
             reserveTokens: 1,
@@ -863,15 +871,24 @@ describe("Compaction", () => {
               expect(history).toContain("You are a careful reviewer")
               expect(history).toContain("<conversation-checkpoint>")
               expect(history).toContain("recent tail")
-              const checkpointId = yield* store.reserveEntryId
-              yield* store.appendCheckpoint({
-                id: checkpointId,
-                parentId: yield* store.leaf,
-                projectedHistory: value.history,
-                telemetry: [],
-                summary: value.summary,
-              })
-              expect(Json.stringify(Session.buildContext(yield* store.path()).content)).toBe(history)
+              const storedHistory = yield* Effect.scoped(
+                Session.acquire("session").pipe(
+                  Effect.flatMap((store) =>
+                    Effect.gen(function* () {
+                      const checkpointId = yield* store.reserveEntryId
+                      yield* store.appendCheckpoint({
+                        id: checkpointId,
+                        parentId: yield* store.leaf,
+                        projectedHistory: value.history,
+                        telemetry: [],
+                        summary: value.summary,
+                      })
+                      return Json.stringify(Session.buildContext(yield* store.path()).content)
+                    }),
+                  ),
+                ),
+              )
+              expect(storedHistory).toBe(history)
             }
           }
         }),

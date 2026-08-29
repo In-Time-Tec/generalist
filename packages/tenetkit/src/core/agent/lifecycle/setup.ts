@@ -38,7 +38,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       persistenceService,
       runtimeService,
       compactionService,
-      sessionService,
       activeSession,
       persisted,
       recoveredHistory,
@@ -93,8 +92,8 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       pendingTelemetry.push(event)
       undeliveredTelemetry.push(event)
     }
-    if (options.driverCheckpoint !== undefined && Option.isSome(sessionService)) {
-      yield* restoreCheckpointTelemetry({ session: sessionService.value, undelivered: undeliveredTelemetry }).pipe(
+    if (options.driverCheckpoint !== undefined && Option.isSome(activeSession)) {
+      yield* restoreCheckpointTelemetry({ session: activeSession.value, undelivered: undeliveredTelemetry }).pipe(
         Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
       )
     }
@@ -232,7 +231,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       persistenceService,
       runtimeService,
       compactionService,
-      sessionService,
       activeSession,
       persisted,
       recoveredHistory,

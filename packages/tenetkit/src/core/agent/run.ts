@@ -54,7 +54,6 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       // prettier-ignore
       const {
         compactionService,
-        sessionService,
         activeSession,
         system,
         persisted,
@@ -341,7 +340,6 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       const compactionRuntime = makeCompactionRuntime({
         activeSession,
         system,
-        sessionService,
         sessionId,
         sessionOwnerToken,
         sessionAppendOptions,

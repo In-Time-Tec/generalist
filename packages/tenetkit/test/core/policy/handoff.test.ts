@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../../../src/core/index"
+import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, Session, ToolExecutor } from "../../../src/core/index"
 import { ItLayer } from "../it-layer"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"
@@ -133,6 +133,7 @@ layer(Layer.empty)("Handoff", (it) => {
         supervisorSetup.catalog,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        Session.layerMemory,
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
@@ -147,6 +148,13 @@ layer(Layer.empty)("Handoff", (it) => {
         expect(mathCalls).toBe(1)
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("42")
+        const path = yield* Effect.scoped(
+          Session.acquire("session-handoff-1").pipe(Effect.flatMap((session) => session.path())),
+        )
+        const handoffs = path.filter((entry) => entry._tag === "Handoff")
+        expect(handoffs).toHaveLength(1)
+        expect(handoffs[0]?.parentId).toBe(path[path.indexOf(handoffs[0]!) - 1]?.id)
+        expect(handoffs[0]?._tag === "Handoff" && handoffs[0].target).toBe("math")
       }),
     ] as const
   })

@@ -117,7 +117,7 @@ export interface Interface {
    * Session is the authority for model-facing history, so the store that owns durability owns it too.
    * A store without durable Session returns undefined and its Runs fall back to process-bound history.
    */
-  readonly sessionStore: (sessionId: string) => Effect.Effect<Option.Option<typeof Session.SessionStore.Service>>
+  readonly sessionStore: (sessionId: string) => Effect.Effect<Option.Option<Session.Interface>>
   readonly hasAdmission: (input: {
     readonly address: Address
     readonly sessionId: string

@@ -426,7 +426,7 @@ export const mysqlSessionStore = (options: {
       return { _tag: "Appended", checkpoint, leafId: checkpoint.id } satisfies CheckpointAppend
     })
 
-  return Session.SessionStore.of({
+  return {
     reserveEntryId: run(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
@@ -486,5 +486,5 @@ export const mysqlSessionStore = (options: {
         }),
       ),
     ),
-  })
+  }
 }

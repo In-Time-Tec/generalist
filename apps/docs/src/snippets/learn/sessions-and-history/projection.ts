@@ -9,30 +9,32 @@ const user = (text: string): Prompt.Message =>
 const assistant = (text: string): Prompt.Message =>
   Prompt.makeMessage("assistant", { content: [Prompt.makePart("text", { text })] })
 
-const program = Effect.gen(function* () {
-  const store = yield* Session.SessionStore
-  yield* store.append(message(Prompt.makeMessage("system", { content: "You are a travel planner." })))
-  yield* store.append(message(user("Plan a trip to Boise.")))
-  yield* store.append(message(assistant("Three days in Boise, starting downtown.")))
-  const kept = yield* store.append(message(user("Add a rafting day.")))
-  const checkpointId = yield* store.reserveEntryId
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const store = yield* Session.acquire("travel-planner")
+    yield* store.append(message(Prompt.makeMessage("system", { content: "You are a travel planner." })))
+    yield* store.append(message(user("Plan a trip to Boise.")))
+    yield* store.append(message(assistant("Three days in Boise, starting downtown.")))
+    const kept = yield* store.append(message(user("Add a rafting day.")))
+    const checkpointId = yield* store.reserveEntryId
 
-  const before = Session.buildContext(yield* store.path())
-  yield* Console.log(`before: ${before.content.map((entry) => entry.role).join(" ")}`)
+    const before = Session.buildContext(yield* store.path())
+    yield* Console.log(`before: ${before.content.map((entry) => entry.role).join(" ")}`)
 
-  yield* store.appendCheckpoint({
-    id: checkpointId,
-    parentId: kept.id,
-    projectedHistory: Prompt.fromMessages([user("Planned a three-day Boise trip. Add a rafting day.")]),
-    telemetry: [],
-    summary: "Planned a three-day Boise trip.",
-  })
+    yield* store.appendCheckpoint({
+      id: checkpointId,
+      parentId: kept.id,
+      projectedHistory: Prompt.fromMessages([user("Planned a three-day Boise trip. Add a rafting day.")]),
+      telemetry: [],
+      summary: "Planned a three-day Boise trip.",
+    })
 
-  const path = yield* store.path()
-  const after = Session.buildContext(path)
-  yield* Console.log(`after: ${after.content.map((entry) => entry.role).join(" ")}`)
-  yield* Console.log(`log entries: ${path.length}`)
-})
+    const path = yield* store.path()
+    const after = Session.buildContext(path)
+    yield* Console.log(`after: ${after.content.map((entry) => entry.role).join(" ")}`)
+    yield* Console.log(`log entries: ${path.length}`)
+  }),
+)
 
 const runtime = ManagedRuntime.make(Session.layerMemory)
 await runtime.runPromise(program)

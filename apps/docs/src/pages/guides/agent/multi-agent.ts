@@ -16,7 +16,7 @@ const childChannels = `Parent Agent.generate
 └── AgentTool handler ──▶ Child Agent.generate({ prompt })
     │
     └── Channel 2: run options / orchestration (not implicitly inherited)
-        ├── sessionId defaults independently
+        ├── omitted sessionId means no Session
         ├── persistence/chatId absent unless explicitly supplied
         └── transport runId, queue, and scheduling remain transport-owned`
 
@@ -62,7 +62,7 @@ export const multiAgent = definePage({
         [
           [code("sessionId")],
           ["Child ", code("RunOptions")],
-          ["Not inherited; omission follows the child default ", code('"local"'), ", not the parent's identity"],
+          "Not inherited; omission leaves the child ephemeral, while requesting the active parent's ID fails before model execution",
         ],
         [
           [code("persistence.chatId")],
@@ -127,7 +127,7 @@ export const multiAgent = definePage({
       code("sessionId"),
       " and ",
       code("persistence"),
-      ", its session ID defaults independently and it uses a fresh chat. It does not share the parent's transcript or enter its transport queue.",
+      ", it has no Session and uses a fresh chat. It does not share the parent's transcript or enter its transport queue.",
     ),
     codeBlock({ label: "agent-as-tool.ts", source: agentAsTool, expectedOutput: agentAsToolExpected }),
     bullets(

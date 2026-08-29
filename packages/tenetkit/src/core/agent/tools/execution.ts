@@ -48,6 +48,7 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
   readonly agent: Agent<T, R>
   readonly staticToolkit: Toolkit.Toolkit<T>
   readonly chat: Chat.Service
+  readonly activeSession: Option.Option<import("../../context/session.js").Interface>
   readonly sessionId: string
   readonly executor: Option.Option<typeof ToolExecutor.Service>
   readonly authorizer: ToolAuthorizer<R>
@@ -68,6 +69,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
     agent,
     staticToolkit,
     chat,
+    activeSession,
     sessionId,
     executor,
     authorizer,
@@ -258,6 +260,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
     if (handoffState === undefined || get(registry, request.call.name)?.dispatch !== "Handoff") return undefined
     return handoffDispatch(request, registry, {
       options,
+      activeSession,
       handoffState,
       chat,
       toolState,

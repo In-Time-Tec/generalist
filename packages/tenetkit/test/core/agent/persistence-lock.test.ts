@@ -107,8 +107,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         Effect.gen(function* () {
           const agent = Agent.make({ name: "continuity-agent", instructions: "system seed" })
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "first user message", persistence: { chatId: "c1" } }))
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "second user message", persistence: { chatId: "c1" } }))
+          yield* Stream.runDrain(
+            Agent.stream(agent, { prompt: "first user message", sessionId: "c1", persistence: { chatId: "c1" } }),
+          )
+          yield* Stream.runDrain(
+            Agent.stream(agent, { prompt: "second user message", sessionId: "c1", persistence: { chatId: "c1" } }),
+          )
 
           const transcript = yield* historyText("c1")
           expect(transcript).toContain("first user message")
@@ -162,8 +166,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           expect(Json.stringify(requests[2]!.content)).toContain("system revision 3")
           expect(Json.stringify(requests[2]!.content)).not.toContain("system revision 2")
 
-          const session = yield* Session.SessionStore
-          const projection = Session.buildContext(yield* session.path())
+          const projection = yield* Effect.scoped(
+            Session.acquire("shared-session").pipe(
+              Effect.flatMap((session) => session.path()),
+              Effect.map(Session.buildContext),
+            ),
+          )
           expect(projection.content).toHaveLength(6)
           expect(projection.content.every((message) => message.role !== "system")).toBe(true)
         }),
@@ -186,11 +194,15 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         Effect.gen(function* () {
           const agent = Agent.make({ name: "seed-agent", instructions: "the one system message" })
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello", persistence: { chatId: "seed" } }))
+          yield* Stream.runDrain(
+            Agent.stream(agent, { prompt: "hello", sessionId: "seed", persistence: { chatId: "seed" } }),
+          )
           const afterFirst = yield* systemMessageCount("seed")
           const firstTranscript = yield* historyText("seed")
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "again", persistence: { chatId: "seed" } }))
+          yield* Stream.runDrain(
+            Agent.stream(agent, { prompt: "again", sessionId: "seed", persistence: { chatId: "seed" } }),
+          )
           const afterSecond = yield* systemMessageCount("seed")
 
           expect(afterFirst).toBe(1)
@@ -215,8 +227,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         Effect.gen(function* () {
           const agent = Agent.make({ name: "isolation-agent", instructions: "system" })
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "message for A", persistence: { chatId: "a" } }))
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "message for B", persistence: { chatId: "b" } }))
+          yield* Stream.runDrain(
+            Agent.stream(agent, { prompt: "message for A", sessionId: "a", persistence: { chatId: "a" } }),
+          )
+          yield* Stream.runDrain(
+            Agent.stream(agent, { prompt: "message for B", sessionId: "b", persistence: { chatId: "b" } }),
+          )
 
           const a = yield* historyText("a")
           const b = yield* historyText("b")
@@ -249,6 +265,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const agent = Agent.make({ name: "structured-persistence-agent" })
           const result = yield* Agent.generate(agent, {
             prompt: "persist a structured answer",
+            sessionId: "structured",
             persistence: { chatId: "structured" },
             output: { schema: Schema.Struct({ value: Schema.String }) },
           })
@@ -260,8 +277,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const persistence = yield* Chat.Persistence
           const chat = yield* persistence.get("structured")
           const history = yield* Ref.get(chat.history)
-          const session = yield* Session.SessionStore
-          expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
+          const sessionContext = yield* Effect.scoped(
+            Session.acquire("structured").pipe(
+              Effect.flatMap((session) => session.path()),
+              Effect.map(Session.buildContext),
+            ),
+          )
+          expect(sessionContext.content).toEqual(conversation(history))
         }),
       ] as const,
   )
@@ -292,6 +314,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
                   ],
                 }),
               ],
+              sessionId: "multipart",
               persistence: { chatId: "multipart" },
             }),
           )
@@ -302,12 +325,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const persistence = yield* Chat.Persistence
           const chat = yield* persistence.get("multipart")
           const history = yield* Ref.get(chat.history)
-          const session = yield* Session.SessionStore
-          const sessionContext = Session.buildContext(yield* session.path())
+          const sessionContext = yield* Effect.scoped(
+            Session.acquire("multipart").pipe(
+              Effect.flatMap((session) => session.path()),
+              Effect.map(Session.buildContext),
+            ),
+          )
           expect(sessionContext.content).toEqual(conversation(history))
 
           // A second turn must rebuild from the provider-facing Session without a prefix conflict.
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "follow up", persistence: { chatId: "multipart" } }))
+          yield* Stream.runDrain(
+            Agent.stream(agent, { prompt: "follow up", sessionId: "multipart", persistence: { chatId: "multipart" } }),
+          )
           expect(yield* historyText("multipart")).toContain("follow up")
         }),
       ] as const,
@@ -342,6 +371,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
 
         const mismatch = yield* Agent.stream(agent, {
           prompt: "ignored",
+          sessionId: "missing-resume-chat",
           persistence: { chatId: "missing-resume-chat" },
           resume: { suspension },
         }).pipe(Stream.runDrain, Effect.flip)
@@ -361,27 +391,30 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
 
   ItLayer.make(it, "does not persist structured output before its Session checkpoint", () => {
     const sessionLayer = Layer.effect(
-      Session.SessionStore,
+      Session.SessionDirectory,
       Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
         Effect.map((entries) =>
-          Session.SessionStore.of({
-            reserveEntryId: Effect.succeed("unused"),
-            append: (input) =>
-              input._tag === "Message" && Json.stringify(input.message).includes(Agent.defaultObjectPrompt)
-                ? Effect.fail(Session.SessionStoreError.make({ message: "structured append failed" }))
-                : Ref.modify(entries, (path) => {
-                    const entry: Session.Entry = {
-                      ...input,
-                      id: String(path.length),
-                      parentId: path.at(-1)?.id ?? null,
-                    }
-                    return [entry, [...path, entry]] as const
-                  }),
-            appendCheckpoint: () =>
-              Effect.fail(Session.SessionStoreError.make({ message: "structured checkpoint failed" })),
-            path: () => Ref.get(entries),
-            setLeaf: () => Effect.void,
-            leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
+          Session.SessionDirectory.of({
+            acquire: () =>
+              Effect.succeed({
+                reserveEntryId: Effect.succeed("unused"),
+                append: (input) =>
+                  input._tag === "Message" && Json.stringify(input.message).includes(Agent.defaultObjectPrompt)
+                    ? Effect.fail(Session.SessionStoreError.make({ message: "structured append failed" }))
+                    : Ref.modify(entries, (path) => {
+                        const entry: Session.Entry = {
+                          ...input,
+                          id: String(path.length),
+                          parentId: path.at(-1)?.id ?? null,
+                        }
+                        return [entry, [...path, entry]] as const
+                      }),
+                appendCheckpoint: () =>
+                  Effect.fail(Session.SessionStoreError.make({ message: "structured checkpoint failed" })),
+                path: () => Ref.get(entries),
+                setLeaf: () => Effect.void,
+                leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
+              }),
           }),
         ),
       ),
@@ -402,6 +435,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
       Effect.gen(function* () {
         const failure = yield* Agent.generate(Agent.make({ name: "structured-failure-agent" }), {
           prompt: "structured failure",
+          sessionId: "structured-failure",
           persistence: { chatId: "structured-failure" },
           output: { schema: Schema.Struct({ value: Schema.String }) },
         }).pipe(Effect.flip)
@@ -493,7 +527,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         })
 
         const failure = yield* Effect.flip(
-          Stream.runDrain(Agent.stream(agent, { prompt: "please wait", persistence: { chatId: "s1" } })),
+          Stream.runDrain(
+            Agent.stream(agent, { prompt: "please wait", sessionId: "s1", persistence: { chatId: "s1" } }),
+          ),
         )
 
         expect(failure._tag).toBe("tenetkit/core/AgentSuspended")
@@ -502,7 +538,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const persistence = yield* Chat.Persistence
         const suspendedChat = yield* persistence.get("s1")
         const suspendedHistory = yield* Ref.get(suspendedChat.history)
-        const session = yield* Session.SessionStore
+        const sessionPath = yield* Effect.scoped(
+          Session.acquire("s1").pipe(Effect.flatMap((session) => session.path())),
+        )
         expect(starts).toEqual(callIds.slice(0, 4))
         expect(interruptions).toEqual([])
         expect(toolResultIds(suspendedHistory)).toEqual([
@@ -510,11 +548,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           "tool-call-ordinary-2",
           "tool-call-ordinary-3",
         ])
-        expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(suspendedHistory))
+        expect(Session.buildContext(sessionPath).content).toEqual(conversation(suspendedHistory))
 
         const events = yield* Stream.runCollect(
           Agent.stream(agent, {
             prompt: "ignored",
+            sessionId: "s1",
             persistence: { chatId: "s1" },
             resume: { suspension: failure },
           }),
@@ -526,7 +565,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const completedChat = yield* persistence.get("s1")
         const completedHistory = yield* Ref.get(completedChat.history)
         expect(toolResultIds(completedHistory)).toEqual(resultOrder)
-        expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(completedHistory))
+        const completedSessionPath = yield* Effect.scoped(
+          Session.acquire("s1").pipe(Effect.flatMap((session) => session.path())),
+        )
+        expect(Session.buildContext(completedSessionPath).content).toEqual(conversation(completedHistory))
         expect(modelCalls).toBe(2)
       }),
     ] as const
@@ -561,12 +603,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const agent = Agent.make({ name: "re-suspend-agent", toolkit: Toolkit.make(echoTool) })
         const first = yield* Agent.stream(agent, {
           prompt: "suspend twice",
+          sessionId: "re-suspend",
           persistence: { chatId: "re-suspend" },
         }).pipe(Stream.runDrain, Effect.flip)
         if (first._tag !== "tenetkit/core/AgentSuspended") return expect.unreachable()
 
         const second = yield* Agent.stream(agent, {
           prompt: "ignored",
+          sessionId: "re-suspend",
           persistence: { chatId: "re-suspend" },
           resume: { suspension: first },
         }).pipe(Stream.runDrain, Effect.flip)
@@ -575,12 +619,15 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const persistence = yield* Chat.Persistence
         const chat = yield* persistence.get("re-suspend")
         const history = yield* Ref.get(chat.history)
-        const session = yield* Session.SessionStore
+        const sessionPath = yield* Effect.scoped(
+          Session.acquire("re-suspend").pipe(Effect.flatMap((session) => session.path())),
+        )
         expect(second.token).toBe("wait-2")
-        expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
+        expect(Session.buildContext(sessionPath).content).toEqual(conversation(history))
 
         yield* Agent.stream(agent, {
           prompt: "ignored",
+          sessionId: "re-suspend",
           persistence: { chatId: "re-suspend" },
           resume: { suspension: second },
         }).pipe(Stream.runDrain)
@@ -607,7 +654,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
       Effect.gen(function* () {
         const persistence = yield* Chat.Persistence
         yield* persistence.getOrCreate("stale-recovery")
-        const session = yield* Session.SessionStore
         const call = Prompt.makePart("tool-call", {
           id: "stale-recovery-call",
           name: "echo",
@@ -621,12 +667,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             },
           },
         })
-        yield* session.appendCheckpoint({
-          id: yield* session.reserveEntryId,
-          parentId: null,
-          projectedHistory: Prompt.fromMessages([Prompt.makeMessage("assistant", { content: [call] })]),
-          telemetry: [],
-        })
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const session = yield* Session.acquire("stale-recovery")
+            yield* session.appendCheckpoint({
+              id: yield* session.reserveEntryId,
+              parentId: null,
+              projectedHistory: Prompt.fromMessages([Prompt.makeMessage("assistant", { content: [call] })]),
+              telemetry: [],
+            })
+          }),
+        )
         const received = AgentEvent.AgentSuspended.make({
           token: "stale-token",
           reason: "tool-wait",
@@ -647,6 +698,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           Agent.make({ name: "stale-recovery-agent", toolkit: Toolkit.make(echoTool) }),
           {
             prompt: "ignored",
+            sessionId: "stale-recovery",
             persistence: { chatId: "stale-recovery" },
             resume: { suspension: received },
           },
@@ -685,25 +737,28 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
       message: Prompt.make("original history").content[0]!,
     }
     const sessionLayer = Layer.effect(
-      Session.SessionStore,
+      Session.SessionDirectory,
       Ref.make<ReadonlyArray<Session.Entry>>([originalHistoryEntry]).pipe(
         Effect.map((entries) =>
-          Session.SessionStore.of({
-            reserveEntryId: Effect.succeed("checkpoint-0"),
-            append: (input) =>
-              Ref.modify(entries, (path) => {
-                const entry: Session.Entry = {
-                  ...input,
-                  id: String(path.length),
-                  parentId: path.at(-1)?.id ?? null,
-                }
-                return [entry, [...path, entry]] as const
+          Session.SessionDirectory.of({
+            acquire: () =>
+              Effect.succeed({
+                reserveEntryId: Effect.succeed("checkpoint-0"),
+                append: (input) =>
+                  Ref.modify(entries, (path) => {
+                    const entry: Session.Entry = {
+                      ...input,
+                      id: String(path.length),
+                      parentId: path.at(-1)?.id ?? null,
+                    }
+                    return [entry, [...path, entry]] as const
+                  }),
+                appendCheckpoint: () =>
+                  Effect.fail(Session.SessionStoreError.make({ message: "checkpoint append failed" })),
+                path: () => Ref.get(entries),
+                setLeaf: () => Effect.void,
+                leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
               }),
-            appendCheckpoint: () =>
-              Effect.fail(Session.SessionStoreError.make({ message: "checkpoint append failed" })),
-            path: () => Ref.get(entries),
-            setLeaf: () => Effect.void,
-            leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
           }),
         ),
       ),
@@ -733,6 +788,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
 
         const failure = yield* Agent.stream(agent, {
           prompt: "never sent",
+          sessionId: "checkpoint-append-failure",
           persistence: { chatId: "checkpoint-append-failure" },
         }).pipe(Stream.runDrain, Effect.flip)
         const transcript = yield* historyText("checkpoint-append-failure")
@@ -770,16 +826,19 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             Agent.make({ name: "duplicate-persisted-agent", toolkit: Toolkit.make(echoTool) }),
             {
               prompt: "duplicate",
+              sessionId: "duplicate-persisted",
               persistence: { chatId: "duplicate-persisted" },
             },
           ).pipe(Stream.runDrain, Effect.flip)
           const persistence = yield* Chat.Persistence
           const chat = yield* persistence.get("duplicate-persisted")
           const history = yield* Ref.get(chat.history)
-          const session = yield* Session.SessionStore
+          const sessionPath = yield* Effect.scoped(
+            Session.acquire("duplicate-persisted").pipe(Effect.flatMap((session) => session.path())),
+          )
 
           expect(failure._tag).toBe("tenetkit/core/DuplicateToolCallId")
-          const projection = Session.buildContext(yield* session.path())
+          const projection = Session.buildContext(sessionPath)
           expect(Json.stringify(projection.content)).toContain("duplicate")
           expect(conversation(history)).toEqual([])
         }),
@@ -835,14 +894,22 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const secondAgent = Agent.make({ name: "second-concurrent-checkpoint-agent" })
         const first = yield* Effect.forkChild(
           Stream.runDrain(
-            Agent.stream(firstAgent, { prompt: "first concurrent", persistence: { chatId: "concurrent" } }),
+            Agent.stream(firstAgent, {
+              prompt: "first concurrent",
+              sessionId: "concurrent",
+              persistence: { chatId: "concurrent" },
+            }),
           ),
           { startImmediately: true },
         )
         yield* Deferred.await(firstEntered)
         const second = yield* Effect.forkChild(
           Stream.runDrain(
-            Agent.stream(secondAgent, { prompt: "second concurrent", persistence: { chatId: "concurrent" } }),
+            Agent.stream(secondAgent, {
+              prompt: "second concurrent",
+              sessionId: "concurrent",
+              persistence: { chatId: "concurrent" },
+            }),
           ),
           { startImmediately: true },
         )
@@ -854,13 +921,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const persistence = yield* Chat.Persistence
         const chat = yield* persistence.get("concurrent")
         const live = yield* Ref.get(chat.history)
-        const session = yield* Session.SessionStore
-        const path = yield* session.path()
+        const path = yield* Effect.scoped(
+          Session.acquire("concurrent").pipe(Effect.flatMap((session) => session.path())),
+        )
 
         expect(calls).toBe(2)
         expect(maxActive).toBe(1)
         expect(Session.buildContext(path).content).toEqual(live.content)
-        expect((yield* session.path()).filter((entry) => entry._tag === "Compaction")).toHaveLength(2)
+        expect(path.filter((entry) => entry._tag === "Compaction")).toHaveLength(2)
       }),
     ] as const
   })
@@ -892,12 +960,24 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         firstEntered = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "interrupted-checkpoint-agent" })
         const first = yield* Effect.forkChild(
-          Stream.runDrain(Agent.stream(agent, { prompt: "interrupted", persistence: { chatId: "interrupted" } })),
+          Stream.runDrain(
+            Agent.stream(agent, {
+              prompt: "interrupted",
+              sessionId: "interrupted",
+              persistence: { chatId: "interrupted" },
+            }),
+          ),
           { startImmediately: true },
         )
         yield* Deferred.await(firstEntered)
         yield* Fiber.interrupt(first)
-        yield* Stream.runDrain(Agent.stream(agent, { prompt: "completed", persistence: { chatId: "interrupted" } }))
+        yield* Stream.runDrain(
+          Agent.stream(agent, {
+            prompt: "completed",
+            sessionId: "interrupted",
+            persistence: { chatId: "interrupted" },
+          }),
+        )
 
         expect(calls).toBe(2)
         expect(yield* historyText("interrupted")).toContain("completed")
@@ -936,18 +1016,30 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         releaseFirst = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "waiting-interruption-agent" })
         const first = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "first", persistence: { chatId: "waiting-interruption" } }),
+          Agent.stream(agent, {
+            prompt: "first",
+            sessionId: "waiting-interruption",
+            persistence: { chatId: "waiting-interruption" },
+          }),
         ).pipe(Effect.forkChild)
         yield* Deferred.await(firstEntered)
         const waiting = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "waiting", persistence: { chatId: "waiting-interruption" } }),
+          Agent.stream(agent, {
+            prompt: "waiting",
+            sessionId: "waiting-interruption",
+            persistence: { chatId: "waiting-interruption" },
+          }),
         ).pipe(Effect.forkChild)
         yield* Effect.yieldNow
         yield* Fiber.interrupt(waiting)
         yield* Deferred.succeed(releaseFirst, undefined)
         yield* Fiber.join(first)
         yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "third", persistence: { chatId: "waiting-interruption" } }),
+          Agent.stream(agent, {
+            prompt: "third",
+            sessionId: "waiting-interruption",
+            persistence: { chatId: "waiting-interruption" },
+          }),
         )
 
         expect(calls).toBe(2)
@@ -962,56 +1054,59 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     let compactionCalls = 0
     let committedCheckpoint: Session.CompactionEntry | undefined
     const sessionLayer = Layer.effect(
-      Session.SessionStore,
+      Session.SessionDirectory,
       Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
         Effect.map((entries) =>
-          Session.SessionStore.of({
-            reserveEntryId: Effect.succeed("checkpoint-interrupted"),
-            append: (input) =>
-              Ref.modify(entries, (path) => {
-                const entry: Session.Entry = {
-                  ...input,
-                  id: `message-${path.length}`,
-                  parentId: path.at(-1)?.id ?? null,
-                }
-                return [entry, [...path, entry]] as const
+          Session.SessionDirectory.of({
+            acquire: () =>
+              Effect.succeed({
+                reserveEntryId: Effect.succeed("checkpoint-interrupted"),
+                append: (input) =>
+                  Ref.modify(entries, (path) => {
+                    const entry: Session.Entry = {
+                      ...input,
+                      id: `message-${path.length}`,
+                      parentId: path.at(-1)?.id ?? null,
+                    }
+                    return [entry, [...path, entry]] as const
+                  }),
+                appendCheckpoint: (prepared) =>
+                  Ref.modify(entries, (path) => {
+                    const existing = path.find((entry) => entry.id === prepared.id)
+                    if (existing?._tag === "Compaction") {
+                      const result: Session.CheckpointAppend = {
+                        _tag: "AlreadyPresent",
+                        checkpoint: existing,
+                        leafId: path.at(-1)?.id ?? existing.id,
+                      }
+                      return [result, path]
+                    }
+                    const checkpoint: Session.CompactionEntry = {
+                      _tag: "Compaction",
+                      ...prepared,
+                    }
+                    committedCheckpoint = checkpoint
+                    const result: Session.CheckpointAppend = {
+                      _tag: "Appended",
+                      checkpoint,
+                      leafId: checkpoint.id,
+                    }
+                    return [result, [...path, checkpoint]]
+                  }),
+                path: () =>
+                  Effect.gen(function* () {
+                    const path = yield* Ref.get(entries)
+                    if (blockCheckpointPath && path.some((entry) => entry._tag === "Compaction")) {
+                      blockCheckpointPath = false
+                      if (pathEntered === undefined) return yield* Effect.die("missing checkpoint path barrier")
+                      yield* Deferred.succeed(pathEntered, undefined)
+                      return yield* Effect.never
+                    }
+                    return path
+                  }),
+                setLeaf: () => Effect.void,
+                leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
               }),
-            appendCheckpoint: (prepared) =>
-              Ref.modify(entries, (path) => {
-                const existing = path.find((entry) => entry.id === prepared.id)
-                if (existing?._tag === "Compaction") {
-                  const result: Session.CheckpointAppend = {
-                    _tag: "AlreadyPresent",
-                    checkpoint: existing,
-                    leafId: path.at(-1)?.id ?? existing.id,
-                  }
-                  return [result, path]
-                }
-                const checkpoint: Session.CompactionEntry = {
-                  _tag: "Compaction",
-                  ...prepared,
-                }
-                committedCheckpoint = checkpoint
-                const result: Session.CheckpointAppend = {
-                  _tag: "Appended",
-                  checkpoint,
-                  leafId: checkpoint.id,
-                }
-                return [result, [...path, checkpoint]]
-              }),
-            path: () =>
-              Effect.gen(function* () {
-                const path = yield* Ref.get(entries)
-                if (blockCheckpointPath && path.some((entry) => entry._tag === "Compaction")) {
-                  blockCheckpointPath = false
-                  if (pathEntered === undefined) return yield* Effect.die("missing checkpoint path barrier")
-                  yield* Deferred.succeed(pathEntered, undefined)
-                  return yield* Effect.never
-                }
-                return path
-              }),
-            setLeaf: () => Effect.void,
-            leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
           }),
         ),
       ),
@@ -1044,6 +1139,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const first = yield* Effect.forkChild(
           Agent.stream(agent, {
             prompt: "first",
+            sessionId: "interrupted-checkpoint-path",
             persistence: { chatId: "interrupted-checkpoint-path" },
           }).pipe(Stream.runDrain),
           { startImmediately: true },
@@ -1052,14 +1148,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         yield* Fiber.interrupt(first)
         yield* Agent.stream(agent, {
           prompt: "second",
+          sessionId: "interrupted-checkpoint-path",
           persistence: { chatId: "interrupted-checkpoint-path" },
         }).pipe(Stream.runDrain)
 
         const persistence = yield* Chat.Persistence
         const chat = yield* persistence.get("interrupted-checkpoint-path")
         const history = yield* Ref.get(chat.history)
-        const session = yield* Session.SessionStore
-        const path = yield* session.path()
+        const path = yield* Effect.scoped(
+          Session.acquire("interrupted-checkpoint-path").pipe(Effect.flatMap((session) => session.path())),
+        )
         const checkpoints = path.filter((entry): entry is Session.CompactionEntry => entry._tag === "Compaction")
         expect(checkpoints).toHaveLength(1)
         expect(committedCheckpoint).toBeDefined()

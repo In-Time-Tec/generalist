@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect"
-import { SessionStore, type Entry } from "../../context/session.js"
+import type { Entry, Interface as SessionStore } from "../../context/session.js"
 import { AgentError } from "../event.js"
 
 export const SessionCursor = Schema.Struct({ leafId: Schema.NullOr(Schema.String) })
@@ -10,7 +10,7 @@ export const cursorFromPath = (path: ReadonlyArray<Entry>): SessionCursor => ({ 
 export const pathFromCursor = (input: {
   readonly turn: number
   readonly cursor: unknown
-  readonly session: Option.Option<typeof SessionStore.Service>
+  readonly session: Option.Option<SessionStore>
   readonly sessionError: (turn: number, error: import("../../context/session.js").SessionStoreError) => AgentError
 }): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
   Schema.decodeUnknownEffect(SessionCursor)(input.cursor).pipe(

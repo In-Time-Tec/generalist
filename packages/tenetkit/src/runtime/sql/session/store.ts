@@ -1,4 +1,4 @@
-import { DateTime, Effect, Layer, Predicate, Schema } from "effect"
+import { DateTime, Effect, Predicate, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Session } from "../../../core/index.js"
 import { decodeSessionPayload, encodeSessionPayload, sessionPayloadEquivalence } from "./payload-codec.js"
@@ -444,7 +444,7 @@ export const make = (options: {
         }),
       )
 
-    return Session.SessionStore.of({
+    return {
       reserveEntryId: Effect.orDie(
         sql.withTransaction(
           Effect.gen(function* () {
@@ -488,10 +488,5 @@ export const make = (options: {
         Effect.map((session) => session.leaf_id),
         Effect.orDie,
       ),
-    })
+    }
   })
-
-/** @experimental Durable SQLite Session store bound to one session identity. */
-export const layerSqliteSessionStore = (options: {
-  readonly sessionId: string
-}): Layer.Layer<Session.SessionStore, never, SqlClient.SqlClient> => Layer.effect(Session.SessionStore, make(options))

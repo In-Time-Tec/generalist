@@ -1,6 +1,6 @@
 import { Effect, Option, Ref } from "effect"
 import { Chat, Prompt } from "effect/unstable/ai"
-import { SessionStore, buildContext } from "../../context/session.js"
+import { buildContext, type Interface as SessionStore } from "../../context/session.js"
 import type { Event as ModelTelemetryEvent } from "../../model/telemetry/events.js"
 import { AgentError, ResumeMismatch } from "../event.js"
 import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "../suspension.js"
@@ -37,7 +37,7 @@ export const withDerivedSystem = (input: {
  * first. Returns undefined when no Session is active or the caller supplied explicit history.
  */
 export const seedFromSession = (input: {
-  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly activeSession: Option.Option<SessionStore>
   readonly suppliedHistory: Prompt.RawInput | undefined
 }): Effect.Effect<Option.Option<Prompt.Prompt>, import("../../context/session.js").SessionStoreError> =>
   input.suppliedHistory !== undefined || Option.isNone(input.activeSession)
@@ -79,7 +79,7 @@ const validateResume = (
 export const SessionHistoryInternal = { validateResume }
 
 export const replayModelMessages = (input: {
-  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly activeSession: Option.Option<SessionStore>
   readonly sessionParentId: string
   readonly system: string | undefined
   readonly turn: number
@@ -103,7 +103,7 @@ export const replayModelMessages = (input: {
 /** @internal Rebuild a resume Chat from Session when no persisted Chat owns the live view. */
 export const resumeChat = (input: {
   readonly persisted: Chat.Persisted | undefined
-  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly activeSession: Option.Option<SessionStore>
   readonly suppliedHistory: Prompt.RawInput | undefined
 }): Effect.Effect<Chat.Service, import("../../context/session.js").SessionStoreError> => {
   if (Option.isSome(input.activeSession)) {
@@ -123,7 +123,7 @@ export const resumeChat = (input: {
 /** @internal Refresh a resumed Session Chat with the system message derived for this Run. */
 export const refreshResumeSystem = (input: {
   readonly chat: Chat.Service | undefined
-  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly activeSession: Option.Option<SessionStore>
   readonly system: string | undefined
   readonly supplemental?: string | undefined
 }): Effect.Effect<void, import("../../context/session.js").SessionStoreError> => {
@@ -147,7 +147,7 @@ export const refreshResumeSystem = (input: {
  * and read as a conflicting model call.
  */
 export const restoreCheckpointTelemetry = (input: {
-  readonly session: typeof SessionStore.Service
+  readonly session: SessionStore
   readonly undelivered: Array<ModelTelemetryEvent>
 }): Effect.Effect<void, import("../../context/session.js").SessionStoreError> =>
   input.session.path().pipe(

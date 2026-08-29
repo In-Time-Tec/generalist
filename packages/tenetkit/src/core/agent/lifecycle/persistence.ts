@@ -1,9 +1,15 @@
 import { Effect, Option, Ref, Schema } from "effect"
 import { Chat, Prompt } from "effect/unstable/ai"
-import { buildContext, SessionStore } from "../../context/session.js"
+import {
+  buildContext,
+  type DirectoryInterface,
+  type Interface as SessionStore,
+  SessionDirectory,
+} from "../../context/session.js"
 import { Compaction } from "../../turn/compaction.js"
 import { AgentError, ResumeMismatch } from "../event.js"
 import { Runtime } from "../persistence-lock.js"
+import { type Interface as ToolContextInterface, ToolContext } from "../../tools/tool-context.js"
 import type { RunOptions } from "../service.js"
 import {
   initialChat,
@@ -16,6 +22,26 @@ import type { SuspensionCheckpoint } from "../suspension.js"
 
 const errorMessage = String
 
+const acquireSession = (
+  sessionId: string | undefined,
+  directory: Option.Option<DirectoryInterface>,
+  toolContext: Option.Option<ToolContextInterface>,
+): Effect.Effect<Option.Option<SessionStore>, AgentError, import("effect").Scope.Scope> => {
+  if (sessionId === undefined || Option.isNone(directory)) return Effect.succeedNone
+  if (Option.isSome(toolContext) && sessionId === toolContext.value.sessionId) {
+    return Effect.fail(
+      AgentError.make({
+        message: `Nested Agent Run cannot acquire its active parent Session ${sessionId}`,
+        turn: 0,
+      }),
+    )
+  }
+  return directory.value.acquire(sessionId).pipe(
+    Effect.map(Option.some),
+    Effect.mapError((error) => AgentError.make({ message: error.message, turn: 0, cause: error })),
+  )
+}
+
 export const setupPersistence = (options: RunOptions) =>
   Effect.gen(function* () {
     const persistenceOptions = options.persistence
@@ -23,8 +49,9 @@ export const setupPersistence = (options: RunOptions) =>
     const persistenceService = yield* Effect.serviceOption(Chat.Persistence)
     const runtimeService = yield* Effect.serviceOption(Runtime)
     const compactionService = yield* Effect.serviceOption(Compaction)
-    const sessionService = yield* Effect.serviceOption(SessionStore)
-    const activeSession = sessionService
+    const sessionDirectory = yield* Effect.serviceOption(SessionDirectory)
+    const toolContext = yield* Effect.serviceOption(ToolContext)
+    const activeSession = yield* acquireSession(options.sessionId, sessionDirectory, toolContext)
     const persisted: Chat.Persisted | undefined =
       persistenceOptions === undefined
         ? undefined
@@ -72,10 +99,10 @@ export const setupPersistence = (options: RunOptions) =>
       resume !== undefined &&
       persisted !== undefined &&
       Option.isSome(compactionService) &&
-      Option.isSome(sessionService)
+      Option.isSome(activeSession)
     ) {
       yield* Effect.gen(function* () {
-        const path = yield* sessionService.value.path()
+        const path = yield* activeSession.value.path()
         const checkpoint = path.at(-1)
         if (checkpoint?._tag !== "Compaction") return
         const history = yield* Ref.get(persisted.history)
@@ -105,7 +132,6 @@ export const setupPersistence = (options: RunOptions) =>
       persistenceService,
       runtimeService,
       compactionService,
-      sessionService,
       activeSession,
       persisted,
       recoveredHistory,
@@ -117,7 +143,7 @@ export const setupPersistence = (options: RunOptions) =>
 /** @internal Materialize the run chat after persistence and prompt resolution agree. */
 export const setupChat = (args: {
   readonly options: RunOptions
-  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly activeSession: Option.Option<SessionStore>
   readonly persisted: Chat.Persisted | undefined
   readonly resumeChat: Chat.Service | undefined
   readonly system: string | undefined

@@ -3226,10 +3226,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "session-epoch-agent", instructions: "fallback" })
+        const sessionId = "session-epoch"
 
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one" }))
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one", sessionId }))
         guidance = "GUIDANCE TWO"
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two" }))
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two", sessionId }))
 
         expect(prompts[0]).toContain("GUIDANCE ONE")
         // A continued Session renders current guidance instead of the epoch captured on run one.
@@ -3260,10 +3261,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "session-continuity-agent" })
+        const sessionId = "session-continuity"
 
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "first question", system: "stable instructions" }))
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "second question", system: "stable instructions" }))
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "third question", system: "stable instructions" }))
+        yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "first question", system: "stable instructions", sessionId }),
+        )
+        yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "second question", system: "stable instructions", sessionId }),
+        )
+        yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "third question", system: "stable instructions", sessionId }),
+        )
 
         expect(prompts).toHaveLength(3)
         // Run 1 sees only its own prompt.
@@ -3279,7 +3287,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(prompts[2]).toContain("reply 2")
         expect(prompts[2]).toContain("third question")
         // The system message is derived per Run and never becomes a Session entry.
-        const path = yield* (yield* Session.SessionStore).path()
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         expect(path.every((entry) => entry._tag !== "Message" || entry.message.role !== "system")).toBe(true)
       }),
     ] as const
@@ -3305,9 +3313,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "session-instructions-agent" })
+        const sessionId = "session-instructions"
 
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one", system: "ORIGINAL GUIDANCE" }))
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two", system: "EDITED GUIDANCE" }))
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one", system: "ORIGINAL GUIDANCE", sessionId }))
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two", system: "EDITED GUIDANCE", sessionId }))
 
         expect(prompts[1]).toContain("EDITED GUIDANCE")
         expect(prompts[1]).not.toContain("ORIGINAL GUIDANCE")
@@ -3331,9 +3340,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-compaction-agent" })
+        const sessionId = "no-compaction"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "complete" }))
-        const session = yield* Session.SessionStore
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "complete", sessionId }))
 
         expect(calls).toBe(1)
         expect(events.map((event) => event._tag)).toEqual([
@@ -3349,7 +3358,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "TurnCompleted",
           "Completed",
         ])
-        const projection = Session.buildContext(yield* session.path())
+        const projection = Session.buildContext(
+          yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path()))),
+        )
         expect(projection.content.map((message) => message.role)).toEqual(["user", "assistant"])
       }),
     ] as const
@@ -3423,14 +3434,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const session = yield* Session.SessionStore
-        yield* session.append({ _tag: "Message", message: seed })
+        const sessionId = "prepopulated-session"
+        yield* Effect.scoped(
+          Session.acquire(sessionId).pipe(
+            Effect.flatMap((session) => session.append({ _tag: "Message", message: seed })),
+          ),
+        )
         const agent = Agent.make({ name: "prepopulated-session-agent" })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "next", history: Prompt.fromMessages([seed]) }),
+          Agent.stream(agent, { prompt: "next", history: Prompt.fromMessages([seed]), sessionId }),
         )
-        const path = yield* session.path()
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         const seedEntries = path.filter(
           (entry) => entry._tag === "Message" && Json.stringify(entry.message.content).includes("seed"),
         )
@@ -3773,10 +3788,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "default-compaction-agent", toolkit: Toolkit.make(echoTool) })
+        const sessionId = "default-compaction"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
-        const session = yield* Session.SessionStore
-        const path = yield* session.path()
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context", sessionId }))
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
 
         expect(streamCalls).toBe(2)
         expect(summaryCalls).toBe(1)
@@ -3816,11 +3831,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "system-compaction-agent", toolkit: Toolkit.make(echoTool) })
+        const sessionId = "system-compaction"
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "old context", system: "You are a careful test agent" }),
+          Agent.stream(agent, { prompt: "old context", system: "You are a careful test agent", sessionId }),
         )
-        const session = yield* Session.SessionStore
         const completed = events.at(-1)
 
         expect(streamCalls).toBe(2)
@@ -3828,7 +3843,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(secondPrompt).toContain("You are a careful test agent")
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
-          expect(Json.stringify(Session.buildContext(yield* session.path()).content)).toBe(
+          const path = yield* Effect.scoped(
+            Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())),
+          )
+          expect(Json.stringify(Session.buildContext(path).content)).toBe(
             Json.stringify(conversation(completed.transcript)),
           )
         }
@@ -3876,10 +3894,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "mixed-checkpoint-agent", toolkit: Toolkit.make(echoTool) })
+        const sessionId = "mixed-checkpoint"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start mixed checkpoints" }))
-        const session = yield* Session.SessionStore
-        const path = yield* session.path()
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start mixed checkpoints", sessionId }))
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         const checkpoints = path.filter((entry) => entry._tag === "Compaction")
         const completed = events.at(-1)
 
@@ -3918,6 +3936,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
+        const sessionId = "truncate-checkpoint"
         const events = yield* Stream.runCollect(
           Agent.stream(Agent.make({ name: "truncate-checkpoint-agent" }), {
             prompt: "newest prompt",
@@ -3925,10 +3944,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "old prompt" })] }),
             ]),
             compaction: { contextWindow: 1 },
+            sessionId,
           }),
         )
-        const session = yield* Session.SessionStore
-        const path = yield* session.path()
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         const completed = events.at(-1)
         const checkpoint = path.find((entry) => entry._tag === "Compaction")
         const messages = path.filter((entry) => entry._tag === "Message")
@@ -3983,14 +4002,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
+        const sessionId = "orphan-checkpoint"
         const failure = yield* Agent.stream(Agent.make({ name: "orphan-checkpoint-agent" }), {
           prompt: "invalid",
+          sessionId,
         }).pipe(Stream.runDrain, Effect.flip)
-        const session = yield* Session.SessionStore
 
         expect(failure._tag).toBe("tenetkit/core/AgentError")
         expect(failure.message).toContain("orphan tool result")
-        expect((yield* session.path()).some((entry) => entry._tag === "Compaction")).toBe(false)
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
+        expect(path.some((entry) => entry._tag === "Compaction")).toBe(false)
       }),
     ] as const
   })
@@ -4038,11 +4059,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
+        const sessionId = "duplicate-tool-checkpoint"
         const failure = yield* Agent.stream(Agent.make({ name: "duplicate-tool-checkpoint-agent" }), {
           prompt: "invalid",
+          sessionId,
         }).pipe(Stream.runDrain, Effect.flip)
-        const session = yield* Session.SessionStore
-        const path = yield* session.path()
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
 
         expect(failure._tag).toBe("tenetkit/core/AgentError")
         expect(failure.message).toContain("duplicate tool call")
@@ -4097,11 +4119,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
+        const sessionId = "provider-checkpoint"
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "provider-checkpoint-agent" }), { prompt: "compact provider exchange" }),
+          Agent.stream(Agent.make({ name: "provider-checkpoint-agent" }), {
+            prompt: "compact provider exchange",
+            sessionId,
+          }),
         )
-        const session = yield* Session.SessionStore
-        const path = yield* session.path()
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         const completed = events.at(-1)
 
         expect(path.some((entry) => entry._tag === "Compaction")).toBe(true)
@@ -4135,20 +4160,30 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const session = yield* Session.SessionStore
-        yield* session.append({ _tag: "Message", message: toolMessage({ first: 1, second: 2 }) })
+        const sessionId = "structural-session"
+        yield* Effect.scoped(
+          Session.acquire(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.append({ _tag: "Message", message: toolMessage({ first: 1, second: 2 }) }),
+            ),
+          ),
+        )
 
         const events = yield* Stream.runCollect(
           Agent.stream(Agent.make({ name: "structural-session-agent" }), {
             history: Prompt.fromMessages([toolMessage({ second: 2, first: 1 })]),
             prompt: "continue",
+            sessionId,
           }),
         )
         const completed = events.at(-1)
 
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
-          expect(Session.buildContext(yield* session.path()).content).toEqual(completed.transcript.content)
+          const path = yield* Effect.scoped(
+            Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())),
+          )
+          expect(Session.buildContext(path).content).toEqual(completed.transcript.content)
         }
       }),
     ] as const
@@ -4230,17 +4265,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedModelLayer,
       ),
       Effect.gen(function* () {
-        const session = yield* Session.SessionStore
         const agent = Agent.make({ name: "reactive-compaction-agent", model: overflowSelection })
+        const sessionId = "reactive-compaction"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large", sessionId }))
 
         expect(calls).toBe(2)
         expect(overflowRequests).toBe(1)
         expect(reactiveInput).toContain("proactive projection")
         expect(reactiveInput).not.toContain("too large")
         expect(retriedPrompt).toContain("after overflow")
-        expect(Json.stringify(Session.buildContext(yield* session.path()).content)).toContain("after overflow")
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
+        expect(Json.stringify(Session.buildContext(path).content)).toContain("after overflow")
         expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(1)
         expect(events.at(-1)?._tag).toBe("Completed")
       }),
@@ -5161,14 +5197,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let policyHistory: Prompt.Prompt | undefined
     let sessionAtPolicy: Prompt.Prompt | undefined
     const remembered: Array<Memory.RememberInput> = []
-    const policy = TurnPolicy.make<Session.SessionStore>((info) =>
-      Effect.gen(function* () {
+    const policy = TurnPolicy.make<Session.SessionDirectory>((info) =>
+      Effect.sync(() => {
         policyHistory = info.history
-        const session = yield* Session.SessionStore
-        const path = yield* session
-          .path()
-          .pipe(Effect.mapError((error) => TurnPolicy.TurnPolicyError.make({ message: error.message, cause: error })))
-        sessionAtPolicy = Session.buildContext(path)
+        sessionAtPolicy = info.history
         return TurnPolicy.decision.continue()
       }),
     )
@@ -5220,6 +5252,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           Agent.stream(agent, {
             prompt: "checkpoint both tools",
             memory: { key: { agent: "tool-result-checkpoint-agent", subject: "issue-67" } },
+            sessionId: "tool-result-checkpoint",
           }),
         )
         const turnCompleted = events.find((event) => event._tag === "TurnCompleted")
@@ -5640,7 +5673,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const agent = Agent.make({ name: "structured-agent" })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }),
+          Agent.stream(agent, {
+            prompt: "make object",
+            output: { schema: objectSchema },
+            sessionId: "structured-output",
+          }),
         )
 
         expect(events.map((event) => event._tag)).toEqual([
@@ -5676,8 +5713,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           expect(completed.turns).toBe(2)
           expect(completed.usage).toEqual(structuredUsage)
           expect(Json.stringify(completed.transcript.content)).toContain(Agent.defaultObjectPrompt)
-          const session = yield* Session.SessionStore
-          expect(Session.buildContext(yield* session.path()).content).toEqual(completed.transcript.content)
+          const path = yield* Effect.scoped(
+            Session.acquire("structured-output").pipe(Effect.flatMap((session) => session.path())),
+          )
+          expect(Session.buildContext(path).content).toEqual(completed.transcript.content)
         }
       }),
     ] as const
@@ -7099,7 +7138,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           toolkit: Toolkit.make(echoTool),
           toolScheduling: { maxConcurrency: 3, parallelSafe: ["echo"] },
         })
-        const suspension = yield* Agent.stream(agent, { prompt: "delegate concurrently" }).pipe(
+        const sessionId = "concurrent-delegation"
+        const suspension = yield* Agent.stream(agent, { prompt: "delegate concurrently", sessionId }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7119,6 +7159,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           prompt: "ignored",
           history: checkpoint,
           resume: { suspension },
+          sessionId,
         }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
@@ -7147,6 +7188,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             prompt: "ignored",
             history: secondCheckpoint,
             resume: { suspension: secondSuspension },
+            sessionId,
           }),
         )
 
@@ -7160,8 +7202,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         )
         const completed = events.at(-1)
         if (completed?._tag !== "Completed") return yield* Effect.die("missing completed transcript")
-        const session = yield* Session.SessionStore
-        expect(Session.buildContext(yield* session.path()).content).toEqual(completed.transcript.content)
+        const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
+        expect(Session.buildContext(path).content).toEqual(completed.transcript.content)
         expect(modelCalls).toBe(2)
       }),
     ] as const
@@ -8497,7 +8539,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Effect.gen(function* () {
         const agent = Agent.make({ name: "compaction-telemetry-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "old context", sessionId: "compaction-telemetry" }),
+        )
 
         const compactionStarted = events.filter((event) => event._tag === "CompactionStarted")
         const compactionSkipped = events.filter((event) => event._tag === "CompactionSkipped")
@@ -8537,13 +8581,20 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let streamCalls = 0
     const prepared: Array<Session.PreparedCheckpoint> = []
     const recordingSession = Layer.effect(
-      Session.SessionStore,
-      Session.SessionStore.pipe(
+      Session.SessionDirectory,
+      Session.SessionDirectory.pipe(
         Effect.map((delegate) =>
-          Session.SessionStore.of({
-            ...delegate,
-            appendCheckpoint: (checkpoint) =>
-              Effect.sync(() => prepared.push(checkpoint)).pipe(Effect.andThen(delegate.appendCheckpoint(checkpoint))),
+          Session.SessionDirectory.of({
+            acquire: (sessionId) =>
+              delegate.acquire(sessionId).pipe(
+                Effect.map((store) => ({
+                  ...store,
+                  appendCheckpoint: (checkpoint) =>
+                    Effect.sync(() => prepared.push(checkpoint)).pipe(
+                      Effect.andThen(store.appendCheckpoint(checkpoint)),
+                    ),
+                })),
+              ),
           }),
         ),
       ),
@@ -8572,6 +8623,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const events = yield* Stream.runCollect(
           Agent.stream(Agent.make({ name: "durable-compaction-agent", toolkit: Toolkit.make(echoTool) }), {
             prompt: "old context",
+            sessionId: "durable-compaction",
           }),
         )
         const checkpoint = prepared.find((item) => item.compactionCommit?.summaryModelCallId !== undefined)
@@ -8635,13 +8687,20 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let calls = 0
     const prepared: Array<Session.PreparedCheckpoint> = []
     const recordingSession = Layer.effect(
-      Session.SessionStore,
-      Session.SessionStore.pipe(
+      Session.SessionDirectory,
+      Session.SessionDirectory.pipe(
         Effect.map((delegate) =>
-          Session.SessionStore.of({
-            ...delegate,
-            appendCheckpoint: (checkpoint) =>
-              Effect.sync(() => prepared.push(checkpoint)).pipe(Effect.andThen(delegate.appendCheckpoint(checkpoint))),
+          Session.SessionDirectory.of({
+            acquire: (sessionId) =>
+              delegate.acquire(sessionId).pipe(
+                Effect.map((store) => ({
+                  ...store,
+                  appendCheckpoint: (checkpoint) =>
+                    Effect.sync(() => prepared.push(checkpoint)).pipe(
+                      Effect.andThen(store.appendCheckpoint(checkpoint)),
+                    ),
+                })),
+              ),
           }),
         ),
       ),
@@ -8668,6 +8727,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const events = yield* Stream.runCollect(
           Agent.stream(Agent.make({ name: "microcompact-commit-agent", toolkit: Toolkit.make(echoTool) }), {
             prompt: "compact",
+            sessionId: "microcompact-commit",
           }),
         )
         const checkpoint = prepared.find((item) => item.compactionCommit !== undefined)
@@ -8721,12 +8781,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let calls = 0
     const successfulCheckpoints = 0
     const failingSession = Layer.effect(
-      Session.SessionStore,
-      Session.SessionStore.pipe(
+      Session.SessionDirectory,
+      Session.SessionDirectory.pipe(
         Effect.map((delegate) =>
-          Session.SessionStore.of({
-            ...delegate,
-            appendCheckpoint: () => Effect.fail(Session.SessionStoreError.make({ message: "checkpoint failed" })),
+          Session.SessionDirectory.of({
+            acquire: (sessionId) =>
+              delegate.acquire(sessionId).pipe(
+                Effect.map((store) => ({
+                  ...store,
+                  appendCheckpoint: () => Effect.fail(Session.SessionStoreError.make({ message: "checkpoint failed" })),
+                })),
+              ),
           }),
         ),
       ),
@@ -8753,7 +8818,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const seen: Array<AgentEvent.Event> = []
         const failure = yield* Agent.stream(
           Agent.make({ name: "failed-compaction-checkpoint-agent", toolkit: Toolkit.make(echoTool) }),
-          { prompt: "compact" },
+          { prompt: "compact", sessionId: "failed-compaction-checkpoint" },
         ).pipe(
           Stream.tap((event) => Effect.sync(() => seen.push(event))),
           Stream.runDrain,

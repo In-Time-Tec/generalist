@@ -36,15 +36,20 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
   ItLayer.make(it, "forwards the session owner token on every message append", () => {
     const appendOptions: Array<Session.AppendOptions | undefined> = []
     const capturingSession = Layer.effect(
-      Session.SessionStore,
+      Session.SessionDirectory,
       Effect.gen(function* () {
-        const inner = yield* Session.SessionStore
-        return Session.SessionStore.of({
-          ...inner,
-          append: (entry, options) => {
-            appendOptions.push(options)
-            return inner.append(entry, options)
-          },
+        const delegate = yield* Session.SessionDirectory
+        return Session.SessionDirectory.of({
+          acquire: (sessionId) =>
+            delegate.acquire(sessionId).pipe(
+              Effect.map((inner) => ({
+                ...inner,
+                append: (entry, options) => {
+                  appendOptions.push(options)
+                  return inner.append(entry, options)
+                },
+              })),
+            ),
         })
       }),
     ).pipe(Layer.provide(Session.layerMemory))
@@ -60,14 +65,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
       Effect.gen(function* () {
         const agent = Agent.make({ name: "fenced-append-agent", instructions: "current instructions" })
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "hello", sessionOwnerToken: "execution:turn-1:epoch:7" }),
+          Agent.stream(agent, {
+            prompt: "hello",
+            sessionId: "session-fenced-append",
+            sessionOwnerToken: "execution:turn-1:epoch:7",
+          }),
         )
         expect(events.at(-1)?._tag).toBe("Completed")
         expect(appendOptions.length).toBeGreaterThan(0)
         expect(appendOptions.every((options) => options?.ownerToken === "execution:turn-1:epoch:7")).toBe(true)
         expect(appendOptions.map((options) => options?.id)).toEqual([
-          "fenced-append-agent:model:0:session-entry:root:1:user",
-          "fenced-append-agent:model:0:session-entry:root:2:assistant",
+          "session-fenced-append:model:0:session-entry:root:1:user",
+          "session-fenced-append:model:0:session-entry:root:2:assistant",
         ])
       }),
     ] as const
@@ -76,15 +85,20 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
   ItLayer.make(it, "forwards the session owner token on compaction checkpoints", () => {
     const checkpoints: Array<Session.PreparedCheckpoint> = []
     const capturingSession = Layer.effect(
-      Session.SessionStore,
+      Session.SessionDirectory,
       Effect.gen(function* () {
-        const inner = yield* Session.SessionStore
-        return Session.SessionStore.of({
-          ...inner,
-          appendCheckpoint: (checkpoint) => {
-            checkpoints.push(checkpoint)
-            return inner.appendCheckpoint(checkpoint)
-          },
+        const delegate = yield* Session.SessionDirectory
+        return Session.SessionDirectory.of({
+          acquire: (sessionId) =>
+            delegate.acquire(sessionId).pipe(
+              Effect.map((inner) => ({
+                ...inner,
+                appendCheckpoint: (checkpoint) => {
+                  checkpoints.push(checkpoint)
+                  return inner.appendCheckpoint(checkpoint)
+                },
+              })),
+            ),
         })
       }),
     ).pipe(Layer.provide(Session.layerMemory))
@@ -112,6 +126,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
           Agent.stream(agent, {
             prompt: "original prompt",
             compaction: { contextWindow: 10 },
+            sessionId: "session-fenced-checkpoint",
             sessionOwnerToken: "execution:turn-1:epoch:7",
           }),
         )
@@ -128,12 +143,15 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("done"))),
         Session.layerTest({
-          reserveEntryId: Effect.succeed("entry-1"),
-          append: () => Effect.fail(fenced),
-          appendCheckpoint: () => Effect.die("unused"),
-          path: () => Effect.succeed([]),
-          setLeaf: () => Effect.void,
-          leaf: Effect.succeed(null),
+          acquire: () =>
+            Effect.succeed({
+              reserveEntryId: Effect.succeed("entry-1"),
+              append: () => Effect.fail(fenced),
+              appendCheckpoint: () => Effect.die("unused"),
+              path: () => Effect.succeed([]),
+              setLeaf: () => Effect.void,
+              leaf: Effect.succeed(null),
+            }),
         }),
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
@@ -143,7 +161,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
       Effect.gen(function* () {
         const agent = Agent.make({ name: "stale-writer-agent" })
         const failure = yield* Effect.flip(
-          Stream.runDrain(Agent.stream(agent, { prompt: "hello", sessionOwnerToken: "stale-owner" })),
+          Stream.runDrain(
+            Agent.stream(agent, {
+              prompt: "hello",
+              sessionId: "session-stale-writer",
+              sessionOwnerToken: "stale-owner",
+            }),
+          ),
         )
         expect(Schema.is(AgentEvent.AgentError)(failure)).toBe(true)
         if (!Schema.is(AgentEvent.AgentError)(failure)) return
@@ -171,8 +195,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const session = yield* Session.SessionStore
-        yield* session.append({ _tag: "Message", message: seed })
+        yield* Effect.scoped(
+          Session.acquire("session-diverged").pipe(
+            Effect.flatMap((session) => session.append({ _tag: "Message", message: seed })),
+          ),
+        )
         const agent = Agent.make({ name: "diverged-agent" })
         const failure = yield* Effect.flip(
           Stream.runDrain(

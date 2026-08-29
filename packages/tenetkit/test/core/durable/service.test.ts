@@ -920,16 +920,20 @@ describe("DurableDriver Agent.stream integration", () => {
     return provideScoped(
       Layer.mergeAll(Session.layerMemory, modelLayer, journalLayer),
       Effect.gen(function* () {
-        const store = yield* Session.SessionStore
-        for (let index = 0; index < 256; index += 1) {
-          yield* store.append({
-            _tag: "Message",
-            message: Prompt.makeMessage("user", {
-              content: [Prompt.makePart("text", { text: `history-${index}-${"x".repeat(32)}` })],
-            }),
-          })
-        }
-        const before = yield* store.path()
+        const before = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* Session.acquire("bounded-session-sync")
+            for (let index = 0; index < 256; index += 1) {
+              yield* store.append({
+                _tag: "Message",
+                message: Prompt.makeMessage("user", {
+                  content: [Prompt.makePart("text", { text: `history-${index}-${"x".repeat(32)}` })],
+                }),
+              })
+            }
+            return yield* store.path()
+          }),
+        )
 
         yield* Agent.stream(agent, {
           prompt: "continue",
@@ -937,7 +941,9 @@ describe("DurableDriver Agent.stream integration", () => {
           sessionId: "bounded-session-sync",
         }).pipe(Stream.runDrain)
 
-        const path = yield* store.path()
+        const path = yield* Effect.scoped(
+          Session.acquire("bounded-session-sync").pipe(Effect.flatMap((store) => store.path())),
+        )
         const succeeded = outcomes.flatMap((outcome) => (outcome._tag === "Succeeded" ? [outcome.value] : []))
         expect(path).toHaveLength(before.length + 2)
         expect(Json.stringify(path).length).toBeGreaterThan(10_000)
@@ -1038,15 +1044,20 @@ describe("DurableDriver Agent.stream integration", () => {
       onCheckpoint: () => Effect.void,
     })
     const countedSessionLayer = Layer.effect(
-      Session.SessionStore,
+      Session.SessionDirectory,
       Effect.gen(function* () {
-        const inner = yield* Session.SessionStore
-        return Session.SessionStore.of({
-          ...inner,
-          append: (entry, options) =>
-            Effect.sync(() => {
-              appendCalls += 1
-            }).pipe(Effect.andThen(inner.append(entry, options))),
+        const directory = yield* Session.SessionDirectory
+        return Session.SessionDirectory.of({
+          acquire: (sessionId) =>
+            directory.acquire(sessionId).pipe(
+              Effect.map((inner) => ({
+                ...inner,
+                append: (entry, options) =>
+                  Effect.sync(() => {
+                    appendCalls += 1
+                  }).pipe(Effect.andThen(inner.append(entry, options))),
+              })),
+            ),
         })
       }),
     ).pipe(Layer.provide(Session.layerMemory))
@@ -1079,28 +1090,39 @@ describe("DurableDriver Agent.stream integration", () => {
     return provideScoped(
       Layer.mergeAll(countedSessionLayer, memoryLayer, modelLayer, journalLayer),
       Effect.gen(function* () {
-        const store = yield* Session.SessionStore
-        const compactionId = yield* store.reserveEntryId
-        yield* store.appendCheckpoint({
-          id: compactionId,
-          parentId: null,
-          projectedHistory: Prompt.empty,
-          telemetry: [],
-          summary: "prior summary",
-        })
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* Session.acquire("session-sync-replay")
+            const compactionId = yield* store.reserveEntryId
+            yield* store.appendCheckpoint({
+              id: compactionId,
+              parentId: null,
+              projectedHistory: Prompt.empty,
+              telemetry: [],
+              summary: "prior summary",
+            })
+          }),
+        )
         yield* run()
-        const completedPath = yield* store.path()
+        const completedPath = yield* Effect.scoped(
+          Session.acquire("session-sync-replay").pipe(Effect.flatMap((store) => store.path())),
+        )
         expect(completedPath[0]?._tag).toBe("Compaction")
         const completedLeaf = completedPath.at(-1)?.id ?? null
         const expectedReplayPath = Session.buildMemoryContext(completedPath)
         expect(remembered).toEqual([expectedReplayPath])
-        yield* store.append({
-          _tag: "Message",
-          message: Prompt.makeMessage("user", {
-            content: [Prompt.makePart("text", { text: "newer unrelated continuation" })],
+        const advancedPath = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* Session.acquire("session-sync-replay")
+            yield* store.append({
+              _tag: "Message",
+              message: Prompt.makeMessage("user", {
+                content: [Prompt.makePart("text", { text: "newer unrelated continuation" })],
+              }),
+            })
+            return yield* store.path()
           }),
-        })
-        const advancedPath = yield* store.path()
+        )
         const firstSyncEntry = [...recorded.entries()].find(([, outcome]) => {
           if (outcome._tag !== "Succeeded") return false
           const leaf = Schema.decodeUnknownOption(leafValueSchema)(outcome.value)
@@ -1122,7 +1144,9 @@ describe("DurableDriver Agent.stream integration", () => {
         yield* run()
 
         expect(appendCalls).toBe(appendsBeforeReplay)
-        expect(yield* store.path()).toEqual(advancedPath)
+        expect(
+          yield* Effect.scoped(Session.acquire("session-sync-replay").pipe(Effect.flatMap((store) => store.path()))),
+        ).toEqual(advancedPath)
         expect(modelParents).toEqual([cursorLeaf, cursorLeaf])
         expect(remembered).toEqual([expectedReplayPath, expectedReplayPath])
 
@@ -1290,6 +1314,7 @@ describe("DurableDriver Agent.stream integration", () => {
             prompt: rawPrompt,
             logicalOperationId: "compacted-baseline",
             executableRef: executable.ref,
+            sessionId: "compacted-baseline",
             persistence: { chatId: "compacted-baseline" },
             compaction: { contextWindow: 1 },
           }).pipe(Stream.runCollect)
@@ -1302,6 +1327,7 @@ describe("DurableDriver Agent.stream integration", () => {
             prompt: rawPrompt,
             logicalOperationId: "compacted-recovery",
             executableRef: executable.ref,
+            sessionId: "compacted-recovery",
             persistence: { chatId: "compacted-recovery" },
             compaction: { contextWindow: 1 },
           }).pipe(Stream.runDrain, Effect.exit)
@@ -1324,6 +1350,7 @@ describe("DurableDriver Agent.stream integration", () => {
             logicalOperationId: "compacted-recovery",
             executableRef: executable.ref,
             driverCheckpoint: pendingCheckpoint!,
+            sessionId: "compacted-recovery",
             persistence: { chatId: "compacted-recovery" },
             compaction: { contextWindow: 1 },
           }).pipe(Stream.runCollect)
@@ -1755,6 +1782,7 @@ describe("DurableDriver Agent.stream integration", () => {
           const suspended = yield* Agent.stream(agent, {
             prompt: "wait",
             logicalOperationId: "suspend-run",
+            sessionId: "driver-suspend",
             persistence: { chatId: "driver-suspend" },
           }).pipe(Stream.runDrain, Effect.flip)
           if (suspended._tag !== "tenetkit/core/AgentSuspended") return expect.unreachable()
@@ -1765,6 +1793,7 @@ describe("DurableDriver Agent.stream integration", () => {
           yield* Agent.stream(agent, {
             prompt: "ignored",
             logicalOperationId: "suspend-run",
+            sessionId: "driver-suspend",
             persistence: { chatId: "driver-suspend" },
             resume: { suspension: suspended },
           }).pipe(Stream.runDrain)

@@ -244,6 +244,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         const events = yield* Stream.runCollect(
           Agent.stream(agent, {
             prompt: "start",
+            sessionId: "session-authority",
             memory: { key: memoryKey },
             persistence: { chatId: "authority-chat" },
           }),
@@ -251,8 +252,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         const persistence = yield* Chat.Persistence
         const persisted = yield* persistence.get("authority-chat")
         const persistedHistory = yield* Ref.get(persisted.history)
-        const session = yield* Session.SessionStore
-        const sessionHistory = Session.buildContext(yield* session.path())
+        const sessionHistory = yield* Effect.scoped(
+          Session.acquire("session-authority").pipe(
+            Effect.flatMap((session) => session.path()),
+            Effect.map(Session.buildContext),
+          ),
+        )
         const modelParts = events.filter((event) => event._tag === "ModelPart").map((event) => event.part)
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         const completeViews = [

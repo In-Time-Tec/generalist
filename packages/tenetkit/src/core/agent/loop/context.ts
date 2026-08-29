@@ -15,7 +15,7 @@ import type { Registry } from "../../tools/tool-registry.js"
 import type { Request } from "../../tools/tool-executor.js"
 import type { SuspensionCheckpoint, ToolCheckpoint } from "../suspension.js"
 import type { HandoffRunState } from "../handoff/state.js"
-import type { SessionStore, Entry } from "../../context/session.js"
+import type { Entry, Interface as SessionStore } from "../../context/session.js"
 import type { Steering, Input } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 
@@ -59,7 +59,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly state: import("../run-state.js").AgentRunState
   readonly chat: Chat.Service
   readonly chain: ReadonlyArray<Middleware>
-  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly activeSession: Option.Option<SessionStore>
   readonly memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined
   readonly steeringService: Option.Option<typeof Steering.Service>
   readonly structured: StructuredRunConfig<S> | undefined

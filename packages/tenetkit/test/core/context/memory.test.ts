@@ -864,9 +864,17 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
-        const session = yield* Session.SessionStore
-        const memoryTranscript = Session.buildMemoryContext(yield* session.path())
+        const result = yield* Agent.generate(agent, {
+          prompt: "live prompt",
+          sessionId: "session-compaction-isolation",
+          memory: { key },
+        })
+        const memoryTranscript = yield* Effect.scoped(
+          Session.acquire("session-compaction-isolation").pipe(
+            Effect.flatMap((session) => session.path()),
+            Effect.map(Session.buildMemoryContext),
+          ),
+        )
 
         expect(result.text).toBe("done")
         expect(modelCalls).toBe(2)
@@ -939,9 +947,17 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "use opaque values", memory: { key } })
-        const session = yield* Session.SessionStore
-        const retained = Session.buildMemoryContext(yield* session.path())
+        const result = yield* Agent.generate(agent, {
+          prompt: "use opaque values",
+          sessionId: "session-opaque-compaction",
+          memory: { key },
+        })
+        const retained = yield* Effect.scoped(
+          Session.acquire("session-opaque-compaction").pipe(
+            Effect.flatMap((session) => session.path()),
+            Effect.map(Session.buildMemoryContext),
+          ),
+        )
         const prompts = [terminalPrompt, retained].filter((prompt): prompt is Prompt.Prompt => prompt !== undefined)
 
         expect(result.text).toBe("done")
@@ -1015,13 +1031,21 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const first = yield* Agent.generate(agent, { prompt: "first authored", memory: { key } })
-        const session = yield* Session.SessionStore
-        const firstPath = yield* session.path()
-        const compaction = firstPath.find((entry) => entry._tag === "Compaction")
-        if (compaction === undefined) return yield* Effect.die("missing compaction entry")
-        yield* session.setLeaf(compaction.id)
-        const projected = Session.buildContext(yield* session.path())
+        const sessionId = "session-existing-compaction"
+        const first = yield* Agent.generate(agent, { prompt: "first authored", sessionId, memory: { key } })
+        const projected = yield* Effect.scoped(
+          Session.acquire(sessionId).pipe(
+            Effect.flatMap((session) =>
+              Effect.gen(function* () {
+                const firstPath = yield* session.path()
+                const compaction = firstPath.find((entry) => entry._tag === "Compaction")
+                if (compaction === undefined) return yield* Effect.die("missing compaction entry")
+                yield* session.setLeaf(compaction.id)
+                return Session.buildContext(yield* session.path())
+              }),
+            ),
+          ),
+        )
         const resumedHistory = Prompt.fromMessages([
           Prompt.makeMessage("system", { content: "system instructions" }),
           ...projected.content,
@@ -1035,10 +1059,16 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
         const second = yield* Agent.generate(agent, {
           prompt: "second authored",
+          sessionId,
           history: resumedHistory,
           memory: { key },
         })
-        const retained = Session.buildMemoryContext(yield* session.path())
+        const retained = yield* Effect.scoped(
+          Session.acquire(sessionId).pipe(
+            Effect.flatMap((session) => session.path()),
+            Effect.map(Session.buildMemoryContext),
+          ),
+        )
         const retainedText = retained.content.map(messageText)
 
         expect(second.text).toBe("second done")
@@ -1068,15 +1098,26 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const session = yield* Session.SessionStore
-        yield* session.append({ _tag: "Message", message: repeated })
+        const sessionId = "session-repeated-suffix"
+        yield* Effect.scoped(
+          Session.acquire(sessionId).pipe(
+            Effect.flatMap((session) => session.append({ _tag: "Message", message: repeated })),
+          ),
+        )
 
         const result = yield* Agent.generate(agent, {
           prompt: "new authored content",
+          sessionId,
           history: Prompt.fromMessages([repeated, repeated]),
           memory: { key },
         })
-        const retainedText = Session.buildMemoryContext(yield* session.path()).content.map(messageText)
+        const retainedText = yield* Effect.scoped(
+          Session.acquire(sessionId).pipe(
+            Effect.flatMap((session) => session.path()),
+            Effect.map(Session.buildMemoryContext),
+            Effect.map((context) => context.content.map(messageText)),
+          ),
+        )
 
         expect(result.text).toBe("done")
         expect(retainedText.filter((text) => text === "same authored content")).toHaveLength(2)

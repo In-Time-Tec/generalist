@@ -22,7 +22,7 @@ import { defaultContextProjection, HandoffInput, type ContextProjection } from "
 import type { HandoffTarget } from "./handoff-target.js"
 import { ModelRegistry } from "../model/registry.js"
 import { validateRef } from "../durable/manifest/executable-manifest.js"
-import { SessionStore } from "../context/session.js"
+import type { Interface as SessionStore } from "../context/session.js"
 
 export class HandoffRejected extends Schema.TaggedError<HandoffRejected>()("tenetkit/core/HandoffRejected", {
   handoffId: Schema.String,
@@ -37,6 +37,7 @@ export interface ExecuteHandoffInput {
   readonly specialist: string
   readonly params: unknown
   readonly options: RunOptions
+  readonly session: Option.Option<SessionStore>
   readonly handoffState: Ref.Ref<HandoffRunState>
   readonly chat: Chat.Service
   readonly toolState: Ref.Ref<{
@@ -161,7 +162,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     const repeated = edgeCount(current.edgeCounts, source, resolved.name)
     const handoffId = operationKey(logicalId, "handoff", input.turn, input.toolCallId, resolved.pin ?? resolved.name)
     const sessionEntryId = `${handoffId}:session-projection`
-    const sessionService = yield* Effect.serviceOption(SessionStore)
+    const sessionService = input.session
     yield* verifyTargetModel(resolved, input.turn, logicalId, handoffId)
     const edge = edgeLabel(source, resolved.name)
     yield* verifyPinnedTarget(resolved, input.options, handoffId, input.turn)

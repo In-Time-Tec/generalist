@@ -4,7 +4,7 @@ import { Prompt } from "effect/unstable/ai"
 import { Session, SessionHistory } from "../../../src/core/index"
 
 /** One isolated in-memory Session per test, built and released in the test's own scope. */
-const withSession = <A, E>(effect: Effect.Effect<A, E, Session.SessionStore>): Effect.Effect<A, E> =>
+const withSession = <A, E>(effect: Effect.Effect<A, E, Session.SessionDirectory>): Effect.Effect<A, E> =>
   Effect.scoped(
     Effect.flatMap(Layer.build(Session.layerMemory), (context) => effect.pipe(Effect.provideContext(context))),
   )
@@ -15,11 +15,15 @@ const userEntry = (text: string) => ({
 })
 
 const seed = (count: number) =>
-  Effect.gen(function* () {
-    const store = yield* Session.SessionStore
-    for (let index = 0; index < count; index += 1) yield* store.append(userEntry(`entry-${index}`))
-    return yield* store.path()
-  }).pipe(withSession)
+  withSession(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const store = yield* Session.acquire("history-test")
+        for (let index = 0; index < count; index += 1) yield* store.append(userEntry(`entry-${index}`))
+        return yield* store.path()
+      }),
+    ),
+  )
 
 const texts = (page: SessionHistory.HistoryPage): ReadonlyArray<string> =>
   page.entries.flatMap((entry) =>
@@ -80,19 +84,21 @@ describe("SessionHistory.pageHistory", () => {
 
   it.effect("reads the newest page when a cursor names no entry it holds", () =>
     withSession(
-      Effect.gen(function* () {
-        // A cursor is a caller's string, so one that matches nothing still selects a window. The
-        // window is the newest page, which is exactly what a caller asking for entries BEFORE
-        // something must not mistake for an answer, so the page names the cursor it could not use.
-        const store = yield* Session.SessionStore
-        for (const text of ["a", "b", "c"]) yield* store.append(userEntry(text))
-        const path = yield* store.path()
-        const page = SessionHistory.pageHistory(path, { limit: 2, before: "no-such-entry" })
-        expect(page.entries.map((entry) => entry.id)).toEqual(path.slice(-2).map((entry) => entry.id))
-        expect(page.unknownCursors).toEqual(["no-such-entry"])
-        expect(SessionHistory.pageHistory(path, { limit: 2 }).unknownCursors).toBeUndefined()
-        expect(page.hasAfter).toBe(false)
-      }),
+      Effect.scoped(
+        Effect.gen(function* () {
+          // A cursor is a caller's string, so one that matches nothing still selects a window. The
+          // window is the newest page, which is exactly what a caller asking for entries BEFORE
+          // something must not mistake for an answer, so the page names the cursor it could not use.
+          const store = yield* Session.acquire("unknown-cursor")
+          for (const text of ["a", "b", "c"]) yield* store.append(userEntry(text))
+          const path = yield* store.path()
+          const page = SessionHistory.pageHistory(path, { limit: 2, before: "no-such-entry" })
+          expect(page.entries.map((entry) => entry.id)).toEqual(path.slice(-2).map((entry) => entry.id))
+          expect(page.unknownCursors).toEqual(["no-such-entry"])
+          expect(SessionHistory.pageHistory(path, { limit: 2 }).unknownCursors).toBeUndefined()
+          expect(page.hasAfter).toBe(false)
+        }),
+      ),
     ),
   )
 
@@ -118,23 +124,27 @@ describe("SessionHistory.pageHistory", () => {
 })
 
 describe("Session history behind a compaction checkpoint", () => {
-  const compacted = Effect.gen(function* () {
-    const store = yield* Session.SessionStore
-    yield* store.append(userEntry("pre-1"))
-    yield* store.append(userEntry("pre-2"))
-    const parentId = yield* store.leaf
-    const id = yield* store.reserveEntryId
-    yield* store.appendCheckpoint({
-      id,
-      parentId,
-      projectedHistory: Prompt.fromMessages([
-        Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "summary" })] }),
-      ]),
-      telemetry: [],
-    })
-    yield* store.append(userEntry("post-1"))
-    return yield* store.path()
-  }).pipe(withSession)
+  const compacted = withSession(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const store = yield* Session.acquire("compacted-history")
+        yield* store.append(userEntry("pre-1"))
+        yield* store.append(userEntry("pre-2"))
+        const parentId = yield* store.leaf
+        const id = yield* store.reserveEntryId
+        yield* store.appendCheckpoint({
+          id,
+          parentId,
+          projectedHistory: Prompt.fromMessages([
+            Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "summary" })] }),
+          ]),
+          telemetry: [],
+        })
+        yield* store.append(userEntry("post-1"))
+        return yield* store.path()
+      }),
+    ),
+  )
 
   it.effect("keeps entries recorded before the checkpoint reachable by paging", () =>
     Effect.gen(function* () {

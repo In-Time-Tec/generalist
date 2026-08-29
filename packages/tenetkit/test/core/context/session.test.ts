@@ -1,6 +1,6 @@
 import "./suites/session-fencing-suite.js"
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber } from "effect"
+import { Deferred, Effect, Fiber, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Memory, ModelTelemetry, Session } from "../../../src/core/index"
 import { ItLayer } from "../it-layer.js"
@@ -30,7 +30,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           expect(yield* store.leaf).toBeNull()
           expect(yield* store.path()).toEqual([])
@@ -46,7 +46,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           const first = yield* store.append({ _tag: "Message", message: user("one") })
           const second = yield* store.append({ _tag: "Message", message: assistant("two") })
@@ -68,7 +68,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const entry = { _tag: "Message" as const, message: user("committed once") }
           const options = { id: "logical:model:0:session-entry:0:user", expectedLeafId: null }
           const committed = yield* Deferred.make<void>()
@@ -114,7 +114,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const entry = { _tag: "Message" as const, message: user("old branch") }
           const options = { id: "logical:model:0:session-entry:0:user", expectedLeafId: null }
           yield* store.append(entry, options)
@@ -139,7 +139,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           const first = yield* store.append({ _tag: "Message", message: user("A") })
           const abandoned = yield* store.append({ _tag: "Message", message: user("B") })
@@ -161,7 +161,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           const first = yield* store.append({ _tag: "Message", message: user("m1") })
           const second = yield* store.append({ _tag: "Message", message: user("m2") })
@@ -190,7 +190,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           const first = yield* store.append({ _tag: "Message", message: user("authored before") })
           yield* store.append({
@@ -226,7 +226,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           yield* store.append({ _tag: "Message", message: user("m1") })
           const second = yield* store.append({ _tag: "Message", message: user("m2") })
@@ -262,7 +262,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           yield* store.append({ _tag: "Message", message: user("main") })
           yield* store.append({ _tag: "BranchSummary", summary: "alternate branch tried X" })
@@ -284,7 +284,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const toolCall = Prompt.makePart("tool-call", {
             id: "call-search",
             name: "web_search",
@@ -412,7 +412,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const source = yield* store.append({ _tag: "Message", message: user("source sentinel") })
           const checkpointId = yield* store.reserveEntryId
           yield* store.appendCheckpoint({
@@ -447,7 +447,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const source = yield* store.append({ _tag: "Message", message: user("source") })
           const handoff = {
             _tag: "Handoff" as const,
@@ -482,7 +482,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
 
           const setLeafFailure = yield* Effect.flip(store.setLeaf("missing"))
           const pathFailure = yield* Effect.flip(store.path("missing"))
@@ -500,7 +500,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const source = yield* store.append({ _tag: "Message", message: user("source") })
           const id = yield* store.reserveEntryId
           const prepared: Session.PreparedCheckpoint = {
@@ -544,7 +544,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const source = yield* store.append({ _tag: "Message", message: user("source") })
           const id = yield* store.reserveEntryId
           const telemetry: ReadonlyArray<ModelTelemetry.Event> = [
@@ -633,7 +633,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const source = yield* store.append({ _tag: "Message", message: user("source") })
           const prepared: Session.PreparedCheckpoint = {
             id: yield* store.reserveEntryId,
@@ -666,7 +666,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const source = yield* store.append({ _tag: "Message", message: user("source") })
           const toolProjection = (params: Readonly<Record<string, number>>) =>
             Prompt.fromMessages([
@@ -706,7 +706,7 @@ describe("Session", () => {
       [
         Session.layerMemory,
         Effect.gen(function* () {
-          const store = yield* Session.SessionStore
+          const store = yield* Session.acquire("test")
           const source = yield* store.append({ _tag: "Message", message: user("source") })
           const prepared: Session.PreparedCheckpoint = {
             id: yield* store.reserveEntryId,
@@ -743,19 +743,119 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
+    "keeps keyed stores isolated across IDs and alive across Run scopes",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const aliceFirst = yield* Effect.scoped(
+            Effect.gen(function* () {
+              const store = yield* Session.acquire("alice")
+              return yield* store.append({ _tag: "Message", message: user("alice only") })
+            }),
+          )
+          const bobFirst = yield* Effect.scoped(
+            Effect.gen(function* () {
+              const store = yield* Session.acquire("bob")
+              return yield* store.append({ _tag: "Message", message: user("bob only") })
+            }),
+          )
+          const alicePath = yield* Effect.scoped(Session.acquire("alice").pipe(Effect.flatMap((store) => store.path())))
+          const bobPath = yield* Effect.scoped(Session.acquire("bob").pipe(Effect.flatMap((store) => store.path())))
+
+          expect(aliceFirst.id).toBe("0")
+          expect(bobFirst.id).toBe("0")
+          expect(promptTexts(Session.buildContext(alicePath))).toEqual(["alice only"])
+          expect(promptTexts(Session.buildContext(bobPath))).toEqual(["bob only"])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "queues one ID independently and releases its lane on cancellation",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const active = yield* Deferred.make<void>()
+          const release = yield* Deferred.make<void>()
+          const sameAcquired = yield* Deferred.make<void>()
+          const otherAcquired = yield* Deferred.make<void>()
+          const first = yield* Effect.scoped(
+            Effect.gen(function* () {
+              yield* Session.acquire("shared")
+              yield* Deferred.succeed(active, undefined)
+              yield* Deferred.await(release)
+            }),
+          ).pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(active)
+          const waiting = yield* Effect.scoped(
+            Effect.gen(function* () {
+              yield* Session.acquire("shared")
+              yield* Deferred.succeed(sameAcquired, undefined)
+            }),
+          ).pipe(Effect.forkChild({ startImmediately: true }))
+          const other = yield* Effect.scoped(
+            Effect.gen(function* () {
+              yield* Session.acquire("other")
+              yield* Deferred.succeed(otherAcquired, undefined)
+            }),
+          ).pipe(Effect.forkChild({ startImmediately: true }))
+
+          yield* Deferred.await(otherAcquired)
+          expect(Option.isNone(yield* Deferred.poll(sameAcquired))).toBe(true)
+          yield* Fiber.interrupt(waiting)
+          yield* Deferred.succeed(release, undefined)
+          yield* Fiber.join(first)
+          yield* Fiber.join(other)
+
+          yield* Effect.scoped(Session.acquire("shared"))
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "releases an active Session lane when its Scope is interrupted",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const acquired = yield* Deferred.make<void>()
+          const active = yield* Effect.scoped(
+            Effect.gen(function* () {
+              yield* Session.acquire("interrupted")
+              yield* Deferred.succeed(acquired, undefined)
+              return yield* Effect.never
+            }),
+          ).pipe(Effect.forkChild({ startImmediately: true }))
+
+          yield* Deferred.await(acquired)
+          yield* Fiber.interrupt(active)
+          yield* Effect.scoped(Session.acquire("interrupted"))
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
     "layerTest provides an exact implementation",
     () =>
       [
         Session.layerTest({
-          reserveEntryId: Effect.succeed("reserved"),
-          append: () => Effect.die("unused"),
-          appendCheckpoint: () => Effect.die("unused"),
-          path: () => Effect.succeed([]),
-          setLeaf: () => Effect.void,
-          leaf: Effect.succeed("leaf"),
+          acquire: () =>
+            Effect.succeed({
+              reserveEntryId: Effect.succeed("reserved"),
+              append: () => Effect.die("unused"),
+              appendCheckpoint: () => Effect.die("unused"),
+              path: () => Effect.succeed([]),
+              setLeaf: () => Effect.void,
+              leaf: Effect.succeed("leaf"),
+            }),
         }),
         Effect.gen(function* () {
-          const expected = yield* Session.SessionStore
+          const expected = yield* Session.acquire("test")
 
           expect(yield* expected.leaf).toBe("leaf")
           expect(yield* expected.path()).toEqual([])
