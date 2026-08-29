@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Option, Stream } from "effect"
+import { Effect, Option, Stream, Tracer } from "effect"
 import { Response } from "effect/unstable/ai"
 import { AgentEvent } from "../../../../src/index.js"
 import { Approval, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
@@ -11,6 +11,18 @@ import {
   suspension,
   textPrompt,
 } from "../../execution/fixtures.js"
+
+const testTracer = () => {
+  const spans: Array<Tracer.NativeSpan> = []
+  const tracer = Tracer.make({
+    span: (options) => {
+      const span = new Tracer.NativeSpan(options)
+      spans.push(span)
+      return span
+    },
+  })
+  return { spans, tracer }
+}
 
 const admitWaitWithClaimedChild = (waitId: string) =>
   Effect.gen(function* () {
@@ -49,7 +61,13 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
         prompt: textPrompt("hello"),
       })
       const claim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
-      yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+      const tracing = testTracer()
+      yield* runtime
+        .cancel({ runId: receipt.runId, reason: "stop" })
+        .pipe(Effect.provideService(Tracer.Tracer, tracing.tracer))
+      const cancellation = tracing.spans.find((span) => span.name === "TenetKit.Runtime.cancel")
+      expect(cancellation?.attributes.get("tenetkit.runtime.run_id")).toBe(receipt.runId)
+      expect(cancellation?.events.map(([name]) => name)).toEqual(["tenetkit.runtime.cancel.requested"])
       expect(yield* driver.complete({ ...claim, result: completedResult("too-late") })).toEqual({ _tag: "Completed" })
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
       const inspection = yield* runtime.inspect(receipt.runId)
@@ -360,7 +378,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
     }),
   )
 
-  it.effect("cancels a needs-resolution Run without rewriting its unknown operation", () =>
+  it.effect("keeps a cancelled needs-resolution Run unresolved", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -385,9 +403,12 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
 
       yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+      expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
       expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
         "unknown",
+      )
+      expect((yield* runtime.history({ runId: receipt.runId, limit: 100 })).map((event) => event._tag)).not.toContain(
+        "RunCancelled",
       )
     }),
   )

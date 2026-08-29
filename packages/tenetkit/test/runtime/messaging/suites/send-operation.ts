@@ -9,7 +9,7 @@ import { provideScoped } from "../../execution/scoped-provide.js"
 const toolContext = (sessionId: string, runId: string) =>
   ToolContext.layerTest({
     signal: new AbortController().signal,
-    emit: () => Effect.void,
+    emit: () => Effect.succeed(true),
     sessionId,
     runId,
     toolCallId: "call:send",

@@ -175,7 +175,10 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
         const host = yield* ExecutionHost.ExecutionHost
         const store = yield* RunStore.RunStore
 
-        yield* host.execute(yield* store.claimExecution({ runId: first.runId, ownerId: "recovery-check" }))
+        const reopened = yield* runtime.inspect(first.runId)
+        if (reopened.status === "running") {
+          yield* host.execute(yield* store.claimExecution({ runId: first.runId, ownerId: "recovery-check" }))
+        }
 
         expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
         expect((yield* store.getOperation({ runId: first.runId, operationId: first.operationId })).status).toBe(

@@ -4,10 +4,9 @@ import { Cause, Config, Effect, Exit, Layer, Option, Redacted, Schema, Stream } 
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { layer as anthropicLayer } from "tenetkit/ai/anthropic"
-import { layer as openAiLayer } from "tenetkit/ai/openai"
+import { layer as openAiLayer, layerOrDeterministic } from "tenetkit/ai/openai"
 import { layer as chatCompletionsLayer } from "tenetkit/ai/openai-chat-completions"
 import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
-import { layerOrDeterministic } from "tenetkit/ai/openai"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const image = new TextEncoder().encode("image")

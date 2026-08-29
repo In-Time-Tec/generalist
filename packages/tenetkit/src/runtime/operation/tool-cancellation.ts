@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Schema } from "effect"
+import { Clock, Effect, Layer, Option, Schema } from "effect"
 import { ToolContext } from "../../core/index.js"
 import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
 import { decodeCancellableOperation, supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
@@ -64,23 +64,43 @@ export const make = (options: { readonly store: RunStore; readonly resolver: Exe
                     toolName: execution.call.name,
                     execution,
                   }
-                  const signal = yield* Effect.abortSignal
-                  const outcome = yield* executor.cancel!(request).pipe(
-                    Effect.provideService(
-                      ToolContext.ToolContext,
-                      ToolContext.ToolContext.of({
-                        signal,
-                        emit: () => Effect.void,
-                        sessionId: request.sessionId,
-                        runId: request.runId,
-                        rootRunId: request.rootRunId,
-                        toolCallId: request.toolCallId,
-                        operationKey: request.operationKey,
-                        idempotencyKey: request.operationKey,
-                        attempt: request.attempt,
-                        admittedAt: claimed.admittedAt,
-                      }),
-                    ),
+                  const outcome = yield* Effect.gen(function* () {
+                    const span = yield* Effect.option(Effect.currentSpan)
+                    if (Option.isSome(span)) {
+                      span.value.event("tenetkit.runtime.semantic_cancel.delivered", yield* Clock.currentTimeNanos)
+                    }
+                    const signal = yield* Effect.abortSignal
+                    const acknowledged = yield* executor.cancel!(request).pipe(
+                      Effect.provideService(
+                        ToolContext.ToolContext,
+                        ToolContext.ToolContext.of({
+                          signal,
+                          emit: () => Effect.succeed(true),
+                          sessionId: request.sessionId,
+                          runId: request.runId,
+                          rootRunId: request.rootRunId,
+                          toolCallId: request.toolCallId,
+                          operationKey: request.operationKey,
+                          idempotencyKey: request.operationKey,
+                          attempt: request.attempt,
+                          admittedAt: claimed.admittedAt,
+                        }),
+                      ),
+                    )
+                    if (Option.isSome(span)) {
+                      span.value.event("tenetkit.runtime.semantic_cancel.acknowledged", yield* Clock.currentTimeNanos, {
+                        "tenetkit.runtime.semantic_cancel.outcome": acknowledged._tag,
+                      })
+                    }
+                    return acknowledged
+                  }).pipe(
+                    Effect.withSpan("TenetKit.Runtime.semanticCancel", {
+                      attributes: {
+                        "tenetkit.runtime.run_id": request.runId,
+                        "tenetkit.runtime.operation_key": request.operationKey,
+                        "tenetkit.runtime.tool_call_id": request.toolCallId,
+                      },
+                    }),
                   )
                   yield* options.store.acknowledgeOperationCancellation({
                     ...claim,

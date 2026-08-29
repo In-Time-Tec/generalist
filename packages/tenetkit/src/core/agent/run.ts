@@ -1,5 +1,5 @@
 import { Effect, Equal, Function, Layer, Option, Ref, Schema, Stream } from "effect"
-import { Prompt, Tool } from "effect/unstable/ai"
+import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, ToolNameCollision } from "./event.js"
 import { type Item, type MemoryError, projectTranscript } from "../context/memory.js"
 import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext } from "../context/session.js"
@@ -232,21 +232,31 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
           for (const message of history.content) {
             if (!Array.isArray(message.content)) continue
             for (const part of message.content) {
-              if (part.type === "tool-result" && part.name === activateSkillToolName && !part.isFailure) {
-                completed.add(part.id)
-                const activation = Schema.decodeUnknownOption(activateSkillSuccess)(part.result)
-                if (Option.isSome(activation)) restoredBodies.set(part.id, activation.value.body)
+              const result = Schema.decodeUnknownOption(Prompt.ToolResultPart)(part)
+              if (Option.isSome(result) && result.value.name === activateSkillToolName && !result.value.isFailure) {
+                completed.add(result.value.id)
+                const activation = Schema.decodeUnknownOption(activateSkillSuccess)(result.value.result)
+                if (Option.isSome(activation)) restoredBodies.set(result.value.id, activation.value.body)
               }
             }
           }
           for (const message of history.content) {
             if (!Array.isArray(message.content)) continue
             for (const part of message.content) {
-              if (part.type !== "tool-call" || part.name !== activateSkillToolName || !completed.has(part.id)) continue
-              const outcome = yield* restoreSkill(0, part, restoredBodies.get(part.id))
+              const call = Schema.decodeUnknownOption(Prompt.ToolCallPart)(part)
+              if (Option.isNone(call) || call.value.name !== activateSkillToolName || !completed.has(call.value.id))
+                continue
+              const restoredCall = Response.makePart("tool-call", {
+                id: call.value.id,
+                name: call.value.name,
+                params: call.value.params,
+                providerExecuted: call.value.providerExecuted,
+              })
+              const outcome = yield* restoreSkill(0, restoredCall, restoredBodies.get(call.value.id))
               if (outcome._tag === "DomainFailure") {
+                const failure = yield* Schema.decodeUnknownEffect(activateSkillFailure)(outcome.failure)
                 return yield* AgentError.make({
-                  message: Schema.decodeUnknownSync(activateSkillFailure)(outcome.failure).message,
+                  message: failure.message,
                   turn: 0,
                   cause: outcome.failure,
                 })

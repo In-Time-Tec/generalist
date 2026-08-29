@@ -11,7 +11,7 @@ const sessionId = "session:child-origin"
 const ambient = (input: { readonly runId?: string; readonly toolCallId?: string; readonly operationKey?: string }) => {
   const base = {
     signal: new AbortController().signal,
-    emit: () => Effect.void,
+    emit: () => Effect.succeed(true),
     sessionId,
   }
   const withRun = input.runId === undefined ? base : { ...base, runId: input.runId }

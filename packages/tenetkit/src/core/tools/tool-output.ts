@@ -152,11 +152,12 @@ const observeBound = (input: {
       "tenetkit.tool.output.truncated": input.truncated,
       "tenetkit.tool.output.spill": input.spill,
       "tenetkit.tool.output.path_count": input.outputPathCount,
-      ...(input.digest === undefined ? {} : { "tenetkit.tool.output.digest": input.digest }),
     }
-    yield* Effect.annotateCurrentSpan(attributes)
+    const observed =
+      input.digest === undefined ? attributes : { ...attributes, "tenetkit.tool.output.digest": input.digest }
+    yield* Effect.annotateCurrentSpan(observed)
     const span = yield* Effect.option(Effect.currentSpan)
-    if (Option.isSome(span)) span.value.event("tenetkit.tool.output.bound", yield* Clock.currentTimeNanos, attributes)
+    if (Option.isSome(span)) span.value.event("tenetkit.tool.output.bound", yield* Clock.currentTimeNanos, observed)
   })
 
 /** @experimental */
@@ -232,13 +233,16 @@ export const bound: {
     const spill = yield* optionalStore(maybeStore.value, options.toolCallId, result)
     const outputPaths = spill._tag === "Stored" ? [spill.path] : []
     const inline = boundedInlineFromOriginal(encoded, bytes, options.maxBytes)
+    let spillStatus: "stored" | "declined" | "failed" = "failed"
+    if (spill._tag === "Stored") spillStatus = "stored"
+    if (spill._tag === "Declined") spillStatus = "declined"
     yield* observeBound({
       bytes,
       maxBytes: options.maxBytes,
       truncated: true,
       digest: inline.digest,
       outputPathCount: outputPaths.length,
-      spill: spill._tag === "Stored" ? "stored" : spill._tag === "Declined" ? "declined" : "failed",
+      spill: spillStatus,
     })
 
     return bounded(inline, outputPaths)

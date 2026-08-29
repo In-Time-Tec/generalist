@@ -9,7 +9,7 @@ const Fail = Schema.TaggedStruct("Never", { reason: Schema.String })
 const context = (sessionId: string) =>
   ToolContext.ToolContext.of({
     signal: new AbortController().signal,
-    emit: () => Effect.void,
+    emit: () => Effect.succeed(true),
     sessionId,
     runId: "run",
     toolCallId: "call",

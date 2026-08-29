@@ -10,7 +10,7 @@ export interface Progress {
 /** @experimental Ambient context available to a tool handler for the current call. */
 export interface Interface {
   readonly signal: AbortSignal
-  readonly emit: (progress: Progress) => Effect.Effect<void>
+  readonly emit: (progress: Progress) => Effect.Effect<boolean>
   readonly sessionId: string
   readonly runId?: string
   readonly rootRunId?: string
@@ -31,7 +31,7 @@ export class ToolContext extends Context.Service<ToolContext, Interface>()(
 export const layerDefault: Layer.Layer<ToolContext> = Layer.sync(ToolContext, () =>
   ToolContext.of({
     signal: new AbortController().signal,
-    emit: () => Effect.void,
+    emit: () => Effect.succeed(true),
     sessionId: "local",
   }),
 )

@@ -36,6 +36,7 @@ import {
 import { assistant, assistantRef, registrationsFor, researcherRef } from "./fixtures.js"
 import { provideScoped } from "./scoped-provide.js"
 import { tempDbPath } from "../sql/scenario.js"
+import { ActiveExecutions, layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
 
 const testExecutable = pinnedTestExecutable
 
@@ -1696,7 +1697,6 @@ describe("ExecutionHost", () => {
           const runtime = yield* Runtime.Runtime
           const host = yield* ExecutionHost.ExecutionHost
           const store = yield* RunStore.RunStore
-          const scheduler = yield* LocalScheduler.LocalScheduler
           const receipt = yield* runtime.send({
             to: address,
             sessionId: "session:cancel-tool",
@@ -1719,8 +1719,7 @@ describe("ExecutionHost", () => {
           yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
           const exit = yield* Fiber.await(fiber)
           expect(exit._tag).toBe("Success")
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-          expect(yield* scheduler.reconcileCancellation(receipt.runId)).toBe("inactive")
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
           expect(yield* Ref.get(interrupted)).toBe(true)
           const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
             (event) => event._tag === "OperationUnknown",
@@ -1731,14 +1730,97 @@ describe("ExecutionHost", () => {
           )
           expect(
             (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
-          ).not.toContain("RunFailed")
+          ).not.toContain("RunCancelled")
+        }),
+      )
+    }),
+  )
+
+  it.effect("keeps cancellation nonterminal until finite uninterruptible tool work exits", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const finalized = yield* Deferred.make<void>()
+      const tool = Tool.make("finite_block", { parameters: Schema.Struct({}), success: Schema.String })
+      const agent = Agent.make({ name: "finite-cancel-tool", toolkit: Toolkit.make(tool) })
+      const executable = testExecutable(agent, "finite-cancel-tool-v1")
+      const address = Address.make("agent:finite-cancel-tool")
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: () =>
+            Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("tool-call", {
+                id: "finite-block-1",
+                name: "finite_block",
+                params: {},
+                providerExecuted: false,
+              }),
+              finish,
+            ]),
+        }),
+      )
+      const executor = ToolExecutor.layerTest({
+        replayPolicy: () => "provider-idempotent",
+        execute: () =>
+          Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(Deferred.await(release).pipe(Effect.uninterruptible)),
+            Effect.andThen(Effect.succeed({ _tag: "Success" as const, result: "done", encodedResult: "done" })),
+            Effect.ensuring(Deferred.succeed(finalized, undefined)),
+          ),
+      })
+      const handlers = Toolkit.make(tool).toLayer({
+        finite_block: () => Effect.die("ToolExecutor test layer owns execution"),
+      })
+      const runtimeLayer = Runtime.layerMemory({
+        resolver: ExecutableResolver.makeStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        ]),
+        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        scheduler: { pollInterval: "1 hour" },
+      }).pipe(Layer.merge(activeExecutionsLayer))
+
+      yield* scopedWith(runtimeLayer)(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler.LocalScheduler
+          const active = yield* ActiveExecutions
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:finite-cancel-tool",
+            idempotencyKey: "finite-cancel-tool:1",
+            prompt: "block finitely",
+          })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+          const running = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(started)
+
+          yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+          expect((yield* active.active).has(receipt.runId)).toBe(true)
+          expect(running.pollUnsafe()).toBeUndefined()
+          expect(yield* scheduler.reconcileCancellation(receipt.runId)).toBe("deferred")
+          expect(
+            (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
+          ).not.toContain("RunCancelled")
+
+          yield* Deferred.succeed(release, undefined)
+          yield* Fiber.join(running)
+
+          expect(yield* Deferred.isDone(finalized)).toBe(true)
+          expect((yield* active.active).has(receipt.runId)).toBe(false)
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
         }),
       )
     }),
   )
 
   for (const backend of ["memory", "sqlite"] as const) {
-    it.live(`${backend} records an interrupted external tool effect as unknown while cancellation settles`, () =>
+    it.live(`${backend} keeps interrupted external tool uncertainty unresolved after cancellation`, () =>
       Effect.gen(function* () {
         const started = yield* Deferred.make<void>()
         const toolFinalized = yield* Deferred.make<void>()
@@ -1821,7 +1903,6 @@ describe("ExecutionHost", () => {
             const runtime = yield* Runtime.Runtime
             const host = yield* ExecutionHost.ExecutionHost
             const store = yield* RunStore.RunStore
-            const scheduler = yield* LocalScheduler.LocalScheduler
             const receipt = yield* runtime.send({
               to: address,
               sessionId: `session:uncertain-${backend}`,
@@ -1842,8 +1923,7 @@ describe("ExecutionHost", () => {
             expect(new Set(lifecycle.slice(2))).toEqual(
               new Set(["tool finalized", "service finalized", "execution resolver finalized"]),
             )
-            expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-            expect(yield* scheduler.reconcileCancellation(receipt.runId)).toBe("inactive")
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
             const persistedTool = yield* store.getOperationByKey({
               runId: receipt.runId,
               operationKey: `${receipt.runId}:tool:0:external-counter-1:external_counter`,
@@ -1866,7 +1946,7 @@ describe("ExecutionHost", () => {
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
               const store = yield* RunStore.RunStore
-              expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
+              expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
               expect((yield* store.getOperation({ runId: first.runId, operationId: first.operationId })).status).toBe(
                 "unknown",
               )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Schema, Stream, Tracer } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
 import { ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
@@ -39,6 +39,18 @@ const finish = Response.makePart("finish", {
   response: undefined,
 })
 
+const testTracer = () => {
+  const spans: Array<Tracer.NativeSpan> = []
+  const tracer = Tracer.make({
+    span: (options) => {
+      const span = new Tracer.NativeSpan(options)
+      spans.push(span)
+      return span
+    },
+  })
+  return { spans, tracer }
+}
+
 const request = (sessionId: string, toolName: string, toolCallId: string): ToolExecutor.Request => {
   const call = Schema.decodeSync(Response.ToolCallPart(toolName, Schema.Struct({})))({
     type: "tool-call",
@@ -74,6 +86,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
         const toolStarted = yield* Deferred.make<void>()
         const cancellationDelivered = yield* Deferred.make<void>()
         const allowAcknowledgement = yield* Deferred.make<void>()
+        const tracing = testTracer()
         const cancellationRequests = new Array<ToolExecutor.CancellationRequest>()
         const tool = Tool.make("durable_write", { parameters: Schema.Struct({}), success: Schema.String })
         const toolkit = Toolkit.make(tool)
@@ -195,7 +208,14 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
             expect(modelCalls).toBe(1)
           }),
+        ).pipe(Effect.provideService(Tracer.Tracer, tracing.tracer))
+        const semanticCancellationSpans = tracing.spans.filter(
+          (span) => span.name === "TenetKit.Runtime.semanticCancel",
         )
+        expect(semanticCancellationSpans.map((span) => span.events.map(([name]) => name))).toEqual([
+          ["tenetkit.runtime.semantic_cancel.delivered"],
+          ["tenetkit.runtime.semantic_cancel.delivered", "tenetkit.runtime.semantic_cancel.acknowledged"],
+        ])
       }),
     )
 

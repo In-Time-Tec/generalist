@@ -13,7 +13,7 @@ const withEnvironment = <A, E>(
 
 const toolContext = (operationKey: string): ToolContext.Interface => ({
   signal: new AbortController().signal,
-  emit: () => Effect.void,
+  emit: () => Effect.succeed(true),
   sessionId: "session",
   runId: "run-1",
   toolCallId: "call-1",

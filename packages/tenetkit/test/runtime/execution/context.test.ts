@@ -9,7 +9,7 @@ import { provideScoped } from "./scoped-provide.js"
 const ambient = (input: { readonly runId?: string; readonly toolCallId?: string }) => {
   const base = {
     signal: new AbortController().signal,
-    emit: () => Effect.void,
+    emit: () => Effect.succeed(true),
     sessionId: "session:in-execution-authority",
   }
   const withRun = input.runId === undefined ? base : { ...base, runId: input.runId }

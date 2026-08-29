@@ -62,7 +62,7 @@ export const expireRunningOperation: {
       { ...state, operations },
       run.runId,
       { _tag: "OperationUnknown", operationId: input.operationId },
-      run.cancellationRequested ? "cancelling" : "needs-resolution",
+      "needs-resolution",
     )
     return [{ record, outcome: "unknown" as const }, next] as const
   }),

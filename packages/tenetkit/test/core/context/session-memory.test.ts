@@ -194,7 +194,7 @@ describe("memory SessionDirectory binding", () => {
       Session.layerMemory,
       ToolContext.layerTest({
         signal: new AbortController().signal,
-        emit: () => Effect.void,
+        emit: () => Effect.succeed(true),
         sessionId: "parent",
         toolCallId: "child-call",
       }),

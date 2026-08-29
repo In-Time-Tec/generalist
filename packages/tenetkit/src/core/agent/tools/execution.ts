@@ -1,4 +1,4 @@
-import { Cause, Duration, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentSuspended, AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./result.js"
@@ -25,17 +25,6 @@ import type { Skill, SkillSourceError } from "../../context/skill-source.js"
 import { intercept } from "../../durable/driver/run.js"
 import { operationKey } from "../../durable/driver/interpreter.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
-
-/**
- * Bound on how long a cancelled run waits for one forked tool or approval fiber to finish tearing down.
- * A fiber that is uninterruptible, or that supervises an uninterruptible child, would otherwise keep the
- * owning scope open forever and strand the run in `cancelling`.
- */
-const toolTeardownGrace = Duration.seconds(5)
-
-/** Interrupt a forked tool or approval fiber and wait for its teardown without letting it wedge the run. */
-const teardown = <A, E>(fiber: Fiber.Fiber<A, E>): Effect.Effect<void> =>
-  Fiber.interrupt(fiber).pipe(Effect.timeoutOption(toolTeardownGrace), Effect.asVoid)
 
 type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
@@ -199,18 +188,18 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
       droppedProgress: Ref.Ref<number>,
       emitSemaphore: Semaphore.Semaphore,
     ) =>
-    (progress: Progress): Effect.Effect<void> => {
+    (progress: Progress): Effect.Effect<boolean> => {
       const event = progressEvent(turn, progress)
       return emitSemaphore.withPermit(
         Effect.gen(function* () {
           if (progressPolicy._tag === "Sliding") {
-            const dropped = yield* Effect.sync(() => {
+            const accepted = yield* Effect.sync(() => {
               const full = Queue.isFullUnsafe(progressQueue)
-              Queue.offerUnsafe(progressQueue, event)
-              return full
+              const offered = Queue.offerUnsafe(progressQueue, event)
+              return { dropped: full && offered, offered }
             })
-            if (dropped) yield* Ref.update(droppedProgress, (count) => count + 1)
-            return
+            if (accepted.dropped) yield* Ref.update(droppedProgress, (count) => count + 1)
+            return accepted.offered
           }
           const offered = yield* Queue.offer(progressQueue, event)
           if (progressPolicy._tag === "Dropping" && !offered) {
@@ -221,6 +210,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
               ProgressOverflow.make({ turn, toolCallId: call.id, capacity: progressPolicy.capacity }),
             )
           }
+          return offered
         }),
       )
     }
@@ -356,7 +346,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
               },
             }),
           )
-          const fiber = yield* Effect.acquireRelease(Effect.forkDetach(toolBody, { startImmediately: true }), teardown)
+          const fiber = yield* Effect.forkScoped(toolBody, { startImmediately: true })
           return Stream.concat(Stream.fromQueue(progressQueue), Stream.fromEffect(Fiber.join(fiber)))
         }),
       ),
@@ -433,10 +423,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
             Effect.mapError((error) => authorizationError(turn, error)),
             Effect.ensuring(Queue.end(approvalEvents).pipe(Effect.asVoid)),
           )
-        const fiber = yield* Effect.acquireRelease(
-          Effect.forkDetach(authorization, { startImmediately: true }),
-          teardown,
-        )
+        const fiber = yield* Effect.forkScoped(authorization, { startImmediately: true })
         return Stream.concat(
           Stream.fromQueue(approvalEvents),
           Stream.fromEffect(Fiber.join(fiber)).pipe(

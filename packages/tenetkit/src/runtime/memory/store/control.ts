@@ -47,6 +47,10 @@ const getRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, Run
 const hasRunningOwnedFanOut = (state: MemoryState, runId: string): boolean =>
   [...state.fanOuts.values()].some((fanOut) => fanOut.parentRunId === runId && fanOut.status === "running")
 
+const hasUnknownOperation = (state: MemoryState, runId: string): boolean =>
+  [...state.operations.values()].some((operation) => operation.runId === runId && operation.status === "unknown") ||
+  [...state.programOperations.values()].some((operation) => operation.runId === runId && operation.status === "unknown")
+
 const reconcileProgramCancellation = (state: MemoryState, runId: string, reason?: string): MemoryState => {
   const programOperations = new Map(state.programOperations)
   const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
@@ -75,6 +79,7 @@ const finalizeCancellingParent = (state: MemoryState, runId: string): Effect.Eff
       run.ownerId !== undefined ||
       hasRunningOwnedFanOut(state, runId) ||
       hasPendingOperationCancellation(state, runId) ||
+      hasUnknownOperation(state, runId) ||
       hasUnsettledChild(state, runId)
     ) {
       return state
@@ -144,6 +149,7 @@ const cancelDescendants = (state: MemoryState, run: StoredRun, reason?: string):
 const cancellationMustWait = (state: MemoryState, run: StoredRun): boolean =>
   hasRunningOwnedFanOut(state, run.runId) ||
   hasPendingOperationCancellation(state, run.runId) ||
+  hasUnknownOperation(state, run.runId) ||
   hasUnsettledChild(state, run.runId)
 
 const completeCancellation = (state: MemoryState, run: StoredRun): Effect.Effect<MemoryState, RuntimeUnavailable> =>
@@ -179,6 +185,7 @@ const cancellationCannotFinalize = (state: MemoryState, run: StoredRun, runId: s
   isTerminal(run.status) ||
   hasRunningOwnedFanOut(state, runId) ||
   hasPendingOperationCancellation(state, runId) ||
+  hasUnknownOperation(state, runId) ||
   hasUnsettledChild(state, runId)
 
 export { respond, signal } from "./control/wait.js"
@@ -274,6 +281,7 @@ export const fail: {
       if (
         hasRunningOwnedFanOut(state, run.runId) ||
         hasPendingOperationCancellation(state, run.runId) ||
+        hasUnknownOperation(state, run.runId) ||
         hasUnsettledChild(state, run.runId)
       ) {
         const runs = new Map(state.runs)

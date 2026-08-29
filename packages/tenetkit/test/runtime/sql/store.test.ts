@@ -1484,9 +1484,9 @@ layer(sqliteLayer(tempDbPath("terminal-parent-spawn")))("rejects child admission
 })
 
 layer(sqliteLayer(tempDbPath("cancel-unknown-resolution")))(
-  "settles an admitted cancellation while preserving an unknown operation",
+  "retains an admitted cancellation while an operation is unknown",
   (suite) => {
-    suite.effect("settles cancellation without unknown resolution", () =>
+    suite.effect("requires unknown resolution before cancellation can settle", () =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
@@ -1511,9 +1511,12 @@ layer(sqliteLayer(tempDbPath("cancel-unknown-resolution")))(
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
 
         yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
           "unknown",
+        )
+        expect((yield* runtime.history({ runId: receipt.runId, limit: 100 })).map((event) => event._tag)).not.toContain(
+          "RunCancelled",
         )
       }),
     )

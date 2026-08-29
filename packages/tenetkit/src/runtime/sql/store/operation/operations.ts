@@ -294,7 +294,7 @@ export const completeOperation: {
         hub,
         yield* requireRun(input.runId),
         { _tag: "OperationUnknown", operationId: input.operationId },
-        run.cancellationRequested ? "cancelling" : "needs-resolution",
+        "needs-resolution",
       )
     }
     const rows =
@@ -391,12 +391,7 @@ export const expireRunningOperation: {
       UPDATE tenetkit_run_operations SET status = 'unknown', finished_at = ${finished}
       WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'running'
     `
-    yield* appendEvent(
-      hub,
-      run,
-      { _tag: "OperationUnknown", operationId: input.operationId },
-      run.cancellationRequested ? "cancelling" : "needs-resolution",
-    )
+    yield* appendEvent(hub, run, { _tag: "OperationUnknown", operationId: input.operationId }, "needs-resolution")
     const next =
       yield* sql<OperationRow>`SELECT * FROM tenetkit_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}`
     return { record: toOperationRecord(next[0]!), outcome: "unknown" as const }

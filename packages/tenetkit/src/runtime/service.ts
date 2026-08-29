@@ -391,6 +391,12 @@ export interface Interface {
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
+  /**
+   * @experimental Durably admit cancellation and request interruption from a process-local owner.
+   *
+   * Successful return does not acknowledge terminal cancellation. Observe Run state or events when
+   * the caller must know whether owned work exited and external outcomes became definitive.
+   */
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly cancelSession: (input: CancelSessionInput) => Effect.Effect<void, RuntimeUnavailable>
   readonly awaitSessionTerminal: (input: AwaitSessionTerminalInput) => Effect.Effect<void, RuntimeUnavailable>

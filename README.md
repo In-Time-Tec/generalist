@@ -88,6 +88,8 @@ const durableTools = ToolExecutor.layerRouter([
 ])
 ```
 
+`Runtime.cancel` returning acknowledges durable request admission and a local interrupt request, not `RunCancelled`. Observe `inspect`, events, or a terminal waiting API for the outcome. TenetKit waits for process-local owned work to exit; a non-cancellable `never` operation whose outcome is ambiguous remains `unknown` with the Run in `needs-resolution`.
+
 ## Effect compatibility
 
 | TenetKit release | Tested Effect version                             | Notes                                                                               |

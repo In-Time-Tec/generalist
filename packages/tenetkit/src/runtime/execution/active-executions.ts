@@ -1,16 +1,37 @@
-import { Context, Effect, Fiber, Layer, SynchronizedRef } from "effect"
+import { Clock, Context, Deferred, Duration, Effect, Fiber, FiberMap, Layer, Option } from "effect"
+
+const localExitObservationGrace = Duration.seconds(5)
+
+const observeCancellation = (runId: string, target: Fiber.Fiber<void, unknown>) =>
+  Effect.gen(function* () {
+    const span = yield* Effect.option(Effect.currentSpan)
+    if (Option.isSome(span)) span.value.event("tenetkit.runtime.cancel.interrupt_sent", yield* Clock.currentTimeNanos)
+    const exit = yield* Fiber.await(target).pipe(Effect.timeoutOption(localExitObservationGrace))
+    if (Option.isNone(exit)) {
+      if (Option.isSome(span)) {
+        span.value.event("tenetkit.runtime.cancel.grace_exceeded", yield* Clock.currentTimeNanos, {
+          "tenetkit.runtime.cancel.pending": "local-fiber",
+        })
+      }
+      yield* Fiber.await(target)
+    }
+    if (Option.isSome(span))
+      span.value.event("tenetkit.runtime.cancel.local_exit_acknowledged", yield* Clock.currentTimeNanos)
+  }).pipe(
+    Effect.withSpan("TenetKit.Runtime.cancel.localExit", {
+      attributes: { "tenetkit.runtime.run_id": runId },
+    }),
+  )
 
 export interface Interface {
-  readonly run: <E, R>(runId: string, execution: Effect.Effect<void, E, R>) => Effect.Effect<void, never, R>
+  readonly run: <E, R, R2 = never>(
+    runId: string,
+    execution: Effect.Effect<void, E, R>,
+    afterExit?: Effect.Effect<void, never, R2>,
+  ) => Effect.Effect<void, never, R | R2>
   readonly interrupt: (runId: string) => Effect.Effect<void>
-  readonly cancellationRequested: (runId: string) => Effect.Effect<boolean>
   /** Run IDs this process is executing right now. A scheduler must not re-admit them. */
   readonly active: Effect.Effect<ReadonlySet<string>>
-}
-
-interface ActiveExecution {
-  fiber: Fiber.Fiber<void, unknown> | undefined
-  cancellationRequested: boolean
 }
 
 export class ActiveExecutions extends Context.Service<ActiveExecutions, Interface>()(
@@ -20,42 +41,48 @@ export class ActiveExecutions extends Context.Service<ActiveExecutions, Interfac
 export const layer: Layer.Layer<ActiveExecutions> = Layer.effect(
   ActiveExecutions,
   Effect.gen(function* () {
-    const active = yield* SynchronizedRef.make<ReadonlyMap<string, ActiveExecution>>(new Map())
+    const cancellationObservers = yield* FiberMap.make<string, void, never>()
+    const active = yield* FiberMap.make<string, void, unknown>()
     return ActiveExecutions.of({
-      run: (runId, execution) =>
-        Effect.uninterruptibleMask((restore) => {
-          const entry: ActiveExecution = { fiber: undefined, cancellationRequested: false }
-          return Effect.gen(function* () {
-            yield* SynchronizedRef.update(active, (current) => new Map(current).set(runId, entry))
-            const fiber = yield* execution.pipe(Effect.forkChild({ startImmediately: false }))
-            entry.fiber = fiber
-            if (entry.cancellationRequested) fiber.interruptUnsafe()
-            yield* restore(Fiber.await(fiber))
-          }).pipe(
-            Effect.ensuring(
-              SynchronizedRef.update(active, (current) => {
-                if (current.get(runId) !== entry) return current
-                const next = new Map(current)
-                next.delete(runId)
-                return next
-              }),
-            ),
-          )
-        }),
-      interrupt: (runId) =>
-        SynchronizedRef.get(active).pipe(
-          Effect.flatMap((current) => {
-            const entry = current.get(runId)
-            if (entry === undefined) return Effect.void
-            return Effect.sync(() => {
-              entry.cancellationRequested = true
-              entry.fiber?.interruptUnsafe()
+      run: (runId, execution, afterExit = Effect.void) =>
+        Effect.uninterruptibleMask((restore) =>
+          Effect.gen(function* () {
+            const start = yield* Deferred.make<void>()
+            const fiber = yield* FiberMap.run(active, runId, Deferred.await(start).pipe(Effect.andThen(execution)), {
+              onlyIfMissing: true,
+              startImmediately: true,
             })
+            const admitted = Option.exists(FiberMap.getUnsafe(active, runId), (current) => current === fiber)
+            yield* Deferred.succeed(start, undefined)
+            if (!admitted) return
+            const complete = Effect.gen(function* () {
+              const observer = FiberMap.getUnsafe(cancellationObservers, runId)
+              if (Option.isSome(observer)) yield* Fiber.await(observer.value)
+              yield* afterExit
+            })
+            yield* restore(Fiber.await(fiber)).pipe(
+              Effect.onInterrupt(() =>
+                Effect.sync(() => fiber.interruptUnsafe()).pipe(
+                  Effect.andThen(Fiber.await(fiber)),
+                  Effect.andThen(complete),
+                  Effect.asVoid,
+                ),
+              ),
+            )
+            yield* complete
           }),
         ),
-      cancellationRequested: (runId) =>
-        SynchronizedRef.get(active).pipe(Effect.map((current) => current.get(runId)?.cancellationRequested === true)),
-      active: SynchronizedRef.get(active).pipe(Effect.map((current) => new Set(current.keys()))),
+      interrupt: (runId) =>
+        Effect.gen(function* () {
+          const fiber = FiberMap.getUnsafe(active, runId)
+          if (Option.isNone(fiber)) return
+          fiber.value.interruptUnsafe()
+          yield* FiberMap.run(cancellationObservers, runId, observeCancellation(runId, fiber.value), {
+            onlyIfMissing: true,
+            startImmediately: true,
+          })
+        }),
+      active: Effect.sync(() => new Set(Array.from(active, ([runId]) => runId))),
     })
   }),
 )

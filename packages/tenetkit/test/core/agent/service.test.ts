@@ -15,7 +15,6 @@ import {
   Stream,
   Tracer,
 } from "effect"
-import { TestClock } from "effect/testing"
 import { AiError, Chat, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import {
@@ -1594,6 +1593,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       }),
       tools: [replayTool],
     }
+    const noOutputPaths: ReadonlyArray<string> = []
     const bounded = {
       inline: {
         truncated: true as const,
@@ -1602,7 +1602,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         digest: "0".repeat(64),
         preview: "bounded activation",
       },
-      outputPaths: [] as ReadonlyArray<string>,
+      outputPaths: noOutputPaths,
     }
     const replayed: DurableDriver.OperationOutcome = {
       _tag: "Succeeded",
@@ -1633,14 +1633,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const journal: DurableDriver.DriverJournal = {
-          onScheduled: (operation) =>
-            operation.kind === "tool" &&
-            typeof operation.input === "object" &&
-            operation.input !== null &&
-            "name" in operation.input &&
-            operation.input.name === "activate_skill"
+          onScheduled: (operation) => {
+            const input = Schema.decodeUnknownOption(Schema.Struct({ name: Schema.String }))(operation.input)
+            return operation.kind === "tool" && Option.isSome(input) && input.value.name === "activate_skill"
               ? Effect.succeed(replayed)
-              : Effect.void,
+              : Effect.void
+          },
           onCompleted: () => Effect.void,
           onCheckpoint: () => Effect.void,
         }
@@ -2716,7 +2714,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         yield* Deferred.await(executionFinalized)
         expect(yield* Deferred.isDone(thirdOfferCompleted)).toBe(false)
         expect(toolSignal.aborted).toBe(true)
-        yield* toolContext.emit({ toolCallId: "tool-call-abandoned-progress", message: "after cancellation" })
+        expect(
+          yield* toolContext.emit({ toolCallId: "tool-call-abandoned-progress", message: "after cancellation" }),
+        ).toBe(false)
       }),
     ] as const
   })
@@ -4973,7 +4973,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(started)
-        // No TestClock advance: teardown must complete on its own, not by burning the grace.
         yield* Fiber.interrupt(fiber)
 
         expect(yield* Deferred.isDone(cleanupDone)).toBe(true)
@@ -4981,27 +4980,35 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "interrupting a run settles even when tool teardown cannot complete", () => {
+  ItLayer.make(it, "interrupting a run waits for supervised tool work to exit", () => {
     let started!: Deferred.Deferred<void>
-    let released!: Ref.Ref<boolean>
+    let release!: Deferred.Deferred<void>
+    let childExited!: Deferred.Deferred<void>
+    let finalized!: Deferred.Deferred<void>
     return [
       Layer.unwrap(
         Effect.gen(function* () {
           started = yield* Deferred.make<void>()
-          released = yield* Ref.make(false)
+          release = yield* Deferred.make<void>()
+          childExited = yield* Deferred.make<void>()
+          finalized = yield* Deferred.make<void>()
           return Layer.mergeAll(
             modelLayer(() => Stream.make(toolCallPart("tool-call-wedge", "echo", { text: "run" }))),
             ToolExecutor.layerTest({
               execute: () =>
                 Effect.gen(function* () {
                   const context = yield* ToolContext.ToolContext
-                  // Undrained progress: the consumer is torn down before these are taken.
                   yield* context.emit({ toolCallId: "tool-call-wedge", message: "one" })
-                  // A tool fiber that supervises an uninterruptible child can never finish teardown.
-                  yield* Effect.forkChild(Effect.never.pipe(Effect.uninterruptible), { startImmediately: true })
+                  yield* Effect.forkChild(
+                    Deferred.await(release).pipe(
+                      Effect.uninterruptible,
+                      Effect.ensuring(Deferred.succeed(childExited, undefined)),
+                    ),
+                    { startImmediately: true },
+                  )
                   yield* Deferred.succeed(started, undefined)
                   return yield* Effect.never
-                }),
+                }).pipe(Effect.ensuring(Deferred.succeed(finalized, undefined))),
             }),
             Approvals.layerAutoApprove,
             ModelMiddleware.layerIdentity,
@@ -5015,24 +5022,25 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(started)
-        const interrupted = yield* Fiber.interrupt(fiber).pipe(
-          Effect.andThen(Ref.set(released, true)),
-          Effect.forkChild({ startImmediately: true }),
-        )
+        const interrupted = yield* Fiber.interrupt(fiber).pipe(Effect.forkChild({ startImmediately: true }))
 
-        // Scope teardown must not block indefinitely on a tool fiber that refuses to die.
-        yield* TestClock.adjust("5 seconds")
+        yield* Effect.yieldNow
+        expect(interrupted.pollUnsafe()).toBeUndefined()
+        expect(yield* Deferred.isDone(childExited)).toBe(false)
+
+        yield* Deferred.succeed(release, undefined)
         yield* Fiber.join(interrupted)
 
-        expect(yield* Ref.get(released)).toBe(true)
+        expect(yield* Deferred.isDone(childExited)).toBe(true)
+        expect(yield* Deferred.isDone(finalized)).toBe(true)
       }),
     ] as const
   })
 
   ItLayer.make(it, "interrupting a run tears down an in-flight approval before the run settles", () => {
     let started!: Deferred.Deferred<void>
+    let release!: Deferred.Deferred<void>
     let finalized!: Deferred.Deferred<void>
-    let ticks!: Ref.Ref<number>
     const orphanApprovalTool = Tool.make("waiting-approval", {
       description: "Requires waiting approval",
       parameters: Schema.Struct({ text: Schema.String }),
@@ -5040,18 +5048,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       needsApproval: () =>
         Effect.gen(function* () {
           yield* Deferred.succeed(started, undefined)
-          yield* Effect.uninterruptible(
-            Effect.forEach([1, 2, 3, 4, 5, 6, 7, 8], () => Ref.update(ticks, (n) => n + 1), { discard: true }),
-          )
-          return yield* Effect.never
+          yield* Deferred.await(release).pipe(Effect.uninterruptible)
+          return true
         }).pipe(Effect.ensuring(Deferred.succeed(finalized, undefined))),
     })
     return [
       Layer.unwrap(
         Effect.gen(function* () {
           started = yield* Deferred.make<void>()
+          release = yield* Deferred.make<void>()
           finalized = yield* Deferred.make<void>()
-          ticks = yield* Ref.make(0)
           return Layer.mergeAll(
             modelLayer(() =>
               Stream.make(toolCallPart("tool-call-orphan-approval", "waiting-approval", { text: "wait" })),
@@ -5069,10 +5075,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         )
 
         yield* Deferred.await(started)
-        yield* Fiber.interrupt(fiber)
+        const interrupted = yield* Fiber.interrupt(fiber).pipe(Effect.forkChild({ startImmediately: true }))
+
+        yield* Effect.yieldNow
+        expect(interrupted.pollUnsafe()).toBeUndefined()
+        expect(yield* Deferred.isDone(finalized)).toBe(false)
+
+        yield* Deferred.succeed(release, undefined)
+        yield* Fiber.join(interrupted)
 
         expect(yield* Deferred.isDone(finalized)).toBe(true)
-        expect(yield* Ref.get(ticks)).toBe(8)
       }),
     ] as const
   })

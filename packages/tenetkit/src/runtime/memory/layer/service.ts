@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Ref, Stream } from "effect"
+import { Clock, Effect, Layer, Option, Ref, Stream } from "effect"
 import {
   AddressNotFound,
   ChildSelectionMissing,
@@ -405,8 +405,16 @@ export const serviceEffect = (
       cancel: (input) =>
         Effect.gen(function* () {
           yield* store.cancel(input)
+          const span = yield* Effect.option(Effect.currentSpan)
+          if (Option.isSome(span)) {
+            span.value.event("tenetkit.runtime.cancel.requested", yield* Clock.currentTimeNanos)
+          }
           yield* active.interrupt(input.runId)
-        }),
+        }).pipe(
+          Effect.withSpan("TenetKit.Runtime.cancel", {
+            attributes: { "tenetkit.runtime.run_id": input.runId },
+          }),
+        ),
       cancelSession: (input) =>
         Effect.gen(function* () {
           const runIds = yield* store.cancelSession(input)

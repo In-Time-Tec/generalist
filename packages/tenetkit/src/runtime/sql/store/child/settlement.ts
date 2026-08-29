@@ -55,11 +55,23 @@ export const hasPendingOperationCancellation = (runId: string): Effect.Effect<bo
     return pending.length > 0
   })
 
+export const hasUnknownOperation = (runId: string): Effect.Effect<boolean, SqlError, SqlClient.SqlClient> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const pending = yield* sql<{ present: number }>`
+      SELECT 1 AS present FROM tenetkit_run_operations
+      WHERE run_id = ${runId} AND status = 'unknown'
+      UNION ALL
+      SELECT 1 AS present FROM tenetkit_program_operations
+      WHERE run_id = ${runId} AND status = 'unknown'
+      LIMIT 1
+    `
+    return pending.length > 0
+  })
+
 export const hasPendingCancellationWork = (runId: string): Effect.Effect<boolean, SqlError, SqlClient.SqlClient> =>
-  Effect.zipWith(
-    hasPendingOperationCancellation(runId),
-    hasUnsettledChild(runId),
-    (operation, child) => operation || child,
+  Effect.all([hasPendingOperationCancellation(runId), hasUnknownOperation(runId), hasUnsettledChild(runId)]).pipe(
+    Effect.map((pending) => pending.some(Boolean)),
   )
 
 export const reconcileChildWaitWith = <E, R>(input: {

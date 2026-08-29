@@ -33,7 +33,7 @@ const toolRequest = (name: string, params: typeof ToolParams.Type): ToolExecutor
 
 const toolContextLayer = ToolContext.layerTest({
   signal: new AbortController().signal,
-  emit: () => Effect.void,
+  emit: () => Effect.succeed(true),
   sessionId: "child-group:test",
   runId: "parent-run",
   toolCallId: "call-start_child_group",

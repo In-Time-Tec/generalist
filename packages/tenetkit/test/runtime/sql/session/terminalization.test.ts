@@ -152,6 +152,7 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
           value: { _tag: "Success", result: "operation result", encodedResult: "operation encoded result" },
         },
       })
+      const noOutputPaths: ReadonlyArray<string> = []
       const boundedOperationResult = {
         inline: {
           truncated: true as const,
@@ -160,7 +161,7 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
           digest: "a".repeat(64),
           preview: "bounded operation fallback",
         },
-        outputPaths: [] as ReadonlyArray<string>,
+        outputPaths: noOutputPaths,
       }
       yield* store.completeOperation({
         ...claim,
@@ -206,6 +207,23 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
       if (terminal === "cancelled") {
         yield* runtime.cancel({ runId: receipt.runId, reason: "user cancelled" })
         yield* runtime.cancel({ runId: receipt.runId, reason: "user cancelled" })
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+        const unresolvedPath = yield* session.value.path()
+        expect(unresolvedPath.filter((entry) => entry.metadata?.terminalRunId === receipt.runId)).toEqual([])
+        expect(Session.unresolvedToolCalls(Session.buildContext(unresolvedPath)).length).toBeGreaterThan(0)
+        yield* runtime.resolveOperation({
+          runId: receipt.runId,
+          operationId: operations[2]!.operationId,
+          idempotencyKey: `terminalization:${backend}:resolve-unknown`,
+          resolution: {
+            _tag: "Succeeded",
+            value: {
+              _tag: "Success",
+              result: "reconciled operation result",
+              encodedResult: "reconciled operation encoded result",
+            },
+          },
+        })
       } else {
         yield* store.fail({ ...claim, error: terminalFailure })
       }
@@ -231,11 +249,19 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
         isFailure: false,
         result: boundedOperationResult,
       })
-      expect(results[2]).toMatchObject({
-        id: calls[2].id,
-        isFailure: true,
-        result: { _tag: "Unknown", operationId: operations[2]!.operationId },
-      })
+      expect(results[2]).toMatchObject(
+        terminal === "cancelled"
+          ? {
+              id: calls[2].id,
+              isFailure: false,
+              result: "reconciled operation encoded result",
+            }
+          : {
+              id: calls[2].id,
+              isFailure: true,
+              result: { _tag: "Unknown", operationId: operations[2]!.operationId },
+            },
+      )
       expect(results[3]).toMatchObject({
         id: calls[3].id,
         isFailure: true,

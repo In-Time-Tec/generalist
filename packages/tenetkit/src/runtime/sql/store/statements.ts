@@ -22,6 +22,7 @@ import type { DecodedRun, EventRow, RunRow, WaitRow } from "../codec/rows.js"
 import { decodeReason, WaitResolution, type RunWait } from "../../run/wait.js"
 import {
   hasPendingOperationCancellation,
+  hasUnknownOperation,
   hasUnsettledChild,
   loadTerminalEvent,
   reconcileChildWaitWith,
@@ -384,6 +385,7 @@ export const settleParent: {
     `
     if (running.length > 0) return
     if (yield* hasPendingOperationCancellation(parent.runId)) return
+    if (yield* hasUnknownOperation(parent.runId)) return
     if (yield* hasUnsettledChild(parent.runId)) return
     const cancellation = Object.assign(
       { _tag: "RunCancelled" as const },

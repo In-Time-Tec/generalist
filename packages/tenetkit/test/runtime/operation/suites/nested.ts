@@ -14,7 +14,7 @@ const OPERATION_KEY = "outer-operation"
 
 const toolContextValue: ToolContext.Interface = {
   signal: new AbortController().signal,
-  emit: () => Effect.void,
+  emit: () => Effect.succeed(true),
   sessionId: "session:nested",
   runId: "run:nested",
   toolCallId: "call:nested",
@@ -23,7 +23,7 @@ const toolContextValue: ToolContext.Interface = {
 
 const recordingContext = (recorded: Ref.Ref<Array<ToolContext.Progress>>): ToolContext.Interface => ({
   ...toolContextValue,
-  emit: (progress) => Ref.update(recorded, (all) => [...all, progress]),
+  emit: (progress) => Ref.update(recorded, (all) => [...all, progress]).pipe(Effect.as(true)),
 })
 
 const nestedProgress = (

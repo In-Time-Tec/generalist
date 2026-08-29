@@ -16,7 +16,7 @@ const ping = {
 
 const ambient = ToolContext.ToolContext.of({
   signal: new AbortController().signal,
-  emit: () => Effect.void,
+  emit: () => Effect.succeed(true),
   sessionId: "ambient",
   runId: "r",
   toolCallId: "t",

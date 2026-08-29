@@ -325,7 +325,7 @@ export const completeOperation: {
         next,
         run.runId,
         operationUnknownEvent(input.operationId),
-        run.cancellationRequested ? "cancelling" : "needs-resolution",
+        "needs-resolution",
       )
       return [record, unknown] as const
     }),

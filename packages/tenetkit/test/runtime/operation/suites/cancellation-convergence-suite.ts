@@ -43,17 +43,20 @@ for (const [backend, runtimeLayer] of layers) {
         return { runtime, store, receipt, claim, operation }
       })
 
-    it.effect("keeps unknown truthful when cancellation wins before expiration and still cancels", () =>
+    it.effect("keeps unknown unresolved when cancellation wins before expiration", () =>
       Effect.gen(function* () {
         const { runtime, store, receipt, claim, operation } = yield* runningOperation("cancel-first")
         yield* runtime.cancel({ runId: receipt.runId, reason: "cancel first" })
         const expired = yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
         expect(expired.outcome).toBe("unknown")
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
           "unknown",
+        )
+        expect((yield* runtime.history({ runId: receipt.runId, limit: 100 })).map((event) => event._tag)).not.toContain(
+          "RunCancelled",
         )
       }),
     )
@@ -68,13 +71,13 @@ for (const [backend, runtimeLayer] of layers) {
           outcome: { _tag: "Unknown" },
         })
         expect(completed.status).toBe("unknown")
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
       }),
     )
 
-    it.effect("lets cancellation settle an Unknown committed by a finalizer first", () =>
+    it.effect("does not let cancellation settle an Unknown committed by a finalizer first", () =>
       Effect.gen(function* () {
         const { runtime, store, receipt, claim, operation } = yield* runningOperation("complete-unknown-first")
         const completed = yield* store.completeOperation({
@@ -85,20 +88,27 @@ for (const [backend, runtimeLayer] of layers) {
         expect(completed.status).toBe("unknown")
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         yield* runtime.cancel({ runId: receipt.runId, reason: "cancel unknown" })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
       }),
     )
 
-    it.effect("lets cancellation terminally settle a Run that was already needs-resolution", () =>
+    it.effect("terminally settles cancellation only after the unknown operation is resolved", () =>
       Effect.gen(function* () {
         const { runtime, store, receipt, claim, operation } = yield* runningOperation("unknown-first")
         const expired = yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
         expect(expired.outcome).toBe("unknown")
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         yield* runtime.cancel({ runId: receipt.runId, reason: "cancel unknown" })
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+        yield* runtime.resolveOperation({
+          runId: receipt.runId,
+          operationId: operation.operationId,
+          idempotencyKey: "resolve unknown cancellation",
+          resolution: { _tag: "Succeeded", value: { reconciled: true } },
+        })
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
-          "unknown",
+          "succeeded",
         )
       }),
     )

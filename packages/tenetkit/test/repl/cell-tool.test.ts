@@ -51,6 +51,7 @@ const contextLayer = ToolContext.layerTest({
   emit: (progress) =>
     Effect.sync(() => {
       collected.push(progress)
+      return true
     }),
   sessionId,
   toolCallId: "call-1",
@@ -237,6 +238,7 @@ const oversizedContext = ToolContext.layerTest({
   emit: (progress) =>
     Effect.sync(() => {
       oversizedCollected.push(progress)
+      return true
     }),
   sessionId,
   toolCallId: "call-1",

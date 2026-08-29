@@ -19,7 +19,6 @@ import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "../run/wait.js"
 import { make as makeAgentExecutionFailure } from "./agent/failure.js"
 import { make as makeExecutionRetry } from "./retry.js"
-import { ExecutionClaimLifecycle } from "./claim-lifecycle.js"
 import { ExecutionResolution } from "./resolution.js"
 import { make as makeToolCancellation } from "../operation/tool-cancellation.js"
 import { make as makeAgentRunOptions } from "./agent/run-options.js"
@@ -56,7 +55,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
     const active = yield* ActiveExecutions
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
     const reconcileCancellation = yield* makeToolCancellation({ store, resolver: options.resolver })
-    const executeClaim = (claim: ExecutionClaim): Effect.Effect<void> =>
+    const executeClaim = (claim: ExecutionClaim, afterExit: Ref.Ref<Effect.Effect<void>>): Effect.Effect<void> =>
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
         if (claimed.attemptFence !== claim.attemptFence) {
@@ -471,18 +470,30 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
             yield* resolved.agent.open(runClosed)
           }),
         )
+        const cancellationRequested = store.loadExecution(runId).pipe(
+          Effect.map((run) => run.cancellationRequested),
+          Effect.catchTag("tenetkit/runtime/RunNotFound", () => Effect.succeed(false)),
+          Effect.orDie,
+        )
         const execution = scopedExecution.pipe(
           Effect.andThen(
             ProgramChildTerminal.commit(store, claim, deferredProgramChildTerminal, (error) =>
               interruption.settle({ reason: "failure", error }),
             ),
           ),
-          Effect.onInterrupt(() => interruption.onInterrupt(active.cancellationRequested(runId))),
+          Effect.onInterrupt(() => Ref.set(afterExit, interruption.onInterrupt(cancellationRequested))),
         )
         yield* execution
       }).pipe(Effect.orDie)
     const execute = (claim: ExecutionClaim): Effect.Effect<void> =>
-      active.run(claim.runId, ExecutionClaimLifecycle.releaseAfter(store, claim, executeClaim(claim)))
+      Effect.gen(function* () {
+        const afterExit = yield* Ref.make<Effect.Effect<void>>(Effect.void)
+        const settleAndRelease = Ref.get(afterExit).pipe(
+          Effect.flatten,
+          Effect.ensuring(store.releaseExecution(claim).pipe(Effect.ignore)),
+        )
+        yield* active.run(claim.runId, executeClaim(claim, afterExit), settleAndRelease)
+      })
     return ExecutionHost.of({ execute, interrupt: (runId) => active.interrupt(runId) })
   })
 export const layer = (options: Options): Layer.Layer<ExecutionHost, never, RunStore | ActiveExecutions> =>

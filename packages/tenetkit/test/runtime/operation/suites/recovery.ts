@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Config, Deferred, Effect, Fiber, Layer, Redacted, Schema, Stream } from "effect"
+import { Config, Deferred, Effect, Fiber, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Agent, Session, ToolContext, ToolExecutor } from "../../../../src/index.js"
@@ -33,6 +33,7 @@ const finish = Response.makePart("finish", {
   }),
   response: undefined,
 })
+const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const openRouterChunk = (delta: { readonly reasoning?: string; readonly content?: string }): string =>
   JSON.stringify({
@@ -214,8 +215,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             operationKey: `${receipt.runId}:tool:0:large-result-call:large_result`,
           })
           const outcome = yield* Schema.decodeUnknownEffect(
-            Schema.Struct({
-              _tag: Schema.Literal("Success"),
+            Schema.TaggedStruct("Success", {
               result: Schema.Unknown,
               encodedResult: Schema.Struct({
                 inline: Schema.Struct({
@@ -239,9 +239,13 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           let sessionResult: Prompt.ToolResultPart | undefined
           for (const message of context.content) {
             if (!Array.isArray(message.content)) continue
-            sessionResult = message.content.find(
-              (part): part is Prompt.ToolResultPart => part.type === "tool-result" && part.id === "large-result-call",
-            )
+            for (const part of message.content) {
+              const result = Schema.decodeUnknownOption(Prompt.ToolResultPart)(part)
+              if (Option.isSome(result) && result.value.id === "large-result-call") {
+                sessionResult = result.value
+                break
+              }
+            }
             if (sessionResult !== undefined) break
           }
 
@@ -258,9 +262,9 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           expect(completed.result.encodedResult).toEqual(outcome.encodedResult)
           expect(sessionResult?.result).toEqual(outcome.encodedResult)
           expect(secondPrompt).toContain(outcome.encodedResult.inline.digest)
-          expect(JSON.stringify(operation)).not.toContain(raw)
-          expect(JSON.stringify(completed)).not.toContain(raw)
-          expect(JSON.stringify(context.content)).not.toContain(raw)
+          expect(stringify(operation)).not.toContain(raw)
+          expect(stringify(completed)).not.toContain(raw)
+          expect(stringify(context.content)).not.toContain(raw)
           expect(secondPrompt).not.toContain(raw)
         }),
       )
@@ -432,7 +436,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
 
             if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
             const recoveryClaim = yield* claim(receipt.runId, "process-after-crash")
-            const recoveryActive = yield* Layer.build(activeExecutionsLayer)
+            const recoveryActive = yield* Layer.build(Layer.fresh(activeExecutionsLayer))
             const recoveryHost = yield* makeExecutionHost({
               workerId: "process-after-crash",
               resolver,
@@ -559,7 +563,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             ).toBe("requested")
             expect((yield* runtime.inspect(receipt.runId)).status).not.toBe("needs-resolution")
 
-            const recoveryActive = yield* Layer.build(activeExecutionsLayer)
+            const recoveryActive = yield* Layer.build(Layer.fresh(activeExecutionsLayer))
             const recoveryHost = yield* makeExecutionHost({
               workerId: "process-after-crash",
               resolver,
