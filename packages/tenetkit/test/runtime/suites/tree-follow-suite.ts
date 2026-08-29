@@ -27,7 +27,7 @@ const immediateDescendantDelivery = () =>
       selection: "researcher",
       prompt: textPrompt("child"),
     })
-    const replay = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+    const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const following = yield* RunTree.watch({ rootRunId: root.runId, cursor: replay.cursor }).pipe(
       Stream.filter(
         (entry) =>
@@ -54,7 +54,7 @@ const subscribeBeforeReplayRace = () =>
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
     const root = yield* startRoot("tree-follow:subscribe-before-replay")
-    const replay = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+    const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "subscribe-before-replay" })
     const scripted: Runtime.Interface = {
       ...runtime,
@@ -96,13 +96,13 @@ const missedWakeRecovery = () =>
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
     const root = yield* startRoot("tree-follow:recovery")
-    const replay = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+    const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const initialRead = yield* Deferred.make<void>()
     const scripted: Runtime.Interface = {
       ...runtime,
       treeChanges: () => Stream.succeed(undefined),
-      inspectTree: (rootRunId) =>
-        runtime.inspectTree(rootRunId).pipe(Effect.tap(() => Deferred.succeed(initialRead, undefined))),
+      treeCheckpoint: (rootRunId) =>
+        runtime.treeCheckpoint(rootRunId).pipe(Effect.tap(() => Deferred.succeed(initialRead, undefined))),
     }
     const following = yield* RunTree.watch({ rootRunId: root.runId, cursor: replay.cursor }).pipe(
       Stream.filter(({ event }) => event._tag === "TurnStarted"),
@@ -138,7 +138,7 @@ const replayEquivalence = () =>
     const rootClaim = yield* store.claimExecution({ runId: root.runId, ownerId: "root" })
     yield* store.complete({ ...rootClaim, result: completedResult("root") })
 
-    const replay = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+    const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const watched = Array.from(yield* RunTree.watch({ rootRunId: root.runId }).pipe(Stream.runCollect))
     expect(watched.map(({ event }) => event.eventId)).toEqual(replay.events.map(({ event }) => event.eventId))
     expect(watched.map(({ cursor }) => cursor)).toEqual(replay.events.map(({ cursor }) => cursor))
@@ -148,20 +148,20 @@ const boundedRecovery = () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const root = yield* startRoot("tree-follow:bounded")
-    const replay = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+    const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const reads = yield* Ref.make(0)
     const limits = yield* Ref.make<ReadonlyArray<number>>([])
     const initialRead = yield* Deferred.make<void>()
     const scripted: Runtime.Interface = {
       ...runtime,
       treeChanges: () => Stream.succeed(undefined),
-      treeHistory: (input) =>
+      treeReplay: (input) =>
         Ref.update(limits, (current) => [...current, input.limit]).pipe(
           Effect.andThen(Ref.updateAndGet(reads, (count) => count + 1)),
-          Effect.andThen(runtime.treeHistory(input)),
+          Effect.andThen(runtime.treeReplay(input)),
         ),
-      inspectTree: (rootRunId) =>
-        runtime.inspectTree(rootRunId).pipe(Effect.tap(() => Deferred.succeed(initialRead, undefined))),
+      treeCheckpoint: (rootRunId) =>
+        runtime.treeCheckpoint(rootRunId).pipe(Effect.tap(() => Deferred.succeed(initialRead, undefined))),
     }
     const following = yield* RunTree.watch({ rootRunId: root.runId, cursor: replay.cursor }).pipe(
       Stream.runDrain,
@@ -205,11 +205,11 @@ testIt.effect("replays a terminal SQLite tree immediately after restart", () => 
       Effect.gen(function* () {
         const store = yield* RunStore.RunStore
         const root = yield* startRoot("tree-follow:restart")
-        const before = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+        const before = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
         const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "restart" })
         yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 13 } })
         yield* store.complete({ ...claim, result: completedResult("done") })
-        const tail = yield* RunTree.history({ rootRunId: root.runId, cursor: before.cursor, limit: 100 })
+        const tail = yield* RunTree.replay({ rootRunId: root.runId, cursor: before.cursor, limit: 100 })
         return {
           rootRunId: root.runId,
           cursor: before.cursor,

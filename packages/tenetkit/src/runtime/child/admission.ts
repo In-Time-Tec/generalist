@@ -248,8 +248,8 @@ export const make = (store: RunStoreInterface): Interface => {
     listDirect: (parentRunId) =>
       Effect.gen(function* () {
         const execution = yield* store.loadExecution(parentRunId)
-        const tree = yield* store.inspectTree(execution.rootRunId)
-        return tree.runs
+        const checkpoint = yield* store.treeCheckpoint(execution.rootRunId)
+        return checkpoint.inspection.runs
           .filter((entry) => entry.parentRunId === parentRunId)
           .map((entry) => {
             const value: ChildInspection = {

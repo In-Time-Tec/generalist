@@ -5,7 +5,7 @@ import { Effect, Fiber, Ref, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Agent, ExecutableManifest, Pins, ProgramManifest } from "../../src/index.js"
 import { Errors, ExecutableRegistration, RunStore, RunTree, Runtime, RunWait } from "../../src/runtime/index.js"
-import { make as makeTreeCursor, type TreeCursor } from "../../src/runtime/tree/cursor.js"
+import { make as makeTreeCursor } from "../../src/runtime/tree/cursor.js"
 import {
   analystRef,
   assistantAddress,
@@ -131,7 +131,7 @@ layer(memoryLayer)("RunTree", (it) => {
       const rootClaim = yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })
       yield* store.complete({ ...rootClaim, result: completedResult("root result") })
 
-      const active = yield* RunTree.inspect(root.runId)
+      const active = (yield* RunTree.checkpoint(root.runId)).inspection
       expect(active._tag).toBe("Active")
       if (active._tag !== "Active") return
       expect(active.activeRunIds).toEqual([child.runId, grandchild.runId])
@@ -140,15 +140,17 @@ layer(memoryLayer)("RunTree", (it) => {
       const childClaim = yield* store.claimExecution({ runId: child.runId, ownerId: "child-worker" })
       yield* store.fail({ ...childClaim, error: Errors.AgentExecutionFailure.make({ message: "child failed" }) })
       yield* runtime.cancel({ runId: grandchild.runId, reason: "not needed" })
-      const terminal = yield* RunTree.inspect(root.runId)
+      const checkpoint = yield* RunTree.checkpoint(root.runId)
+      const terminal = checkpoint.inspection
       expect(terminal._tag).toBe("Terminal")
       expect(terminal.runs.map(({ outcome }) => outcome?._tag)).toEqual(["Succeeded", "Failed", "Cancelled"])
       expect(yield* RunTree.decodeInspection(yield* RunTree.encodeInspection(terminal))).toEqual(terminal)
-      expect(yield* RunTree.inspect(root.runId)).toEqual(terminal)
+      expect(yield* RunTree.decodeCheckpoint(yield* RunTree.encodeCheckpoint(checkpoint))).toEqual(checkpoint)
+      expect((yield* RunTree.checkpoint(root.runId)).inspection).toEqual(terminal)
     }),
   )
 
-  it.effect("awaits terminal from an inspection cursor without losing the transition", () =>
+  it.effect("awaits terminal from a checkpoint cursor without losing the transition", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -166,7 +168,7 @@ layer(memoryLayer)("RunTree", (it) => {
     }),
   )
 
-  it.effect("watches a tree until its terminal inspection cursor is drained", () =>
+  it.effect("watches a tree until its terminal checkpoint cursor is drained", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -185,7 +187,7 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* TestClock.adjust("50 millis")
       const watched = Array.from(yield* Fiber.join(watching))
       expect(watched.some(({ runId, event }) => runId === root.runId && event._tag === "RunCompleted")).toBe(true)
-      expect((yield* RunTree.inspect(root.runId))._tag).toBe("Terminal")
+      expect((yield* RunTree.checkpoint(root.runId)).inspection._tag).toBe("Terminal")
     }),
   )
 
@@ -217,15 +219,15 @@ layer(memoryLayer)("RunTree", (it) => {
         prompt: textPrompt("sibling"),
       })
 
-      const page = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+      const page = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
       const encodedEvent = yield* RunTree.encodeTreeEvent(page.events[0]!)
-      const encodedPage = yield* RunTree.encodeTreePage(page)
+      const encodedPage = yield* RunTree.encodeReplayPage(page)
       expect(yield* RunTree.decodeTreeEvent(encodedEvent)).toEqual(page.events[0])
-      expect(yield* RunTree.decodeTreePage(encodedPage)).toEqual(page)
+      expect(yield* RunTree.decodeReplayPage(encodedPage)).toEqual(page)
       const invalidEvent = { ...encodedEvent, event: null }
       const invalidPage = { ...encodedPage, hasMore: null }
       expect(yield* Effect.flip(Schema.decodeUnknownEffect(RunTree.TreeEvent)(invalidEvent))).toBeDefined()
-      expect(yield* Effect.flip(Schema.decodeUnknownEffect(RunTree.TreePage)(invalidPage))).toBeDefined()
+      expect(yield* Effect.flip(Schema.decodeUnknownEffect(RunTree.ReplayPage)(invalidPage))).toBeDefined()
       expect(page.events.map((entry) => entry.runId)).toContain(grandchild.runId)
       const childAccepted = page.events.find(
         (entry) => entry.runId === child.runId && entry.event._tag === "RunAccepted",
@@ -272,7 +274,7 @@ layer(memoryLayer)("RunTree", (it) => {
           startedAt: 0,
         },
       })
-      const page = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+      const page = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
       expect(page.events.find((entry) => entry.event._tag === "ToolProgress")?.toolCallId).toBe("tool:1")
       const attempt = page.events.find((entry) => entry.event._tag === "ModelAttemptStarted")
       expect(attempt?.modelCallId).toBe("model-call:1")
@@ -289,16 +291,59 @@ layer(memoryLayer)("RunTree", (it) => {
         idempotencyKey: "pages",
         prompt: textPrompt("pages"),
       })
-      const first = yield* RunTree.history({ rootRunId: root.runId, limit: 1 })
+      const first = yield* RunTree.replay({ rootRunId: root.runId, limit: 1 })
       expect(first.events).toHaveLength(1)
       expect(first.hasMore).toBe(true)
-      const second = yield* RunTree.history({ rootRunId: root.runId, cursor: first.cursor, limit: 1 })
+      const second = yield* RunTree.replay({ rootRunId: root.runId, cursor: first.cursor, limit: 1 })
       expect(second.events).toHaveLength(1)
       expect(second.hasMore).toBe(false)
-      const tail = yield* RunTree.history({ rootRunId: root.runId, cursor: second.cursor, limit: 1 })
+      const tail = yield* RunTree.replay({ rootRunId: root.runId, cursor: second.cursor, limit: 1 })
       expect(tail.events).toEqual([])
       expect(tail.cursor).toBe(second.cursor)
       expect(tail.hasMore).toBe(false)
+    }),
+  )
+
+  it.effect("returns identical pages for duplicate replay reads", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:duplicate-replay",
+        idempotencyKey: "duplicate-replay",
+        prompt: textPrompt("duplicate replay"),
+      })
+      const input = { rootRunId: root.runId, limit: 1 } as const
+      expect(yield* RunTree.replay(input)).toEqual(yield* RunTree.replay(input))
+    }),
+  )
+
+  it.effect("atomically places a concurrent append in the checkpoint or its replay tail", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:checkpoint-race",
+        idempotencyKey: "checkpoint-race",
+        prompt: textPrompt("checkpoint race"),
+      })
+      const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "checkpoint-race" })
+      const [checkpoint] = yield* Effect.all(
+        [
+          RunTree.checkpoint(root.runId),
+          store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 41 } }),
+        ] as const,
+        { concurrency: "unbounded" },
+      )
+      const appended = (yield* runtime.history({ runId: root.runId, limit: 100 })).find(
+        (event) => event._tag === "TurnStarted" && event.turn === 41,
+      )!
+      const inspected = checkpoint.inspection.runs.find(({ run }) => run.runId === root.runId)!.run
+      const tail = yield* RunTree.replay({ rootRunId: root.runId, cursor: checkpoint.cursor, limit: 100 })
+      const reflected = inspected.lastSequence >= appended.sequence
+      const replayed = tail.events.some(({ event }) => event.eventId === appended.eventId)
+      expect([reflected, replayed].filter(Boolean)).toHaveLength(1)
     }),
   )
 
@@ -318,27 +363,45 @@ layer(memoryLayer)("RunTree", (it) => {
         prompt: textPrompt("second"),
       })
       const malformed = RunTree.TreeCursor.make("not-a-cursor")
-      expect((yield* Effect.flip(RunTree.history({ rootRunId: first.runId, cursor: malformed, limit: 1 })))._tag).toBe(
+      expect((yield* Effect.flip(RunTree.replay({ rootRunId: first.runId, cursor: malformed, limit: 1 })))._tag).toBe(
         "tenetkit/runtime/TreeCursorInvalid",
       )
       const unsupported = RunTree.TreeCursor.make(
         `tenetkit-tree:${encodeURIComponent(encodeJson({ version: 2, projection: "run-tree", rootRunId: first.runId, position: 0 }))}`,
       )
-      expect(
-        (yield* Effect.flip(RunTree.history({ rootRunId: first.runId, cursor: unsupported, limit: 1 })))._tag,
-      ).toBe("tenetkit/runtime/TreeCursorInvalid")
-      const firstPage = yield* RunTree.history({ rootRunId: first.runId, limit: 1 })
-      expect(
-        (yield* Effect.flip(RunTree.history({ rootRunId: second.runId, cursor: firstPage.cursor, limit: 1 })))._tag,
-      ).toBe("tenetkit/runtime/TreeCursorInvalid")
-      expect(
-        (yield* Effect.flip(
-          RunTree.history({ rootRunId: first.runId, cursor: makeTreeCursor(first.runId, 99), limit: 1 }),
-        ))._tag,
-      ).toBe("tenetkit/runtime/TreeCursorInvalid")
-      expect((yield* Effect.flip(RunTree.history({ rootRunId: first.runId, limit: 0 })))._tag).toBe(
+      expect((yield* Effect.flip(RunTree.replay({ rootRunId: first.runId, cursor: unsupported, limit: 1 })))._tag).toBe(
         "tenetkit/runtime/TreeCursorInvalid",
       )
+      const firstPage = yield* RunTree.replay({ rootRunId: first.runId, limit: 1 })
+      expect(
+        (yield* Effect.flip(RunTree.replay({ rootRunId: second.runId, cursor: firstPage.cursor, limit: 1 })))._tag,
+      ).toBe("tenetkit/runtime/TreeCursorRootMismatch")
+      const future = yield* Effect.flip(
+        RunTree.replay({ rootRunId: first.runId, cursor: makeTreeCursor(first.runId, 99), limit: 1 }),
+      )
+      expect(future._tag).toBe("tenetkit/runtime/TreeCursorFuture")
+      if (future._tag === "tenetkit/runtime/TreeCursorFuture") {
+        expect(future.latestCursor).toBe((yield* RunTree.checkpoint(first.runId)).cursor)
+      }
+      const expired = yield* Effect.flip(
+        RunTree.replay({ rootRunId: first.runId, cursor: makeTreeCursor(first.runId, -2), limit: 1 }),
+      )
+      expect(expired._tag).toBe("tenetkit/runtime/TreeCursorExpired")
+      if (expired._tag === "tenetkit/runtime/TreeCursorExpired") {
+        expect(expired.earliestCursor).toBe(makeTreeCursor(first.runId, -1))
+      }
+      const reset = yield* RunTree.checkpoint(first.runId)
+      expect(yield* RunTree.replay({ rootRunId: first.runId, cursor: reset.cursor, limit: 1 })).toMatchObject({
+        events: [],
+        cursor: reset.cursor,
+        hasMore: false,
+      })
+      expect(yield* Effect.flip(RunTree.replay({ rootRunId: first.runId, limit: 0 }))).toMatchObject({
+        _tag: "tenetkit/runtime/TreeReplayLimitInvalid",
+        received: "0",
+        minimum: 1,
+        maximum: 1000,
+      })
     }),
   )
 
@@ -352,7 +415,7 @@ layer(memoryLayer)("RunTree", (it) => {
         idempotencyKey: "live",
         prompt: textPrompt("live"),
       })
-      const history = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+      const history = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
       const next = yield* RunTree.events({ rootRunId: root.runId, cursor: history.cursor }).pipe(
         Stream.take(2),
         Stream.runCollect,
@@ -367,6 +430,33 @@ layer(memoryLayer)("RunTree", (it) => {
       expect(events.map(({ event }) => (event._tag === "TurnStarted" ? event.turn : undefined))).toEqual([1, 2])
       expect(events[0]?.cursor).not.toBe(history.cursor)
       expect(events[1]?.cursor).not.toBe(events[0]?.cursor)
+    }),
+  )
+
+  it.effect("hands a checkpoint to live changes without a snapshot gap", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:checkpoint-live",
+        idempotencyKey: "checkpoint-live",
+        prompt: textPrompt("checkpoint live"),
+      })
+      const checkpoint = yield* RunTree.checkpoint(root.runId)
+      const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "checkpoint-live" })
+      yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 42 } })
+      const following = yield* RunTree.events({ rootRunId: root.runId, cursor: checkpoint.cursor }).pipe(
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.forkChild({ startImmediately: true }),
+      )
+      yield* TestClock.adjust("1 second")
+      expect(
+        Array.from(yield* Fiber.join(following), ({ event }) =>
+          event._tag === "TurnStarted" ? event.turn : undefined,
+        ),
+      ).toEqual([42])
     }),
   )
 
@@ -388,7 +478,7 @@ layer(memoryLayer)("RunTree", (it) => {
       })
       const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
       expect(watched.some(({ runId, event }) => runId === root.runId && event._tag === "RunWaiting")).toBe(true)
-      expect((yield* RunTree.inspect(root.runId))._tag).toBe("Active")
+      expect((yield* RunTree.checkpoint(root.runId)).inspection._tag).toBe("Active")
     }),
   )
 
@@ -485,19 +575,18 @@ layer(memoryLayer)("RunTree", (it) => {
         wait: openWait({ waitId: "gate", reason: "external" }),
         suspension: suspension({ waitId: "gate" }),
       })
-      const blocked = yield* RunTree.inspect(root.runId)
+      const blocked = (yield* RunTree.checkpoint(root.runId)).inspection
       expect(blocked._tag).toBe("Active")
       if (blocked._tag !== "Active") return
-      const history = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+      const history = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
       const first = history.events[0]!
       const second = history.events[1]!
       const early = makeTreeCursor(root.runId, 0)
       const late = makeTreeCursor(root.runId, 1)
       expect(blocked.runs).toHaveLength(1)
       const rootRun = blocked.runs[0]!.run
-      const inspectionWith = (wait: RunWait.RunWait | undefined, cursor: TreeCursor): RunTree.Inspection => ({
+      const inspectionWith = (wait: RunWait.RunWait | undefined): RunTree.Inspection => ({
         ...blocked,
-        cursor,
         runs: [
           {
             run:
@@ -526,17 +615,20 @@ layer(memoryLayer)("RunTree", (it) => {
           },
         ],
       })
-      const pages: ReadonlyArray<RunTree.TreePage> = [
+      const pages: ReadonlyArray<RunTree.ReplayPage> = [
         { events: [first], cursor: early, hasMore: false },
         { events: [], cursor: early, hasMore: false },
         { events: [], cursor: early, hasMore: false },
         { events: [second], cursor: late, hasMore: false },
       ]
-      const inspections: ReadonlyArray<RunTree.Inspection> = [
-        inspectionWith({ ...openWait({ waitId: "gate", reason: "external" }), status: "responded" }, early),
-        inspectionWith(undefined, early),
-        inspectionWith(openWait({ waitId: "gate", reason: "external" }), late),
-        inspectionWith(openWait({ waitId: "gate", reason: "external" }), late),
+      const checkpoints: ReadonlyArray<RunTree.Checkpoint> = [
+        {
+          inspection: inspectionWith({ ...openWait({ waitId: "gate", reason: "external" }), status: "responded" }),
+          cursor: early,
+        },
+        { inspection: inspectionWith(undefined), cursor: early },
+        { inspection: inspectionWith(openWait({ waitId: "gate", reason: "external" })), cursor: late },
+        { inspection: inspectionWith(openWait({ waitId: "gate", reason: "external" })), cursor: late },
       ]
       const reads = yield* Ref.make(0)
       const inspects = yield* Ref.make(0)
@@ -547,13 +639,13 @@ layer(memoryLayer)("RunTree", (it) => {
             Stream.succeed(undefined),
             Stream.fromSchedule(Schedule.spaced("1 milli")).pipe(Stream.map(() => undefined)),
           ),
-        treeHistory: () =>
+        treeReplay: () =>
           Ref.getAndUpdate(reads, (index) => index + 1).pipe(
             Effect.map((index) => pages[index] ?? pages[pages.length - 1]!),
           ),
-        inspectTree: () =>
+        treeCheckpoint: () =>
           Ref.getAndUpdate(inspects, (index) => index + 1).pipe(
-            Effect.map((index) => inspections[index] ?? inspections[inspections.length - 1]!),
+            Effect.map((index) => checkpoints[index] ?? checkpoints[checkpoints.length - 1]!),
           ),
       }
       const watching = yield* RunTree.watch({ rootRunId: root.runId, settlement: "root-blocked" }).pipe(
@@ -565,7 +657,7 @@ layer(memoryLayer)("RunTree", (it) => {
       const collected = Array.from(yield* Fiber.join(watching))
       expect(collected.map(({ cursor }) => cursor)).toEqual([first.cursor, second.cursor])
       expect(yield* Ref.get(reads)).toBe(pages.length)
-      expect(yield* Ref.get(inspects)).toBe(inspections.length)
+      expect(yield* Ref.get(inspects)).toBe(checkpoints.length)
     }),
   )
 })

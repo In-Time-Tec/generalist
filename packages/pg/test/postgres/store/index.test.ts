@@ -14,6 +14,7 @@ import {
   Runtime,
   RuntimeWorker,
   RunStore,
+  RunTree,
 } from "tenetkit/runtime"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/postgres/schema.js"
 import {
@@ -160,6 +161,90 @@ const finish = Response.makePart("finish", {
 })
 
 describePostgres("PostgreSQL run store", () => {
+  it.live("atomically checkpoints, bounds replay, and hands off to live tree changes", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const root = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("tree-checkpoint"),
+          idempotencyKey: "tree-checkpoint",
+          prompt: textPrompt("tree checkpoint"),
+        })
+        const [claimed] = yield* claims.claimReadyRuns({ workerId: "tree-checkpoint", limit: 1, lease: "10 seconds" })
+        const claim = {
+          runId: root.runId,
+          ownerId: claimed!.workerId,
+          attemptFence: claimed!.attemptFence,
+        }
+        const [checkpoint] = yield* Effect.all(
+          [
+            runtime.treeCheckpoint(root.runId),
+            store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 41 } }),
+          ] as const,
+          { concurrency: "unbounded" },
+        )
+        const appended = (yield* runtime.history({ runId: root.runId, limit: 100 })).find(
+          (event) => event._tag === "TurnStarted" && event.turn === 41,
+        )!
+        const inspected = checkpoint.inspection.runs.find(({ run }) => run.runId === root.runId)!.run
+        const tail = yield* runtime.treeReplay({ rootRunId: root.runId, cursor: checkpoint.cursor, limit: 100 })
+        expect(
+          [
+            inspected.lastSequence >= appended.sequence,
+            tail.events.some(({ event }) => event.eventId === appended.eventId),
+          ].filter(Boolean),
+        ).toHaveLength(1)
+
+        const first = yield* runtime.treeReplay({ rootRunId: root.runId, limit: 1 })
+        expect(first.events).toHaveLength(1)
+        expect(first.hasMore).toBe(true)
+        expect(yield* runtime.treeReplay({ rootRunId: root.runId, limit: 1 })).toEqual(first)
+
+        const other = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("tree-checkpoint-other"),
+          idempotencyKey: "tree-checkpoint-other",
+          prompt: textPrompt("other tree"),
+        })
+        expect(
+          (yield* runtime.treeReplay({ rootRunId: other.runId, cursor: checkpoint.cursor, limit: 1 }).pipe(Effect.flip))
+            ._tag,
+        ).toBe("tenetkit/runtime/TreeCursorRootMismatch")
+        const cursor = (position: number) =>
+          RunTree.TreeCursor.make(
+            `tenetkit-tree:${encodeURIComponent(JSON.stringify({ version: 1, projection: "run-tree", rootRunId: root.runId, position }))}`,
+          )
+        expect(
+          (yield* runtime.treeReplay({ rootRunId: root.runId, cursor: cursor(99), limit: 1 }).pipe(Effect.flip))._tag,
+        ).toBe("tenetkit/runtime/TreeCursorFuture")
+        const expired = yield* runtime
+          .treeReplay({ rootRunId: root.runId, cursor: cursor(-2), limit: 1 })
+          .pipe(Effect.flip)
+        expect(expired._tag).toBe("tenetkit/runtime/TreeCursorExpired")
+        if (expired._tag === "tenetkit/runtime/TreeCursorExpired") expect(expired.earliestCursor).toBe(cursor(-1))
+
+        const liveCheckpoint = yield* runtime.treeCheckpoint(root.runId)
+        const following = yield* RunTree.events({ rootRunId: root.runId, cursor: liveCheckpoint.cursor }).pipe(
+          Stream.filter(({ event }) => event._tag === "TurnStarted" && event.turn === 42),
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.forkChild({ startImmediately: true }),
+        )
+        yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 42 } })
+        expect(Array.from(yield* Fiber.join(following))).toHaveLength(1)
+        const reset = yield* runtime.treeCheckpoint(root.runId)
+        expect(yield* runtime.treeReplay({ rootRunId: root.runId, cursor: reset.cursor, limit: 1 })).toMatchObject({
+          events: [],
+          cursor: reset.cursor,
+          hasMore: false,
+        })
+      }).pipe(scopedWith(postgresLayer(url))),
+    ),
+  )
+
   it.live("paginates every Run in deterministic keyset order beyond one scheduler window", () =>
     withSchema(
       Effect.gen(function* () {
@@ -1490,7 +1575,7 @@ describePostgres("PostgreSQL run store", () => {
           })
           .pipe(Effect.flip)
         expect(changed).toBeInstanceOf(Errors.FanOutConflict)
-        const beforeMissing = yield* runtime.inspectTree(parent.runId)
+        const beforeMissing = yield* runtime.treeCheckpoint(parent.runId)
         const missing = yield* runtime
           .fanOut({
             parentRunId: parent.runId,
@@ -1502,7 +1587,7 @@ describePostgres("PostgreSQL run store", () => {
           })
           .pipe(Effect.flip)
         expect(missing).toBeInstanceOf(Errors.ChildSelectionMissing)
-        expect(yield* runtime.inspectTree(parent.runId)).toEqual(beforeMissing)
+        expect(yield* runtime.treeCheckpoint(parent.runId)).toEqual(beforeMissing)
         const first = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(first.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[0]])
         yield* claims.commitWithClaim({

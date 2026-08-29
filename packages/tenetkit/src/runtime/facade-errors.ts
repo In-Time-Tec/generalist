@@ -17,7 +17,10 @@ import {
   ApprovalMismatch as Errors_ApprovalMismatch,
   CursorExpired as Errors_CursorExpired,
   TreeCursorInvalid as Errors_TreeCursorInvalid,
+  TreeCursorRootMismatch as Errors_TreeCursorRootMismatch,
   TreeCursorExpired as Errors_TreeCursorExpired,
+  TreeCursorFuture as Errors_TreeCursorFuture,
+  TreeReplayLimitInvalid as Errors_TreeReplayLimitInvalid,
   SubscriberLagged as Errors_SubscriberLagged,
   RuntimeUnavailable as Errors_RuntimeUnavailable,
   SessionEntryNotFound as Errors_SessionEntryNotFound,
@@ -67,7 +70,10 @@ export const Errors = {
   ApprovalMismatch: Errors_ApprovalMismatch,
   CursorExpired: Errors_CursorExpired,
   TreeCursorInvalid: Errors_TreeCursorInvalid,
+  TreeCursorRootMismatch: Errors_TreeCursorRootMismatch,
   TreeCursorExpired: Errors_TreeCursorExpired,
+  TreeCursorFuture: Errors_TreeCursorFuture,
+  TreeReplayLimitInvalid: Errors_TreeReplayLimitInvalid,
   SubscriberLagged: Errors_SubscriberLagged,
   RuntimeUnavailable: Errors_RuntimeUnavailable,
   SessionEntryNotFound: Errors_SessionEntryNotFound,
@@ -115,7 +121,10 @@ export namespace Errors {
   export type ApprovalMismatch = import("./errors.js").ApprovalMismatch
   export type CursorExpired = import("./errors.js").CursorExpired
   export type TreeCursorInvalid = import("./errors.js").TreeCursorInvalid
+  export type TreeCursorRootMismatch = import("./errors.js").TreeCursorRootMismatch
   export type TreeCursorExpired = import("./errors.js").TreeCursorExpired
+  export type TreeCursorFuture = import("./errors.js").TreeCursorFuture
+  export type TreeReplayLimitInvalid = import("./errors.js").TreeReplayLimitInvalid
   export type SubscriberLagged = import("./errors.js").SubscriberLagged
   export type RuntimeUnavailable = import("./errors.js").RuntimeUnavailable
   export type SessionEntryNotFound = import("./errors.js").SessionEntryNotFound

@@ -198,7 +198,7 @@ layer(memoryLayer)("Runtime children", (it) => {
         expect(cancelled).toMatchObject({ reason: "stop" })
       }
 
-      const tree = yield* RunTree.history({ rootRunId: parent.runId, limit: 200 })
+      const tree = yield* RunTree.replay({ rootRunId: parent.runId, limit: 200 })
       const cancelledRunIds = tree.events.filter((item) => item.event._tag === "RunCancelled").map((item) => item.runId)
       expect(new Set(cancelledRunIds)).toEqual(new Set([parent.runId, first.runId, second.runId]))
       expect(cancelledRunIds.indexOf(parent.runId)).toBe(cancelledRunIds.length - 1)
@@ -217,7 +217,7 @@ layer(memoryLayer)("Runtime children", (it) => {
       })
       const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "test" })
       yield* store.complete({ ...claim, result: completedResult("done") })
-      const before = yield* RunTree.inspect(parent.runId)
+      const before = yield* RunTree.checkpoint(parent.runId)
       const failure = yield* runtime
         .spawn({
           parentRunId: parent.runId,
@@ -227,7 +227,7 @@ layer(memoryLayer)("Runtime children", (it) => {
         })
         .pipe(Effect.flip)
       expect(failure).toBeInstanceOf(Errors.RunTerminal)
-      expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+      expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
     }),
   )
 })
@@ -311,12 +311,12 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
         idempotencyKey: "parent",
         prompt: "parent",
       })
-      const before = yield* RunTree.inspect(parent.runId)
+      const before = yield* RunTree.checkpoint(parent.runId)
       const failure = yield* runtime
         .spawn({ parentRunId: parent.runId, invocationId: "missing", selection: "undeclared", prompt: "child" })
         .pipe(Effect.flip)
       expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-      expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+      expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
     }),
   )
 })

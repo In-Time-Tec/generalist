@@ -855,7 +855,7 @@ describeMysql("mysql run store", () => {
           })
           .pipe(Effect.flip)
         expect(changed).toBeInstanceOf(Errors.FanOutConflict)
-        const beforeMissing = yield* runtime.inspectTree(parent.runId)
+        const beforeMissing = yield* runtime.treeCheckpoint(parent.runId)
         const missing = yield* runtime
           .fanOut({
             parentRunId: parent.runId,
@@ -867,7 +867,7 @@ describeMysql("mysql run store", () => {
           })
           .pipe(Effect.flip)
         expect(missing).toBeInstanceOf(Errors.ChildSelectionMissing)
-        expect(yield* runtime.inspectTree(parent.runId)).toEqual(beforeMissing)
+        expect(yield* runtime.treeCheckpoint(parent.runId)).toEqual(beforeMissing)
         const first = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(first.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[0]])
         yield* claims.commitWithClaim({

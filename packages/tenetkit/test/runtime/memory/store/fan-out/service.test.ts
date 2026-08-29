@@ -76,7 +76,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
     Effect.gen(function* () {
       const { parent, receipt } = yield* admit("tree-index")
       for (const childRunId of receipt.childRunIds) yield* succeed(childRunId)
-      const page = yield* RunTree.history({ rootRunId: parent.runId, limit: 100 })
+      const page = yield* RunTree.replay({ rootRunId: parent.runId, limit: 100 })
       const acceptedChildren = page.events
         .filter((entry) => entry.event._tag === "RunAccepted" && entry.runId !== parent.runId)
         .map((entry) => entry.runId)
@@ -170,7 +170,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
       yield* succeed(parent.runId)
       expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
       yield* succeed(receipt.childRunIds[0]!)
-      const rootEvents = (yield* RunTree.history({ rootRunId: parent.runId, limit: 100 })).events
+      const rootEvents = (yield* RunTree.replay({ rootRunId: parent.runId, limit: 100 })).events
         .filter((entry) => entry.runId === parent.runId)
         .map((entry) => entry.event)
       const completed = rootEvents.find((event) => event._tag === "RunCompleted")!
@@ -181,7 +181,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
       expect((yield* runtime.awaitFanOut(receipt.fanOutId)).status).toBe("succeeded")
       const snapshot = yield* runtime.inspect(parent.runId)
       expect(snapshot.status).toBe("succeeded")
-      const terminal = yield* RunTree.inspect(parent.runId)
+      const terminal = (yield* RunTree.checkpoint(parent.runId)).inspection
       expect(terminal.runs.find((entry) => entry.run.runId === parent.runId)!.outcome!.eventId).toBe(completed.eventId)
     }),
   )
@@ -450,7 +450,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
         idempotencyKey: "parent",
         prompt: "parent",
       })
-      const before = yield* RunTree.inspect(parent.runId)
+      const before = yield* RunTree.checkpoint(parent.runId)
       const failure = yield* runtime
         .fanOut({
           parentRunId: parent.runId,
@@ -465,7 +465,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
         })
         .pipe(Effect.flip)
       expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-      expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+      expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
     }),
   )
 })

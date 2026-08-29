@@ -64,8 +64,8 @@ import {
 } from "./store/directory.js"
 import { make as makeEventHub } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store/fan-out/service.js"
-import { loadTreeHistory } from "./tree-history.js"
-import { loadRunSnapshot, loadTreeInspection } from "./inspection/service.js"
+import { loadTreeReplay } from "./tree-replay.js"
+import { loadRunSnapshot, loadTreeCheckpoint } from "./inspection/service.js"
 import {
   admitProgramAgents,
   commitProgramLog,
@@ -270,7 +270,7 @@ const makeSqliteStoreServices = (
           }),
         ),
       snapshot: (runId) => run(loadRunSnapshot(runId)),
-      inspectTree: (rootRunId) => run(loadTreeInspection(rootRunId)),
+      treeCheckpoint: (rootRunId) => run(loadTreeCheckpoint(rootRunId)),
       sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
       history: (input) =>
         runNoTxn(
@@ -283,7 +283,7 @@ const makeSqliteStoreServices = (
             return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
           }),
         ),
-      treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
+      treeReplay: (input) => runNoTxn(loadTreeReplay(input)),
       treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
       list: (input) => runNoTxn(listRuns(input)),
       complete: (input) =>

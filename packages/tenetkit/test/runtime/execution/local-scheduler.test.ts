@@ -253,7 +253,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           const tags = history.map((event) => event._tag)
           expect(tags.slice(tags.indexOf("RunCancellationRequested") + 1)).not.toContain("RunResumed")
           expect(tags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
-          const tree = yield* runtime.treeHistory({ rootRunId: parent.runId, limit: 100 })
+          const tree = yield* runtime.treeReplay({ rootRunId: parent.runId, limit: 100 })
           const cancelled = tree.events
             .filter((entry) => entry.event._tag === "RunCancelled")
             .map((entry) => entry.runId)
@@ -279,7 +279,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           yield* scheduler.tick
           expect((yield* runtime.inspect(activeChild.runId)).status).toBe("cancelled")
           expect((yield* runtime.inspect(activeParent.runId)).status).toBe("cancelled")
-          const activeTree = yield* runtime.treeHistory({ rootRunId: activeParent.runId, limit: 100 })
+          const activeTree = yield* runtime.treeReplay({ rootRunId: activeParent.runId, limit: 100 })
           const activeCancelled = activeTree.events
             .filter((entry) => entry.event._tag === "RunCancelled")
             .map((entry) => entry.runId)

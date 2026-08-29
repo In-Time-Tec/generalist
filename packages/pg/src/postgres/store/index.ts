@@ -43,7 +43,7 @@ import { hasAdmission, loadRunWait } from "tenetkit/runtime/driver/sql/store/sta
 import { WaitResolution } from "tenetkit/runtime/driver/run/wait"
 import { fanOutStoreMethods } from "./fan-out.js"
 import { deferCancelledFanOutParent, cancelRunFor } from "./cancel.js"
-import "tenetkit/runtime/driver/sql/tree-history"
+import "tenetkit/runtime/driver/sql/tree-replay"
 import "tenetkit/runtime/driver/sql/inspection/service"
 import { withConsistentSnapshot } from "tenetkit/runtime/driver/sql/inspection/transaction"
 import {

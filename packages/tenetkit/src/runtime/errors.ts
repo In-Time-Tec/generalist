@@ -4,9 +4,9 @@ import { RunBudget } from "../core/durable/public/run-budget.js"
 import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
 import { ExecutableRef } from "./executable/manifest.js"
-import { TreeCursor, TreeCursorInvalid } from "./tree/cursor.js"
+import { TreeCursor, TreeCursorInvalid, TreeCursorRootMismatch } from "./tree/cursor.js"
 
-export { TreeCursorInvalid }
+export { TreeCursorInvalid, TreeCursorRootMismatch }
 
 export class AddressNotFound extends Schema.TaggedError<AddressNotFound>()("tenetkit/runtime/AddressNotFound", {
   address: Address,
@@ -181,6 +181,23 @@ export class TreeCursorExpired extends Schema.TaggedError<TreeCursorExpired>()("
   cursor: TreeCursor,
   earliestCursor: TreeCursor,
 }) {}
+
+/** @experimental The cursor names a position that has not committed. */
+export class TreeCursorFuture extends Schema.TaggedError<TreeCursorFuture>()("tenetkit/runtime/TreeCursorFuture", {
+  rootRunId: Schema.String,
+  cursor: TreeCursor,
+  latestCursor: TreeCursor,
+}) {}
+
+/** @experimental A replay request falls outside the fixed page-size contract. */
+export class TreeReplayLimitInvalid extends Schema.TaggedError<TreeReplayLimitInvalid>()(
+  "tenetkit/runtime/TreeReplayLimitInvalid",
+  {
+    received: Schema.String,
+    minimum: Schema.Int,
+    maximum: Schema.Int,
+  },
+) {}
 
 export class SubscriberLagged extends Schema.TaggedError<SubscriberLagged>()("tenetkit/runtime/SubscriberLagged", {
   runId: Schema.String,

@@ -191,7 +191,7 @@ describe("Runtime code_mode Program children", () => {
         yield* scheduler.tick
         yield* scheduler.idle
         expect((yield* runtime.inspect(rootRunId)).status).toBe("waiting")
-        const tree = yield* runtime.inspectTree(rootRunId)
+        const tree = (yield* runtime.treeCheckpoint(rootRunId)).inspection
         expect(tree.runs).toHaveLength(2)
         const children = tree.runs.filter((run) => run.parentRunId === rootRunId)
         expect(children).toHaveLength(1)
@@ -210,7 +210,7 @@ describe("Runtime code_mode Program children", () => {
           _tag: "Succeeded",
           result: { text: "root-complete" },
         })
-        expect((yield* runtime.inspectTree(rootRunId)).runs).toHaveLength(2)
+        expect((yield* runtime.treeCheckpoint(rootRunId)).inspection.runs).toHaveLength(2)
       })
       if (backend === "memory") {
         return withLayer(Runtime.layerMemory(options))(admit.pipe(Effect.andThen(finishRun)))
@@ -241,7 +241,7 @@ describe("Runtime code_mode Program children", () => {
             })).runId
             yield* scheduler.tick
             yield* scheduler.idle
-            const childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find(
+            const childRunId = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.find(
               (run) => run.parentRunId === rootRunId,
             )!.run.runId
             yield* runtime.cancel({ runId: rootRunId, reason: "operator cancelled" })
@@ -290,7 +290,7 @@ describe("Runtime code_mode Program children", () => {
           const scope = yield* Scope.make()
           const fiber = yield* host.execute(claim).pipe(Effect.forkIn(scope))
           yield* Deferred.await(reached)
-          const tree = yield* runtime.inspectTree(rootRunId)
+          const tree = (yield* runtime.treeCheckpoint(rootRunId)).inspection
           expect(counts.model).toBe(1)
           expect(counts.capability).toBe(0)
           expect(tree.runs).toHaveLength(crashPoint === "before-admission" ? 1 : 2)
@@ -306,7 +306,7 @@ describe("Runtime code_mode Program children", () => {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           if (crashPoint === "before-admission") {
-            expect((yield* runtime.inspectTree(rootRunId)).runs).toHaveLength(1)
+            expect((yield* runtime.treeCheckpoint(rootRunId)).inspection.runs).toHaveLength(1)
             expect(counts.model).toBe(1)
             expect(counts.capability).toBe(0)
             return
@@ -318,7 +318,7 @@ describe("Runtime code_mode Program children", () => {
           expect(counts.model).toBe(2)
           expect(counts.capability).toBe(1)
           expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
-          const tree = yield* runtime.inspectTree(rootRunId)
+          const tree = (yield* runtime.treeCheckpoint(rootRunId)).inspection
           expect(tree.runs).toHaveLength(2)
           const recoveredChild = tree.runs.find((run) => run.parentRunId === rootRunId)!.run.runId
           const expectedChild = `run_code_${Pins.digest({ parentRunId: rootRunId, toolCallId: "code-1" }).slice(0, 32)}`
@@ -349,8 +349,9 @@ describe("Runtime code_mode Program children", () => {
         })).runId
         yield* scheduler.tick
         yield* scheduler.idle
-        childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find((run) => run.parentRunId === rootRunId)!.run
-          .runId
+        childRunId = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.find(
+          (run) => run.parentRunId === rootRunId,
+        )!.run.runId
         yield* scheduler.tick
         yield* scheduler.idle
         expect((yield* runtime.inspect(rootRunId)).status).toBe("running")

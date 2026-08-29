@@ -72,7 +72,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
           }
 
           const receipt = yield* runtime.admit(broaderStart)
-          expect((yield* runtime.inspectTree(receipt.runId)).runs).toHaveLength(1)
+          expect((yield* runtime.treeCheckpoint(receipt.runId)).inspection.runs).toHaveLength(1)
           expect(yield* tags(receipt.runId)).toEqual(["RunAccepted"])
         }),
       ),

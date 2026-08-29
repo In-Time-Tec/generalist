@@ -8,7 +8,7 @@ import {
   type RunInspection,
   type RunOutcome,
 } from "../run.js"
-import type { TreeRunInspection } from "../tree.js"
+import type { Checkpoint, Inspection, TreeRunInspection } from "../tree.js"
 
 export interface InspectionRun {
   readonly inspection: RunInspection
@@ -322,25 +322,6 @@ export const projectRunSnapshot = (run: InspectionRun) =>
     return outcome === undefined ? snapshot : { ...snapshot, outcome }
   })
 
-type TreeInspectionResult =
-  | {
-      readonly _tag: "Terminal"
-      readonly rootRunId: string
-      readonly cursor: import("../tree/cursor.js").TreeCursor
-      readonly runs: TreeRunInspection[]
-      readonly usage: readonly RawUsageFact[]
-      readonly compactions: readonly CompactionInspection[]
-    }
-  | {
-      readonly _tag: "Active"
-      readonly rootRunId: string
-      readonly cursor: import("../tree/cursor.js").TreeCursor
-      readonly runs: TreeRunInspection[]
-      readonly usage: readonly RawUsageFact[]
-      readonly compactions: readonly CompactionInspection[]
-      readonly activeRunIds: string[]
-    }
-
 interface ProjectedTreeRun {
   run: RunInspection
   parentRunId?: string
@@ -348,16 +329,16 @@ interface ProjectedTreeRun {
   outcome?: RunOutcome
 }
 
-export const projectTreeInspection: {
+export const projectTreeCheckpoint: {
   (
     cursor: import("../tree/cursor.js").TreeCursor,
     input: ReadonlyArray<InspectionRun>,
-  ): (rootRunId: string) => Effect.Effect<TreeInspectionResult, RuntimeUnavailable>
+  ): (rootRunId: string) => Effect.Effect<Checkpoint, RuntimeUnavailable>
   (
     rootRunId: string,
     cursor: import("../tree/cursor.js").TreeCursor,
     input: ReadonlyArray<InspectionRun>,
-  ): Effect.Effect<TreeInspectionResult, RuntimeUnavailable>
+  ): Effect.Effect<Checkpoint, RuntimeUnavailable>
 } = Function.dual(
   3,
   (rootRunId: string, cursor: import("../tree/cursor.js").TreeCursor, input: ReadonlyArray<InspectionRun>) =>
@@ -391,13 +372,14 @@ export const projectTreeInspection: {
       const activeRunIds = inspected.filter(({ run }) => !isTerminal(run.status)).map(({ run }) => run.runId)
       const common = {
         rootRunId,
-        cursor,
         runs: inspected,
         usage: yield* factsFor(runs),
         compactions: yield* compactionsFor(runs),
       }
-      return activeRunIds.length === 0
-        ? ({ _tag: "Terminal", ...common } as const)
-        : ({ _tag: "Active", ...common, activeRunIds } as const)
+      const inspection: Inspection =
+        activeRunIds.length === 0
+          ? ({ _tag: "Terminal", ...common } as const)
+          : ({ _tag: "Active", ...common, activeRunIds } as const)
+      return { inspection, cursor }
     }),
 )

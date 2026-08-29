@@ -16,9 +16,9 @@ export const awaitSessionTerminal = (input: {
           Effect.gen(function* () {
             const pull = yield* Stream.toPull(input.store.treeChanges(rootRunId))
             const awaitTerminal: Effect.Effect<void, RuntimeUnavailable> = Effect.suspend(() =>
-              input.store.inspectTree(rootRunId).pipe(
-                Effect.flatMap((inspection) =>
-                  inspection.runs.every((entry) => isTerminal(entry.run.status))
+              input.store.treeCheckpoint(rootRunId).pipe(
+                Effect.flatMap((checkpoint) =>
+                  checkpoint.inspection.runs.every((entry) => isTerminal(entry.run.status))
                     ? Effect.void
                     : Effect.raceFirst(pull.pipe(Pull.catchDone(() => Effect.void)), Effect.sleep("1 second")).pipe(
                         Effect.andThen(awaitTerminal),

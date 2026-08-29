@@ -87,7 +87,7 @@ standalone.live("persists and resumes bounded fan-out across SQLite reopen", () 
         ])
         expect(joined.members.map((member) => member.status)).toEqual(["succeeded", "succeeded", "abandoned"])
         expect(joined.members.map((member) => member.ordinal)).toEqual([0, 1, 2])
-        const tree = yield* RunTree.history({ rootRunId: admitted.parentRunId, limit: 100 })
+        const tree = yield* RunTree.replay({ rootRunId: admitted.parentRunId, limit: 100 })
         const acceptedChildren = tree.events.filter(
           (entry) => entry.event._tag === "RunAccepted" && entry.parentRunId === admitted.parentRunId,
         )
@@ -165,11 +165,11 @@ standalone.live("recovers a pending SQLite root outcome and settles it after fan
         const runtime = yield* Runtime.Runtime
         const snapshot = yield* runtime.inspect(settled.parentRunId)
         expect(snapshot.status).toBe("succeeded")
-        const terminal = yield* RunTree.inspect(settled.parentRunId)
+        const terminal = (yield* RunTree.checkpoint(settled.parentRunId)).inspection
         expect(terminal.runs.find((entry) => entry.run.runId === settled.parentRunId)!.outcome!.eventId).toBe(
           settled.completedEventId,
         )
-        const history = yield* RunTree.history({ rootRunId: settled.parentRunId, limit: 100 })
+        const history = yield* RunTree.replay({ rootRunId: settled.parentRunId, limit: 100 })
         expect(history.events.filter((entry) => entry.event._tag === "FanOutJoined")).toHaveLength(1)
       }),
     )
@@ -188,7 +188,7 @@ layer(sqliteLayer(tempDbPath("fan-out-missing")))(
           idempotencyKey: "parent",
           prompt: "parent",
         })
-        const before = yield* RunTree.inspect(parent.runId)
+        const before = yield* RunTree.checkpoint(parent.runId)
         const failure = yield* runtime
           .fanOut({
             parentRunId: parent.runId,
@@ -203,7 +203,7 @@ layer(sqliteLayer(tempDbPath("fan-out-missing")))(
           })
           .pipe(Effect.flip)
         expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-        expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+        expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
       }),
     )
   },
@@ -221,7 +221,7 @@ layer(sqliteLayer(tempDbPath("fan-out-terminate")))(
           idempotencyKey: "parent",
           prompt: "parent",
         })
-        const before = yield* RunTree.inspect(parent.runId)
+        const before = yield* RunTree.checkpoint(parent.runId)
         const failure = yield* runtime
           .fanOut({
             parentRunId: parent.runId,
@@ -235,7 +235,7 @@ layer(sqliteLayer(tempDbPath("fan-out-terminate")))(
         expect(failure).toEqual(
           Errors.FanOutRemainderUnsupported.make({ remainder: "terminate", durability: "durable" }),
         )
-        expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+        expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
       }),
     )
   },

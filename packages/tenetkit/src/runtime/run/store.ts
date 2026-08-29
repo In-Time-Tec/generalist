@@ -23,7 +23,8 @@ import type {
   FanOutNotFound,
   ChildSelectionMissing,
   TreeCursorExpired,
-  TreeCursorInvalid,
+  TreeCursorFuture,
+  TreeReplayLimitInvalid,
   OperationResolutionConflict,
   ExecutableRegistrationConflict,
   StartInvalid,
@@ -257,22 +258,22 @@ export interface Interface {
   }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RunNotFound | RuntimeUnavailable>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable>
-  readonly inspectTree: (
+  readonly treeCheckpoint: (
     rootRunId: string,
-  ) => Effect.Effect<import("../tree.js").Inspection, RunNotFound | RuntimeUnavailable>
+  ) => Effect.Effect<import("../tree.js").Checkpoint, RunNotFound | RuntimeUnavailable>
   readonly sessionRoots: (sessionId: string) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable>
   readonly history: (input: {
     readonly runId: string
     readonly cursor: Cursor
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<RunEvent>, RunNotFound | CursorExpired | RuntimeUnavailable>
-  readonly treeHistory: (input: {
+  readonly treeReplay: (input: {
     readonly rootRunId: string
     readonly position: number
     readonly limit: number
   }) => Effect.Effect<
-    import("../tree.js").TreePage,
-    RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
+    import("../tree.js").ReplayPage,
+    RunNotFound | TreeCursorExpired | TreeCursorFuture | TreeReplayLimitInvalid | RuntimeUnavailable
   >
   readonly treeChanges: (rootRunId: string) => Stream.Stream<void, RunNotFound | RuntimeUnavailable>
   readonly list: (input: {

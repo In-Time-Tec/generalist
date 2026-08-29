@@ -1,13 +1,13 @@
 import { Effect } from "effect"
 import { CursorExpired, RunNotFound } from "tenetkit/runtime/driver/errors"
 import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
-import { loadRunSnapshot, loadTreeInspection } from "tenetkit/runtime/driver/sql/inspection/service"
+import { loadRunSnapshot, loadTreeCheckpoint } from "tenetkit/runtime/driver/sql/inspection/service"
 import { sessionRoots } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { loadChildReadiness } from "tenetkit/runtime/driver/sql/store/child/capacity"
 import { loadEventsAfter, loadRun, loadRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import { listRuns } from "tenetkit/runtime/driver/sql/store/list"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import { loadTreeHistory } from "tenetkit/runtime/driver/sql/tree-history"
+import { loadTreeReplay } from "tenetkit/runtime/driver/sql/tree-replay"
 import type { RunFn } from "../transaction/events.js"
 
 export const inspectionStoreMethods = (deps: {
@@ -16,7 +16,7 @@ export const inspectionStoreMethods = (deps: {
   readonly runInspection: RunFn
 }): Pick<
   RunStoreInterface,
-  "inspect" | "snapshot" | "sessionRoots" | "inspectTree" | "history" | "treeHistory" | "treeChanges" | "list"
+  "inspect" | "snapshot" | "sessionRoots" | "treeCheckpoint" | "history" | "treeReplay" | "treeChanges" | "list"
 > => ({
   inspect: (runId) =>
     deps.runNoTxn(
@@ -42,7 +42,7 @@ export const inspectionStoreMethods = (deps: {
     ),
   snapshot: (runId) => deps.runInspection(loadRunSnapshot(runId)),
   sessionRoots: (sessionId) => deps.runNoTxn(sessionRoots(sessionId)),
-  inspectTree: (rootRunId) => deps.runInspection(loadTreeInspection(rootRunId)),
+  treeCheckpoint: (rootRunId) => deps.runInspection(loadTreeCheckpoint(rootRunId)),
   history: (input) =>
     deps.runNoTxn(
       Effect.gen(function* () {
@@ -53,7 +53,7 @@ export const inspectionStoreMethods = (deps: {
         return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
       }),
     ),
-  treeHistory: (input) => deps.runNoTxn(loadTreeHistory(input)),
+  treeReplay: (input) => deps.runNoTxn(loadTreeReplay(input)),
   treeChanges: (rootRunId) => deps.hub.subscribeTree({ rootRunId }),
   list: (input) => deps.runNoTxn(listRuns(input)),
 })

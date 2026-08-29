@@ -391,13 +391,13 @@ export const serviceEffect = (
         store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
       sessionEntry: readEntry(store),
       resolveModelResponse: resolveModelResponse(store),
-      treeHistory: (input) =>
+      treeReplay: (input) =>
         Effect.gen(function* () {
           const position = yield* parseCursor(input.rootRunId, input.cursor)
-          return yield* store.treeHistory({ rootRunId: input.rootRunId, position, limit: input.limit })
+          return yield* store.treeReplay({ rootRunId: input.rootRunId, position, limit: input.limit })
         }),
       treeChanges: store.treeChanges,
-      inspectTree: store.inspectTree,
+      treeCheckpoint: store.treeCheckpoint,
       list: store.list,
       respond: store.respond,
       respondApproval: store.respondApproval,

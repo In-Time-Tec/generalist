@@ -266,7 +266,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
         })
         .pipe(Effect.flip)
       expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
-      expect((yield* runtime.inspectTree((yield* runtime.start(base)).runId)).runs).toHaveLength(3)
+      expect((yield* runtime.treeCheckpoint((yield* runtime.start(base)).runId)).inspection.runs).toHaveLength(3)
     }),
   )
 
@@ -433,7 +433,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.start(input)
-        expect((yield* runtime.inspectTree(receipt.runId)).runs).toHaveLength(2)
+        expect((yield* runtime.treeCheckpoint(receipt.runId)).inspection.runs).toHaveLength(2)
         expect(
           (yield* runtime.history({ runId: receipt.runId, limit: 100 })).find((event) => event._tag === "ChildLinked"),
         ).toMatchObject({

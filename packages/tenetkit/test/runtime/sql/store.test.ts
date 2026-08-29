@@ -173,7 +173,7 @@ it.live("migrates and reopens a durable sqlite store", () =>
       expect(snapshot.outcome?._tag).toBe("Succeeded")
       expect(snapshot.usage.map((fact) => fact.modelAttemptId)).toEqual(["reopen-attempt"])
       expect(snapshot.compactions.map((compaction) => compaction._tag)).toEqual(["Applied"])
-      const tree = yield* RunTree.inspect(first)
+      const tree = (yield* RunTree.checkpoint(first)).inspection
       expect(tree._tag).toBe("Terminal")
       expect(tree.runs.map(({ outcome }) => outcome?._tag)).toEqual(["Succeeded", "Succeeded"])
       const tags = yield* runtime.events({ runId: first, cursor: -1 }).pipe(
@@ -220,7 +220,7 @@ layer(SqliteRuntime.layerSqlite({ filename: tempDbPath("relative-selection"), ..
         expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
         expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
 
-        const before = yield* RunTree.inspect(first.runId)
+        const before = yield* RunTree.checkpoint(first.runId)
         const failure = yield* runtime
           .spawn({
             parentRunId: first.runId,
@@ -230,13 +230,13 @@ layer(SqliteRuntime.layerSqlite({ filename: tempDbPath("relative-selection"), ..
           })
           .pipe(Effect.flip)
         expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-        expect(yield* RunTree.inspect(first.runId)).toEqual(before)
+        expect(yield* RunTree.checkpoint(first.runId)).toEqual(before)
       }),
     )
   },
 )
 
-it.live("resumes tree history from an opaque cursor after close and reopen", () =>
+it.live("resumes tree replay from an opaque cursor after close and reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("tree-cursor-reopen")
     const admit = Effect.gen(function* () {
@@ -247,7 +247,7 @@ it.live("resumes tree history from an opaque cursor after close and reopen", () 
         idempotencyKey: "tree-reopen",
         prompt: textPrompt("tree-reopen"),
       })
-      const page = yield* RunTree.history({ rootRunId: receipt.runId, limit: 100 })
+      const page = yield* RunTree.replay({ rootRunId: receipt.runId, limit: 100 })
       return { receipt, cursor: page.cursor }
     })
     const initial = yield* scopedWith(sqliteLayer(filename))(admit)
@@ -255,7 +255,7 @@ it.live("resumes tree history from an opaque cursor after close and reopen", () 
       const store = yield* RunStore.RunStore
       const claim = yield* store.claimExecution({ runId: initial.receipt.runId, ownerId: "tree-reopen" })
       yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
-      return yield* RunTree.history({
+      return yield* RunTree.replay({
         rootRunId: initial.receipt.runId,
         cursor: initial.cursor,
         limit: 100,
@@ -1448,7 +1448,7 @@ layer(sqliteLayer(tempDbPath("terminal-parent-spawn")))("rejects child admission
         })
         .pipe(Effect.flip)
       expect(failure).toBeInstanceOf(Errors.RunTerminal)
-      expect((yield* RunTree.inspect(parent.runId)).runs).toHaveLength(1)
+      expect((yield* RunTree.checkpoint(parent.runId)).inspection.runs).toHaveLength(1)
     }),
   )
 })
@@ -1521,7 +1521,7 @@ layer(sqliteLayer(tempDbPath("cancel-tree-quiescence")))(
         expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
         expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
 
-        const tree = yield* RunTree.history({ rootRunId: parent.runId, limit: 500 })
+        const tree = yield* RunTree.replay({ rootRunId: parent.runId, limit: 500 })
         const cancelled = tree.events.filter((item) => item.event._tag === "RunCancelled").map((item) => item.runId)
         expect(new Set(cancelled)).toEqual(new Set([parent.runId, first.runId, second.runId]))
         expect(cancelled[cancelled.length - 1]).toBe(parent.runId)

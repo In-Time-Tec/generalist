@@ -515,7 +515,7 @@ it.live("persists one ordered child-group suspension and result across SQLite re
               .filter((event) => event._tag === "ChildLinked" && event.childRunId !== admitted.singletonRunId)
               .map((event) => (event._tag === "ChildLinked" ? event.label : undefined)),
           ).toEqual(["First researcher", "Second analyst", undefined])
-          const tree = yield* runtime.treeHistory({ rootRunId: admitted.parentRunId, limit: 100 })
+          const tree = yield* runtime.treeReplay({ rootRunId: admitted.parentRunId, limit: 100 })
           expect(
             tree.events.find(
               (entry) => entry.event._tag === "ChildLinked" && entry.event.childRunId === admitted.singletonRunId,

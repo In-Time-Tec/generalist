@@ -46,7 +46,7 @@ describeMysql("mysql runtime layer Program registration", () => {
             const [claim] = yield* claims.claimReadyRuns({ workerId: "registration-parity", limit: 1 })
             yield* host.execute({ runId: root.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
             const rootRegistrations = (yield* store.loadExecution(root.runId)).registrations
-            const children = (yield* runtime.inspectTree(root.runId)).runs.filter(
+            const children = (yield* runtime.treeCheckpoint(root.runId)).inspection.runs.filter(
               (run) => run.parentRunId === root.runId,
             )
             expect(children).toHaveLength(3)

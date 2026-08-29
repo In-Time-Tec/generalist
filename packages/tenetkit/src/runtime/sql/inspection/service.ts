@@ -1,8 +1,8 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RunNotFound } from "../../errors.js"
-import { projectRunSnapshot, projectTreeInspection } from "../../execution/inspection.js"
-import { TreeCursor } from "../../tree/cursor.js"
+import { projectRunSnapshot, projectTreeCheckpoint } from "../../execution/inspection.js"
+import { make as makeTreeCursor } from "../../tree/cursor.js"
 import { decodeEvent } from "../codec/codecs.js"
 import { decodeRunEffect, loadRunWait } from "../store/statements.js"
 import type { EventRow, RunRow } from "../codec/rows.js"
@@ -12,11 +12,6 @@ interface FirstPositionRow {
   readonly run_id: string
   readonly first_position: number
 }
-
-const cursorAt = (rootRunId: string, position: number) =>
-  TreeCursor.make(
-    `tenetkit-tree:${encodeURIComponent(JSON.stringify({ version: 1, projection: "run-tree", rootRunId, position }))}`,
-  )
 
 const loadRuns = (rootRunId: string) =>
   Effect.gen(function* () {
@@ -91,7 +86,7 @@ export const loadRunSnapshot = (runId: string) =>
     return yield* projectRunSnapshot(run)
   })
 
-export const loadTreeInspection = (rootRunId: string) =>
+export const loadTreeCheckpoint = (rootRunId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const roots = yield* sql<{ readonly last_position: number }>`
@@ -100,5 +95,5 @@ export const loadTreeInspection = (rootRunId: string) =>
     const root = roots[0]
     if (root === undefined) return yield* RunNotFound.make({ runId: rootRunId })
     const runs = yield* loadRuns(rootRunId)
-    return yield* projectTreeInspection(rootRunId, cursorAt(rootRunId, root.last_position), runs)
+    return yield* projectTreeCheckpoint(rootRunId, makeTreeCursor(rootRunId, root.last_position), runs)
   })

@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RunNotFound, TreeCursorExpired, TreeCursorInvalid } from "../errors.js"
-import { TreeCursor } from "../tree/cursor.js"
+import { RunNotFound, TreeCursorExpired, TreeCursorFuture, TreeReplayLimitInvalid } from "../errors.js"
+import { make as makeTreeCursor } from "../tree/cursor.js"
 import { projectTreeEvent } from "../tree/event.js"
 import { decodeEvent } from "./codec/codecs.js"
 
@@ -13,12 +13,7 @@ interface TreeRow {
   readonly invocation_id: string | null
 }
 
-const cursorAt = (rootRunId: string, position: number) =>
-  TreeCursor.make(
-    `tenetkit-tree:${encodeURIComponent(JSON.stringify({ version: 1, projection: "run-tree", rootRunId, position }))}`,
-  )
-
-export const loadTreeHistory = (input: {
+export const loadTreeReplay = (input: {
   readonly rootRunId: string
   readonly position: number
   readonly limit: number
@@ -33,24 +28,24 @@ export const loadTreeHistory = (input: {
     const earliest = root.earliest_position
     const last = root.last_position
     if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1000) {
-      return yield* TreeCursorInvalid.make({
-        rootRunId: input.rootRunId,
-        cursor: cursorAt(input.rootRunId, input.position),
-        message: "tree history limit must be an integer between 1 and 1000",
+      return yield* TreeReplayLimitInvalid.make({
+        received: String(input.limit),
+        minimum: 1,
+        maximum: 1000,
       })
     }
     if (input.position > last) {
-      return yield* TreeCursorInvalid.make({
+      return yield* TreeCursorFuture.make({
         rootRunId: input.rootRunId,
-        cursor: cursorAt(input.rootRunId, input.position),
-        message: "tree cursor position is in the future",
+        cursor: makeTreeCursor(input.rootRunId, input.position),
+        latestCursor: makeTreeCursor(input.rootRunId, last),
       })
     }
     if (input.position < earliest - 1) {
       return yield* TreeCursorExpired.make({
         rootRunId: input.rootRunId,
-        cursor: cursorAt(input.rootRunId, input.position),
-        earliestCursor: cursorAt(input.rootRunId, earliest - 1),
+        cursor: makeTreeCursor(input.rootRunId, input.position),
+        earliestCursor: makeTreeCursor(input.rootRunId, earliest - 1),
       })
     }
     const rows = yield* sql<TreeRow>`
@@ -70,5 +65,5 @@ export const loadTreeHistory = (input: {
     })
     const finalRow = selected.at(-1)
     const position = finalRow === undefined ? input.position : finalRow.position
-    return { events, cursor: cursorAt(input.rootRunId, position), hasMore: rows.length > input.limit }
+    return { events, cursor: makeTreeCursor(input.rootRunId, position), hasMore: rows.length > input.limit }
   })

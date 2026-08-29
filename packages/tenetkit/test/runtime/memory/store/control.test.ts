@@ -102,7 +102,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
     }),
   )
 
-  it.effect("preserves a typed approval request and response in Run and tree history", () =>
+  it.effect("preserves a typed approval request and response in Run and tree replay", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -174,7 +174,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
           resolution: { _tag: "Denied", reason: "operator denied" },
         }),
       )
-      const tree = yield* runtime.treeHistory({ rootRunId: receipt.runId, limit: 100 })
+      const tree = yield* runtime.treeReplay({ rootRunId: receipt.runId, limit: 100 })
       expect(tree.events.map(({ event }) => event._tag)).toContain("ApprovalRequested")
       const resumed = tree.events.find(({ event }) => event._tag === "RunResumed")
       expect(resumed?.event._tag).toBe("RunResumed")

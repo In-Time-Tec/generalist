@@ -174,9 +174,9 @@ const makeRuntime = (acceptedSequence = 0) => {
       const run = runs.get(runId)!
       return Effect.succeed(run.events.filter((event) => event.sequence > cursor).slice(0, limit))
     },
-    treeHistory: () => Effect.die("not used"),
+    treeReplay: () => Effect.die("not used"),
     treeChanges: () => Stream.empty,
-    inspectTree: () => Effect.die("not used"),
+    treeCheckpoint: () => Effect.die("not used"),
     list: ({ status, limit }) =>
       Effect.succeed(
         [...runs]

@@ -30,10 +30,13 @@ import type {
   FanOutNotFound,
   FanOutRemainderUnsupported,
   TreeCursorInvalid,
+  TreeCursorRootMismatch,
   ChildDepthExceeded,
   ChildLimitExceeded,
   TreePolicyInvalid,
   TreeCursorExpired,
+  TreeCursorFuture,
+  TreeReplayLimitInvalid,
   ChildSelectionMissing,
   OperationResolutionConflict,
   ExecutableIdentityMismatch,
@@ -323,7 +326,15 @@ export type DirectoryError = RunNotFound | RuntimeUnavailable
 export type ChildSettlementError = RunNotFound | RuntimeUnavailable
 export type RegisterAgentNameError = RunNotFound | AgentNameConflict | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
-export type TreeEventsError = RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
+export type TreeReplayError =
+  | RunNotFound
+  | TreeCursorInvalid
+  | TreeCursorRootMismatch
+  | TreeCursorExpired
+  | TreeCursorFuture
+  | TreeReplayLimitInvalid
+  | RuntimeUnavailable
+export type TreeEventsError = TreeReplayError
 export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
 export type RespondApprovalError = RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
@@ -369,11 +380,13 @@ export interface Interface {
   readonly resolveModelResponse: (
     event: ModelResponseEvent,
   ) => Effect.Effect<CompletedModelResponse, ResolveModelResponseError>
-  readonly treeHistory: (
-    input: import("./tree.js").HistoryInput,
-  ) => Effect.Effect<import("./tree.js").TreePage, TreeEventsError>
+  /** @experimental Read one bounded, ordered page strictly after an opaque root-bound cursor. */
+  readonly treeReplay: (
+    input: import("./tree.js").ReplayInput,
+  ) => Effect.Effect<import("./tree.js").ReplayPage, TreeReplayError>
   readonly treeChanges: (rootRunId: string) => Stream.Stream<void, TreeEventsError>
-  readonly inspectTree: (rootRunId: string) => Effect.Effect<import("./tree.js").Inspection, InspectError>
+  /** @experimental Atomically pair a point-in-time tree inspection with its exclusive replay cursor. */
+  readonly treeCheckpoint: (rootRunId: string) => Effect.Effect<import("./tree.js").Checkpoint, InspectError>
   readonly list: (input: ListInput) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable>
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>

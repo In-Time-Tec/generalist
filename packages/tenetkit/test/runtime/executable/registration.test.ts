@@ -35,7 +35,9 @@ for (const backend of ["memory", "sqlite"] as const) {
             prompt: "run",
           })
           yield* host.execute(yield* store.claimExecution({ runId: root.runId, ownerId: `${backend}-worker` }))
-          const children = (yield* runtime.inspectTree(root.runId)).runs.filter((run) => run.parentRunId === root.runId)
+          const children = (yield* runtime.treeCheckpoint(root.runId)).inspection.runs.filter(
+            (run) => run.parentRunId === root.runId,
+          )
           const rootRegistrations = (yield* store.loadExecution(root.runId)).registrations
           expect(children).toHaveLength(3)
           for (const child of children) {

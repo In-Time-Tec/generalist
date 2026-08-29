@@ -106,12 +106,12 @@ it.effect("round-trips representative tree event families and pages", () =>
       expect(yield* RunTree.decodeTreeEvent(yield* RunTree.encodeTreeEvent(event))).toEqual(event)
     }
 
-    const page: RunTree.TreePage = {
+    const page: RunTree.ReplayPage = {
       events: representativeEvents,
       cursor: cursor(4),
       hasMore: false,
     }
-    expect(yield* RunTree.decodeTreePage(yield* RunTree.encodeTreePage(page))).toEqual(page)
+    expect(yield* RunTree.decodeReplayPage(yield* RunTree.encodeReplayPage(page))).toEqual(page)
   }),
 )
 

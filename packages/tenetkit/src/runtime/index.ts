@@ -305,6 +305,8 @@ export namespace Runtime {
   export type ActivateError = import("./service.js").ActivateError
   export type SpawnError = import("./service.js").SpawnError
   export type EventsError = import("./service.js").EventsError
+  export type TreeReplayError = import("./service.js").TreeReplayError
+  export type TreeEventsError = import("./service.js").TreeEventsError
   export type RespondError = import("./service.js").RespondError
   export type RespondApprovalError = import("./service.js").RespondApprovalError
   export type SignalError = import("./service.js").SignalError

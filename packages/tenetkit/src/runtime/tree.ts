@@ -49,7 +49,13 @@ export const encodeTreeEvent: {
 )
 
 const isParseOptions = (
-  value: TreeEventEncoded | TreePageEncoded | InspectionEncoded | import("effect/SchemaAST").ParseOptions | undefined,
+  value:
+    | TreeEventEncoded
+    | ReplayPageEncoded
+    | InspectionEncoded
+    | CheckpointEncoded
+    | import("effect/SchemaAST").ParseOptions
+    | undefined,
 ): value is import("effect/SchemaAST").ParseOptions =>
   Predicate.isObject(value) &&
   ("errors" in value ||
@@ -74,53 +80,59 @@ export function decodeTreeEvent(
   return Schema.decodeEffect(TreeEvent)(input, options)
 }
 
-export interface TreePage {
+/** @experimental One bounded, ordered page read strictly after the requested cursor. */
+export interface ReplayPage {
   readonly events: ReadonlyArray<TreeEvent>
   readonly cursor: TreeCursorType
   readonly hasMore: boolean
 }
 
-interface TreePageEncoded extends Omit<TreePage, "events" | "cursor"> {
+interface ReplayPageEncoded extends Omit<ReplayPage, "events" | "cursor"> {
   readonly events: ReadonlyArray<TreeEventEncoded>
   readonly cursor: typeof TreeCursor.Encoded
 }
 
-export const TreePage: Schema.Codec<TreePage, TreePageEncoded> = Schema.Struct({
+/** @experimental */
+export const ReplayPage: Schema.Codec<ReplayPage, ReplayPageEncoded> = Schema.Struct({
   events: Schema.Array(TreeEvent),
   cursor: TreeCursor,
   hasMore: Schema.Boolean,
 })
 
-export const encodeTreePage: {
+/** @experimental */
+export const encodeReplayPage: {
   (
-    input: TreePage,
+    input: ReplayPage,
     options?: import("effect/SchemaAST").ParseOptions,
-  ): Effect.Effect<TreePageEncoded, Schema.SchemaError>
+  ): Effect.Effect<ReplayPageEncoded, Schema.SchemaError>
   (
     options?: import("effect/SchemaAST").ParseOptions,
-  ): (input: TreePage) => Effect.Effect<TreePageEncoded, Schema.SchemaError>
+  ): (input: ReplayPage) => Effect.Effect<ReplayPageEncoded, Schema.SchemaError>
 } = Function.dual(
-  (args) => Schema.is(TreePage)(args[0]),
-  (input: TreePage, options?: import("effect/SchemaAST").ParseOptions) => Schema.encodeEffect(TreePage)(input, options),
+  (args) => Schema.is(ReplayPage)(args[0]),
+  (input: ReplayPage, options?: import("effect/SchemaAST").ParseOptions) =>
+    Schema.encodeEffect(ReplayPage)(input, options),
 )
 
-export function decodeTreePage(
-  input: TreePageEncoded,
+/** @experimental */
+export function decodeReplayPage(
+  input: ReplayPageEncoded,
   options?: import("effect/SchemaAST").ParseOptions,
-): Effect.Effect<TreePage, Schema.SchemaError>
-export function decodeTreePage(
+): Effect.Effect<ReplayPage, Schema.SchemaError>
+export function decodeReplayPage(
   options?: import("effect/SchemaAST").ParseOptions,
-): (input: TreePageEncoded) => Effect.Effect<TreePage, Schema.SchemaError>
-export function decodeTreePage(
-  input?: TreePageEncoded | import("effect/SchemaAST").ParseOptions,
+): (input: ReplayPageEncoded) => Effect.Effect<ReplayPage, Schema.SchemaError>
+export function decodeReplayPage(
+  input?: ReplayPageEncoded | import("effect/SchemaAST").ParseOptions,
   options?: import("effect/SchemaAST").ParseOptions,
 ) {
   if (input === undefined || isParseOptions(input))
-    return (page: TreePageEncoded) => Schema.decodeEffect(TreePage)(page, input)
-  return Schema.decodeEffect(TreePage)(input, options)
+    return (page: ReplayPageEncoded) => Schema.decodeEffect(ReplayPage)(page, input)
+  return Schema.decodeEffect(ReplayPage)(input, options)
 }
 
-export interface HistoryInput {
+/** @experimental Bounded replay strictly after an optional root-bound cursor. */
+export interface ReplayInput {
   readonly rootRunId: string
   readonly cursor?: TreeCursorType
   readonly limit: number
@@ -156,7 +168,6 @@ export const TreeRunInspection: Schema.Codec<TreeRunInspection, TreeRunInspectio
 
 const InspectionBase = {
   rootRunId: Schema.String,
-  cursor: TreeCursor,
   runs: Schema.Array(TreeRunInspection),
   usage: Schema.Array(RawUsageFact),
   compactions: Schema.Array(CompactionInspection),
@@ -164,7 +175,6 @@ const InspectionBase = {
 
 interface InspectionBase {
   readonly rootRunId: string
-  readonly cursor: TreeCursorType
   readonly runs: ReadonlyArray<TreeRunInspection>
   readonly usage: ReadonlyArray<RawUsageFact>
   readonly compactions: ReadonlyArray<CompactionInspection>
@@ -174,8 +184,7 @@ export type Inspection =
   | (InspectionBase & { readonly _tag: "Active"; readonly activeRunIds: ReadonlyArray<string> })
   | (InspectionBase & { readonly _tag: "Terminal" })
 
-interface InspectionBaseEncoded extends Omit<InspectionBase, "cursor" | "runs" | "usage" | "compactions"> {
-  readonly cursor: typeof TreeCursor.Encoded
+interface InspectionBaseEncoded extends Omit<InspectionBase, "runs" | "usage" | "compactions"> {
   readonly runs: ReadonlyArray<TreeRunInspectionEncoded>
   readonly usage: ReadonlyArray<typeof RawUsageFact.Encoded>
   readonly compactions: ReadonlyArray<typeof CompactionInspection.Encoded>
@@ -220,18 +229,69 @@ export function decodeInspection(
   return Schema.decodeEffect(Inspection)(input, options)
 }
 
-export const history = (input: HistoryInput) => Runtime.use((runtime) => runtime.treeHistory(input))
+/** @experimental Atomic point-in-time tree inspection and exclusive replay cursor. */
+export interface Checkpoint {
+  readonly inspection: Inspection
+  readonly cursor: TreeCursorType
+}
 
-export const inspect = (rootRunId: string) => Runtime.use((runtime) => runtime.inspectTree(rootRunId))
+interface CheckpointEncoded extends Omit<Checkpoint, "inspection" | "cursor"> {
+  readonly inspection: InspectionEncoded
+  readonly cursor: typeof TreeCursor.Encoded
+}
+
+/** @experimental */
+export const Checkpoint: Schema.Codec<Checkpoint, CheckpointEncoded> = Schema.Struct({
+  inspection: Inspection,
+  cursor: TreeCursor,
+})
+
+/** @experimental */
+export const encodeCheckpoint: {
+  (
+    input: Checkpoint,
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): Effect.Effect<CheckpointEncoded, Schema.SchemaError>
+  (
+    options?: import("effect/SchemaAST").ParseOptions,
+  ): (input: Checkpoint) => Effect.Effect<CheckpointEncoded, Schema.SchemaError>
+} = Function.dual(
+  (args) => Schema.is(Checkpoint)(args[0]),
+  (input: Checkpoint, options?: import("effect/SchemaAST").ParseOptions) =>
+    Schema.encodeEffect(Checkpoint)(input, options),
+)
+
+/** @experimental */
+export function decodeCheckpoint(
+  input: CheckpointEncoded,
+  options?: import("effect/SchemaAST").ParseOptions,
+): Effect.Effect<Checkpoint, Schema.SchemaError>
+export function decodeCheckpoint(
+  options?: import("effect/SchemaAST").ParseOptions,
+): (input: CheckpointEncoded) => Effect.Effect<Checkpoint, Schema.SchemaError>
+export function decodeCheckpoint(
+  input?: CheckpointEncoded | import("effect/SchemaAST").ParseOptions,
+  options?: import("effect/SchemaAST").ParseOptions,
+) {
+  if (input === undefined || isParseOptions(input))
+    return (checkpoint: CheckpointEncoded) => Schema.decodeEffect(Checkpoint)(checkpoint, input)
+  return Schema.decodeEffect(Checkpoint)(input, options)
+}
+
+/** @experimental Read one bounded, ordered page strictly after the supplied cursor. */
+export const replay = (input: ReplayInput) => Runtime.use((runtime) => runtime.treeReplay(input))
+
+/** @experimental Atomically inspect one root Run tree and bind the inspection to its replay cursor. */
+export const checkpoint = (rootRunId: string) => Runtime.use((runtime) => runtime.treeCheckpoint(rootRunId))
 
 export const awaitTerminal = (
   rootRunId: string,
 ): Effect.Effect<Extract<Inspection, { readonly _tag: "Terminal" }>, import("./service.js").TreeEventsError, Runtime> =>
   Effect.suspend(() =>
-    inspect(rootRunId).pipe(
+    checkpoint(rootRunId).pipe(
       Effect.flatMap((current) =>
-        current._tag === "Terminal"
-          ? Effect.succeed(current)
+        current.inspection._tag === "Terminal"
+          ? Effect.succeed(current.inspection)
           : events({ rootRunId, cursor: current.cursor }).pipe(
               Stream.filter(
                 ({ event }) =>
@@ -268,11 +328,11 @@ export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./s
           > =>
             Effect.gen(function* () {
               if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))
-              const request: HistoryInput = {
+              const request: ReplayInput = {
                 rootRunId: input.rootRunId,
                 limit: 256,
               }
-              const page = yield* runtime.treeHistory(
+              const page = yield* runtime.treeReplay(
                 state.cursor === undefined ? request : { ...request, cursor: state.cursor },
               )
               return [page.events, Option.some({ cursor: page.cursor, wait: !page.hasMore })] as const
@@ -344,21 +404,21 @@ export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./ser
           > =>
             Effect.gen(function* () {
               if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))
-              const request: HistoryInput = {
+              const request: ReplayInput = {
                 rootRunId: input.rootRunId,
                 limit: 256,
               }
-              const page = yield* runtime.treeHistory(
+              const page = yield* runtime.treeReplay(
                 state.cursor === undefined ? request : { ...request, cursor: state.cursor },
               )
               if (page.hasMore) {
                 return [page.events, Option.some({ cursor: page.cursor, wait: false })] as const
               }
-              const inspection = yield* runtime.inspectTree(input.rootRunId)
-              const drained = page.cursor === inspection.cursor
+              const current = yield* runtime.treeCheckpoint(input.rootRunId)
+              const drained = page.cursor === current.cursor
               return [
                 page.events,
-                drained && isSettled(inspection, settlement)
+                drained && isSettled(current.inspection, settlement)
                   ? Option.none()
                   : Option.some({ cursor: page.cursor, wait: drained }),
               ] as const
