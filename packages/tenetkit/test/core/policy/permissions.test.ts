@@ -64,6 +64,14 @@ describe("Permissions", () => {
     }),
   ])
 
+  ItLayer.make(it, "layerFailClosed asks for an unmatched tool", () => [
+    Permissions.layerFailClosed([{ pattern: "read", level: "allow" }]),
+    Effect.gen(function* () {
+      const policy = yield* Permissions.Permissions
+      expect(yield* policy.evaluate(request)).toEqual({ _tag: "Ask", token: "permission:one" })
+    }),
+  ])
+
   ItLayer.make(it, "layerAllowAll provides an evaluate-only allow policy", () => [
     Permissions.layerAllowAll,
     Effect.gen(function* () {

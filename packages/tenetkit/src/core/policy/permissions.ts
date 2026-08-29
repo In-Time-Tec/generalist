@@ -226,6 +226,10 @@ export const layerRuleset = (ruleset: Ruleset): Layer.Layer<Permissions> =>
     }),
   )
 
+/** @experimental Permission policy that asks before every unmatched call. */
+export const layerFailClosed = (rules: ReadonlyArray<Rule> = []): Layer.Layer<Permissions> =>
+  layerRuleset({ rules, fallback: "ask" })
+
 /** @experimental Permission policy that allows every call. */
 export const layerAllowAll: Layer.Layer<Permissions> = Layer.succeed(
   Permissions,

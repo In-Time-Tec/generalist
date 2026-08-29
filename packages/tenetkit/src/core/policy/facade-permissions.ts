@@ -7,6 +7,7 @@ import {
   evaluate as Permissions_evaluate,
   evaluateWithRules as Permissions_evaluateWithRules,
   layerRuleset as Permissions_layerRuleset,
+  layerFailClosed as Permissions_layerFailClosed,
   layerAllowAll as Permissions_layerAllowAll,
   layerRuleStoreMemory as Permissions_layerRuleStoreMemory,
   layerRuleStoreTest as Permissions_layerRuleStoreTest,
@@ -21,6 +22,7 @@ export const Permissions = {
   evaluate: Permissions_evaluate,
   evaluateWithRules: Permissions_evaluateWithRules,
   layerRuleset: Permissions_layerRuleset,
+  layerFailClosed: Permissions_layerFailClosed,
   layerAllowAll: Permissions_layerAllowAll,
   layerRuleStoreMemory: Permissions_layerRuleStoreMemory,
   layerRuleStoreTest: Permissions_layerRuleStoreTest,
@@ -35,6 +37,7 @@ export namespace Permissions {
   export type evaluate = typeof import("./permissions.js").evaluate
   export type evaluateWithRules = typeof import("./permissions.js").evaluateWithRules
   export type layerRuleset = typeof import("./permissions.js").layerRuleset
+  export type layerFailClosed = typeof import("./permissions.js").layerFailClosed
   export type layerAllowAll = typeof import("./permissions.js").layerAllowAll
   export type layerRuleStoreMemory = typeof import("./permissions.js").layerRuleStoreMemory
   export type layerRuleStoreTest = typeof import("./permissions.js").layerRuleStoreTest

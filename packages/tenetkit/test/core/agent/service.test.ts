@@ -2829,14 +2829,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "suspends permission asks through the existing approval suspension path", () => {
+  ItLayer.make(it, "never executes a tool missing from the fail-closed policy", () => {
     const events: Array<AgentEvent.Event> = []
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-permission-ask", "gated", { text: "ask" }))),
-        ToolExecutor.layerTest({ execute: () => Effect.die("permission ask must not execute") }),
+        ToolExecutor.layerTest({ execute: () => Effect.die("unclassified tool must not execute") }),
         Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
-        Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+        Permissions.layerFailClosed(),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
