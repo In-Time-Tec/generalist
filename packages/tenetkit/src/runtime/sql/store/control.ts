@@ -1,4 +1,4 @@
-import { Effect, Equal, Function } from "effect"
+import { Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   ApprovalMismatch,
@@ -16,7 +16,7 @@ import type { CancelInput, RespondInput, SignalInput } from "../../service.js"
 import type { RespondInput as RespondApprovalInput } from "../../operation/approval.js"
 import { isTerminal } from "../../run.js"
 import type { RunFailure } from "../../run/event.js"
-import { WaitResolution } from "../../run/wait.js"
+import { classifyResponse, WaitResolution } from "../../run/wait.js"
 import { encodeJson } from "../codec/codecs.js"
 import {
   afterTerminal,
@@ -179,15 +179,13 @@ export const respond: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.cancellationRequested) {
-      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
-    }
     const prior = yield* loadRunWait(run.runId, input.waitId)
-    if (prior !== undefined && prior.status !== "open") {
-      if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
+    const classification = classifyResponse(prior, input.resolution)
+    if (classification === "duplicate-identical") return
+    if (classification === "duplicate-conflict") {
       return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (prior === undefined) {
+    if (run.cancellationRequested || classification !== "open") {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
     const updated = yield* nowIso
@@ -199,7 +197,15 @@ export const respond: {
       resolution,
       closedAt: updated,
     })
-    if (affected !== 1) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    if (affected !== 1) {
+      const current = yield* loadRunWait(run.runId, input.waitId)
+      const outcome = classifyResponse(current, resolution)
+      if (outcome === "duplicate-identical") return
+      if (outcome === "duplicate-conflict") {
+        return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
+      }
+      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    }
     yield* sql`
       UPDATE tenetkit_program_operations SET status = 'reserved'
       WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
@@ -378,15 +384,13 @@ export const resume: {
   Effect.gen(function* () {
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.cancellationRequested) {
-      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
-    }
     const prior = yield* loadRunWait(run.runId, input.waitId)
-    if (prior !== undefined && prior.status !== "open") {
-      if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
+    const classification = classifyResponse(prior, input.resolution)
+    if (classification === "duplicate-identical") return
+    if (classification === "duplicate-conflict") {
       return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (prior === undefined) {
+    if (run.cancellationRequested || classification !== "open") {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
     const resolution: WaitResolution = input.resolution
@@ -398,7 +402,15 @@ export const resume: {
       resolution,
       closedAt: updated,
     })
-    if (affected !== 1) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    if (affected !== 1) {
+      const current = yield* loadRunWait(run.runId, input.waitId)
+      const outcome = classifyResponse(current, resolution)
+      if (outcome === "duplicate-identical") return
+      if (outcome === "duplicate-conflict") {
+        return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
+      }
+      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    }
     const current = (yield* loadRun(run.runId))!
     yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
   }),

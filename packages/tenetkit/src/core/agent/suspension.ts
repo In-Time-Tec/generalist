@@ -1,4 +1,4 @@
-import { Equal, Function } from "effect"
+import { Equal, Function, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import type { AgentSuspended } from "./event.js"
 import {
@@ -27,9 +27,13 @@ export const canonicalSuspensionCall = canonicalCall
 const checkpointMessageIndex = (messages: ReadonlyArray<Prompt.Message>, checkpoint: ToolBatchCheckpoint): number =>
   messages.findIndex((message) => {
     if (message.role !== "assistant") return false
-    const calls = message.content.flatMap((part) =>
-      part.type === "tool-call" && !part.providerExecuted ? [canonicalCall(part)] : [],
-    )
+    const calls = []
+    for (const part of message.content) {
+      if (part.type !== "tool-call" || part.providerExecuted) continue
+      const metadata = Schema.decodeOption(Response.ProviderMetadata)(part.options)
+      if (metadata._tag === "None") return false
+      calls.push(canonicalCall({ ...part, metadata: metadata.value }))
+    }
     return Equal.equals(
       calls,
       checkpoint.calls.map((entry) => entry.call),
@@ -113,7 +117,9 @@ export const validResolutions: {
     if (wait.reason === "approval" && entry.resolution._tag !== "Approved" && entry.resolution._tag !== "Denied") {
       return false
     }
-    if (wait.reason === "tool-wait" && entry.resolution._tag === "Approved") return false
+    if (wait.reason === "tool-wait" && entry.resolution._tag !== "ToolResult" && entry.resolution._tag !== "Signal") {
+      return false
+    }
     if (entry.resolution._tag === "Signal" && entry.resolution.name !== entry.waitId) return false
   }
   return true

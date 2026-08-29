@@ -1,4 +1,4 @@
-import { Effect, Equal, Option } from "effect"
+import { Effect, Option } from "effect"
 import { listRuns } from "tenetkit/runtime/driver/sql/store/list"
 import { SqlClient } from "effect/unstable/sql"
 import {
@@ -40,7 +40,7 @@ import { eventStream } from "../events/event-stream.js"
 import { postgresClaims } from "./claims.js"
 import { postgresOperations, type RunFn } from "./ops.js"
 import { hasAdmission, loadRunWait, nowIso, transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
-import { WaitResolution } from "tenetkit/runtime/driver/run/wait"
+import { classifyResponse, WaitResolution } from "tenetkit/runtime/driver/run/wait"
 import { fanOutStoreMethods } from "./fan-out.js"
 import { deferCancelledFanOutParent, cancelRunFor } from "./cancel.js"
 import "tenetkit/runtime/driver/sql/tree-replay"
@@ -241,15 +241,13 @@ export const postgresServices = (options: PostgresOptions) =>
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status))
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
-            if (loaded.cancellationRequested) {
-              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
-            }
             const prior = yield* loadRunWait(loaded.runId, input.waitId)
-            if (prior !== undefined && prior.status !== "open") {
-              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
+            const classification = classifyResponse(prior, input.resolution)
+            if (classification === "duplicate-identical") return
+            if (classification === "duplicate-conflict") {
               return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            if (prior === undefined) {
+            if (loaded.cancellationRequested || classification !== "open") {
               return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
             const resolution: WaitResolution = input.resolution
@@ -262,8 +260,12 @@ export const postgresServices = (options: PostgresOptions) =>
             })
             if (closed !== 1) {
               const transitioned = yield* loadRunWait(loaded.runId, input.waitId)
-              if (transitioned?.resolution !== undefined && Equal.equals(transitioned.resolution, resolution)) return
-              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+              const outcome = classifyResponse(transitioned, resolution)
+              if (outcome === "duplicate-identical") return
+              if (outcome === "duplicate-conflict") {
+                return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+              }
+              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
             yield* sql`
               UPDATE tenetkit_program_operations SET status = 'reserved'
@@ -436,15 +438,13 @@ export const postgresServices = (options: PostgresOptions) =>
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
-            if (loaded.cancellationRequested) {
-              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
-            }
             const prior = yield* loadRunWait(loaded.runId, input.waitId)
-            if (prior !== undefined && prior.status !== "open") {
-              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
+            const classification = classifyResponse(prior, input.resolution)
+            if (classification === "duplicate-identical") return
+            if (classification === "duplicate-conflict") {
               return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            if (prior === undefined) {
+            if (loaded.cancellationRequested || classification !== "open") {
               return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
             const resolution: WaitResolution = input.resolution
@@ -457,8 +457,12 @@ export const postgresServices = (options: PostgresOptions) =>
             })
             if (closed !== 1) {
               const transitioned = yield* loadRunWait(loaded.runId, input.waitId)
-              if (transitioned?.resolution !== undefined && Equal.equals(transitioned.resolution, resolution)) return
-              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+              const outcome = classifyResponse(transitioned, resolution)
+              if (outcome === "duplicate-identical") return
+              if (outcome === "duplicate-conflict") {
+                return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+              }
+              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
             yield* sql`
               UPDATE tenetkit_program_operations SET status = 'reserved'

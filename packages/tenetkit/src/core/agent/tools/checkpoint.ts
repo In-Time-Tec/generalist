@@ -1,5 +1,6 @@
 import { Function, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
+import { ReplayPolicy } from "../../durable/driver/contract.js"
 import type { ResumeResolution } from "../lifecycle/resume.js"
 import type { PendingToolResult } from "./result.js"
 
@@ -17,6 +18,10 @@ export type CanonicalToolCall = typeof CanonicalToolCall.Type
 /** @experimental The one current state of a model-authored framework call. */
 export const ToolCallCheckpointState = Schema.Union([
   Schema.TaggedStruct("Ready", { stage: Schema.Literals(["authorization", "execution"]) }),
+  Schema.TaggedStruct("Scheduled", {
+    inputDigest: Schema.String,
+    replayPolicy: ReplayPolicy,
+  }),
   Schema.TaggedStruct("Waiting", {
     reason: Schema.Literals(["approval", "tool-wait"]),
     waitId: Schema.String,
@@ -79,7 +84,7 @@ export const canonicalCall = (
   name: call.name,
   params: call.params,
   providerExecuted: call.providerExecuted,
-  metadata: {},
+  metadata: call.metadata ?? {},
 })
 
 export const make = (input: {

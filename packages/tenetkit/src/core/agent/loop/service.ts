@@ -307,6 +307,9 @@ export const make = <
                     }),
                   )
                 }
+                if (entry.state._tag === "Scheduled") {
+                  return resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
+                }
                 return entry.state.stage === "execution"
                   ? resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
                   : toolCallEvents(turn, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)

@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Equal, Function, Schema } from "effect"
 import { Request as ApprovalRequest } from "../operation/approval.js"
 
 export const WaitResolution = Schema.Union([
@@ -35,6 +35,17 @@ export const RunWait = Schema.Struct({
   closedAt: Schema.optionalKey(Schema.String),
 })
 export type RunWait = typeof RunWait.Type
+
+/** @experimental Classify one response against the immutable history of its exact wait. */
+type ResponseClassification = "open" | "duplicate-identical" | "duplicate-conflict" | "not-open"
+export const classifyResponse: {
+  (resolution: WaitResolution): (wait: RunWait | undefined) => ResponseClassification
+  (wait: RunWait | undefined, resolution: WaitResolution): ResponseClassification
+} = Function.dual(2, (wait: RunWait | undefined, resolution: WaitResolution): ResponseClassification => {
+  if (wait?.status === "open") return "open"
+  if (wait?.status !== "responded" || wait.resolution === undefined) return "not-open"
+  return Equal.equals(wait.resolution, resolution) ? "duplicate-identical" : "duplicate-conflict"
+})
 
 /** @experimental Construct the approval reason shared by Runtime producers and controls. */
 export const approvalReason = (request: ApprovalRequest): WaitReason => ({

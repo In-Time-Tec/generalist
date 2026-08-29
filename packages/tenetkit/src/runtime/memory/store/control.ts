@@ -1,12 +1,12 @@
 /* oxlint-disable no-accumulating-spread */
-import { DateTime, Effect, Equal, Function, Option } from "effect"
+import { DateTime, Effect, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { CancelInput } from "../../service.js"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
 import type { ExecutionResult } from "../../execution/state.js"
 import type { RunFailure } from "../../run/event.js"
-import type { WaitResolution } from "../../run/wait.js"
+import { classifyResponse, type WaitResolution } from "../../run/wait.js"
 import {
   appendAgentEvent,
   appendLifecycle,
@@ -336,15 +336,15 @@ export const resume: {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
-    if (run.cancellationRequested) {
-      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
-    }
     const prior = state.waits.get(waitMapKey(run.runId, input.waitId))
-    if (prior !== undefined && prior.status !== "open") {
-      if (prior.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return state
+    const classification = classifyResponse(prior, input.resolution)
+    if (classification === "duplicate-identical") return state
+    if (classification === "duplicate-conflict") {
       return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (prior === undefined) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    if (run.cancellationRequested || classification !== "open") {
+      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    }
     const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     const transitioned = closeWait(state, {
       runId: run.runId,
@@ -353,7 +353,15 @@ export const resume: {
       resolution: input.resolution,
       closedAt,
     })
-    if (transitioned.affected !== 1) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    if (transitioned.affected !== 1) {
+      const current = transitioned.state.waits.get(waitMapKey(run.runId, input.waitId))
+      const outcome = classifyResponse(current, input.resolution)
+      if (outcome === "duplicate-identical") return transitioned.state
+      if (outcome === "duplicate-conflict") {
+        return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
+      }
+      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    }
     const [, next] = yield* appendLifecycle(
       transitioned.state,
       run.runId,

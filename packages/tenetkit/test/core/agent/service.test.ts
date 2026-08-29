@@ -6941,21 +6941,26 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let checkpoint: Prompt.Prompt | undefined
     let executions = 0
     let modelCalls = 0
+    let resumedMetadata: unknown
     return [
       Layer.mergeAll(
-        modelLayer(() => {
+        modelLayer((options) => {
           modelCalls += 1
-          return modelCalls === 1
-            ? Stream.make(
-                Response.makePart("tool-call", {
-                  id: "provider-metadata-wait",
-                  name: "echo",
-                  params: { text: "wait" },
-                  providerExecuted: false,
-                  metadata: { openai: { itemId: "fc_provider_metadata_wait" } },
-                }),
-              )
-            : Stream.make(textDelta("resumed"))
+          if (modelCalls === 1) {
+            return Stream.make(
+              Response.makePart("tool-call", {
+                id: "provider-metadata-wait",
+                name: "echo",
+                params: { text: "wait" },
+                providerExecuted: false,
+                metadata: { openai: { itemId: "fc_provider_metadata_wait" } },
+              }),
+            )
+          }
+          resumedMetadata = options.prompt.content
+            .flatMap((message) => (message.role === "assistant" ? message.content : []))
+            .find((part) => part.type === "tool-call" && part.id === "provider-metadata-wait")?.options
+          return Stream.make(textDelta("resumed"))
         }),
         ToolExecutor.layerTest({
           execute: () => {
@@ -6982,7 +6987,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         if (suspension._tag !== "tenetkit/core/AgentSuspended" || checkpoint === undefined) {
           return yield* Effect.die("missing provider metadata suspension checkpoint")
         }
-        expect(suspension.checkpoint.calls[0]?.call.metadata).toEqual({})
+        const metadata = { openai: { itemId: "fc_provider_metadata_wait" } }
+        expect(suspension.checkpoint.calls[0]?.call.metadata).toEqual(metadata)
+        expect(suspension.waits[0]?.call.metadata).toEqual(metadata)
+        expect(
+          checkpoint.content
+            .flatMap((message) => (message.role === "assistant" ? message.content : []))
+            .find((part) => part.type === "tool-call" && part.id === "provider-metadata-wait")?.options,
+        ).toEqual(metadata)
 
         const events = yield* Stream.runCollect(
           Agent.stream(agent, {
@@ -6998,6 +7010,56 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(events.at(-1)?._tag).toBe("Completed")
         expect(executions).toBe(1)
         expect(modelCalls).toBe(2)
+        expect(resumedMetadata).toEqual(metadata)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects a denial targeted to a tool wait before side effects", () => {
+    let checkpoint: Prompt.Prompt | undefined
+    let executions = 0
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(toolCallPart("tool-wait-denial", "echo", { text: "wait" }))
+        }),
+        ToolExecutor.layerTest({
+          execute: () => {
+            executions += 1
+            return Effect.succeed({ _tag: "Suspend", token: "tool-wait-denial-token" })
+          },
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "tool-wait-denial-agent", toolkit: Toolkit.make(echoTool) })
+        const suspension = yield* Agent.stream(agent, { prompt: "wait" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (suspension._tag !== "tenetkit/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing tool-wait suspension")
+        }
+        const failure = yield* Agent.stream(agent, {
+          prompt: "ignored",
+          history: checkpoint,
+          resume: {
+            suspension,
+            resolutions: [{ waitId: suspension.waits[0]!.waitId, resolution: { _tag: "Denied" } }],
+          },
+        }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(failure._tag).toBe("tenetkit/core/ResumeMismatch")
+        expect(executions).toBe(1)
+        expect(modelCalls).toBe(1)
       }),
     ] as const
   })

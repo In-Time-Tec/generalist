@@ -1,7 +1,7 @@
-import { DateTime, Effect, Equal, Function, Option } from "effect"
+import { DateTime, Effect, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../../errors.js"
 import type { RespondInput, SignalInput } from "../../../service.js"
-import type { RunWait, WaitResolution } from "../../../run/wait.js"
+import { classifyResponse, type RunWait, type WaitResolution } from "../../../run/wait.js"
 import { appendLifecycle, rejectIfTerminal, resumedEvent } from "../../append.js"
 import { waitMapKey, type MemoryState, type StoredRun } from "../../state.js"
 
@@ -56,15 +56,13 @@ export const respond: {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
-    if (run.cancellationRequested) {
-      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
-    }
     const prior = state.waits.get(waitMapKey(run.runId, input.waitId))
-    if (prior !== undefined && prior.status !== "open") {
-      if (prior.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return state
+    const classification = classifyResponse(prior, input.resolution)
+    if (classification === "duplicate-identical") return state
+    if (classification === "duplicate-conflict") {
       return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (prior === undefined) {
+    if (run.cancellationRequested || classification !== "open") {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
     const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
@@ -76,7 +74,15 @@ export const respond: {
       resolution,
       closedAt,
     })
-    if (transitioned.affected !== 1) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    if (transitioned.affected !== 1) {
+      const current = transitioned.state.waits.get(waitMapKey(run.runId, input.waitId))
+      const outcome = classifyResponse(current, resolution)
+      if (outcome === "duplicate-identical") return transitioned.state
+      if (outcome === "duplicate-conflict") {
+        return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
+      }
+      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    }
     const programOperations = new Map(state.programOperations)
     for (const [key, operation] of programOperations) {
       if (operation.runId === run.runId && operation.waitId === input.waitId && operation.status === "waiting") {

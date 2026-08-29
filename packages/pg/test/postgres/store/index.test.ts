@@ -170,6 +170,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims
         const waitId = uniqueSession("affected-wait")
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -177,9 +178,13 @@ describePostgres("PostgreSQL run store", () => {
           idempotencyKey: waitId,
           prompt: textPrompt("wait"),
         })
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "affected-row" })
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "affected-row", limit: 1 })
+        if (claim === undefined) return yield* Effect.die("affected-row claim is missing")
         yield* store.suspend({
-          ...claim,
+          runId: receipt.runId,
+          ownerId: claim.workerId,
+          attemptFence: claim.attemptFence,
+          session: claim.session,
           waits: [openWait({ waitId })],
           suspension: suspension({ waitId }),
         })

@@ -209,7 +209,7 @@ describePostgres("PostgreSQL Program store contract", () => {
                   const [resumed] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
                   expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
                     suspension: { operation: "echo", reason: "approval" },
-                    resolution: { _tag: "Approved" },
+                    resolutions: [{ waitId: "approval:echo", resolution: { _tag: "Approved" } }],
                   })
                   yield* host.execute({
                     runId: receipt.runId,

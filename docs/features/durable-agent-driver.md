@@ -38,7 +38,7 @@ Inline process-local `AgentTool` children call `reserveChildBudget` before the n
 - **Compaction** — `intercept` around proactive `maybeCompact` and `applyCompactionResult`; reactive overflow compaction runs inline inside an active model operation without a separate driver record.
 - **Memory / session** — `intercept` for recall, remember, and `syncSession` in `compaction-runtime.ts`.
 - **Structured output** — `intercept` in `run-loop.ts`.
-- **Suspension** — one schema-backed authored-order tool-batch checkpoint carries each call's exact `Ready`, `Waiting`, `Completed`, `Unknown`, or `Cancelled` state. Driver checkpoint mutations persist the batch; resume validation checks targeted resolutions and updates only those calls when `RunOptions.resume` is set.
+- **Suspension** — one schema-backed authored-order tool-batch checkpoint carries each call's exact `Ready`, `Scheduled`, `Waiting`, `Completed`, `Unknown`, or `Cancelled` state. `Scheduled` durably binds the admitted operation digest and replay policy so parallel calls charge once and recovery reconciles without repeating authorization. Driver checkpoint mutations persist the batch; resume validation checks targeted resolutions and updates only those calls when `RunOptions.resume` is set.
 
 Control flow still lives in `run-loop.ts`, `model-turn.ts`, and related modules. The driver validates pending operations, charges `RunBudget`, records outcomes, and maintains checkpoint state; it does not yet choose the next loop step (that remains pending-operation-driven rather than fully decide-driven).
 

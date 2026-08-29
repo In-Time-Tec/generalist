@@ -23,6 +23,9 @@ import { edgeCount, incrementEdge } from "../../../src/core/agent/handoff/state.
 import { applyHandoffCommit } from "../../../src/core/durable/loop-driver.js"
 import { Pin } from "../../../src/core/durable/pin.js"
 import { withDerivedSystem } from "../../../src/core/agent/session/history.js"
+import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
+import { make as makeToolBatch, updateCall } from "../../../src/core/agent/tools/checkpoint.js"
+import { applyToolOutcome } from "../../../src/core/agent/tools/checkpoint-operation.js"
 
 type JsonRoundTripValue = typeof Schema.Unknown.Type
 const roundTrip = (value: JsonRoundTripValue): JsonRoundTripValue => Json.parse(Json.stringify(value))
@@ -682,6 +685,48 @@ const captureJournal = () => {
   return { scheduled, journalLayer: Layer.succeed(DurableDriver.DriverJournalService, journal) }
 }
 
+const batchToolFixture = (logicalOperationId: string, ids: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const calls = ids.map((id) =>
+      Response.toolCallPart({
+        id,
+        name: "echo",
+        params: { text: id },
+        providerExecuted: false,
+      }),
+    )
+    const operationKeys = calls.map((call) => `${logicalOperationId}:tool:0:${call.id}:${call.name}`)
+    const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
+    const initial = yield* driver.initial({
+      prompt: Prompt.make("parallel tools"),
+      budget: RunBudget.allocate({ toolCalls: ids.length }),
+    })
+    const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(initial.state)
+    const ready = makeToolBatch({ turn: 0, calls, operationKeys, activeTools: ["echo"] })
+    const toolBatch = calls.reduce(
+      (checkpoint, _call, callIndex) =>
+        updateCall(checkpoint, { callIndex, state: { _tag: "Ready", stage: "execution" } }),
+      ready,
+    )
+    const checkpoint = { ...initial, state: { ...state, toolBatch } }
+    const specs = calls.map((call, callIndex) => ({
+      kind: "tool" as const,
+      key: operationKeys[callIndex]!,
+      turn: 0,
+      input: { turn: 0, callId: call.id, name: call.name },
+      replayPolicy: "pure" as const,
+      applyCheckpoint: applyToolOutcome({
+        callIndex,
+        call,
+        operationKey: operationKeys[callIndex]!,
+        activatedSkills: [],
+        invocationPath: [],
+        collapseSuspension: false,
+      }),
+    }))
+    return { checkpoint, driver, specs }
+  })
+
 describe("DurableDriver Agent.stream integration", () => {
   it("restores Agent instructions ahead of derived Session system context", () => {
     const projection = Prompt.fromMessages([
@@ -809,6 +854,139 @@ describe("DurableDriver Agent.stream integration", () => {
         )
         .pipe(Effect.flip)
       expect(failure._tag).toBe("tenetkit/core/DriverStateInvalid")
+    }),
+  )
+
+  it.effect("admits parallel batch tools atomically and charges every call once", () =>
+    Effect.gen(function* () {
+      const fixture = yield* batchToolFixture("parallel-batch-admission", ["call-a", "call-b"])
+      const firstScheduled = yield* Deferred.make<void>()
+      const releaseFirstSchedule = yield* Deferred.make<void>()
+      const bothExecuting = yield* Deferred.make<void>()
+      const releaseExecutions = yield* Deferred.make<void>()
+      const scheduled = new Array<string>()
+      let active = 0
+      let maxActive = 0
+      const interpreter = yield* DurableDriver.makeInline({
+        driver: fixture.driver,
+        initial: fixture.checkpoint,
+        journal: {
+          onScheduled: (operation) =>
+            Effect.gen(function* () {
+              scheduled.push(operation.key)
+              if (operation.key !== fixture.specs[0]!.key) return
+              yield* Deferred.succeed(firstScheduled, undefined)
+              yield* Deferred.await(releaseFirstSchedule)
+            }),
+          onCompleted: () => Effect.void,
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const execute = (id: string) =>
+        Effect.gen(function* () {
+          active += 1
+          maxActive = Math.max(maxActive, active)
+          if (active === 2) yield* Deferred.succeed(bothExecuting, undefined)
+          yield* Deferred.await(releaseExecutions)
+          return { _tag: "Success" as const, result: id, encodedResult: id }
+        }).pipe(Effect.ensuring(Effect.sync(() => void (active -= 1))))
+      const fiber = yield* Effect.all(
+        fixture.specs.map((spec) => interpreter.run(spec, execute(spec.key))),
+        { concurrency: "unbounded" },
+      ).pipe(Effect.forkChild({ startImmediately: true }))
+
+      yield* Deferred.await(firstScheduled)
+      expect(scheduled).toEqual([fixture.specs[0]!.key])
+      yield* Deferred.succeed(releaseFirstSchedule, undefined)
+      yield* Deferred.await(bothExecuting)
+      expect(maxActive).toBe(2)
+      yield* Deferred.succeed(releaseExecutions, undefined)
+      yield* Fiber.join(fiber)
+
+      const checkpoint = yield* interpreter.checkpoint
+      const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state)
+      expect(scheduled).toEqual(fixture.specs.map((spec) => spec.key))
+      expect(checkpoint.budget.remaining.toolCalls).toBe(0)
+      expect(state.pending).toBeUndefined()
+      expect(state.toolBatch?.calls.map((entry) => entry.state._tag)).toEqual(["Completed", "Completed"])
+    }),
+  )
+
+  it.effect("recovers a scheduled batch tool without recharging or repeating authorization", () =>
+    Effect.gen(function* () {
+      const fixture = yield* batchToolFixture("scheduled-tool-recovery", ["call-a"])
+      let persisted: DurableDriver.DriverCheckpoint | undefined
+      let executions = 0
+      const crashing = yield* DurableDriver.makeInline({
+        driver: fixture.driver,
+        initial: fixture.checkpoint,
+        journal: {
+          onScheduled: (_operation, checkpoint) =>
+            Effect.sync(() => {
+              persisted = checkpoint
+            }).pipe(Effect.andThen(Effect.interrupt)),
+          onCompleted: () => Effect.void,
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const firstExit = yield* crashing
+        .run(
+          fixture.specs[0]!,
+          Effect.sync(() => {
+            executions += 1
+            return { _tag: "Success" as const, result: "first", encodedResult: "first" }
+          }),
+        )
+        .pipe(Effect.exit)
+      expect(firstExit._tag).toBe("Failure")
+      expect(executions).toBe(0)
+      expect(persisted?.budget.remaining.toolCalls).toBe(0)
+      expect(
+        (yield* Schema.decodeUnknownEffect(LoopDriverState)(persisted!.state)).toolBatch?.calls[0]?.state._tag,
+      ).toBe("Scheduled")
+
+      const recovered = yield* DurableDriver.makeInline({
+        driver: fixture.driver,
+        initial: persisted!,
+      })
+      yield* recovered.run(
+        fixture.specs[0]!,
+        Effect.sync(() => {
+          executions += 1
+          return { _tag: "Success" as const, result: "recovered", encodedResult: "recovered" }
+        }),
+      )
+      const checkpoint = yield* recovered.checkpoint
+      const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state)
+      expect(executions).toBe(1)
+      expect(checkpoint.budget.remaining.toolCalls).toBe(0)
+      expect(state.toolBatch?.calls[0]?.state._tag).toBe("Completed")
+    }),
+  )
+
+  it.effect("rejects a same-kind operation outside the active tool batch", () =>
+    Effect.gen(function* () {
+      const fixture = yield* batchToolFixture("batch-operation-boundary", ["call-a"])
+      const interpreter = yield* DurableDriver.makeInline({
+        driver: fixture.driver,
+        initial: fixture.checkpoint,
+      })
+      const failure = yield* interpreter
+        .run(
+          {
+            ...fixture.specs[0]!,
+            key: "batch-operation-boundary:tool:0:unlisted:echo",
+            input: { turn: 0, callId: "unlisted", name: "echo" },
+          },
+          Effect.die("unlisted tool operation must not execute"),
+        )
+        .pipe(Effect.flip)
+
+      expect(failure).toMatchObject({
+        _tag: "tenetkit/core/DriverStateInvalid",
+        message: "Tool operation batch-operation-boundary:tool:0:unlisted:echo is not part of the active batch",
+      })
+      expect((yield* interpreter.checkpoint).budget.remaining.toolCalls).toBe(1)
     }),
   )
 

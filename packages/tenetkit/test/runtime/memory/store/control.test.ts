@@ -48,6 +48,32 @@ const admitWaitWithClaimedChild = (waitId: string) =>
     return { runtime, store, runId: parent.runId }
   })
 
+const duplicateResponseAfterCancellation = (waitId: string) =>
+  Effect.gen(function* () {
+    const { runtime, store, runId } = yield* admitWaitWithClaimedChild(waitId)
+    const resolution = { _tag: "ToolResult" as const, result: "accepted", encodedResult: "accepted" }
+    yield* runtime.respond({ runId, waitId, resolution })
+    yield* runtime.cancel({ runId, reason: "stop" })
+    expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+
+    yield* runtime.respond({ runId, waitId, resolution })
+    yield* store.resume({ runId, waitId, resolution })
+    for (const respond of [
+      runtime.respond({
+        runId,
+        waitId,
+        resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
+      }),
+      store.resume({
+        runId,
+        waitId,
+        resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
+      }),
+    ]) {
+      expect(yield* respond.pipe(Effect.flip)).toBeInstanceOf(Errors.ResponseConflict)
+    }
+  })
+
 layer(memoryLayer)("Runtime control and terminals", (it) => {
   it.effect("enforces first-terminal-wins for complete after cancel", () =>
     Effect.gen(function* () {
@@ -226,6 +252,10 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
       expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
     }),
+  )
+
+  it.effect("keeps duplicate responses idempotent after cancellation admission", () =>
+    duplicateResponseAfterCancellation("wait:memory-duplicate-cancel"),
   )
 
   it.effect("keeps a concurrent response and cancellation from leaving a Run running", () =>

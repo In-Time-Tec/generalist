@@ -79,6 +79,32 @@ const admitWaitWithClaimedChild = (waitId: string) =>
     return { runtime, store, runId: parent.runId }
   })
 
+const duplicateResponseAfterCancellation = (waitId: string) =>
+  Effect.gen(function* () {
+    const { runtime, store, runId } = yield* admitWaitWithClaimedChild(waitId)
+    const resolution = { _tag: "ToolResult" as const, result: "accepted", encodedResult: "accepted" }
+    yield* runtime.respond({ runId, waitId, resolution })
+    yield* runtime.cancel({ runId, reason: "stop" })
+    expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+
+    yield* runtime.respond({ runId, waitId, resolution })
+    yield* store.resume({ runId, waitId, resolution })
+    for (const respond of [
+      runtime.respond({
+        runId,
+        waitId,
+        resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
+      }),
+      store.resume({
+        runId,
+        waitId,
+        resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
+      }),
+    ]) {
+      expect(yield* respond.pipe(Effect.flip)).toBeInstanceOf(Errors.ResponseConflict)
+    }
+  })
+
 it.live("migrates and reopens a durable sqlite store", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("migrate")
@@ -1092,6 +1118,15 @@ layer(sqliteLayer(tempDbPath("cancelled-wait")))(
         expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
         expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
       }),
+    )
+  },
+)
+
+layer(sqliteLayer(tempDbPath("duplicate-cancelled-wait")))(
+  "keeps duplicate SQLite responses idempotent after cancellation admission",
+  (suite) => {
+    suite.effect("keeps duplicate responses idempotent", () =>
+      duplicateResponseAfterCancellation("wait:sqlite-duplicate-cancel"),
     )
   },
 )
