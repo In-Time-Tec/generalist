@@ -22,12 +22,12 @@ import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { reconcileFanOutWith } from "tenetkit/runtime/driver/sql/store/fan-out/service"
 import type { DecodedRun, EventRow, RunRow } from "tenetkit/runtime/driver/sql/codec/rows"
 import { decodePersistedEvents, decodeRunEffect, nowIso } from "tenetkit/runtime/driver/sql/store/statements"
-import { NOTIFY_CHANNEL } from "../schema.js"
 import type { EmittableAgentLoopEvent } from "tenetkit/runtime/driver/execution/agent/event"
 import { PendingRunOutcome, type ExecutionClaim } from "tenetkit/runtime/driver/run/store"
 import type { ExecutionResult } from "tenetkit/runtime/driver/execution/state"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
+import { notifyRun } from "../events/transaction-events.js"
 import { admitChildSettlementFromEventId } from "tenetkit/runtime/driver/sql/settlement-notifications"
 import { discardPendingSteering } from "tenetkit/runtime/driver/sql/store/steering/disposition"
 import {
@@ -161,7 +161,6 @@ export const appendEvent: {
   (_hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const pg = yield* PgClient.PgClient
       const discarded = yield* discardPendingSteering({ runId: run.runId, terminalTag: partial._tag })
       if (discarded !== undefined) {
         yield* appendEvent(_hub, run, discarded)
@@ -224,7 +223,7 @@ export const appendEvent: {
         WHERE run_id = ${run.runId}
       `
       }
-      yield* pg.notify(NOTIFY_CHANNEL, run.runId)
+      yield* notifyRun(run.runId)
       return event
     }),
 )

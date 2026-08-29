@@ -1,6 +1,7 @@
 import { Context, Effect, Random } from "effect"
 import { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { RunEvent } from "tenetkit/runtime/driver/run/event"
 import { withSql } from "tenetkit/runtime/driver/sql/effect"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
@@ -11,6 +12,13 @@ const TransactionEvents = Context.Reference<Array<readonly [string, RunEvent]>>(
   "tenetkit/runtime/driver/sql/postgres/TransactionEvents",
   { defaultValue: () => [] },
 )
+
+/** @experimental Notify event followers through the active SQL connection. */
+export const notifyRun = (runId: string): Effect.Effect<void, SqlError, SqlClient.SqlClient> =>
+  SqlClient.SqlClient.pipe(
+    Effect.flatMap((sql) => sql`SELECT pg_notify(${NOTIFY_CHANNEL}, ${runId})`),
+    Effect.asVoid,
+  )
 
 export const transactionRunner = (input: {
   readonly sql: SqlClient.SqlClient
@@ -29,26 +37,9 @@ export const transactionRunner = (input: {
       Effect.gen(function* () {
         const events: Array<readonly [string, RunEvent]> = []
         const result = yield* effect.pipe(Effect.provideService(TransactionEvents, events))
-        return [result, events] as const
+        yield* Effect.forEach(new Set(events.map(([runId]) => runId)), notifyRun, { discard: true })
+        return result
       }),
-    ).pipe(
-      Effect.tap(([, events]) =>
-        Effect.forEach(
-          new Set(events.map(([runId]) => runId)),
-          (runId) =>
-            input.pg
-              .notify(NOTIFY_CHANNEL, runId)
-              .pipe(
-                Effect.catch((error) =>
-                  Effect.logWarning("runtime.postgres.event_notification.failed").pipe(
-                    Effect.annotateLogs({ "tenetkit.run.id": runId, "tenetkit.failure": String(error) }),
-                  ),
-                ),
-              ),
-          { discard: true },
-        ),
-      ),
-      Effect.map(([result]) => result),
     )
   const runNoTxn: RunFn = (effect) =>
     withSql(input.sql, effect.pipe(Effect.provideService(PgClient.PgClient, input.pg)))
