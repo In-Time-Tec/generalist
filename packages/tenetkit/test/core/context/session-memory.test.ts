@@ -26,7 +26,7 @@ const pathText = (path: ReadonlyArray<Session.Entry>): string => Json.stringify(
 const provideScoped = <A, E, R>(services: Layer.Layer<R>, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E> =>
   Effect.scoped(Effect.flatMap(Layer.build(services), (context) => Effect.provideContext(effect, context)))
 
-describe("Agent SessionDirectory binding", () => {
+describe("memory SessionDirectory binding", () => {
   it.effect("runs different IDs concurrently without sharing history", () => {
     let started = 0
     let bothStarted: Deferred.Deferred<void> | undefined

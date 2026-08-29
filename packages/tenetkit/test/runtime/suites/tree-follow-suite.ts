@@ -197,7 +197,7 @@ layer(sqliteLayer(tempDbPath("tree-follow")))("RunTree replay-then-follow SQLite
   it.effect("bounds recovery reads", boundedRecovery)
 })
 
-testIt.effect("replays a terminal SQLite tree immediately after restart", () => {
+testIt.live("replays a terminal SQLite tree immediately after restart", () => {
   const filename = tempDbPath("tree-follow-restart")
   return Effect.gen(function* () {
     const seeded = yield* provideScoped(

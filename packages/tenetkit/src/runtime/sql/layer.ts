@@ -1,5 +1,5 @@
 import { Layer } from "effect"
-import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient"
+import { layer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { layer as runtimeLayer } from "../memory/layer/service.js"
 import { Runtime } from "../service.js"
 import { RunStore } from "../run/store.js"
@@ -17,7 +17,7 @@ export interface BunSqliteStoreOptions extends SqliteStoreOptions {
 export const layerSqlite = (
   options: BunSqliteStoreOptions,
 ): Layer.Layer<Runtime | RunStore | ExternalChildStore | ExecutionHost | LocalScheduler, SqliteStoreError> => {
-  const client = SqliteClient.layer({ filename: options.filename })
+  const client = layer({ filename: options.filename })
   const store = layerSqliteStore({ ...options, source: options.source ?? options.filename }).pipe(Layer.provide(client))
   const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
   const runtime = runtimeLayer(options).pipe(Layer.provide(dependencies))

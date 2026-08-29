@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite"
-import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient"
+import { layer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import {
@@ -14,7 +14,7 @@ import { tempDbPath } from "./scenario.js"
 
 const apply = (filename: string) =>
   Effect.scoped(
-    Effect.flatMap(Layer.build(SqliteClient.layer({ filename })), (context) =>
+    Effect.flatMap(Layer.build(layer({ filename })), (context) =>
       migrate(filename).pipe(Effect.provideContext(context)),
     ),
   )

@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite"
-import * as SqliteClient from "@effect/sql-sqlite-bun/SqliteClient"
+import { SqliteClient, type SqliteClientConfig, layer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { expect, it } from "@effect/vitest"
 import { Clock, Context, Deferred, Effect, Fiber, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
@@ -7,26 +7,22 @@ import { SqlError } from "effect/unstable/sql/SqlError"
 import { migrate } from "../../../src/runtime/sql/migrate.js"
 import { tempDbPath } from "./scenario.js"
 
-type Services = SqlClient.SqlClient | SqliteClient.SqliteClient
+type Services = SqlClient.SqlClient | SqliteClient
 
 const withClient = <A, E>(
-  config: SqliteClient.SqliteClientConfig,
-  use: (
-    sql: SqlClient.SqlClient,
-    sqlite: SqliteClient.SqliteClient,
-  ) => Effect.Effect<A, E, Services>,
+  config: SqliteClientConfig,
+  use: (sql: SqlClient.SqlClient, sqlite: SqliteClient) => Effect.Effect<A, E, Services>,
 ): Effect.Effect<A, E> =>
   Effect.scoped(
     Effect.gen(function* () {
-      const context = yield* Layer.build(SqliteClient.layer(config))
-      return yield* use(
-        Context.get(context, SqlClient.SqlClient),
-        Context.get(context, SqliteClient.SqliteClient),
-      ).pipe(Effect.provideContext(context))
+      const context = yield* Layer.build(layer(config))
+      return yield* use(Context.get(context, SqlClient.SqlClient), Context.get(context, SqliteClient)).pipe(
+        Effect.provideContext(context),
+      )
     }),
   )
 
-it.live("opens readonly databases without changing their journal mode", () => {
+it.live("uses the upstream client to open readonly databases without changing their journal mode", () => {
   const filename = tempDbPath("sqlite-upstream-readonly")
   const db = new Database(filename)
   db.run("CREATE TABLE records (value TEXT NOT NULL)")
@@ -81,8 +77,8 @@ it.live("returns a typed failure after the configured busy timeout", () => {
   const filename = tempDbPath("sqlite-upstream-contention")
   return Effect.scoped(
     Effect.gen(function* () {
-      const contextA = yield* Layer.build(SqliteClient.layer({ filename, busyTimeout: "40 millis" }))
-      const contextB = yield* Layer.build(SqliteClient.layer({ filename, busyTimeout: "40 millis" }))
+      const contextA = yield* Layer.build(layer({ filename, busyTimeout: "40 millis" }))
+      const contextB = yield* Layer.build(layer({ filename, busyTimeout: "40 millis" }))
       const sqlA = Context.get(contextA, SqlClient.SqlClient)
       const sqlB = Context.get(contextB, SqlClient.SqlClient)
       const locked = yield* Deferred.make<void>()

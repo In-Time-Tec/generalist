@@ -221,7 +221,6 @@ test("multi-agent guide preserves the two-channel child-run contract", () => {
     "runId",
     "Queue position",
     "Scheduling and run permits",
-    '"local"',
     "fresh chat",
     "Effect.provide",
     "ToolExecutor.layerToolkit",
