@@ -282,7 +282,7 @@ describePostgres("PostgreSQL run store", () => {
     ),
   )
 
-  it.live("settles cancel-first completeOperation Unknown without rewriting uncertainty", () =>
+  it.live("keeps cancel-first completeOperation Unknown unresolved and revokes Session authority", () =>
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -319,12 +319,21 @@ describePostgres("PostgreSQL run store", () => {
           outcome: { _tag: "Unknown" },
         })
         expect(completed.status).toBe("unknown")
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+        const staleSession = Option.getOrThrow(yield* store.claimedSessionStore(claim))
         yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
           "unknown",
         )
+        expect((yield* runtime.history({ runId: receipt.runId, limit: 100 })).map((event) => event._tag)).not.toContain(
+          "RunCancelled",
+        )
+        expect(
+          yield* Effect.flip(
+            staleSession.append({ _tag: "Message", message: textPrompt("stale after unknown").content[0]! }),
+          ),
+        ).toMatchObject({ message: "Session write claim is stale" })
       }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
@@ -1487,11 +1496,11 @@ describePostgres("PostgreSQL run store", () => {
             ),
           )
           yield* worker.idle
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
           expect(lifecycle).toEqual(["service acquired", "service finalized", "tool finalized"])
-          const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
-            (event) => event._tag === "OperationUnknown",
-          )
+          const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+          expect(history.map((event) => event._tag)).not.toContain("RunCancelled")
+          const unknown = history.find((event) => event._tag === "OperationUnknown")
           if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
           expect((yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).status).toBe(
             "unknown",

@@ -1,5 +1,5 @@
 import "./suites/sqlite-cancellation-reconciliation-suite.js"
-import "./suites/cancellation-convergence-suite.js"
+import { cancellationConvergenceSuite } from "./suites/cancellation-convergence-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
 import { LocalScheduler, Runtime, RunStore } from "../../../src/runtime/index.js"
@@ -7,6 +7,21 @@ import { assistantAddress, parentRelativeOptions, textPrompt } from "../executio
 import { tempDbPath } from "../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
+
+cancellationConvergenceSuite({
+  name: "memory",
+  storeLayer: Runtime.layerMemory({ ...parentRelativeOptions, scheduler: { pollInterval: "1 day" } }),
+})
+
+cancellationConvergenceSuite({
+  name: "sqlite",
+  storeLayer: SqliteRuntime.layerSqlite({
+    ...parentRelativeOptions,
+    filename: tempDbPath("operation-cancellation-convergence"),
+    scheduler: { pollInterval: "1 day" },
+  }),
+})
+
 for (const backend of ["memory", "sqlite"] as const) {
   const runtimeLayer =
     backend === "memory"

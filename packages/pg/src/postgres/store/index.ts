@@ -80,17 +80,18 @@ import { cancelSessionRuns } from "../sessions/session-cancellation.js"
 import { postgresSessionStore } from "../sessions/session-store.js"
 import { postgresSessionReader } from "../sessions/session-reader.js"
 import { readinessForAdmission } from "tenetkit/runtime/driver/sql/store/child/capacity"
-import { hasPendingOperationCancellation } from "tenetkit/runtime/driver/sql/store/child/settlement"
+import {
+  hasPendingOperationCancellation,
+  hasUnknownOperation,
+} from "tenetkit/runtime/driver/sql/store/child/settlement"
 import { revokeExecutionSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 
 export const postgresServices = (options: PostgresOptions) =>
   Effect.gen(function* () {
-    const source = options.source ?? "postgres"
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
-    yield* checkSchema(source)
+    yield* checkSchema(options.source ?? "postgres")
     const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
-    const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
     yield* reconcileCancellationRequested
     const pg = yield* PgClient.PgClient
@@ -228,7 +229,7 @@ export const postgresServices = (options: PostgresOptions) =>
           pg,
           runId: input.runId,
           cursor: input.cursor,
-          capacity,
+          capacity: options.subscriberQueueCapacity ?? 64,
           loadReplay: runNoTxn(
             Effect.gen(function* () {
               const loaded = yield* requireRun(input.runId)
@@ -384,7 +385,8 @@ export const postgresServices = (options: PostgresOptions) =>
             if (loaded.cancellationRequested) {
               if (
                 (yield* deferCancelledFanOutParent(sql, loaded.runId)) ||
-                (yield* hasPendingOperationCancellation(loaded.runId))
+                (yield* hasPendingOperationCancellation(loaded.runId)) ||
+                (yield* hasUnknownOperation(loaded.runId))
               ) {
                 yield* sql`
                   UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL
@@ -493,6 +495,6 @@ export const postgresServices = (options: PostgresOptions) =>
       ...operations,
       ...programStoreMethods({ sql, hub: transactionHub, run, runNoTxn, lockRunHierarchy }),
     })
-    const claims = postgresClaims({ pg, source, hub: transactionHub, run, cancelRun })
+    const claims = postgresClaims({ pg, source: options.source ?? "postgres", hub: transactionHub, run, cancelRun })
     return { store, claims }
   })

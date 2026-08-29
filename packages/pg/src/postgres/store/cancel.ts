@@ -5,7 +5,11 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { RunNotFound, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { isTerminal } from "tenetkit/runtime/driver/run"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import { hasPendingOperationCancellation, hasUnsettledChild } from "tenetkit/runtime/driver/sql/store/child/settlement"
+import {
+  hasPendingOperationCancellation,
+  hasUnknownOperation,
+  hasUnsettledChild,
+} from "tenetkit/runtime/driver/sql/store/child/settlement"
 import { markOperationCancellations } from "tenetkit/runtime/driver/sql/store/operation/operations"
 import { afterTerminal, appendEvent, loadRun, settleParent } from "./runtime.js"
 import { cancelOwnedFanOuts } from "./fan-out.js"
@@ -63,6 +67,7 @@ const settleCancellation = (
     `
     if (running.length > 0) return
     if (yield* hasPendingOperationCancellation(current.runId)) return
+    if (yield* hasUnknownOperation(current.runId)) return
     if (yield* hasUnsettledChild(current.runId)) return
     const event = yield* appendEvent(
       input.hub,

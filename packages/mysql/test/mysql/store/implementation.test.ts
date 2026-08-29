@@ -90,7 +90,7 @@ describeMysql("mysql run store", () => {
     ),
   )
 
-  it.live("settles cancel-first completeOperation Unknown without rewriting uncertainty", () =>
+  it.live("keeps cancel-first completeOperation Unknown unresolved and revokes Session authority", () =>
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -127,12 +127,21 @@ describeMysql("mysql run store", () => {
           outcome: { _tag: "Unknown" },
         })
         expect(completed.status).toBe("unknown")
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+        const staleSession = Option.getOrThrow(yield* store.claimedSessionStore(claim))
         yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
           "unknown",
         )
+        expect((yield* runtime.history({ runId: receipt.runId, limit: 100 })).map((event) => event._tag)).not.toContain(
+          "RunCancelled",
+        )
+        expect(
+          yield* Effect.flip(
+            staleSession.append({ _tag: "Message", message: textPrompt("stale after unknown").content[0]! }),
+          ),
+        ).toMatchObject({ message: "Session write claim is stale" })
       }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )

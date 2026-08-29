@@ -3,11 +3,13 @@ import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { provideScoped } from "../../../../tenetkit/test/runtime/execution/scoped-provide.js"
+import { cancellationConvergenceSuite } from "../../../../tenetkit/test/runtime/operation/suites/cancellation-convergence-suite.js"
 import { operationRecoverySuite } from "../../../../tenetkit/test/runtime/operation/suites/recovery.js"
 import { toolCancellationSuite } from "../../../../tenetkit/test/runtime/operation/suites/tool-cancellation.js"
-import { postgresAvailable, postgresDatabase, postgresTestMaxConnections } from "../database.js"
+import { postgresAvailable, postgresDatabase, postgresLayer, postgresTestMaxConnections } from "../database.js"
 
 const database = postgresDatabase("operation-recovery")
+const cancellationDatabase = postgresDatabase("cancellation-convergence")
 
 operationRecoverySuite({
   name: "PostgreSQL",
@@ -89,4 +91,29 @@ toolCancellationSuite({
         (sql) => sql`UPDATE tenetkit_runs SET lease_expires_at = NOW() - INTERVAL '1 second' WHERE run_id = ${runId}`,
       ),
     ).pipe(Effect.scoped, Effect.asVoid),
+})
+
+cancellationConvergenceSuite({
+  name: "postgres",
+  skip: !postgresAvailable,
+  storeLayer: cancellationDatabase.provision(postgresLayer(cancellationDatabase.url)),
+  claim: (runId, ownerId) =>
+    Effect.gen(function* () {
+      const claims = yield* RunClaims
+      const batch = yield* claims.claimReadyRuns({ workerId: ownerId, limit: 10, lease: "10 seconds" })
+      const claimed = batch.find((item) => item.run.runId === runId)
+      yield* Effect.forEach(
+        batch.filter((item) => item !== claimed),
+        (item) =>
+          claims.releaseClaim({
+            runId: item.run.runId,
+            workerId: item.workerId,
+            attemptFence: item.attemptFence,
+            session: item.session,
+          }),
+        { discard: true },
+      )
+      if (claimed === undefined) return yield* Effect.die(`claim missing for ${runId} (${ownerId})`)
+      return { runId, ownerId, attemptFence: claimed.attemptFence, session: claimed.session }
+    }),
 })

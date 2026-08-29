@@ -32,6 +32,7 @@ import { admitChildSettlementFromEventId } from "tenetkit/runtime/driver/sql/set
 import { discardPendingSteering } from "tenetkit/runtime/driver/sql/store/steering/disposition"
 import {
   hasPendingOperationCancellation,
+  hasUnknownOperation,
   hasUnsettledChild,
   loadTerminalEvent,
   reconcileChildWaitWith,
@@ -304,6 +305,7 @@ export const completeRun: {
       if (
         runningFanOut.length > 0 ||
         (yield* hasPendingOperationCancellation(run.runId)) ||
+        (yield* hasUnknownOperation(run.runId)) ||
         (yield* hasUnsettledChild(run.runId))
       ) {
         yield* sql`
@@ -408,6 +410,7 @@ const settleCancelledParent = (hub: EventHub, parent: DecodedRun) =>
     `
     if (running.length > 0) return
     if (yield* hasPendingOperationCancellation(parent.runId)) return
+    if (yield* hasUnknownOperation(parent.runId)) return
     if (yield* hasUnsettledChild(parent.runId)) return
     const cancelled = yield* appendEvent(
       hub,

@@ -261,10 +261,10 @@ describeMysql("mysql worker cancellation", () => {
               )
               yield* worker.idle
               expect(yield* Ref.get(interrupted)).toBe(true)
-              expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-              const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
-                (event) => event._tag === "OperationUnknown",
-              )
+              expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+              const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+              expect(history.map((event) => event._tag)).not.toContain("RunCancelled")
+              const unknown = history.find((event) => event._tag === "OperationUnknown")
               if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
               expect(
                 (yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).status,
