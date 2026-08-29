@@ -1,9 +1,10 @@
 import { Generated, OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
 import { ContextOverflow } from "../../core/index.js"
 import { ModelRegistry } from "../../core/model/public/registry.js"
-import { Config, Effect, Layer, Redacted, Schema } from "effect"
+import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError, AnthropicStructuredOutput, LanguageModel, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
-import { HttpClient } from "effect/unstable/http"
+import { Sse } from "effect/unstable/encoding"
+import { HttpClient, HttpClientError } from "effect/unstable/http"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
 import type { RegistrationOptions } from "../model/registration.js"
@@ -38,6 +39,56 @@ const decodeConfigInput = Schema.decodeUnknownSync(Schema.NullOr(ConfigSchema), 
 type ConfigInput = typeof Schema.Unknown.Type
 
 export const decodeConfig = (options: ConfigInput): Config => decodeConfigInput(options ?? null) ?? {}
+
+const ChatStreamChunk = Schema.Struct({
+  ...Generated.ChatStreamChunk.fields,
+  provider: Schema.optionalKey(Schema.String),
+})
+const decodeChatStreamChunk = Schema.decodeUnknownEffect(Schema.fromJsonString(ChatStreamChunk))
+const openRouterStreamError = (error: unknown): AiError.AiError => {
+  if (HttpClientError.isHttpClientError(error)) {
+    switch (error.reason._tag) {
+      case "TransportError":
+      case "EncodeError":
+      case "InvalidUrlError":
+        return AiError.make({
+          module: "OpenRouterClient",
+          method: "createChatCompletionStream",
+          reason: AiError.NetworkError.fromRequestError(error.reason),
+        })
+    }
+  }
+  return AiError.make({
+    module: "OpenRouterClient",
+    method: "createChatCompletionStream",
+    reason: AiError.InvalidOutputError.make({ description: "OpenRouter streaming response could not be decoded" }),
+  })
+}
+
+const preserveServedProvider = (client: OpenRouterClient.Service): OpenRouterClient.Service =>
+  OpenRouterClient.OpenRouterClient.of({
+    ...client,
+    createChatCompletionStream: (options) =>
+      client.createChatCompletionStream(options).pipe(
+        Effect.map(([response]) => [
+          response,
+          response.stream.pipe(
+            Stream.decodeText(),
+            Stream.pipeThroughChannel(Sse.decode()),
+            Stream.takeWhile((event) => event.data !== "[DONE]"),
+            Stream.mapEffect((event) => decodeChatStreamChunk(event.data)),
+            Stream.mapError(openRouterStreamError),
+          ),
+        ]),
+      ),
+  })
+
+/** @experimental */
+export const layerConfig = (options?: Parameters<typeof OpenRouterClient.layerConfig>[0]) =>
+  Layer.effect(
+    OpenRouterClient.OpenRouterClient,
+    OpenRouterClient.OpenRouterClient.pipe(Effect.map(preserveServedProvider)),
+  ).pipe(Layer.provide(OpenRouterClient.layerConfig(options)))
 
 const OpenRouterErrorPayload = Schema.Struct({
   code: Schema.optionalKey(Schema.Unknown),
@@ -182,16 +233,17 @@ export const toolJsonSchemaCompiler =
 /** @experimental */
 export interface LayerOptions extends OpenRouterInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
-  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenRouterClient.layerConfig>[0]>, "apiKey">
+  readonly clientConfig?: Omit<NonNullable<Parameters<typeof layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
 export const layer = (
   input: LayerOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
-    Layer.provide(OpenRouterClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
+): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> => {
+  return ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+    Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
+}
 
 const registrationOptions = (input: OpenRouterInput) => {
   const required = {
@@ -209,6 +261,3 @@ const registrationOptions = (input: OpenRouterInput) => {
     ? { ...required, registrationKey: input.registrationKey }
     : { ...required, registrationKey: input.registrationKey, metadata: input.metadata }
 }
-
-/** @experimental */
-export const layerConfig = OpenRouterClient.layerConfig
