@@ -152,6 +152,18 @@
         "typescript": "catalog:",
       },
     },
+    "examples/mcp-toolkit-server": {
+      "name": "@tenetkit/example-mcp-toolkit-server",
+      "dependencies": {
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+        "tenetkit": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/memory-chat": {
       "name": "@tenetkit/example-memory-chat",
       "dependencies": {
@@ -907,6 +919,8 @@
     "@tenetkit/example-hitl-over-sse": ["@tenetkit/example-hitl-over-sse@workspace:examples/hitl-over-sse"],
 
     "@tenetkit/example-mcp-agent": ["@tenetkit/example-mcp-agent@workspace:examples/mcp-agent"],
+
+    "@tenetkit/example-mcp-toolkit-server": ["@tenetkit/example-mcp-toolkit-server@workspace:examples/mcp-toolkit-server"],
 
     "@tenetkit/example-memory-chat": ["@tenetkit/example-memory-chat@workspace:examples/memory-chat"],
 

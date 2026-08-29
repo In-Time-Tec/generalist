@@ -1,0 +1,18 @@
+{
+  "name": "@tenetkit/example-mcp-toolkit-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "catalog:",
+    "effect": "catalog:",
+    "tenetkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}
