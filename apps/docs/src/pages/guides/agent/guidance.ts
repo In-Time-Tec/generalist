@@ -1,27 +1,27 @@
-import pinSnapshot from "virtual:source/src/snippets/guides/agent/continual-harness/pin-a-snapshot.ts"
-import pinSnapshotExpected from "virtual:source/src/snippets/guides/agent/continual-harness/pin-a-snapshot.expected.txt"
-import refine from "virtual:source/src/snippets/guides/agent/continual-harness/refine-and-roll-back.ts"
-import refineExpected from "virtual:source/src/snippets/guides/agent/continual-harness/refine-and-roll-back.expected.txt"
+import pinSnapshot from "virtual:source/src/snippets/guides/agent/agent-guidance/pin-a-snapshot.ts"
+import pinSnapshotExpected from "virtual:source/src/snippets/guides/agent/agent-guidance/pin-a-snapshot.expected.txt"
+import refine from "virtual:source/src/snippets/guides/agent/agent-guidance/refine-and-roll-back.ts"
+import refineExpected from "virtual:source/src/snippets/guides/agent/agent-guidance/refine-and-roll-back.expected.txt"
 import { callout, code, codeBlock, definePage, h2, link, p, table } from "../../../prose"
 
 const durableStore = `import { layer as bunServices } from "@effect/platform-bun/BunServices"
 import { Layer } from "effect"
-import { FileSystemHarnessStore } from "tenetkit/harness"
+import { FileSystemStore } from "tenetkit/agent-guidance"
 
-const storeLayer = FileSystemHarnessStore.layer({
-  path: (scope) => \`\${process.env.HOME}/.tenetkit/harness/\${encodeURIComponent(scope)}.json\`,
+const storeLayer = FileSystemStore.layer({
+  path: (scope) => \`\${process.env.HOME}/.tenetkit/agent-guidance/\${encodeURIComponent(scope)}.json\`,
 }).pipe(Layer.provide(bunServices))`
 
-export const continualHarness = definePage({
-  path: "/docs/guides/continual-harness",
-  title: "How to let an agent refine its own guidance",
-  navTitle: "Continual harness",
+export const agentGuidance = definePage({
+  path: "/docs/guides/agent-guidance",
+  title: "Let an agent refine its own guidance",
+  navTitle: "Agent guidance",
   group: "Guides",
   description:
     "Accept a model-authored refinement, apply it atomically, roll it back exactly, persist it durably, and pin one exact state into a durable Execution.",
   content: [
     p(
-      code("tenetkit/harness"),
+      code("tenetkit/agent-guidance"),
       " is the engine for agent guidance an agent may refine and a host may pin: prompt notes, memories, skills, and subagent specs, each versioned and audited. Store locations, scope policy, and the refine flow itself stay host-owned.",
     ),
     h2("accept-a-refinement", "1. Accept a refinement from the model"),
@@ -73,9 +73,9 @@ export const continualHarness = definePage({
     ),
     h2("persist-it", "3. Persist it durably"),
     p(
-      code("HarnessStore.layerMemory"),
+      code("Store.layerMemory"),
       " is the in-process store. ",
-      code("FileSystemHarnessStore.layer({ path })"),
+      code("FileSystemStore.layer({ path })"),
       " is the durable one: the host owns every location decision through ",
       code("path(scope)"),
       " and the package owns encoding and atomicity.",
@@ -109,13 +109,13 @@ export const continualHarness = definePage({
     h2("pin-a-snapshot", "4. Pin one exact state into a durable Execution"),
     p(
       "A durable host must reconstruct the same guidance a Run started with, not whatever the store holds now. ",
-      code("HarnessRegistration.registration(state, name)"),
+      code("Registration.registration(state, name)"),
       " produces the named capability and the exact secret-free payload for it.",
     ),
     codeBlock({ label: "pin-a-snapshot.ts", source: pinSnapshot, expectedOutput: pinSnapshotExpected }),
     p(
       "The capability carries pinned content, so the executable digest changes when the state changes and Runtime's registration validation requires the supplied payload to match the declared codec, version, and digest. Refinement history is audit data and stays outside the pinned identity, so recording an event does not change what a snapshot means. See ",
-      link("/docs/reference/harness", "the tenetkit/harness reference"),
+      link("/docs/reference/agent-guidance", "the tenetkit/agent-guidance reference"),
       " for the full rejection taxonomy, scope merge, and bounded overview contracts.",
     ),
   ],

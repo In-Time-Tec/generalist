@@ -35,7 +35,7 @@ import {
   Permissions,
   RunBudget,
   Session,
-  SkillSource,
+  SkillCatalog,
   Steering,
   ToolContext,
   ToolExecutor,
@@ -344,16 +344,14 @@ const testSkill = (
   name: string,
   description: string,
   body: string,
-  options: Partial<SkillSource.Frontmatter> = {},
-): SkillSource.Skill => {
-  const frontmatter: SkillSource.Frontmatter = { name, description, ...options }
-  return {
-    frontmatter,
-    listing: SkillSource.makeListing(frontmatter),
-    body: Effect.succeed(body),
-    tools: [],
-  }
-}
+  options: Partial<SkillCatalog.Skill> = {},
+): SkillCatalog.Skill => ({
+  name,
+  description,
+  instructions: Effect.succeed(body),
+  tools: [],
+  ...options,
+})
 
 const echoExecutor = ToolExecutor.layerTest({
   execute: (request) =>
@@ -745,7 +743,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           modelCalls += 1
           return Stream.make(textDelta("unexpected"))
         }),
-        SkillSource.layerSkills([testSkill("review", "Review code", "Review carefully")]),
+        SkillCatalog.layerSkills([testSkill("review", "Review code", "Review carefully")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reserved-agent", tools: [reserved] })
@@ -1175,7 +1173,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         let competitorEntered = false
         const competitor = yield* Effect.forkChild(
-          ModelRegistry.operate(
+          ModelRegistry.withModel(
             selection,
             Effect.sync(() => {
               competitorEntered = true
@@ -1514,7 +1512,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       parameters: Schema.Struct({ target: Schema.String }),
       success: Schema.Unknown,
     })
-    const review: SkillSource.Skill = {
+    const review: SkillCatalog.Skill = {
       ...testSkill("review", "Review code before changing it.", "FULL REVIEW BODY", {
         allowedTools: ["read", "grep"],
       }),
@@ -1523,9 +1521,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     const deployBase = testSkill("deploy", "Deploy after verification.", "FULL DEPLOY BODY", {
       allowedTools: ["deploy"],
     })
-    const deploy: SkillSource.Skill = {
+    const deploy: SkillCatalog.Skill = {
       ...deployBase,
-      body: Effect.sync(() => {
+      instructions: Effect.sync(() => {
         deployBodyReads += 1
         return "FULL DEPLOY BODY"
       }),
@@ -1547,7 +1545,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        SkillSource.layerSkills([review, deploy]),
+        SkillCatalog.layerSkills([review, deploy]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "skill-agent", instructions: "base instructions" })
@@ -1585,9 +1583,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let modelCalls = 0
     let bodyReads = 0
     let executorCalls = 0
-    const collidingSkill: SkillSource.Skill = {
+    const collidingSkill: SkillCatalog.Skill = {
       ...testSkill("collision", "Contributes a colliding tool", "unused"),
-      body: Effect.sync(() => {
+      instructions: Effect.sync(() => {
         bodyReads += 1
         return "unused"
       }),
@@ -1599,7 +1597,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           modelCalls += 1
           return Stream.make(toolCallPart("activate-collision", "activate_skill", { name: "collision" }))
         }),
-        SkillSource.layerSkills([collidingSkill]),
+        SkillCatalog.layerSkills([collidingSkill]),
         ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
@@ -1632,13 +1630,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let modelCalls = 0
     let secondBodyReads = 0
     const sharedTool = Tool.make("shared", { parameters: Schema.Unknown, success: Schema.Unknown })
-    const first: SkillSource.Skill = {
+    const first: SkillCatalog.Skill = {
       ...testSkill("first", "First shared tool", "first body"),
       tools: [sharedTool],
     }
-    const second: SkillSource.Skill = {
+    const second: SkillCatalog.Skill = {
       ...testSkill("second", "Second shared tool", "second body"),
-      body: Effect.sync(() => {
+      instructions: Effect.sync(() => {
         secondBodyReads += 1
         return "second body"
       }),
@@ -1652,7 +1650,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             toolCallPart(`activate-${modelCalls}`, "activate_skill", { name: modelCalls === 1 ? "first" : "second" }),
           )
         }),
-        SkillSource.layerSkills([first, second]),
+        SkillCatalog.layerSkills([first, second]),
         unusedExecutor,
       ),
       Effect.gen(function* () {
@@ -1677,7 +1675,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
   ItLayer.make(it, "isolates activated tool registries across concurrent runs", () => {
     const skillTool = Tool.make("skill_only", { parameters: Schema.Unknown, success: Schema.Unknown })
-    const skill: SkillSource.Skill = {
+    const skill: SkillCatalog.Skill = {
       ...testSkill("isolated", "Run-local tools", "isolated body"),
       tools: [skillTool],
     }
@@ -1697,7 +1695,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("activate-isolated", "activate_skill", { name: "isolated" }))
             : Stream.make(textDelta("activated"))
         }),
-        SkillSource.layerSkills([skill]),
+        SkillCatalog.layerSkills([skill]),
         unusedExecutor,
       ),
       Effect.gen(function* () {
@@ -1720,7 +1718,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let modelCalls = 0
     let executorCalls = 0
     const skillTool = Tool.make("new_skill_tool", { parameters: Schema.Unknown, success: Schema.Unknown })
-    const skill: SkillSource.Skill = {
+    const skill: SkillCatalog.Skill = {
       ...testSkill("same-turn", "Contributes a tool", "same turn body"),
       tools: [skillTool],
     }
@@ -1735,7 +1733,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               ])
             : Stream.make(textDelta("done"))
         }),
-        SkillSource.layerSkills([skill]),
+        SkillCatalog.layerSkills([skill]),
         ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
@@ -1761,9 +1759,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let bodyReads = 0
     let suspendedTranscript: Prompt.Prompt | undefined
     const resumableTool = Tool.make("resumable_skill_tool", { parameters: Schema.Unknown, success: Schema.Unknown })
-    const skill: SkillSource.Skill = {
+    const skill: SkillCatalog.Skill = {
       ...testSkill("resumable", "Contributes a resumable tool", "unused"),
-      body: Effect.sync(() => {
+      instructions: Effect.sync(() => {
         bodyReads += 1
         return "checkpointed body"
       }),
@@ -1779,7 +1777,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           if (modelCalls === 2) return Stream.make(toolCallPart("resumable-call", "resumable_skill_tool", {}))
           return Stream.make(textDelta("resumed"))
         }),
-        SkillSource.layerSkills([skill]),
+        SkillCatalog.layerSkills([skill]),
         ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
@@ -1821,7 +1819,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "keeps runs without SkillSource unchanged", () => {
+  ItLayer.make(it, "keeps runs without SkillCatalog unchanged", () => {
     let capturedPrompt: Prompt.Prompt | undefined
     let capturedTools: ReadonlyArray<string> = []
     return [
@@ -1853,7 +1851,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "preserves empty system instructions without SkillSource", () => {
+  ItLayer.make(it, "preserves empty system instructions without SkillCatalog", () => {
     let capturedPrompt: Prompt.Prompt | undefined
     return [
       Layer.mergeAll(
@@ -2578,7 +2576,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let executionFinalized!: Deferred.Deferred<void>
     let consumerStarted!: Deferred.Deferred<void>
     let toolSignal!: AbortSignal
-    let toolContext!: ToolContext.Interface
+    let toolContext!: ToolContext.Service
     return [
       Layer.unwrap(
         Effect.gen(function* () {
@@ -3119,7 +3117,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       parameters: Schema.Struct({ target: Schema.String }),
       success: Schema.Unknown,
     })
-    const review: SkillSource.Skill = {
+    const review: SkillCatalog.Skill = {
       ...testSkill("review-active", "Review active tool behavior.", "REVIEW BODY"),
       tools: [reviewTool],
     }
@@ -3136,7 +3134,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta(modelCalls === 2 ? "invalid skill call" : "done"))
         }),
         ToolExecutor.layerTest({ execute: () => Effect.die("excluded skill tool must not execute") }),
-        SkillSource.layerSkills([review]),
+        SkillCatalog.layerSkills([review]),
         ModelMiddleware.layer([
           {
             transformPart: (part, context) =>
@@ -7483,7 +7481,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       success: Schema.Unknown,
       needsApproval: true,
     })
-    const review: SkillSource.Skill = {
+    const review: SkillCatalog.Skill = {
       ...testSkill("resumable-review", "Review with resumable approval.", "RESUMABLE REVIEW BODY"),
       tools: [reviewTool],
     }
@@ -7514,7 +7512,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             return Effect.succeed(approvalChecks === 1 ? { ...pending, token: "skill-approval" } : { _tag: "Approved" })
           },
         }),
-        SkillSource.layerSkills([review]),
+        SkillCatalog.layerSkills([review]),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {

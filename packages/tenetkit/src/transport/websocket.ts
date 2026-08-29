@@ -29,7 +29,7 @@ const authorize = (
     : Effect.fail(RunMismatch.make({ attachedRunId: state.runId, requestedRunId: runId }))
 }
 
-/** @experimental One-Run-per-socket canonical RunEvent handler. */
+/** @experimental One-Run-per-WebSocket canonical RunEvent handler. */
 export const handle: Handle = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest
   const runtime = yield* Runtime

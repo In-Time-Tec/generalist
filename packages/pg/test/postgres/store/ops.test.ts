@@ -1,9 +1,9 @@
-import { layerPostgres } from "@tenetkit/pg"
+import { layer as backendLayer } from "@tenetkit/pg"
 import { describe, expect, layer } from "@effect/vitest"
 import { Clock, Effect, Layer } from "effect"
 import { Pins } from "tenetkit"
 import { SqlClient } from "effect/unstable/sql"
-import { Errors, ExecutionHost, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
+import { Errors, RunExecutor, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -37,7 +37,7 @@ describePostgres("PostgreSQL Program store contract", () => {
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
     }
-    layer(database0.provision(layerPostgres(options)), { excludeTestServices: true })(
+    layer(database0.provision(backendLayer(options)), { excludeTestServices: true })(
       "enforces budgets, replay identity, and cancellation fences",
       (it) => {
         it.effect("enforces budgets, replay identity, and cancellation fences", () =>
@@ -55,7 +55,7 @@ describePostgres("PostgreSQL Program store contract", () => {
   {
     const database1 = postgresDatabase("program-operations")
     const fixture = programFixture()
-    const runtimeLayer = layerPostgres({
+    const runtimeLayer = backendLayer({
       url: database1.url,
       maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
@@ -75,7 +75,7 @@ describePostgres("PostgreSQL Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: programAddress,
               sessionId: "postgres-program",
@@ -104,7 +104,7 @@ describePostgres("PostgreSQL Program store contract", () => {
     const fixture = programFixture()
     const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "postgres-exact-root-worker" }).pipe(
       Layer.provideMerge(
-        layerPostgres({
+        backendLayer({
           url: database.url,
           maxConnections: postgresTestMaxConnections,
           resolver: fixture.resolver,
@@ -149,7 +149,7 @@ describePostgres("PostgreSQL Program store contract", () => {
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
     }
-    layer(database2.provision(layerPostgres(options)), { excludeTestServices: true })(
+    layer(database2.provision(backendLayer(options)), { excludeTestServices: true })(
       "atomically reserves one approval response and resumes the Program operation",
       (it) => {
         it.effect("atomically reserves one approval response and resumes the Program operation", () =>
@@ -157,7 +157,7 @@ describePostgres("PostgreSQL Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: programAddress,
               sessionId: "postgres-program-approval",
@@ -196,7 +196,7 @@ describePostgres("PostgreSQL Program store contract", () => {
                   const runtime = yield* Runtime.Runtime
                   const store = yield* RunStore.RunStore
                   const claims = yield* RunClaims.RunClaims
-                  const host = yield* ExecutionHost.ExecutionHost
+                  const host = yield* RunExecutor.RunExecutor
                   const receipt = { runId }
                   const [resumed] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
                   expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
@@ -233,7 +233,7 @@ describePostgres("PostgreSQL Program store contract", () => {
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
     }
-    layer(database3.provision(layerPostgres(options)), { excludeTestServices: true })(
+    layer(database3.provision(backendLayer(options)), { excludeTestServices: true })(
       "does not reopen a cancelled Program approval operation",
       (it) => {
         it.effect("does not reopen a cancelled Program approval operation", () =>
@@ -241,7 +241,7 @@ describePostgres("PostgreSQL Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: programAddress,
               sessionId: "postgres-program-cancelled-approval",
@@ -285,7 +285,7 @@ describePostgres("PostgreSQL Program store contract", () => {
   {
     const database4 = postgresDatabase("program-children")
     const fixture = agentMapProgramFixture()
-    const runtimeLayer = layerPostgres({
+    const runtimeLayer = backendLayer({
       url: database4.url,
       maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
@@ -305,7 +305,7 @@ describePostgres("PostgreSQL Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: fixture.address,
               sessionId: "postgres-program-map",
@@ -393,7 +393,7 @@ describePostgres("PostgreSQL Program store contract", () => {
   {
     const database5 = postgresDatabase("program-crashed")
     const fixture = programFixture()
-    const runtimeLayer = layerPostgres({
+    const runtimeLayer = backendLayer({
       url: database5.url,
       maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
@@ -413,7 +413,7 @@ describePostgres("PostgreSQL Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: programAddress,
               sessionId: "postgres-program-unknown",

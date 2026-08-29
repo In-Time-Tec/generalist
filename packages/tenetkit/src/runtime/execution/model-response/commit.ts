@@ -344,7 +344,7 @@ export const referenceFromEvent = (event: ModelResponseCommitted): CompletedOper
   )
 
 export const hydrateCompletedOperation = (input: {
-  readonly session: Session.Interface
+  readonly session: Session.Service
   readonly reference: CompletedOperationRef
 }): Effect.Effect<CompletedOperation, SessionEntryNotFound | SessionEntryCorrupt> =>
   Effect.gen(function* () {

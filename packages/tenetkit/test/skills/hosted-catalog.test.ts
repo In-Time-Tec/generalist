@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Crypto, Effect, Encoding, Layer, Schema } from "effect"
 import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
-import { SkillSource } from "tenetkit"
+import { SkillCatalog } from "tenetkit"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "../../src/skills/index"
 
 const hostedCatalogIsInternal: "HostedCatalog" extends keyof typeof import("../../src/skills/index") ? false : true =
@@ -16,7 +16,7 @@ const secretSource = "https://user:password@example.invalid/catalog?token=SECRET
 
 const withSecretSource = <Options extends object>(options: Options): Options => ({ ...options, source: secretSource })
 
-const expectSafeError = (failure: SkillSource.SkillSourceError, source: string) => {
+const expectSafeError = (failure: SkillCatalog.SkillCatalogError, source: string) => {
   const encoded = stringify(failure)
   expect(failure.source).toBe(source)
   expect(failure.cause).toBeUndefined()
@@ -159,7 +159,7 @@ describe("hosted skill catalogs", () => {
     )
     return Effect.gen(function* () {
       const source = yield* HttpCatalog.make(options)
-      yield* (yield* source.get("remote"))!.body
+      yield* (yield* source.get("remote"))!.instructions
 
       expect(reads).toEqual({ source: 0, manifestHeaders: 0, bodyHeaders: 0 })
       expect(authorizations).toEqual([undefined, undefined])
@@ -272,10 +272,10 @@ describe("hosted skill catalogs", () => {
       const source = yield* HttpCatalog.make({ manifestUrl })
       const all = yield* source.all
 
-      expect(all.map((skill) => skill.frontmatter.name)).toEqual(["remote"])
+      expect(all.map((skill) => skill.name)).toEqual(["remote"])
       expect(requests.map((request) => request.url)).toEqual([manifestUrl])
 
-      const body = yield* all[0]!.body
+      const body = yield* all[0]!.instructions
 
       expect(body).toContain("# Remote body")
       expect(requests.map((request) => request.url)).toEqual([manifestUrl, bodyUrl])
@@ -289,13 +289,13 @@ describe("hosted skill catalogs", () => {
     )
   })
 
-  it.effect("rejects unsafe hosted paths during source construction", () => {
+  it.effect("rejects unsafe hosted paths during catalog construction", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const manifestUrl = "https://skills.example/catalog/skills.json"
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(HttpCatalog.make({ manifestUrl }))
 
-      expect(failure._tag).toBe("tenetkit/core/SkillSourceError")
+      expect(failure._tag).toBe("tenetkit/core/SkillCatalogError")
       expect(failure.source).toBe(manifestUrl)
     }).pipe(
       provideTestLayer(
@@ -311,8 +311,8 @@ describe("hosted skill catalogs", () => {
     return Effect.gen(function* () {
       const source = yield* HttpCatalog.make({ manifestUrl })
       const skill = yield* source.get("remote")
-      const first = yield* Effect.exit(skill!.body)
-      const second = yield* Effect.exit(skill!.body)
+      const first = yield* Effect.exit(skill!.instructions)
+      const second = yield* Effect.exit(skill!.instructions)
 
       expect(first._tag).toBe("Failure")
       expect(second._tag).toBe("Failure")
@@ -335,9 +335,9 @@ describe("hosted skill catalogs", () => {
     return Effect.gen(function* () {
       const source = yield* HttpCatalog.make({ manifestUrl })
       const skill = yield* source.get("remote")
-      const failure = yield* Effect.flip(skill!.body)
+      const failure = yield* Effect.flip(skill!.instructions)
 
-      expect(failure._tag).toBe("tenetkit/core/SkillSourceError")
+      expect(failure._tag).toBe("tenetkit/core/SkillCatalogError")
       expect(failure.message).toContain("Frontmatter mismatch")
     }).pipe(
       provideTestLayer(
@@ -388,7 +388,7 @@ describe("hosted skill catalogs", () => {
       skills: [
         {
           name: "remote",
-          description: "x".repeat(SkillSource.DESCRIPTION_CAP + 1),
+          description: "x".repeat(SkillCatalog.DESCRIPTION_CAP + 1),
           skillPath: "remote/SKILL.md",
           sha256: digest,
         },
@@ -436,8 +436,8 @@ describe("hosted skill catalogs", () => {
         root: "skills",
       })
 
-      yield* (yield* s3.get("remote"))!.body
-      yield* (yield* github.get("remote"))!.body
+      yield* (yield* s3.get("remote"))!.instructions
+      yield* (yield* github.get("remote"))!.instructions
 
       expect(requests.map((request) => request.url)).toEqual([s3Manifest, githubManifest, s3Body, githubBody])
       expect(requests.filter((request) => request.url.startsWith("https://api.github.com"))).toSatisfy(
@@ -467,7 +467,7 @@ describe("hosted skill catalogs", () => {
       const failure = yield* Effect.flip(
         GitHubCatalog.make({ owner: "acme", repo: "agent-skills", ref: "main", root: "skills" }),
       )
-      expect(failure._tag).toBe("tenetkit/core/SkillSourceError")
+      expect(failure._tag).toBe("tenetkit/core/SkillCatalogError")
     }).pipe(provideTestLayer(Layer.mergeAll(cryptoLayer(), httpLayer({}, [])))),
   )
 
@@ -539,7 +539,7 @@ describe("hosted skill catalogs", () => {
     return Effect.gen(function* () {
       const source = yield* HttpCatalog.make({ manifestUrl, toolsBySkill: {} })
       const skill = yield* source.get("constructor")
-      yield* skill!.body
+      yield* skill!.instructions
 
       expect([...hashed!]).toEqual([...raw])
       expect(skill!.tools).toEqual([])
@@ -590,7 +590,7 @@ describe("hosted skill catalogs", () => {
     ),
   )
 
-  it.effect("composes public filesystem-independent adapters with later sources winning", () => {
+  it.effect("composes public filesystem-independent adapters with later catalogs winning", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const httpUrl = "https://skills.example/catalog.json"
     const s3Url = "https://company-skills.s3.us-west-2.amazonaws.com/skills.json"
@@ -606,15 +606,15 @@ describe("hosted skill catalogs", () => {
       ],
     })
     return Effect.gen(function* () {
-      const source = yield* SkillSource.SkillSource
+      const source = yield* SkillCatalog.SkillCatalog
       const all = yield* source.all
       const remote = yield* source.get("remote")
 
       expect(all).toHaveLength(1)
-      expect(remote?.frontmatter.description).toBe("Later source wins")
+      expect(remote?.description).toBe("Later source wins")
     }).pipe(
       provideTestLayer(
-        SkillSource.layer([
+        SkillCatalog.layer([
           HttpCatalog.make({ manifestUrl: httpUrl }),
           S3Catalog.make({ bucket: "company-skills", region: "us-west-2" }),
         ]),

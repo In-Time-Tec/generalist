@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import { AgentManifest, ExecutableManifest, Pins } from "../../../src/core/index"
 
 const payload = { schemaVersion: "1", entries: [{ id: "a" }] }
-const content = { codec: "tenetkit/harness/snapshot", version: "1", digest: Pins.digest(payload) }
+const content = { codec: "tenetkit/agent-guidance/snapshot", version: "1", digest: Pins.digest(payload) }
 const skillPin = Pins.makeCapability({ codec: content.codec, version: content.version, payload })
 
 const manifest = (skills: ReadonlyArray<AgentManifest.NamedCapability>) =>
@@ -21,27 +21,27 @@ const manifest = (skills: ReadonlyArray<AgentManifest.NamedCapability>) =>
 
 describe("AgentManifest pinned capability content", () => {
   it("carries codec, version, and payload digest on a named capability", () => {
-    const pinned = manifest([{ name: "harness", pin: skillPin, content }])
+    const pinned = manifest([{ name: "guidance", pin: skillPin, content }])
     expect(pinned.manifest.skills[0]?.content).toEqual(content)
   })
 
   it("changes the Agent manifest digest when pinned content changes", () => {
-    const first = manifest([{ name: "harness", pin: skillPin, content }])
+    const first = manifest([{ name: "guidance", pin: skillPin, content }])
     const second = manifest([
-      { name: "harness", pin: skillPin, content: { ...content, digest: Pins.digest({ other: true }) } },
+      { name: "guidance", pin: skillPin, content: { ...content, digest: Pins.digest({ other: true }) } },
     ])
     expect(second.pin).not.toBe(first.pin)
   })
 
   it("changes the Agent manifest digest when pinned content is added to an existing capability", () => {
-    const without = manifest([{ name: "harness", pin: skillPin }])
-    const withContent = manifest([{ name: "harness", pin: skillPin, content }])
+    const without = manifest([{ name: "guidance", pin: skillPin }])
+    const withContent = manifest([{ name: "guidance", pin: skillPin, content }])
     expect(withContent.pin).not.toBe(without.pin)
   })
 
   it("changes the executable digest when pinned content changes", () => {
     const executable = (pinnedContent: AgentManifest.PinnedContent) => {
-      const agent = manifest([{ name: "harness", pin: skillPin, content: pinnedContent }])
+      const agent = manifest([{ name: "guidance", pin: skillPin, content: pinnedContent }])
       return ExecutableManifest.make({ root: agent.pin, entries: [{ _tag: "Agent", ...agent }] })
     }
     const first = executable(content)
@@ -50,27 +50,27 @@ describe("AgentManifest pinned capability content", () => {
   })
 
   it("keeps the Agent manifest digest stable for identical pinned content", () => {
-    expect(manifest([{ name: "harness", pin: skillPin, content }]).pin).toBe(
-      manifest([{ name: "harness", pin: skillPin, content: { ...content } }]).pin,
+    expect(manifest([{ name: "guidance", pin: skillPin, content }]).pin).toBe(
+      manifest([{ name: "guidance", pin: skillPin, content: { ...content } }]).pin,
     )
   })
 
   it("rejects a pinned content digest that is not a SHA-256 hex digest", () => {
-    expect(() => manifest([{ name: "harness", pin: skillPin, content: { ...content, digest: "nope" } }])).toThrow()
+    expect(() => manifest([{ name: "guidance", pin: skillPin, content: { ...content, digest: "nope" } }])).toThrow()
   })
 
   it("rejects an empty pinned codec", () => {
-    expect(() => manifest([{ name: "harness", pin: skillPin, content: { ...content, codec: "" } }])).toThrow()
+    expect(() => manifest([{ name: "guidance", pin: skillPin, content: { ...content, codec: "" } }])).toThrow()
   })
 
   it("rejects an empty pinned version", () => {
-    expect(() => manifest([{ name: "harness", pin: skillPin, content: { ...content, version: "" } }])).toThrow()
+    expect(() => manifest([{ name: "guidance", pin: skillPin, content: { ...content, version: "" } }])).toThrow()
   })
 
   it("rejects an excess property inside pinned content", () => {
     expect(() =>
       Schema.decodeUnknownSync(AgentManifest.NamedCapability, { onExcessProperty: "error" })({
-        name: "harness",
+        name: "guidance",
         pin: skillPin,
         content: { ...content, extra: 1 },
       }),
@@ -78,11 +78,11 @@ describe("AgentManifest pinned capability content", () => {
   })
 
   it("keeps pinned content optional", () => {
-    expect(manifest([{ name: "harness", pin: skillPin }]).manifest.skills[0]?.content).toBeUndefined()
+    expect(manifest([{ name: "guidance", pin: skillPin }]).manifest.skills[0]?.content).toBeUndefined()
   })
 
   it("round-trips a named capability with pinned content", () => {
-    const capability: AgentManifest.NamedCapability = { name: "harness", pin: skillPin, content }
+    const capability: AgentManifest.NamedCapability = { name: "guidance", pin: skillPin, content }
     const encoded = Schema.encodeSync(AgentManifest.NamedCapability)(capability)
     expect(Schema.decodeSync(AgentManifest.NamedCapability)(encoded)).toEqual(capability)
   })
@@ -103,7 +103,7 @@ describe("AgentManifest pinned capability content", () => {
         input: Pins.makeCapability({ fixture: "input" }),
         output: Pins.makeCapability({ fixture: "output" }),
         maxSourceBytes: 1024,
-        tools: [{ name: "harness", pin: skillPin, content }],
+        tools: [{ name: "guidance", pin: skillPin, content }],
         agents: [],
         steps: [],
         budget: {

@@ -131,9 +131,9 @@ export namespace ModelTelemetry {
   export type CurrentCompactionId = typeof import("../telemetry/events.js").CurrentCompactionId
   export type CurrentSummaryCall = typeof import("../telemetry/events.js").CurrentSummaryCall
   export type generateId = typeof import("../telemetry/events.js").generateId
-  export type DeliveryInterface = import("../telemetry/events.js").DeliveryInterface
+  export type DeliveryService = import("../telemetry/events.js").DeliveryService
   export type EventPayload = import("../telemetry/events.js").EventPayload
   export type Instrumentation = import("../telemetry/events.js").Instrumentation
-  export type InvocationCoordinatorInterface = import("../telemetry/events.js").InvocationCoordinatorInterface
+  export type InvocationCoordinatorService = import("../telemetry/events.js").InvocationCoordinatorService
   export type SummaryCallCell = import("../telemetry/events.js").SummaryCallCell
 }

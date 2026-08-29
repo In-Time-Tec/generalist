@@ -259,7 +259,7 @@ export const Runtime = {
 }
 export namespace Runtime {
   export type Runtime = import("./service.js").Runtime
-  export type Interface = import("./service.js").Interface
+  export type Service = import("./service.js").Service
   export type LayerOptions = import("./service.js").LayerOptions
   export type AddressBinding = import("./service.js").AddressBinding
   export type SendInput = import("./service.js").SendInput
@@ -368,7 +368,7 @@ export const RunStore = {
 }
 export namespace RunStore {
   export type RunStore = import("./run/store.js").RunStore
-  export type Interface = import("./run/store.js").Interface
+  export type Service = import("./run/store.js").Service
   export type Durability = import("./run/store.js").Durability
   export type StoreBackend = import("./run/store.js").StoreBackend
   export type StoreInfo = import("./run/store.js").StoreInfo
@@ -387,7 +387,7 @@ export const RunClaims = {
 }
 export namespace RunClaims {
   export type RunClaims = import("./sql/run/claims.js").RunClaims
-  export type Interface = import("./sql/run/claims.js").Interface
+  export type Service = import("./sql/run/claims.js").Service
 }
 
 import { RuntimeWorker as RuntimeWorker_RuntimeWorker, layerWorker as RuntimeWorker_layerWorker } from "./sql/worker.js"
@@ -397,7 +397,7 @@ export const RuntimeWorker = {
 }
 export namespace RuntimeWorker {
   export type RuntimeWorker = import("./sql/worker.js").RuntimeWorker
-  export type Interface = import("./sql/worker.js").Interface
+  export type Service = import("./sql/worker.js").Service
   export type WorkerOptions = import("./sql/worker.js").WorkerOptions
   export type WorkerFailure = import("./sql/worker.js").WorkerFailure
   export type WorkerScan = import("./sql/worker.js").WorkerScan
@@ -412,19 +412,19 @@ export const LocalScheduler = {
 }
 export namespace LocalScheduler {
   export type LocalScheduler = import("./execution/local-scheduler.js").LocalScheduler
-  export type Interface = import("./execution/local-scheduler.js").Interface
+  export type Service = import("./execution/local-scheduler.js").Service
   export type Options = import("./execution/local-scheduler.js").Options
 }
 
-import { ExecutionHost as ExecutionHost_ExecutionHost, layer as ExecutionHost_layer } from "./execution/host.js"
-export const ExecutionHost = {
-  ExecutionHost: ExecutionHost_ExecutionHost,
-  layer: ExecutionHost_layer,
+import { RunExecutor as RunExecutor_RunExecutor, layer as RunExecutor_layer } from "./execution/run-executor.js"
+export const RunExecutor = {
+  RunExecutor: RunExecutor_RunExecutor,
+  layer: RunExecutor_layer,
 }
-export namespace ExecutionHost {
-  export type ExecutionHost = import("./execution/host.js").ExecutionHost
-  export type Interface = import("./execution/host.js").Interface
-  export type Options = import("./execution/host.js").Options
+export namespace RunExecutor {
+  export type RunExecutor = import("./execution/run-executor.js").RunExecutor
+  export type Service = import("./execution/run-executor.js").Service
+  export type Options = import("./execution/run-executor.js").Options
 }
 
 export * as RunTree from "./tree.js"

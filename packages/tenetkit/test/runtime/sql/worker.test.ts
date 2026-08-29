@@ -6,12 +6,12 @@ import { TestClock } from "effect/testing"
 import { Address, Message } from "../../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../../src/runtime/errors.js"
 import { makeStatic as makeExecutableResolver } from "../../../src/runtime/executable/resolver.js"
-import { ExecutionHost } from "../../../src/runtime/execution/host.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { makeRunStore } from "../../../src/runtime/memory/store.js"
 import { makeWorker } from "../../../src/runtime/sql/worker.js"
 import type { DecodedRun } from "../../../src/runtime/sql/codec/rows.js"
-import { RunClaims, type ClaimedRun, type Interface as ClaimsInterface } from "../../../src/runtime/sql/run/claims.js"
-import { RunStore, type Interface as StoreInterface } from "../../../src/runtime/run/store.js"
+import { RunClaims, type ClaimedRun, type Service as ClaimsService } from "../../../src/runtime/sql/run/claims.js"
+import { RunStore, type Service as StoreService } from "../../../src/runtime/run/store.js"
 import type { RunInspection, RunStatus } from "../../../src/runtime/run.js"
 import { assistantRef } from "../execution/fixtures.js"
 
@@ -54,7 +54,7 @@ const claimed = {
 
 const quietChanges = Stream.concat(Stream.succeed(undefined), Stream.never)
 
-const claimsService = (refreshLease: ClaimsInterface["refreshLease"]): ClaimsInterface =>
+const claimsService = (refreshLease: ClaimsService["refreshLease"]): ClaimsService =>
   RunClaims.of({
     changes: quietChanges,
     claimReadyRuns: () => Effect.succeed([claimed]),
@@ -64,7 +64,7 @@ const claimsService = (refreshLease: ClaimsInterface["refreshLease"]): ClaimsInt
   })
 
 /** These worker tests exercise claim renewal only; the watcher needs one status read. */
-const storeService = (status: RunStatus): StoreInterface =>
+const storeService = (status: RunStatus): StoreService =>
   RunStore.of({
     ...Effect.runSync(Effect.scoped(makeRunStore({ resolver: makeExecutableResolver([]), addresses: [] }))),
     inspect: () =>
@@ -86,12 +86,12 @@ it.effect("renews a claim for the lifetime of agent execution", () =>
       const started = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
       const refreshes = yield* Ref.make(0)
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(release))),
         interrupt: () => Effect.void,
       })
       const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(
           RunClaims,
@@ -116,12 +116,12 @@ it.effect("interrupts a claimed Run once another node persists cancellation", ()
     Effect.gen(function* () {
       const started = yield* Deferred.make<void>()
       const interrupted = yield* Deferred.make<void>()
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(interrupted))),
         interrupt: () => Deferred.succeed(interrupted, undefined),
       })
       const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("cancelling")),
         Effect.provideService(
           RunClaims,
@@ -142,7 +142,7 @@ it.effect("interrupts stale execution when lease renewal loses ownership", () =>
     Effect.gen(function* () {
       const started = yield* Deferred.make<void>()
       const interrupted = yield* Deferred.make<void>()
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: () =>
           Deferred.succeed(started, undefined).pipe(
             Effect.andThen(Effect.never),
@@ -151,7 +151,7 @@ it.effect("interrupts stale execution when lease renewal loses ownership", () =>
         interrupt: () => Effect.void,
       })
       const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(
           RunClaims,
@@ -191,7 +191,7 @@ it.effect("refills capacity while another Run remains active", () =>
         releaseClaim: () => Effect.void,
         commitWithClaim: () => Effect.void,
       })
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: ({ runId }) => {
           if (runId === "run:blocked")
             return Deferred.succeed(blockedStarted, undefined).pipe(Effect.andThen(Effect.never))
@@ -206,7 +206,7 @@ it.effect("refills capacity while another Run remains active", () =>
         lease: "1 second",
         fallbackInterval: "10 millis",
       }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
       )
@@ -237,12 +237,12 @@ it.effect("reports scan, wakeup, fallback, capacity, claim age, and the last fai
         releaseClaim: () => Effect.void,
         commitWithClaim: () => Effect.void,
       })
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: () => Deferred.await(release),
         interrupt: () => Effect.void,
       })
       const worker = yield* makeWorker({ workerId: "worker-a", concurrency: 2 }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
       )
@@ -299,12 +299,12 @@ it.effect("continuous run survives an unavailable claim poll", () =>
         releaseClaim: () => Effect.void,
         commitWithClaim: () => Effect.void,
       })
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: () => Deferred.succeed(started, undefined),
         interrupt: () => Effect.void,
       })
       const worker = yield* makeWorker({ workerId: "worker-a", fallbackInterval: "10 millis" }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
       )
@@ -327,7 +327,7 @@ it.effect("does not restart an active Run for the same claim fence", () =>
       const releases = yield* Deferred.make<void>()
       const executions = yield* Ref.make(0)
       const observations = yield* Ref.make(0)
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: () =>
           Ref.update(executions, (count) => count + 1).pipe(
             Effect.andThen(Deferred.succeed(started, undefined)),
@@ -340,7 +340,7 @@ it.effect("does not restart an active Run for the same claim fence", () =>
         concurrency: 2,
         onClaim: () => Ref.update(observations, (count) => count + 1),
       }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(
           RunClaims,
@@ -378,7 +378,7 @@ it.effect("replaces stale execution when the same Run is claimed with a newer fe
         releaseClaim: () => Effect.void,
         commitWithClaim: () => Effect.void,
       })
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: ({ attemptFence }) =>
           Ref.update(fences, (values) => [...values, attemptFence]).pipe(
             Effect.andThen(
@@ -397,7 +397,7 @@ it.effect("replaces stale execution when the same Run is claimed with a newer fe
         concurrency: 2,
         onClaim: ({ attemptFence }) => Ref.update(observedFences, (values) => [...values, attemptFence]),
       }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
       )
@@ -418,7 +418,7 @@ it.effect("awaits claim observation before host execution", () =>
       const observed = yield* Deferred.make<void>()
       const continueObservation = yield* Deferred.make<void>()
       const executed = yield* Deferred.make<void>()
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: () => Deferred.succeed(executed, undefined),
         interrupt: () => Effect.void,
       })
@@ -426,7 +426,7 @@ it.effect("awaits claim observation before host execution", () =>
         workerId: "worker-a",
         onClaim: () => Deferred.succeed(observed, undefined).pipe(Effect.andThen(Deferred.await(continueObservation))),
       }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(
           RunClaims,
@@ -460,7 +460,7 @@ it.effect("releases an unobserved claim when claim observation defects", () =>
         releaseClaim: ({ attemptFence }) => Ref.update(releasedFences, (values) => [...values, attemptFence]),
         commitWithClaim: () => Effect.void,
       })
-      const host = ExecutionHost.of({
+      const host = RunExecutor.of({
         execute: ({ attemptFence }) => Ref.update(executedFences, (values) => [...values, attemptFence]),
         interrupt: () => Effect.void,
       })
@@ -475,7 +475,7 @@ it.effect("releases an unobserved claim when claim observation defects", () =>
             ),
           ),
       }).pipe(
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
       )
@@ -500,7 +500,7 @@ it.effect("closing the worker scope interrupts active execution", () =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>()
     const interrupted = yield* Deferred.make<void>()
-    const host = ExecutionHost.of({
+    const host = RunExecutor.of({
       execute: () =>
         Deferred.succeed(started, undefined).pipe(
           Effect.andThen(Effect.never),
@@ -511,7 +511,7 @@ it.effect("closing the worker scope interrupts active execution", () =>
     yield* Effect.scoped(
       Effect.gen(function* () {
         const worker = yield* makeWorker({ workerId: "worker-a" }).pipe(
-          Effect.provideService(ExecutionHost, host),
+          Effect.provideService(RunExecutor, host),
           Effect.provideService(RunStore, storeService("running")),
           Effect.provideService(
             RunClaims,

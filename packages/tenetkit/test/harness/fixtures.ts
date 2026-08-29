@@ -1,24 +1,25 @@
-import { HarnessEntry, HarnessState, Refinement } from "../../src/harness/index.js"
+import { Entry, State, Refinement } from "../../src/harness/index.js"
 import { Result } from "effect"
 
-export const scope: HarnessEntry.HarnessScope = "thread:alpha"
+export const scope: Entry.GuidanceScope = "thread:alpha"
 
-export const at = (minute: number): HarnessEntry.HarnessInstant =>
-  `2024-01-01T00:${String(minute).padStart(2, "0")}:00.000Z`
+export const at = (minute: number): Entry.GuidanceInstant => `2024-01-01T00:${String(minute).padStart(2, "0")}:00.000Z`
 
-export const entryValue = (
-  overrides: Partial<HarnessEntry.HarnessEntryValue> = {},
-): HarnessEntry.HarnessEntryValue => ({ title: "title", content: "content", ...overrides })
+export const entryValue = (overrides: Partial<Entry.GuidanceEntryValue> = {}): Entry.GuidanceEntryValue => ({
+  title: "title",
+  content: "content",
+  ...overrides,
+})
 
 export const entry = (
   input: {
     readonly id: string
-    readonly kind: HarnessEntry.HarnessKind
+    readonly kind: Entry.GuidanceKind
     readonly scope?: string
     readonly version?: number
-  } & Partial<HarnessEntry.HarnessEntryValue>,
-): HarnessEntry.HarnessEntry => {
-  let value: HarnessEntry.HarnessEntry = {
+  } & Partial<Entry.GuidanceEntryValue>,
+): Entry.GuidanceEntry => {
+  let value: Entry.GuidanceEntry = {
     id: input.id,
     kind: input.kind,
     scope: input.scope ?? scope,
@@ -38,13 +39,13 @@ export const entry = (
 
 export const proposal = (input: {
   readonly id?: string
-  readonly at?: HarnessEntry.HarnessInstant
-  readonly baseSnapshot?: HarnessEntry.HarnessSnapshotId
+  readonly at?: Entry.GuidanceInstant
+  readonly baseSnapshot?: Entry.GuidanceSnapshotId
   readonly rationale?: string
   readonly source?: string
-  readonly edits: ReadonlyArray<HarnessEntry.RefinementEdit>
-}): HarnessEntry.RefinementProposal => {
-  let value: HarnessEntry.RefinementProposal = {
+  readonly edits: ReadonlyArray<Entry.RefinementEdit>
+}): Entry.RefinementProposal => {
+  let value: Entry.RefinementProposal = {
     id: input.id ?? "proposal-1",
     at: input.at ?? at(1),
     edits: input.edits,
@@ -56,10 +57,10 @@ export const proposal = (input: {
 }
 
 export const create = (input: {
-  readonly kind: HarnessEntry.HarnessKind
+  readonly kind: Entry.GuidanceKind
   readonly id: string
-  readonly value?: Partial<HarnessEntry.HarnessEntryValue>
-}): HarnessEntry.RefinementEdit => ({
+  readonly value?: Partial<Entry.GuidanceEntryValue>
+}): Entry.RefinementEdit => ({
   _tag: "Create",
   kind: input.kind,
   id: input.id,
@@ -67,12 +68,12 @@ export const create = (input: {
 })
 
 export const update = (input: {
-  readonly kind: HarnessEntry.HarnessKind
+  readonly kind: Entry.GuidanceKind
   readonly id: string
-  readonly value?: Partial<HarnessEntry.HarnessEntryValue>
+  readonly value?: Partial<Entry.GuidanceEntryValue>
   readonly baseVersion?: number
-}): HarnessEntry.RefinementEdit => {
-  const value: HarnessEntry.UpdateEdit = {
+}): Entry.RefinementEdit => {
+  const value: Entry.UpdateEdit = {
     _tag: "Update",
     kind: input.kind,
     id: input.id,
@@ -82,11 +83,11 @@ export const update = (input: {
 }
 
 export const remove = (input: {
-  readonly kind: HarnessEntry.HarnessKind
+  readonly kind: Entry.GuidanceKind
   readonly id: string
   readonly baseVersion?: number
-}): HarnessEntry.RefinementEdit => {
-  const value: HarnessEntry.DeleteEdit = {
+}): Entry.RefinementEdit => {
+  const value: Entry.DeleteEdit = {
     _tag: "Delete",
     kind: input.kind,
     id: input.id,
@@ -95,15 +96,15 @@ export const remove = (input: {
 }
 
 export const applied = (input: {
-  readonly state: HarnessState.HarnessState
-  readonly proposal: HarnessEntry.RefinementProposal
+  readonly state: State.GuidanceState
+  readonly proposal: Entry.RefinementProposal
   readonly options?: Refinement.ApplyOptions
 }): Refinement.RefinementResult =>
   Result.getOrThrow(Refinement.applyTrustedProposal(input.state, input.proposal, input.options ?? {}))
 
 export const rejected = (input: {
-  readonly state: HarnessState.HarnessState
-  readonly proposal: HarnessEntry.RefinementProposal
+  readonly state: State.GuidanceState
+  readonly proposal: Entry.RefinementProposal
   readonly options?: Refinement.ApplyOptions
 }): Refinement.RefinementRejected => {
   const result = Refinement.applyTrustedProposal(input.state, input.proposal, input.options ?? {})

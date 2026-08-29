@@ -2,7 +2,7 @@ import { Context, Effect, Layer, RcMap, Scope, Semaphore } from "effect"
 import { Chat } from "effect/unstable/ai"
 
 /** @experimental Shared resources owned by persisted agent runs. */
-export interface RuntimeInterface {
+export interface RuntimeService {
   readonly persistenceSemaphore: (
     persistence: Chat.Persistence.Service,
     chatId: string,
@@ -10,12 +10,12 @@ export interface RuntimeInterface {
 }
 
 /** @experimental Application-scoped owner for resources shared across agent runs. */
-export class Runtime extends Context.Service<Runtime, RuntimeInterface>()(
+export class Runtime extends Context.Service<Runtime, RuntimeService>()(
   "tenetkit/core/agent/persistence-lock/Runtime",
 ) {}
 
 /** @experimental Build one application-scoped agent runtime. */
-export const makeRuntime: Effect.Effect<RuntimeInterface, never, Scope.Scope> = Effect.gen(function* () {
+export const makeRuntime: Effect.Effect<RuntimeService, never, Scope.Scope> = Effect.gen(function* () {
   const persistenceLocks = yield* RcMap.make({
     lookup: (_persistence: Chat.Persistence.Service) =>
       RcMap.make({

@@ -3,14 +3,14 @@ import {
   layerWebSocket as Client_layerWebSocket,
   sseEvents as Client_sseEvents,
 } from "./client.js"
-export const Client = {
+export const RunClient = {
   RunClient: Client_RunClient,
   layerWebSocket: Client_layerWebSocket,
   sseEvents: Client_sseEvents,
 }
-export namespace Client {
+export namespace RunClient {
   export type RunClient = import("./client.js").RunClient
-  export type Interface = import("./client.js").Interface
+  export type Service = import("./client.js").Service
   export type ConnectOptions = import("./client.js").ConnectOptions
   export type Connection = import("./client.js").Connection
   export type ConnectionStatus = import("./client.js").ConnectionStatus
@@ -51,20 +51,20 @@ export namespace Snapshot {
 }
 
 import {
-  decodeEvent as Sse_decodeEvent,
-  lastEventId as Sse_lastEventId,
-  respond as Sse_respond,
-  StreamError as Sse_StreamError,
-  streamSuccess as Sse_streamSuccess,
+  decodeEvent as SSE_decodeEvent,
+  lastEventId as SSE_lastEventId,
+  respond as SSE_respond,
+  StreamError as SSE_StreamError,
+  streamSuccess as SSE_streamSuccess,
 } from "./sse.js"
-export const Sse = {
-  decodeEvent: Sse_decodeEvent,
-  lastEventId: Sse_lastEventId,
-  respond: Sse_respond,
-  StreamError: Sse_StreamError,
-  streamSuccess: Sse_streamSuccess,
+export const SSE = {
+  decodeEvent: SSE_decodeEvent,
+  lastEventId: SSE_lastEventId,
+  respond: SSE_respond,
+  StreamError: SSE_StreamError,
+  streamSuccess: SSE_streamSuccess,
 }
-export namespace Sse {
+export namespace SSE {
   export type StreamError = import("./sse.js").StreamError
 }
 
@@ -101,5 +101,5 @@ export namespace Wire {
   export type ResolvedRunEvent = import("./wire.js").ResolvedRunEvent
 }
 
-import { handle as Ws_handle } from "./ws.js"
-export const Ws = { handle: Ws_handle }
+import { handle as WebSocket_handle } from "./websocket.js"
+export const WebSocket = { handle: WebSocket_handle }

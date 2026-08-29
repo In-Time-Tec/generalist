@@ -1,8 +1,12 @@
-import { OpenAiClient, OpenAiLanguageModel, OpenAiSchema } from "@effect/ai-openai"
+import {
+  OpenAiClient as OpenAIClient,
+  OpenAiLanguageModel as OpenAILanguageModel,
+  OpenAiSchema as OpenAISchema,
+} from "@effect/ai-openai"
 import { ContextOverflow } from "../../core/index.js"
 import { ModelRegistry } from "../../core/model/public/registry.js"
 import { Config, Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
-import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
+import { AiError, OpenAiStructuredOutput as OpenAIStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
@@ -14,13 +18,13 @@ export interface RegistrationOptions {
 }
 
 /** @experimental */
-export interface OpenAiInput extends RegistrationOptions {
-  readonly model: (string & {}) | OpenAiLanguageModel.Model
+export interface Options extends RegistrationOptions {
+  readonly model: (string & {}) | OpenAILanguageModel.Model
   readonly config?: Config
 }
 
 /** @experimental */
-export type Config = Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+export type Config = Omit<typeof OpenAILanguageModel.Config.Service, "model">
 
 const {
   input: _input,
@@ -30,7 +34,7 @@ const {
   tool_choice: _toolChoice,
   tools: _tools,
   ...openAiConfigFields
-} = OpenAiSchema.CreateResponse.fields
+} = OpenAISchema.CreateResponse.fields
 
 const ConfigSchema = Schema.Struct({
   ...openAiConfigFields,
@@ -79,15 +83,15 @@ const invalidRequestCodes = new Set([
 ])
 
 const NullableString = Schema.NullOr(Schema.String)
-const OpenAiErrorPayload = Schema.Struct({
+const OpenAIErrorPayload = Schema.Struct({
   code: Schema.optionalKey(NullableString),
   message: Schema.optionalKey(Schema.String),
   param: Schema.optionalKey(NullableString),
   type: Schema.optionalKey(NullableString),
 })
-const decodeOpenAiError = Schema.decodeUnknownOption(OpenAiErrorPayload)
+const decodeOpenAIError = Schema.decodeUnknownOption(OpenAIErrorPayload)
 
-type OpenAiErrorPayload = typeof OpenAiErrorPayload.Type
+type OpenAIErrorPayload = typeof OpenAIErrorPayload.Type
 
 const boundedDescription = (value: string | undefined, fallback: string): string =>
   value !== undefined && value.length > 0 ? value.slice(0, 2_048) : fallback
@@ -143,8 +147,8 @@ export const openAiFailureReason = ({
   readonly error: FailureInput["error"]
   readonly requestId: string | null
 }): AiError.AiErrorReason => {
-  const decoded = decodeOpenAiError(error)
-  const event: OpenAiErrorPayload = Option.isSome(decoded) ? decoded.value : {}
+  const decoded = decodeOpenAIError(error)
+  const event: OpenAIErrorPayload = Option.isSome(decoded) ? decoded.value : {}
   const code = boundedMetadata(event?.code)
   const message = boundedDescription(event?.message, "OpenAI response failed")
   const parameter = boundedMetadata(event?.param)
@@ -165,24 +169,24 @@ export const openAiFailureReason = ({
   return AiError.UnknownError.make({ description: message, metadata })
 }
 
-const resolveOpenAiFailure = ({ error, metadata: partMetadata, method }: FailureInput): AiError.AiError =>
+const resolveOpenAIFailure = ({ error, metadata: partMetadata, method }: FailureInput): AiError.AiError =>
   AiError.isAiError(error)
     ? error
     : AiError.make({
-        module: "OpenAiLanguageModel",
+        module: "OpenAILanguageModel",
         method,
         reason: openAiFailureReason({ error, requestId: openAiRequestId(partMetadata) }),
       })
 
 /** @internal Shared by the API-key and account registrations. */
-export const openAiLanguageModelLayer = (input: OpenAiInput) =>
+export const openAiLanguageModelLayer = (input: Options) =>
   layerModelFailures(
     layerImageSources(
-      OpenAiLanguageModel.layer(
+      OpenAILanguageModel.layer(
         input.config === undefined ? { model: input.model } : { model: input.model, config: input.config },
       ),
     ),
-    resolveOpenAiFailure,
+    resolveOpenAIFailure,
   )
 
 /** @experimental */
@@ -191,10 +195,10 @@ export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.
 /** @experimental */
 export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
-    try: () => Tool.getJsonSchema(tool, { transformer: OpenAiStructuredOutput.toCodecOpenAI }),
+    try: () => Tool.getJsonSchema(tool, { transformer: OpenAIStructuredOutput.toCodecOpenAI }),
     catch: (error) =>
       AiError.make({
-        module: "OpenAiLanguageModel",
+        module: "OpenAILanguageModel",
         method: "prepareTools",
         reason: AiError.UnsupportedSchemaError.make({
           description: error instanceof Error ? error.message : String(error),
@@ -203,26 +207,26 @@ export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (too
   })
 
 /** @experimental */
-export interface LayerOptions extends OpenAiInput {
+export interface ClientOptions extends Options {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
-  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey">
+  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAIClient.layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
 export const layer = (
-  input: LayerOptions,
+  input: ClientOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
     Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 
-/** @experimental Bare registration effect; the consumer provides the OpenAi client (see layerConfig). */
+/** @experimental Bare registration effect; the consumer provides the OpenAI client (see layerConfig). */
 export const registration = (
-  input: OpenAiInput,
-): Effect.Effect<ModelRegistry.Registration, never, OpenAiClient.OpenAiClient> =>
+  input: Options,
+): Effect.Effect<ModelRegistry.Registration, never, OpenAIClient.OpenAiClient> =>
   ModelRegistry.registration(registrationOptions(input))
 
-const registrationOptions = (input: OpenAiInput) => {
+const registrationOptions = (input: Options) => {
   const required = {
     provider: "openai",
     model: input.model,
@@ -243,9 +247,9 @@ const stringifyJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const parseJsonOption = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 const SseErrorPayload = Schema.Struct({
   code: Schema.optionalKey(NullableString),
-  error: Schema.optionalKey(OpenAiErrorPayload),
+  error: Schema.optionalKey(OpenAIErrorPayload),
   message: Schema.optionalKey(Schema.String),
-  response: Schema.optionalKey(Schema.Struct({ error: Schema.optionalKey(OpenAiErrorPayload) })),
+  response: Schema.optionalKey(Schema.Struct({ error: Schema.optionalKey(OpenAIErrorPayload) })),
   sequence_number: Schema.optionalKey(Schema.Finite),
   type: Schema.optionalKey(Schema.String),
 })
@@ -257,7 +261,7 @@ const lineSeparator = /(\r?\n)/
 const isResponsesUrl = (url: string) => url.split(/[?#]/)[0]!.replace(/\/+$/, "").endsWith("/responses")
 
 const stringifyFlattenedError = (
-  details: OpenAiErrorPayload,
+  details: OpenAIErrorPayload,
   message: string | undefined,
   sequenceNumber: number,
 ): string =>
@@ -347,8 +351,8 @@ export const normalizeResponsesSse = (client: HttpClient.HttpClient): HttpClient
   )
 
 /** @experimental */
-export const layerConfig = (options?: Parameters<typeof OpenAiClient.layerConfig>[0]) =>
-  OpenAiClient.layerConfig({
+export const layerConfig = (options?: Parameters<typeof OpenAIClient.layerConfig>[0]) =>
+  OpenAIClient.layerConfig({
     ...options,
     transformClient: (client) =>
       options?.transformClient === undefined

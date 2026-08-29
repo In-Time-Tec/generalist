@@ -161,7 +161,7 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
       entry._tag === "Agent" ? (entry.manifest.programAuthority?.agents ?? []) : entry.manifest.capabilities.agents
     for (const child of children) {
       const target = byPin.get(child.agent)
-      if (target?._tag !== "Agent") throw new TypeError(`Agent binding does not resolve to an Agent: ${child.agent}`)
+      if (target?._tag !== "Agent") throw new TypeError(`Agent reference does not resolve to an Agent: ${child.agent}`)
       visit(child.agent)
     }
     visiting.delete(pin)

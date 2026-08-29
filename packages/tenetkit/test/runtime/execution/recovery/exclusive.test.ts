@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolContext, ToolExecutor } from "../../../../src/index.js"
-import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 import { registrationsFor } from "../fixtures.js"
 import { testExecutable } from "../../run/identity.js"
@@ -90,7 +90,7 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,
@@ -172,7 +172,7 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
 
         yield* host.execute(yield* store.claimExecution({ runId: first.runId, ownerId: "recovery-check" }))

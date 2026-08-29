@@ -98,10 +98,10 @@ const scriptedDeterministicModel: Layer.Layer<LanguageModel.LanguageModel> = Lay
 )
 
 /** @experimental */
-export type LayerOrDeterministicOptions = OpenRouter.LayerOptions
+export type LayerOrDeterministicOptions = OpenRouter.ClientOptions
 
 /**
- * @experimental Copies the shape of `Deterministic.layerOpenAi`
+ * @experimental Copies the shape of `Deterministic.layerOpenAI`
  * (`packages/providers/src/deterministic.ts`), swapping OpenAI for
  * OpenRouter: try to build a real OpenRouter model layer from `options`, and
  * fall back to the scripted deterministic model above when the API key

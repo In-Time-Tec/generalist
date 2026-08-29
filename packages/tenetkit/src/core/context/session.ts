@@ -184,7 +184,7 @@ export interface CheckpointAppend {
   readonly leafId: EntryId
 }
 /** @experimental Session event-log service boundary. */
-export interface Interface {
+export interface Service {
   readonly reserveEntryId: Effect.Effect<EntryId, SessionStoreError>
   readonly append: (
     entry: AppendInput,
@@ -199,7 +199,7 @@ export interface Interface {
   readonly leaf: Effect.Effect<EntryId | null>
 }
 /** @experimental */
-export class SessionStore extends Context.Service<SessionStore, Interface>()(
+export class SessionStore extends Context.Service<SessionStore, Service>()(
   "tenetkit/core/context/session/SessionStore",
 ) {}
 interface State {
@@ -495,5 +495,5 @@ export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(
 )
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<SessionStore> =>
+export const layerTest = (implementation: Service): Layer.Layer<SessionStore> =>
   Layer.succeed(SessionStore, SessionStore.of(implementation))

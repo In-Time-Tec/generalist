@@ -42,13 +42,13 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
       return { runtime, store, children: ChildAdmission.make(store), runId: receipt.runId, policy }
     })
   const admit = (
-    children: ChildAdmission.Interface,
+    children: ChildAdmission.Service,
     parentRunId: string,
     key: string,
     prompt = key,
     selection = "researcher",
   ) => children.admit({ parentRunId, toolCallId: `call:${key}`, selection, prompt, key })
-  const group = (runtime: Runtime.Interface, parentRunId: string, key: string, size: number) =>
+  const group = (runtime: Runtime.Service, parentRunId: string, key: string, size: number) =>
     runtime.fanOut({
       parentRunId,
       idempotencyKey: key,

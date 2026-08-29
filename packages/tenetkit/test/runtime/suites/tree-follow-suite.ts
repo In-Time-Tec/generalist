@@ -56,7 +56,7 @@ const subscribeBeforeReplayRace = () =>
     const root = yield* startRoot("tree-follow:subscribe-before-replay")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "subscribe-before-replay" })
-    const scripted: Runtime.Interface = {
+    const scripted: Runtime.Service = {
       ...runtime,
       treeChanges: (rootRunId) =>
         runtime.treeChanges(rootRunId).pipe(
@@ -98,7 +98,7 @@ const missedWakeRecovery = () =>
     const root = yield* startRoot("tree-follow:recovery")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const initialRead = yield* Deferred.make<void>()
-    const scripted: Runtime.Interface = {
+    const scripted: Runtime.Service = {
       ...runtime,
       treeChanges: () => Stream.succeed(undefined),
       treeCheckpoint: (rootRunId) =>
@@ -152,7 +152,7 @@ const boundedRecovery = () =>
     const reads = yield* Ref.make(0)
     const limits = yield* Ref.make<ReadonlyArray<number>>([])
     const initialRead = yield* Deferred.make<void>()
-    const scripted: Runtime.Interface = {
+    const scripted: Runtime.Service = {
       ...runtime,
       treeChanges: () => Stream.succeed(undefined),
       treeReplay: (input) =>

@@ -11,7 +11,7 @@ const registryLayer = ModelRegistry.layerCombined([
 ])
 
 const runWith = (selection: ModelRegistry.ModelSelection) =>
-  ModelRegistry.operate(selection, Agent.generate(agent, { prompt: "Summarize the incident." }))
+  ModelRegistry.withModel(selection, Agent.generate(agent, { prompt: "Summarize the incident." }))
 
 const program = runWith({ provider: "anthropic", model: "claude-sonnet-4-5" }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),

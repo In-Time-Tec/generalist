@@ -5,7 +5,7 @@ import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { checkpointRef } from "tenetkit/runtime/driver/executable/manifest"
 import { isTerminal } from "tenetkit/runtime/driver/run"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
 import { encodeExecutableRef, encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
@@ -25,9 +25,9 @@ type SuspendEffect = Effect.Effect<
 >
 
 export const suspend: {
-  (input: Parameters<RunStoreInterface["suspend"]>[0]): (hub: EventHub) => SuspendEffect
-  (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]): SuspendEffect
-} = Function.dual(2, (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
+  (input: Parameters<RunStoreService["suspend"]>[0]): (hub: EventHub) => SuspendEffect
+  (hub: EventHub, input: Parameters<RunStoreService["suspend"]>[0]): SuspendEffect
+} = Function.dual(2, (hub: EventHub, input: Parameters<RunStoreService["suspend"]>[0]) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* lockRun(input.runId)

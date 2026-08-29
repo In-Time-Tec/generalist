@@ -28,7 +28,7 @@ export interface MakeOptions {
 }
 
 /** @experimental In-process steering service boundary. */
-export interface Interface {
+export interface Service {
   readonly steer: (input: Input) => Effect.Effect<void, SteeringQueueFull>
   readonly followUp: (input: Input) => Effect.Effect<void, SteeringQueueFull>
   readonly takeSteering: Effect.Effect<ReadonlyArray<Input>>
@@ -36,7 +36,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Steering extends Context.Service<Steering, Interface>()("tenetkit/core/turn/steering") {}
+export class Steering extends Context.Service<Steering, Service>()("tenetkit/core/turn/steering") {}
 
 /** @experimental Bounded steering queue rejected an input. */
 export class SteeringQueueFull extends Schema.TaggedError<SteeringQueueFull>()("tenetkit/core/SteeringQueueFull", {
@@ -120,5 +120,5 @@ export const layer = (options: MakeOptions = {}): Layer.Layer<Steering> =>
   )
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<Steering> =>
+export const layerTest = (implementation: Service): Layer.Layer<Steering> =>
   Layer.succeed(Steering, Steering.of(implementation))

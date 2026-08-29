@@ -39,5 +39,5 @@ export namespace ModelResilience {
   export type Classification = import("../resilience.js").Classification
   export type FailureInput = import("../resilience.js").FailureInput
   export type FailureResolver = import("../resilience.js").FailureResolver
-  export type Interface = import("../resilience.js").Interface
+  export type Service = import("../resilience.js").Service
 }

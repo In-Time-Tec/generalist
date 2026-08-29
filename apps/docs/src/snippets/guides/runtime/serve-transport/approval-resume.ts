@@ -13,7 +13,7 @@ import {
   ToolExecutor,
   Toolkit,
 } from "tenetkit"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service",
@@ -109,7 +109,7 @@ const program = Effect.gen(function* () {
     prompt: "Deploy the api service",
   })
   const store = yield* RunStore.RunStore
-  const host = yield* ExecutionHost.ExecutionHost
+  const host = yield* RunExecutor.RunExecutor
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-example" }))
   const firstRun = yield* runtime.events({ runId: receipt.runId }).pipe(
     Stream.takeUntil((event) => event._tag === "RunWaiting"),

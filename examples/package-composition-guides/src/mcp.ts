@@ -1,8 +1,8 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { McpToolSource } from "tenetkit/mcp"
+import { MCPClient } from "tenetkit/mcp"
 
-const source: McpToolSource.Interface = {
+const client: MCPClient.Service = {
   server: "local-docs",
   tools: Effect.succeed([
     {
@@ -25,11 +25,11 @@ const source: McpToolSource.Interface = {
   ]),
 }
 
-const sourceLayer = Layer.succeed(McpToolSource.McpToolSource, source)
+const clientLayer = Layer.succeed(MCPClient.MCPClient, client)
 
-const program = McpToolSource.McpToolSource.use((mcp) =>
+const program = MCPClient.MCPClient.use((mcp) =>
   mcp.tools.pipe(Effect.flatMap((tools) => Console.log(`discovered ${tools.length} MCP tool`))),
 )
 
-const runtime = ManagedRuntime.make(sourceLayer)
+const runtime = ManagedRuntime.make(clientLayer)
 await runtime.runPromise(program)

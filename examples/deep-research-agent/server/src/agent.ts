@@ -1,5 +1,5 @@
 import { Agent, LanguageModel, Tool, TurnPolicy } from "tenetkit"
-import { Service as SearchProvider } from "./search-provider"
+import { SearchProvider } from "./search-provider"
 import { toolkit, webSearchTool } from "./tools"
 
 /** @experimental The bounded research policy used by the demo agent. */

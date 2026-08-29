@@ -2,10 +2,10 @@ import { describe, expect, it } from "@effect/vitest"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Deferred, Effect, Fiber, Option } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { McpToolSource } from "../../src/mcp/index"
+import { MCPClient } from "../../src/mcp/index"
 import { addInputSchema, makeFixture, makeFixtureWith, statsOutputSchema } from "./fixture"
 
-describe("McpToolSource", () => {
+describe("MCPClient", () => {
   it.effect("preserves connection details for non-OAuth transports", () =>
     Effect.gen(function* () {
       const state = { open: false, closes: 0 }
@@ -23,9 +23,9 @@ describe("McpToolSource", () => {
           return Promise.resolve()
         },
       }
-      const error = yield* McpToolSource.fromTransport("custom", transport).pipe(Effect.flip, Effect.scoped)
+      const error = yield* MCPClient.fromTransport("custom", transport).pipe(Effect.flip, Effect.scoped)
 
-      expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
+      expect(error).toBeInstanceOf(MCPClient.MCPConnectionFailed)
       expect(error.message).toContain("custom transport unavailable")
       expect(state.open).toBe(false)
       expect(state.closes).toBe(1)
@@ -63,7 +63,7 @@ describe("McpToolSource", () => {
           return Promise.resolve()
         },
       }
-      const fiber = yield* McpToolSource.fromTransport("custom", transport).pipe(Effect.scoped, Effect.forkChild)
+      const fiber = yield* MCPClient.fromTransport("custom", transport).pipe(Effect.scoped, Effect.forkChild)
       yield* Deferred.await(connectStarted)
       const interruption = yield* Fiber.interrupt(fiber).pipe(Effect.forkChild({ startImmediately: true }))
 
@@ -148,8 +148,8 @@ describe("McpToolSource", () => {
         const closes = { count: 0 }
         const error = yield* Effect.scoped(Effect.flip(makeFixtureWith({ malformedDiscoverySchema, closes })))
 
-        expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
-        expect(error._tag).toBe("tenetkit/mcp/McpConnectionFailed")
+        expect(error).toBeInstanceOf(MCPClient.MCPConnectionFailed)
+        expect(error._tag).toBe("tenetkit/mcp/MCPConnectionFailed")
         expect(error.server).toBe("calc")
         expect(error.message).toContain("Expected JSON value")
         expect(closes.count).toBeGreaterThanOrEqual(1)
@@ -167,8 +167,8 @@ describe("McpToolSource", () => {
         )
 
         for (const error of errors) {
-          expect(error).toBeInstanceOf(McpToolSource.McpToolCallFailed)
-          expect(error._tag).toBe("tenetkit/mcp/McpToolCallFailed")
+          expect(error).toBeInstanceOf(MCPClient.MCPToolCallFailed)
+          expect(error._tag).toBe("tenetkit/mcp/MCPToolCallFailed")
           expect(error.server).toBe("calc")
           expect(error.tool).toBe("stats")
           expect(error.message).toContain("Expected JSON value")
@@ -183,8 +183,8 @@ describe("McpToolSource", () => {
         const { source } = yield* makeFixture
         const error = yield* Effect.flip(source.callTool("boom", {}))
 
-        expect(error).toBeInstanceOf(McpToolSource.McpToolCallFailed)
-        expect(error._tag).toBe("tenetkit/mcp/McpToolCallFailed")
+        expect(error).toBeInstanceOf(MCPClient.MCPToolCallFailed)
+        expect(error._tag).toBe("tenetkit/mcp/MCPToolCallFailed")
         expect(error.server).toBe("calc")
         expect(error.tool).toBe("boom")
         expect(error.message).toContain("boom failed")
@@ -240,7 +240,7 @@ describe("McpToolSource", () => {
 
         expect(Option.isSome(outcome)).toBe(true)
         if (Option.isSome(outcome)) {
-          expect(outcome.value._tag).toBe("tenetkit/mcp/McpToolCallFailed")
+          expect(outcome.value._tag).toBe("tenetkit/mcp/MCPToolCallFailed")
           expect(outcome.value.server).toBe("calc")
           expect(outcome.value.tool).toBe("hang")
           expect(outcome.value.message).toContain("timed out")

@@ -6,7 +6,7 @@ import type { Request } from "../../core/tools/nested-operation.js"
 import { ToolContext } from "../../core/tools/public/tool-context.js"
 import type { AgentEvent } from "../../core/agent/public/event.js"
 import { canonicalSuspensionCall } from "../../core/agent/suspension.js"
-import type { ExecutionClaim, ExecutionRecord, Interface as RunStoreInterface } from "../run/store.js"
+import type { ExecutionClaim, ExecutionRecord, Service as RunStoreService } from "../run/store.js"
 import { approvalReason, type WaitReason } from "../run/wait.js"
 
 /** @experimental The persisted operation kind every nested host operation uses. */
@@ -20,7 +20,7 @@ interface PendingApproval {
 }
 
 /** @experimental Runtime-owned nested durable operations plus the waits they open. */
-export interface Interface extends NestedOperation.Interface {
+export interface Service extends NestedOperation.Service {
   readonly waitFor: (
     suspension: AgentEvent.AgentSuspended,
   ) => Effect.Effect<{ readonly waitId: string; readonly reason: WaitReason } | undefined>
@@ -54,8 +54,8 @@ const errorFromCause = <E>(cause: Cause.Cause<E>): { readonly _tag: "Failed"; re
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
-  readonly store: RunStoreInterface
-}): Effect.Effect<Interface> =>
+  readonly store: RunStoreService
+}): Effect.Effect<Service> =>
   Effect.gen(function* () {
     const ordinals = yield* Ref.make(new Map<string, number>())
     const pending = yield* Ref.make(new Map<string, PendingApproval>())
@@ -266,7 +266,7 @@ export const make = (input: {
       })
     }
 
-    const waitFor: Interface["waitFor"] = (suspension) =>
+    const waitFor: Service["waitFor"] = (suspension) =>
       Ref.get(pending).pipe(
         Effect.map((current) => {
           const approval = current.get(suspension.token)
@@ -286,4 +286,4 @@ export const make = (input: {
     return { run, waitFor }
   })
 
-const autoApprove: Approvals.Interface = { resolve: () => Effect.succeed({ _tag: "Approved" as const }) }
+const autoApprove: Approvals.Service = { resolve: () => Effect.succeed({ _tag: "Approved" as const }) }

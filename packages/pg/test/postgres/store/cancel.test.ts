@@ -1,4 +1,4 @@
-import { layerPostgres } from "@tenetkit/pg"
+import { layer } from "@tenetkit/pg"
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RunClaims } from "tenetkit/runtime"
@@ -14,7 +14,7 @@ operationRecoverySuite({
   skip: !postgresAvailable,
   makeLayer: (options) =>
     database.provision(
-      layerPostgres({
+      layer({
         ...options,
         url: database.url,
         source: "postgres-test",
@@ -54,7 +54,7 @@ toolCancellationSuite({
   skip: !postgresAvailable,
   makeLayer: (options) =>
     database.provision(
-      layerPostgres({
+      layer({
         ...options,
         url: database.url,
         source: "postgres-test",

@@ -8,12 +8,12 @@ export const SearchResult = Schema.Struct({
 
 export type SearchResult = typeof SearchResult.Type
 
-export interface Interface {
+export interface Service {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<SearchResult>>
 }
 
-export class Service extends Context.Service<Service, Interface>()(
-  "@tenetkit/docs/snippets/research-agent/search-provider/Service",
+export class SearchProvider extends Context.Service<SearchProvider, Service>()(
+  "@tenetkit/docs/snippets/research-agent/search-provider/SearchProvider",
 ) {}
 
 const cannedResults: ReadonlyArray<SearchResult> = [
@@ -29,7 +29,7 @@ const cannedResults: ReadonlyArray<SearchResult> = [
   },
 ]
 
-export const cannedLayer: Layer.Layer<Service> = Layer.succeed(
-  Service,
-  Service.of({ search: () => Effect.succeed(cannedResults) }),
+export const cannedLayer: Layer.Layer<SearchProvider> = Layer.succeed(
+  SearchProvider,
+  SearchProvider.of({ search: () => Effect.succeed(cannedResults) }),
 )

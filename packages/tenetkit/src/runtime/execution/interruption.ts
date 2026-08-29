@@ -1,18 +1,18 @@
 import { ActiveModelResponse } from "../../core/model/public/active-model-response.js"
 import { Context, Effect, Option, Ref, Schema } from "effect"
 import { AgentExecutionFailure, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
-import type { ExecutionClaim, Interface as RunStoreInterface } from "../run/store.js"
+import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"
 import type { RunFailure } from "../run/event.js"
 import { make as makeModelResponseInterrupted } from "./model-response/interrupted.js"
 
 const interrupted = AgentExecutionFailure.make({ message: "execution interrupted" })
 
 const settleRunningModels = (input: {
-  readonly store: RunStoreInterface
+  readonly store: RunStoreService
   readonly claim: ExecutionClaim
   readonly runId: string
   readonly activeOperationIds: Ref.Ref<ReadonlySet<string>>
-  readonly activeModelResponse: ActiveModelResponse.Interface
+  readonly activeModelResponse: ActiveModelResponse.Service
   readonly reason: "cancel" | "failure"
   readonly error: RunFailure
 }) =>
@@ -55,12 +55,12 @@ const settleRunningModels = (input: {
 
 /** Settle a Run whose execution ended mid-operation without claiming an unsafe operation can replay. */
 export const settleInterruptedExecution = (input: {
-  readonly store: RunStoreInterface
+  readonly store: RunStoreService
   readonly claim: ExecutionClaim
   readonly runId: string
   readonly activeOperationIds: Ref.Ref<ReadonlySet<string>>
   readonly completingRetrySafeOperationIds: Ref.Ref<ReadonlySet<string>>
-  readonly activeModelResponse: ActiveModelResponse.Interface
+  readonly activeModelResponse: ActiveModelResponse.Service
   readonly reason: "cancel" | "failure"
   readonly error?: RunFailure
   readonly settleRun?: boolean
@@ -103,7 +103,7 @@ export interface ExecutionInterruption {
 
 /** Bind interruption settlement and Core's retained response to one hosted execution. */
 export const make = (input: {
-  readonly store: RunStoreInterface
+  readonly store: RunStoreService
   readonly claim: ExecutionClaim
   readonly runId: string
   readonly activeOperationIds: Ref.Ref<ReadonlySet<string>>

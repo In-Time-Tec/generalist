@@ -23,7 +23,7 @@ export type Authorize<I> = (request: {
 }) => Effect.Effect<boolean, ProgramAuthorizationFailure | ProgramCapabilityDenied | ProgramSuspended>
 
 /** @experimental One live typed tool implementation and its exact identity. */
-export interface ToolBinding<I, IE, O, OE, E = never> {
+export interface ToolHandler<I, IE, O, OE, E = never> {
   readonly name: string
   readonly pin: CapabilityPin
   readonly input: Schema.Codec<I, IE>
@@ -34,12 +34,12 @@ export interface ToolBinding<I, IE, O, OE, E = never> {
 }
 
 /** @experimental One live typed named step implementation and its exact identity. */
-export interface StepBinding<I, IE, O, OE, E = never> extends Omit<ToolBinding<I, IE, O, OE, E>, "name"> {
+export interface StepHandler<I, IE, O, OE, E = never> extends Omit<ToolHandler<I, IE, O, OE, E>, "name"> {
   readonly name: string
 }
 
 /** @experimental One exact Agent implementation callable by a program host. */
-export interface AgentBinding<I extends Prompt.RawInput, IE, E = never> {
+export interface AgentHandler<I extends Prompt.RawInput, IE, E = never> {
   readonly selection: string
   readonly agent: AgentPin
   readonly inputPin: CapabilityPin
@@ -50,8 +50,8 @@ export interface AgentBinding<I extends Prompt.RawInput, IE, E = never> {
 }
 
 /**
- * @experimental One decoded invocation of a bound tool or step. The decoded input stays inside the binding, so
- * authorization and execution keep the exact type the binding declared.
+ * @experimental One decoded invocation of a tool or step. The decoded input stays inside the handler, so
+ * authorization and execution keep the exact type the handler declared.
  */
 export interface Invocation<O = unknown, E = ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> {
   readonly authorize: (
@@ -70,7 +70,7 @@ export interface AgentInvocation {
 }
 
 /**
- * @experimental Host-facing view of one bound tool in a heterogeneous binding set. Its identity, replay policy, and
+ * @experimental Host-facing view of one tool in a heterogeneous handler set. Its identity, replay policy, and
  * boundary codecs stay observable; its decoded input type is reachable only through {@link Invocation}.
  */
 export interface AnyTool {
@@ -82,18 +82,18 @@ export interface AnyTool {
   readonly decode: (encoded: typeof Schema.Unknown.Type) => Effect.Effect<Invocation, Schema.SchemaError>
 }
 
-/** @experimental Host-facing view of one bound named step, with the same hidden input as {@link AnyTool}. */
+/** @experimental Host-facing view of one named step, with the same hidden input as {@link AnyTool}. */
 export type AnyStep = AnyTool
 
-/** @experimental A bound tool retaining its exact decoded invocation types. */
+/** @experimental A tool handler retaining its exact decoded invocation types. */
 export type TypedTool = AnyTool & {
   readonly decode: (encoded: typeof Schema.Unknown.Type) => Effect.Effect<Invocation, Schema.SchemaError>
 }
 
-/** @experimental A bound step retaining its exact decoded invocation types. */
+/** @experimental A step handler retaining its exact decoded invocation types. */
 export type TypedStep = TypedTool
 
-/** @experimental Host-facing view of one bound Agent, with its decoded input hidden behind {@link AgentInvocation}. */
+/** @experimental Host-facing view of one Agent handler, with its decoded input hidden behind {@link AgentInvocation}. */
 export interface AnyAgent {
   readonly selection: string
   readonly agent: AgentPin
@@ -114,8 +114,8 @@ const checkUnique = (kind: string, values: ReadonlyArray<readonly [string, strin
   }
 }
 
-/** @experimental Complete live authority available to a ProgramHost. */
-export interface Bindings {
+/** @experimental Complete live authority available to a ProgramRunner. */
+export interface Handlers {
   readonly tools: ReadonlyArray<TypedTool>
   readonly steps: ReadonlyArray<TypedStep>
   readonly agents: ReadonlyArray<AnyAgent>
@@ -126,23 +126,23 @@ const decodeInput = <I, IE>(
   encoded: typeof Schema.Unknown.Type,
 ): Effect.Effect<I, Schema.SchemaError> => Schema.decodeUnknownEffect(codec, { onExcessProperty: "error" })(encoded)
 
-/** @experimental Construct a typed tool binding. */
+/** @experimental Construct a typed tool handler. */
 export const tool = <I, IE, O, OE, E>(
-  binding: ToolBinding<I, IE, O, OE, E>,
+  handler: ToolHandler<I, IE, O, OE, E>,
 ): TypedTool & {
   readonly decode: (encoded: typeof Schema.Unknown.Type) => Effect.Effect<Invocation<O>, Schema.SchemaError>
 } => ({
-  name: binding.name,
-  pin: binding.pin,
-  input: binding.input,
-  output: binding.output,
-  replay: binding.replay,
+  name: handler.name,
+  pin: handler.pin,
+  input: handler.input,
+  output: handler.output,
+  replay: handler.replay,
   decode: (encoded) =>
     Effect.map(
-      decodeInput(binding.input, encoded),
+      decodeInput(handler.input, encoded),
       (input): Invocation<O> => ({
-        authorize: (operation) => binding.authorize({ operation, input }),
-        execute: Effect.suspend(() => binding.execute(input)).pipe(
+        authorize: (operation) => handler.authorize({ operation, input }),
+        execute: Effect.suspend(() => handler.execute(input)).pipe(
           Effect.catch(
             (cause): Effect.Effect<O, ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> =>
               Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
@@ -154,27 +154,27 @@ export const tool = <I, IE, O, OE, E>(
     ),
 })
 
-/** @experimental Construct a typed named step binding. */
+/** @experimental Construct a typed named step handler. */
 export const step = <I, IE, O, OE, E>(
-  binding: StepBinding<I, IE, O, OE, E>,
+  handler: StepHandler<I, IE, O, OE, E>,
 ): TypedStep & {
   readonly decode: (encoded: typeof Schema.Unknown.Type) => Effect.Effect<Invocation<O>, Schema.SchemaError>
-} => tool(binding)
+} => tool(handler)
 
-/** @experimental Construct an exact typed Agent binding. */
-export const agent = <I extends Prompt.RawInput, IE, E>(binding: AgentBinding<I, IE, E>): AnyAgent => ({
-  selection: binding.selection,
-  agent: binding.agent,
-  inputPin: binding.inputPin,
-  input: binding.input,
-  replay: binding.replay,
+/** @experimental Construct an exact typed Agent handler. */
+export const agent = <I extends Prompt.RawInput, IE, E>(handler: AgentHandler<I, IE, E>): AnyAgent => ({
+  selection: handler.selection,
+  agent: handler.agent,
+  inputPin: handler.inputPin,
+  input: handler.input,
+  replay: handler.replay,
   decode: (encoded) =>
     Effect.map(
-      decodeInput(binding.input, encoded),
+      decodeInput(handler.input, encoded),
       (input): AgentInvocation => ({
         prompt: input,
-        authorize: (operation) => binding.authorize({ operation, input }),
-        execute: Effect.suspend(() => binding.execute(input)).pipe(
+        authorize: (operation) => handler.authorize({ operation, input }),
+        execute: Effect.suspend(() => handler.execute(input)).pipe(
           Effect.catch(
             (cause): Effect.Effect<AgentRunResult, ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> =>
               Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
@@ -186,19 +186,19 @@ export const agent = <I extends Prompt.RawInput, IE, E>(binding: AgentBinding<I,
     ),
 })
 
-/** @experimental Construct the host's complete live Program binding set. */
-export const make = (bindings: Bindings): Bindings => {
+/** @experimental Construct the runner's complete live Program handler set. */
+export const make = (handlers: Handlers): Handlers => {
   checkUnique(
     "tool",
-    bindings.tools.map((binding) => [binding.name, binding.pin]),
+    handlers.tools.map((handler) => [handler.name, handler.pin]),
   )
   checkUnique(
     "step",
-    bindings.steps.map((binding) => [binding.name, binding.pin]),
+    handlers.steps.map((handler) => [handler.name, handler.pin]),
   )
   checkUnique(
     "Agent",
-    bindings.agents.map((binding) => [binding.selection, `${binding.agent}\0${binding.inputPin}`]),
+    handlers.agents.map((handler) => [handler.selection, `${handler.agent}\0${handler.inputPin}`]),
   )
-  return bindings
+  return handlers
 }

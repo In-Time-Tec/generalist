@@ -317,7 +317,7 @@ const updateSession = <A, E>(
 export const make = (config: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
   readonly sessionId: string
-}): Session.Interface => {
+}): Session.Service => {
   const { stateRef, sessionId } = config
   return Session.SessionStore.of({
     reserveEntryId: updateSession(stateRef, sessionId, (session) => {

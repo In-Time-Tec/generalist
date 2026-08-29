@@ -3,7 +3,7 @@ import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Session } from "../../../../src/index.js"
-import { Address, ExecutableResolver, ExecutionHost, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { decodeSessionPayload, encodeSessionPayload } from "../../../../src/runtime/sql/session/payload-codec.js"
 import { SessionStorage } from "../../../../src/runtime/sql/session/store.js"
 import { registrationsFor } from "../../execution/fixtures.js"
@@ -213,7 +213,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
     const runId = yield* scopedWith(SqliteRuntime.layerSqlite(options))(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,

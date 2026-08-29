@@ -1,10 +1,10 @@
 import { Context, Effect, Schema } from "effect"
 import { Tool, Toolkit } from "tenetkit"
-export interface DocsIndexInterface {
+export interface DocsIndexService {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<string>>
 }
 
-export class DocsIndex extends Context.Service<DocsIndex, DocsIndexInterface>()(
+export class DocsIndex extends Context.Service<DocsIndex, DocsIndexService>()(
   "@tenetkit/docs/snippets/guides/tools/define-tools/search-tool/DocsIndex",
 ) {}
 

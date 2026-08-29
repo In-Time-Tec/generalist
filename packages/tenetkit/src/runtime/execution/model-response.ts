@@ -1,7 +1,7 @@
 import { DurableDriver } from "../../core/durable/public/driver.js"
 import { Effect, Option, Ref, Schema } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
-import type { ExecutionClaim, Interface as RunStoreInterface } from "../run/store.js"
+import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import {
   completedOperationRefValue,
@@ -17,7 +17,7 @@ interface PreparedCompletion {
 
 /** Commit the driver result through the model-specific atomic outbox or the generic operation path. */
 export const commitDriverOperation = (input: {
-  readonly store: RunStoreInterface
+  readonly store: RunStoreService
   readonly claim: ExecutionClaim
   readonly operation: DurableDriver.DriverOperation
   readonly operationId: string
@@ -31,7 +31,7 @@ export const commitDriverOperation = (input: {
     if (Schema.is(RuntimeUnavailable)(event)) return event
     return store.commitModelResponse({ ...claim, operationId, outcome, checkpoint, ...prepared, event })
   }
-  let completion: Parameters<RunStoreInterface["completeOperation"]>[0]["outcome"]
+  let completion: Parameters<RunStoreService["completeOperation"]>[0]["outcome"]
   if (outcome._tag === "Succeeded") completion = { _tag: "Succeeded", value: outcome.value }
   else if (outcome._tag === "Failed") completion = { _tag: "Failed", error: outcome.error }
   else completion = { _tag: "Unknown" }
@@ -45,7 +45,7 @@ export const commitDriverOperation = (input: {
 }
 
 export const hydratePersistedModelOperation = (input: {
-  readonly store: RunStoreInterface
+  readonly store: RunStoreService
   readonly value: unknown
 }): Effect.Effect<unknown, RuntimeUnavailable> =>
   Effect.gen(function* () {
@@ -70,7 +70,7 @@ export const hydratePersistedModelOperation = (input: {
 
 /** Verify Core's later live semantic event against the already committed transactional outbox. */
 export const verifyCommittedModelEvent = (input: {
-  readonly store: RunStoreInterface
+  readonly store: RunStoreService
   readonly claim: ExecutionClaim
   readonly event: LiveModelResponseCommitted
 }): Effect.Effect<

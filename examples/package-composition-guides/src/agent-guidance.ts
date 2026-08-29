@@ -1,7 +1,7 @@
 import { Console, Effect, ManagedRuntime, Result } from "effect"
-import { Authorship, HarnessOverview, HarnessStore, Refinement } from "tenetkit/harness"
+import { Authorship, Overview, Store, Refinement } from "tenetkit/agent-guidance"
 
-const program = HarnessStore.HarnessStore.use((store) =>
+const program = Store.Store.use((store) =>
   Effect.gen(function* () {
     const state = yield* store.load("thread:demo")
     const proposal = yield* Authorship.authorProposal({
@@ -20,9 +20,9 @@ const program = HarnessStore.HarnessStore.use((store) =>
     const result = Refinement.applyProposal(state, proposal)
     if (Result.isFailure(result)) return yield* Console.log(`rejected: ${result.failure.reason}`)
     yield* store.save(result.success.state)
-    yield* Console.log(HarnessOverview.formatOverview(result.success.state, { maxEntriesPerKind: 4 }))
+    yield* Console.log(Overview.formatOverview(result.success.state, { maxEntriesPerKind: 4 }))
   }),
 )
 
-const runtime = ManagedRuntime.make(HarnessStore.layerMemory)
+const runtime = ManagedRuntime.make(Store.layerMemory)
 await runtime.runPromise(program)

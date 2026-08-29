@@ -1,4 +1,4 @@
-import { layer as layerWithClient, layerPostgres } from "@tenetkit/pg"
+import { layer as postgresLayer } from "@tenetkit/pg"
 import { PgClient } from "@effect/sql-pg"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schedule, Stream } from "effect"
@@ -20,7 +20,7 @@ it.effect("rejects invalid PostgreSQL pool bounds before opening a client", () =
   Effect.gen(function* () {
     for (const maxConnections of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
       const failure = yield* Layer.build(
-        layerPostgres({
+        postgresLayer({
           url: "postgres://must-not-connect",
           resolver,
           addresses: [],
@@ -40,7 +40,7 @@ const describePostgres = postgresAvailable ? describe : describe.skip
 const database = postgresDatabase("host-transaction")
 const sharedResolver = ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }])
 const sharedLayer = database.provision(
-  layerWithClient({
+  postgresLayer({
     source: "postgres-host-transaction",
     resolver: sharedResolver,
     addresses: [],

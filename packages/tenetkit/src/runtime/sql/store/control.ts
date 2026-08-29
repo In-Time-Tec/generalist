@@ -61,7 +61,7 @@ type CompleteInput = { readonly runId: string; readonly result: ExecutionResult 
 type FailInput = { readonly runId: string; readonly error: RunFailure }
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
 type AgentEventInput = { readonly runId: string; readonly event: EmittableAgentLoopEvent }
-type SuspendInput = Parameters<import("../../run/store.js").Interface["suspend"]>[0]
+type SuspendInput = Parameters<import("../../run/store.js").Service["suspend"]>[0]
 
 const cancellationEvent = (reason: string | undefined) =>
   reason === undefined ? { _tag: "RunCancelled" as const } : { _tag: "RunCancelled" as const, reason }

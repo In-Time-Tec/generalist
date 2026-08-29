@@ -7,7 +7,7 @@ import { Steering } from "../../core/turn/facade-steering.js"
 import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../errors.js"
-import { matchesActiveRunOptions, type Interface as ExecutableResolverInterface } from "../executable/resolver.js"
+import { matchesActiveRunOptions, type Service as ExecutableResolverService } from "../executable/resolver.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
@@ -41,16 +41,16 @@ import {
 } from "./completion/operations.js"
 export interface Options {
   readonly workerId: string
-  readonly resolver: ExecutableResolverInterface
+  readonly resolver: ExecutableResolverService
 }
-export interface Interface {
+export interface Service {
   readonly execute: (claim: ExecutionClaim) => Effect.Effect<void>
   readonly interrupt: (runId: string) => Effect.Effect<void>
 }
-export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()(
-  "tenetkit/runtime/execution/host/ExecutionHost",
+export class RunExecutor extends Context.Service<RunExecutor, Service>()(
+  "tenetkit/runtime/execution/run-executor/RunExecutor",
 ) {}
-export const make = (options: Options): Effect.Effect<Interface, never, RunStore | ActiveExecutions> =>
+export const make = (options: Options): Effect.Effect<Service, never, RunStore | ActiveExecutions> =>
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
@@ -483,7 +483,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
       }).pipe(Effect.orDie)
     const execute = (claim: ExecutionClaim): Effect.Effect<void> =>
       active.run(claim.runId, ExecutionClaimLifecycle.releaseAfter(store, claim, executeClaim(claim)))
-    return ExecutionHost.of({ execute, interrupt: (runId) => active.interrupt(runId) })
+    return RunExecutor.of({ execute, interrupt: (runId) => active.interrupt(runId) })
   })
-export const layer = (options: Options): Layer.Layer<ExecutionHost, never, RunStore | ActiveExecutions> =>
-  Layer.effect(ExecutionHost, make(options))
+export const layer = (options: Options): Layer.Layer<RunExecutor, never, RunStore | ActiveExecutions> =>
+  Layer.effect(RunExecutor, make(options))

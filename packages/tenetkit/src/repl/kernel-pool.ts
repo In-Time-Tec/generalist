@@ -57,7 +57,7 @@ export interface Restart {
  * @experimental The kernel lifecycle port. One live kernel per Session identity, exclusive per
  * Session and authored-order; the pool owns process lifetime, generation, and lease.
  */
-export interface Interface {
+export interface Service {
   readonly execute: (request: ExecuteRequest) => Effect.Effect<Execution, CellFailure>
   readonly inspect: (request: InspectRequest) => Effect.Effect<Inspection, CellFailure>
   readonly interrupt: (sessionId: SessionId, cellId: CellId) => Effect.Effect<Interruption, CellFailure>
@@ -66,4 +66,4 @@ export interface Interface {
 }
 
 /** @experimental */
-export class KernelPool extends Context.Service<KernelPool, Interface>()("tenetkit/repl/kernel-pool/KernelPool") {}
+export class KernelPool extends Context.Service<KernelPool, Service>()("tenetkit/repl/kernel-pool/KernelPool") {}

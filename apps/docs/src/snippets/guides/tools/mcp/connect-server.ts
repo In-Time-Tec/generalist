@@ -1,11 +1,11 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "tenetkit"
-import { route } from "tenetkit/mcp/tools"
+import { connect } from "tenetkit/mcp/tools"
 import { OpenRouter } from "tenetkit/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {
-  const tools = yield* route({
+  const tools = yield* connect({
     name: "files",
     transport: { kind: "stdio", command: "bunx", args: ["@modelcontextprotocol/server-filesystem", "."] },
     callTimeout: "30 seconds",
@@ -29,7 +29,7 @@ const program = Effect.gen(function* () {
         ),
       ),
       (services) =>
-        ModelRegistry.operate(
+        ModelRegistry.withModel(
           { provider: "openrouter", model: "openai/gpt-4o-mini" },
           Agent.generate(agent, { prompt: "List the markdown files in this project." }),
         ).pipe(Effect.provideContext(services)),

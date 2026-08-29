@@ -1,6 +1,6 @@
 import { Function, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
-import type { Interface } from "./tool-executor.js"
+import type { Service } from "./tool-executor.js"
 import type { DomainFailure, Request, Success } from "./tool-result-codec.js"
 
 /** @experimental A completed tool outcome reported while cancelling an exact durable operation. */
@@ -65,10 +65,10 @@ export const decodeCancellableOperation = (input: typeof Schema.Unknown.Type): R
   )
 
 export const supportsCancellation: {
-  (request: Request): (executor: Interface) => boolean
-  (executor: Interface, request: Request): boolean
+  (request: Request): (executor: Service) => boolean
+  (executor: Service, request: Request): boolean
 } = Function.dual(
   2,
-  (executor: Interface, request: Request): boolean =>
+  (executor: Service, request: Request): boolean =>
     executor.cancel !== undefined && (executor.cancellable?.(request) ?? true),
 )

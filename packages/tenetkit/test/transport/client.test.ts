@@ -1,7 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Layer, Schedule, Schema, Stream } from "effect"
 import { Socket } from "effect/unstable/socket"
-import { Client, Wire } from "../../src/transport/index.js"
+import { RunClient, Wire } from "../../src/transport/index.js"
 import { event } from "./fixtures.js"
 
 class FakeWebSocket extends EventTarget implements WebSocket {
@@ -55,7 +55,7 @@ const socketAt = (sockets: ReadonlyArray<FakeWebSocket>, index: number): Effect.
       : Effect.succeed(socket)
   })
 
-describe("Client", () => {
+describe("RunClient", () => {
   {
     const sockets: Array<FakeWebSocket> = []
     const constructor = Layer.succeed(Socket.WebSocketConstructor, (url) => {
@@ -63,13 +63,13 @@ describe("Client", () => {
       sockets.push(socket)
       return socket
     })
-    layer(Client.layerWebSocket.pipe(Layer.provide(constructor)), { excludeTestServices: true })(
+    layer(RunClient.layerWebSocket.pipe(Layer.provide(constructor)), { excludeTestServices: true })(
       "reconnects from the last RunEvent admitted to its bounded queue",
       (suite) => {
         suite.effect("reconnects from the last RunEvent admitted to its bounded queue", () =>
           Effect.scoped(
             Effect.gen(function* () {
-              const connection = yield* Client.RunClient.use((client) =>
+              const connection = yield* RunClient.RunClient.use((client) =>
                 client.connect({
                   url: "ws://test/runs",
                   runId: "run-1",

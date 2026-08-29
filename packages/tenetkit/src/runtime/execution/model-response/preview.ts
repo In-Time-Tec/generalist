@@ -96,12 +96,12 @@ const clearedLane = (generation: number): LaneState => ({
   nextSubscriberId: 1,
 })
 
-interface Interface {
+interface Service {
   readonly open: (runId: string, attemptFence: number) => Effect.Effect<Sink, never, Scope.Scope>
   readonly previews: (runId: string) => Stream.Stream<ModelPreviewEvent>
 }
 
-export class ModelPreviewLane extends Context.Service<ModelPreviewLane, Interface>()(
+export class ModelPreviewLane extends Context.Service<ModelPreviewLane, Service>()(
   "tenetkit/runtime/execution/model-response/preview/ModelPreviewLane",
 ) {}
 
@@ -252,7 +252,7 @@ const update = <E, R>(
     return state
   })
 
-export const make: Effect.Effect<Interface, never, Scope.Scope> = Effect.gen(function* () {
+export const make: Effect.Effect<Service, never, Scope.Scope> = Effect.gen(function* () {
   const lanes = yield* SynchronizedRef.make<ReadonlyMap<string, LaneState>>(new Map())
   const publish = (runId: string, generation: number, frame: ModelPreviewFrame): Effect.Effect<void> =>
     SynchronizedRef.modify(lanes, (current): readonly [ReadonlyArray<Publication>, ReadonlyMap<string, LaneState>] => {
@@ -427,7 +427,7 @@ export const make: Effect.Effect<Interface, never, Scope.Scope> = Effect.gen(fun
 export const layer: Layer.Layer<ModelPreviewLane> = Layer.effect(ModelPreviewLane, make)
 
 export const open =
-  (lane: Option.Option<Interface>) =>
+  (lane: Option.Option<Service>) =>
   (runId: string, attemptFence: number): Effect.Effect<Sink, never, Scope.Scope> =>
     Option.match(lane, {
       onNone: () => Effect.succeed({ offer: () => Effect.succeed(false), clear: Effect.void, discard: Effect.void }),
@@ -435,6 +435,6 @@ export const open =
     })
 
 export const previews =
-  (lane: Option.Option<Interface>) =>
+  (lane: Option.Option<Service>) =>
   (runId: string): Stream.Stream<ModelPreviewEvent> =>
     Option.match(lane, { onNone: () => Stream.empty, onSome: (service) => service.previews(runId) })

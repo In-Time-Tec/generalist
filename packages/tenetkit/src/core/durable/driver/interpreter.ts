@@ -93,7 +93,7 @@ export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServi
 }
 type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted
 /** @experimental Inline interpreter executing driver operations through Effect services. */
-export interface Interface {
+export interface Service {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
   readonly run: <A, E, R>(spec: OperationSpec, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, OperationError<E>, R>
   readonly runStream: {
@@ -130,7 +130,7 @@ export class DriverUnknownReplay extends Schema.TaggedError<DriverUnknownReplay>
   { operationKey: Schema.String, operationId: Schema.String },
 ) {}
 /** @experimental */
-export class DriverInterpreter extends Context.Service<DriverInterpreter, Interface>()(
+export class DriverInterpreter extends Context.Service<DriverInterpreter, Service>()(
   "tenetkit/core/durable/driver/interpreter/DriverInterpreter",
 ) {}
 const noopJournal: DriverJournal = {
@@ -154,7 +154,7 @@ export const make = (input: {
   readonly driver: DurableAgentDriver
   readonly journal?: DriverJournal
   readonly initial: DriverCheckpoint
-}): Effect.Effect<Interface> =>
+}): Effect.Effect<Service> =>
   Effect.gen(function* () {
     const checkpointRef = yield* Ref.make(input.initial)
     const recordedRef = yield* Ref.make<ReadonlyArray<RecordedOperation>>([])
@@ -275,7 +275,7 @@ export const make = (input: {
         }
         return yield* Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause)
       })
-    const interpreter: Interface = {
+    const interpreter: Service = {
       checkpoint: Ref.get(checkpointRef),
       run,
       runStream: <A, E, R, Success, ReplayError, ReplayServices>(

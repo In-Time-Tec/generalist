@@ -6,7 +6,7 @@ import {
   Runtime,
   type EventsError,
   type InspectError,
-  type Interface as RuntimeInterface,
+  type Service as RuntimeService,
   type RespondApprovalError,
   type RespondError,
   type SendError,
@@ -36,13 +36,13 @@ export type RunError =
   | SessionEntryError
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly run: (input: RunAgentInput) => Stream.Stream<AGUIEvent, RunError>
   readonly snapshot: (runId: string) => Effect.Effect<AGUIEvent, EventInvalid | InspectError>
 }
 
 /** @experimental */
-export class AgUi extends Context.Service<AgUi, Interface>()("tenetkit/interoperability/ag-ui/service/AgUi") {}
+export class AGUI extends Context.Service<AGUI, Service>()("tenetkit/interoperability/ag-ui/service/AGUI") {}
 
 const validate = (value: RunAgentInput): Effect.Effect<RunAgentInput, InputMalformed> => {
   const parsed = RunAgentInputSchema.safeParse(value)
@@ -74,7 +74,7 @@ const finalPrompt = (
 }
 
 const recover = (
-  runtime: RuntimeInterface,
+  runtime: RuntimeService,
   runId: string,
   threadId: string,
   cursor: Cursor,
@@ -106,9 +106,9 @@ const recover = (
   )
 
 /** @experimental */
-export const layer = (options: LayerOptions): Layer.Layer<AgUi, never, Runtime> =>
+export const layer = (options: LayerOptions): Layer.Layer<AGUI, never, Runtime> =>
   Layer.effect(
-    AgUi,
+    AGUI,
     Effect.gen(function* () {
       const runtime = yield* Runtime
       const snapshot = (runId: string) => runtime.snapshot(runId).pipe(Effect.flatMap(stateSnapshot))
@@ -172,6 +172,6 @@ export const layer = (options: LayerOptions): Layer.Layer<AgUi, never, Runtime> 
             return recover(runtime, input.runId, input.threadId, cursor)
           }),
         )
-      return AgUi.of({ run, snapshot })
+      return AGUI.of({ run, snapshot })
     }),
   )

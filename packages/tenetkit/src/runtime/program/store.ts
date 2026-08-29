@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { ProgramBindings, ProgramCapabilities, ProgramManifest } from "../../core/index.js"
+import { ProgramHandlers, ProgramCapabilities, ProgramManifest } from "../../core/index.js"
 import type { ExecutionClaim } from "../run/store.js"
 import type { AdmitFanOutInput } from "../child/fan-out.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/state.js"
@@ -46,7 +46,7 @@ export const ProgramOperationRecord = Schema.Struct({
   capability: Schema.String,
   inputDigest: Schema.String,
   input: Schema.Unknown,
-  replay: ProgramBindings.ProgramReplayPolicy,
+  replay: ProgramHandlers.ProgramReplayPolicy,
   status: ProgramOperationStatus,
   result: Schema.optionalKey(Schema.Unknown),
   error: Schema.optionalKey(Schema.Unknown),
@@ -77,7 +77,7 @@ export interface ReserveProgramOperationInput extends ExecutionClaim {
   readonly capability: string
   readonly inputDigest: string
   readonly input: unknown
-  readonly replay: ProgramBindings.ProgramReplayPolicy
+  readonly replay: ProgramHandlers.ProgramReplayPolicy
   readonly reservation: ProgramReservation
 }
 

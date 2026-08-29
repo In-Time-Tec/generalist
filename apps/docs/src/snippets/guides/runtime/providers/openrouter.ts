@@ -13,7 +13,7 @@ const registryLayer = OpenRouter.layer({
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })
 
-const program = ModelRegistry.operate(
+const program = ModelRegistry.withModel(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
   Agent.generate(agent, { prompt: "Name one Effect data type." }),
 ).pipe(Effect.flatMap((result) => Console.log(result.text)))

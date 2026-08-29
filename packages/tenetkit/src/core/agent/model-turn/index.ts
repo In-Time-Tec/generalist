@@ -71,7 +71,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
   const withAgentModel = <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
     agentModelRegistry === undefined || agentModel === undefined
       ? effect
-      : agentModelRegistry.operate(agentModel, effect)
+      : agentModelRegistry.withModel(agentModel, effect)
   const partEvents = (
     turn: number,
     part: Response.StreamPart<Record<string, Tool.Any>>,

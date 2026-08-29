@@ -21,8 +21,8 @@ export const Frontmatter = Schema.Struct({
 /** @experimental Parsed SKILL.md frontmatter. */
 export type Frontmatter = typeof Frontmatter.Type
 
-/** @experimental Skill source operation failed. */
-export class SkillSourceError extends Schema.TaggedError<SkillSourceError>()("tenetkit/core/SkillSourceError", {
+/** @experimental Skill catalog operation failed. */
+export class SkillCatalogError extends Schema.TaggedError<SkillCatalogError>()("tenetkit/core/SkillCatalogError", {
   source: Schema.String,
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
@@ -30,79 +30,76 @@ export class SkillSourceError extends Schema.TaggedError<SkillSourceError>()("te
 
 /** @experimental A discovered skill. */
 export interface Skill {
-  readonly frontmatter: Frontmatter
-  readonly listing: string
-  readonly body: Effect.Effect<string, SkillSourceError>
+  readonly name: string
+  readonly description: string
+  readonly whenToUse?: string
+  readonly allowedTools?: ReadonlyArray<string>
+  readonly disableModelInvocation?: boolean
+  readonly userInvocable?: boolean
+  readonly contextFork?: boolean
+  readonly agent?: string
+  readonly model?: string
+  readonly paths?: ReadonlyArray<string>
+  readonly instructions: Effect.Effect<string, SkillCatalogError>
   readonly tools: ReadonlyArray<Tool.Any>
   /**
-   * Where the skill was found, for a source that reads a filesystem. A host that resolves resources
+   * Where the skill was found, for a catalog that reads a filesystem. A host that resolves resources
    * beside a skill needs the directory it came from rather than one derived from its name, because
-   * a source may find a skill anywhere beneath its root.
+   * a catalog may find a skill anywhere beneath its root.
    */
-  readonly directory?: string
+  readonly location?: string
 }
 
 /** @experimental Skill registry seam. */
-export interface Interface {
-  readonly all: Effect.Effect<ReadonlyArray<Skill>, SkillSourceError>
-  readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillSourceError>
+export interface Service {
+  readonly all: Effect.Effect<ReadonlyArray<Skill>, SkillCatalogError>
+  readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError>
 }
 
-/** @experimental Effect that builds one skill source implementation. */
-export type Source<R = never> = Effect.Effect<Interface, SkillSourceError, R>
-
 /** @experimental */
-export class SkillSource extends Context.Service<SkillSource, Interface>()(
-  "tenetkit/core/context/skill-source/SkillSource",
+export class SkillCatalog extends Context.Service<SkillCatalog, Service>()(
+  "tenetkit/core/context/skill-catalog/SkillCatalog",
 ) {}
 
-/** @experimental Build a startup listing line from skill frontmatter. */
-export const listing: {
-  (descriptionCap?: number): (frontmatter: Frontmatter) => string
-  (frontmatter: Frontmatter, descriptionCap?: number): string
-} = Function.dual(
-  (args) => Schema.is(Frontmatter)(args[0]),
-  (frontmatter: Frontmatter, descriptionCap: number = DESCRIPTION_CAP): string =>
-    `- ${frontmatter.name}: ${frontmatter.description.slice(0, Math.max(0, descriptionCap))}`,
-)
+export const listing = (skill: Skill): string => `- ${skill.name}: ${skill.description}`
 
-/** @experimental A source built from in-memory skills. */
-export const layerSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillSource> => {
+/** @experimental A catalog built from in-memory skills. */
+export const layerSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillCatalog> => {
   const all = [...skills]
-  const byName = new Map(all.map((skill) => [skill.frontmatter.name, skill]))
+  const byName = new Map(all.map((skill) => [skill.name, skill]))
   return Layer.succeed(
-    SkillSource,
-    SkillSource.of({
+    SkillCatalog,
+    SkillCatalog.of({
       all: Effect.succeed(all),
       get: (name) => Effect.succeed(byName.get(name)),
     }),
   )
 }
 
-/** @experimental Empty skill source. */
-export const layerEmpty: Layer.Layer<SkillSource> = layerSkills([])
+/** @experimental Empty skill catalog. */
+export const layerEmpty: Layer.Layer<SkillCatalog> = layerSkills([])
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<SkillSource> =>
-  Layer.succeed(SkillSource, SkillSource.of(implementation))
+export const layerTest = (implementation: Service): Layer.Layer<SkillCatalog> =>
+  Layer.succeed(SkillCatalog, SkillCatalog.of(implementation))
 
-const emptySource: Interface = {
+const emptyCatalog: Service = {
   all: Effect.succeed([]),
   get: () => Effect.void.pipe(Effect.as(undefined)),
 }
 
-/** @experimental Merge two built sources with the second source winning duplicate names. */
+/** @experimental Merge two catalogs with the second catalog winning duplicate names. */
 export const merge: {
-  (second: Interface): (first: Interface) => Interface
-  (first: Interface, second: Interface): Interface
+  (second: Service): (first: Service) => Service
+  (first: Service, second: Service): Service
 } = Function.dual(
   2,
-  (first: Interface, second: Interface): Interface => ({
+  (first: Service, second: Service): Service => ({
     all: Effect.all([first.all, second.all]).pipe(
       Effect.map((groups) => {
         const byName = new Map<string, Skill>()
         for (const skills of groups) {
-          for (const skill of skills) byName.set(skill.frontmatter.name, skill)
+          for (const skill of skills) byName.set(skill.name, skill)
         }
         return [...byName.values()]
       }),
@@ -112,19 +109,21 @@ export const merge: {
   }),
 )
 
-/** @experimental Build one layer from composable sources. */
-export const layer = <R>(sources: ReadonlyArray<Source<R>>): Layer.Layer<SkillSource, SkillSourceError, R> =>
+/** @experimental Build one layer from composable catalogs. */
+export const layer = <R>(
+  catalogs: ReadonlyArray<Effect.Effect<Service, SkillCatalogError, R>>,
+): Layer.Layer<SkillCatalog, SkillCatalogError, R> =>
   Layer.effect(
-    SkillSource,
-    Effect.forEach(sources, (source) => source).pipe(
-      Effect.map((built) => SkillSource.of(built.reduce((first, second) => merge(first, second), emptySource))),
+    SkillCatalog,
+    Effect.forEach(catalogs, (catalog) => catalog).pipe(
+      Effect.map((built) => SkillCatalog.of(built.reduce((first, second) => merge(first, second), emptyCatalog))),
     ),
   )
 
 const estimatedTokens = (listingText: string): number => Math.ceil(listingText.length / 4)
 
 const usageRank = (skill: Skill, recentlyUsed: ReadonlyArray<string>): number => {
-  const index = recentlyUsed.indexOf(skill.frontmatter.name)
+  const index = recentlyUsed.indexOf(skill.name)
   return index === -1 ? -1 : index
 }
 
@@ -137,9 +136,9 @@ export const selectListings: {
   (skills: ReadonlyArray<Skill>, budgetTokens: number, recentlyUsed: ReadonlyArray<string>): ReadonlyArray<Skill> => {
     if (budgetTokens <= 0) return []
     const selected = skills.filter(
-      (skill) => skill.frontmatter.disableModelInvocation !== true && estimatedTokens(skill.listing) <= budgetTokens,
+      (skill) => skill.disableModelInvocation !== true && estimatedTokens(listing(skill)) <= budgetTokens,
     )
-    let total = selected.reduce((sum, skill) => sum + estimatedTokens(skill.listing), 0)
+    let total = selected.reduce((sum, skill) => sum + estimatedTokens(listing(skill)), 0)
     while (total > budgetTokens && selected.length > 0) {
       let dropIndex = 0
       for (let index = 1; index < selected.length; index += 1) {
@@ -154,7 +153,7 @@ export const selectListings: {
         }
       }
       const [dropped] = selected.splice(dropIndex, 1)
-      total -= dropped === undefined ? 0 : estimatedTokens(dropped.listing)
+      total -= dropped === undefined ? 0 : estimatedTokens(listing(dropped))
     }
     return selected
   },

@@ -20,7 +20,7 @@ export type { FailureInput, FailureResolver } from "./response/failure.js"
 export type Classification = "transient" | "terminal"
 
 /** @experimental Retry and correction policy for one logical model call. */
-export interface Interface {
+export interface Service {
   readonly classify: (error: ModelFailure) => Classification
   readonly resolve: FailureResolver
   readonly retrySchedule: Schedule.Schedule<unknown>
@@ -29,15 +29,15 @@ export interface Interface {
 }
 
 interface MutableInterface {
-  classify: Interface["classify"]
-  resolve: Interface["resolve"]
-  retrySchedule: Interface["retrySchedule"]
+  classify: Service["classify"]
+  resolve: Service["resolve"]
+  retrySchedule: Service["retrySchedule"]
   invalidToolCallCorrectionLimit: number
   streamIdleTimeout?: Duration.Input
 }
 
 /** @experimental */
-export class ModelResilience extends Context.Service<ModelResilience, Interface>()(
+export class ModelResilience extends Context.Service<ModelResilience, Service>()(
   "tenetkit/core/model/resilience/ModelResilience",
 ) {}
 
@@ -69,7 +69,7 @@ const defaultProviderClassify = (error: ModelFailure): Classification =>
     : "terminal"
 
 /** @experimental */
-export const defaultPolicy: Interface = {
+export const defaultPolicy: Service = {
   classify: defaultProviderClassify,
   resolve: defaultResolveFailure,
   retrySchedule: Schedule.exponential("2 seconds").pipe(Schedule.upTo({ times: 2, duration: "30 seconds" })),
@@ -77,7 +77,7 @@ export const defaultPolicy: Interface = {
 }
 
 /** @experimental */
-export const none: Interface = {
+export const none: Service = {
   ...defaultPolicy,
   classify: () => "terminal",
   retrySchedule: Schedule.recurs(0),
@@ -90,7 +90,7 @@ const misconfigured = (): ModelResilienceMisconfigured =>
   })
 
 /** @experimental Validate a structurally supplied model resilience policy. */
-export const validate = (implementation: Interface): Effect.Effect<Interface, ModelResilienceMisconfigured> =>
+export const validate = (implementation: Service): Effect.Effect<Service, ModelResilienceMisconfigured> =>
   Effect.suspend(() => {
     const limit = implementation.invalidToolCallCorrectionLimit
     return Number.isSafeInteger(limit) && limit >= 0 && limit <= 2
@@ -99,7 +99,7 @@ export const validate = (implementation: Interface): Effect.Effect<Interface, Mo
   })
 
 /** @experimental */
-export const make = (input?: Partial<Interface>): Effect.Effect<Interface, ModelResilienceMisconfigured> => {
+export const make = (input?: Partial<Service>): Effect.Effect<Service, ModelResilienceMisconfigured> => {
   const implementation: MutableInterface = {
     classify: input?.classify ?? defaultClassify,
     resolve: input?.resolve ?? defaultPolicy.resolve,
@@ -111,14 +111,14 @@ export const make = (input?: Partial<Interface>): Effect.Effect<Interface, Model
 }
 
 /** @experimental */
-export const layer = (input?: Partial<Interface>): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
+export const layer = (input?: Partial<Service>): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
   Layer.effect(ModelResilience, make(input).pipe(Effect.map(ModelResilience.of)))
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
+export const layerTest = (implementation: Service): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
   Layer.effect(ModelResilience, validate(implementation).pipe(Effect.map(ModelResilience.of)))
 
-const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: Interface): Effect.Effect<A, E, R> =>
+const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: Service): Effect.Effect<A, E, R> =>
   Effect.suspend(effect).pipe(
     Effect.map((value): Result.Result<A, Cause.Cause<E>> => Result.succeed(value)),
     Effect.catchCause((cause): Effect.Effect<Result.Result<A, Cause.Cause<E>>, E> => {
@@ -136,13 +136,13 @@ const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: 
     ),
   )
 
-const retryStreamSchedule = (resilience: Interface): Schedule.Schedule<unknown, unknown> =>
+const retryStreamSchedule = (resilience: Service): Schedule.Schedule<unknown, unknown> =>
   resilience.retrySchedule.pipe(Schedule.while(({ input }) => resilience.classify(input) === "transient"))
 
 const retryStream = <A, B, E, R>(
   stream: () => Stream.Stream<A, E, R>,
   onEmittedFailure: (error: E) => B,
-  resilience: Interface,
+  resilience: Service,
   consumesReplay: (value: A) => boolean,
 ): Stream.Stream<A | B, E, R> =>
   Stream.suspend(() => {
@@ -181,11 +181,11 @@ const retryStream = <A, B, E, R>(
 
 /** @experimental */
 export const apply: {
-  (resilience: Interface): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, resilience: Interface): LanguageModel.Service
+  (resilience: Service): (model: LanguageModel.Service) => LanguageModel.Service
+  (model: LanguageModel.Service, resilience: Service): LanguageModel.Service
 } = Function.dual(
   2,
-  (model: LanguageModel.Service, resilience: Interface): LanguageModel.Service =>
+  (model: LanguageModel.Service, resilience: Service): LanguageModel.Service =>
     adapt<
       AiError.AiError | ModelResilienceMisconfigured,
       AiError.AiError | ModelResilienceMisconfigured,

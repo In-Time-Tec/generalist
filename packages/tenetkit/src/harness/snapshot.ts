@@ -1,11 +1,11 @@
 import { Effect, Function, Schema } from "effect"
-import { HarnessEntry, HarnessScope, HarnessSnapshotId } from "./entry.js"
-import { HarnessState, allEntries, make, snapshotId } from "./state.js"
+import { GuidanceEntry, GuidanceScope, GuidanceSnapshotId } from "./entry.js"
+import { GuidanceState, allEntries, make, snapshotId } from "./state.js"
 
-/** @experimental Codec name a durable host records alongside a pinned harness snapshot. */
-export const CODEC = "tenetkit/harness/snapshot"
+/** @experimental Codec name a durable host records alongside a pinned guidance snapshot. */
+export const CODEC = "tenetkit/agent-guidance/snapshot"
 
-/** @experimental Payload version a durable host records alongside a pinned harness snapshot. */
+/** @experimental Payload version a durable host records alongside a pinned guidance snapshot. */
 export const VERSION = "1"
 
 /**
@@ -14,30 +14,33 @@ export const VERSION = "1"
  */
 export const SnapshotPayload = Schema.Struct({
   schemaVersion: Schema.Literal("1"),
-  scope: HarnessScope,
-  entries: Schema.Array(HarnessEntry),
+  scope: GuidanceScope,
+  entries: Schema.Array(GuidanceEntry),
 })
 /** @experimental */
 export type SnapshotPayload = typeof SnapshotPayload.Type
 
-/** @experimental One content-addressed harness snapshot and the payload that reconstructs it. */
-export const HarnessSnapshot = Schema.Struct({ id: HarnessSnapshotId, payload: SnapshotPayload })
+/** @experimental One content-addressed guidance snapshot and the payload that reconstructs it. */
+export const GuidanceSnapshot = Schema.Struct({ id: GuidanceSnapshotId, payload: SnapshotPayload })
 /** @experimental */
-export type HarnessSnapshot = typeof HarnessSnapshot.Type
+export type GuidanceSnapshot = typeof GuidanceSnapshot.Type
 
 /** @experimental A pinned snapshot payload does not reconstruct the snapshot it claims. */
-export class SnapshotMismatch extends Schema.TaggedError<SnapshotMismatch>()("tenetkit/harness/SnapshotMismatch", {
-  expected: Schema.String,
-  actual: Schema.String,
-}) {}
+export class SnapshotMismatch extends Schema.TaggedError<SnapshotMismatch>()(
+  "tenetkit/agent-guidance/SnapshotMismatch",
+  {
+    expected: Schema.String,
+    actual: Schema.String,
+  },
+) {}
 
-/** @experimental A pinned snapshot payload is not a valid harness state. */
-export class SnapshotInvalid extends Schema.TaggedError<SnapshotInvalid>()("tenetkit/harness/SnapshotInvalid", {
+/** @experimental A pinned snapshot payload is not a valid guidance state. */
+export class SnapshotInvalid extends Schema.TaggedError<SnapshotInvalid>()("tenetkit/agent-guidance/SnapshotInvalid", {
   message: Schema.String,
 }) {}
 
 /** @experimental Pin one exact state as a content-addressed snapshot. */
-export const snapshot = (state: HarnessState): HarnessSnapshot => ({
+export const snapshot = (state: GuidanceState): GuidanceSnapshot => ({
   id: snapshotId(state),
   payload: { schemaVersion: state.schemaVersion, scope: state.scope, entries: allEntries(state) },
 })
@@ -46,23 +49,23 @@ const decodePayload = Schema.decodeUnknownEffect(SnapshotPayload, { onExcessProp
 const encodePayload = Schema.encodeSync(SnapshotPayload)
 
 /** @experimental Encode one snapshot payload as the closed JSON a registration carries. */
-export const encode = (state: HarnessState): typeof SnapshotPayload.Encoded => encodePayload(snapshot(state).payload)
+export const encode = (state: GuidanceState): typeof SnapshotPayload.Encoded => encodePayload(snapshot(state).payload)
 
 /** @experimental Reconstruct the exact state one pinned snapshot identifies. */
 export const decode: {
   (
     payload: typeof SnapshotPayload.Encoded,
-  ): (id: HarnessSnapshotId) => Effect.Effect<HarnessState, SnapshotInvalid | SnapshotMismatch>
+  ): (id: GuidanceSnapshotId) => Effect.Effect<GuidanceState, SnapshotInvalid | SnapshotMismatch>
   (
-    id: HarnessSnapshotId,
+    id: GuidanceSnapshotId,
     payload: typeof SnapshotPayload.Encoded,
-  ): Effect.Effect<HarnessState, SnapshotInvalid | SnapshotMismatch>
+  ): Effect.Effect<GuidanceState, SnapshotInvalid | SnapshotMismatch>
 } = Function.dual(
   2,
   (
-    id: HarnessSnapshotId,
+    id: GuidanceSnapshotId,
     payload: typeof SnapshotPayload.Encoded,
-  ): Effect.Effect<HarnessState, SnapshotInvalid | SnapshotMismatch> =>
+  ): Effect.Effect<GuidanceState, SnapshotInvalid | SnapshotMismatch> =>
     decodePayload(payload).pipe(
       Effect.mapError((error) => SnapshotInvalid.make({ message: String(error) })),
       Effect.flatMap((decoded) => {

@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import type { ExecutionClaim, Interface as RunStore } from "../run/store.js"
+import type { ExecutionClaim, Service as RunStore } from "../run/store.js"
 
 const releaseAfter = <A, E, R>(
   store: RunStore,

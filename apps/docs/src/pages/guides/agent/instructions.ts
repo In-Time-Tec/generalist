@@ -7,13 +7,13 @@ export const instructions = definePage({
   title: "How to compose instructions and context sources",
   navTitle: "Instructions",
   group: "Guides",
-  description: "Register ordered baseline ContextSources with Instructions.layer and load AGENTS.md files as sources.",
+  description: "Register ordered baseline sources with Instructions.layer and load AGENTS.md files as sources.",
   content: [
     p(
       "The ",
       code("Instructions"),
       " service replaces a single instruction string with an ordered registry of ",
-      code("ContextSource"),
+      code("Source"),
       " values. At run start the loop opens a context epoch and baseline sources render once into the system message. Persona, house style, and repository files compose as sources instead of string concatenation.",
     ),
     h2("register-sources", "1. Register ordered sources"),

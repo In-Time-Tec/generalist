@@ -1,20 +1,20 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../../prose"
-export const harnessReference = definePage({
-  path: "/docs/reference/harness",
-  title: "tenetkit/harness",
-  navTitle: "harness",
+export const agentGuidanceReference = definePage({
+  path: "/docs/reference/agent-guidance",
+  title: "tenetkit/agent-guidance",
+  navTitle: "agent guidance",
   group: "Reference",
   description:
-    "The continual harness engine: versioned entries, audited refinements, rollback, scope merge, bounded overview, and content-addressed snapshots.",
+    "The agent-guidance engine: versioned entries, audited refinements, rollback, scope merge, bounded overview, and content-addressed snapshots.",
   content: [
     lead(
-      "tenetkit/harness is the generic engine for agent guidance an agent may refine and a host may pin into a later Execution. It owns entry identity, versions, atomic proposals, rollback, scope overlay, bounded prompt overviews, and snapshot identity. Store locations, scope policy, and refine flows stay host-owned.",
+      "tenetkit/agent-guidance is the generic engine for agent guidance an agent may refine and a host may pin into a later Execution. It owns entry identity, versions, atomic proposals, rollback, scope overlay, bounded prompt overviews, and snapshot identity. Store locations, scope policy, and refine flows stay host-owned.",
     ),
-    command("Install", "bun add tenetkit tenetkit/harness"),
+    command("Install", "bun add tenetkit tenetkit/agent-guidance"),
     p("Requires ", code("tenetkit"), "."),
     h2("entries", "Entry kinds"),
     p(
-      "One harness state holds four kinds of entry, each keyed by ",
+      "One guidance state holds four kinds of entry, each keyed by ",
       code("id"),
       " within its kind. An id may repeat across kinds.",
     ),
@@ -154,12 +154,12 @@ export const harnessReference = definePage({
     ),
     h2("merge", "Scope merge"),
     p(
-      code("HarnessMerge.mergeStates(outer, inner)"),
+      code("Merge.mergeStates(outer, inner)"),
       " overlays one scope on another. An inner entry wins over an outer entry of the same kind and id, an override applies only within a kind, every surviving entry keeps the scope that authored it, and the merged state takes the inner scope. Refinement history merges by instant, then scope, then proposal id, so the result is deterministic.",
     ),
     h2("overview", "Bounded prompt overview"),
     p(
-      code("HarnessOverview.formatOverview(state, options?)"),
+      code("Overview.formatOverview(state, options?)"),
       " renders the compact overview a system prompt carries. Its size depends only on ",
       code("maxEntriesPerKind"),
       ", ",
@@ -168,21 +168,21 @@ export const harnessReference = definePage({
       code("maxTitleLength"),
       ", and ",
       code("maxRefinements"),
-      " — never on how many entries or refinements the state holds — so a growing harness cannot grow the prompt. Selection is id-sorted and kinds render in canonical order, so the same state always renders the same text. Full entries are read on demand from the state itself.",
+      " — never on how many entries or refinements the state holds — so growing guidance cannot grow the prompt. Selection is id-sorted and kinds render in canonical order, so the same state always renders the same text. Full entries are read on demand from the state itself.",
     ),
     h2("snapshot", "Snapshot identity"),
     p(
-      code("HarnessSnapshot.snapshot(state)"),
+      code("Snapshot.snapshot(state)"),
       " pins one exact state as ",
-      code("harness-snapshot:v1:sha256:<digest>"),
+      code("guidance-snapshot:v1:sha256:<digest>"),
       " over the schema version, scope, and encoded entries. Refinement history is audit data and stays outside the identity, so recording an event does not change what a snapshot means. ",
-      code("HarnessSnapshot.encode"),
+      code("Snapshot.encode"),
       " produces the closed-JSON payload a durable host records in an executable registration under codec ",
-      code("tenetkit/harness/snapshot"),
+      code("tenetkit/agent-guidance/snapshot"),
       ", version ",
       code("1"),
       ", and ",
-      code("HarnessSnapshot.decode(id, payload)"),
+      code("Snapshot.decode(id, payload)"),
       " reconstructs the exact state or fails ",
       code("SnapshotMismatch"),
       " or ",
@@ -191,9 +191,9 @@ export const harnessReference = definePage({
     ),
     h2("store", "Store port and layers"),
     p(
-      code("HarnessStore"),
+      code("Store"),
       " is the load and save seam, keyed by scope. Loading an unknown scope yields an empty state; every other failure is a typed ",
-      code("HarnessStoreError"),
+      code("StoreError"),
       " carrying ",
       code('reason: "corrupt" | "encode" | "unreadable" | "unwritable"'),
       ".",
@@ -201,12 +201,9 @@ export const harnessReference = definePage({
     table(
       ["Layer", "Use"],
       [
-        [[code("HarnessStore.layerMemory")], "In-process state for tests and hosts without durable storage"],
-        [[code("HarnessStore.layerTest")], "A supplied implementation for exercising host behavior"],
-        [
-          [code("FileSystemHarnessStore.layer({ path })")],
-          ["Durable state over ", code("FileSystem"), " and ", code("Path")],
-        ],
+        [[code("Store.layerMemory")], "In-process state for tests and hosts without durable storage"],
+        [[code("Store.layerTest")], "A supplied implementation for exercising host behavior"],
+        [[code("FileSystemStore.layer({ path })")], ["Durable state over ", code("FileSystem"), " and ", code("Path")]],
       ],
     ),
     p(

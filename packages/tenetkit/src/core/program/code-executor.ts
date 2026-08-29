@@ -27,7 +27,7 @@ export const CapabilityGrant = Schema.Struct({
 /** @experimental */
 export type CapabilityGrant = typeof CapabilityGrant.Type
 
-/** @experimental Canonical protocol version implemented by SandboxExecutor adapters. */
+/** @experimental Canonical protocol version implemented by CodeExecutor adapters. */
 export const protocolVersion = "1" as const
 
 /** @experimental Complete immutable reconstruction request for one sandbox invocation. */
@@ -134,14 +134,14 @@ export const Identity = Schema.Record(Schema.String, Schema.Json)
 export type Identity = typeof Identity.Type
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly identity: Identity
   readonly execute: (request: Request) => Effect.Effect<Result, ExecutionFailure, ProgramCapabilities | Scope.Scope>
 }
 
 /** @experimental Host-supplied isolated source executor. */
-export class SandboxExecutor extends Context.Service<SandboxExecutor, Interface>()(
-  "tenetkit/core/program/sandbox-executor/SandboxExecutor",
+export class CodeExecutor extends Context.Service<CodeExecutor, Service>()(
+  "tenetkit/core/program/code-executor/CodeExecutor",
 ) {}
 
 /** @experimental Compute the sole digest representation for normalized source. */
@@ -214,7 +214,7 @@ export const request = (input: {
 /** @experimental Identity carried by trusted fixture executors. */
 export const testIdentity: Identity = Object.freeze({
   language: "javascript",
-  implementation: "tenetkit/SandboxExecutor/test",
+  implementation: "tenetkit/CodeExecutor/test",
   version: "1",
 })
 
@@ -225,12 +225,12 @@ export type TestExecute = (
 
 /** @experimental Trusted fixture executor for tests only. */
 export const make: {
-  (identity?: Identity): (execute: TestExecute) => Interface
-  (execute: TestExecute, identity?: Identity): Interface
+  (identity?: Identity): (execute: TestExecute) => Service
+  (execute: TestExecute, identity?: Identity): Service
 } = Function.dual(
   (args) => args.length > 1 || !Schema.is(Identity)(args[0]),
-  (execute: TestExecute, identity: Identity = testIdentity): Interface =>
-    SandboxExecutor.of({
+  (execute: TestExecute, identity: Identity = testIdentity): Service =>
+    CodeExecutor.of({
       identity: Object.freeze({ ...identity }),
       execute: (sandboxRequest) =>
         execute(sandboxRequest).pipe(
@@ -252,10 +252,10 @@ export const make: {
 
 /** @experimental Trusted fixture Layer for tests only. It provides no source isolation. */
 export const layerTest: {
-  (identity?: Identity): (execute: TestExecute) => Layer.Layer<SandboxExecutor>
-  (execute: TestExecute, identity?: Identity): Layer.Layer<SandboxExecutor>
+  (identity?: Identity): (execute: TestExecute) => Layer.Layer<CodeExecutor>
+  (execute: TestExecute, identity?: Identity): Layer.Layer<CodeExecutor>
 } = Function.dual(
   (args) => args.length > 1 || !Schema.is(Identity)(args[0]),
-  (execute: TestExecute, identity?: Identity): Layer.Layer<SandboxExecutor> =>
-    Layer.succeed(SandboxExecutor, make(execute, identity)),
+  (execute: TestExecute, identity?: Identity): Layer.Layer<CodeExecutor> =>
+    Layer.succeed(CodeExecutor, make(execute, identity)),
 )

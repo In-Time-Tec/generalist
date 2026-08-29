@@ -34,4 +34,4 @@ const admitWithHostRow = Effect.gen(function* () {
 
 Runtime admission nests through the exact same Effect SQL transaction service, so nested use keeps Effect SQL savepoint behavior. PostgreSQL notifications run on that transaction connection and become visible only after the outermost commit; rollback removes both host and Runtime rows without emitting a notification.
 
-`layerPostgres(options)` remains the convenient URL-backed constructor. Schema deployment stays separate through `RunSchema.plan`, `RunSchema.check`, and `RunSchema.apply`.
+`layer(options)` accepts either URL-backed `UrlOptions` or `Options` with a caller-provided client. Schema deployment stays separate through `RunSchema.plan`, `RunSchema.check`, and `RunSchema.apply`.

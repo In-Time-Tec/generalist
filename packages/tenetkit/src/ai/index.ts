@@ -21,9 +21,9 @@ export namespace Anthropic {
   export type layer = typeof import("./provider/anthropic.js").layer
   export type registration = typeof import("./provider/anthropic.js").registration
   export type layerConfig = typeof import("./provider/anthropic.js").layerConfig
-  export type AnthropicInput = import("./provider/anthropic.js").AnthropicInput
+  export type Options = import("./provider/anthropic.js").Options
   export type Config = import("./provider/anthropic.js").Config
-  export type LayerOptions = import("./provider/anthropic.js").LayerOptions
+  export type ClientOptions = import("./provider/anthropic.js").ClientOptions
 }
 import {
   Client as amazonBedrockClient,
@@ -77,32 +77,32 @@ export namespace AmazonBedrock {
   export type Config = import("./provider/bedrock/service.js").Config
   export type Credential = import("./provider/bedrock/service.js").Credential
   export type Credentials = import("./provider/bedrock/service.js").Credentials
-  export type Input = import("./provider/bedrock/service.js").Input
-  export type Interface = import("./provider/bedrock/service.js").Interface
   export type Options = import("./provider/bedrock/service.js").Options
+  export type Service = import("./provider/bedrock/service.js").Service
+  export type ClientOptions = import("./provider/bedrock/service.js").ClientOptions
   export type Recovery = import("./provider/bedrock/service.js").Recovery
 }
 import {
-  ModelMetadataNotFound as Catalog_ModelMetadataNotFound,
-  ModelCatalog as Catalog_ModelCatalog,
-  bundled as Catalog_bundled,
-  layer as Catalog_layer,
-  layerTest as Catalog_layerTest,
-  lookup as Catalog_lookup,
-  require as Catalog_require,
-  all as Catalog_all,
+  ModelMetadataNotFound as ModelCatalog_ModelMetadataNotFound,
+  ModelCatalog as ModelCatalog_ModelCatalog,
+  bundled as ModelCatalog_bundled,
+  layer as ModelCatalog_layer,
+  layerTest as ModelCatalog_layerTest,
+  lookup as ModelCatalog_lookup,
+  require as ModelCatalog_require,
+  all as ModelCatalog_all,
 } from "./catalog/service.js"
-export const Catalog = {
-  ModelMetadataNotFound: Catalog_ModelMetadataNotFound,
-  ModelCatalog: Catalog_ModelCatalog,
-  bundled: Catalog_bundled,
-  layer: Catalog_layer,
-  layerTest: Catalog_layerTest,
-  lookup: Catalog_lookup,
-  require: Catalog_require,
-  all: Catalog_all,
+export const ModelCatalog = {
+  ModelMetadataNotFound: ModelCatalog_ModelMetadataNotFound,
+  ModelCatalog: ModelCatalog_ModelCatalog,
+  bundled: ModelCatalog_bundled,
+  layer: ModelCatalog_layer,
+  layerTest: ModelCatalog_layerTest,
+  lookup: ModelCatalog_lookup,
+  require: ModelCatalog_require,
+  all: ModelCatalog_all,
 }
-export namespace Catalog {
+export namespace ModelCatalog {
   export type ModelMetadataNotFound = import("./catalog/service.js").ModelMetadataNotFound
   export type ModelCatalog = import("./catalog/service.js").ModelCatalog
   export type bundled = typeof import("./catalog/service.js").bundled
@@ -111,25 +111,25 @@ export namespace Catalog {
   export type lookup = typeof import("./catalog/service.js").lookup
   export type require = typeof import("./catalog/service.js").require
   export type all = typeof import("./catalog/service.js").all
-  export type Interface = import("./catalog/service.js").Interface
+  export type Service = import("./catalog/service.js").Service
   export type ModelMetadata = import("./catalog/service.js").ModelMetadata
 }
 import {
   registration as Deterministic_registration,
   layer as Deterministic_layer,
-  layerOpenAi as Deterministic_layerOpenAi,
+  layerOpenAI as Deterministic_layerOpenAI,
 } from "./provider/deterministic.js"
 export const Deterministic = {
   registration: Deterministic_registration,
   layer: Deterministic_layer,
-  layerOpenAi: Deterministic_layerOpenAi,
+  layerOpenAI: Deterministic_layerOpenAI,
 }
 export namespace Deterministic {
   export type registration = typeof import("./provider/deterministic.js").registration
   export type layer = typeof import("./provider/deterministic.js").layer
-  export type layerOpenAi = typeof import("./provider/deterministic.js").layerOpenAi
-  export type DeterministicInput = import("./provider/deterministic.js").DeterministicInput
-  export type OpenAiFallbackOptions = import("./provider/deterministic.js").OpenAiFallbackOptions
+  export type layerOpenAI = typeof import("./provider/deterministic.js").layerOpenAI
+  export type Options = import("./provider/deterministic.js").Options
+  export type OpenAIFallbackOptions = import("./provider/deterministic.js").OpenAIFallbackOptions
 }
 import { layer as Embedding_layer, layerCompatible as Embedding_layerCompatible } from "./model/embedding.js"
 export const Embedding = {
@@ -139,8 +139,8 @@ export const Embedding = {
 export namespace Embedding {
   export type layer = typeof import("./model/embedding.js").layer
   export type layerCompatible = typeof import("./model/embedding.js").layerCompatible
-  export type OpenAiCompatibleEmbeddingInput = import("./model/embedding.js").OpenAiCompatibleEmbeddingInput
-  export type OpenAiEmbeddingInput = import("./model/embedding.js").OpenAiEmbeddingInput
+  export type OpenAICompatibleOptions = import("./model/embedding.js").OpenAICompatibleOptions
+  export type OpenAIOptions = import("./model/embedding.js").OpenAIOptions
 }
 import {
   AvailabilitySemanticsMissing as ModelRoute_AvailabilitySemanticsMissing,
@@ -157,36 +157,36 @@ export namespace ModelRoute {
   export type Route = import("./model/route.js").Route
 }
 import {
-  classifyFailure as OpenAi_classifyFailure,
-  decodeConfig as OpenAi_decodeConfig,
-  toolJsonSchemaCompiler as OpenAi_toolJsonSchemaCompiler,
-  layer as OpenAi_layer,
-  registration as OpenAi_registration,
-  normalizeResponsesSse as OpenAi_normalizeResponsesSse,
-  layerConfig as OpenAi_layerConfig,
+  classifyFailure as OpenAI_classifyFailure,
+  decodeConfig as OpenAI_decodeConfig,
+  toolJsonSchemaCompiler as OpenAI_toolJsonSchemaCompiler,
+  layer as OpenAI_layer,
+  registration as OpenAI_registration,
+  normalizeResponsesSse as OpenAI_normalizeResponsesSse,
+  layerConfig as OpenAI_layerConfig,
 } from "./provider/openai.js"
 import {
-  OpenAiAccountCredentialError as OpenAi_OpenAiAccountCredentialError,
-  credentialsFromAccountAuth as OpenAi_credentialsFromAccountAuth,
-  registrationAccount as OpenAi_registrationAccount,
-  layerAccount as OpenAi_layerAccount,
-  layerAccountClient as OpenAi_layerAccountClient,
+  OpenAIAccountCredentialError as OpenAI_OpenAIAccountCredentialError,
+  credentialsFromAccountAuth as OpenAI_credentialsFromAccountAuth,
+  registrationAccount as OpenAI_registrationAccount,
+  layerAccount as OpenAI_layerAccount,
+  layerAccountClient as OpenAI_layerAccountClient,
 } from "./provider/openai-account.js"
-export const OpenAi = {
-  classifyFailure: OpenAi_classifyFailure,
-  decodeConfig: OpenAi_decodeConfig,
-  toolJsonSchemaCompiler: OpenAi_toolJsonSchemaCompiler,
-  layer: OpenAi_layer,
-  registration: OpenAi_registration,
-  normalizeResponsesSse: OpenAi_normalizeResponsesSse,
-  layerConfig: OpenAi_layerConfig,
-  OpenAiAccountCredentialError: OpenAi_OpenAiAccountCredentialError,
-  credentialsFromAccountAuth: OpenAi_credentialsFromAccountAuth,
-  registrationAccount: OpenAi_registrationAccount,
-  layerAccount: OpenAi_layerAccount,
-  layerAccountClient: OpenAi_layerAccountClient,
+export const OpenAI = {
+  classifyFailure: OpenAI_classifyFailure,
+  decodeConfig: OpenAI_decodeConfig,
+  toolJsonSchemaCompiler: OpenAI_toolJsonSchemaCompiler,
+  layer: OpenAI_layer,
+  registration: OpenAI_registration,
+  normalizeResponsesSse: OpenAI_normalizeResponsesSse,
+  layerConfig: OpenAI_layerConfig,
+  OpenAIAccountCredentialError: OpenAI_OpenAIAccountCredentialError,
+  credentialsFromAccountAuth: OpenAI_credentialsFromAccountAuth,
+  registrationAccount: OpenAI_registrationAccount,
+  layerAccount: OpenAI_layerAccount,
+  layerAccountClient: OpenAI_layerAccountClient,
 }
-export namespace OpenAi {
+export namespace OpenAI {
   export type classifyFailure = typeof import("./provider/openai.js").classifyFailure
   export type decodeConfig = typeof import("./provider/openai.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/openai.js").toolJsonSchemaCompiler
@@ -194,76 +194,76 @@ export namespace OpenAi {
   export type registration = typeof import("./provider/openai.js").registration
   export type normalizeResponsesSse = typeof import("./provider/openai.js").normalizeResponsesSse
   export type layerConfig = typeof import("./provider/openai.js").layerConfig
-  export type OpenAiAccountCredentialError = import("./provider/openai-account.js").OpenAiAccountCredentialError
+  export type OpenAIAccountCredentialError = import("./provider/openai-account.js").OpenAIAccountCredentialError
   export type credentialsFromAccountAuth = typeof import("./provider/openai-account.js").credentialsFromAccountAuth
   export type registrationAccount = typeof import("./provider/openai-account.js").registrationAccount
   export type layerAccount = typeof import("./provider/openai-account.js").layerAccount
   export type layerAccountClient = typeof import("./provider/openai-account.js").layerAccountClient
-  export type LayerOptions = import("./provider/openai.js").LayerOptions
+  export type ClientOptions = import("./provider/openai.js").ClientOptions
   export type Config = import("./provider/openai.js").Config
-  export type OpenAiAccountCredential = import("./provider/openai-account.js").OpenAiAccountCredential
-  export type OpenAiAccountCredentials = import("./provider/openai-account.js").OpenAiAccountCredentials
-  export type OpenAiAccountInput = import("./provider/openai-account.js").OpenAiAccountInput
-  export type OpenAiInput = import("./provider/openai.js").OpenAiInput
+  export type OpenAIAccountCredential = import("./provider/openai-account.js").OpenAIAccountCredential
+  export type OpenAIAccountCredentials = import("./provider/openai-account.js").OpenAIAccountCredentials
+  export type AccountOptions = import("./provider/openai-account.js").AccountOptions
+  export type Options = import("./provider/openai.js").Options
   export type RegistrationOptions = import("./provider/openai.js").RegistrationOptions
 }
 import {
-  issuer as OpenAiAccountAuth_issuer,
-  clientId as OpenAiAccountAuth_clientId,
-  redirectUri as OpenAiAccountAuth_redirectUri,
-  scopes as OpenAiAccountAuth_scopes,
-  originator as OpenAiAccountAuth_originator,
-  deviceVerificationUrl as OpenAiAccountAuth_deviceVerificationUrl,
-  deviceExchangeRedirect as OpenAiAccountAuth_deviceExchangeRedirect,
-  credentialFormatVersion as OpenAiAccountAuth_credentialFormatVersion,
-  AuthError as OpenAiAccountAuth_AuthError,
-  StoreError as OpenAiAccountAuth_StoreError,
-  OpenAiAccountAuthHost as OpenAiAccountAuth_OpenAiAccountAuthHost,
-  OpenAiAccountDevicePresenter as OpenAiAccountAuth_OpenAiAccountDevicePresenter,
-  TokenResponse as OpenAiAccountAuth_TokenResponse,
-  DeviceStartResponse as OpenAiAccountAuth_DeviceStartResponse,
-  DevicePollResponse as OpenAiAccountAuth_DevicePollResponse,
-  OpenAiAccountAuthHttp as OpenAiAccountAuth_OpenAiAccountAuthHttp,
-  CredentialDisk as OpenAiAccountAuth_CredentialDisk,
-  OpenAiAccountCredentialStore as OpenAiAccountAuth_OpenAiAccountCredentialStore,
-  authorizationUrl as OpenAiAccountAuth_authorizationUrl,
-  OpenAiAccountAuth as OpenAiAccountAuth_OpenAiAccountAuth,
-  layer as OpenAiAccountAuth_layer,
-  layerHostTest as OpenAiAccountAuth_layerHostTest,
-  layerPresenterTest as OpenAiAccountAuth_layerPresenterTest,
-  layerHttpTest as OpenAiAccountAuth_layerHttpTest,
-  layerStoreTest as OpenAiAccountAuth_layerStoreTest,
-  generatePkce as OpenAiAccountAuth_generatePkce,
+  issuer as OpenAIAccountAuth_issuer,
+  clientId as OpenAIAccountAuth_clientId,
+  redirectUri as OpenAIAccountAuth_redirectUri,
+  scopes as OpenAIAccountAuth_scopes,
+  originator as OpenAIAccountAuth_originator,
+  deviceVerificationUrl as OpenAIAccountAuth_deviceVerificationUrl,
+  deviceExchangeRedirect as OpenAIAccountAuth_deviceExchangeRedirect,
+  credentialFormatVersion as OpenAIAccountAuth_credentialFormatVersion,
+  AuthError as OpenAIAccountAuth_AuthError,
+  StoreError as OpenAIAccountAuth_StoreError,
+  OpenAIAccountAuthHost as OpenAIAccountAuth_OpenAIAccountAuthHost,
+  OpenAIAccountDevicePresenter as OpenAIAccountAuth_OpenAIAccountDevicePresenter,
+  TokenResponse as OpenAIAccountAuth_TokenResponse,
+  DeviceStartResponse as OpenAIAccountAuth_DeviceStartResponse,
+  DevicePollResponse as OpenAIAccountAuth_DevicePollResponse,
+  OpenAIAccountAuthHttp as OpenAIAccountAuth_OpenAIAccountAuthHttp,
+  CredentialDisk as OpenAIAccountAuth_CredentialDisk,
+  OpenAIAccountCredentialStore as OpenAIAccountAuth_OpenAIAccountCredentialStore,
+  authorizationUrl as OpenAIAccountAuth_authorizationUrl,
+  OpenAIAccountAuth as OpenAIAccountAuth_OpenAIAccountAuth,
+  layer as OpenAIAccountAuth_layer,
+  layerHostTest as OpenAIAccountAuth_layerHostTest,
+  layerPresenterTest as OpenAIAccountAuth_layerPresenterTest,
+  layerHttpTest as OpenAIAccountAuth_layerHttpTest,
+  layerStoreTest as OpenAIAccountAuth_layerStoreTest,
+  generatePkce as OpenAIAccountAuth_generatePkce,
 } from "./provider/openai-account-auth.js"
-export const OpenAiAccountAuth = {
-  issuer: OpenAiAccountAuth_issuer,
-  clientId: OpenAiAccountAuth_clientId,
-  redirectUri: OpenAiAccountAuth_redirectUri,
-  scopes: OpenAiAccountAuth_scopes,
-  originator: OpenAiAccountAuth_originator,
-  deviceVerificationUrl: OpenAiAccountAuth_deviceVerificationUrl,
-  deviceExchangeRedirect: OpenAiAccountAuth_deviceExchangeRedirect,
-  credentialFormatVersion: OpenAiAccountAuth_credentialFormatVersion,
-  AuthError: OpenAiAccountAuth_AuthError,
-  StoreError: OpenAiAccountAuth_StoreError,
-  OpenAiAccountAuthHost: OpenAiAccountAuth_OpenAiAccountAuthHost,
-  OpenAiAccountDevicePresenter: OpenAiAccountAuth_OpenAiAccountDevicePresenter,
-  TokenResponse: OpenAiAccountAuth_TokenResponse,
-  DeviceStartResponse: OpenAiAccountAuth_DeviceStartResponse,
-  DevicePollResponse: OpenAiAccountAuth_DevicePollResponse,
-  OpenAiAccountAuthHttp: OpenAiAccountAuth_OpenAiAccountAuthHttp,
-  CredentialDisk: OpenAiAccountAuth_CredentialDisk,
-  OpenAiAccountCredentialStore: OpenAiAccountAuth_OpenAiAccountCredentialStore,
-  generatePkce: OpenAiAccountAuth_generatePkce,
-  authorizationUrl: OpenAiAccountAuth_authorizationUrl,
-  OpenAiAccountAuth: OpenAiAccountAuth_OpenAiAccountAuth,
-  layer: OpenAiAccountAuth_layer,
-  layerHostTest: OpenAiAccountAuth_layerHostTest,
-  layerPresenterTest: OpenAiAccountAuth_layerPresenterTest,
-  layerHttpTest: OpenAiAccountAuth_layerHttpTest,
-  layerStoreTest: OpenAiAccountAuth_layerStoreTest,
+export const OpenAIAccountAuth = {
+  issuer: OpenAIAccountAuth_issuer,
+  clientId: OpenAIAccountAuth_clientId,
+  redirectUri: OpenAIAccountAuth_redirectUri,
+  scopes: OpenAIAccountAuth_scopes,
+  originator: OpenAIAccountAuth_originator,
+  deviceVerificationUrl: OpenAIAccountAuth_deviceVerificationUrl,
+  deviceExchangeRedirect: OpenAIAccountAuth_deviceExchangeRedirect,
+  credentialFormatVersion: OpenAIAccountAuth_credentialFormatVersion,
+  AuthError: OpenAIAccountAuth_AuthError,
+  StoreError: OpenAIAccountAuth_StoreError,
+  OpenAIAccountAuthHost: OpenAIAccountAuth_OpenAIAccountAuthHost,
+  OpenAIAccountDevicePresenter: OpenAIAccountAuth_OpenAIAccountDevicePresenter,
+  TokenResponse: OpenAIAccountAuth_TokenResponse,
+  DeviceStartResponse: OpenAIAccountAuth_DeviceStartResponse,
+  DevicePollResponse: OpenAIAccountAuth_DevicePollResponse,
+  OpenAIAccountAuthHttp: OpenAIAccountAuth_OpenAIAccountAuthHttp,
+  CredentialDisk: OpenAIAccountAuth_CredentialDisk,
+  OpenAIAccountCredentialStore: OpenAIAccountAuth_OpenAIAccountCredentialStore,
+  generatePkce: OpenAIAccountAuth_generatePkce,
+  authorizationUrl: OpenAIAccountAuth_authorizationUrl,
+  OpenAIAccountAuth: OpenAIAccountAuth_OpenAIAccountAuth,
+  layer: OpenAIAccountAuth_layer,
+  layerHostTest: OpenAIAccountAuth_layerHostTest,
+  layerPresenterTest: OpenAIAccountAuth_layerPresenterTest,
+  layerHttpTest: OpenAIAccountAuth_layerHttpTest,
+  layerStoreTest: OpenAIAccountAuth_layerStoreTest,
 }
-export namespace OpenAiAccountAuth {
+export namespace OpenAIAccountAuth {
   export type issuer = typeof import("./provider/openai-account-auth.js").issuer
   export type clientId = typeof import("./provider/openai-account-auth.js").clientId
   export type redirectUri = typeof import("./provider/openai-account-auth.js").redirectUri
@@ -274,17 +274,17 @@ export namespace OpenAiAccountAuth {
   export type credentialFormatVersion = typeof import("./provider/openai-account-auth.js").credentialFormatVersion
   export type AuthError = import("./provider/openai-account-auth.js").AuthError
   export type StoreError = import("./provider/openai-account-auth.js").StoreError
-  export type OpenAiAccountAuthHost = import("./provider/openai-account-auth.js").OpenAiAccountAuthHost
-  export type OpenAiAccountDevicePresenter = import("./provider/openai-account-auth.js").OpenAiAccountDevicePresenter
+  export type OpenAIAccountAuthHost = import("./provider/openai-account-auth.js").OpenAIAccountAuthHost
+  export type OpenAIAccountDevicePresenter = import("./provider/openai-account-auth.js").OpenAIAccountDevicePresenter
   export type TokenResponse = import("./provider/openai-account-auth.js").TokenResponse
   export type DeviceStartResponse = typeof import("./provider/openai-account-auth.js").DeviceStartResponse
   export type DevicePollResponse = typeof import("./provider/openai-account-auth.js").DevicePollResponse
-  export type OpenAiAccountAuthHttp = import("./provider/openai-account-auth.js").OpenAiAccountAuthHttp
+  export type OpenAIAccountAuthHttp = import("./provider/openai-account-auth.js").OpenAIAccountAuthHttp
   export type CredentialDisk = typeof import("./provider/openai-account-auth.js").CredentialDisk
-  export type OpenAiAccountCredentialStore = import("./provider/openai-account-auth.js").OpenAiAccountCredentialStore
+  export type OpenAIAccountCredentialStore = import("./provider/openai-account-auth.js").OpenAIAccountCredentialStore
   export type generatePkce = typeof import("./provider/openai-account-auth.js").generatePkce
   export type authorizationUrl = typeof import("./provider/openai-account-auth.js").authorizationUrl
-  export type OpenAiAccountAuth = import("./provider/openai-account-auth.js").OpenAiAccountAuth
+  export type OpenAIAccountAuth = import("./provider/openai-account-auth.js").OpenAIAccountAuth
   export type layer = typeof import("./provider/openai-account-auth.js").layer
   export type layerHostTest = typeof import("./provider/openai-account-auth.js").layerHostTest
   export type layerPresenterTest = typeof import("./provider/openai-account-auth.js").layerPresenterTest
@@ -294,61 +294,61 @@ export namespace OpenAiAccountAuth {
   export type Credential = import("./provider/openai-account-auth.js").Credential
   export type DevicePrompt = import("./provider/openai-account-auth.js").DevicePrompt
   export type Error = import("./provider/openai-account-auth.js").Error
-  export type HostInterface = import("./provider/openai-account-auth.js").HostInterface
-  export type HttpInterface = import("./provider/openai-account-auth.js").HttpInterface
-  export type PresenterInterface = import("./provider/openai-account-auth.js").PresenterInterface
-  export type ServiceInterface = import("./provider/openai-account-auth.js").ServiceInterface
+  export type HostService = import("./provider/openai-account-auth.js").HostService
+  export type HttpService = import("./provider/openai-account-auth.js").HttpService
+  export type PresenterService = import("./provider/openai-account-auth.js").PresenterService
+  export type AuthService = import("./provider/openai-account-auth.js").AuthService
   export type Status = import("./provider/openai-account-auth.js").Status
-  export type StoreInterface = import("./provider/openai-account-auth.js").StoreInterface
+  export type StoreService = import("./provider/openai-account-auth.js").StoreService
   export type TimingOptions = import("./provider/openai-account-auth.js").TimingOptions
 }
-import { layer as OpenAiAccountAuthHttp_layer } from "./provider/openai-account-auth-http.js"
-export const OpenAiAccountAuthHttp = {
-  layer: OpenAiAccountAuthHttp_layer,
+import { layer as OpenAIAccountAuthHttp_layer } from "./provider/openai-account-auth-http.js"
+export const OpenAIAccountAuthHttp = {
+  layer: OpenAIAccountAuthHttp_layer,
 }
-export namespace OpenAiAccountAuthHttp {
+export namespace OpenAIAccountAuthHttp {
   export type layer = typeof import("./provider/openai-account-auth-http.js").layer
 }
 import {
-  decodeConfig as OpenAiChatCompletions_decodeConfig,
-  toolJsonSchemaCompiler as OpenAiChatCompletions_toolJsonSchemaCompiler,
-  layer as OpenAiChatCompletions_layer,
-  layerConfig as OpenAiChatCompletions_layerConfig,
+  decodeConfig as OpenAIChatCompletions_decodeConfig,
+  toolJsonSchemaCompiler as OpenAIChatCompletions_toolJsonSchemaCompiler,
+  layer as OpenAIChatCompletions_layer,
+  layerConfig as OpenAIChatCompletions_layerConfig,
 } from "./provider/openai-chat-completions.js"
-export const OpenAiChatCompletions = {
-  decodeConfig: OpenAiChatCompletions_decodeConfig,
-  toolJsonSchemaCompiler: OpenAiChatCompletions_toolJsonSchemaCompiler,
-  layer: OpenAiChatCompletions_layer,
-  layerConfig: OpenAiChatCompletions_layerConfig,
+export const OpenAIChatCompletions = {
+  decodeConfig: OpenAIChatCompletions_decodeConfig,
+  toolJsonSchemaCompiler: OpenAIChatCompletions_toolJsonSchemaCompiler,
+  layer: OpenAIChatCompletions_layer,
+  layerConfig: OpenAIChatCompletions_layerConfig,
 }
-export namespace OpenAiChatCompletions {
+export namespace OpenAIChatCompletions {
   export type decodeConfig = typeof import("./provider/openai-chat-completions.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/openai-chat-completions.js").toolJsonSchemaCompiler
   export type layer = typeof import("./provider/openai-chat-completions.js").layer
   export type layerConfig = typeof import("./provider/openai-chat-completions.js").layerConfig
   export type Config = import("./provider/openai-chat-completions.js").Config
-  export type LayerOptions = import("./provider/openai-chat-completions.js").LayerOptions
-  export type OpenAiChatCompletionsInput = import("./provider/openai-chat-completions.js").OpenAiChatCompletionsInput
+  export type ClientOptions = import("./provider/openai-chat-completions.js").ClientOptions
+  export type Options = import("./provider/openai-chat-completions.js").Options
 }
 import {
-  decodeConfig as OpenAiResponses_decodeConfig,
-  toolJsonSchemaCompiler as OpenAiResponses_toolJsonSchemaCompiler,
-  layer as OpenAiResponses_layer,
-  layerConfig as OpenAiResponses_layerConfig,
+  decodeConfig as OpenAIResponses_decodeConfig,
+  toolJsonSchemaCompiler as OpenAIResponses_toolJsonSchemaCompiler,
+  layer as OpenAIResponses_layer,
+  layerConfig as OpenAIResponses_layerConfig,
 } from "./provider/openai-responses.js"
-export const OpenAiResponses = {
-  decodeConfig: OpenAiResponses_decodeConfig,
-  toolJsonSchemaCompiler: OpenAiResponses_toolJsonSchemaCompiler,
-  layer: OpenAiResponses_layer,
-  layerConfig: OpenAiResponses_layerConfig,
+export const OpenAIResponses = {
+  decodeConfig: OpenAIResponses_decodeConfig,
+  toolJsonSchemaCompiler: OpenAIResponses_toolJsonSchemaCompiler,
+  layer: OpenAIResponses_layer,
+  layerConfig: OpenAIResponses_layerConfig,
 }
-export namespace OpenAiResponses {
+export namespace OpenAIResponses {
   export type decodeConfig = typeof import("./provider/openai-responses.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/openai-responses.js").toolJsonSchemaCompiler
   export type layer = typeof import("./provider/openai-responses.js").layer
   export type layerConfig = typeof import("./provider/openai-responses.js").layerConfig
-  export type LayerOptions = import("./provider/openai-responses.js").LayerOptions
-  export type OpenAiResponsesInput = import("./provider/openai-responses.js").OpenAiResponsesInput
+  export type ClientOptions = import("./provider/openai-responses.js").ClientOptions
+  export type Options = import("./provider/openai-responses.js").Options
 }
 import {
   classifyFailure as OpenRouter_classifyFailure,
@@ -370,35 +370,35 @@ export namespace OpenRouter {
   export type layer = typeof import("./provider/openrouter.js").layer
   export type layerConfig = typeof import("./provider/openrouter.js").layerConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/openrouter.js").toolJsonSchemaCompiler
-  export type LayerOptions = import("./provider/openrouter.js").LayerOptions
-  export type OpenRouterInput = import("./provider/openrouter.js").OpenRouterInput
+  export type ClientOptions = import("./provider/openrouter.js").ClientOptions
+  export type Options = import("./provider/openrouter.js").Options
 }
 import {
-  layerGroq as Presets_layerGroq,
-  layerMistral as Presets_layerMistral,
-  layerXai as Presets_layerXai,
-  layerDeepseek as Presets_layerDeepseek,
-  layerGoogleAiStudio as Presets_layerGoogleAiStudio,
-  layerAzureOpenAi as Presets_layerAzureOpenAi,
-  layerOllama as Presets_layerOllama,
+  layerGroq as OpenAICompatible_layerGroq,
+  layerMistral as OpenAICompatible_layerMistral,
+  layerXai as OpenAICompatible_layerXai,
+  layerDeepseek as OpenAICompatible_layerDeepseek,
+  layerGoogleAiStudio as OpenAICompatible_layerGoogleAiStudio,
+  layerAzureOpenAI as OpenAICompatible_layerAzureOpenAI,
+  layerOllama as OpenAICompatible_layerOllama,
 } from "./catalog/presets.js"
-export const Presets = {
-  layerGroq: Presets_layerGroq,
-  layerMistral: Presets_layerMistral,
-  layerXai: Presets_layerXai,
-  layerDeepseek: Presets_layerDeepseek,
-  layerGoogleAiStudio: Presets_layerGoogleAiStudio,
-  layerAzureOpenAi: Presets_layerAzureOpenAi,
-  layerOllama: Presets_layerOllama,
+export const OpenAICompatible = {
+  layerGroq: OpenAICompatible_layerGroq,
+  layerMistral: OpenAICompatible_layerMistral,
+  layerXai: OpenAICompatible_layerXai,
+  layerDeepseek: OpenAICompatible_layerDeepseek,
+  layerGoogleAiStudio: OpenAICompatible_layerGoogleAiStudio,
+  layerAzureOpenAI: OpenAICompatible_layerAzureOpenAI,
+  layerOllama: OpenAICompatible_layerOllama,
 }
-export namespace Presets {
+export namespace OpenAICompatible {
   export type layerGroq = typeof import("./catalog/presets.js").layerGroq
   export type layerMistral = typeof import("./catalog/presets.js").layerMistral
   export type layerXai = typeof import("./catalog/presets.js").layerXai
   export type layerDeepseek = typeof import("./catalog/presets.js").layerDeepseek
   export type layerGoogleAiStudio = typeof import("./catalog/presets.js").layerGoogleAiStudio
-  export type layerAzureOpenAi = typeof import("./catalog/presets.js").layerAzureOpenAi
+  export type layerAzureOpenAI = typeof import("./catalog/presets.js").layerAzureOpenAI
   export type layerOllama = typeof import("./catalog/presets.js").layerOllama
-  export type AzureOpenAiInput = import("./catalog/presets.js").AzureOpenAiInput
-  export type PresetInput = import("./catalog/presets.js").PresetInput
+  export type AzureOptions = import("./catalog/presets.js").AzureOptions
+  export type Options = import("./catalog/presets.js").Options
 }

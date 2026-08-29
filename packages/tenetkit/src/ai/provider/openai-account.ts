@@ -1,8 +1,8 @@
-import { OpenAiClient, type OpenAiSchema } from "@effect/ai-openai"
+import { OpenAiClient as OpenAIClient, type OpenAiSchema as OpenAISchema } from "@effect/ai-openai"
 import { ModelRegistry } from "../../core/index.js"
 import { Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
-import type { Credential, ServiceInterface } from "./openai-account-auth.js"
+import type { Credential, AuthService } from "./openai-account-auth.js"
 import {
   type Config,
   type RegistrationOptions,
@@ -27,33 +27,33 @@ const openAiAccountResponsesUrl = `${openAiAccountApiUrl}/responses`
 const openAiAccountIdHeader = "ChatGPT-Account-ID"
 
 /** @experimental */
-export interface OpenAiAccountCredential {
+export interface OpenAIAccountCredential {
   readonly accessToken: Redacted.Redacted<string>
   readonly accountId: string
   readonly generation: string
 }
 
 /** @experimental */
-export class OpenAiAccountCredentialError extends Schema.TaggedError<OpenAiAccountCredentialError>()(
-  "tenetkit/ai/OpenAiAccountCredentialError",
+export class OpenAIAccountCredentialError extends Schema.TaggedError<OpenAIAccountCredentialError>()(
+  "tenetkit/ai/OpenAIAccountCredentialError",
   {
     operation: Schema.Literals(["acquire", "refreshRejected"]),
   },
 ) {}
 
 /** @experimental */
-export interface OpenAiAccountCredentials {
-  readonly acquire: Effect.Effect<OpenAiAccountCredential, OpenAiAccountCredentialError>
-  readonly refreshRejected: (generation: string) => Effect.Effect<OpenAiAccountCredential, OpenAiAccountCredentialError>
+export interface OpenAIAccountCredentials {
+  readonly acquire: Effect.Effect<OpenAIAccountCredential, OpenAIAccountCredentialError>
+  readonly refreshRejected: (generation: string) => Effect.Effect<OpenAIAccountCredential, OpenAIAccountCredentialError>
 }
 
 const credentialsFromAccountAuthImpl = (
-  service: ServiceInterface,
+  service: AuthService,
   expectedFingerprint: string,
-): OpenAiAccountCredentials => {
-  const mapCredential = (operation: OpenAiAccountCredentialError["operation"]) =>
-    Effect.mapError(() => OpenAiAccountCredentialError.make({ operation }))
-  const accountCredential = (operation: OpenAiAccountCredentialError["operation"]) =>
+): OpenAIAccountCredentials => {
+  const mapCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
+    Effect.mapError(() => OpenAIAccountCredentialError.make({ operation }))
+  const accountCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
     Effect.flatMap((credential: Credential) =>
       credential.fingerprint === expectedFingerprint
         ? Effect.succeed({
@@ -61,7 +61,7 @@ const credentialsFromAccountAuthImpl = (
             accountId: Redacted.value(credential.accountId),
             generation: credential.generation,
           })
-        : Effect.fail(OpenAiAccountCredentialError.make({ operation })),
+        : Effect.fail(OpenAIAccountCredentialError.make({ operation })),
     )
   return {
     acquire: service.acquire.pipe(accountCredential("acquire"), mapCredential("acquire")),
@@ -72,20 +72,20 @@ const credentialsFromAccountAuthImpl = (
 
 /** @experimental */
 export const credentialsFromAccountAuth: {
-  (service: ServiceInterface, expectedFingerprint: string): OpenAiAccountCredentials
-  (expectedFingerprint: string): (service: ServiceInterface) => OpenAiAccountCredentials
+  (service: AuthService, expectedFingerprint: string): OpenAIAccountCredentials
+  (expectedFingerprint: string): (service: AuthService) => OpenAIAccountCredentials
 } = Function.dual(2, credentialsFromAccountAuthImpl)
 
 /** @experimental */
-export interface OpenAiAccountInput extends RegistrationOptions {
-  readonly model: (string & {}) | OpenAiLanguageModelModel
-  readonly credentials: OpenAiAccountCredentials
+export interface AccountOptions extends RegistrationOptions {
+  readonly model: (string & {}) | OpenAILanguageModelModel
+  readonly credentials: OpenAIAccountCredentials
   readonly config?: Config
 }
 
-type OpenAiLanguageModelModel = Parameters<typeof openAiLanguageModelLayer>[0]["model"]
+type OpenAILanguageModelModel = Parameters<typeof openAiLanguageModelLayer>[0]["model"]
 
-const credentialFailure = (request: HttpClientRequest.HttpClientRequest, error: OpenAiAccountCredentialError) =>
+const credentialFailure = (request: HttpClientRequest.HttpClientRequest, error: OpenAIAccountCredentialError) =>
   new HttpClientError.HttpClientError({
     reason: new HttpClientError.TransportError({
       request,
@@ -94,7 +94,7 @@ const credentialFailure = (request: HttpClientRequest.HttpClientRequest, error: 
     }),
   })
 
-const withCredential = (request: HttpClientRequest.HttpClientRequest, credential: OpenAiAccountCredential) =>
+const withCredential = (request: HttpClientRequest.HttpClientRequest, credential: OpenAIAccountCredential) =>
   request.pipe(
     HttpClientRequest.setUrl(openAiAccountResponsesUrl),
     HttpClientRequest.bearerToken(credential.accessToken),
@@ -105,14 +105,14 @@ const withCredential = (request: HttpClientRequest.HttpClientRequest, credential
 const executeWithCredential = (
   client: HttpClient.HttpClient,
   request: HttpClientRequest.HttpClientRequest,
-  credential: OpenAiAccountCredential,
+  credential: OpenAIAccountCredential,
 ): Effect.Effect<HttpClientResponse.HttpClientResponse, HttpClientError.HttpClientError> =>
   client.postprocess(Effect.succeed(withCredential(request, credential))).pipe(
     Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" }),
     Effect.updateService(Headers.CurrentRedactedNames, (names) => [...names, openAiAccountIdHeader]),
   )
 
-const accountClientTransform = (credentials: OpenAiAccountCredentials) => (client: HttpClient.HttpClient) =>
+const accountClientTransform = (credentials: OpenAIAccountCredentials) => (client: HttpClient.HttpClient) =>
   HttpClient.transform(client, (_, request) =>
     credentials.acquire.pipe(
       Effect.mapError((error) => credentialFailure(request, error)),
@@ -138,14 +138,14 @@ const accountClientTransform = (credentials: OpenAiAccountCredentials) => (clien
 const withAccountHeaderRedaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.updateService(Headers.CurrentRedactedNames, (names) => [...names, openAiAccountIdHeader]))
 
-const withoutOpenAiSocket = <A, E>(effect: Effect.Effect<A, E>) =>
-  effect.pipe(Effect.provideService(OpenAiClient.OpenAiSocket, undefined!))
+const withoutOpenAISocket = <A, E>(effect: Effect.Effect<A, E>) =>
+  effect.pipe(Effect.provideService(OpenAIClient.OpenAiSocket, undefined!))
 
 const accountError = (method: string, reason: AiError.AiErrorReason) =>
-  AiError.make({ module: "OpenAiClient", method, reason })
+  AiError.make({ module: "OpenAIClient", method, reason })
 
-type ResponseStreamEvent = OpenAiSchema.ResponseStreamEvent
-type FoldedResponse = OpenAiSchema.Response
+type ResponseStreamEvent = OpenAISchema.ResponseStreamEvent
+type FoldedResponse = OpenAISchema.Response
 type TerminalEvent = Extract<ResponseStreamEvent, { readonly type: "response.completed" | "response.incomplete" }>
 
 const isTerminalEvent = (event: ResponseStreamEvent): event is TerminalEvent =>
@@ -165,11 +165,11 @@ const terminalResponse = (event: ResponseStreamEvent): FoldedResponse | undefine
  * non-streaming `Response`.
  */
 const foldedCreateResponse =
-  (client: OpenAiClient.Service): OpenAiClient.Service["createResponse"] =>
+  (client: OpenAIClient.Service): OpenAIClient.Service["createResponse"] =>
   (options) => {
     const { stream: _stream, ...payload } = options
     return client.createResponseStream(payload).pipe(
-      withoutOpenAiSocket,
+      withoutOpenAISocket,
       Effect.flatMap(([response, events]) =>
         events.pipe(
           Stream.mapEffect(
@@ -200,7 +200,7 @@ const foldedCreateResponse =
   }
 
 /** The account backend exposes no embeddings endpoint; every request URL is rewritten to Responses. */
-const unsupportedCreateEmbedding: OpenAiClient.Service["createEmbedding"] = () =>
+const unsupportedCreateEmbedding: OpenAIClient.Service["createEmbedding"] = () =>
   Effect.fail(
     accountError(
       "createEmbedding",
@@ -211,20 +211,20 @@ const unsupportedCreateEmbedding: OpenAiClient.Service["createEmbedding"] = () =
   )
 
 /** @experimental */
-export const layerAccountClient = (credentials: OpenAiAccountCredentials) =>
+export const layerAccountClient = (credentials: OpenAIAccountCredentials) =>
   Layer.effect(
-    OpenAiClient.OpenAiClient,
-    OpenAiClient.make({
+    OpenAIClient.OpenAiClient,
+    OpenAIClient.make({
       apiUrl: openAiAccountApiUrl,
       transformClient: (client) => client.pipe(normalizeResponsesSse, accountClientTransform(credentials)),
     }).pipe(
       Effect.map((client) =>
-        OpenAiClient.OpenAiClient.of({
+        OpenAIClient.OpenAiClient.of({
           client: client.client,
           createResponse: (options) => withAccountHeaderRedaction(foldedCreateResponse(client)(options)),
           createResponseStream: (options) =>
             client.createResponseStream(options).pipe(
-              withoutOpenAiSocket,
+              withoutOpenAISocket,
               withAccountHeaderRedaction,
               Effect.map(
                 ([response, stream]) =>
@@ -244,11 +244,11 @@ export const layerAccountClient = (credentials: OpenAiAccountCredentials) =>
 
 /** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
 export const registrationAccount = (
-  input: OpenAiAccountInput,
+  input: AccountOptions,
 ): Effect.Effect<ModelRegistry.Registration, never, HttpClient.HttpClient> =>
   ModelRegistry.registration(registrationOptions(input))
 
-const registrationOptions = (input: OpenAiAccountInput) => {
+const registrationOptions = (input: AccountOptions) => {
   const required = {
     provider: "openai",
     model: input.model,
@@ -264,6 +264,6 @@ const registrationOptions = (input: OpenAiAccountInput) => {
 
 /** @experimental */
 export const layerAccount = (
-  input: OpenAiAccountInput,
+  input: AccountOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, never, HttpClient.HttpClient> =>
   ModelRegistry.layer([registrationAccount(input)])

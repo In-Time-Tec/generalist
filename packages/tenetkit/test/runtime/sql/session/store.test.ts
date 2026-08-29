@@ -4,7 +4,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
-import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { registrationsFor } from "../../execution/fixtures.js"
 import { testExecutable } from "../../run/identity.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
@@ -227,7 +227,7 @@ const executeScale = (scale: number) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const receipt = yield* runtime.send({
             to: fixture.address,
             sessionId: `session:linear-storage:${scale}`,

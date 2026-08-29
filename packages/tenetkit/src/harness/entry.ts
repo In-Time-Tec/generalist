@@ -5,49 +5,49 @@ const TEXT_MAX = 512
 const CONTENT_MAX = 65_536
 const PATH_MAX = 1_024
 
-/** @experimental Bounded identifier of one harness entry within its kind. */
-export const HarnessId = Schema.String.check(
+/** @experimental Bounded identifier of one guidance entry within its kind. */
+export const GuidanceId = Schema.String.check(
   Schema.isNonEmpty(),
   Schema.isMaxLength(ID_MAX),
   Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
 )
 /** @experimental */
-export type HarnessId = typeof HarnessId.Type
+export type GuidanceId = typeof GuidanceId.Type
 
 /** @experimental Host-chosen store partition one entry belongs to. */
-export const HarnessScope = Schema.String.check(
+export const GuidanceScope = Schema.String.check(
   Schema.isNonEmpty(),
   Schema.isMaxLength(ID_MAX),
   Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
 )
 /** @experimental */
-export type HarnessScope = typeof HarnessScope.Type
+export type GuidanceScope = typeof GuidanceScope.Type
 
-/** @experimental The four continual-harness entry kinds. */
-export const HarnessKind = Schema.Literals(["prompt", "memory", "skill", "subagent"])
+/** @experimental The four Agent Guidance entry kinds. */
+export const GuidanceKind = Schema.Literals(["prompt", "memory", "skill", "subagent"])
 /** @experimental */
-export type HarnessKind = typeof HarnessKind.Type
+export type GuidanceKind = typeof GuidanceKind.Type
 
-/** @experimental Every harness kind in canonical order. */
-export const kinds: ReadonlyArray<HarnessKind> = ["prompt", "memory", "skill", "subagent"]
+/** @experimental Every guidance kind in canonical order. */
+export const kinds: ReadonlyArray<GuidanceKind> = ["prompt", "memory", "skill", "subagent"]
 
 /** @experimental Caller-supplied UTC ISO-8601 instant with millisecond precision. */
-export const HarnessInstant = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/))
+export const GuidanceInstant = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/))
 /** @experimental */
-export type HarnessInstant = typeof HarnessInstant.Type
+export type GuidanceInstant = typeof GuidanceInstant.Type
 
 /** @experimental Revision counter of one entry. */
-export const HarnessVersion = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
+export const GuidanceVersion = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
 /** @experimental */
-export type HarnessVersion = typeof HarnessVersion.Type
+export type GuidanceVersion = typeof GuidanceVersion.Type
 
-/** @experimental Content-addressed identity of one exact harness state. */
-export const HarnessSnapshotId = Schema.String.check(Schema.isPattern(/^harness-snapshot:v1:sha256:[0-9a-f]{64}$/))
+/** @experimental Content-addressed identity of one exact guidance state. */
+export const GuidanceSnapshotId = Schema.String.check(Schema.isPattern(/^guidance-snapshot:v1:sha256:[0-9a-f]{64}$/))
 /** @experimental */
-export type HarnessSnapshotId = typeof HarnessSnapshotId.Type
+export type GuidanceSnapshotId = typeof GuidanceSnapshotId.Type
 
 /** @experimental The authored value of one entry, independent of identity and revision. */
-export const HarnessEntryValue = Schema.Struct({
+export const GuidanceEntryValue = Schema.Struct({
   title: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(TEXT_MAX)),
   content: Schema.String.check(Schema.isMaxLength(CONTENT_MAX)),
   path: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(PATH_MAX))),
@@ -57,31 +57,31 @@ export const HarnessEntryValue = Schema.Struct({
   source: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(TEXT_MAX))),
 })
 /** @experimental */
-export type HarnessEntryValue = typeof HarnessEntryValue.Type
+export type GuidanceEntryValue = typeof GuidanceEntryValue.Type
 
 /** @experimental The audit revision of one entry. */
-export const HarnessRevision = Schema.Struct({
-  createdAt: HarnessInstant,
-  updatedAt: HarnessInstant,
-  version: HarnessVersion,
+export const GuidanceRevision = Schema.Struct({
+  createdAt: GuidanceInstant,
+  updatedAt: GuidanceInstant,
+  version: GuidanceVersion,
 })
 /** @experimental */
-export type HarnessRevision = typeof HarnessRevision.Type
+export type GuidanceRevision = typeof GuidanceRevision.Type
 
-/** @experimental One versioned continual-harness entry. */
-export const HarnessEntry = Schema.Struct({
-  id: HarnessId,
-  kind: HarnessKind,
-  scope: HarnessScope,
-  ...HarnessEntryValue.fields,
-  ...HarnessRevision.fields,
+/** @experimental One versioned Agent Guidance entry. */
+export const GuidanceEntry = Schema.Struct({
+  id: GuidanceId,
+  kind: GuidanceKind,
+  scope: GuidanceScope,
+  ...GuidanceEntryValue.fields,
+  ...GuidanceRevision.fields,
 })
 /** @experimental */
-export type HarnessEntry = typeof HarnessEntry.Type
+export type GuidanceEntry = typeof GuidanceEntry.Type
 
 /** @experimental Project one entry back to its authored value. */
-export const value = (entry: HarnessEntry): HarnessEntryValue => {
-  let projected: HarnessEntryValue = { title: entry.title, content: entry.content }
+export const value = (entry: GuidanceEntry): GuidanceEntryValue => {
+  let projected: GuidanceEntryValue = { title: entry.title, content: entry.content }
   if (entry.path !== undefined) projected = { ...projected, path: entry.path }
   if (entry.reference !== undefined) projected = { ...projected, reference: entry.reference }
   if (entry.arguments !== undefined) projected = { ...projected, arguments: entry.arguments }
@@ -91,7 +91,7 @@ export const value = (entry: HarnessEntry): HarnessEntryValue => {
 }
 
 /** @experimental Project one entry back to its audit revision. */
-export const revision = (entry: HarnessEntry): HarnessRevision => ({
+export const revision = (entry: GuidanceEntry): GuidanceRevision => ({
   createdAt: entry.createdAt,
   updatedAt: entry.updatedAt,
   version: entry.version,
@@ -99,35 +99,35 @@ export const revision = (entry: HarnessEntry): HarnessRevision => ({
 
 /** @experimental Add one entry that must not already exist. A pinned revision reconstructs an exact prior entry. */
 export const CreateEdit = Schema.TaggedStruct("Create", {
-  kind: HarnessKind,
-  id: HarnessId,
-  value: HarnessEntryValue,
-  revision: Schema.optionalKey(HarnessRevision),
+  kind: GuidanceKind,
+  id: GuidanceId,
+  value: GuidanceEntryValue,
+  revision: Schema.optionalKey(GuidanceRevision),
 })
 /** @experimental */
 export type CreateEdit = typeof CreateEdit.Type
 
 /** @experimental Replace the authored value of one existing entry. A pinned revision reconstructs an exact prior entry. */
 export const UpdateEdit = Schema.TaggedStruct("Update", {
-  kind: HarnessKind,
-  id: HarnessId,
-  value: HarnessEntryValue,
-  baseVersion: Schema.optionalKey(HarnessVersion),
-  revision: Schema.optionalKey(HarnessRevision),
+  kind: GuidanceKind,
+  id: GuidanceId,
+  value: GuidanceEntryValue,
+  baseVersion: Schema.optionalKey(GuidanceVersion),
+  revision: Schema.optionalKey(GuidanceRevision),
 })
 /** @experimental */
 export type UpdateEdit = typeof UpdateEdit.Type
 
 /** @experimental Remove one existing entry. */
 export const DeleteEdit = Schema.TaggedStruct("Delete", {
-  kind: HarnessKind,
-  id: HarnessId,
-  baseVersion: Schema.optionalKey(HarnessVersion),
+  kind: GuidanceKind,
+  id: GuidanceId,
+  baseVersion: Schema.optionalKey(GuidanceVersion),
 })
 /** @experimental */
 export type DeleteEdit = typeof DeleteEdit.Type
 
-/** @experimental One requested change to the harness. */
+/** @experimental One requested change to the guidance. */
 export const RefinementEdit = Schema.Union([CreateEdit, UpdateEdit, DeleteEdit])
 /** @experimental */
 export type RefinementEdit = typeof RefinementEdit.Type
@@ -137,19 +137,19 @@ export type RefinementEdit = typeof RefinementEdit.Type
  * untrusted input cannot choose an entry's createdAt, updatedAt, or version.
  */
 export const AuthoredCreateEdit = Schema.TaggedStruct("Create", {
-  kind: HarnessKind,
-  id: HarnessId,
-  value: HarnessEntryValue,
+  kind: GuidanceKind,
+  id: GuidanceId,
+  value: GuidanceEntryValue,
 })
 /** @experimental */
 export type AuthoredCreateEdit = typeof AuthoredCreateEdit.Type
 
 /** @experimental One update edit an untrusted author may request, without any pinned revision. */
 export const AuthoredUpdateEdit = Schema.TaggedStruct("Update", {
-  kind: HarnessKind,
-  id: HarnessId,
-  value: HarnessEntryValue,
-  baseVersion: Schema.optionalKey(HarnessVersion),
+  kind: GuidanceKind,
+  id: GuidanceId,
+  value: GuidanceEntryValue,
+  baseVersion: Schema.optionalKey(GuidanceVersion),
 })
 /** @experimental */
 export type AuthoredUpdateEdit = typeof AuthoredUpdateEdit.Type
@@ -160,17 +160,17 @@ export const AuthoredEdit = Schema.Union([AuthoredCreateEdit, AuthoredUpdateEdit
 export type AuthoredEdit = typeof AuthoredEdit.Type
 
 const proposalFields = {
-  id: HarnessId,
-  at: HarnessInstant,
+  id: GuidanceId,
+  at: GuidanceInstant,
   rationale: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(CONTENT_MAX))),
   source: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(TEXT_MAX))),
-  baseSnapshot: Schema.optionalKey(HarnessSnapshotId),
+  baseSnapshot: Schema.optionalKey(GuidanceSnapshotId),
 }
 
 /** @experimental An atomic set of requested changes with optional baseline pinning. */
 export const RefinementProposal = Schema.Struct({
   ...proposalFields,
-  rollbackOf: Schema.optionalKey(HarnessId),
+  rollbackOf: Schema.optionalKey(GuidanceId),
   edits: Schema.Array(RefinementEdit).check(Schema.isNonEmpty()),
 })
 /** @experimental */
@@ -195,26 +195,29 @@ export type AuthoredProposal = typeof AuthoredProposal.Type
  * level. Structural typing cannot make that distinction, because an edit carrying a `revision` is still
  * assignable to an authored edit.
  */
-export type AuthoredRefinementProposal = Brand.Branded<AuthoredProposal, "tenetkit/harness/AuthoredRefinementProposal">
+export type AuthoredRefinementProposal = Brand.Branded<
+  AuthoredProposal,
+  "tenetkit/agent-guidance/AuthoredRefinementProposal"
+>
 
 /** @experimental One applied change with its exact before and after entries. */
 export const AppliedRefinementEdit = Schema.Struct({
   edit: RefinementEdit,
-  before: Schema.optionalKey(HarnessEntry),
-  after: Schema.optionalKey(HarnessEntry),
+  before: Schema.optionalKey(GuidanceEntry),
+  after: Schema.optionalKey(GuidanceEntry),
 })
 /** @experimental */
 export type AppliedRefinementEdit = typeof AppliedRefinementEdit.Type
 
 /** @experimental The durable record of one applied proposal. */
 export const RefinementEvent = Schema.Struct({
-  proposal: HarnessId,
-  at: HarnessInstant,
-  scope: HarnessScope,
+  proposal: GuidanceId,
+  at: GuidanceInstant,
+  scope: GuidanceScope,
   rationale: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(CONTENT_MAX))),
   source: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(TEXT_MAX))),
-  before: HarnessSnapshotId,
-  after: HarnessSnapshotId,
+  before: GuidanceSnapshotId,
+  after: GuidanceSnapshotId,
   applied: Schema.Array(AppliedRefinementEdit).check(Schema.isNonEmpty()),
 })
 /** @experimental */

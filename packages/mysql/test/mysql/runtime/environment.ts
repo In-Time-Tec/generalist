@@ -1,11 +1,11 @@
-import { layerMysql, MysqlRunSchema } from "@tenetkit/mysql"
+import { layer, RunSchema } from "@tenetkit/mysql"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { provideScoped } from "../../../../tenetkit/test/runtime/execution/scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { ExecutableResolver } from "tenetkit/runtime"
-import type { MysqlStoreError } from "../../../src/mysql/store/implementation.js"
+import type { StoreError } from "../../../src/mysql/store/implementation.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
   analyst,
@@ -41,7 +41,7 @@ const addresses = [
 export const mysqlClient = (url: string) => MysqlClient.layer({ url: Redacted.make(url), maxConnections: 4 })
 
 export const mysqlLayer = (url: string) =>
-  layerMysql({
+  layer({
     url,
     source: "mysql-test",
     resolver,
@@ -59,7 +59,7 @@ export const mysqlLayer = (url: string) =>
  */
 export const mysqlMessagingLayer = (database: MysqlDatabase) => (overrides: MessagingOverrides) =>
   database.provision(
-    layerMysql({
+    layer({
       url: database.url,
       source: "mysql-test",
       resolver,
@@ -104,11 +104,11 @@ type MysqlClientError = SqlError | Config.ConfigError
 export interface MysqlDatabase {
   readonly url: string
   readonly empty: Effect.Effect<void, MysqlClientError>
-  readonly ready: Effect.Effect<void, MysqlClientError | MysqlStoreError>
-  readonly truncated: Effect.Effect<void, MysqlClientError | MysqlStoreError>
+  readonly ready: Effect.Effect<void, MysqlClientError | StoreError>
+  readonly truncated: Effect.Effect<void, MysqlClientError | StoreError>
   readonly provisioned: () => Promise<void>
   readonly client: Layer.Layer<SqlClient.SqlClient, MysqlClientError>
-  readonly provision: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | MysqlClientError | MysqlStoreError, R>
+  readonly provision: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | MysqlClientError | StoreError, R>
   readonly provisionEmpty: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | MysqlClientError, R>
 }
 
@@ -140,7 +140,7 @@ export const mysqlDatabase = (label: string): MysqlDatabase => {
         yield* sql.unsafe(`CREATE DATABASE IF NOT EXISTS \`${name}\``)
       }),
     ),
-    withDatabase(MysqlRunSchema.apply("mysql-test")),
+    withDatabase(RunSchema.apply("mysql-test")),
   ).pipe(Effect.asVoid)
   const readyOnce = Effect.runSync(Effect.cached(ready))
   const provisioned = () => (mysqlAvailable ? Effect.runPromise(readyOnce) : Promise.resolve())

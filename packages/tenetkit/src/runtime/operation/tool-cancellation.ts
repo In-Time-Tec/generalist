@@ -3,10 +3,10 @@ import { ToolContext } from "../../core/index.js"
 import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
 import { decodeCancellableOperation, supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { AgentExecutionFailure } from "../errors.js"
-import type { Interface as ExecutableResolver } from "../executable/resolver.js"
+import type { Service as ExecutableResolver } from "../executable/resolver.js"
 import { selectToolExecutor } from "../execution/context.js"
 import { ExecutionResolution } from "../execution/resolution.js"
-import type { ExecutionClaim, ExecutionRecord, Interface as RunStore } from "../run/store.js"
+import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Result, Schema } from "effect"
-import { Authorship, HarnessEntry, HarnessState, Refinement } from "../../src/harness/index.js"
+import { Authorship, Entry, State, Refinement } from "../../src/harness/index.js"
 import { applied, at, create, entry, proposal, scope, update } from "./fixtures.js"
 
-const seeded = HarnessState.make({
+const seeded = State.make({
   scope,
   entries: [entry({ id: "target", kind: "memory", version: 5, content: "original" })],
 })
@@ -11,7 +11,7 @@ const seeded = HarnessState.make({
 const authored = (edits: ReadonlyArray<unknown>) => ({ id: "model-1", at: at(2), edits })
 
 const expectRejected = (failure: Effect.Error<ReturnType<typeof Authorship.authorProposal>>) => {
-  expect(failure._tag).toBe("tenetkit/harness/AuthorshipRejected")
+  expect(failure._tag).toBe("tenetkit/agent-guidance/AuthorshipRejected")
   if (!Schema.is(Authorship.AuthorshipRejected)(failure)) {
     throw new Error("Expected an AuthorshipRejected failure", { cause: failure })
   }
@@ -170,7 +170,7 @@ describe("Authorship.authorProposal", () => {
         authored([{ _tag: "Create", kind: "skill", id: "fresh", value: { title: "t", content: "c" } }]),
       )
       const result = applied({ state: seeded, proposal: accepted })
-      const created = HarnessState.findEntry(result.state, "skill", "fresh")!
+      const created = State.findEntry(result.state, "skill", "fresh")!
       expect(created.version).toBe(1)
       expect(created.createdAt).toBe(at(2))
       expect(created.updatedAt).toBe(at(2))
@@ -183,7 +183,7 @@ describe("Authorship.authorProposal", () => {
         authored([{ _tag: "Update", kind: "memory", id: "target", value: { title: "t", content: "next" } }]),
       )
       const result = applied({ state: seeded, proposal: accepted })
-      const updated = HarnessState.findEntry(result.state, "memory", "target")!
+      const updated = State.findEntry(result.state, "memory", "target")!
       expect(updated.version).toBe(6)
       expect(updated.createdAt).toBe(at(0))
       expect(updated.updatedAt).toBe(at(2))
@@ -200,7 +200,7 @@ describe("Authorship.authorProposal", () => {
         authored([{ _tag: "Create", kind: "memory", id: "target", value: { title: "t", content: "restored" } }]),
       )
       const result = applied({ state: removed.state, proposal: accepted })
-      expect(HarnessState.findEntry(result.state, "memory", "target")!.version).toBe(1)
+      expect(State.findEntry(result.state, "memory", "target")!.version).toBe(1)
     }),
   )
 
@@ -224,7 +224,7 @@ describe("Authorship.authorProposal", () => {
       state: change.state,
       proposal: Refinement.rollbackProposal(change, { id: "rollback-1", at: at(9) }),
     })
-    const entryValue = HarnessState.findEntry(restored.state, "memory", "target")!
+    const entryValue = State.findEntry(restored.state, "memory", "target")!
     expect(entryValue.version).toBe(5)
     expect(entryValue.content).toBe("original")
   })
@@ -237,14 +237,12 @@ describe("Authorship.authorProposal", () => {
       value: { title: "t", content: "c" },
       revision: { createdAt: at(0), updatedAt: at(0), version: 3 },
     }
-    expect(() =>
-      Schema.decodeUnknownSync(HarnessEntry.AuthoredCreateEdit, { onExcessProperty: "error" })(forged),
-    ).toThrow()
-    expect(Schema.decodeUnknownSync(HarnessEntry.CreateEdit)(forged).revision?.version).toBe(3)
+    expect(() => Schema.decodeUnknownSync(Entry.AuthoredCreateEdit, { onExcessProperty: "error" })(forged)).toThrow()
+    expect(Schema.decodeUnknownSync(Entry.CreateEdit)(forged).revision?.version).toBe(3)
   })
 
   it("drops a revision that survives lenient decoding of an authored edit", () => {
-    const decoded = Schema.decodeUnknownSync(HarnessEntry.AuthoredCreateEdit)({
+    const decoded = Schema.decodeUnknownSync(Entry.AuthoredCreateEdit)({
       _tag: "Create",
       kind: "memory",
       id: "x",
@@ -255,18 +253,18 @@ describe("Authorship.authorProposal", () => {
   })
 
   it("statically forbids a revision on an authored edit", () => {
-    const authoredHasRevision: "revision" extends keyof HarnessEntry.AuthoredCreateEdit ? false : true = true
-    const trustedHasRevision: "revision" extends keyof HarnessEntry.CreateEdit ? true : false = true
+    const authoredHasRevision: "revision" extends keyof Entry.AuthoredCreateEdit ? false : true = true
+    const trustedHasRevision: "revision" extends keyof Entry.CreateEdit ? true : false = true
     expect(authoredHasRevision && trustedHasRevision).toBe(true)
   })
 
   it("accepts every authored proposal as a refinement proposal", () => {
-    const value: HarnessEntry.RefinementProposal = {
+    const value: Entry.RefinementProposal = {
       id: "model-1",
       at: at(2),
       edits: [{ _tag: "Create", kind: "memory", id: "x", value: { title: "t", content: "c" } }],
     }
-    expect(Result.isSuccess(Refinement.applyTrustedProposal(HarnessState.empty(scope), value))).toBe(true)
+    expect(Result.isSuccess(Refinement.applyTrustedProposal(State.empty(scope), value))).toBe(true)
     expect(create({ kind: "memory", id: "x" })._tag).toBe("Create")
   })
 })

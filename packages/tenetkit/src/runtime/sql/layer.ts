@@ -4,7 +4,7 @@ import { Runtime } from "../service.js"
 import { RunStore } from "../run/store.js"
 import { layer as sqliteClientLayer } from "./bun-client.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "./store.js"
-import { ExecutionHost, make as makeExecutionHost } from "../execution/host.js"
+import { RunExecutor, make as makeRunExecutor } from "../execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
 import { LocalScheduler, layer as localSchedulerLayer } from "../execution/local-scheduler.js"
 import { layer as modelPreviewLayer } from "../execution/model-response/preview.js"
@@ -16,12 +16,12 @@ export interface BunSqliteStoreOptions extends SqliteStoreOptions {
 
 export const layerSqlite = (
   options: BunSqliteStoreOptions,
-): Layer.Layer<Runtime | RunStore | ExternalChildStore | ExecutionHost | LocalScheduler, SqliteStoreError> => {
+): Layer.Layer<Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler, SqliteStoreError> => {
   const client = sqliteClientLayer({ filename: options.filename })
   const store = layerSqliteStore({ ...options, source: options.source ?? options.filename }).pipe(Layer.provide(client))
   const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
   const runtime = runtimeLayer(options).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(ExecutionHost, makeExecutionHost({ workerId: "sqlite", resolver: options.resolver })).pipe(
+  const host = Layer.effect(RunExecutor, makeRunExecutor({ workerId: "sqlite", resolver: options.resolver })).pipe(
     Layer.provide(dependencies),
   )
   const scheduler = localSchedulerLayer({ workerId: "sqlite", ...options.scheduler }).pipe(

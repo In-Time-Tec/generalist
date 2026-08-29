@@ -5,7 +5,7 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { Agent, DurableDriver, ToolExecutor } from "../../../src/index.js"
 import { Database } from "bun:sqlite"
 import { closedTestAgent, testExecutable } from "./identity.js"
-import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Address, RunExecutor, Errors, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
 import {
   assistant,
   assistantAddress,
@@ -507,12 +507,12 @@ it.live("atomically persists steering consumption and model scheduling before SQ
     resolver: ExecutableResolver.makeStatic([{ executable: ref, agent: Agent.close(agent, model) }]),
     addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
   })
-  layer(runtimeLayer)("ExecutionHost delivers durable steering in the next model operation", (test) => {
-    test.effect("ExecutionHost delivers durable steering in the next model operation", () =>
+  layer(runtimeLayer)("RunExecutor delivers durable steering in the next model operation", (test) => {
+    test.effect("RunExecutor delivers durable steering in the next model operation", () =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:host-steering",
@@ -589,7 +589,7 @@ it.effect("steering admitted during model streaming does not interrupt it and re
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,
@@ -686,7 +686,7 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,

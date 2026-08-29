@@ -69,7 +69,7 @@ export const quickstart = definePage({
       [
         code("Ai.LanguageModel.LanguageModel"),
         ": the model, either a direct layer like ours or supplied per run by ",
-        code("ModelRegistry.operate"),
+        code("ModelRegistry.withModel"),
         ".",
       ],
       [
@@ -107,10 +107,10 @@ export const quickstart = definePage({
     codeBlock({ label: "eval.ts", source: evalSource, expectedOutput: evalExpected }),
     callout(
       "info",
-      "The ModelRegistry.operate pattern",
+      "The ModelRegistry.withModel pattern",
       code("Deterministic.layer"),
       " registers a model in the ModelRegistry; ",
-      code("ModelRegistry.operate(selection, effect)"),
+      code("ModelRegistry.withModel(selection, effect)"),
       " supplies the actual LanguageModel per run. Swapping to a real model is the same shape with ",
       code("layer"),
       " (see ",

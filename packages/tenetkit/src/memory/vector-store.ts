@@ -40,16 +40,14 @@ export class VectorStoreError extends Schema.TaggedError<VectorStoreError>()("te
 }) {}
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly upsert: (documents: ReadonlyArray<Embedded>) => Effect.Effect<void, VectorStoreError>
   readonly query: (query: Query) => Effect.Effect<ReadonlyArray<Match>, VectorStoreError>
   readonly delete: (input: DeleteInput) => Effect.Effect<void, VectorStoreError>
 }
 
 /** @experimental */
-export class VectorStore extends Context.Service<VectorStore, Interface>()(
-  "tenetkit/memory/vector-store/VectorStore",
-) {}
+export class VectorStore extends Context.Service<VectorStore, Service>()("tenetkit/memory/vector-store/VectorStore") {}
 
 const storageKey = (key: Memory.Key, id: string): string => JSON.stringify([key.agent, key.subject, id])
 
@@ -80,7 +78,7 @@ const cosine = (left: ReadonlyArray<number>, right: ReadonlyArray<number>): numb
 
 const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
   Effect.map(
-    (documents): Interface => ({
+    (documents): Service => ({
       upsert: (nextDocuments) =>
         Effect.gen(function* () {
           for (const document of nextDocuments) {
@@ -128,5 +126,5 @@ const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
 export const layerMemory: Layer.Layer<VectorStore> = Layer.effect(VectorStore, make.pipe(Effect.map(VectorStore.of)))
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<VectorStore> =>
+export const layerTest = (implementation: Service): Layer.Layer<VectorStore> =>
   Layer.succeed(VectorStore, VectorStore.of(implementation))

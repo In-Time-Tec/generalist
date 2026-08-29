@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, no-new-func */
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
-import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
+import { CodeExecutor, ProgramCapabilities } from "tenetkit"
 import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "@tenetkit/cloudflare/dynamic-workers"
 import { runner } from "../src/dynamic-workers/source.js"
 
@@ -22,13 +22,13 @@ const capabilityFailureId = (reason: Error): string => {
   return message.slice("tenetkit-capability-failure:".length)
 }
 
-const request = (signal = new AbortController().signal): SandboxExecutor.Request => {
+const request = (signal = new AbortController().signal): CodeExecutor.Request => {
   const modules = [{ name: "program.js", source: "export default async input => ({ value: input.value + 1 })" }]
   const identity = { modules, entrypoint: "program.js", inputCodec: "input:v1", outputCodec: "output:v1" }
   return {
     protocolVersion: "1",
     requestId: "run-1:attempt-1",
-    sourceDigest: SandboxExecutor.sourceDigest(identity),
+    sourceDigest: CodeExecutor.sourceDigest(identity),
     ...identity,
     input: { value: 1 },
     signal,
@@ -110,7 +110,7 @@ it.effect("rejects invalid source before WorkerLoader.load", () =>
         .execute({ ...request(), sourceDigest: "invalid" })
         .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities)),
     )
-    expect(failure).toBeInstanceOf(SandboxExecutor.SandboxSourceInvalid)
+    expect(failure).toBeInstanceOf(CodeExecutor.SandboxSourceInvalid)
     expect(loads).toBe(0)
   }),
 )
@@ -128,7 +128,7 @@ it.effect("normalizes the exact module graph and rejects unsupported imports bef
         },
       },
     })
-    const invalidModules: ReadonlyArray<ReadonlyArray<SandboxExecutor.Module>> = [
+    const invalidModules: ReadonlyArray<ReadonlyArray<CodeExecutor.Module>> = [
       [{ name: "program.js", source: 'import "node:fs"; export default () => null' }],
       [{ name: "program.js", source: 'const target = "./part.js"; export default () => import(target)' }],
       [
@@ -147,7 +147,7 @@ it.effect("normalizes the exact module graph and rejects unsupported imports bef
       const candidate = {
         ...request(),
         modules,
-        sourceDigest: SandboxExecutor.sourceDigest({
+        sourceDigest: CodeExecutor.sourceDigest({
           modules,
           entrypoint: "program.js",
           inputCodec: "input:v1",
@@ -158,7 +158,7 @@ it.effect("normalizes the exact module graph and rejects unsupported imports bef
         yield* executor
           .execute(candidate)
           .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip),
-      ).toBeInstanceOf(SandboxExecutor.SandboxSourceInvalid)
+      ).toBeInstanceOf(CodeExecutor.SandboxSourceInvalid)
     }
     expect(loads).toBe(0)
   }),
@@ -368,7 +368,7 @@ it.effect("does not misattribute a caught capability failure to a later source f
       yield* executor
         .execute(request())
         .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, failing), Effect.flip),
-    ).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
+    ).toBeInstanceOf(CodeExecutor.SandboxExecutionFailure)
   }),
 )
 
@@ -477,7 +477,7 @@ it.effect("does not consume a typed capability envelope for a non-500 response",
       yield* executor
         .execute(request())
         .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, failing), Effect.flip),
-    ).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
+    ).toBeInstanceOf(CodeExecutor.SandboxExecutionFailure)
   }),
 )
 
@@ -523,14 +523,14 @@ it.effect("fences a late Worker response after cancellation", () =>
     yield* Effect.yieldNow
     controller.abort()
     const failure = yield* Fiber.join(fiber).pipe(Effect.flip)
-    expect(failure).toBeInstanceOf(SandboxExecutor.SandboxCancelled)
+    expect(failure).toBeInstanceOf(CodeExecutor.SandboxCancelled)
     complete(Response.json({ output: "late" }))
   }),
 )
 
 it.effect("fences cancellation and deadline while reading a delayed response body", () =>
   Effect.gen(function* () {
-    const execute = (input: SandboxExecutor.Request, reading: () => void) =>
+    const execute = (input: CodeExecutor.Request, reading: () => void) =>
       make({
         compatibilityDate: "2026-08-19",
         capabilityBinding: (rpc) => rpc,
@@ -558,7 +558,7 @@ it.effect("fences cancellation and deadline while reading a delayed response bod
     const cancelled = yield* execute(request(controller.signal), bodyReading).pipe(Effect.forkChild)
     yield* Effect.promise(() => bodyStarted)
     controller.abort()
-    expect(yield* Fiber.join(cancelled).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxCancelled)
+    expect(yield* Fiber.join(cancelled).pipe(Effect.flip)).toBeInstanceOf(CodeExecutor.SandboxCancelled)
 
     let deadlineReading!: () => void
     const deadlineBodyStarted = new Promise<void>((resolve) => {
@@ -568,7 +568,7 @@ it.effect("fences cancellation and deadline while reading a delayed response bod
       Effect.forkChild,
     )
     yield* Effect.promise(() => deadlineBodyStarted)
-    expect(yield* Fiber.join(deadline).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxDeadlineExceeded)
+    expect(yield* Fiber.join(deadline).pipe(Effect.flip)).toBeInstanceOf(CodeExecutor.SandboxDeadlineExceeded)
   }),
 )
 
@@ -609,7 +609,7 @@ it.effect("turns hostile loader failures into bounded typed diagnostics", () =>
     const failure = yield* executor
       .execute(request())
       .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
-    expect(failure).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
+    expect(failure).toBeInstanceOf(CodeExecutor.SandboxExecutionFailure)
     expect(failure.message).toContain("uninspectable failure")
     expect(failure.message.length).toBeLessThan(220)
   }),
@@ -643,7 +643,7 @@ it.effect("redacts credentials from loader and fetch diagnostics before truncati
       })
         .execute(request())
         .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
-      expect(failure).toBeInstanceOf(SandboxExecutor.SandboxExecutionFailure)
+      expect(failure).toBeInstanceOf(CodeExecutor.SandboxExecutionFailure)
       expect(failure.message).toContain("[REDACTED]")
       for (const secret of ["review-secret", "api-secret", "token-secret", "client-secret"]) {
         expect(failure.message).not.toContain(secret)

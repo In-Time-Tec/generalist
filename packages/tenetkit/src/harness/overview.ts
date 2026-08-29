@@ -1,6 +1,6 @@
 import { Function } from "effect"
-import { HarnessEntry, HarnessKind, kinds } from "./entry.js"
-import { HarnessState, snapshotId } from "./state.js"
+import { GuidanceEntry, GuidanceKind, kinds } from "./entry.js"
+import { GuidanceState, snapshotId } from "./state.js"
 
 /** @experimental Bounds every prompt overview must respect. */
 export interface OverviewOptions {
@@ -35,10 +35,10 @@ const compareText = (left: string, right: string): number => {
   return left > right ? 1 : 0
 }
 
-const select = (entries: ReadonlyArray<HarnessEntry>, limit: number): ReadonlyArray<HarnessEntry> =>
+const select = (entries: ReadonlyArray<GuidanceEntry>, limit: number): ReadonlyArray<GuidanceEntry> =>
   entries.toSorted((left, right) => compareText(left.id, right.id)).slice(0, limit)
 
-const line = (entry: HarnessEntry, limits: Required<OverviewOptions>): string => {
+const line = (entry: GuidanceEntry, limits: Required<OverviewOptions>): string => {
   const title = clamp(entry.title, limits.maxTitleLength)
   const content = clamp(entry.content, limits.maxContentLength)
   const reference = entry.reference === undefined ? "" : ` [${clamp(entry.reference, limits.maxTitleLength)}]`
@@ -46,7 +46,11 @@ const line = (entry: HarnessEntry, limits: Required<OverviewOptions>): string =>
   return `- ${entry.id} (v${entry.version}, ${entry.scope})${reference}: ${title}${suffix}`
 }
 
-const section = (state: HarnessState, kind: HarnessKind, limits: Required<OverviewOptions>): ReadonlyArray<string> => {
+const section = (
+  state: GuidanceState,
+  kind: GuidanceKind,
+  limits: Required<OverviewOptions>,
+): ReadonlyArray<string> => {
   const all = state.entries[kind]
   const shown = select(all, limits.maxEntriesPerKind)
   const omitted = all.length - shown.length
@@ -54,7 +58,7 @@ const section = (state: HarnessState, kind: HarnessKind, limits: Required<Overvi
   return [header, ...shown.map((entry) => line(entry, limits))]
 }
 
-const refinementSection = (state: HarnessState, limits: Required<OverviewOptions>): ReadonlyArray<string> => {
+const refinementSection = (state: GuidanceState, limits: Required<OverviewOptions>): ReadonlyArray<string> => {
   const shown = state.refinements.slice(-limits.maxRefinements)
   const header = `recent refinements: ${state.refinements.length}${
     shown.length < state.refinements.length ? ` (showing ${shown.length})` : ""
@@ -69,18 +73,18 @@ const refinementSection = (state: HarnessState, limits: Required<OverviewOptions
 }
 
 /**
- * @experimental Render one deterministic, bounded prompt overview of a harness state. Output size depends only on
+ * @experimental Render one deterministic, bounded prompt overview of a guidance state. Output size depends only on
  * the supplied bounds, never on how many entries or refinements the state holds.
  */
 export const formatOverview: {
-  (options?: OverviewOptions): (state: HarnessState) => string
-  (state: HarnessState, options?: OverviewOptions): string
+  (options?: OverviewOptions): (state: GuidanceState) => string
+  (state: GuidanceState, options?: OverviewOptions): string
 } = Function.dual(
   (args) => "schemaVersion" in args[0],
-  (state: HarnessState, options: OverviewOptions = {}): string => {
+  (state: GuidanceState, options: OverviewOptions = {}): string => {
     const limits = bounded(options)
     return [
-      `harness ${snapshotId(state)} (scope ${state.scope})`,
+      `guidance ${snapshotId(state)} (scope ${state.scope})`,
       ...kinds.flatMap((kind) => ["", ...section(state, kind, limits)]),
       "",
       ...refinementSection(state, limits),

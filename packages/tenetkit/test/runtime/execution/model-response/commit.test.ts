@@ -68,14 +68,14 @@ const schedule = (runId: string) =>
     return { store, claim, operation, operationKey, sessionParentId: prefix.id }
   })
 
-const sessionPath = (store: RunStore.Interface, sessionId: string) =>
+const sessionPath = (store: RunStore.Service, sessionId: string) =>
   Effect.gen(function* () {
     const maybeSession = yield* store.sessionStore(sessionId)
     if (Option.isNone(maybeSession)) return yield* Effect.die("expected Session store")
     return yield* maybeSession.value.path()
   })
 
-const sessionProjection = (store: RunStore.Interface, sessionId: string) =>
+const sessionProjection = (store: RunStore.Service, sessionId: string) =>
   sessionPath(store, sessionId).pipe(Effect.map(Session.buildContext))
 
 layer(memoryLayer)("atomic model response memory commit", (suite) => {

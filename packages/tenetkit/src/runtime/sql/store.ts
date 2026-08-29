@@ -3,7 +3,7 @@ import { listRuns } from "./store/list.js"
 import { SqlClient } from "effect/unstable/sql"
 import { CursorExpired, RunNotFound } from "../errors.js"
 import type { LayerOptions } from "../service.js"
-import { RunStore, type Interface as RunStoreInterface } from "../run/store.js"
+import { RunStore, type Service as RunStoreService } from "../run/store.js"
 import {
   MultiWorkerUnsupported,
   SchemaChecksumMismatch,
@@ -110,7 +110,7 @@ export type SqliteStoreError =
 const makeSqliteStoreServices = (
   options: SqliteStoreOptions,
 ): Effect.Effect<
-  { readonly runStore: RunStoreInterface; readonly externalChildStore: ExternalChildStore["Service"] },
+  { readonly runStore: RunStoreService; readonly externalChildStore: ExternalChildStore["Service"] },
   SqliteStoreError,
   SqlClient.SqlClient | Scope.Scope
 > =>
@@ -416,7 +416,7 @@ const makeSqliteStoreServices = (
 
 export const makeSqliteRunStore = (
   options: SqliteStoreOptions,
-): Effect.Effect<RunStoreInterface, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
+): Effect.Effect<RunStoreService, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
   makeSqliteStoreServices(options).pipe(Effect.map(({ runStore }) => runStore))
 
 export const layerSqliteStore = (

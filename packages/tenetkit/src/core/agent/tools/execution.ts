@@ -21,7 +21,7 @@ import { type Registry, get } from "../../tools/tool-registry.js"
 import { ToolContext, type Progress } from "../../tools/tool-context.js"
 import { canonicalSuspensionCall, suspended } from "../suspension.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
-import type { Skill, SkillSourceError } from "../../context/skill-source.js"
+import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
 import { intercept } from "../../durable/driver/run.js"
 import { operationKey } from "../../durable/driver/interpreter.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
@@ -52,12 +52,12 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
   readonly executor: Option.Option<typeof ToolExecutor.Service>
   readonly authorizer: ToolAuthorizer<R>
   readonly skillRuntime:
-    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillSourceError> } }
+    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined
   readonly toolState: Ref.Ref<ToolState>
   readonly handoffState?: Ref.Ref<HandoffRunState>
   readonly progressPolicy: ProgressOverflowPolicy
-  readonly skillError: (turn: number, error: SkillSourceError) => AgentError
+  readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
 }
 
 export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext: ToolExecutionContext<T, R>) => {

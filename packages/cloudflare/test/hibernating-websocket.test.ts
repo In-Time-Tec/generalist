@@ -10,7 +10,7 @@ import {
 } from "../src/durable-objects/index.js"
 import { event, runtimeLayer } from "../../tenetkit/test/transport/fixtures.js"
 import { Runtime } from "tenetkit/runtime"
-import type { Interface as RuntimeInterface } from "tenetkit/runtime/driver/service"
+import type { Service as RuntimeInterface } from "tenetkit/runtime/driver/service"
 
 type StoredAttachment = Attachment | { readonly version: number }
 

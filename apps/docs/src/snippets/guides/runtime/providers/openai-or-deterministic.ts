@@ -5,7 +5,7 @@ import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "release-notes" })
 
-const modelLayer = Deterministic.layerOpenAi({
+const modelLayer = Deterministic.layerOpenAI({
   model: "gpt-4o-mini",
   fallbackModel: "gpt-4o-mini",
   apiKey: Config.redacted("OPENAI_API_KEY"),
@@ -13,7 +13,7 @@ const modelLayer = Deterministic.layerOpenAi({
 
 const selection: ModelRegistry.ModelSelection = { provider: "deterministic", model: "gpt-4o-mini" }
 
-const program = ModelRegistry.operate(selection, Agent.generate(agent, { prompt: "Draft the release note." })).pipe(
+const program = ModelRegistry.withModel(selection, Agent.generate(agent, { prompt: "Draft the release note." })).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
 )
 

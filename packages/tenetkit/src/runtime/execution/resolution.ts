@@ -1,16 +1,12 @@
 import { Effect } from "effect"
 import { ExecutableIdentityMismatch } from "../errors.js"
-import {
-  verifyAttestation,
-  verifyInput,
-  type Interface as ExecutableResolverInterface,
-} from "../executable/resolver.js"
+import { verifyAttestation, verifyInput, type Service as ExecutableResolverService } from "../executable/resolver.js"
 import { decodePinned, equals } from "../executable/manifest.js"
 import type { ExecutionRecord, WorkerMutationError } from "../run/store.js"
 import type { RunFailure } from "../run/event.js"
 
 const resolveExecution = (
-  resolver: ExecutableResolverInterface,
+  resolver: ExecutableResolverService,
   claimed: ExecutionRecord,
   fail: (error: RunFailure) => Effect.Effect<void, WorkerMutationError>,
 ) =>

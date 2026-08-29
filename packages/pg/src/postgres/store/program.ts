@@ -3,7 +3,7 @@ import { ProgramCapabilities } from "tenetkit"
 import type { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import type { Interface as RunStore } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStore } from "tenetkit/runtime/driver/run/store"
 import { requireExecutionClaim } from "tenetkit/runtime/driver/sql/store/execution"
 import {
   loadProgramState,

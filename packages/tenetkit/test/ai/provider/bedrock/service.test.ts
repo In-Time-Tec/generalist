@@ -22,8 +22,8 @@ import {
   make,
   type Credential,
   type Credentials,
-  type Interface,
-  type Options,
+  type Service,
+  type ClientOptions,
 } from "tenetkit/ai/amazon-bedrock"
 import { Deferred, Effect, Fiber, Layer, Redacted, Ref, Schema, Stream } from "effect"
 import { AiError, Tool, Toolkit } from "effect/unstable/ai"
@@ -106,7 +106,7 @@ const httpResponse = (statusCode: number, body: string, headers: Record<string, 
   },
 })
 
-const runClient = <A, E>(options: Options, effect: Effect.Effect<A, E, Client>) =>
+const runClient = <A, E>(options: ClientOptions, effect: Effect.Effect<A, E, Client>) =>
   Effect.scoped(Effect.flatMap(Layer.build(layerClient(options)), (context) => Effect.provide(effect, context)))
 
 const authorization = (headers: Record<string, string> | undefined) =>
@@ -117,7 +117,7 @@ const fakeClient = (options?: {
   readonly events?: ReadonlyArray<ConverseStreamOutput>
   readonly requestId?: string
   readonly capture?: (input: ConverseCommandInput) => void
-}): Interface => ({
+}): Service => ({
   converse: (input) =>
     Effect.sync(() => {
       options?.capture?.(input)
@@ -571,7 +571,7 @@ describe("AmazonBedrock", () => {
       failures,
       ([failure, expected]) =>
         Effect.gen(function* () {
-          const client: Interface = {
+          const client: Service = {
             ...fakeClient(),
             converse: () => Effect.fail(failure),
           }
@@ -686,7 +686,7 @@ describe("AmazonBedrock", () => {
 
   it.effect("constructs SigV4 and explicit bearer requests without exposing secrets", () => {
     const signedHeaders: Array<Record<string, string>> = []
-    const handler: NonNullable<Options["requestHandler"]> = {
+    const handler: NonNullable<ClientOptions["requestHandler"]> = {
       handle: (request: HttpRequest) => {
         signedHeaders.push(request.headers)
         return Promise.resolve(httpResponse(200, responseBody))
@@ -724,7 +724,7 @@ describe("AmazonBedrock", () => {
     let requests = 0
     let refreshes = 0
     let recoveries = 0
-    const handler: NonNullable<Options["requestHandler"]> = {
+    const handler: NonNullable<ClientOptions["requestHandler"]> = {
       handle: () => {
         requests++
         return Promise.resolve(
@@ -772,7 +772,7 @@ describe("AmazonBedrock", () => {
 
   it.effect("resolves credentials for each request and observes credential interruption", () => {
     let acquires = 0
-    const handler: NonNullable<Options["requestHandler"]> = {
+    const handler: NonNullable<ClientOptions["requestHandler"]> = {
       handle: () => Promise.resolve(httpResponse(200, responseBody)),
     }
     const input: ConverseCommandInput = { modelId: "test", messages: [{ role: "user", content: [{ text: "hi" }] }] }
@@ -818,7 +818,7 @@ describe("AmazonBedrock", () => {
     const pending = Promise.withResolvers<ReturnType<typeof httpResponse>>()
     let requestSignal: { readonly aborted: boolean } | undefined
     let destroys = 0
-    const handler: NonNullable<Options["requestHandler"]> = {
+    const handler: NonNullable<ClientOptions["requestHandler"]> = {
       handle: (_request: HttpRequest, options?: HttpHandlerOptions) => {
         requestSignal = options?.abortSignal
         started.resolve()
@@ -848,7 +848,7 @@ describe("AmazonBedrock", () => {
 
   it.effect("does not recover access denial or arbitrary forbidden responses", () => {
     let recoveries = 0
-    const handler: NonNullable<Options["requestHandler"]> = {
+    const handler: NonNullable<ClientOptions["requestHandler"]> = {
       handle: () =>
         Promise.resolve(
           httpResponse(403, JSON.stringify({ message: "denied" }), {

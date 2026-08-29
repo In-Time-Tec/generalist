@@ -27,7 +27,7 @@ export class RecoveryFailure extends Schema.TaggedError<RecoveryFailure>()("tene
 }) {}
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly converse: (input: ConverseCommandInput) => Effect.Effect<ConverseCommandOutput, ClientFailure>
   readonly converseStream: (input: ConverseCommandInput) => Effect.Effect<ConverseStreamCommandOutput, ClientFailure>
 }
@@ -38,17 +38,17 @@ export interface Recovery {
 }
 
 /** @experimental */
-export class Client extends Context.Service<Client, Interface>()("tenetkit/ai/provider/bedrock/client") {}
+export class Client extends Context.Service<Client, Service>()("tenetkit/ai/provider/bedrock/client") {}
 
 /** @experimental */
-export interface Options {
+export interface ClientOptions {
   readonly region?: string
   readonly endpoint?: string
   readonly profile?: string
   readonly credentials?: Credentials
   readonly bearerToken?: Redacted.Redacted<string>
   readonly authMode?: "default" | "bearer"
-  readonly client?: Interface
+  readonly client?: Service
   readonly recovery?: Recovery
   readonly requestHandler?: BedrockRuntimeClientConfig["requestHandler"]
 }
@@ -129,7 +129,7 @@ const wrapStream = (output: ConverseStreamCommandOutput, client: BedrockRuntimeC
 }
 
 /** @experimental */
-export const layerClient = (options: Options = {}) => {
+export const layerClient = (options: ClientOptions = {}) => {
   if (options.client !== undefined) return Layer.succeed(Client, options.client)
   return Layer.effect(
     Client,

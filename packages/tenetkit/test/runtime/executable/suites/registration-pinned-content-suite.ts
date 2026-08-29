@@ -3,7 +3,7 @@ import { AgentManifest, ExecutableManifest as CoreExecutableManifest, Pins } fro
 import { Effect } from "effect"
 import { ExecutableRegistration } from "../../../../src/runtime/index.js"
 
-const CODEC = "tenetkit/harness/snapshot"
+const CODEC = "tenetkit/agent-guidance/snapshot"
 const VERSION = "1"
 
 const payload = { schemaVersion: "1", scope: "thread:alpha", entries: [{ id: "a", kind: "memory" }] }
@@ -37,7 +37,7 @@ const opaqueRegistrations = (executable: CoreExecutableManifest.PinnedExecutable
     .filter((pin) => !exclude.has(pin))
     .map((pin) => ({ pin, codec: "test", version: "1", payload: { fixture: "1" } }))
 
-const pinnedCapability = { name: "harness", pin: pinFor(payload), content: contentFor(payload) }
+const pinnedCapability = { name: "guidance", pin: pinFor(payload), content: contentFor(payload) }
 const executable = executableWith([pinnedCapability])
 const others = opaqueRegistrations(executable, new Set([pinnedCapability.pin]))
 const registrationFor = (overrides: Partial<ExecutableRegistration.ExecutableRegistration> = {}) => ({
@@ -124,7 +124,7 @@ describe("pinned content in executable registrations", () => {
     Effect.gen(function* () {
       const conflicting = executableWith(
         [pinnedCapability],
-        [{ name: "harness-alias", pin: pinnedCapability.pin, content: { ...pinnedCapability.content, version: "2" } }],
+        [{ name: "guidance-alias", pin: pinnedCapability.pin, content: { ...pinnedCapability.content, version: "2" } }],
       )
       const failure = yield* ExecutableRegistration.validate(conflicting, [
         ...opaqueRegistrations(conflicting, new Set([pinnedCapability.pin])),
@@ -139,7 +139,7 @@ describe("pinned content in executable registrations", () => {
     Effect.gen(function* () {
       const shared = executableWith(
         [pinnedCapability],
-        [{ name: "harness-alias", pin: pinnedCapability.pin, content: { ...pinnedCapability.content } }],
+        [{ name: "guidance-alias", pin: pinnedCapability.pin, content: { ...pinnedCapability.content } }],
       )
       const validated = yield* ExecutableRegistration.validate(shared, [
         ...opaqueRegistrations(shared, new Set([pinnedCapability.pin])),
@@ -151,7 +151,7 @@ describe("pinned content in executable registrations", () => {
 
   it.effect("leaves capabilities without pinned content unconstrained", () =>
     Effect.gen(function* () {
-      const opaque = executableWith([{ name: "harness", pin: pinnedCapability.pin }])
+      const opaque = executableWith([{ name: "guidance", pin: pinnedCapability.pin }])
       const validated = yield* ExecutableRegistration.validate(opaque, [
         ...opaqueRegistrations(opaque, new Set([pinnedCapability.pin])),
         registrationFor({ codec: "anything", version: "9", payload: { free: true } }),

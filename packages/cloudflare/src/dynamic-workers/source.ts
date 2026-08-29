@@ -1,4 +1,4 @@
-import { SandboxExecutor } from "tenetkit"
+import { CodeExecutor } from "tenetkit"
 import { ImportType, initSync, parse } from "es-module-lexer"
 
 const validName = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+\.js$/
@@ -8,7 +8,7 @@ export const capabilityFailurePrefix = "tenetkit-capability-failure:"
 
 /** @experimental Validated source graph passed to Worker Loader. */
 export interface NormalizedSource {
-  readonly modules: ReadonlyArray<SandboxExecutor.Module>
+  readonly modules: ReadonlyArray<CodeExecutor.Module>
   readonly record: Readonly<Record<string, string>>
 }
 
@@ -25,13 +25,13 @@ const resolve = (from: string, specifier: string): string => {
 }
 
 /** @experimental Validate and normalize an exact ES module graph before loading it. */
-const compareModules = (left: SandboxExecutor.Module, right: SandboxExecutor.Module): number => {
+const compareModules = (left: CodeExecutor.Module, right: CodeExecutor.Module): number => {
   if (left.name < right.name) return -1
   if (left.name > right.name) return 1
   return 0
 }
 
-const validateImports = (module: SandboxExecutor.Module, names: ReadonlySet<string>): void => {
+const validateImports = (module: CodeExecutor.Module, names: ReadonlySet<string>): void => {
   const [imports] = parse(module.source, module.name)
   for (const imported of imports) {
     if (imported.t === ImportType.ImportMeta) continue
@@ -45,7 +45,7 @@ const validateImports = (module: SandboxExecutor.Module, names: ReadonlySet<stri
   if (/\brequire\s*\(/.test(module.source)) throw new TypeError("CommonJS imports are unsupported")
 }
 
-export const normalize = (request: SandboxExecutor.Request): NormalizedSource => {
+export const normalize = (request: CodeExecutor.Request): NormalizedSource => {
   initSync()
   const names = new Set<string>()
   const folded = new Set<string>()

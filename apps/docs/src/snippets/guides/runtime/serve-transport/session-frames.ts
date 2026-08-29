@@ -11,7 +11,7 @@ import {
   Response,
   ToolExecutor,
 } from "tenetkit"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
@@ -93,7 +93,7 @@ const program = Effect.gen(function* () {
     prompt: "Say hello",
   })
   const store = yield* RunStore.RunStore
-  const host = yield* ExecutionHost.ExecutionHost
+  const host = yield* RunExecutor.RunExecutor
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "docs-example" }))
   const live = yield* collectRun(receipt.runId)
   yield* Console.log(`live:   ${tags(live)}`)

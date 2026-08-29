@@ -5,7 +5,7 @@ import { type Item, type MemoryError, projectTranscript } from "../context/memor
 import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext } from "../context/session.js"
 import { type Candidate, assemble, get, type Registry } from "../tools/tool-registry.js"
 import type { CompactionError } from "../turn/compaction.js"
-import type { SkillSourceError } from "../context/skill-source.js"
+import type { SkillCatalogError } from "../context/skill-catalog.js"
 import type { Agent, RunError, RunOptions } from "./service.js"
 import { withSystem } from "./message.js"
 import { activateSkillSuccess, activateSkillToolName } from "./skill-tool.js"
@@ -234,7 +234,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               if (Option.isNone(activation)) continue
               if (skillRuntime === undefined) {
                 return yield* AgentError.make({
-                  message: "Resuming activated skill tools requires SkillSource in context",
+                  message: "Resuming activated skill tools requires SkillCatalog in context",
                   turn: 0,
                 })
               }
@@ -246,19 +246,19 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
                 })
               }
               const current = yield* Ref.get(toolState)
-              if (current.activatedSkillBodies.has(skill.frontmatter.name)) continue
+              if (current.activatedSkillBodies.has(skill.name)) continue
               const registry = yield* assemble([
                 ...current.registry.entries,
                 ...skill.tools.map(
                   (tool: Tool.Any): Candidate => ({
                     tool,
-                    origin: { _tag: "Skill", skill: skill.frontmatter.name },
+                    origin: { _tag: "Skill", skill: skill.name },
                     dispatch: "Skill",
                   }),
                 ),
               ])
               const activatedSkillBodies = new Map(current.activatedSkillBodies)
-              activatedSkillBodies.set(skill.frontmatter.name, activation.value.body)
+              activatedSkillBodies.set(skill.name, activation.value.body)
               yield* Ref.set(toolState, { registry, activatedSkillBodies })
             }
           }
@@ -280,7 +280,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         AgentError.make({ message: error.message, turn, cause: error })
       const memoryError = (turn: number, error: MemoryError): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
-      const skillError = (turn: number, error: SkillSourceError): AgentError =>
+      const skillError = (turn: number, error: SkillCatalogError): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
       const isSkillActivationCall = (call: AnyToolCall, registry: Registry): boolean =>
         get(registry, call.name)?.dispatch === "Builtin" && skillRuntime !== undefined

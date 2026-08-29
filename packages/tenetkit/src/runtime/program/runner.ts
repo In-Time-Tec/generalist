@@ -1,12 +1,12 @@
 import { Clock, DateTime, Effect, Schema, SchemaRepresentation } from "effect"
 import {
   ProgramCapabilities,
-  ProgramHost,
+  ProgramRunner,
   ProgramManifest,
-  SandboxExecutor,
-  type ProgramBindings,
+  CodeExecutor,
+  type ProgramHandlers,
 } from "../../core/index.js"
-import type { ExecutionClaim, ExecutionRecord, Interface as RunStore } from "../run/store.js"
+import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 import type { CommitProgramLogInput, ProgramOperationKind, ProgramReservation } from "./store.js"
 import { childRunIdFor, fanOutIdFor } from "../child/fan-out.js"
 import { fanOutMemberSessionId } from "../child/session.js"
@@ -35,12 +35,12 @@ export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
   readonly store: RunStore
-  readonly sandbox: SandboxExecutor.Interface
-  readonly bindings: ProgramBindings.Bindings
-}): ProgramHost.Interface => {
-  const tools = new Map(input.bindings.tools.map((binding) => [binding.name, binding] as const))
-  const steps = new Map(input.bindings.steps.map((binding) => [binding.name, binding] as const))
-  const agents = new Map(input.bindings.agents.map((binding) => [binding.selection, binding] as const))
+  readonly executor: CodeExecutor.Service
+  readonly handlers: ProgramHandlers.Handlers
+}): ProgramRunner.Service => {
+  const tools = new Map(input.handlers.tools.map((handler) => [handler.name, handler] as const))
+  const steps = new Map(input.handlers.steps.map((handler) => [handler.name, handler] as const))
+  const agents = new Map(input.handlers.agents.map((handler) => [handler.selection, handler] as const))
   const settleOperation = (
     operation: string,
     outcome: Parameters<RunStore["settleProgramOperation"]>[0]["outcome"],
@@ -56,7 +56,7 @@ export const make = (input: {
       readonly kind: Exclude<ProgramOperationKind, "log">
       readonly capability: string
       readonly request: unknown
-      readonly replay: ProgramBindings.ProgramReplayPolicy
+      readonly replay: ProgramHandlers.ProgramReplayPolicy
       readonly reservation?: ProgramReservation
       readonly prepare: Effect.Effect<void, ProgramCapabilities.CapabilityFailure>
       readonly dispatch: Effect.Effect<A, ProgramCapabilities.CapabilityFailure>
@@ -354,7 +354,7 @@ export const make = (input: {
 
   const makeCapabilities = (program: ProgramManifest.PinnedProgram) =>
     ProgramCapabilities.ProgramCapabilities.of({
-      discoverTools: Effect.succeed(input.bindings.tools.map(({ name }) => ({ name }))),
+      discoverTools: Effect.succeed(input.handlers.tools.map(({ name }) => ({ name }))),
       describeTool: (name) => {
         const binding = tools.get(name)
         if (binding === undefined)
@@ -435,20 +435,23 @@ export const make = (input: {
         }),
     })
 
-  return ProgramHost.ProgramHost.of({
+  return ProgramRunner.ProgramRunner.of({
     execute: (request) =>
       Effect.gen(function* () {
         const actual = ProgramManifest.make(request.program.manifest)
         if (actual.pin !== request.program.pin)
-          return yield* ProgramHost.ProgramIdentityMismatch.make({ expected: request.program.pin, actual: actual.pin })
-        yield* ProgramHost.validateBindings(request.program, input.bindings)
+          return yield* ProgramRunner.ProgramIdentityMismatch.make({
+            expected: request.program.pin,
+            actual: actual.pin,
+          })
+        yield* ProgramRunner.validateHandlers(request.program, input.handlers)
         const capabilities = makeCapabilities(request.program)
         const signal = yield* Effect.abortSignal
         const now = yield* Clock.currentTimeMillis
         const budget = request.program.manifest.budget
-        const execution = input.sandbox
+        const execution = input.executor
           .execute(
-            SandboxExecutor.makeRequest({
+            CodeExecutor.makeRequest({
               requestId: `${input.claim.runId}:${input.claim.attemptFence}`,
               source: request.program.manifest.source.text,
               inputCodec: request.program.manifest.input,

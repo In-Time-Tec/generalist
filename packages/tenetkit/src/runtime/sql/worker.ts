@@ -15,7 +15,7 @@ import {
 } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import { RunClaims, type ClaimedRun } from "./run/claims.js"
-import { ExecutionHost } from "../execution/host.js"
+import { RunExecutor } from "../execution/run-executor.js"
 import { RunStore } from "../run/store.js"
 import { isTerminal } from "../run.js"
 
@@ -66,7 +66,7 @@ interface WorkerState {
   readonly claims: ReadonlyMap<string, ActiveClaim>
 }
 
-export interface Interface {
+export interface Service {
   readonly workerId: string
   readonly active: Effect.Effect<number>
   readonly status: Effect.Effect<WorkerStatus>
@@ -75,16 +75,16 @@ export interface Interface {
   readonly run: Effect.Effect<never>
 }
 
-export class RuntimeWorker extends Context.Service<RuntimeWorker, Interface>()(
+export class RuntimeWorker extends Context.Service<RuntimeWorker, Service>()(
   "tenetkit/runtime/sql/worker/RuntimeWorker",
 ) {}
 
 export const makeWorker = (
   options: WorkerOptions,
-): Effect.Effect<Interface, never, RunClaims | ExecutionHost | RunStore | Scope.Scope> =>
+): Effect.Effect<Service, never, RunClaims | RunExecutor | RunStore | Scope.Scope> =>
   Effect.gen(function* () {
     const claims = yield* RunClaims
-    const host = yield* ExecutionHost
+    const executor = yield* RunExecutor
     const store = yield* RunStore
     const concurrency = options.concurrency ?? 1
     const lease = options.lease ?? "30 seconds"
@@ -153,7 +153,7 @@ export const makeWorker = (
         Effect.andThen(store.inspect(runId)),
         Effect.flatMap((run) => {
           if (run.status === "cancelling") {
-            return host.interrupt(runId).pipe(Effect.andThen(watchCancellation(runId)))
+            return executor.interrupt(runId).pipe(Effect.andThen(watchCancellation(runId)))
           }
           return isTerminal(run.status) ? Effect.void : watchCancellation(runId)
         }),
@@ -173,7 +173,7 @@ export const makeWorker = (
         ),
         Effect.flatMap((refreshed) => (refreshed ? renew : Effect.void)),
       )
-      const hosted = host
+      const hosted = executor
         .execute({ runId: item.run.runId, ownerId: options.workerId, attemptFence: item.attemptFence })
         .pipe(Effect.raceFirst(renew))
       return (
@@ -351,5 +351,5 @@ export const makeWorker = (
 
 export const layerWorker = (
   options: WorkerOptions,
-): Layer.Layer<RuntimeWorker, never, RunClaims | ExecutionHost | RunStore> =>
+): Layer.Layer<RuntimeWorker, never, RunClaims | RunExecutor | RunStore> =>
   Layer.effect(RuntimeWorker, makeWorker(options).pipe(Effect.map((service) => RuntimeWorker.of(service))))

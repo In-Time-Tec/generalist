@@ -1,6 +1,6 @@
 import { Context, Effect, Fiber, Layer, SynchronizedRef } from "effect"
 
-export interface Interface {
+export interface Service {
   readonly run: <E, R>(runId: string, execution: Effect.Effect<void, E, R>) => Effect.Effect<void, never, R>
   readonly interrupt: (runId: string) => Effect.Effect<void>
   readonly cancellationRequested: (runId: string) => Effect.Effect<boolean>
@@ -13,7 +13,7 @@ interface ActiveExecution {
   cancellationRequested: boolean
 }
 
-export class ActiveExecutions extends Context.Service<ActiveExecutions, Interface>()(
+export class ActiveExecutions extends Context.Service<ActiveExecutions, Service>()(
   "tenetkit/runtime/execution/active-executions/ActiveExecutions",
 ) {}
 

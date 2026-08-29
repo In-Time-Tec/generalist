@@ -4,13 +4,13 @@ import { adapt } from "../service.js"
 import type { IdentityCell } from "./identity.js"
 import { disabledResponseIdTracker, firstOutputKind, providerUsage, singleFailure } from "./observation.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "../response/failure.js"
-import type { Classification, Interface as Resilience } from "../resilience.js"
+import type { Classification, Service as Resilience } from "../resilience.js"
 import type { CandidateIdentity, FailureDisposition } from "../registry.js"
 import { type TerminationFailure, requireTerminal } from "../stream-termination.js"
 import {
   InvocationCoordinationFailed,
   type EventPayload,
-  type InvocationCoordinatorInterface,
+  type InvocationCoordinatorService,
   type ModelCallPurpose,
   type ModelFailureCategory,
   type ModelFirstOutputKind,
@@ -29,7 +29,7 @@ export interface InstrumentOptions {
   readonly resilience?: Resilience
   readonly logicalOperationId?: string
   readonly nextCallOrdinal?: (persisted?: number) => number
-  readonly coordinator?: InvocationCoordinatorInterface
+  readonly coordinator?: InvocationCoordinatorService
 }
 
 export interface CallState {

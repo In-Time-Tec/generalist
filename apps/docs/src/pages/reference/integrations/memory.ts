@@ -100,7 +100,7 @@ export const memoryReference = definePage({
       code("VectorStore.layerMemory"),
       " is the in-process implementation using cosine similarity; it rejects non-finite vectors and mismatched dimensions. ",
       code("layerTest(implementation)"),
-      " wraps an explicit interface; a Postgres/pgvector store implements the same two functions.",
+      " wraps an explicit service; a Postgres/pgvector store implements the same two functions.",
     ),
     h2("combined", "layerCombined"),
     p(

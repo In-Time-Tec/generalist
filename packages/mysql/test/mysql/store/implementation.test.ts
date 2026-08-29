@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Layer, Redacted, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
-import { MysqlRunSchema } from "@tenetkit/mysql"
+import { RunSchema } from "@tenetkit/mysql"
 import { Errors, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
@@ -1011,7 +1011,7 @@ describeMysql("mysql run store", () => {
   it.live("exposes plan, check, apply, markDirty, and verify-only startup", () =>
     withSchema(
       Effect.gen(function* () {
-        const plan = yield* MysqlRunSchema.plan("mysql-test").pipe(scopedWith(mysqlClient(url)))
+        const plan = yield* RunSchema.plan("mysql-test").pipe(scopedWith(mysqlClient(url)))
         expect(plan.required).toBe(SCHEMA_VERSION)
         expect(plan.upgradeRequired).toBe(false)
         expect(plan.statements).toEqual([])
@@ -1025,7 +1025,7 @@ describeMysql("mysql run store", () => {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION} WHERE id = 1`
         }).pipe(scopedWith(mysqlClient(url)))
-        yield* MysqlRunSchema.markDirty("mysql-test").pipe(scopedWith(mysqlClient(url)))
+        yield* RunSchema.markDirty("mysql-test").pipe(scopedWith(mysqlClient(url)))
         const dirty = yield* Effect.exit(scopedWith(mysqlLayer(url))(Effect.void))
         expect(Exit.isFailure(dirty)).toBe(true)
         yield* Effect.gen(function* () {
@@ -1036,7 +1036,7 @@ describeMysql("mysql run store", () => {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`
         }).pipe(scopedWith(mysqlClient(url)))
-        const future = yield* MysqlRunSchema.apply("mysql-test").pipe(scopedWith(mysqlClient(url)), Effect.flip)
+        const future = yield* RunSchema.apply("mysql-test").pipe(scopedWith(mysqlClient(url)), Effect.flip)
         expect(future).toBeInstanceOf(Errors.SchemaVersionUnsupported)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient

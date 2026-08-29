@@ -3,7 +3,7 @@ import { expect, test } from "vitest"
 
 import { allPages, pageByPath } from "../../src/content/registry"
 import { addressedMessaging } from "../../src/pages/guides/agent/addressed-messaging"
-import { continualHarness } from "../../src/pages/guides/agent/continual-harness"
+import { agentGuidance } from "../../src/pages/guides/agent/guidance"
 import { durableCompositeTools } from "../../src/pages/guides/tools/durable-composite-tools"
 import { typescriptCells } from "../../src/pages/guides/tools/typescript-cells"
 import { kernelBoundaries } from "../../src/pages/learn/kernel-boundaries"
@@ -21,7 +21,7 @@ test("every new capability page is registered under its Diataxis group", () => {
     cellAgent,
     kernelBoundaries,
     typescriptCells,
-    continualHarness,
+    agentGuidance,
     durableCompositeTools,
     addressedMessaging,
   ]) {
@@ -30,7 +30,7 @@ test("every new capability page is registered under its Diataxis group", () => {
   }
   expect(cellAgent.group).toBe("Start")
   expect(kernelBoundaries.group).toBe("Learn")
-  for (const page of [typescriptCells, continualHarness, durableCompositeTools, addressedMessaging]) {
+  for (const page of [typescriptCells, agentGuidance, durableCompositeTools, addressedMessaging]) {
     expect(page.group, page.path).toBe("Guides")
   }
 })
@@ -99,7 +99,7 @@ test("the cell tutorial walks a beginner from an epoch to the real kernel", () =
     "KernelProfile",
     "bun add effect tenetkit tenetkit/repl",
     "TestKernel.layerTestPool",
-    "HostBindingRegistry",
+    "HostModules",
     "tenetkit/repl/bun",
     "bindingsDigest",
     "sequence",
@@ -111,7 +111,7 @@ test("the cell tutorial walks a beginner from an epoch to the real kernel", () =
   expect(steps.length).toBeGreaterThanOrEqual(5)
 })
 
-test("the harness guide keeps the authorship boundary and the durable-store guarantees", () => {
+test("the agent-guidance guide keeps the authorship boundary and the durable-store guarantees", () => {
   for (const marker of [
     "Authorship.authorProposal",
     "AuthoredProposal",
@@ -122,13 +122,13 @@ test("the harness guide keeps the authorship boundary and the durable-store guar
     "pinned-revision",
     "compile-time discriminator",
     "rollback-not-newest",
-    "FileSystemHarnessStore.layer({ path })",
+    "FileSystemStore.layer({ path })",
     "0600",
     "0700",
     "corrupt",
-    "HarnessRegistration.registration(state, name)",
+    "Registration.registration(state, name)",
   ]) {
-    expect(continualHarness.markdown, marker).toContain(marker)
+    expect(agentGuidance.markdown, marker).toContain(marker)
   }
 })
 

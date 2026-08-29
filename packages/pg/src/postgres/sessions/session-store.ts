@@ -296,7 +296,7 @@ export const postgresSessionStore = (options: {
   readonly sessionId: string
   readonly run: RunFn
   readonly runNoTxn: RunFn
-}): Session.Interface => {
+}): Session.Service => {
   const { sessionId, run, runNoTxn } = options
 
   const append = (entry: AppendInput, appendOptions?: AppendOptions) =>

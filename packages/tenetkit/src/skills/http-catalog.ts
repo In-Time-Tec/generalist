@@ -1,6 +1,6 @@
-import { Crypto, Effect } from "effect"
-import { HttpClient, Url } from "effect/unstable/http"
-import { SkillSource } from "../core/index.js"
+import { Effect } from "effect"
+import { Url } from "effect/unstable/http"
+import { SkillCatalog } from "../core/index.js"
 import { type Limits, make as makeHostedCatalog, resolveRelative } from "./hosted-catalog.js"
 
 /** @experimental Generic HTTP skill catalog options. */
@@ -9,10 +9,10 @@ export interface Options extends Limits {
 }
 
 const invalidUrl = () =>
-  SkillSource.SkillSourceError.make({ source: "http-skill-catalog", message: "Invalid manifest URL" })
+  SkillCatalog.SkillCatalogError.make({ source: "http-skill-catalog", message: "Invalid manifest URL" })
 
-/** @experimental Build a generic HTTP catalog source. */
-export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient | Crypto.Crypto> =>
+/** @experimental Build a generic HTTP catalog. */
+export const make = (options: Options) =>
   Effect.gen(function* () {
     const parsed = yield* Effect.fromResult(Url.fromString(options.manifestUrl)).pipe(Effect.mapError(invalidUrl))
     const source = `${parsed.origin}${parsed.pathname}`
@@ -25,4 +25,4 @@ export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient
   })
 
 /** @experimental Build a generic HTTP catalog layer. */
-export const layer = (options: Options): ReturnType<typeof SkillSource.layer> => SkillSource.layer([make(options)])
+export const layer = (options: Options): ReturnType<typeof SkillCatalog.layer> => SkillCatalog.layer([make(options)])

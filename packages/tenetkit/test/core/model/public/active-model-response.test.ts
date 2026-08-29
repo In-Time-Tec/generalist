@@ -26,7 +26,7 @@ const noToolAgent = Agent.make({ name: "active-model-response-agent" })
 
 const provideRun = <A, E, R>(
   stream: Stream.Stream<A, E, R | LanguageModel.LanguageModel>,
-  handle: ActiveModelResponse.Interface,
+  handle: ActiveModelResponse.Service,
   model: Layer.Layer<LanguageModel.LanguageModel>,
   resilience?: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.ModelResilienceMisconfigured>,
 ) =>

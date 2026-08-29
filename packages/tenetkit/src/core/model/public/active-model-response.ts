@@ -10,5 +10,5 @@ export const ActiveModelResponse = {
 export namespace ActiveModelResponse {
   export type AttemptIdentity = import("../result/active-model-response.js").AttemptIdentity
   export type Snapshot = import("../result/active-model-response.js").Snapshot
-  export type Interface = import("../result/active-model-response.js").Interface
+  export type Service = import("../result/active-model-response.js").Service
 }

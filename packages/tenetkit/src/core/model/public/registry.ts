@@ -17,7 +17,7 @@ import {
   layerTest as ModelRegistry_layerTest,
   register as ModelRegistry_register,
   registrations as ModelRegistry_registrations,
-  operate as ModelRegistry_operate,
+  withModel as ModelRegistry_withModel,
   stream as ModelRegistry_stream,
 } from "../registry.js"
 export const ModelRegistry = {
@@ -35,7 +35,7 @@ export const ModelRegistry = {
   layerTest: ModelRegistry_layerTest,
   register: ModelRegistry_register,
   registrations: ModelRegistry_registrations,
-  operate: ModelRegistry_operate,
+  withModel: ModelRegistry_withModel,
   stream: ModelRegistry_stream,
 } satisfies ModelRegistryFacade
 export namespace ModelRegistry {
@@ -53,7 +53,7 @@ export namespace ModelRegistry {
   export type layerTest = typeof import("../registry.js").layerTest
   export type register = typeof import("../registry.js").register
   export type registrations = typeof import("../registry.js").registrations
-  export type operate = typeof import("../registry.js").operate
+  export type withModel = typeof import("../registry.js").withModel
   export type stream = typeof import("../registry.js").stream
   export type FailureClassification = import("../registry.js").FailureClassification
   export type AvailabilityFailureClassifier = import("../registry.js").AvailabilityFailureClassifier
@@ -63,7 +63,7 @@ export namespace ModelRegistry {
   export type CandidateRouteInstrumentation = import("../registry.js").CandidateRouteInstrumentation
   export type FailureClassifier = import("../registry.js").FailureClassifier
   export type GovernanceOptions = import("../registry.js").GovernanceOptions
-  export type Interface = import("../registry.js").Interface
+  export type Service = import("../registry.js").Service
   export type Metadata = import("../registry.js").Metadata
   export type ModelEnvironment = import("../registry.js").ModelEnvironment
   export type ModelSelection = import("../registry.js").ModelSelection

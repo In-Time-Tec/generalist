@@ -4,7 +4,7 @@ import { HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Response } from "effect/unstable/ai"
 import { Errors as RuntimeErrors } from "tenetkit/runtime"
-import { Wire, Ws } from "../../src/transport/index.js"
+import { WebSocket, Wire } from "../../src/transport/index.js"
 import { event, runtimeLayer } from "./fixtures.js"
 
 interface FakeSocket {
@@ -61,10 +61,10 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest => 
 const run = (fake: FakeSocket, layer = runtimeLayer()) =>
   provideScoped(
     layer,
-    Ws.handle.pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, request(fake.socket))),
+    WebSocket.handle.pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, request(fake.socket))),
   ).pipe(Effect.forkChild)
 
-describe("Ws", () => {
+describe("WebSocket transport", () => {
   it.live("replays after the attached cursor and cancels only on an explicit command", () =>
     Effect.gen(function* () {
       const cancelled = yield* Ref.make<Array<string>>([])

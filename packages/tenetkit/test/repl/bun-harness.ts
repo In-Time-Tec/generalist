@@ -4,9 +4,9 @@ import { execFileSync } from "node:child_process"
 import { layer as bunLayer, type BunServices } from "@effect/platform-bun/BunServices"
 import { Context, Duration, Effect, FileSystem, Layer, Path, type PlatformError, Scope, Stream } from "effect"
 import type { CellEvent, CellFailure, CellResult } from "../../src/repl/cell.js"
-import type { Execution, Interface as KernelPoolInterface } from "../../src/repl/kernel-pool.js"
+import type { Execution, Service as KernelPoolService } from "../../src/repl/kernel-pool.js"
 import { KernelStateStore } from "../../src/repl/kernel-state-store.js"
-import { HostBindingRegistry, KernelProfile } from "../../src/repl/index.js"
+import { HostModules, KernelProfile } from "../../src/repl/index.js"
 import { BunKernelPool, BunKernelStateStore } from "../../src/repl/bun/index.js"
 
 /** The kernel worker module a real-worker test spawns. */
@@ -40,13 +40,13 @@ export interface PoolOverrides {
   readonly startTimeoutMillis?: number
   readonly workspaceRoot?: string
   readonly workerModuleOverride?: string
-  readonly modules?: ReadonlyArray<HostBindingRegistry.Module>
+  readonly modules?: ReadonlyArray<HostModules.Module>
   readonly bootstrap?: string
 }
 
 /** What one real-worker test is handed. */
 export interface Harness {
-  readonly pool: KernelPoolInterface
+  readonly pool: KernelPoolService
   readonly dataRoot: string
   readonly profile: KernelProfile.KernelProfile
   /** How many kernel workers this test process currently owns. */
@@ -74,12 +74,12 @@ export const ownWorkers: Effect.Effect<number> = Effect.sync(() =>
 )
 
 const registryContext = (
-  modules: ReadonlyArray<HostBindingRegistry.Module> | undefined,
+  modules: ReadonlyArray<HostModules.Module> | undefined,
 ): Effect.Effect<Context.Context<never>> =>
   modules === undefined
     ? Effect.succeed(Context.empty())
-    : HostBindingRegistry.make(modules).pipe(
-        Effect.map((registry) => Context.make(HostBindingRegistry.HostBindingRegistry, registry)),
+    : HostModules.make(modules).pipe(
+        Effect.map((registry) => Context.make(HostModules.HostModules, registry)),
         Effect.orDie,
       )
 
@@ -144,7 +144,7 @@ export const withPool = <A, E, R>(
 
 /** One cell submitted to a session of a live pool. */
 export interface CellRequest {
-  readonly pool: KernelPoolInterface
+  readonly pool: KernelPoolService
   readonly sessionId: string
   readonly cellId: string
   readonly code: string

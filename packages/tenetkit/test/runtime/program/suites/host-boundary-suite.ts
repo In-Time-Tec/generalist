@@ -6,18 +6,18 @@ import {
   AgentProgram,
   ExecutableManifest,
   Pins,
-  ProgramBindings,
+  ProgramHandlers,
   ProgramCapabilities,
-  SandboxExecutor,
+  CodeExecutor,
 } from "../../../../src/index.js"
-import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import type { ToolCallInput } from "../../../../src/core/program/capabilities.js"
 import type { StaticExecutable } from "../../../../src/runtime/executable/resolver.js"
 import { registrationsFor } from "../../execution/fixtures.js"
 
 const makeFixture = (
   name: string,
-  execute: SandboxExecutor.TestExecute,
+  execute: CodeExecutor.TestExecute,
   options?: {
     readonly outputBytes?: number
     readonly wallClockMillis?: number
@@ -50,9 +50,9 @@ const makeFixture = (
     root: program.pinned.pin,
     entries: [{ _tag: "Program", ...program.pinned }],
   })
-  const bindings = ProgramBindings.make({
+  const handlers = ProgramHandlers.make({
     tools: [
-      ProgramBindings.tool({
+      ProgramHandlers.tool({
         name: "echo",
         pin: program.pinned.manifest.capabilities.tools[0]!.pin,
         input: Schema.Struct({ value: Schema.Finite }),
@@ -70,8 +70,8 @@ const makeFixture = (
     _tag: "Program",
     executable,
     program,
-    sandbox: SandboxExecutor.makeTest(execute, { ...SandboxExecutor.testIdentity, fixture: `boundary:${name}` }),
-    bindings,
+    executor: CodeExecutor.makeTest(execute, { ...CodeExecutor.testIdentity, fixture: `boundary:${name}` }),
+    handlers,
   }
   const registration: StaticExecutable =
     options?.services === undefined ? registrationBase : { ...registrationBase, services: options.services }
@@ -89,7 +89,7 @@ const execute = (address: Address.Address) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
-    const host = yield* ExecutionHost.ExecutionHost
+    const host = yield* RunExecutor.RunExecutor
     const receipt = yield* runtime.send({ to: address, sessionId: address, idempotencyKey: address, prompt: "run" })
     yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: address }))
     return { runId: receipt.runId, outcome: (yield* runtime.snapshot(receipt.runId)).outcome }
@@ -196,7 +196,7 @@ describe("durable Program host boundary", () => {
   it.effect("interrupts the sandbox and finalizes resources before terminal settlement", () => {
     const lifecycle: Array<string> = []
     let runId = ""
-    let store: RunStore.Interface
+    let store: RunStore.Service
     let started: Deferred.Deferred<void>
     const statusAtFinalizer = (name: string) =>
       store.inspect(runId).pipe(
@@ -220,7 +220,7 @@ describe("durable Program host boundary", () => {
         started = yield* Deferred.make<void>()
         const runtime = yield* Runtime.Runtime
         store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const receipt = yield* runtime.send({
           to: fixture.address,
           sessionId: "cancel",

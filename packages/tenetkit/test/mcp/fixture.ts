@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Deferred, type Duration, Effect, Option, type Scope, Schema } from "effect"
-import { McpToolSource, OAuth } from "../../src/mcp/index"
+import { MCPClient, OAuth } from "../../src/mcp/index"
 
 export const addInputSchema = {
   type: "object" as const,
@@ -22,7 +22,7 @@ export const statsOutputSchema = {
 const AddArguments = Schema.Struct({ a: Schema.Finite, b: Schema.Finite })
 
 export interface Fixture {
-  readonly source: McpToolSource.Interface
+  readonly source: MCPClient.Service
   readonly closes: { count: number }
   readonly hang: { readonly started: Deferred.Deferred<void>; readonly aborted: Deferred.Deferred<void> }
 }
@@ -166,19 +166,15 @@ export const makeFixtureWith = (options?: {
   readonly malformedStructuredContent?: boolean
   readonly closes?: { count: number }
   readonly rejectClose?: boolean
-}): Effect.Effect<
-  Fixture,
-  FixtureSetupError | McpToolSource.McpConnectionFailed | OAuth.OAuthProviderError,
-  Scope.Scope
-> =>
+}): Effect.Effect<Fixture, FixtureSetupError | MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError, Scope.Scope> =>
   Effect.gen(function* () {
     const fixture = yield* makeTransportFixture(options)
-    const source = yield* McpToolSource.fromTransport("calc", fixture.transport, options)
+    const source = yield* MCPClient.fromTransport("calc", fixture.transport, options)
     return { source, closes: fixture.closes, hang: fixture.hang }
   })
 
 export const makeFixture: Effect.Effect<
   Fixture,
-  FixtureSetupError | McpToolSource.McpConnectionFailed | OAuth.OAuthProviderError,
+  FixtureSetupError | MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError,
   Scope.Scope
 > = makeFixtureWith()

@@ -1,7 +1,7 @@
 import { Effect, Option, Schema } from "effect"
 import type { Session } from "../../core/index.js"
 import { RuntimeUnavailable, SessionEntryCorrupt, SessionEntryNotFound } from "../errors.js"
-import type { Interface as RunStoreInterface } from "../run/store.js"
+import type { Service as RunStoreService } from "../run/store.js"
 import type { ModelResponseEvent, SessionEntryInput } from "../service.js"
 import {
   completedSessionEntryId,
@@ -12,7 +12,7 @@ import {
 import { interruptedSessionEntryId, resolveInterruptedModelResponse } from "../execution/model-response/interrupted.js"
 
 export const readEntry =
-  (store: RunStoreInterface) =>
+  (store: RunStoreService) =>
   (
     input: SessionEntryInput,
   ): Effect.Effect<Session.Entry, SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable> =>
@@ -41,7 +41,7 @@ export const readEntry =
       return Object.freeze(entry)
     })
 
-export const resolveModelResponse = (store: RunStoreInterface) => (event: ModelResponseEvent) =>
+export const resolveModelResponse = (store: RunStoreService) => (event: ModelResponseEvent) =>
   Effect.gen(function* () {
     const expectedEntryId =
       event._tag === "ModelResponseCommitted"

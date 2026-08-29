@@ -4,7 +4,7 @@ import { Prompt } from "effect/unstable/ai"
 import type { TreePolicy } from "./tree/policy.js"
 import type { Address } from "./address.js"
 import type { PinnedExecutable } from "./executable/manifest.js"
-import type { Interface as ExecutableResolverInterface } from "./executable/resolver.js"
+import type { Service as ExecutableResolverService } from "./executable/resolver.js"
 import type { Cursor } from "./cursor.js"
 import type {
   AddressNotFound,
@@ -51,7 +51,7 @@ import type {
 import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
-import type { Interface as MessagingPolicyInterface } from "./messaging/service.js"
+import type { Service as MessagingPolicyService } from "./messaging/service.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { CompletedModelResponse, RunEvent } from "./run/event.js"
 import type { WaitResolution } from "./run/wait.js"
@@ -80,10 +80,10 @@ export interface AddressBinding {
 
 export interface LayerOptions {
   readonly addresses: ReadonlyArray<AddressBinding>
-  readonly resolver: ExecutableResolverInterface
+  readonly resolver: ExecutableResolverService
   readonly subscriberQueueCapacity?: number
   /** Host policy for addressing beyond TenetKit's derived relationships. Absent means relationships only. */
-  readonly messagingPolicy?: MessagingPolicyInterface
+  readonly messagingPolicy?: MessagingPolicyService
   readonly mailboxBounds?: Partial<MailboxBounds>
   /** Final-state callback executed synchronously inside each authoritative store transaction. */
   readonly activationProjection?: RunActivationProjection
@@ -357,7 +357,7 @@ export type FanOutError =
 export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
 
-export interface Interface {
+export interface Service {
   readonly start: (input: StartInput) => Effect.Effect<StartReceipt, StartError>
   /** @experimental Durably admit one exact root without making it executable. */
   readonly admit: (input: AdmitInput) => Effect.Effect<RunReceipt, AdmitError>
@@ -427,4 +427,4 @@ export interface Interface {
   readonly awaitFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, AwaitFanOutError>
 }
 
-export class Runtime extends Context.Service<Runtime, Interface>()("tenetkit/runtime/service/Runtime") {}
+export class Runtime extends Context.Service<Runtime, Service>()("tenetkit/runtime/service/Runtime") {}

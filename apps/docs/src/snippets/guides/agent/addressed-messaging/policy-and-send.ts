@@ -20,7 +20,7 @@ const messagingPolicy = Messaging.Policy.make({
     ),
 })
 
-export const runtimeLayer = (resolver: ExecutableResolver.Interface): Layer.Layer<Runtime.Runtime> =>
+export const runtimeLayer = (resolver: ExecutableResolver.Service): Layer.Layer<Runtime.Runtime> =>
   Runtime.layerMemory({
     resolver,
     addresses: [],

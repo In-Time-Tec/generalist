@@ -29,7 +29,7 @@ export const replReference = definePage({
             ", ",
             code("KernelStateStore"),
             ", ",
-            code("HostBindingRegistry"),
+            code("HostModules"),
             ", and ",
             code("TestKernel"),
           ],
@@ -120,18 +120,18 @@ export const replReference = definePage({
     ),
     h2("ports", "Kernel ports"),
     table(
-      ["Service", "Interface"],
+      ["Service", "Members"],
       [
         [
           [code("KernelPool")],
           [code("execute"), ", ", code("inspect"), ", ", code("interrupt"), ", ", code("restart"), ", ", code("close")],
         ],
         [[code("KernelStateStore")], [code("load"), ", ", code("save"), ", ", code("drop")]],
-        [[code("HostBindingRegistry")], [code("descriptors"), ", ", code("resolve"), ", ", code("invoke")]],
+        [[code("HostModules")], [code("descriptors"), ", ", code("resolve"), ", ", code("invoke")]],
       ],
     ),
     p(
-      code("HostBindingRegistry.make(modules)"),
+      code("HostModules.make(modules)"),
       " mounts named Schema-typed host modules into the kernel namespace and rejects duplicate module or operation names. Operation failures are tagged so a cell discriminates them as data, and schema faults report their stage.",
     ),
     h2("state", "State is working memory"),

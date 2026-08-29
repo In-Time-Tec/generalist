@@ -5,10 +5,10 @@ import {
   AgentProgram,
   ExecutableManifest,
   Pins,
-  ProgramBindings,
+  ProgramHandlers,
   ProgramCapabilities,
-  ProgramHost,
-  SandboxExecutor,
+  ProgramRunner,
+  CodeExecutor,
 } from "../../../src/core/index.js"
 import { Deferred, Effect, Fiber, Function, Layer, Schema, Scope } from "effect"
 import { expect } from "vitest"
@@ -67,11 +67,11 @@ const program = (
 
 const incrementTool = (
   overrides: {
-    readonly authorize?: ProgramBindings.Authorize<number>
+    readonly authorize?: ProgramHandlers.Authorize<number>
     readonly execute?: (value: number) => Effect.Effect<unknown, unknown>
   } = {},
 ) =>
-  ProgramBindings.tool({
+  ProgramHandlers.tool({
     name: "increment",
     pin: toolPin,
     input: Schema.Finite,
@@ -86,7 +86,7 @@ const workerAgent = (
     readonly execute?: (input: string) => Effect.Effect<ProgramCapabilities.AgentRunResult, unknown>
   } = {},
 ) =>
-  ProgramBindings.agent({
+  ProgramHandlers.agent({
     selection: "worker",
     agent: agentPin,
     inputPin: agentInputPin,
@@ -99,17 +99,17 @@ const workerAgent = (
         Effect.succeed({ text: input, turns: 1, tokenUsage: { input: 2, output: 3 } })),
   })
 
-const bindings = (options?: { readonly toolOutput?: number; readonly agentDelay?: number }) => {
+const handlers = (options?: { readonly toolOutput?: number; readonly agentDelay?: number }) => {
   const toolOutput = options?.toolOutput
   const agentDelay = options?.agentDelay
-  return ProgramBindings.make({
+  return ProgramHandlers.make({
     tools: [
       incrementTool(
         toolOutput === undefined ? {} : { execute: (): Effect.Effect<number, unknown> => Effect.succeed(toolOutput) },
       ),
     ],
     steps: [
-      ProgramBindings.step({
+      ProgramHandlers.step({
         name: "double",
         pin: stepPin,
         input: Schema.Finite,
@@ -153,16 +153,16 @@ const provideScoped = Function.dual<
 
 const runWith =
   <A, E>(
-    fixture: SandboxExecutor.TestExecute,
-    live = bindings(),
+    fixture: CodeExecutor.TestExecute,
+    live = handlers(),
   ): ((
-    effect: Effect.Effect<A, E, ProgramHost.ProgramHost | import("effect").Scope.Scope>,
+    effect: Effect.Effect<A, E, ProgramRunner.ProgramRunner | import("effect").Scope.Scope>,
   ) => Effect.Effect<A, E, import("effect").Scope.Scope>) =>
   (effect) =>
     provideScoped(
-      ProgramHost.layerDirect({
-        sandbox: SandboxExecutor.makeTest(fixture, { ...SandboxExecutor.testIdentity, fixture: "agent-program" }),
-        bindings: live,
+      ProgramRunner.layerDirect({
+        executor: CodeExecutor.makeTest(fixture, { ...CodeExecutor.testIdentity, fixture: "agent-program" }),
+        handlers: live,
       }),
       effect,
     )
@@ -185,37 +185,37 @@ it.effect("runs sequential typed tools and steps while filtering a large interme
             yield* capabilities.log({ operation: "complete", level: "info", message: "complete" })
             return { value: output }
           }),
-        bindings({ toolOutput: 10_000 }),
+        handlers({ toolOutput: 10_000 }),
       ),
       Effect.map((result) => expect(result).toEqual({ value: 42 })),
     ),
   ),
 )
 
-it.effect("denies bindings outside the exact manifest closure and rejects pin mismatches", () =>
+it.effect("denies handlers outside the exact manifest closure and rejects pin mismatches", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const closed = program("closed", { steps: false, agents: false })
-      const fixture = SandboxExecutor.makeTest(() => Effect.succeed({ value: 1 }), {
-        ...SandboxExecutor.testIdentity,
+      const fixture = CodeExecutor.makeTest(() => Effect.succeed({ value: 1 }), {
+        ...CodeExecutor.testIdentity,
         fixture: "closed-program",
       })
       const extra = yield* provideScoped(
-        ProgramHost.layerDirect({ sandbox: fixture, bindings: bindings() }),
+        ProgramRunner.layerDirect({ executor: fixture, handlers: handlers() }),
         AgentProgram.run(closed, { value: 1 }),
       ).pipe(Effect.flip)
-      expect(extra).toBeInstanceOf(ProgramHost.ProgramBindingMismatch)
+      expect(extra).toBeInstanceOf(ProgramRunner.ProgramHandlerMismatch)
 
-      const wrong = ProgramBindings.make({
-        tools: [{ ...bindings().tools[0]!, pin: Pins.makeCapability({ wrong: true }) }],
+      const wrong = ProgramHandlers.make({
+        tools: [{ ...handlers().tools[0]!, pin: Pins.makeCapability({ wrong: true }) }],
         steps: [],
         agents: [],
       })
       const mismatch = yield* provideScoped(
-        ProgramHost.layerDirect({ sandbox: fixture, bindings: wrong }),
+        ProgramRunner.layerDirect({ executor: fixture, handlers: wrong }),
         AgentProgram.run(closed, { value: 1 }),
       ).pipe(Effect.flip)
-      expect(mismatch).toBeInstanceOf(ProgramHost.ProgramBindingMismatch)
+      expect(mismatch).toBeInstanceOf(ProgramRunner.ProgramHandlerMismatch)
     }),
   ),
 )
@@ -235,8 +235,8 @@ it.effect("schema-validates every capability argument and result", () =>
       )
       expect(badInput).toBeInstanceOf(ProgramCapabilities.ProgramSchemaFailure)
 
-      const badBindings = bindings()
-      const invalidOutput = ProgramBindings.make({
+      const badBindings = handlers()
+      const invalidOutput = ProgramHandlers.make({
         ...badBindings,
         tools: [
           incrementTool({
@@ -264,8 +264,8 @@ it.effect("schema-validates every capability argument and result", () =>
 it.effect("keeps host authorization and handler failures distinct", () =>
   Effect.scoped(
     Effect.gen(function* () {
-      const live = bindings()
-      const denied = ProgramBindings.make({
+      const live = handlers()
+      const denied = ProgramHandlers.make({
         ...live,
         tools: [incrementTool({ authorize: () => Effect.succeed(false) })],
       })
@@ -282,7 +282,7 @@ it.effect("keeps host authorization and handler failures distinct", () =>
       expect(denial).toBeInstanceOf(ProgramCapabilities.ProgramCapabilityDenied)
 
       let executed = false
-      const suspended = ProgramBindings.make({
+      const suspended = ProgramHandlers.make({
         ...live,
         tools: [
           incrementTool({
@@ -306,7 +306,7 @@ it.effect("keeps host authorization and handler failures distinct", () =>
       expect(executed).toBe(false)
 
       const cause = { code: "tool-down" }
-      const failed = ProgramBindings.make({
+      const failed = ProgramHandlers.make({
         ...live,
         tools: [incrementTool({ execute: () => Effect.fail(cause) })],
       })
@@ -326,8 +326,8 @@ it("round-trips typed Program failures through the durable schema", () => {
     reason: "approval",
     token: "approval-1",
   })
-  const encoded = Schema.encodeUnknownSync(ProgramHost.ExecutionFailure)(failure)
-  expect(Schema.decodeSync(ProgramHost.ExecutionFailure)(encoded)).toEqual(failure)
+  const encoded = Schema.encodeUnknownSync(ProgramRunner.ExecutionFailure)(failure)
+  expect(Schema.decodeSync(ProgramRunner.ExecutionFailure)(encoded)).toEqual(failure)
 })
 
 it.effect("runs bounded parallel Agents in deterministic member order", () =>
@@ -336,8 +336,8 @@ it.effect("runs bounded parallel Agents in deterministic member order", () =>
       let active = 0
       let maximum = 0
       const gate = yield* Deferred.make<void>()
-      const live = bindings()
-      const measured = ProgramBindings.make({
+      const live = handlers()
+      const measured = ProgramHandlers.make({
         ...live,
         agents: [
           workerAgent({
@@ -429,8 +429,8 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         expect(agentRunFailure.dimension).toBe("agentRuns")
       }
 
-      const live = bindings()
-      const expensiveAgent = ProgramBindings.make({
+      const live = handlers()
+      const expensiveAgent = ProgramHandlers.make({
         ...live,
         agents: [
           workerAgent({
@@ -532,7 +532,7 @@ it.effect("exposes no ambient host authority across the trusted sandbox seam", (
           "signal",
           "sourceDigest",
         ])
-        expect(request).not.toHaveProperty("bindings")
+        expect(request).not.toHaveProperty("handlers")
         expect(request).not.toHaveProperty("sandbox")
         expect(request).not.toHaveProperty("process")
         return Effect.succeed({ value: 1 })
@@ -552,7 +552,7 @@ it.effect("rejects a forged Program manifest pin before sandbox execution", () =
         runWith(() => Effect.succeed({ value: 1 })),
         Effect.flip,
       )
-      expect(failure).toBeInstanceOf(ProgramHost.ProgramIdentityMismatch)
+      expect(failure).toBeInstanceOf(ProgramRunner.ProgramIdentityMismatch)
     }),
   ),
 )

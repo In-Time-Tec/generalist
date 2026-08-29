@@ -4,14 +4,10 @@ import { Prompt } from "effect/unstable/ai"
 import { TestClock } from "effect/testing"
 import { Address, Message } from "../../../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
-import { ExecutionHost } from "../../../../src/runtime/execution/host.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import type { DecodedRun } from "../../../../src/runtime/sql/codec/rows.js"
-import {
-  RunClaims,
-  type ClaimedRun,
-  type Interface as ClaimsInterface,
-} from "../../../../src/runtime/sql/run/claims.js"
+import { RunClaims, type ClaimedRun, type Service as ClaimsService } from "../../../../src/runtime/sql/run/claims.js"
 import type { WorkerOptions } from "../../../../src/runtime/sql/worker.js"
 import { assistantRef } from "../../execution/fixtures.js"
 
@@ -59,10 +55,7 @@ export const workerWakeupSuite = (constructors: {
     Effect.scoped(constructors.makeRunStore({ resolver: constructors.makeExecutableResolver([]), addresses: [] })),
   )
 
-  const claims = (
-    changes: ClaimsInterface["changes"],
-    claimReadyRuns: ClaimsInterface["claimReadyRuns"],
-  ): ClaimsInterface =>
+  const claims = (changes: ClaimsService["changes"], claimReadyRuns: ClaimsService["claimReadyRuns"]): ClaimsService =>
     RunClaims.of({
       changes,
       claimReadyRuns,
@@ -72,17 +65,14 @@ export const workerWakeupSuite = (constructors: {
     })
 
   const make = (input: {
-    readonly claims: ClaimsInterface
-    readonly execute: ExecutionHost["Service"]["execute"]
+    readonly claims: ClaimsService
+    readonly execute: RunExecutor["Service"]["execute"]
     readonly options?: Omit<WorkerOptions, "workerId">
   }) =>
     constructors
       .makeWorker({ workerId: "worker-wakeup", ...input.options })
       .pipe(
-        Effect.provideService(
-          ExecutionHost,
-          ExecutionHost.of({ execute: input.execute, interrupt: () => Effect.void }),
-        ),
+        Effect.provideService(RunExecutor, RunExecutor.of({ execute: input.execute, interrupt: () => Effect.void })),
         Effect.provideService(RunStore, store),
         Effect.provideService(RunClaims, input.claims),
       )

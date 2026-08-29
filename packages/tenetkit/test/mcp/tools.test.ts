@@ -2,13 +2,13 @@ import { describe, expect, it } from "@effect/vitest"
 import { Agent, Approvals, ModelMiddleware, Response, ToolContext, ToolExecutor } from "tenetkit"
 import { TestModel } from "tenetkit/test"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
-import { layerToolkit, route, toolkit } from "../../src/mcp/tools.js"
-import { McpToolSource } from "../../src/mcp/index"
+import { layerToolkit, connect, toolkit } from "../../src/mcp/tools.js"
+import { MCPClient } from "../../src/mcp/index"
 import { makeFixture, makeTransportFixture } from "./fixture"
 
 describe("mcp tools adapter", () => {
-  it("exports the complete scoped route", () => {
-    expect(Schema.is(Schema.declare((value): value is typeof route => value === route))(route)).toBe(true)
+  it("exports the complete scoped connect", () => {
+    expect(Schema.is(Schema.declare((value): value is typeof connect => value === connect))(connect)).toBe(true)
   })
 
   it.effect("exposes discovered tools as a toolkit", () =>
@@ -55,7 +55,7 @@ describe("mcp tools adapter", () => {
       const fixture = yield* makeTransportFixture()
       yield* Effect.scoped(
         Effect.gen(function* () {
-          const tools = yield* route({ name: "calc", transport: fixture.transport })
+          const tools = yield* connect({ name: "calc", transport: fixture.transport })
           const model = yield* TestModel.make([
             TestModel.toolCall("calc_add", { a: 20, b: 22 }, { id: "add-1" }),
             TestModel.text("the answer is 42"),
@@ -81,7 +81,7 @@ describe("mcp tools adapter", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const fixture = yield* makeTransportFixture()
-        const tools = yield* route({ name: "calc", transport: fixture.transport })
+        const tools = yield* connect({ name: "calc", transport: fixture.transport })
         const model = yield* TestModel.make([
           TestModel.toolCall("calc_boom", {}, { id: "boom-1" }),
           TestModel.text("recovered from the tool failure"),
@@ -100,7 +100,7 @@ describe("mcp tools adapter", () => {
         if (completed?._tag === "ToolExecutionCompleted") {
           expect(completed.result.isFailure).toBe(true)
           expect(completed.result.result).toEqual({
-            _tag: "tenetkit/mcp/McpToolCallFailed",
+            _tag: "tenetkit/mcp/MCPToolCallFailed",
             server: "calc",
             tool: "boom",
             message: "boom failed",
@@ -117,7 +117,7 @@ describe("mcp tools adapter", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const fixture = yield* makeTransportFixture()
-        const tools = yield* route({ name: "calc", transport: fixture.transport })
+        const tools = yield* connect({ name: "calc", transport: fixture.transport })
         const services = yield* Layer.build(Layer.mergeAll(tools.executorLayer, ToolContext.layerDefault))
         const executor = Context.get(services, ToolExecutor.ToolExecutor)
         const call1 = yield* Schema.decodeEffect(
@@ -168,22 +168,22 @@ describe("mcp tools adapter", () => {
       Effect.gen(function* () {
         const fixture = yield* makeTransportFixture()
         const transport = Object.assign(fixture.transport, { kind: "http" as const })
-        const tools = yield* route({ name: "calc", transport })
+        const tools = yield* connect({ name: "calc", transport })
 
         expect(Object.keys(tools.toolkit.tools)).toContain("calc_add")
       }),
     ),
   )
 
-  it.effect("keeps transport construction failures typed on route acquisition", () =>
+  it.effect("keeps transport construction failures typed on connect acquisition", () =>
     Effect.gen(function* () {
-      const error = yield* route({ name: "broken", transport: { kind: "http", url: "://invalid" } }).pipe(
+      const error = yield* connect({ name: "broken", transport: { kind: "http", url: "://invalid" } }).pipe(
         Effect.scoped,
         Effect.flip,
       )
 
-      expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
-      if (error._tag === "tenetkit/mcp/McpConnectionFailed") expect(error.server).toBe("broken")
+      expect(error).toBeInstanceOf(MCPClient.MCPConnectionFailed)
+      if (error._tag === "tenetkit/mcp/MCPConnectionFailed") expect(error.server).toBe("broken")
     }),
   )
 })

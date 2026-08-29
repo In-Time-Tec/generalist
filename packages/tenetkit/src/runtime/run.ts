@@ -1,5 +1,5 @@
 import { Effect, Function, Predicate, Schema } from "effect"
-import { ModelTelemetry, ProgramHost } from "../core/index.js"
+import { ModelTelemetry, ProgramRunner } from "../core/index.js"
 import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable/manifest.js"
 import { RunWait } from "./run/wait.js"
 import { Cursor } from "./cursor.js"
@@ -115,7 +115,7 @@ export type RunFailure =
   | ExecutableIdentityMismatch
   | ExecutableRegistrationInvalid
   | ExecutableRegistrationMissing
-  | ProgramHost.ExecutionFailure
+  | ProgramRunner.ExecutionFailure
 
 export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
   AgentExecutionFailure,
@@ -123,7 +123,7 @@ export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
   ExecutableIdentityMismatch,
   ExecutableRegistrationInvalid,
   ExecutableRegistrationMissing,
-  ProgramHost.ExecutionFailure,
+  ProgramRunner.ExecutionFailure,
 ])
 
 export type RunOutcome =

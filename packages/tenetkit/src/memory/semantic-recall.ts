@@ -57,7 +57,7 @@ const itemFromMatch = (match: Match): Memory.Item => ({
 /** @experimental */
 export const make = (
   options: Options = {},
-): Effect.Effect<Memory.Interface, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
+): Effect.Effect<Memory.Service, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
   Effect.gen(function* () {
     const store = yield* VectorStore
     const embeddingModel = yield* EmbeddingModel.EmbeddingModel
@@ -113,9 +113,6 @@ export const make = (
       forget: (input) => store.delete(input).pipe(Effect.mapError((error) => memoryError(String(error)))),
     }
   })
-
-/** @experimental */
-export const makeSemanticRecall = make
 
 /** @experimental */
 export const layer = (

@@ -12,13 +12,13 @@ import {
   type Execution,
   type ExecuteRequest,
   type Inspection,
-  type Interface as KernelPoolInterface,
+  type Service as KernelPoolService,
   type Interruption,
   KernelPool,
   type Restart,
 } from "./kernel-pool.js"
 import {
-  type Interface as KernelStateStoreInterface,
+  type Service as KernelStateStoreService,
   KernelStateStore,
   KernelStateUnavailable,
   Manifest,
@@ -54,7 +54,7 @@ const defaultScript = (request: ExecuteRequest): Script => ({ _tag: "Value", val
  * cell-local monotonic sequences, epochs across restart, closed sessions — so hosts and projections
  * can be tested without a worker process.
  */
-export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolInterface> =>
+export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolService> =>
   Effect.gen(function* () {
     const sessions = yield* Ref.make(new Map<string, SessionState>())
     const script = options.script ?? defaultScript
@@ -191,7 +191,7 @@ export const layerTestPool = (options: TestPoolOptions): Layer.Layer<KernelPool>
   Layer.effect(KernelPool, makeTest(options))
 
 /** @experimental An in-memory snapshot store keyed by Session identity. */
-export const makeMemoryStore: Effect.Effect<KernelStateStoreInterface> = Effect.gen(function* () {
+export const makeMemoryStore: Effect.Effect<KernelStateStoreService> = Effect.gen(function* () {
   const snapshots = yield* Ref.make(new Map<string, Snapshot>())
   return {
     load: (sessionId) => Ref.get(snapshots).pipe(Effect.map((all) => all.get(sessionId))),

@@ -2,11 +2,11 @@ import { Cause, Context, Effect, Layer, Schema } from "effect"
 import type { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentSuspended, type ApprovalRequest } from "../agent/event.js"
 import { canonicalSuspensionCall } from "../agent/suspension.js"
-import { PermissionError, evaluateWithRules, type RuleStoreInterface } from "../policy/permissions.js"
+import { PermissionError, evaluateWithRules, type RuleStoreService } from "../policy/permissions.js"
 
-type Approvals = import("../policy/approvals.js").Interface
+type Approvals = import("../policy/approvals.js").Service
 type PendingApproval = import("../policy/approvals.js").Pending
-type Permissions = import("../policy/permissions.js").Interface
+type Permissions = import("../policy/permissions.js").Service
 
 /** @experimental The common identity and context of one authorization attempt. */
 export interface AccessRequest {
@@ -68,7 +68,7 @@ export class ToolAuthorizerService extends Context.Service<ToolAuthorizerService
 export interface Options {
   readonly permissions: Permissions
   readonly approvals: Approvals
-  readonly ruleStore: RuleStoreInterface
+  readonly ruleStore: RuleStoreService
 }
 
 const deny = (message: string): Deny => ({ _tag: "Deny", error: PermissionDenied.make({ message }) })

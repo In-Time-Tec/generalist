@@ -11,9 +11,9 @@ import {
   Compaction,
   ExecutableManifest,
   Pins,
-  ProgramBindings,
+  ProgramHandlers,
   ProgramCapabilities,
-  SandboxExecutor,
+  CodeExecutor,
   Session,
   Handoff,
   ToolContext,
@@ -23,7 +23,7 @@ import { closedTestAgent, pinnedTestAgent, pinnedTestExecutable } from "../run/i
 import {
   Address,
   ChildRuns,
-  ExecutionHost,
+  RunExecutor,
   LocalScheduler,
   Cursor,
   Errors,
@@ -64,7 +64,7 @@ const scopedWith =
   <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
-describe("ExecutionHost", () => {
+describe("RunExecutor execution", () => {
   it.effect("passes the exact pinned context window and reserve to compaction", () =>
     Effect.gen(function* () {
       let observed: Compaction.Usage | undefined
@@ -151,7 +151,7 @@ describe("ExecutionHost", () => {
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.start({
             executable,
@@ -176,7 +176,7 @@ describe("ExecutionHost", () => {
       const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+      const withSession = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
             const store = yield* RunStore.RunStore
@@ -220,7 +220,7 @@ describe("ExecutionHost", () => {
       const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+      const withSession = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
             const store = yield* RunStore.RunStore
@@ -276,7 +276,7 @@ describe("ExecutionHost", () => {
       const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+      const withSession = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
             const store = yield* RunStore.RunStore
@@ -357,7 +357,7 @@ describe("ExecutionHost", () => {
               idempotencyKey,
               prompt,
             })
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const store = yield* RunStore.RunStore
             yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: idempotencyKey }))
           }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
@@ -536,7 +536,7 @@ describe("ExecutionHost", () => {
       )
       yield* scopedWith(layerSqlite())(
         Effect.gen(function* () {
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "reopened-compaction" }))
         }),
@@ -598,7 +598,7 @@ describe("ExecutionHost", () => {
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: address,
@@ -682,7 +682,7 @@ describe("ExecutionHost", () => {
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const scheduler = yield* LocalScheduler.LocalScheduler
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
@@ -768,7 +768,7 @@ describe("ExecutionHost", () => {
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: address,
@@ -800,7 +800,7 @@ describe("ExecutionHost", () => {
     const address = Address.make("agent:resolution-failure")
 
     const verify = (
-      resolver: ExecutableResolver.Interface,
+      resolver: ExecutableResolver.Service,
       expectedTag: string,
       key: string,
       finalized: Ref.Ref<boolean>,
@@ -808,7 +808,7 @@ describe("ExecutionHost", () => {
     ) =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,
@@ -963,7 +963,7 @@ describe("ExecutionHost", () => {
     return scopedWith(runtimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,
@@ -1165,7 +1165,7 @@ describe("ExecutionHost", () => {
       const admitted = yield* Effect.scoped(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const parent = yield* runtime.send({
             to: address,
@@ -1189,7 +1189,7 @@ describe("ExecutionHost", () => {
       yield* Effect.scoped(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const group = yield* runtime.inspectFanOut(admitted.fanOutId)
           expect(group.members.map(({ key, label, depth }) => ({ key, label, depth }))).toEqual([
@@ -1271,7 +1271,7 @@ describe("ExecutionHost", () => {
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       let sequence = 0
       const root = (treePolicy: { readonly maxDepth: number; readonly maxSubagents: number }) =>
         runtime.start({
@@ -1407,7 +1407,7 @@ describe("ExecutionHost", () => {
 
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
         to: address,
@@ -1460,7 +1460,7 @@ describe("ExecutionHost", () => {
 
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
         to: address,
@@ -1535,7 +1535,7 @@ describe("ExecutionHost", () => {
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const scheduler = yield* LocalScheduler.LocalScheduler
           const receipt = yield* runtime.send({
@@ -1604,7 +1604,7 @@ describe("ExecutionHost", () => {
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: address,
@@ -1655,7 +1655,7 @@ describe("ExecutionHost", () => {
     Effect.gen(function* () {
       const started = yield* Deferred.make<void>()
       const interrupted = yield* Ref.make(false)
-      let invocation: ToolContext.Interface | undefined
+      let invocation: ToolContext.Service | undefined
       const tool = Tool.make("block", { parameters: Schema.Struct({}), success: Schema.String })
       const agent = Agent.make({ name: "cancel-tool", toolkit: Toolkit.make(tool) })
       const ref = testExecutable(agent, "cancel-tool-v1")
@@ -1694,7 +1694,7 @@ describe("ExecutionHost", () => {
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const scheduler = yield* LocalScheduler.LocalScheduler
           const receipt = yield* runtime.send({
@@ -1819,7 +1819,7 @@ describe("ExecutionHost", () => {
         const first = yield* scopedWith(layer())(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const store = yield* RunStore.RunStore
             const scheduler = yield* LocalScheduler.LocalScheduler
             const receipt = yield* runtime.send({
@@ -2228,7 +2228,7 @@ describe("ExecutionHost", () => {
   ] as const) {
     it.effect(`defers Program map child ${earlyFailure.name} until scoped finalizers close`, () => {
       let childRunId = ""
-      let store: RunStore.Interface
+      let store: RunStore.Service
       let bindingDispatches = 0
       let modelCalls = 0
       let serviceAcquisitions = 0
@@ -2309,11 +2309,11 @@ describe("ExecutionHost", () => {
         Agent.make({ name: `wrong-child:${earlyFailure.name}` }),
         `wrong-child:${earlyFailure.name}:v1`,
       )
-      const bindings = ProgramBindings.make({
+      const handlers = ProgramHandlers.make({
         tools: [],
         steps: [],
         agents: [
-          ProgramBindings.agent({
+          ProgramHandlers.agent({
             selection: "worker",
             agent: pinnedChild.pin,
             inputPin: program.pinned.manifest.capabilities.agents[0]!.input,
@@ -2328,7 +2328,7 @@ describe("ExecutionHost", () => {
           }),
         ],
       })
-      const sandbox = SandboxExecutor.makeTest(
+      const codeExecutor = CodeExecutor.makeTest(
         () =>
           Effect.gen(function* () {
             const capabilities = yield* ProgramCapabilities.ProgramCapabilities
@@ -2339,10 +2339,10 @@ describe("ExecutionHost", () => {
             })
             return results.map((member) => member.result.text)
           }),
-        { ...SandboxExecutor.testIdentity, fixture: `early-failure-map:${earlyFailure.name}` },
+        { ...CodeExecutor.testIdentity, fixture: `early-failure-map:${earlyFailure.name}` },
       )
       const staticResolver = ExecutableResolver.makeStatic([
-        { _tag: "Program", executable, program, sandbox, bindings },
+        { _tag: "Program", executable, program, executor: codeExecutor, handlers },
         { _tag: "Agent", executable: childExecutable, agent: closedChild },
       ])
       const resolver = ExecutableResolver.ExecutableResolver.of({
@@ -2388,7 +2388,7 @@ describe("ExecutionHost", () => {
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           store = yield* RunStore.RunStore
           const parent = yield* runtime.send({
             to: address,
@@ -2405,7 +2405,7 @@ describe("ExecutionHost", () => {
             childRunIds: [expect.any(String)],
           })
           if (operation === undefined || operation.childRunIds.length !== 1) {
-            return yield* Effect.die("ProgramHost did not admit exactly one owned Agent child")
+            return yield* Effect.die("ProgramRunner did not admit exactly one owned Agent child")
           }
           childRunId = operation.childRunIds[0]!
           const childExecution = yield* store.loadExecution(childRunId)
@@ -2456,7 +2456,7 @@ describe("ExecutionHost", () => {
       let bindingDispatches = 0
       let sandboxCalls = 0
       let childRunId = ""
-      let store: RunStore.Interface
+      let store: RunStore.Service
       const providerRequests: Array<string> = []
       const finalizerObservations: Array<{
         readonly name: "service" | "resolver"
@@ -2523,8 +2523,8 @@ describe("ExecutionHost", () => {
             return { _tag: "Success" as const, result: "child complete", encodedResult: "child complete" }
           }),
       })
-      const handlers = toolkit.toLayer({ child_work: () => Effect.die("ToolExecutor owns child work") })
-      const closedChild = Agent.close(child, Layer.mergeAll(model, executor, handlers))
+      const toolLayer = toolkit.toLayer({ child_work: () => Effect.die("ToolExecutor owns child work") })
+      const closedChild = Agent.close(child, Layer.mergeAll(model, executor, toolLayer))
 
       const program = AgentProgram.make({
         name: "failed-agent-map",
@@ -2564,11 +2564,11 @@ describe("ExecutionHost", () => {
         ref: { executable: executable.ref.executable, active: pinnedChild.pin },
         manifest: executable.manifest,
       }
-      const bindings = ProgramBindings.make({
+      const handlers = ProgramHandlers.make({
         tools: [],
         steps: [],
         agents: [
-          ProgramBindings.agent({
+          ProgramHandlers.agent({
             selection: "worker",
             agent: pinnedChild.pin,
             inputPin: program.pinned.manifest.capabilities.agents[0]!.input,
@@ -2583,7 +2583,7 @@ describe("ExecutionHost", () => {
           }),
         ],
       })
-      const sandbox = SandboxExecutor.makeTest(
+      const codeExecutor = CodeExecutor.makeTest(
         () =>
           Effect.gen(function* () {
             yield* Effect.sync(() => void ++sandboxCalls)
@@ -2595,10 +2595,10 @@ describe("ExecutionHost", () => {
             })
             return results.map((member) => `${member.member}:${member.result.text}`)
           }),
-        { ...SandboxExecutor.testIdentity, fixture: "failed-agent-map" },
+        { ...CodeExecutor.testIdentity, fixture: "failed-agent-map" },
       )
       const staticResolver = ExecutableResolver.makeStatic([
-        { _tag: "Program", executable, program, sandbox, bindings },
+        { _tag: "Program", executable, program, executor: codeExecutor, handlers },
         { _tag: "Agent", executable: childExecutable, agent: closedChild },
       ])
       const resolver = ExecutableResolver.ExecutableResolver.of({
@@ -2627,7 +2627,7 @@ describe("ExecutionHost", () => {
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: address,
@@ -2645,7 +2645,7 @@ describe("ExecutionHost", () => {
             childRunIds: [expect.any(String)],
           })
           if (admitted?.fanOutId === undefined || admitted.childRunIds.length !== 1) {
-            return yield* Effect.die("ProgramHost did not admit exactly one map child")
+            return yield* Effect.die("ProgramRunner did not admit exactly one map child")
           }
           childRunId = admitted.childRunIds[0]!
           const fanOutId = admitted.fanOutId
@@ -2792,7 +2792,7 @@ describe("ExecutionHost", () => {
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const receipt = yield* runtime.send({
         to: Address.make("agent:handoff-recovery"),
         sessionId: "session:handoff-recovery",

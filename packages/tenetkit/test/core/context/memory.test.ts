@@ -1176,13 +1176,13 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
   it.effect("merge calls both forget implementations", () => {
     const forgotten: Array<string> = []
-    const first: Memory.Interface = {
+    const first: Memory.Service = {
       recall: () => Effect.succeed([]),
       remember: () => Effect.void,
       forget: (input) =>
         Effect.sync(() => forgotten.push(`first:${input.key.subject}:${input.id ?? "all"}`)).pipe(Effect.asVoid),
     }
-    const second: Memory.Interface = {
+    const second: Memory.Service = {
       recall: () => Effect.succeed([]),
       remember: () => Effect.void,
       forget: (input) =>

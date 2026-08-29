@@ -1,8 +1,8 @@
-import { layerMysql } from "@tenetkit/mysql"
+import { layer as backendLayer } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Errors, ExecutionHost, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
+import { Errors, RunExecutor, RunClaims, Runtime, RuntimeWorker, RunStore } from "tenetkit/runtime"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -35,7 +35,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = programFixture()
-    const runtimeLayer = layerMysql({
+    const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
       resolver: fixture.resolver,
@@ -62,7 +62,7 @@ describeMysql("mysql Program store contract", () => {
     const fixture = programFixture()
     const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "mysql-exact-root-worker" }).pipe(
       Layer.provideMerge(
-        layerMysql({
+        backendLayer({
           url,
           source: "mysql-test",
           resolver: fixture.resolver,
@@ -99,7 +99,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = programFixture()
-    const runtimeLayer = layerMysql({
+    const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
       resolver: fixture.resolver,
@@ -121,7 +121,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = programFixture()
-    const runtimeLayer = layerMysql({
+    const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
       resolver: fixture.resolver,
@@ -136,7 +136,7 @@ describeMysql("mysql Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: programAddress,
               sessionId: "mysql-program",
@@ -174,7 +174,7 @@ describeMysql("mysql Program store contract", () => {
       addresses: programAddresses,
     }
     let runId = ""
-    layer(database.provision(layerMysql(options)), { excludeTestServices: true })(
+    layer(database.provision(backendLayer(options)), { excludeTestServices: true })(
       "atomically reserves one approval response and resumes the Program operation",
       (it) => {
         it.effect("atomically reserves one approval response and resumes the Program operation", () =>
@@ -183,7 +183,7 @@ describeMysql("mysql Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: programAddress,
               sessionId: "mysql-program-approval",
@@ -222,7 +222,7 @@ describeMysql("mysql Program store contract", () => {
                   const runtime = yield* Runtime.Runtime
                   const store = yield* RunStore.RunStore
                   const claims = yield* RunClaims.RunClaims
-                  const host = yield* ExecutionHost.ExecutionHost
+                  const host = yield* RunExecutor.RunExecutor
                   const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program-resume", limit: 1 })
                   yield* host.execute({ runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
                   expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
@@ -241,7 +241,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = approvalProgramFixture()
-    const runtimeLayer = layerMysql({
+    const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
       resolver: fixture.resolver,
@@ -256,7 +256,7 @@ describeMysql("mysql Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: programAddress,
               sessionId: "mysql-program-cancelled-approval",
@@ -291,7 +291,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = agentMapProgramFixture()
-    const runtimeLayer = layerMysql({
+    const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
       resolver: fixture.resolver,
@@ -312,7 +312,7 @@ describeMysql("mysql Program store contract", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims.RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: fixture.address,
               sessionId: "mysql-program-map",

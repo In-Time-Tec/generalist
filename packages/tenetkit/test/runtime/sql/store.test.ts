@@ -13,7 +13,7 @@ import {
 } from "../../../src/index.js"
 import {
   Address,
-  ExecutionHost,
+  RunExecutor,
   Errors,
   ExecutableResolver,
   Runtime,
@@ -21,7 +21,7 @@ import {
   RunTree,
 } from "../../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
-import { make as makeExecutionHost } from "../../../src/runtime/execution/host.js"
+import { make as makeRunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/runtime/sql/codec/schema.js"
 import { markDirty } from "../../../src/runtime/sql/migrate.js"
 import { layer as sqliteClientLayer } from "../../../src/runtime/sql/bun-client.js"
@@ -696,7 +696,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
             ),
       })
       const crashHost = yield* scopedWith(activeExecutionsLayer)(
-        makeExecutionHost({ workerId: "before-reopen", resolver: firstResolver }).pipe(
+        makeRunExecutor({ workerId: "before-reopen", resolver: firstResolver }).pipe(
           Effect.provideService(RunStore.RunStore, crashStore),
         ),
       )
@@ -790,7 +790,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
     const reopen = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const session = yield* store.sessionStore("session:durable-handoff")
       if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
       const conversationBeforeContinuation = Session.buildContext(yield* session.value.path())

@@ -4,38 +4,38 @@ import { Context, type Duration, Effect, Layer, Schema, type Scope } from "effec
 import { Tool, Toolkit } from "effect/unstable/ai"
 import {
   fromTransport,
-  type Interface,
+  type Service,
   type JsonValue,
-  McpConnectionFailed,
-  type McpAiTool,
-  type McpToolFailure,
-  McpToolSource,
-  type McpTransport,
+  MCPConnectionFailed,
+  type MCPTool,
+  type MCPToolFailure,
+  MCPClient,
+  type MCPTransport,
   layer,
-} from "./tool-source.js"
+} from "./client.js"
 import type { OAuthPending, OAuthProviderError } from "./oauth.js"
 
 /** @experimental */
 export interface Options {
   readonly name: string
-  readonly transport: McpTransport | Transport
+  readonly transport: MCPTransport | Transport
   readonly callTimeout?: Duration.Input
 }
 
-const McpTransportSchema = Schema.Union([
+const MCPTransportSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("stdio"), command: Schema.String }),
   Schema.Struct({ kind: Schema.Literal("http"), url: Schema.String }),
 ])
 
 interface LayerOptions {
   name: string
-  transport: McpTransport
+  transport: MCPTransport
   callTimeout?: Duration.Input
 }
 
 /** @experimental */
-export interface McpTools {
-  readonly toolkit: Toolkit.Toolkit<Record<string, McpAiTool>>
+export interface MCPTools {
+  readonly toolkit: Toolkit.Toolkit<Record<string, MCPTool>>
   readonly executorLayer: Layer.Layer<ToolExecutor.ToolExecutor | Tool.Handler<string>>
 }
 
@@ -45,11 +45,11 @@ export interface McpTools {
  *
  * @experimental
  */
-export const toolkit = (source: Interface): Effect.Effect<Toolkit.Toolkit<Record<string, McpAiTool>>> =>
-  source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools)))
+export const toolkit = (client: Service): Effect.Effect<Toolkit.Toolkit<Record<string, MCPTool>>> =>
+  client.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools)))
 
-const toolFailure = (server: string, tool: string, message: string): McpToolFailure => ({
-  _tag: "tenetkit/mcp/McpToolCallFailed",
+const toolFailure = (server: string, tool: string, message: string): MCPToolFailure => ({
+  _tag: "tenetkit/mcp/MCPToolCallFailed",
   server,
   tool,
   message,
@@ -60,19 +60,19 @@ const toolFailure = (server: string, tool: string, message: string): McpToolFail
  *
  * @experimental
  */
-export const layerToolkit = (source: Interface): Layer.Layer<Tool.Handler<string>> =>
+export const layerToolkit = (client: Service): Layer.Layer<Tool.Handler<string>> =>
   Layer.unwrap(
     Effect.gen(function* () {
-      const mcpToolkit = yield* toolkit(source)
-      const tools = yield* source.tools
+      const mcpToolkit = yield* toolkit(client)
+      const tools = yield* client.tools
       type HandlerInput = typeof Schema.Unknown.Type
-      const handlers: Record<string, (params: HandlerInput) => Effect.Effect<JsonValue, McpToolFailure>> = {}
+      const handlers: Record<string, (params: HandlerInput) => Effect.Effect<JsonValue, MCPToolFailure>> = {}
       for (const tool of tools) {
         handlers[tool.name] = (params) =>
           Schema.decodeUnknownEffect(Schema.Json)(params).pipe(
-            Effect.mapError((error) => toolFailure(source.server, tool.rawName, error.message)),
+            Effect.mapError((error) => toolFailure(client.server, tool.rawName, error.message)),
             Effect.flatMap((input) =>
-              source
+              client
                 .callTool(tool.rawName, input)
                 .pipe(Effect.mapError((error) => toolFailure(error.server, error.tool, error.message))),
             ),
@@ -82,12 +82,12 @@ export const layerToolkit = (source: Interface): Layer.Layer<Tool.Handler<string
     }),
   )
 
-const isMcpTransport = Schema.is(McpTransportSchema)
+const isMCPTransport = Schema.is(MCPTransportSchema)
 
 const acquire = (
   options: Options,
-): Effect.Effect<Interface, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
-  !isMcpTransport(options.transport)
+): Effect.Effect<Service, MCPConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
+  !isMCPTransport(options.transport)
     ? fromTransport(
         options.name,
         options.transport,
@@ -99,7 +99,7 @@ const acquire = (
           transport: options.transport,
         }
         if (options.callTimeout !== undefined) layerOptions.callTimeout = options.callTimeout
-        return Layer.build(layer(layerOptions)).pipe(Effect.map((services) => Context.get(services, McpToolSource)))
+        return Layer.build(layer(layerOptions)).pipe(Effect.map((services) => Context.get(services, MCPClient)))
       })()
 
 /**
@@ -107,13 +107,13 @@ const acquire = (
  *
  * @experimental
  */
-export const route = (
+export const connect = (
   options: Options,
-): Effect.Effect<McpTools, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
+): Effect.Effect<MCPTools, MCPConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
   Effect.gen(function* () {
-    const source = yield* acquire(options)
-    const mcpToolkit = yield* toolkit(source)
-    const handlers = layerToolkit(source)
+    const client = yield* acquire(options)
+    const mcpToolkit = yield* toolkit(client)
+    const handlers = layerToolkit(client)
     return {
       toolkit: mcpToolkit,
       executorLayer: ToolExecutor.layerToolkit(mcpToolkit).pipe(Layer.provideMerge(handlers)),

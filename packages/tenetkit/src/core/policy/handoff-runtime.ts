@@ -31,7 +31,7 @@ export class HandoffRejected extends Schema.TaggedError<HandoffRejected>()("tene
 }) {}
 
 export interface ExecuteHandoffInput {
-  readonly catalog: import("./handoff-target.js").HandoffCatalogInterface
+  readonly catalog: import("./handoff-target.js").HandoffCatalogService
   readonly turn: number
   readonly toolCallId: string
   readonly specialist: string
@@ -102,7 +102,7 @@ const verifyTargetModel = (target: HandoffTarget, turn: number, logicalId: strin
             turn,
           })
         }
-        const available = yield* registry.value.operate(model, Effect.void).pipe(Effect.exit)
+        const available = yield* registry.value.withModel(model, Effect.void).pipe(Effect.exit)
         if (available._tag === "Failure") {
           yield* recordRejected(logicalId, turn, handoffId, "target model requirements missing")
           return yield* HandoffRequirementsMissing.make({

@@ -57,13 +57,13 @@ export class KernelStateUnavailable extends Schema.TaggedError<KernelStateUnavai
  * @experimental Best-effort namespace persistence. Never durable authority: TenetKit operations,
  * events, Session entries, and children remain the only truth.
  */
-export interface Interface {
+export interface Service {
   readonly load: (sessionId: SessionId) => Effect.Effect<Snapshot | undefined, KernelStateUnavailable>
   readonly save: (snapshot: Snapshot) => Effect.Effect<void, KernelStateUnavailable>
   readonly drop: (sessionId: SessionId) => Effect.Effect<void, KernelStateUnavailable>
 }
 
 /** @experimental */
-export class KernelStateStore extends Context.Service<KernelStateStore, Interface>()(
+export class KernelStateStore extends Context.Service<KernelStateStore, Service>()(
   "tenetkit/repl/kernel-state-store/KernelStateStore",
 ) {}

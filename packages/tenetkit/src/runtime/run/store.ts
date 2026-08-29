@@ -109,7 +109,7 @@ export const PendingRunOutcome = Schema.Union([
 ])
 export type PendingRunOutcome = typeof PendingRunOutcome.Type
 
-export interface Interface {
+export interface Service {
   readonly info: Effect.Effect<StoreInfo>
   /**
    * @experimental Durable conversation history for one session identity.
@@ -439,4 +439,4 @@ export interface Interface {
   ) => Effect.Effect<ProgramOperationRecord, WorkerMutationError | ProgramStoreFailure>
 }
 
-export class RunStore extends Context.Service<RunStore, Interface>()("tenetkit/runtime/run/store/RunStore") {}
+export class RunStore extends Context.Service<RunStore, Service>()("tenetkit/runtime/run/store/RunStore") {}

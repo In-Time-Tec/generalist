@@ -17,7 +17,7 @@ import {
   type PinnedProgram,
   type ProgramBudget,
 } from "../durable/manifest/program-manifest.js"
-import type { Bindings, Invocation } from "./bindings.js"
+import type { Handlers, Invocation } from "./handlers.js"
 import {
   type AgentFanOutInput,
   type AgentMapInput,
@@ -25,7 +25,7 @@ import {
   type AgentRunInput,
   type AgentRunResult,
   type CapabilityFailure,
-  type Interface as Capabilities,
+  type Service as Capabilities,
   type LogInput,
   LogLevel,
   ProgramAgentFailure,
@@ -49,9 +49,9 @@ import {
 } from "./capabilities.js"
 import {
   ExecutionFailure as SandboxFailure,
-  type Interface as Sandbox,
+  type Service as CodeExecutor,
   request as makeSandboxRequest,
-} from "./sandbox-executor.js"
+} from "./code-executor.js"
 
 const ToolCall = Schema.Struct({ operation: ProgramOperationName, tool: Schema.String, input: Schema.Unknown })
 const StepCall = Schema.Struct({ operation: ProgramOperationName, step: Schema.String, input: Schema.Unknown })
@@ -82,8 +82,8 @@ const AgentResult = Schema.Struct({
 })
 
 /** @experimental */
-export class ProgramBindingMismatch extends Schema.TaggedError<ProgramBindingMismatch>()(
-  "tenetkit/core/ProgramBindingMismatch",
+export class ProgramHandlerMismatch extends Schema.TaggedError<ProgramHandlerMismatch>()(
+  "tenetkit/core/ProgramHandlerMismatch",
   { kind: Schema.Literals(["tool", "step", "agent"]), name: Schema.String, reason: Schema.String },
 ) {}
 
@@ -94,9 +94,8 @@ export class ProgramIdentityMismatch extends Schema.TaggedError<ProgramIdentityM
 ) {}
 
 /** @experimental Failures returned by Core-owned Program execution. */
-export const ExecutionFailure = Schema.Union([SandboxFailure, ProgramBindingMismatch, ProgramIdentityMismatch])
-/** @experimental */
-export type ExecutionFailure = typeof ExecutionFailure.Type
+export const ExecutionFailure = Schema.Union([SandboxFailure, ProgramHandlerMismatch, ProgramIdentityMismatch])
+/** @experimental */ export type ExecutionFailure = typeof ExecutionFailure.Type
 
 /** @experimental Encoded execution request used by direct and durable hosts. */
 export interface Request {
@@ -105,12 +104,14 @@ export interface Request {
 }
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly execute: (request: Request) => Effect.Effect<unknown, ExecutionFailure, Scope.Scope>
 }
 
 /** @experimental Owner of Agent Program execution and its host policy. */
-export class ProgramHost extends Context.Service<ProgramHost, Interface>()("tenetkit/core/program/host/ProgramHost") {}
+export class ProgramRunner extends Context.Service<ProgramRunner, Service>()(
+  "tenetkit/core/program/runner/ProgramRunner",
+) {}
 
 const encodedBytes = (value: typeof Schema.Unknown.Type): Effect.Effect<number, ProgramSchemaFailure> =>
   Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(value).pipe(
@@ -126,56 +127,56 @@ const schemaFailure =
       : ProgramSchemaFailure.make({ boundary, capability, message: String(error) })
 
 const exactClosure: {
-  (bindings: Bindings): (program: PinnedProgram) => Effect.Effect<void, ProgramBindingMismatch>
-  (program: PinnedProgram, bindings: Bindings): Effect.Effect<void, ProgramBindingMismatch>
+  (handlers: Handlers): (program: PinnedProgram) => Effect.Effect<void, ProgramHandlerMismatch>
+  (program: PinnedProgram, handlers: Handlers): Effect.Effect<void, ProgramHandlerMismatch>
 } = Function.dual(
   2,
-  (program: PinnedProgram, bindings: Bindings): Effect.Effect<void, ProgramBindingMismatch> =>
+  (program: PinnedProgram, handlers: Handlers): Effect.Effect<void, ProgramHandlerMismatch> =>
     Effect.gen(function* () {
       const check = (
         kind: "tool" | "step" | "agent",
         expectedByName: ReadonlyMap<string, string>,
         actualByName: ReadonlyMap<string, string>,
-      ): Effect.Effect<void, ProgramBindingMismatch> =>
+      ): Effect.Effect<void, ProgramHandlerMismatch> =>
         Effect.gen(function* () {
           for (const [name, pin] of expectedByName) {
             const bound = actualByName.get(name)
             if (bound === undefined)
-              return yield* ProgramBindingMismatch.make({ kind, name, reason: "declared capability is not bound" })
+              return yield* ProgramHandlerMismatch.make({ kind, name, reason: "declared capability has no handler" })
             if (bound !== pin)
-              return yield* ProgramBindingMismatch.make({ kind, name, reason: "binding pin does not match" })
+              return yield* ProgramHandlerMismatch.make({ kind, name, reason: "handler pin does not match" })
           }
           for (const name of actualByName.keys()) {
             if (!expectedByName.has(name))
-              return yield* ProgramBindingMismatch.make({
+              return yield* ProgramHandlerMismatch.make({
                 kind,
                 name,
-                reason: "binding is outside the manifest closure",
+                reason: "handler is outside the manifest closure",
               })
           }
         })
       yield* check(
         "tool",
         new Map(program.manifest.capabilities.tools.map((entry) => [entry.name, entry.pin])),
-        new Map(bindings.tools.map((entry) => [entry.name, entry.pin])),
+        new Map(handlers.tools.map((entry) => [entry.name, entry.pin])),
       )
       yield* check(
         "step",
         new Map(program.manifest.capabilities.steps.map((entry) => [entry.name, entry.pin])),
-        new Map(bindings.steps.map((entry) => [entry.name, entry.pin])),
+        new Map(handlers.steps.map((entry) => [entry.name, entry.pin])),
       )
       yield* check(
         "agent",
         new Map(
           program.manifest.capabilities.agents.map((entry) => [entry.selection, `${entry.agent}\0${entry.input}`]),
         ),
-        new Map(bindings.agents.map((entry) => [entry.selection, `${entry.agent}\0${entry.inputPin}`])),
+        new Map(handlers.agents.map((entry) => [entry.selection, `${entry.agent}\0${entry.inputPin}`])),
       )
     }),
 )
 
-/** @experimental Verify that live Program bindings exactly match persisted manifest authority. */
-export const validateBindings = exactClosure
+/** @experimental Verify that live Program handlers exactly match persisted manifest authority. */
+export const validateHandlers = exactClosure
 
 interface State {
   readonly toolCalls: number
@@ -185,17 +186,17 @@ interface State {
   readonly operations: ReadonlyMap<string, string>
 }
 
-const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
+const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
   Effect.gen(function* () {
     const state = yield* Ref.make<State>({ toolCalls: 0, agentRuns: 0, tokens: 0, logBytes: 0, operations: new Map() })
     const semaphore = yield* Semaphore.make(budget.concurrency)
-    const tools = new Map(bindings.tools.map((binding) => [binding.name, binding] as const))
-    const steps = new Map(bindings.steps.map((binding) => [binding.name, binding] as const))
-    const agents = new Map(bindings.agents.map((binding) => [binding.selection, binding] as const))
+    const tools = new Map(handlers.tools.map((handler) => [handler.name, handler] as const))
+    const steps = new Map(handlers.steps.map((handler) => [handler.name, handler] as const))
+    const agents = new Map(handlers.agents.map((handler) => [handler.selection, handler] as const))
     const describeSchema = (schema: Schema.Top) =>
       SchemaRepresentation.toJson(SchemaRepresentation.toRepresentation(schema.ast))
     const discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>> = Effect.succeed(
-      bindings.tools.map((binding) => ({ name: binding.name })),
+      handlers.tools.map((handler) => ({ name: handler.name })),
     )
     const describeTool = (name: string) => {
       const binding = tools.get(name)
@@ -431,29 +432,29 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
     } satisfies Capabilities)
   })
 
-/** @experimental Direct process-local host for an explicitly supplied sandbox and live bindings. */
+/** @experimental Direct process-local runner for an explicitly supplied code executor and live handlers. */
 export const layerDirect = (options: {
-  readonly sandbox: Sandbox
-  readonly bindings: Bindings
-}): Layer.Layer<ProgramHost> =>
+  readonly executor: CodeExecutor
+  readonly handlers: Handlers
+}): Layer.Layer<ProgramRunner> =>
   Layer.effect(
-    ProgramHost,
+    ProgramRunner,
     Effect.gen(function* () {
       const requestSequence = yield* Ref.make(0)
-      return ProgramHost.of({
+      return ProgramRunner.of({
         execute: (request) =>
           Effect.gen(function* () {
             const actualPin = makeProgramManifest(request.program.manifest).pin
             if (actualPin !== request.program.pin)
               return yield* ProgramIdentityMismatch.make({ expected: request.program.pin, actual: actualPin })
-            yield* validateBindings(request.program, options.bindings)
-            const capabilities = yield* makeCapabilities(options.bindings, request.program.manifest.budget)
+            yield* validateHandlers(request.program, options.handlers)
+            const capabilities = yield* makeCapabilities(options.handlers, request.program.manifest.budget)
             const signal = yield* Effect.abortSignal
             const now = yield* Clock.currentTimeMillis
             const requestNonce = yield* Ref.updateAndGet(requestSequence, (sequence) => sequence + 1)
             const requestEntropy = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
             const budget = request.program.manifest.budget
-            const execution = options.sandbox
+            const execution = options.executor
               .execute(
                 makeSandboxRequest({
                   requestId: `${now}:${requestNonce}:${requestEntropy}`,

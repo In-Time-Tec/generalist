@@ -2,10 +2,10 @@ import "./suites/store-real-file-system-suite.js"
 import "./suites/store-file-system-suite.js"
 import "./suites/apply-seam-suite.js"
 import { describe, expect, it } from "@effect/vitest"
-import { HarnessState, Refinement } from "../../src/harness/index.js"
+import { State, Refinement } from "../../src/harness/index.js"
 import { applied, at, create, entry, proposal, rejected, remove, scope, update } from "./fixtures.js"
 
-const seeded = HarnessState.make({
+const seeded = State.make({
   scope,
   entries: [
     entry({ id: "keep", kind: "memory", content: "original" }),
@@ -18,11 +18,11 @@ const rollback = (result: Refinement.RefinementResult) =>
   Refinement.rollbackProposal(result, { id: "rollback-1", at: at(9), rationale: "undo", source: "refine" })
 
 const roundTrip = (edits: ReadonlyArray<ReturnType<typeof create>>): void => {
-  const before = HarnessState.snapshotId(seeded)
+  const before = State.snapshotId(seeded)
   const result = applied({ state: seeded, proposal: proposal({ edits }) })
   const restored = applied({ state: result.state, proposal: rollback(result) })
-  expect(HarnessState.snapshotId(restored.state)).toBe(before)
-  expect(HarnessState.allEntries(restored.state)).toEqual(HarnessState.allEntries(seeded))
+  expect(State.snapshotId(restored.state)).toBe(before)
+  expect(State.allEntries(restored.state)).toEqual(State.allEntries(seeded))
 }
 
 describe("Refinement.rollbackProposal", () => {
@@ -49,9 +49,7 @@ describe("Refinement.rollbackProposal", () => {
   it("restores every optional entry field a delete removed", () => {
     const result = applied({ state: seeded, proposal: proposal({ edits: [remove({ kind: "skill", id: "target" })] }) })
     const restored = applied({ state: result.state, proposal: rollback(result) })
-    expect(HarnessState.findEntry(restored.state, "skill", "target")).toEqual(
-      HarnessState.findEntry(seeded, "skill", "target"),
-    )
+    expect(State.findEntry(restored.state, "skill", "target")).toEqual(State.findEntry(seeded, "skill", "target"))
   })
 
   it("restores the prior version rather than bumping it", () => {
@@ -59,10 +57,10 @@ describe("Refinement.rollbackProposal", () => {
       state: seeded,
       proposal: proposal({ edits: [update({ kind: "skill", id: "target", value: { content: "next" } })] }),
     })
-    expect(HarnessState.findEntry(result.state, "skill", "target")!.version).toBe(4)
+    expect(State.findEntry(result.state, "skill", "target")!.version).toBe(4)
     const restored = applied({ state: result.state, proposal: rollback(result) })
-    expect(HarnessState.findEntry(restored.state, "skill", "target")!.version).toBe(3)
-    expect(HarnessState.findEntry(restored.state, "skill", "target")!.updatedAt).toBe(at(0))
+    expect(State.findEntry(restored.state, "skill", "target")!.version).toBe(3)
+    expect(State.findEntry(restored.state, "skill", "target")!.updatedAt).toBe(at(0))
   })
 
   it("inverts the edits in reverse order", () => {
@@ -123,8 +121,8 @@ describe("Refinement.rollbackProposal", () => {
     })
     const restored = applied({ state: recreated.state, proposal: rollback(recreated) })
 
-    expect(HarnessState.findEntry(restored.state, "skill", "target")).toBeUndefined()
-    expect(rollback(recreated).baseSnapshot).toBe(HarnessState.snapshotId(recreated.state))
+    expect(State.findEntry(restored.state, "skill", "target")).toBeUndefined()
+    expect(rollback(recreated).baseSnapshot).toBe(State.snapshotId(recreated.state))
   })
 
   it("guards each inverse edit with the version it undoes", () => {
@@ -152,6 +150,6 @@ describe("Refinement.rollbackProposal", () => {
       state: restored.state,
       proposal: Refinement.rollbackProposal(restored, { id: "rollback-2", at: at(10) }),
     })
-    expect(HarnessState.allEntries(redo.state)).toEqual(HarnessState.allEntries(result.state))
+    expect(State.allEntries(redo.state)).toEqual(State.allEntries(result.state))
   })
 })

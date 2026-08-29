@@ -64,7 +64,7 @@ import {
   requireRun,
   settleParent,
 } from "./runtime.js"
-import type { PostgresOptions } from "../runtime-layer.js"
+import type { Options } from "../runtime-layer.js"
 import { lockMailbox, lockRun, lockRunHierarchy, lockSpawnParent } from "../runs/locks.js"
 import { inspectionStoreMethods } from "./inspection.js"
 import { programStoreMethods } from "./program.js"
@@ -80,7 +80,7 @@ import { cancelSessionRuns } from "../sessions/session-cancellation.js"
 import { postgresSessionStore } from "../sessions/session-store.js"
 import { readinessForAdmission } from "tenetkit/runtime/driver/sql/store/child/capacity"
 import { hasPendingOperationCancellation } from "tenetkit/runtime/driver/sql/store/child/settlement"
-export const postgresServices = (options: PostgresOptions) =>
+export const postgresServices = (options: Options) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))

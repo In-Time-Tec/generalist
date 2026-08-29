@@ -1,9 +1,9 @@
 import { DateTime, Effect, Layer, Schema, Scope } from "effect"
-import { AgentProgram, ProgramCapabilities, ProgramHost } from "../../core/index.js"
+import { AgentProgram, ProgramCapabilities, ProgramRunner } from "../../core/index.js"
 import type { ProgramResolution } from "../executable/resolver.js"
-import type { ExecutionClaim, ExecutionRecord, Interface as RunStore } from "../run/store.js"
+import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 import { AgentExecutionFailure, RunTerminal, failureMessage } from "../errors.js"
-import { make as makeProgramHost } from "../program/host.js"
+import { make as makeProgramRunner } from "../program/runner.js"
 import { programWait } from "../program/approval.js"
 
 export const executeProgram = (input: {
@@ -13,15 +13,15 @@ export const executeProgram = (input: {
   readonly resolution: ProgramResolution
 }): Effect.Effect<void, never, Scope.Scope> => {
   const { claim, claimed, resolution, store } = input
-  const programHost = makeProgramHost({
+  const programRunner = makeProgramRunner({
     claim,
     claimed,
     store,
-    sandbox: resolution.sandbox,
-    bindings: resolution.bindings,
+    executor: resolution.executor,
+    handlers: resolution.handlers,
   })
   const execution = AgentProgram.run(resolution.program, claimed.message.prompt).pipe(
-    Effect.provideService(ProgramHost.ProgramHost, programHost),
+    Effect.provideService(ProgramRunner.ProgramRunner, programRunner),
   )
   const services = resolution.services
   const scopedExecution = Effect.scoped(
@@ -58,7 +58,7 @@ export const executeProgram = (input: {
           if (!Schema.is(ProgramCapabilities.ProgramSuspended)(error)) {
             return store.fail({
               ...claim,
-              error: Schema.is(ProgramHost.ExecutionFailure)(error)
+              error: Schema.is(ProgramRunner.ExecutionFailure)(error)
                 ? error
                 : AgentExecutionFailure.make({ message: failureMessage(String(error)) }),
             })

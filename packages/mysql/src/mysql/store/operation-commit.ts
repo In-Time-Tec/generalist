@@ -4,7 +4,7 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { RunNotFound, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { ExecutionCheckpoint } from "tenetkit/runtime/driver/execution/state"
 import { checkpointRef } from "tenetkit/runtime/driver/executable/manifest"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { encodeExecutableRef, encodeJson, encodeJsonValue } from "tenetkit/runtime/driver/sql/codec/codecs"
 import type { DecodedRun, OperationRow } from "tenetkit/runtime/driver/sql/codec/rows"
 import type { OperationRecord } from "tenetkit/runtime/driver/sql/operations"
@@ -24,7 +24,7 @@ const requireRun = (runId: string) =>
     Effect.flatMap((run) => (run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run))),
   )
 
-type CompleteInput = Parameters<RunStoreInterface["completeOperation"]>[0]
+type CompleteInput = Parameters<RunStoreService["completeOperation"]>[0]
 
 const verifyCompletedRetry = (loaded: DecodedRun, current: OperationRecord, op: CompleteInput) =>
   Effect.gen(function* () {

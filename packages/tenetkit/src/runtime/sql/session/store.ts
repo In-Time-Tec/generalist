@@ -235,7 +235,7 @@ export const verifyInterruptedSessionEntry = (
  */
 export const make = (options: {
   readonly sessionId: string
-}): Effect.Effect<Session.Interface, never, SqlClient.SqlClient> =>
+}): Effect.Effect<Session.Service, never, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
 

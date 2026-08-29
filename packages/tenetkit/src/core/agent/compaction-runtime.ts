@@ -28,7 +28,7 @@ import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { intercept } from "../durable/driver/run.js"
 import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
 import type { Key, Memory, MemoryError } from "../context/memory.js"
-import type { SkillSourceError } from "../context/skill-source.js"
+import type { SkillCatalogError } from "../context/skill-catalog.js"
 import { CompactionProjection } from "./session/compaction-projection.js"
 type CompactionContext = {
   readonly activeSession: Option.Option<typeof SessionStore.Service>
@@ -56,7 +56,7 @@ type CompactionContext = {
   readonly agent: { readonly name: string }
   readonly memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined
   readonly memoryError: (turn: number, error: MemoryError) => AgentError
-  readonly skillError: (turn: number, error: SkillSourceError) => AgentError
+  readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
   readonly compactionError: (turn: number, error: import("../turn/compaction.js").CompactionError) => AgentError
   readonly sessionError: (turn: number, error: SessionStoreError | SessionConflict) => AgentError
 }

@@ -36,7 +36,7 @@ describe("ModelRegistry", () => {
     )
     return [
       ModelRegistry.layer([Effect.succeed(registrationValue)]),
-      ModelRegistry.operate(
+      ModelRegistry.withModel(
         { provider: "test", model: "resolved" },
         LanguageModel.generateText({ prompt: "hello" }),
       ).pipe(Effect.map((response) => expect(response.text).toBe("resolved output"))),
@@ -51,7 +51,7 @@ describe("ModelRegistry", () => {
         ModelRegistry.layer(),
         Effect.gen(function* () {
           const failure = yield* Effect.flip(
-            ModelRegistry.operate({ provider: "missing", model: "none" }, Effect.succeed("unused")),
+            ModelRegistry.withModel({ provider: "missing", model: "none" }, Effect.succeed("unused")),
           )
 
           expect(failure._tag).toBe("tenetkit/core/LanguageModelNotRegistered")
@@ -93,7 +93,7 @@ describe("ModelRegistry", () => {
           })
           yield* ModelRegistry.register({ registration })
 
-          const response = yield* ModelRegistry.operate(
+          const response = yield* ModelRegistry.withModel(
             { provider: "test", model: "deterministic" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -123,8 +123,8 @@ describe("ModelRegistry", () => {
     return [
       ModelRegistry.layer([ModelRegistry.registration({ ...selection, layer: registered })]),
       Effect.gen(function* () {
-        yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "first" }))
-        yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "second" }))
+        yield* ModelRegistry.withModel(selection, LanguageModel.generateText({ prompt: "first" }))
+        yield* ModelRegistry.withModel(selection, LanguageModel.generateText({ prompt: "second" }))
 
         expect(builds).toBe(1)
       }),
@@ -161,8 +161,8 @@ describe("ModelRegistry", () => {
           const context = yield* Layer.build(registryLayer)
           const registry = Context.get(context, ModelRegistry.ModelRegistry)
           const calls = yield* Effect.all([
-            Effect.forkChild(registry.operate(selection, Effect.void)),
-            Effect.forkChild(registry.operate(selection, Effect.void)),
+            Effect.forkChild(registry.withModel(selection, Effect.void)),
+            Effect.forkChild(registry.withModel(selection, Effect.void)),
           ])
           yield* Deferred.await(started)
           yield* Effect.yieldNow
@@ -199,12 +199,12 @@ describe("ModelRegistry", () => {
         Effect.gen(function* () {
           const context = yield* Layer.build(registryLayer)
           const registry = Context.get(context, ModelRegistry.ModelRegistry)
-          const first = yield* Effect.forkChild(registry.operate(selection, Effect.void))
+          const first = yield* Effect.forkChild(registry.withModel(selection, Effect.void))
           yield* Deferred.await(started)
           yield* Fiber.interrupt(first)
 
           const second = yield* Effect.forkChild(
-            registry.operate(selection, LanguageModel.generateText({ prompt: "recover" })),
+            registry.withModel(selection, LanguageModel.generateText({ prompt: "recover" })),
           )
           yield* Deferred.succeed(gate, undefined)
           expect((yield* Fiber.join(second)).text).toBe("recovered")
@@ -250,7 +250,7 @@ describe("ModelRegistry", () => {
           expect(registrations[0]?.metadata).toEqual({ revision: 2 })
           expect(registrations[1]?.registrationKey).toBe("eu")
 
-          const keyedResponse = yield* ModelRegistry.operate(
+          const keyedResponse = yield* ModelRegistry.withModel(
             { provider: "test", model: "deterministic", registrationKey: "eu" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -285,7 +285,7 @@ describe("ModelRegistry", () => {
         })
         yield* ModelRegistry.register({ registration: first })
         yield* ModelRegistry.register({ registration: other })
-        expect((yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "first" }))).text).toBe(
+        expect((yield* ModelRegistry.withModel(selection, LanguageModel.generateText({ prompt: "first" }))).text).toBe(
           "first",
         )
 
@@ -296,8 +296,8 @@ describe("ModelRegistry", () => {
           }),
         })
         yield* ModelRegistry.register({ registration: second })
-        yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "second" }))
-        const response = yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "repeat" }))
+        yield* ModelRegistry.withModel(selection, LanguageModel.generateText({ prompt: "second" }))
+        const response = yield* ModelRegistry.withModel(selection, LanguageModel.generateText({ prompt: "repeat" }))
         const registrations = yield* ModelRegistry.registrations()
 
         expect(response.text).toBe("second")
@@ -322,7 +322,7 @@ describe("ModelRegistry", () => {
           toolJsonSchemaCompiler: compiler,
         }),
       ]),
-      ModelRegistry.operate(
+      ModelRegistry.withModel(
         selection,
         LanguageModel.LanguageModel.pipe(
           Effect.map((model) => expect(ModelRegistry.toolJsonSchemaCompiler(model)).toBe(compiler)),
@@ -345,11 +345,11 @@ describe("ModelRegistry", () => {
           ]),
         ]),
         Effect.gen(function* () {
-          const first = yield* ModelRegistry.operate(
+          const first = yield* ModelRegistry.withModel(
             { provider: "prov-a", model: "model-a" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
-          const second = yield* ModelRegistry.operate(
+          const second = yield* ModelRegistry.withModel(
             { provider: "prov-b", model: "model-b" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -375,7 +375,7 @@ describe("ModelRegistry", () => {
         const entered = yield* Deferred.make<void>()
         const release = yield* Deferred.make<void>()
         const inFlight = yield* Effect.forkChild(
-          ModelRegistry.operate(
+          ModelRegistry.withModel(
             selection,
             Effect.gen(function* () {
               const model = yield* LanguageModel.LanguageModel
@@ -396,7 +396,7 @@ describe("ModelRegistry", () => {
 
         expect(yield* Fiber.join(inFlight)).toBe("context-overflow")
         expect(
-          yield* ModelRegistry.operate(
+          yield* ModelRegistry.withModel(
             selection,
             LanguageModel.LanguageModel.pipe(Effect.map((model) => ModelRegistry.classifyFailure(model, failure))),
           ),
@@ -428,7 +428,7 @@ describe("ModelRegistry", () => {
         ]),
         Effect.gen(function* () {
           const registrations = yield* ModelRegistry.registrations()
-          const response = yield* ModelRegistry.operate(
+          const response = yield* ModelRegistry.withModel(
             { provider: "test", model: "deterministic" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -455,7 +455,7 @@ describe("ModelRegistry", () => {
           const entered = yield* Ref.make(0)
           const firstEntered = yield* Deferred.make<void>()
           const gate = yield* Deferred.make<void>()
-          const call = ModelRegistry.operate(
+          const call = ModelRegistry.withModel(
             { provider: "test", model: "deterministic" },
             Ref.updateAndGet(entered, (count) => count + 1).pipe(
               Effect.tap((count) => (count === 1 ? Deferred.succeed(firstEntered, undefined) : Effect.void)),

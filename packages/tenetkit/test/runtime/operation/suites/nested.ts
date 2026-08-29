@@ -12,7 +12,7 @@ import { assistantAddress, textPrompt } from "../../execution/fixtures.js"
 
 const OPERATION_KEY = "outer-operation"
 
-const toolContextValue: ToolContext.Interface = {
+const toolContextValue: ToolContext.Service = {
   signal: new AbortController().signal,
   emit: () => Effect.void,
   sessionId: "session:nested",
@@ -21,7 +21,7 @@ const toolContextValue: ToolContext.Interface = {
   operationKey: OPERATION_KEY,
 }
 
-const recordingContext = (recorded: Ref.Ref<Array<ToolContext.Progress>>): ToolContext.Interface => ({
+const recordingContext = (recorded: Ref.Ref<Array<ToolContext.Progress>>): ToolContext.Service => ({
   ...toolContextValue,
   emit: (progress) => Ref.update(recorded, (all) => [...all, progress]),
 })
@@ -289,7 +289,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { nested } = yield* claimedRun("approval-pending")
-          const approvals: Approvals.Interface = { resolve: (pending) => Effect.succeed(pending) }
+          const approvals: Approvals.Service = { resolve: (pending) => Effect.succeed(pending) }
           const failure = yield* Effect.flip(
             nested
               .run(
@@ -310,7 +310,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { nested } = yield* claimedRun("approval-wait")
-          const approvals: Approvals.Interface = { resolve: (pending) => Effect.succeed(pending) }
+          const approvals: Approvals.Service = { resolve: (pending) => Effect.succeed(pending) }
           const failure = yield* Effect.flip(
             nested
               .run(
@@ -345,7 +345,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const { nested, store, claim } = yield* claimedRun("approval-denied")
           const calls = yield* Ref.make(0)
-          const approvals: Approvals.Interface = {
+          const approvals: Approvals.Service = {
             resolve: () => Effect.succeed({ _tag: "Denied", reason: "not allowed" }),
           }
           const failure = yield* Effect.flip(
@@ -374,7 +374,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { nested } = yield* claimedRun("approval-approved")
-          const approvals: Approvals.Interface = { resolve: () => Effect.succeed({ _tag: "Approved" }) }
+          const approvals: Approvals.Service = { resolve: () => Effect.succeed({ _tag: "Approved" }) }
           const value = yield* nested
             .run({ ...request("write", { path: "a" }), approval: { capability: "write" } }, Effect.succeed("wrote"))
             .pipe(

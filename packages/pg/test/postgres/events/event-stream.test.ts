@@ -1,4 +1,4 @@
-import { layerPostgres } from "@tenetkit/pg"
+import { layer as backendLayer } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { ExecutableResolver, RunClaims, Runtime, RunStore } from "tenetkit/runtime"
@@ -25,7 +25,7 @@ describePostgres("PostgreSQL event stream catch-up", () => {
   it.effect("advances the polling cursor so two subscribers never re-receive boundary events", () =>
     scopedWith(
       database.provision(
-        layerPostgres({
+        backendLayer({
           url: database.url,
           source: "postgres-event-stream",
           resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),

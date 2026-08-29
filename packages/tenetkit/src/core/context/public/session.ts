@@ -51,7 +51,7 @@ export namespace Session {
   export type Entry = import("../session.js").Entry
   export type EntryId = import("../session.js").EntryId
   export type HandoffEntry = import("../session.js").HandoffEntry
-  export type Interface = import("../session.js").Interface
+  export type Service = import("../session.js").Service
   export type MemoryEntry = import("../session.js").MemoryEntry
   export type MessageEntry = import("../session.js").MessageEntry
   export type ModelResponseEntry = import("../session.js").ModelResponseEntry

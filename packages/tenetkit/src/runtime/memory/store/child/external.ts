@@ -16,7 +16,7 @@ import {
 } from "../../../child/external/placement.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../../errors.js"
 import { isTerminal, type RunInspection, type RunOutcome } from "../../../run.js"
-import type { Interface as ExternalChildStoreInterface } from "../../../child/external/store.js"
+import type { Service as ExternalChildStoreService } from "../../../child/external/store.js"
 import { projectRunSnapshot, type InspectionRun } from "../../../execution/inspection.js"
 import { startDigest } from "../../digest.js"
 import { admitStart } from "../admit.js"
@@ -162,7 +162,7 @@ const settle = (
     return [updated, next] as const
   })
 
-type AdmitRootInput = Parameters<ExternalChildStoreInterface["admitRoot"]>[0]
+type AdmitRootInput = Parameters<ExternalChildStoreService["admitRoot"]>[0]
 
 const rootView = (state: MemoryState, stored: ExternalRoot) =>
   Effect.gen(function* () {

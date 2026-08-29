@@ -1,10 +1,11 @@
 import { Crypto, Effect, Encoding, Function, Schema, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse, Url } from "effect/unstable/http"
-import { SkillSource } from "../core/index.js"
+import { SkillCatalog } from "../core/index.js"
+import { Frontmatter } from "../core/context/skill-catalog.js"
 import { parseDocument, validateName } from "./document.js"
 
 const ManifestSkill = Schema.Struct({
-  ...SkillSource.Frontmatter.fields,
+  ...Frontmatter.fields,
   skillPath: Schema.String,
   sha256: Schema.String,
 })
@@ -21,31 +22,30 @@ export interface Limits {
   readonly manifestMaxBytes?: number
   readonly bodyMaxBytes?: number
   readonly maxSkills?: number
-  readonly descriptionCap?: number
-  readonly toolsBySkill?: Readonly<Record<string, ReadonlyArray<SkillSource.Skill["tools"][number]>>>
+  readonly toolsBySkill?: Readonly<Record<string, ReadonlyArray<SkillCatalog.Skill["tools"][number]>>>
 }
 
 interface MakeOptions {
   readonly limits: Limits
   readonly source: string
   readonly manifestUrl: string
-  readonly resolveSkillUrl: (skillPath: string) => Effect.Effect<string, SkillSource.SkillSourceError>
+  readonly resolveSkillUrl: (skillPath: string) => Effect.Effect<string, SkillCatalog.SkillCatalogError>
   readonly manifestHeaders?: Readonly<Record<string, string>>
   readonly bodyHeaders?: Readonly<Record<string, string>>
 }
 
 const decoder = new TextDecoder("utf-8", { fatal: true })
 
-interface SkillSourceErrorInput {
+interface SkillCatalogErrorInput {
   source: string
   message: string
   cause?: unknown
 }
 
-const sourceError = (source: string, message: string, cause?: unknown): SkillSource.SkillSourceError => {
-  const input: SkillSourceErrorInput = { source, message }
+const sourceError = (source: string, message: string, cause?: unknown): SkillCatalog.SkillCatalogError => {
+  const input: SkillCatalogErrorInput = { source, message }
   if (cause !== undefined) input.cause = cause
-  return SkillSource.SkillSourceError.make(input)
+  return SkillCatalog.SkillCatalogError.make(input)
 }
 
 const safeInteger = (
@@ -53,7 +53,7 @@ const safeInteger = (
   name: string,
   value: number,
   minimum: number,
-): Effect.Effect<number, SkillSource.SkillSourceError> =>
+): Effect.Effect<number, SkillCatalog.SkillCatalogError> =>
   Number.isSafeInteger(value) && value >= minimum
     ? Effect.succeed(value)
     : Effect.fail(sourceError(source, `${name} must be a safe integer >= ${minimum}`))
@@ -70,7 +70,7 @@ const fetchBytes = (
   url: string,
   headers: Readonly<Record<string, string>> | undefined,
   maxBytes: number,
-): Effect.Effect<Uint8Array, SkillSource.SkillSourceError> =>
+): Effect.Effect<Uint8Array, SkillCatalog.SkillCatalogError> =>
   client.execute(request(url, headers)).pipe(
     Effect.flatMap(HttpClientResponse.filterStatusOk),
     Effect.mapError(() => sourceError(source, "Hosted skill request failed")),
@@ -101,19 +101,19 @@ const fetchBytes = (
     ),
   )
 
-const decodeText = (source: string, bytes: Uint8Array): Effect.Effect<string, SkillSource.SkillSourceError> =>
+const decodeText = (source: string, bytes: Uint8Array): Effect.Effect<string, SkillCatalog.SkillCatalogError> =>
   Effect.try({
     try: () => decoder.decode(bytes),
     catch: (cause) => sourceError(source, "Hosted skill response is not valid UTF-8", cause),
   })
 
-const sameFrontmatter = (left: SkillSource.Frontmatter, right: SkillSource.Frontmatter): boolean =>
+const sameFrontmatter = (left: Frontmatter, right: Frontmatter): boolean =>
   JSON.stringify(left) === JSON.stringify(right)
 
 /** @experimental Validate one safe relative SKILL.md path. */
 export const validateSkillPath: {
-  (skillPath: string): (source: string) => Effect.Effect<string, SkillSource.SkillSourceError>
-  (source: string, skillPath: string): Effect.Effect<string, SkillSource.SkillSourceError>
+  (skillPath: string): (source: string) => Effect.Effect<string, SkillCatalog.SkillCatalogError>
+  (source: string, skillPath: string): Effect.Effect<string, SkillCatalog.SkillCatalogError>
 } = Function.dual(2, (source: string, skillPath: string) => {
   const segments = skillPath.split("/")
   return skillPath.length > 0 &&
@@ -129,8 +129,8 @@ export const validateSkillPath: {
 
 /** @experimental Resolve a same-origin path beneath a manifest directory. */
 export const resolveRelative: {
-  (manifestUrl: string, skillPath: string): (source: string) => Effect.Effect<string, SkillSource.SkillSourceError>
-  (source: string, manifestUrl: string, skillPath: string): Effect.Effect<string, SkillSource.SkillSourceError>
+  (manifestUrl: string, skillPath: string): (source: string) => Effect.Effect<string, SkillCatalog.SkillCatalogError>
+  (source: string, manifestUrl: string, skillPath: string): Effect.Effect<string, SkillCatalog.SkillCatalogError>
 } = Function.dual(3, (source: string, manifestUrl: string, skillPath: string) =>
   Effect.gen(function* () {
     yield* validateSkillPath(source, skillPath)
@@ -150,8 +150,8 @@ export const resolveRelative: {
   }),
 )
 
-/** @experimental Build a hosted manifest source over Effect HTTP and Crypto services. */
-export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpClient | Crypto.Crypto> =>
+/** @experimental Build a hosted manifest catalog over Effect HTTP and Crypto services. */
+export const make = (options: MakeOptions) =>
   Effect.gen(function* () {
     const client = yield* HttpClient.HttpClient
     const crypto = yield* Crypto.Crypto
@@ -168,12 +168,6 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
       1,
     )
     const maxSkills = yield* safeInteger(options.source, "maxSkills", options.limits.maxSkills ?? 1_000, 1)
-    const descriptionCap = yield* safeInteger(
-      options.source,
-      "descriptionCap",
-      options.limits.descriptionCap ?? SkillSource.DESCRIPTION_CAP,
-      0,
-    )
     const manifestBytes = yield* fetchBytes(
       client,
       options.source,
@@ -188,7 +182,7 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
     if (manifest.skills.length > maxSkills) {
       return yield* sourceError(options.source, `Hosted skill manifest exceeds ${maxSkills} skills`)
     }
-    const byName = new Map<string, SkillSource.Skill>()
+    const byName = new Map<string, SkillCatalog.Skill>()
     for (const entry of manifest.skills) {
       yield* validateName(options.source, entry.name)
       if (!/^[0-9a-f]{64}$/.test(entry.sha256)) {
@@ -229,15 +223,14 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
           ? (options.limits.toolsBySkill[entry.name] ?? [])
           : []
       byName.set(entry.name, {
-        frontmatter: metadata,
-        listing: SkillSource.makeListing(metadata, descriptionCap),
-        body,
+        ...metadata,
+        instructions: body,
         tools,
       })
     }
     const skills = [...byName.values()]
     return {
       all: Effect.succeed(skills),
-      get: (name) => Effect.succeed(byName.get(name)),
+      get: (name: string) => Effect.succeed(byName.get(name)),
     }
   })

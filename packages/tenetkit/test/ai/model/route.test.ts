@@ -70,7 +70,7 @@ const provideScoped = <A, E, R, A2, E2, R2>(
 ): Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>> =>
   Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
-const run = (route: ModelRoute.Route, resilience: ModelResilience.Interface = ModelResilience.none) =>
+const run = (route: ModelRoute.Route, resilience: ModelResilience.Service = ModelResilience.none) =>
   Stream.runCollect(Agent.stream(Agent.make({ name: "route", model: route.selection }), { prompt: "go" })).pipe(
     (effect) =>
       provideScoped(

@@ -58,17 +58,17 @@ export class OAuthProviderError extends Schema.TaggedError<OAuthProviderError>()
 }) {}
 
 /** @experimental */
-export interface TokenStoreInterface {
+export interface TokenStoreService {
   readonly load: (server: string) => Effect.Effect<Option.Option<Redacted.Redacted<string>>, OAuthProviderError>
   readonly save: (server: string, tokens: Redacted.Redacted<string>) => Effect.Effect<void, OAuthProviderError>
   readonly remove: (server: string) => Effect.Effect<void, OAuthProviderError>
 }
 
 /** @experimental */
-export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()("tenetkit/mcp/oauth/TokenStore") {}
+export class TokenStore extends Context.Service<TokenStore, TokenStoreService>()("tenetkit/mcp/oauth/TokenStore") {}
 
 /** @experimental */
-export const layerTokenStoreTest = (implementation: TokenStoreInterface): Layer.Layer<TokenStore> =>
+export const layerTokenStoreTest = (implementation: TokenStoreService): Layer.Layer<TokenStore> =>
   Layer.succeed(TokenStore, TokenStore.of(implementation))
 
 /** @experimental */
@@ -115,7 +115,7 @@ export interface Authorization {
 }
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly provider: OAuthClientProvider
   readonly withTransport: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | OAuthProviderError, R>
   readonly authorize: Effect.Effect<Authorization, OAuthProviderError>
@@ -125,7 +125,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class OAuth extends Context.Service<OAuth, Interface>()("tenetkit/mcp/oauth") {}
+export class OAuth extends Context.Service<OAuth, Service>()("tenetkit/mcp/oauth") {}
 
 type OAuthFlow =
   | { readonly _tag: "Idle" }
@@ -390,5 +390,4 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
   )
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<OAuth> =>
-  Layer.succeed(OAuth, OAuth.of(implementation))
+export const layerTest = (implementation: Service): Layer.Layer<OAuth> => Layer.succeed(OAuth, OAuth.of(implementation))

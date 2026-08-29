@@ -7,7 +7,7 @@ import { layer as anthropicLayer } from "tenetkit/ai/anthropic"
 import { layer as openAiLayer } from "tenetkit/ai/openai"
 import { layer as chatCompletionsLayer } from "tenetkit/ai/openai-chat-completions"
 import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
-import { layerOpenAi } from "tenetkit/ai/deterministic"
+import { layerOpenAI } from "tenetkit/ai/deterministic"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const image = new TextEncoder().encode("image")
@@ -55,7 +55,7 @@ const capture = (
   const call =
     operation === "streamText"
       ? ModelRegistry.stream(selection, LanguageModel.streamText({ prompt: input })).pipe(Stream.runDrain)
-      : ModelRegistry.operate(
+      : ModelRegistry.withModel(
           selection,
           operation === "generateObject"
             ? LanguageModel.generateObject({
@@ -119,7 +119,7 @@ const adapters = [
     name: "deterministic OpenAI fallback",
     provider: "openai",
     model: "fallback-openai-test",
-    layer: layerOpenAi({ model: "fallback-openai-test", fallbackModel: "fallback-test", apiKey }),
+    layer: layerOpenAI({ model: "fallback-openai-test", fallbackModel: "fallback-test", apiKey }),
     inline: imageDataUri,
   },
 ]

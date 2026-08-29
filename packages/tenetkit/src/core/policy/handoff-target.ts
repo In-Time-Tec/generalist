@@ -27,12 +27,12 @@ export const target: {
   },
 )
 
-export interface HandoffCatalogInterface {
+export interface HandoffCatalogService {
   readonly resolve: (name: string) => HandoffTarget | undefined
   readonly targets: ReadonlyMap<string, HandoffTarget>
 }
 
-export class HandoffCatalog extends Context.Service<HandoffCatalog, HandoffCatalogInterface>()(
+export class HandoffCatalog extends Context.Service<HandoffCatalog, HandoffCatalogService>()(
   "tenetkit/core/policy/handoff-target/HandoffCatalog",
 ) {}
 

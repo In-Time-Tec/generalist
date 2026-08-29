@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Path, PlatformError, Stream } from "effect"
-import { SkillSource } from "tenetkit"
-import { SkillLoader } from "../../src/skills/index"
+import { SkillCatalog } from "tenetkit"
+import { FileSystemCatalog } from "../../src/skills/index"
 
 const encoder = new TextEncoder()
 
@@ -13,7 +13,7 @@ interface ReadCounts {
 const notFound = (method: string, path: string) =>
   PlatformError.systemError({
     _tag: "NotFound",
-    module: "SkillLoaderTest",
+    module: "FileSystemCatalogTest",
     method,
     description: "not found",
     pathOrDescriptor: path,
@@ -52,18 +52,21 @@ const testFsLayer = (
   })
 
 const loaderTestLayer = (
-  options: Parameters<typeof SkillLoader.layer>[0],
+  options: Parameters<typeof FileSystemCatalog.layer>[0],
   files: Readonly<Record<string, string>>,
   directories: Readonly<Record<string, ReadonlyArray<string>>>,
   reads?: ReadCounts,
-) => SkillLoader.layer(options).pipe(Layer.provide(Layer.mergeAll(testFsLayer(files, directories, reads), Path.layer)))
+) =>
+  FileSystemCatalog.layer(options).pipe(
+    Layer.provide(Layer.mergeAll(testFsLayer(files, directories, reads), Path.layer)),
+  )
 
 const provideTestLayer =
   <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
   <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
     Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
 
-describe("SkillLoader", () => {
+describe("FileSystemCatalog", () => {
   it.effect("parses frontmatter and leaves body lazy", () => {
     const reads: ReadCounts = { full: {}, streamed: {} }
     const path = "/repo/.agents/skills/review/SKILL.md"
@@ -86,13 +89,13 @@ Use the checklist.
     }
     const directories = { "/repo/.agents/skills": ["review/SKILL.md"] }
     return Effect.gen(function* () {
-      const source = yield* SkillSource.SkillSource
+      const source = yield* SkillCatalog.SkillCatalog
       const all = yield* source.all
       const found = yield* source.get("review")
 
       expect(all).toHaveLength(1)
       expect(found).toBe(all[0])
-      expect(all[0]?.frontmatter).toMatchObject({
+      expect(all[0]).toMatchObject({
         name: "review",
         description: "Review code carefully",
         whenToUse: "before merging",
@@ -104,11 +107,10 @@ Use the checklist.
         model: "fast",
         paths: ["packages/core/**", "docs/features/**"],
       })
-      expect(all[0]?.listing).toBe("- review: Review code carefully")
       expect(reads.streamed[path]).toBe(1)
       expect(reads.full[path]).toBeUndefined()
 
-      const body = yield* all[0]!.body
+      const body = yield* all[0]!.instructions
 
       expect(body).toContain("# Review body")
       expect(reads.full[path]).toBe(1)
@@ -138,14 +140,14 @@ body second`,
       "/repo/b": ["dup/SKILL.md"],
     }
     return Effect.gen(function* () {
-      const source = yield* SkillSource.SkillSource
+      const source = yield* SkillCatalog.SkillCatalog
       const all = yield* source.all
       const nested = yield* source.get("lint")
       const duplicate = yield* source.get("dup")
 
-      expect(all.map((skill) => skill.frontmatter.name)).toEqual(["dup", "lint"])
-      expect(nested?.frontmatter.description).toBe("Lint frontend")
-      expect(duplicate?.frontmatter.description).toBe("Second duplicate")
+      expect(all.map((skill) => skill.name)).toEqual(["dup", "lint"])
+      expect(nested?.description).toBe("Lint frontend")
+      expect(duplicate?.description).toBe("Second duplicate")
     }).pipe(provideTestLayer(loaderTestLayer({ cwd: "/repo", roots: ["a", "b"] }, files, directories)))
   })
 
@@ -165,14 +167,14 @@ body`,
     const directories = { "/repo/skills": ["user-only/SKILL.md", "bad/SKILL.md"] }
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(
-        SkillSource.SkillSource.pipe(
+        SkillCatalog.SkillCatalog.pipe(
           provideTestLayer(loaderTestLayer({ cwd: "/repo", roots: ["skills"] }, files, directories)),
         ),
       )
 
-      expect(failure._tag).toBe("tenetkit/core/SkillSourceError")
+      expect(failure._tag).toBe("tenetkit/core/SkillCatalogError")
 
-      const goodSource = yield* SkillSource.SkillSource.pipe(
+      const goodSource = yield* SkillCatalog.SkillCatalog.pipe(
         provideTestLayer(
           loaderTestLayer(
             { cwd: "/repo", roots: ["skills"] },
@@ -186,7 +188,7 @@ body`,
       const userOnly = yield* goodSource.get("user-only")
 
       expect(userOnly).toBeDefined()
-      expect(SkillSource.selectListings(userOnly === undefined ? [] : [userOnly], 1_000, [])).toEqual([])
+      expect(SkillCatalog.selectListings(userOnly === undefined ? [] : [userOnly], 1_000, [])).toEqual([])
     })
   })
 
@@ -236,7 +238,7 @@ body`,
       for (const testCase of cases) {
         const relative = testCase.file.slice("/repo/skills/".length)
         const failure = yield* Effect.flip(
-          SkillSource.SkillSource.pipe(
+          SkillCatalog.SkillCatalog.pipe(
             provideTestLayer(
               loaderTestLayer(
                 { cwd: "/repo", roots: ["skills"] },
@@ -246,7 +248,7 @@ body`,
             ),
           ),
         )
-        expect(failure._tag).toBe("tenetkit/core/SkillSourceError")
+        expect(failure._tag).toBe("tenetkit/core/SkillCatalogError")
       }
     })
   })

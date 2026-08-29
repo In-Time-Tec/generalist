@@ -8,7 +8,7 @@ import {
 } from "../durable/manifest/program-manifest.js"
 import type { CapabilityPin } from "../durable/pin.js"
 import { ProgramSchemaFailure } from "./capabilities.js"
-import { ProgramHost, type ExecutionFailure } from "./host.js"
+import { ProgramRunner, type ExecutionFailure } from "./runner.js"
 
 /** @experimental An exact Agent Program paired with its input and output codecs. */
 export interface Program<I, IE, O, OE> {
@@ -50,23 +50,23 @@ export const run: {
     input: I,
   ): (
     program: Program<I, IE, O, OE>,
-  ) => Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramHost | Scope.Scope>
+  ) => Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramRunner | Scope.Scope>
   <I, IE, O, OE>(
     program: Program<I, IE, O, OE>,
     input: I,
-  ): Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramHost | Scope.Scope>
+  ): Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramRunner | Scope.Scope>
 } = Function.dual(
   2,
   <I, IE, O, OE>(
     program: Program<I, IE, O, OE>,
     input: I,
-  ): Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramHost | Scope.Scope> =>
+  ): Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramRunner | Scope.Scope> =>
     Effect.gen(function* () {
       const encoded = yield* Schema.encodeEffect(program.input)(input).pipe(
         Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-input", message: String(error) })),
       )
-      const host = yield* ProgramHost
-      const output = yield* host.execute({ program: program.pinned, input: encoded })
+      const runner = yield* ProgramRunner
+      const output = yield* runner.execute({ program: program.pinned, input: encoded })
       return yield* Schema.decodeUnknownEffect(program.output)(output).pipe(
         Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-output", message: String(error) })),
       )

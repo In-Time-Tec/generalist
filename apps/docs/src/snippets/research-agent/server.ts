@@ -1,6 +1,6 @@
 import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
-import { Sse, Ws } from "tenetkit/transport"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { SSE, WebSocket } from "tenetkit/transport"
 import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
@@ -59,13 +59,13 @@ const errorResponse = (status: number) => (error: Error) =>
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
-    const host = yield* ExecutionHost.ExecutionHost
+    const host = yield* RunExecutor.RunExecutor
     yield* host.execute(yield* store.claimExecution({ runId, ownerId: "research-agent-server" }))
   })
 
 const routesLayer = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    yield* router.add("GET", "/ws", Ws.handle)
+    yield* router.add("GET", "/ws", WebSocket.handle)
 
     yield* router.add(
       "GET",
@@ -74,7 +74,7 @@ const routesLayer = HttpRouter.use((router) =>
         Effect.flatMap(({ pathParams }) =>
           Effect.gen(function* () {
             const request = yield* HttpServerRequest.HttpServerRequest
-            return yield* Sse.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
+            return yield* SSE.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
         Effect.catchTag("tenetkit/transport/InvalidCursor", errorResponse(400)),
@@ -145,7 +145,7 @@ const agentServices = Layer.mergeAll(
   persistenceLayer,
 )
 
-export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExecutionHost.ExecutionHost> =
+export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor> =
   Runtime.layerMemory({
     resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
     addresses: [],

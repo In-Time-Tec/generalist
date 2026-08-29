@@ -10,7 +10,7 @@ import type {
 import type { DocumentType } from "@smithy/types"
 import { Effect, Encoding, Option, Result, Schema } from "effect"
 import { AiError, LanguageModel, Tool } from "effect/unstable/ai"
-import type { Config, Input } from "./service.js"
+import type { Config, Options } from "./service.js"
 
 const fail = (description: string) =>
   AiError.AiError.make({
@@ -265,7 +265,7 @@ const requestConfig = (config: Config, options: LanguageModel.ProviderOptions) =
 }
 
 /** @experimental */
-export const make = Effect.fnUntraced(function* (input: Input, options: LanguageModel.ProviderOptions) {
+export const make = Effect.fnUntraced(function* (input: Options, options: LanguageModel.ProviderOptions) {
   const { system, messages } = yield* prompt(options)
   return {
     modelId: input.model,

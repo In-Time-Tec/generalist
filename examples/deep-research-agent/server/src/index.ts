@@ -1,8 +1,8 @@
 import { layer } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
-import { Sse, Ws } from "tenetkit/transport"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { SSE, WebSocket } from "tenetkit/transport"
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
@@ -66,7 +66,7 @@ const errorResponse = (status: number) => (error: ResponseFailure) =>
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
-    const host = yield* ExecutionHost.ExecutionHost
+    const host = yield* RunExecutor.RunExecutor
     const claim = yield* store.claimExecution({ runId, ownerId: "deep-research-server" })
     yield* host.execute(claim)
   })
@@ -74,7 +74,7 @@ const executeRun = (runId: string) =>
 /** @experimental */
 const routesLayer = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    yield* router.add("GET", "/ws", Ws.handle)
+    yield* router.add("GET", "/ws", WebSocket.handle)
 
     yield* router.add(
       "GET",
@@ -83,7 +83,7 @@ const routesLayer = HttpRouter.use((router) =>
         Effect.flatMap(({ pathParams }) =>
           Effect.gen(function* () {
             const request = yield* HttpServerRequest.HttpServerRequest
-            return yield* Sse.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
+            return yield* SSE.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
         Effect.catchTag("tenetkit/transport/InvalidCursor", errorResponse(400)),

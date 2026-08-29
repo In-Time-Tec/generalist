@@ -4,10 +4,10 @@ import { AgentSuspended } from "../../core/agent/event.js"
 import type { Address } from "../../runtime/address.js"
 import { IdempotencyConflict, RunIdConflict } from "../../runtime/errors.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
-import { RunStore, type Interface as RunStoreInterface } from "../../runtime/run/store.js"
-import { Runtime, type Interface as RuntimeInterface } from "../../runtime/service.js"
+import { RunStore, type Service as RunStoreService } from "../../runtime/run/store.js"
+import { Runtime, type Service as RuntimeService } from "../../runtime/service.js"
 import { StaleClaim } from "../../runtime/sql/errors.js"
-import { RunClaims, type Interface as RunClaimsInterface } from "../../runtime/sql/run/claims.js"
+import { RunClaims, type Service as RunClaimsService } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
 
 /** @experimental The minimum claim identity shared by Runtime store and multi-worker claim APIs. */
@@ -26,9 +26,9 @@ export interface WorkerClaim {
 
 /** @experimental Runtime services passed to driver-specific conformance operations. */
 export interface Services {
-  readonly runtime: RuntimeInterface
-  readonly store: RunStoreInterface
-  readonly claims?: RunClaimsInterface
+  readonly runtime: RuntimeService
+  readonly store: RunStoreService
+  readonly claims?: RunClaimsService
 }
 
 /** @experimental Driver-specific activation or worker claim needed before a fenced mutation. */
@@ -111,7 +111,7 @@ const provide = <A, E, LayerError, ClaimsLayerError>(
 
 const provideClaims = <A, E, LayerError>(
   layer: Layer.Layer<Runtime | RunStore | RunClaims, LayerError, never>,
-  use: (services: Services & { readonly claims: RunClaimsInterface }) => Effect.Effect<A, E>,
+  use: (services: Services & { readonly claims: RunClaimsService }) => Effect.Effect<A, E>,
 ): Effect.Effect<A, E | LayerError> =>
   Effect.scoped(
     Effect.flatMap(Layer.build(layer), (context) =>

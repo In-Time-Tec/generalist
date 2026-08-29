@@ -2,7 +2,7 @@ import "./suites/fifo-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { ChildRuns, ExecutionHost, LocalScheduler, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { ChildRuns, RunExecutor, LocalScheduler, Runtime, RunStore } from "../../../src/runtime/index.js"
 import {
   assistant,
   assistantAddress,
@@ -423,14 +423,14 @@ for (const backend of ["memory", "sqlite"] as const) {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const host = ExecutionHost.ExecutionHost.of({
+          const host = RunExecutor.RunExecutor.of({
             execute: (claim) =>
               store.complete({ ...claim, result: completedResult("done") }).pipe(Effect.asVoid, Effect.orDie),
             interrupt: () => Effect.void,
           })
           const scheduler = yield* makeLocalScheduler({ workerId: backend, concurrency: 4 }).pipe(
             Effect.provideService(RunStore.RunStore, store),
-            Effect.provideService(ExecutionHost.ExecutionHost, host),
+            Effect.provideService(RunExecutor.RunExecutor, host),
             Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
           )
           const receipts: Array<{ readonly runId: string }> = []

@@ -9,7 +9,7 @@ import {
   KernelUnavailable,
 } from "../cell.js"
 import type { Manifest, Snapshot } from "../kernel-state-store.js"
-import type { Interface as HostBindings, Request as HostRequest } from "../host-binding-registry.js"
+import type { Service as HostModulesService, Request as HostRequest } from "../host-modules.js"
 import type { WorkerFrame } from "./protocol.js"
 import type { Worker } from "./session.js"
 
@@ -21,7 +21,7 @@ export interface CellOutcome {
 
 /** @experimental Everything a session needs to answer host requests raised by a running cell. */
 export interface HostAnswerOptions {
-  readonly registry: HostBindings | undefined
+  readonly registry: HostModulesService | undefined
   readonly worker: Worker
   readonly sessionId?: string
   readonly cellId?: string

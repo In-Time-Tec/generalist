@@ -1,32 +1,32 @@
 import { Pins } from "../core/index.js"
 import { Function, Schema } from "effect"
-import { HarnessEntry, HarnessScope, HarnessSnapshotId, RefinementEvent, kinds, type HarnessKind } from "./entry.js"
+import { GuidanceEntry, GuidanceScope, GuidanceSnapshotId, RefinementEvent, kinds, type GuidanceKind } from "./entry.js"
 
 /** @experimental Entries of one state grouped by kind and sorted by id. */
-export const HarnessEntries = Schema.Struct({
-  prompt: Schema.Array(HarnessEntry),
-  memory: Schema.Array(HarnessEntry),
-  skill: Schema.Array(HarnessEntry),
-  subagent: Schema.Array(HarnessEntry),
+export const GuidanceEntries = Schema.Struct({
+  prompt: Schema.Array(GuidanceEntry),
+  memory: Schema.Array(GuidanceEntry),
+  skill: Schema.Array(GuidanceEntry),
+  subagent: Schema.Array(GuidanceEntry),
 })
 /** @experimental */
-export type HarnessEntries = typeof HarnessEntries.Type
+export type GuidanceEntries = typeof GuidanceEntries.Type
 
-/** @experimental One complete continual-harness state for one scope. */
-export const HarnessState = Schema.Struct({
+/** @experimental One complete Agent Guidance state for one scope. */
+export const GuidanceState = Schema.Struct({
   schemaVersion: Schema.Literal("1"),
-  scope: HarnessScope,
-  entries: HarnessEntries,
+  scope: GuidanceScope,
+  entries: GuidanceEntries,
   refinements: Schema.Array(RefinementEvent),
 })
 /** @experimental */
-export type HarnessState = typeof HarnessState.Type
+export type GuidanceState = typeof GuidanceState.Type
 
 interface GroupedEntries {
-  readonly prompt: Array<HarnessEntry>
-  readonly memory: Array<HarnessEntry>
-  readonly skill: Array<HarnessEntry>
-  readonly subagent: Array<HarnessEntry>
+  readonly prompt: Array<GuidanceEntry>
+  readonly memory: Array<GuidanceEntry>
+  readonly skill: Array<GuidanceEntry>
+  readonly subagent: Array<GuidanceEntry>
 }
 
 const compareText = (left: string, right: string): number => {
@@ -35,11 +35,11 @@ const compareText = (left: string, right: string): number => {
   return 0
 }
 
-const sortEntries = (entries: ReadonlyArray<HarnessEntry>): ReadonlyArray<HarnessEntry> =>
+const sortEntries = (entries: ReadonlyArray<GuidanceEntry>): ReadonlyArray<GuidanceEntry> =>
   entries.toSorted((left, right) => compareText(left.id, right.id))
 
 /** @experimental An empty state for one scope. */
-export const empty = (scope: HarnessScope): HarnessState => ({
+export const empty = (scope: GuidanceScope): GuidanceState => ({
   schemaVersion: "1",
   scope,
   entries: { prompt: [], memory: [], skill: [], subagent: [] },
@@ -48,10 +48,10 @@ export const empty = (scope: HarnessScope): HarnessState => ({
 
 /** @experimental Build one state from unordered entries and refinements. */
 export const make = (input: {
-  readonly scope: HarnessScope
-  readonly entries?: ReadonlyArray<HarnessEntry>
+  readonly scope: GuidanceScope
+  readonly entries?: ReadonlyArray<GuidanceEntry>
   readonly refinements?: ReadonlyArray<RefinementEvent>
-}): HarnessState => {
+}): GuidanceState => {
   const grouped: GroupedEntries = {
     prompt: [],
     memory: [],
@@ -73,34 +73,34 @@ export const make = (input: {
 }
 
 /** @experimental Every entry of one state in canonical kind then id order. */
-export const allEntries = (state: HarnessState): ReadonlyArray<HarnessEntry> =>
+export const allEntries = (state: GuidanceState): ReadonlyArray<GuidanceEntry> =>
   kinds.flatMap((kind) => state.entries[kind])
 
 /** @experimental The entry of one kind and id, when present. */
 export const findEntry: {
-  (kind: HarnessKind, id: string): (state: HarnessState) => HarnessEntry | undefined
-  (state: HarnessState, kind: HarnessKind, id: string): HarnessEntry | undefined
-} = Function.dual(3, (state: HarnessState, kind: HarnessKind, id: string): HarnessEntry | undefined =>
+  (kind: GuidanceKind, id: string): (state: GuidanceState) => GuidanceEntry | undefined
+  (state: GuidanceState, kind: GuidanceKind, id: string): GuidanceEntry | undefined
+} = Function.dual(3, (state: GuidanceState, kind: GuidanceKind, id: string): GuidanceEntry | undefined =>
   state.entries[kind].find((entry) => entry.id === id),
 )
 
 /** @experimental Replace the entries of one kind, keeping canonical order. */
 export const withEntries: {
-  (kind: HarnessKind, entries: ReadonlyArray<HarnessEntry>): (state: HarnessState) => HarnessState
-  (state: HarnessState, kind: HarnessKind, entries: ReadonlyArray<HarnessEntry>): HarnessState
+  (kind: GuidanceKind, entries: ReadonlyArray<GuidanceEntry>): (state: GuidanceState) => GuidanceState
+  (state: GuidanceState, kind: GuidanceKind, entries: ReadonlyArray<GuidanceEntry>): GuidanceState
 } = Function.dual(
   3,
-  (state: HarnessState, kind: HarnessKind, entries: ReadonlyArray<HarnessEntry>): HarnessState => ({
+  (state: GuidanceState, kind: GuidanceKind, entries: ReadonlyArray<GuidanceEntry>): GuidanceState => ({
     ...state,
     entries: { ...state.entries, [kind]: sortEntries(entries) },
   }),
 )
 
-const encodeEntries = Schema.encodeSync(HarnessEntries)
+const encodeEntries = Schema.encodeSync(GuidanceEntries)
 
 /** @experimental Content-addressed identity of one exact state, independent of refinement history. */
-export const snapshotId = (state: HarnessState): HarnessSnapshotId =>
-  `harness-snapshot:v1:sha256:${Pins.digest({
+export const snapshotId = (state: GuidanceState): GuidanceSnapshotId =>
+  `guidance-snapshot:v1:sha256:${Pins.digest({
     schemaVersion: state.schemaVersion,
     scope: state.scope,
     entries: encodeEntries(state.entries),

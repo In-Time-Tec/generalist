@@ -1,35 +1,35 @@
 import {
-  McpConnectionFailed as McpToolSource_McpConnectionFailed,
-  McpToolCallFailed as McpToolSource_McpToolCallFailed,
-  McpToolFailure as McpToolSource_McpToolFailure,
-  McpToolSource as McpToolSource_McpToolSource,
-  fromTransport as McpToolSource_fromTransport,
-  layer as McpToolSource_layer,
-  layerTagged as McpToolSource_layerTagged,
-} from "./tool-source.js"
-export const McpToolSource = {
-  McpConnectionFailed: McpToolSource_McpConnectionFailed,
-  McpToolCallFailed: McpToolSource_McpToolCallFailed,
-  McpToolFailure: McpToolSource_McpToolFailure,
-  McpToolSource: McpToolSource_McpToolSource,
-  fromTransport: McpToolSource_fromTransport,
-  layer: McpToolSource_layer,
-  layerTagged: McpToolSource_layerTagged,
+  MCPConnectionFailed as MCPClient_MCPConnectionFailed,
+  MCPToolCallFailed as MCPClient_MCPToolCallFailed,
+  MCPToolFailure as MCPClient_MCPToolFailure,
+  MCPClient as MCPClient_MCPClient,
+  fromTransport as MCPClient_fromTransport,
+  layer as MCPClient_layer,
+  layerTagged as MCPClient_layerTagged,
+} from "./client.js"
+export const MCPClient = {
+  MCPConnectionFailed: MCPClient_MCPConnectionFailed,
+  MCPToolCallFailed: MCPClient_MCPToolCallFailed,
+  MCPToolFailure: MCPClient_MCPToolFailure,
+  MCPClient: MCPClient_MCPClient,
+  fromTransport: MCPClient_fromTransport,
+  layer: MCPClient_layer,
+  layerTagged: MCPClient_layerTagged,
 }
-export namespace McpToolSource {
-  export type McpConnectionFailed = import("./tool-source.js").McpConnectionFailed
-  export type McpToolCallFailed = import("./tool-source.js").McpToolCallFailed
-  export type McpToolFailure = import("./tool-source.js").McpToolFailure
-  export type McpToolSource = import("./tool-source.js").McpToolSource
-  export type fromTransport = typeof import("./tool-source.js").fromTransport
-  export type layer = typeof import("./tool-source.js").layer
-  export type layerTagged = typeof import("./tool-source.js").layerTagged
-  export type CallOptions = import("./tool-source.js").CallOptions
-  export type DiscoveredTool = import("./tool-source.js").DiscoveredTool
-  export type Interface = import("./tool-source.js").Interface
-  export type JsonValue = import("./tool-source.js").JsonValue
-  export type McpAiTool = import("./tool-source.js").McpAiTool
-  export type McpTransport = import("./tool-source.js").McpTransport
+export namespace MCPClient {
+  export type MCPConnectionFailed = import("./client.js").MCPConnectionFailed
+  export type MCPToolCallFailed = import("./client.js").MCPToolCallFailed
+  export type MCPToolFailure = import("./client.js").MCPToolFailure
+  export type MCPClient = import("./client.js").MCPClient
+  export type fromTransport = typeof import("./client.js").fromTransport
+  export type layer = typeof import("./client.js").layer
+  export type layerTagged = typeof import("./client.js").layerTagged
+  export type CallOptions = import("./client.js").CallOptions
+  export type DiscoveredTool = import("./client.js").DiscoveredTool
+  export type Service = import("./client.js").Service
+  export type JsonValue = import("./client.js").JsonValue
+  export type MCPTool = import("./client.js").MCPTool
+  export type MCPTransport = import("./client.js").MCPTransport
 }
 import {
   OAuthPending as OAuth_OAuthPending,
@@ -68,6 +68,6 @@ export namespace OAuth {
   export type layerTest = typeof import("./oauth.js").layerTest
   export type Authorization = import("./oauth.js").Authorization
   export type Configuration = import("./oauth.js").Configuration
-  export type Interface = import("./oauth.js").Interface
-  export type TokenStoreInterface = import("./oauth.js").TokenStoreInterface
+  export type Service = import("./oauth.js").Service
+  export type TokenStoreService = import("./oauth.js").TokenStoreService
 }

@@ -67,16 +67,16 @@ export const chargeAttemptUsageWith: {
   (
     state: Pick<AgentRunState, "finish" | "currentContextTokens">,
   ): (
-    interpreter: import("../../durable/driver/interpreter.js").Interface,
+    interpreter: import("../../durable/driver/interpreter.js").Service,
   ) => Effect.Effect<void, RunError | RunBudgetExhausted>
   (
-    interpreter: import("../../durable/driver/interpreter.js").Interface,
+    interpreter: import("../../durable/driver/interpreter.js").Service,
     state: Pick<AgentRunState, "finish" | "currentContextTokens">,
   ): Effect.Effect<void, RunError | RunBudgetExhausted>
 } = Function.dual(
   2,
   (
-    interpreter: import("../../durable/driver/interpreter.js").Interface,
+    interpreter: import("../../durable/driver/interpreter.js").Service,
     state: Pick<AgentRunState, "finish" | "currentContextTokens">,
   ): Effect.Effect<void, RunError | RunBudgetExhausted> => {
     const input = state.finish?.usage.inputTokens.total ?? 0

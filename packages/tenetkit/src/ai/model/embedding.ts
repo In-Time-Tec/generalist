@@ -1,54 +1,54 @@
-import { OpenAiClient, OpenAiEmbeddingModel } from "@effect/ai-openai"
+import { OpenAiClient as OpenAIClient, OpenAiEmbeddingModel as OpenAIEmbeddingModel } from "@effect/ai-openai"
 import {
-  OpenAiClient as OpenAiCompatibleClient,
-  OpenAiEmbeddingModel as OpenAiCompatibleEmbeddingModel,
+  OpenAiClient as OpenAICompatibleClient,
+  OpenAiEmbeddingModel as OpenAICompatibleEmbeddingModel,
 } from "@effect/ai-openai-compat"
 import { Config, Layer, Redacted } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 
 /** @experimental */
-export interface OpenAiEmbeddingInput {
-  readonly model: (string & {}) | OpenAiEmbeddingModel.Model
+export interface OpenAIOptions {
+  readonly model: (string & {}) | OpenAIEmbeddingModel.Model
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
-  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey">
-  readonly config?: Omit<typeof OpenAiEmbeddingModel.Config.Service, "model">
+  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAIClient.layerConfig>[0]>, "apiKey">
+  readonly config?: Omit<typeof OpenAIEmbeddingModel.Config.Service, "model">
 }
 
-const openAiModelOptions = (options: OpenAiEmbeddingInput) => {
-  const modelOptions: Parameters<typeof OpenAiEmbeddingModel.layer>[0] =
+const openAiModelOptions = (options: OpenAIOptions) => {
+  const modelOptions: Parameters<typeof OpenAIEmbeddingModel.layer>[0] =
     options.config === undefined ? { model: options.model } : { model: options.model, config: options.config }
   return modelOptions
 }
 
 /** @experimental */
 export const layer = (
-  options: OpenAiEmbeddingInput,
+  options: OpenAIOptions,
 ): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError, HttpClient.HttpClient> =>
-  OpenAiEmbeddingModel.layer(openAiModelOptions(options)).pipe(
-    Layer.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
+  OpenAIEmbeddingModel.layer(openAiModelOptions(options)).pipe(
+    Layer.provide(OpenAIClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
   )
 
 /** @experimental */
-export interface OpenAiCompatibleEmbeddingInput {
+export interface OpenAICompatibleOptions {
   readonly model: string
   readonly baseUrl: string
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<
-    NonNullable<Parameters<typeof OpenAiCompatibleClient.layerConfig>[0]>,
+    NonNullable<Parameters<typeof OpenAICompatibleClient.layerConfig>[0]>,
     "apiKey" | "apiUrl"
   >
-  readonly config?: Omit<typeof OpenAiCompatibleEmbeddingModel.Config.Service, "model">
+  readonly config?: Omit<typeof OpenAICompatibleEmbeddingModel.Config.Service, "model">
 }
 
-const compatibleModelOptions = (options: OpenAiCompatibleEmbeddingInput) => {
-  const modelOptions: Parameters<typeof OpenAiCompatibleEmbeddingModel.layer>[0] =
+const compatibleModelOptions = (options: OpenAICompatibleOptions) => {
+  const modelOptions: Parameters<typeof OpenAICompatibleEmbeddingModel.layer>[0] =
     options.config === undefined ? { model: options.model } : { model: options.model, config: options.config }
   return modelOptions
 }
 
-const compatibleClientOptions = (options: OpenAiCompatibleEmbeddingInput) => {
-  const clientOptions: NonNullable<Parameters<typeof OpenAiCompatibleClient.layerConfig>[0]> = {
+const compatibleClientOptions = (options: OpenAICompatibleOptions) => {
+  const clientOptions: NonNullable<Parameters<typeof OpenAICompatibleClient.layerConfig>[0]> = {
     ...options.clientConfig,
     apiUrl: Config.succeed(options.baseUrl),
   }
@@ -57,8 +57,8 @@ const compatibleClientOptions = (options: OpenAiCompatibleEmbeddingInput) => {
 
 /** @experimental */
 export const layerCompatible = (
-  options: OpenAiCompatibleEmbeddingInput,
+  options: OpenAICompatibleOptions,
 ): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError, HttpClient.HttpClient> =>
-  OpenAiCompatibleEmbeddingModel.layer(compatibleModelOptions(options)).pipe(
-    Layer.provide(OpenAiCompatibleClient.layerConfig(compatibleClientOptions(options))),
+  OpenAICompatibleEmbeddingModel.layer(compatibleModelOptions(options)).pipe(
+    Layer.provide(OpenAICompatibleClient.layerConfig(compatibleClientOptions(options))),
   )

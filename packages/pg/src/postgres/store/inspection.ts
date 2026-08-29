@@ -1,7 +1,7 @@
 import { Effect, Stream } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import { CursorExpired } from "tenetkit/runtime/driver/errors"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { loadRunSnapshot, loadTreeCheckpoint } from "tenetkit/runtime/driver/sql/inspection/service"
 import { sessionRoots } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { loadChildReadiness } from "tenetkit/runtime/driver/sql/store/child/capacity"
@@ -20,7 +20,7 @@ export const inspectionStoreMethods = (deps: {
   readonly runNoTxn: Run
   readonly runInspection: RunFn
 }): Pick<
-  RunStoreInterface,
+  RunStoreService,
   "inspect" | "snapshot" | "sessionRoots" | "treeCheckpoint" | "history" | "treeReplay" | "treeChanges"
 > => ({
   inspect: (runId) =>

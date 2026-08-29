@@ -11,7 +11,7 @@ const withEnvironment = <A, E>(
 ): Effect.Effect<A, E> =>
   Effect.scoped(Effect.flatMap(Layer.build(environment), (context) => effect.pipe(Effect.provideContext(context))))
 
-const toolContext = (operationKey: string): ToolContext.Interface => ({
+const toolContext = (operationKey: string): ToolContext.Service => ({
   signal: new AbortController().signal,
   emit: () => Effect.void,
   sessionId: "session",

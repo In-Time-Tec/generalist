@@ -4,12 +4,10 @@ import { Memory } from "../core/index.js"
 import { make as SemanticRecall_make, layer as SemanticRecall_layer } from "./semantic-recall.js"
 export const SemanticRecall = {
   make: SemanticRecall_make,
-  makeSemanticRecall: SemanticRecall_make,
   layer: SemanticRecall_layer,
 }
 export namespace SemanticRecall {
   export type make = typeof import("./semantic-recall.js").make
-  export type makeSemanticRecall = typeof import("./semantic-recall.js").makeSemanticRecall
   export type layer = typeof import("./semantic-recall.js").layer
   export type Options = import("./semantic-recall.js").Options
 }
@@ -34,7 +32,7 @@ export namespace VectorStore {
   export type DeleteInput = import("./vector-store.js").DeleteInput
   export type Document = import("./vector-store.js").Document
   export type Embedded = import("./vector-store.js").Embedded
-  export type Interface = import("./vector-store.js").Interface
+  export type Service = import("./vector-store.js").Service
   export type Match = import("./vector-store.js").Match
   export type Query = import("./vector-store.js").Query
 }
@@ -49,14 +47,12 @@ export const WorkingMemory = {
   SummaryModel: WorkingMemory_SummaryModel,
   layerSummaryModel: WorkingMemory_layerSummaryModel,
   make: WorkingMemory_make,
-  makeWorkingMemory: WorkingMemory_make,
   layer: WorkingMemory_layer,
 }
 export namespace WorkingMemory {
   export type SummaryModel = import("./working-memory.js").SummaryModel
   export type layerSummaryModel = typeof import("./working-memory.js").layerSummaryModel
   export type make = typeof import("./working-memory.js").make
-  export type makeWorkingMemory = typeof import("./working-memory.js").makeWorkingMemory
   export type layer = typeof import("./working-memory.js").layer
   export type Options = import("./working-memory.js").Options
   export type SummarizeOptions = import("./working-memory.js").SummarizeOptions

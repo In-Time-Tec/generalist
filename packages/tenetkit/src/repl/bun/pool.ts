@@ -4,14 +4,14 @@ import {
   type Execution,
   type ExecuteRequest,
   type Inspection,
-  type Interface as KernelPoolInterface,
+  type Service as KernelPoolService,
   type InspectRequest,
   type Interruption,
   KernelPool,
   type Restart,
 } from "../kernel-pool.js"
 import { KernelStateStore } from "../kernel-state-store.js"
-import { HostBindingRegistry, type Interface as HostBindings } from "../host-binding-registry.js"
+import { HostModules, type Service as HostModulesService } from "../host-modules.js"
 import { type KernelProfile, digest } from "../kernel-profile.js"
 import { type Kernel, make as makeKernel } from "./kernel.js"
 import { toSnapshot, unavailable } from "./runtime.js"
@@ -50,11 +50,11 @@ const initialState: SessionState = { epoch: 0, lease: undefined }
  * kernel's reference is held for exactly the duration of a cell, and idle eviction is the map's
  * reference-count expiry rather than a sweep.
  */
-export const make = (options: Options): Effect.Effect<KernelPoolInterface, never, KernelStateStore | Scope.Scope> =>
+export const make = (options: Options): Effect.Effect<KernelPoolService, never, KernelStateStore | Scope.Scope> =>
   Effect.gen(function* () {
     const store = yield* KernelStateStore
-    const mounted = yield* Effect.serviceOption(HostBindingRegistry)
-    const bindings: HostBindings | undefined = mounted._tag === "Some" ? mounted.value : undefined
+    const mounted = yield* Effect.serviceOption(HostModules)
+    const bindings: HostModulesService | undefined = mounted._tag === "Some" ? mounted.value : undefined
     const boots = yield* Semaphore.make(Math.max(options.maxConcurrentBoots, 1))
     const states = yield* Ref.make(new Map<string, SessionState>())
     const generations = yield* Ref.make(0)

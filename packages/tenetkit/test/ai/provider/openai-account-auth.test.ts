@@ -9,11 +9,11 @@ import {
   clientId,
   issuer,
   generatePkce,
-  OpenAiAccountAuthHttp,
+  OpenAIAccountAuthHttp,
   originator,
   redirectUri,
   scopes,
-  type ServiceInterface,
+  type AuthService,
 } from "../../../src/ai/provider/openai-account-auth.js"
 import { layer } from "../../../src/ai/provider/openai-account-auth-http.js"
 
@@ -24,7 +24,7 @@ const digest = (_algorithm: string, data: Uint8Array) =>
 
 const provideAuth =
   (clientLayer: Layer.Layer<HttpClient.HttpClient>) =>
-  <A, E>(effect: Effect.Effect<A, E, OpenAiAccountAuthHttp>) =>
+  <A, E>(effect: Effect.Effect<A, E, OpenAIAccountAuthHttp>) =>
     Effect.scoped(
       Layer.build(Layer.provide(layer, clientLayer)).pipe(Effect.flatMap((context) => Effect.provide(effect, context))),
     )
@@ -92,7 +92,7 @@ describe("OpenAI account authorization protocol", () => {
       return Effect.succeed(HttpClientResponse.fromWeb(request, responses.shift()!))
     })
     return Effect.gen(function* () {
-      const http = yield* OpenAiAccountAuthHttp
+      const http = yield* OpenAIAccountAuthHttp
       yield* http.exchange({
         code: Redacted.make("code-secret"),
         verifier: Redacted.make("verifier-secret"),
@@ -150,7 +150,7 @@ describe("OpenAI account authorization protocol", () => {
         Effect.succeed(HttpClientResponse.fromWeb(request, responses.shift()!)),
       )
       return Effect.gen(function* () {
-        const http = yield* OpenAiAccountAuthHttp
+        const http = yield* OpenAIAccountAuthHttp
         const terminal = yield* Effect.flip(http.devicePoll(Redacted.make("device-request-secret"), "USER-SECRET"))
         const permanent = yield* Effect.flip(http.refresh(Redacted.make("refresh-request-secret")))
         const unauthorized = yield* Effect.flip(http.refresh(Redacted.make("refresh-request-secret")))
@@ -180,7 +180,7 @@ describe("OpenAI account authorization protocol", () => {
       { preconnect: () => {} },
     )
     return Effect.gen(function* () {
-      yield* (yield* OpenAiAccountAuthHttp).exchange({
+      yield* (yield* OpenAIAccountAuthHttp).exchange({
         code: Redacted.make("code-secret"),
         verifier: Redacted.make("verifier-secret"),
         redirectUri,
@@ -202,7 +202,7 @@ describe("OpenAI account authorization protocol", () => {
         expiresAt: 1,
         refreshedAt: 1,
       }
-      const service: ServiceInterface = {
+      const service: AuthService = {
         loginBrowser: () => Effect.fail(secretError),
         loginDevice: Effect.fail(secretError),
         status: Effect.succeed({ _tag: "Present", fingerprint: "fingerprint" }),

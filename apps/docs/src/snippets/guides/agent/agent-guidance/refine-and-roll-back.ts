@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime, Result } from "effect"
-import { Authorship, HarnessOverview, HarnessState, HarnessStore, Refinement } from "tenetkit/harness"
+import { Authorship, Overview, State, Store, Refinement } from "tenetkit/agent-guidance"
 
 const scope = "thread:demo"
 
@@ -29,7 +29,7 @@ const forged = {
   ],
 }
 
-const program = HarnessStore.HarnessStore.use((store) =>
+const program = Store.Store.use((store) =>
   Effect.gen(function* () {
     const state = yield* store.load(scope)
 
@@ -38,7 +38,7 @@ const program = HarnessStore.HarnessStore.use((store) =>
     if (Result.isFailure(applied)) return yield* Console.log(`rejected: ${applied.failure.reason}`)
     yield* store.save(applied.success.state)
 
-    const created = HarnessState.findEntry(applied.success.state, "memory", "prefers-bun")
+    const created = State.findEntry(applied.success.state, "memory", "prefers-bun")
     yield* Console.log(`created version: ${created?.version}, createdAt: ${created?.createdAt}`)
 
     const refused = yield* Effect.flip(Authorship.authorProposal(forged))
@@ -49,11 +49,11 @@ const program = HarnessStore.HarnessStore.use((store) =>
     if (Result.isFailure(restored)) return yield* Console.log(`rollback rejected: ${restored.failure.reason}`)
     yield* store.save(restored.success.state)
     yield* Console.log(
-      `after rollback: ${HarnessState.findEntry(restored.success.state, "memory", "prefers-bun") === undefined ? "absent" : "present"}`,
+      `after rollback: ${State.findEntry(restored.success.state, "memory", "prefers-bun") === undefined ? "absent" : "present"}`,
     )
-    yield* Console.log(HarnessOverview.formatOverview(restored.success.state, { maxEntriesPerKind: 2 }))
+    yield* Console.log(Overview.formatOverview(restored.success.state, { maxEntriesPerKind: 2 }))
   }),
 )
 
-const runtime = ManagedRuntime.make(HarnessStore.layerMemory)
+const runtime = ManagedRuntime.make(Store.layerMemory)
 await runtime.runPromise(program)

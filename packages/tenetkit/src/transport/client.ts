@@ -51,12 +51,12 @@ export interface Connection {
 }
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly connect: (options: ConnectOptions) => Effect.Effect<Connection, never, Scope.Scope>
 }
 
 /** @experimental */
-export class RunClient extends Context.Service<RunClient, Interface>()("tenetkit/transport/client/RunClient") {}
+export class RunClient extends Context.Service<RunClient, Service>()("tenetkit/transport/client/RunClient") {}
 
 const transportError = (message: string, kind?: TransportError["kind"]): TransportError =>
   TransportError.make(kind === undefined ? { message } : { message, kind })

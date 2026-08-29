@@ -1,18 +1,13 @@
 import { describe, expect, it } from "@effect/vitest"
 import { AgentManifest, ExecutableManifest, Pins } from "../packages/tenetkit/src/core/index.js"
-import {
-  HarnessEntry,
-  HarnessRegistration,
-  HarnessSnapshot,
-  HarnessState,
-} from "../packages/tenetkit/src/harness/index.js"
+import { Entry, Registration, Snapshot, State } from "../packages/tenetkit/src/harness/index.js"
 import { ExecutableRegistration } from "../packages/tenetkit/src/runtime/index.js"
 import { Effect } from "effect"
 
 const scope = "thread:alpha"
 const at = "2024-01-01T00:00:00.000Z"
 
-const entry = (id: string, kind: HarnessEntry.HarnessKind): HarnessEntry.HarnessEntry => ({
+const entry = (id: string, kind: Entry.GuidanceKind): Entry.GuidanceEntry => ({
   id,
   kind,
   scope,
@@ -23,8 +18,8 @@ const entry = (id: string, kind: HarnessEntry.HarnessKind): HarnessEntry.Harness
   version: 1,
 })
 
-const state = HarnessState.make({ scope, entries: [entry("a", "memory"), entry("b", "skill")] })
-const pinned = HarnessRegistration.registration(state, "harness")
+const state = State.make({ scope, entries: [entry("a", "memory"), entry("b", "skill")] })
+const pinned = Registration.registration(state, "guidance")
 
 const executableFor = (capability: AgentManifest.NamedCapability) => {
   const agent = AgentManifest.make({
@@ -45,54 +40,52 @@ const executable = executableFor(pinned.capability)
 
 const registrationsFor = (
   target: ExecutableManifest.PinnedExecutable,
-  harness: ExecutableRegistration.ExecutableRegistration,
+  guidance: ExecutableRegistration.ExecutableRegistration,
 ) => [
   ...[...ExecutableRegistration.requiredPins(target)]
-    .filter((pin) => pin !== harness.pin)
+    .filter((pin) => pin !== guidance.pin)
     .map((pin) => ({ pin, codec: "test", version: "1", payload: { fixture: "1" } })),
-  harness,
+  guidance,
 ]
 
-const harnessRegistration = (overrides: Partial<ExecutableRegistration.ExecutableRegistration> = {}) => ({
+const guidanceRegistration = (overrides: Partial<ExecutableRegistration.ExecutableRegistration> = {}) => ({
   pin: pinned.capability.pin,
-  codec: HarnessSnapshot.CODEC,
-  version: HarnessSnapshot.VERSION,
+  codec: Snapshot.CODEC,
+  version: Snapshot.VERSION,
   payload: pinned.payload,
   ...overrides,
 })
 
-describe("harness snapshot pinning through the runtime registration seam", () => {
-  it.effect("validates the registration the harness helper produces and reconstructs the exact state", () =>
+describe("agent-guidance snapshot pinning through the runtime registration seam", () => {
+  it.effect("validates the registration the guidance helper produces and reconstructs the exact state", () =>
     Effect.gen(function* () {
       const validated = yield* ExecutableRegistration.validate(
         executable,
-        registrationsFor(executable, harnessRegistration()),
+        registrationsFor(executable, guidanceRegistration()),
       )
       const carried = validated.find((registration) => registration.pin === pinned.capability.pin)
-      expect(carried?.codec).toBe(HarnessSnapshot.CODEC)
-      const restored = yield* HarnessSnapshot.decode(pinned.id, carried!.payload)
-      expect(HarnessState.allEntries(restored)).toEqual(HarnessState.allEntries(state))
+      expect(carried?.codec).toBe(Snapshot.CODEC)
+      const restored = yield* Snapshot.decode(pinned.id, carried!.payload)
+      expect(State.allEntries(restored)).toEqual(State.allEntries(state))
     }),
   )
 
   it.effect("fails validation typed when the pinned snapshot payload is mutated", () =>
     Effect.gen(function* () {
-      const mutated = HarnessSnapshot.encode(
-        HarnessState.make({ scope, entries: [entry("a", "memory"), entry("c", "skill")] }),
-      )
+      const mutated = Snapshot.encode(State.make({ scope, entries: [entry("a", "memory"), entry("c", "skill")] }))
       const failure = yield* ExecutableRegistration.validate(
         executable,
-        registrationsFor(executable, harnessRegistration({ payload: mutated })),
+        registrationsFor(executable, guidanceRegistration({ payload: mutated })),
       ).pipe(Effect.flip)
       expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),
   )
 
-  it.effect("fails validation typed when the registration codec is not the harness codec", () =>
+  it.effect("fails validation typed when the registration codec is not the guidance codec", () =>
     Effect.gen(function* () {
       const failure = yield* ExecutableRegistration.validate(
         executable,
-        registrationsFor(executable, harnessRegistration({ codec: "@tenetkit/other" })),
+        registrationsFor(executable, guidanceRegistration({ codec: "@tenetkit/other" })),
       ).pipe(Effect.flip)
       expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),
@@ -102,17 +95,17 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
     Effect.gen(function* () {
       const failure = yield* ExecutableRegistration.validate(
         executable,
-        registrationsFor(executable, harnessRegistration({ version: "2" })),
+        registrationsFor(executable, guidanceRegistration({ version: "2" })),
       ).pipe(Effect.flip)
       expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),
   )
 
-  it.effect("fails validation typed when the declared harness registration is absent", () =>
+  it.effect("fails validation typed when the declared guidance registration is absent", () =>
     Effect.gen(function* () {
       const failure = yield* ExecutableRegistration.validate(
         executable,
-        registrationsFor(executable, harnessRegistration()).filter(
+        registrationsFor(executable, guidanceRegistration()).filter(
           (registration) => registration.pin !== pinned.capability.pin,
         ),
       ).pipe(Effect.flip)
@@ -123,10 +116,10 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
     }),
   )
 
-  it("changes the Agent manifest and executable digests when the pinned harness state changes", () => {
-    const changed = HarnessRegistration.registration(
-      HarnessState.make({ scope, entries: [entry("a", "memory"), entry("b", "skill"), entry("d", "memory")] }),
-      "harness",
+  it("changes the Agent manifest and executable digests when the pinned guidance state changes", () => {
+    const changed = Registration.registration(
+      State.make({ scope, entries: [entry("a", "memory"), entry("b", "skill"), entry("d", "memory")] }),
+      "guidance",
     )
     const other = executableFor(changed.capability)
     expect(other.manifest.entries[0]?.pin).not.toBe(executable.manifest.entries[0]?.pin)
@@ -135,14 +128,11 @@ describe("harness snapshot pinning through the runtime registration seam", () =>
 
   it.effect("rejects a payload pinned for one state supplied against another pinned executable", () =>
     Effect.gen(function* () {
-      const changed = HarnessRegistration.registration(
-        HarnessState.make({ scope, entries: [entry("a", "memory")] }),
-        "harness",
-      )
+      const changed = Registration.registration(State.make({ scope, entries: [entry("a", "memory")] }), "guidance")
       const other = executableFor(changed.capability)
       const failure = yield* ExecutableRegistration.validate(
         other,
-        registrationsFor(other, { ...harnessRegistration(), pin: changed.capability.pin }),
+        registrationsFor(other, { ...guidanceRegistration(), pin: changed.capability.pin }),
       ).pipe(Effect.flip)
       expect(failure._tag).toBe("tenetkit/runtime/ExecutableRegistrationInvalid")
     }),

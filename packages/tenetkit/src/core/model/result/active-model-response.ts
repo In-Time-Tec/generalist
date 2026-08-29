@@ -20,13 +20,13 @@ export interface Snapshot extends AttemptIdentity {
 const HandleTypeId: unique symbol = Symbol.for("tenetkit/ActiveModelResponse/Handle")
 
 /** @experimental Read-only access to the active model response owned by one Run. */
-export interface Interface {
+export interface Service {
   readonly [HandleTypeId]: typeof HandleTypeId
   readonly snapshot: Effect.Effect<Option.Option<Snapshot>>
 }
 
 /** @experimental Run-owned access to the currently authoritative partial model response. */
-export class ActiveModelResponse extends Context.Service<ActiveModelResponse, Interface>()(
+export class ActiveModelResponse extends Context.Service<ActiveModelResponse, Service>()(
   "tenetkit/core/model/result/active-model-response/ActiveModelResponse",
 ) {}
 
@@ -53,7 +53,7 @@ interface State {
     | undefined
 }
 
-const controllers = new WeakMap<Interface, Controller>()
+const controllers = new WeakMap<Service, Controller>()
 
 const hasSemanticContent = (response: CompletedModelResponse<Record<string, Tool.Any>>): boolean =>
   response.content.some((part) => {
@@ -70,7 +70,7 @@ const hasSemanticContent = (response: CompletedModelResponse<Record<string, Tool
   })
 
 /** @experimental Make one opaque accumulator handle for a single Run. */
-export const make = (): Interface => {
+export const make = (): Service => {
   const state: State = { generation: 0, current: undefined }
   const service = ActiveModelResponse.of({
     [HandleTypeId]: HandleTypeId,
@@ -107,7 +107,7 @@ export const make = (): Interface => {
 }
 
 /** @internal Access Core's mutation side without widening the public retained handle. */
-export const controller = (service: Interface): Controller => {
+export const controller = (service: Service): Controller => {
   const value = controllers.get(service)
   if (value === undefined) throw new Error("ActiveModelResponse must be constructed with ActiveModelResponse.make")
   return value

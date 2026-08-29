@@ -1,10 +1,10 @@
 import { Duration, Layer } from "effect"
 import { layer as bunServices } from "@effect/platform-bun/BunServices"
 import { ToolContext, ToolExecutor } from "tenetkit"
-import { CellTool, HostBindingRegistry, KernelProfile } from "tenetkit/repl"
+import { CellTool, HostModules, KernelProfile } from "tenetkit/repl"
 import { BunKernelPool, BunKernelStateStore, workerModule } from "tenetkit/repl/bun"
 
-declare const workspace: HostBindingRegistry.Module
+declare const workspace: HostModules.Module
 declare const dataRoot: string
 declare const bunVersion: string
 
@@ -32,7 +32,7 @@ const kernelPool = BunKernelPool.layer({
 
 export const cellLayer: Layer.Layer<
   ToolExecutor.ToolExecutor | ToolContext.ToolContext,
-  HostBindingRegistry.HostBindingConflict
+  HostModules.HostModuleConflict
 > = CellTool.layer.pipe(
-  Layer.provideMerge(Layer.mergeAll(ToolContext.layerDefault, HostBindingRegistry.layer([workspace]), kernelPool)),
+  Layer.provideMerge(Layer.mergeAll(ToolContext.layerDefault, HostModules.layer([workspace]), kernelPool)),
 )

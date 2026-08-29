@@ -16,7 +16,7 @@ export const transportReference = definePage({
     table(
       ["Subpath", "Contents"],
       [
-        [[code(".")], "Client, Errors, Snapshot, Sse, Wire, and Ws namespaces"],
+        [[code(".")], "RunClient, Errors, Snapshot, SSE, Wire, and WebSocket namespaces"],
         [[code("./wire")], [code("producerCodec"), ", ", code("observerCodec"), ", and command schemas"]],
         [[code("./snapshot")], [code("Snapshot.get(runId)"), " finite inspection resource"]],
         [[code("./sse")], [code("streamSuccess"), ", ", code("respond"), ", and cursor parsing"]],
@@ -44,9 +44,9 @@ export const transportReference = definePage({
     ),
     h2("connections", "SSE, WebSocket, and clients"),
     p(
-      code("Sse.respond"),
+      code("SSE.respond"),
       " streams Runtime history and live events. Last-Event-ID takes precedence over the cursor query parameter. ",
-      code("Ws.handle"),
+      code("WebSocket.handle"),
       " accepts Attach and explicit Cancel only. Closing an observer never cancels its Run.",
     ),
     p(

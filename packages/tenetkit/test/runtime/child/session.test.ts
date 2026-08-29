@@ -16,7 +16,7 @@ const ambient = (input: { readonly runId?: string; readonly toolCallId?: string;
   }
   const withRun = input.runId === undefined ? base : { ...base, runId: input.runId }
   const withToolCall = input.toolCallId === undefined ? withRun : { ...withRun, toolCallId: input.toolCallId }
-  const context: ToolContext.Interface =
+  const context: ToolContext.Service =
     input.operationKey === undefined ? withToolCall : { ...withToolCall, operationKey: input.operationKey }
   return ToolContext.layerTest(context)
 }

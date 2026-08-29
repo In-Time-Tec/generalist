@@ -1,8 +1,8 @@
-import { OpenAiClient } from "@effect/ai-openai"
+import { OpenAiClient as OpenAIClient } from "@effect/ai-openai"
 import { ModelRegistry } from "../../core/index.js"
 import { Config, Effect, Layer, Option, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { registration as registerOpenAi, type LayerOptions, type RegistrationOptions } from "./openai.js"
+import { registration as registerOpenAI, type ClientOptions, type RegistrationOptions } from "./openai.js"
 
 const deterministicUsage = Response.Usage.make({
   inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
@@ -32,12 +32,12 @@ const deterministicModelLayer = Layer.effect(
 )
 
 /** @experimental */
-export interface DeterministicInput extends RegistrationOptions {
+export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model?: string
 }
 
-const deterministicRegistrationOptions = (input: DeterministicInput) => {
+const deterministicRegistrationOptions = (input: Options) => {
   const required = {
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
@@ -50,21 +50,21 @@ const deterministicRegistrationOptions = (input: DeterministicInput) => {
 }
 
 /** @experimental */
-export const registration = (input: DeterministicInput = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
+export const registration = (input: Options = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
   ModelRegistry.registration(deterministicRegistrationOptions(input))
 
 /** @experimental */
-export const layer = (input: DeterministicInput = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
+export const layer = (input: Options = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
   ModelRegistry.layer([registration(input)])
 
 /** @experimental */
-export interface OpenAiFallbackOptions extends LayerOptions {
+export interface OpenAIFallbackOptions extends ClientOptions {
   readonly fallbackModel: string
   readonly fallbackProvider?: string
 }
 
 /** @experimental */
-export const layerOpenAi = (options: OpenAiFallbackOptions) =>
+export const layerOpenAI = (options: OpenAIFallbackOptions) =>
   Layer.unwrap(
     Effect.gen(function* () {
       const deterministic = yield* registration({
@@ -76,13 +76,13 @@ export const layerOpenAi = (options: OpenAiFallbackOptions) =>
         onNone: () => Effect.succeedNone,
         onSome: (apiKey) =>
           Layer.build(
-            OpenAiClient.layerConfig({
+            OpenAIClient.layerConfig({
               ...options.clientConfig,
               apiKey: Config.succeed(apiKey),
             }),
           ).pipe(
             Effect.flatMap((context) =>
-              registerOpenAi(openAiRegistrationOptions(options)).pipe(Effect.provide(context)),
+              registerOpenAI(openAiRegistrationOptions(options)).pipe(Effect.provide(context)),
             ),
             Effect.asSome,
           ),
@@ -94,7 +94,7 @@ export const layerOpenAi = (options: OpenAiFallbackOptions) =>
     }),
   )
 
-const openAiRegistrationOptions = (options: OpenAiFallbackOptions) => {
+const openAiRegistrationOptions = (options: OpenAIFallbackOptions) => {
   const required = { model: options.model }
   const configured = options.config === undefined ? required : { ...required, config: options.config }
   const registered =

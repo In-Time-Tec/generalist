@@ -5,20 +5,17 @@ import { NestedOperation } from "../../core/tools/public/nested-operation.js"
 import { Session } from "../../core/context/public/session.js"
 import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
 import { ChildRuns, Executor as ChildRunsExecutor, make as makeChildRuns } from "../child/runs.js"
-import { Executor as CodeModeExecutor, type Interface as CodeModeInterface } from "../code-mode.js"
-import type { Interface as NestedOperations } from "../operation/nested-operations.js"
-import type { Interface as RunStoreInterface } from "../run/store.js"
+import { Executor as CodeModeExecutor, type Service as CodeModeService } from "../code-mode.js"
+import type { Service as NestedOperations } from "../operation/nested-operations.js"
+import type { Service as RunStoreService } from "../run/store.js"
 
 /** @experimental Select the resolved executable's ToolExecutor before the ambient host executor. */
 export const selectToolExecutor: {
   (
-    ambient: Option.Option<ToolExecutor.Interface>,
-  ): <R>(services: Context.Context<R>) => Option.Option<ToolExecutor.Interface>
-  <R>(
-    services: Context.Context<R>,
-    ambient: Option.Option<ToolExecutor.Interface>,
-  ): Option.Option<ToolExecutor.Interface>
-} = Function.dual(2, <R>(services: Context.Context<R>, ambient: Option.Option<ToolExecutor.Interface>) => {
+    ambient: Option.Option<ToolExecutor.Service>,
+  ): <R>(services: Context.Context<R>) => Option.Option<ToolExecutor.Service>
+  <R>(services: Context.Context<R>, ambient: Option.Option<ToolExecutor.Service>): Option.Option<ToolExecutor.Service>
+} = Function.dual(2, <R>(services: Context.Context<R>, ambient: Option.Option<ToolExecutor.Service>) => {
   const resolved = Context.getOption(services, ToolExecutor.ToolExecutor)
   return Option.isSome(resolved) ? resolved : ambient
 })
@@ -30,8 +27,8 @@ export const selectToolExecutor: {
 export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: {
   readonly agent: Agent.Agent<Tools, R>
   readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
-  readonly store: RunStoreInterface
-  readonly codeMode: CodeModeInterface | undefined
+  readonly store: RunStoreService
+  readonly codeMode: CodeModeService | undefined
   readonly nested: NestedOperations
 }): Effect.Effect<
   | Context.Context<Agent.ClosedServices<Tools, R> | ChildRuns | NestedOperation.NestedOperations>
@@ -85,7 +82,7 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
  * undefined and the Run falls back to whatever Session its environment provides.
  */
 export const sessionContext = (input: {
-  readonly store: RunStoreInterface
+  readonly store: RunStoreService
   readonly sessionId: string
 }): Effect.Effect<Context.Context<never> | Context.Context<Session.SessionStore>> =>
   input.store.sessionStore(input.sessionId).pipe(

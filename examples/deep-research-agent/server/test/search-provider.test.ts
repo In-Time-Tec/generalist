@@ -1,7 +1,7 @@
 import { describe, expect, layer as layerHost } from "@effect/vitest"
 import { ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
-import { Service, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/search-provider"
+import { SearchProvider, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/search-provider"
 const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
@@ -96,7 +96,7 @@ describe("SearchProvider", () => {
     (it) => {
       it.effect("builds the configured Exa provider when EXA_API_KEY is present", () =>
         Effect.gen(function* () {
-          const service = yield* Service
+          const service = yield* SearchProvider
 
           expect(service.search).toBeTypeOf("function")
         }),

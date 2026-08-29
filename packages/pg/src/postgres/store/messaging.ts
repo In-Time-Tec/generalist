@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { RunFn } from "./ops.js"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
@@ -22,7 +22,7 @@ export const messagingStoreMethods = (input: {
   readonly lockRun: (runId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
   readonly lockMailbox: (targetSessionId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
 }): Pick<
-  RunStoreInterface,
+  RunStoreService,
   | "directory"
   | "resolveAddress"
   | "registerAgentName"

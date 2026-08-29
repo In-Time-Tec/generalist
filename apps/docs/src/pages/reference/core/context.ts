@@ -4,7 +4,7 @@ export const coreContextReference = definePage({
   title: "Context seams",
   navTitle: "Context seams",
   group: "Reference",
-  description: "Instructions, SkillSource, Memory, Session, Compaction, Steering, and Handoff.",
+  description: "Instructions, SkillCatalog, Memory, Session, Compaction, Steering, and Handoff.",
   content: [
     lead(
       "Seven namespaces of tenetkit shape what the model sees and how a conversation persists. All are optional seams discovered per run; absent means default behavior.",
@@ -13,7 +13,7 @@ export const coreContextReference = definePage({
     h2("instructions", "Instructions"),
     p(
       "An ordered registry of ",
-      code("ContextSource"),
+      code("Source"),
       " values: ",
       code("{ id, render }"),
       ". Every source renders once into the system message when an epoch opens.",
@@ -25,17 +25,17 @@ export const coreContextReference = definePage({
         [[code("openEpoch(instructions, context)")], "Renders every source once and returns the joined baseline"],
         [
           [code("layer(sources)"), " / ", code("layerTest(implementation)")],
-          "Explicit ordered registry; layer from an interface",
+          "Explicit ordered registry; layer from a service",
         ],
       ],
     ),
-    h2("skill-source", "SkillSource"),
+    h2("skill-catalog", "SkillCatalog"),
     p(
       "The skill registry seam: ",
       code("{ all, get(name) }"),
       " over ",
-      code("Skill = { frontmatter, listing, body, tools }"),
-      ". The loop lists skills within a token budget and loads bodies lazily through the built-in ",
+      code("Skill = { name, description, instructions, tools, location? }"),
+      ". The loop derives listings within a token budget and loads instructions lazily through the built-in ",
       code("activate_skill"),
       " tool.",
     ),
@@ -43,11 +43,15 @@ export const coreContextReference = definePage({
       ["Export", "Notes"],
       [
         [
-          [code("Frontmatter")],
+          [code("Skill")],
           [
             code("name"),
             " and ",
             code("description"),
+            ", lazy ",
+            code("instructions"),
+            ", and ",
+            code("tools"),
             " required; optional ",
             code("whenToUse"),
             ", ",
@@ -64,11 +68,9 @@ export const coreContextReference = definePage({
             code("model"),
             ", ",
             code("paths"),
+            ", and ",
+            code("location"),
           ],
-        ],
-        [
-          [code("makeListing(frontmatter, descriptionCap?)")],
-          ["One listing line; descriptions capped at ", code("DESCRIPTION_CAP"), " (1024) characters"],
         ],
         [
           [code("selectListings(skills, budgetTokens, recentlyUsed)")],
@@ -80,9 +82,9 @@ export const coreContextReference = definePage({
         ],
         [
           [code("layerSkills(skills)"), " / ", code("layerEmpty"), " / ", code("layerTest")],
-          "In-memory source, empty source, layer from an interface",
+          "In-memory catalog, empty catalog, layer from a service",
         ],
-        [[code("SkillSourceError")], [code("{ source, message, cause? }")]],
+        [[code("SkillCatalogError")], [code("{ source, message, cause? }")]],
       ],
     ),
     h2("memory", "Memory"),
@@ -106,7 +108,7 @@ export const coreContextReference = definePage({
       [
         [[code("merge(first, second)")], "Concatenates recalls, fans out remembers"],
         [[code("layerNoop")], "Recalls nothing, remembers nothing"],
-        [[code("layerTest(implementation)")], "Layer from an explicit interface"],
+        [[code("layerTest(implementation)")], "Layer from an explicit service"],
         [[code("MemoryError")], [code("{ message }")]],
       ],
     ),
@@ -119,7 +121,7 @@ export const coreContextReference = definePage({
       code(
         "MessageEntry | ToolCallEntry | ToolResultEntry | MemoryEntry | SkillEntry | SteeringEntry | HandoffEntry | CompactionEntry | BranchSummaryEntry",
       ),
-      "; the store interface is ",
+      "; the store service is ",
       code("{ reserveEntryId, append, appendCheckpoint, path, setLeaf, leaf }"),
       ".",
     ),
@@ -153,7 +155,7 @@ export const coreContextReference = definePage({
       code("Session.layerMemory"),
       " is the Ref-backed non-durable store; ",
       code("layerTest"),
-      " wraps an explicit interface. Store failures are ",
+      " wraps an explicit service. Store failures are ",
       code("SessionStoreError{ message }"),
       "; stale leaves and reused checkpoint identities fail with ",
       code("SessionConflict"),
@@ -216,10 +218,7 @@ export const coreContextReference = definePage({
           [code("truncate(maxTokens)")],
           ["Truncate-only implementation over an ", code("Ai.Tokenizer"), " when one is provided"],
         ],
-        [
-          [code("make(strategy, options?)"), " / ", code("layerTest")],
-          "Interface from a strategy; layer from an interface",
-        ],
+        [[code("make(strategy, options?)"), " / ", code("layerTest")], "Service from a strategy; layer from a service"],
       ],
     ),
     h2("steering", "Steering"),
@@ -250,7 +249,7 @@ export const coreContextReference = definePage({
           ],
         ],
         [
-          [code("Interface")],
+          [code("Service")],
           [
             code("steer"),
             ", ",
@@ -263,7 +262,7 @@ export const coreContextReference = definePage({
             code("Input = { prompt }"),
           ],
         ],
-        [[code("layerTest(implementation)")], "Layer from an explicit interface"],
+        [[code("layerTest(implementation)")], "Layer from an explicit service"],
       ],
     ),
     h2("handoff", "Handoff"),

@@ -4,7 +4,7 @@ import type { AnyToolCall } from "./result.js"
 import { type DomainFailure, FrameworkFailure, type Outcome, type Success } from "../../tools/tool-executor.js"
 import { type Candidate, type Registry, assemble } from "../../tools/tool-registry.js"
 import { activateSkillParameters } from "../skill-tool.js"
-import type { Skill, SkillSourceError } from "../../context/skill-source.js"
+import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
 
 const isToolNameCollision = Schema.is(ToolNameCollision)
 
@@ -16,10 +16,10 @@ export interface ToolState {
 
 interface SkillActivationContext {
   readonly skillRuntime:
-    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillSourceError> } }
+    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined
   readonly toolState: Ref.Ref<ToolState>
-  readonly skillError: (turn: number, error: SkillSourceError) => AgentError
+  readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
 }
 
 /** @internal Resolve one `activate_skill` call, registering the skill's tools and body in the run's tool state. */
@@ -32,7 +32,7 @@ export const make =
         return yield* FrameworkFailure.make({
           stage: "missing-handler",
           tool: call.name,
-          message: "SkillSource is not available",
+          message: "SkillCatalog is not available",
         })
       }
       const params = Schema.decodeUnknownOption(activateSkillParameters)(call.params)
@@ -48,7 +48,7 @@ export const make =
         const failure = { reason: "not-found" as const, message: `Skill not found: ${params.value.name}` }
         return { _tag: "DomainFailure", failure, encodedFailure: failure } satisfies DomainFailure
       }
-      if (skill.frontmatter.disableModelInvocation === true) {
+      if (skill.disableModelInvocation === true) {
         const failure = {
           reason: "not-model-invocable" as const,
           message: `Skill is not model-invocable: ${params.value.name}`,
@@ -56,27 +56,27 @@ export const make =
         return { _tag: "DomainFailure", failure, encodedFailure: failure } satisfies DomainFailure
       }
       const current = yield* Ref.get(toolState)
-      let body = current.activatedSkillBodies.get(skill.frontmatter.name)
+      let body = current.activatedSkillBodies.get(skill.name)
       if (body === undefined) {
         const registry = yield* assemble([
           ...current.registry.entries,
           ...skill.tools.map(
             (tool): Candidate => ({
               tool,
-              origin: { _tag: "Skill", skill: skill.frontmatter.name },
+              origin: { _tag: "Skill", skill: skill.name },
               dispatch: "Skill",
             }),
           ),
         ])
-        body = yield* skill.body
+        body = yield* skill.instructions
         const activatedSkillBodies = new Map(current.activatedSkillBodies)
-        activatedSkillBodies.set(skill.frontmatter.name, body)
+        activatedSkillBodies.set(skill.name, body)
         yield* Ref.set(toolState, { registry, activatedSkillBodies })
       }
       const output = {
-        name: skill.frontmatter.name,
+        name: skill.name,
         body,
-        allowedTools: [...(skill.frontmatter.allowedTools ?? [])],
+        allowedTools: [...(skill.allowedTools ?? [])],
       }
       return { _tag: "Success", result: output, encodedResult: output } satisfies Success
     }).pipe(

@@ -8,7 +8,7 @@ import {
   Cursor,
   Errors,
   ExecutableResolver,
-  ExecutionHost,
+  RunExecutor,
   Runtime,
   RunStore,
 } from "../../../../src/runtime/index.js"
@@ -314,7 +314,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const sessionId = `session:interrupted-cancel:${backend}`
           const first = yield* runtime.send({
             to: hosted.address,
@@ -393,7 +393,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const receipt = yield* runtime.send({
           to: hosted.address,
           sessionId: `session:interrupted-failure:${backend}`,
@@ -443,7 +443,7 @@ it.effect("fails an empty model operation without writing an interrupted event o
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const receipt = yield* runtime.send({
         to: hosted.address,
         sessionId: "session:interrupted-empty",
@@ -518,7 +518,7 @@ it.effect("commits only the authoritative internal retry response", () => {
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const receipt = yield* runtime.send({
         to: hosted.address,
         sessionId: "session:interrupted-internal-retry",

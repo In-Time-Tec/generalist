@@ -48,26 +48,20 @@ export type Response =
   | { readonly _tag: "Failure"; readonly failure: unknown }
 
 /** @experimental The cell addressed a module or operation that is not mounted. */
-export class HostBindingNotFound extends Schema.TaggedError<HostBindingNotFound>()(
-  "tenetkit/repl/HostBindingNotFound",
-  {
-    module: Schema.String,
-    operation: Schema.optionalKey(Schema.String),
-  },
-) {}
+export class HostModuleNotFound extends Schema.TaggedError<HostModuleNotFound>()("tenetkit/repl/HostModuleNotFound", {
+  module: Schema.String,
+  operation: Schema.optionalKey(Schema.String),
+}) {}
 
 /** @experimental Two modules or two operations claimed the same mounted name. */
-export class HostBindingConflict extends Schema.TaggedError<HostBindingConflict>()(
-  "tenetkit/repl/HostBindingConflict",
-  {
-    module: Schema.String,
-    operation: Schema.optionalKey(Schema.String),
-  },
-) {}
+export class HostModuleConflict extends Schema.TaggedError<HostModuleConflict>()("tenetkit/repl/HostModuleConflict", {
+  module: Schema.String,
+  operation: Schema.optionalKey(Schema.String),
+}) {}
 
 /** @experimental A host request or reply did not match the operation's declared schema. */
-export class HostBindingSchemaFailure extends Schema.TaggedError<HostBindingSchemaFailure>()(
-  "tenetkit/repl/HostBindingSchemaFailure",
+export class HostModuleSchemaFailure extends Schema.TaggedError<HostModuleSchemaFailure>()(
+  "tenetkit/repl/HostModuleSchemaFailure",
   {
     module: Schema.String,
     operation: Schema.String,
@@ -76,8 +70,8 @@ export class HostBindingSchemaFailure extends Schema.TaggedError<HostBindingSche
   },
 ) {}
 
-/** @experimental Closed union of host-binding boundary failures. */
-export type BindingFailure = HostBindingNotFound | HostBindingSchemaFailure
+/** @experimental Closed union of host-module boundary failures. */
+export type BindingFailure = HostModuleNotFound | HostModuleSchemaFailure
 
 /** @experimental The mounted surface a cell can see, without any handler. */
 export interface Descriptor {
@@ -89,27 +83,25 @@ export interface Descriptor {
  * @experimental The seam by which a host mounts named Schema-typed modules into the kernel
  * namespace and answers requests from an executing cell.
  */
-export interface Interface {
+export interface Service {
   readonly descriptors: ReadonlyArray<Descriptor>
-  readonly resolve: (request: Request) => Effect.Effect<AnyOperation, HostBindingNotFound>
+  readonly resolve: (request: Request) => Effect.Effect<AnyOperation, HostModuleNotFound>
   readonly invoke: (request: Request) => Effect.Effect<Response, BindingFailure>
 }
 
 /** @experimental */
-export class HostBindingRegistry extends Context.Service<HostBindingRegistry, Interface>()(
-  "tenetkit/repl/host-binding-registry/HostBindingRegistry",
-) {}
+export class HostModules extends Context.Service<HostModules, Service>()("tenetkit/repl/host-modules/HostModules") {}
 
 const schemaMessage = (error: { readonly message: string }): string => error.message
 
 const index = <R>(modules: ReadonlyArray<Module<R>>): Map<string, Map<string, AnyOperation<R>>> => {
   const mounted = new Map<string, Map<string, AnyOperation<R>>>()
   for (const module of modules) {
-    if (mounted.has(module.name)) throw HostBindingConflict.make({ module: module.name })
+    if (mounted.has(module.name)) throw HostModuleConflict.make({ module: module.name })
     const operations = new Map<string, AnyOperation<R>>()
     for (const operation of module.operations) {
       if (operations.has(operation.name)) {
-        throw HostBindingConflict.make({ module: module.name, operation: operation.name })
+        throw HostModuleConflict.make({ module: module.name, operation: operation.name })
       }
       operations.set(operation.name, operation)
     }
@@ -122,7 +114,7 @@ const callContext = <R>(request: Request, base: Context.Context<R>): Context.Con
   if (request.sessionId === undefined) return base
   const ambient = Option.getOrUndefined(Context.getOption(base, ToolContext.ToolContext))
   if (ambient === undefined) return base
-  const toolContext: ToolContext.Interface =
+  const toolContext: ToolContext.Service =
     request.cellId === undefined
       ? { ...ambient, sessionId: request.sessionId }
       : { ...ambient, sessionId: request.sessionId, toolCallId: request.cellId }
@@ -130,22 +122,22 @@ const callContext = <R>(request: Request, base: Context.Context<R>): Context.Con
 }
 
 /** @experimental Mount modules and reject duplicate module or operation names. */
-export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Interface, HostBindingConflict, R> =>
+export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Service, HostModuleConflict, R> =>
   Effect.contextWith((context: Context.Context<R>) =>
     Effect.try({
       try: () => index(modules),
       catch: (error) =>
-        Schema.is(HostBindingConflict)(error)
+        Schema.is(HostModuleConflict)(error)
           ? error
-          : HostBindingConflict.make({ module: "Host binding registry construction failed" }),
+          : HostModuleConflict.make({ module: "Host module construction failed" }),
     }).pipe(
-      Effect.map((mounted): Interface => {
-        const resolve = (request: Request): Effect.Effect<AnyOperation, HostBindingNotFound> => {
+      Effect.map((mounted): Service => {
+        const resolve = (request: Request): Effect.Effect<AnyOperation, HostModuleNotFound> => {
           const operations = mounted.get(request.module)
-          if (operations === undefined) return Effect.fail(HostBindingNotFound.make({ module: request.module }))
+          if (operations === undefined) return Effect.fail(HostModuleNotFound.make({ module: request.module }))
           const operation = operations.get(request.operation)
           if (operation === undefined) {
-            return Effect.fail(HostBindingNotFound.make({ module: request.module, operation: request.operation }))
+            return Effect.fail(HostModuleNotFound.make({ module: request.module, operation: request.operation }))
           }
           return Effect.succeed({
             ...operation,
@@ -157,10 +149,10 @@ export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Interf
         }
         const schemaFailure = (
           request: Request,
-          stage: HostBindingSchemaFailure["stage"],
+          stage: HostModuleSchemaFailure["stage"],
           error: { readonly message: string },
-        ): HostBindingSchemaFailure =>
-          HostBindingSchemaFailure.make({
+        ): HostModuleSchemaFailure =>
+          HostModuleSchemaFailure.make({
             module: request.module,
             operation: request.operation,
             stage,
@@ -219,9 +211,9 @@ export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Interf
   )
 
 /** @experimental */
-export const layer = <R>(modules: ReadonlyArray<Module<R>>): Layer.Layer<HostBindingRegistry, HostBindingConflict, R> =>
-  Layer.effect(HostBindingRegistry, make(modules))
+export const layer = <R>(modules: ReadonlyArray<Module<R>>): Layer.Layer<HostModules, HostModuleConflict, R> =>
+  Layer.effect(HostModules, make(modules))
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<HostBindingRegistry> =>
-  Layer.succeed(HostBindingRegistry, HostBindingRegistry.of(implementation))
+export const layerTest = (implementation: Service): Layer.Layer<HostModules> =>
+  Layer.succeed(HostModules, HostModules.of(implementation))

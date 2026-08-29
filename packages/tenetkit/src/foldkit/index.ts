@@ -180,6 +180,6 @@ export namespace Connection {
   export type AgentConnection = import("./chat/connection.js").AgentConnection
   export type layerTest = typeof import("./chat/connection.js").layerTest
   export type layerWebSocket = typeof import("./chat/connection.js").layerWebSocket
-  export type Interface = import("./chat/connection.js").Interface
+  export type Service = import("./chat/connection.js").Service
   export type SessionConnection = import("./chat/connection.js").SessionConnection
 }

@@ -27,7 +27,7 @@ const withRuntime = <A, E, R extends Runtime.Runtime | RunStore.RunStore | RunCl
   effect: Effect.Effect<A, E, R>,
 ) => scopedWith(runtimeLayer)(effect)
 
-const withSession = <A, E>(sessionId: string, body: (session: Session.Interface) => Effect.Effect<A, E>) =>
+const withSession = <A, E>(sessionId: string, body: (session: Session.Service) => Effect.Effect<A, E>) =>
   withRuntime(
     Effect.gen(function* () {
       const store = yield* RunStore.RunStore

@@ -177,7 +177,7 @@ export type Failure =
  * host assigns the ordinal, so cell or tool code cannot forge, reorder, or collide with another
  * call's journal.
  */
-export interface Interface {
+export interface Service {
   readonly run: <A, E, R>(
     request: Request<A, E>,
     effect: Effect.Effect<A, E, R>,
@@ -185,7 +185,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class NestedOperations extends Context.Service<NestedOperations, Interface>()(
+export class NestedOperations extends Context.Service<NestedOperations, Service>()(
   "tenetkit/core/tools/nested-operation/NestedOperations",
 ) {}
 
@@ -299,5 +299,5 @@ export const layerDirect: Layer.Layer<NestedOperations> = Layer.effect(
 )
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<NestedOperations> =>
+export const layerTest = (implementation: Service): Layer.Layer<NestedOperations> =>
   Layer.succeed(NestedOperations, NestedOperations.of(implementation))

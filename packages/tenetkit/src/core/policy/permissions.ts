@@ -44,21 +44,21 @@ export class PermissionError extends Schema.TaggedError<PermissionError>()("tene
 }) {}
 
 /** @experimental Permission policy service boundary. */
-export interface Interface {
+export interface Service {
   readonly evaluate: (request: AccessRequest) => Effect.Effect<Decision, PermissionError>
 }
 
 /** @experimental */
-export class Permissions extends Context.Service<Permissions, Interface>()("tenetkit/core/policy/permissions") {}
+export class Permissions extends Context.Service<Permissions, Service>()("tenetkit/core/policy/permissions") {}
 
 /** @experimental Remembered-rule store. */
-export interface RuleStoreInterface {
+export interface RuleStoreService {
   readonly remember: (rule: Rule) => Effect.Effect<void, PermissionError>
   readonly rules: Effect.Effect<ReadonlyArray<Rule>, PermissionError>
 }
 
 /** @experimental */
-export class RuleStore extends Context.Service<RuleStore, RuleStoreInterface>()(
+export class RuleStore extends Context.Service<RuleStore, RuleStoreService>()(
   "tenetkit/core/policy/permissions/RuleStore",
 ) {}
 
@@ -195,11 +195,11 @@ const decisionFor = (ruleset: Ruleset, request: AccessRequest): Decision => {
 
 /** @experimental Evaluate a base policy with remembered rules as a last-match overlay. */
 export const evaluateWithRules: {
-  (store: RuleStoreInterface, request: AccessRequest): (base: Interface) => Effect.Effect<Decision, PermissionError>
-  (base: Interface, store: RuleStoreInterface, request: AccessRequest): Effect.Effect<Decision, PermissionError>
+  (store: RuleStoreService, request: AccessRequest): (base: Service) => Effect.Effect<Decision, PermissionError>
+  (base: Service, store: RuleStoreService, request: AccessRequest): Effect.Effect<Decision, PermissionError>
 } = dual(
   3,
-  (base: Interface, store: RuleStoreInterface, request: AccessRequest): Effect.Effect<Decision, PermissionError> =>
+  (base: Service, store: RuleStoreService, request: AccessRequest): Effect.Effect<Decision, PermissionError> =>
     Effect.gen(function* () {
       const baseDecision = yield* base.evaluate(request)
       if (baseDecision._tag === "Deny") return baseDecision
@@ -250,9 +250,9 @@ export const layerRuleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): La
   )
 
 /** @experimental */
-export const layerRuleStoreTest = (implementation: RuleStoreInterface): Layer.Layer<RuleStore> =>
+export const layerRuleStoreTest = (implementation: RuleStoreService): Layer.Layer<RuleStore> =>
   Layer.succeed(RuleStore, RuleStore.of(implementation))
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<Permissions> =>
+export const layerTest = (implementation: Service): Layer.Layer<Permissions> =>
   Layer.succeed(Permissions, Permissions.of(implementation))

@@ -2,7 +2,13 @@ import { Generated, OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai
 import { ContextOverflow } from "../../core/index.js"
 import { ModelRegistry } from "../../core/model/public/registry.js"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
-import { AiError, AnthropicStructuredOutput, LanguageModel, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
+import {
+  AiError,
+  AnthropicStructuredOutput,
+  LanguageModel,
+  OpenAiStructuredOutput as OpenAIStructuredOutput,
+  Tool,
+} from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
@@ -28,7 +34,7 @@ const ConfigSchema = Schema.Struct({
 export type Config = typeof ConfigSchema.Type
 
 /** @experimental */
-export interface OpenRouterInput extends RegistrationOptions {
+export interface Options extends RegistrationOptions {
   readonly model: string
   readonly config?: Config
 }
@@ -124,7 +130,7 @@ const resolveOpenRouterFailure = ({ error, metadata: partMetadata, method }: Fai
   return make(openRouterReason(status, message, metadata))
 }
 
-const openRouterLanguageModelLayer = (input: OpenRouterInput) =>
+const openRouterLanguageModelLayer = (input: Options) =>
   Layer.suspend(() =>
     layerModelFailures(
       layerImageSources(
@@ -151,7 +157,7 @@ const codecTransformer = (model: string): LanguageModel.CodecTransformer => {
     model.startsWith("o3-") ||
     model.startsWith("o4-")
   ) {
-    return OpenAiStructuredOutput.toCodecOpenAI
+    return OpenAIStructuredOutput.toCodecOpenAI
   }
   return LanguageModel.defaultCodecTransformer
 }
@@ -180,20 +186,20 @@ export const toolJsonSchemaCompiler =
     })
 
 /** @experimental */
-export interface LayerOptions extends OpenRouterInput {
+export interface ClientOptions extends Options {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenRouterClient.layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
 export const layer = (
-  input: LayerOptions,
+  input: ClientOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
     Layer.provide(OpenRouterClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 
-const registrationOptions = (input: OpenRouterInput) => {
+const registrationOptions = (input: ClientOptions) => {
   const required = {
     provider: "openrouter",
     model: input.model,
