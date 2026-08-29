@@ -94,12 +94,7 @@ const fixture = (options: { readonly revision?: string; readonly toolName?: stri
       check(request).pipe(
         Effect.andThen(
           Effect.acquireRelease(
-            Effect.succeed(
-              SandboxExecutor.makeTest(() => Effect.succeed(request.program.manifest.name), {
-                ...SandboxExecutor.testIdentity,
-                fixture: `dynamic:${revision}`,
-              }),
-            ),
+            Effect.succeed(SandboxExecutor.makeTest(() => Effect.succeed(request.program.manifest.name))),
             () => Effect.sync(() => void released.push("sandbox")),
           ),
         ),

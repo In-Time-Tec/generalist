@@ -1,6 +1,7 @@
 /* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/global-timers-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, effecttsgo/unnecessary-fail-yieldable-error, no-await-in-loop */
 import { Effect, Layer, Option, Result, Schema } from "effect"
 import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
+import { identity } from "./identity.js"
 import { capabilityFailurePrefix, normalize, runner, runnerName } from "./source.js"
 import { type CapabilityRpc, CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
 
@@ -44,21 +45,33 @@ const bytes = <A>(value: A): number | undefined => {
   return encoded === undefined ? undefined : new TextEncoder().encode(encoded).byteLength
 }
 
-const readBounded = async (response: Response, limit: number): Promise<string | undefined> => {
+const readBounded = async (response: Response, limit: number, signal: AbortSignal): Promise<string | undefined> => {
   if (response.body === null) return ""
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let size = 0
   let text = ""
-  while (true) {
-    const next = await reader.read()
-    if (next.done) return text + decoder.decode()
-    size += next.value.byteLength
-    if (size > limit) {
-      await reader.cancel()
-      return undefined
+  let rejectAborted!: (cause: Error) => void
+  const aborted = new Promise<never>((_, reject) => {
+    rejectAborted = reject
+  })
+  const abort = () => rejectAborted(new Error("interrupted"))
+  signal.addEventListener("abort", abort, { once: true })
+  try {
+    while (true) {
+      const next = await Promise.race([reader.read(), aborted])
+      if (next.done) return text + decoder.decode()
+      size += next.value.byteLength
+      if (size > limit) {
+        await reader.cancel()
+        return undefined
+      }
+      text += decoder.decode(next.value, { stream: true })
     }
-    text += decoder.decode(next.value, { stream: true })
+  } finally {
+    signal.removeEventListener("abort", abort)
+    if (signal.aborted) await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
   }
 }
 
@@ -205,13 +218,6 @@ const loaderFailure = (
   return failExecution(cause)
 }
 
-const resultIdentityMatches = (result: SandboxExecutor.Result, request: SandboxExecutor.Request): boolean =>
-  result.protocolVersion === request.protocolVersion &&
-  result.requestId === request.requestId &&
-  result.sourceDigest === request.sourceDigest &&
-  result.inputCodec === request.inputCodec &&
-  result.outputCodec === request.outputCodec
-
 const recoverCapabilityFailure = (
   response: Response,
   decoded: Schema.Json,
@@ -272,11 +278,7 @@ const decodeWorkerResponse = (
       if (failure !== undefined) return yield* Effect.fail(failure)
       return yield* failExecution(`dynamic Worker returned status ${response.status}`)
     }
-    const result = yield* Schema.decodeUnknownEffect(SandboxExecutor.Result, { onExcessProperty: "error" })(
-      decoded,
-    ).pipe(Effect.mapError(() => SandboxExecutor.SandboxProtocolViolation.make({ message: "invalid result envelope" })))
-    if (!resultIdentityMatches(result, request))
-      return yield* SandboxExecutor.SandboxProtocolViolation.make({ message: "result identity mismatch" })
+    const result = yield* SandboxExecutor.validateResult(request, decoded)
     const resultBytes = bytes(result.output)
     if (resultBytes === undefined)
       return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON serializable" })
@@ -288,16 +290,18 @@ const decodeWorkerResponse = (
     return result
   })
 
+const interruptionFailure = (request: SandboxExecutor.Request, deadlineElapsed: boolean) => {
+  if (request.signal.aborted) return SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+  if (deadlineElapsed || Date.now() >= request.deadlineMillis)
+    return SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+  return undefined
+}
+
 /** @experimental Construct a production SandboxExecutor backed by Cloudflare Worker Loader. */
-export const make = (options: Options): SandboxExecutor.Interface =>
-  SandboxExecutor.SandboxExecutor.of({
-    identity: Object.freeze({
-      implementation: "@tenetkit/cloudflare/dynamic-workers",
-      protocolVersion: SandboxExecutor.protocolVersion,
-      compatibilityDate: options.compatibilityDate,
-      isolation: "worker-loader-load",
-      globalOutbound: false,
-    }),
+export const make = (options: Options): SandboxExecutor.Interface => {
+  const executorIdentity = identity(options.compatibilityDate)
+  return SandboxExecutor.SandboxExecutor.of({
+    identity: executorIdentity,
     execute: (request) =>
       Effect.gen(function* () {
         const now = Date.now()
@@ -305,59 +309,83 @@ export const make = (options: Options): SandboxExecutor.Interface =>
           return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
         if (now >= request.deadlineMillis)
           return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+        yield* SandboxExecutor.admit(executorIdentity, request, now)
         const { source, encodedInput } = yield* prepareRequest(request)
 
         const capabilities = yield* ProgramCapabilities.ProgramCapabilities
-        const grants = new Map(request.capabilities.map((grant) => [grant.operation, new Set(grant.names)] as const))
-        let active = true
-        const capabilityFailures = new Map<string, ProgramCapabilities.CapabilityFailure>()
-        let nextCapabilityFailure = 0
-        const invocation = new AbortController()
-        const cancel = () => invocation.abort()
-        let deadlineElapsed = false
-        const rpc = makeCapabilityRpc({
-          capabilities,
-          request,
-          grants,
-          signal: invocation.signal,
-          isActive: () => active && !request.signal.aborted && Date.now() < request.deadlineMillis,
-          recordFailure: (failure) => {
-            const failureId = `failure-${++nextCapabilityFailure}`
-            capabilityFailures.set(failureId, failure)
-            return failureId
-          },
-        })
-        const code: WorkerCode = {
-          compatibilityDate: options.compatibilityDate,
-          mainModule: runnerName,
-          modules: { ...source.record, [runnerName]: runner(request.entrypoint) },
-          globalOutbound: null,
-          env: {
-            TENET_CAPABILITIES: options.capabilityBinding(rpc),
-            TENET_PROTOCOL_VERSION: request.protocolVersion,
-            TENET_REQUEST_ID: request.requestId,
-            TENET_SOURCE_DIGEST: request.sourceDigest,
-            TENET_INPUT_CODEC: request.inputCodec,
-            TENET_OUTPUT_CODEC: request.outputCodec,
-          },
-          limits: { cpuMs: request.limits.cpuMillis, subrequests: request.limits.subrequests },
-        }
-        request.signal.addEventListener("abort", cancel, { once: true })
-        const deadlineTimer = setTimeout(
-          () => {
-            deadlineElapsed = true
-            cancel()
-          },
-          Math.min(request.deadlineMillis - now, 2_147_483_647),
-        )
-        const abort = new Promise<never>((_, reject) => {
-          invocation.signal.addEventListener("abort", () => reject(new Error("interrupted")), { once: true })
-        })
-        try {
-          const response = yield* Effect.tryPromise({
-            try: () =>
-              Promise.race([
-                options.loader
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            const grants = new Map(
+              request.capabilities.map((grant) => [grant.operation, new Set(grant.names)] as const),
+            )
+            let active = true
+            const capabilityFailures = new Map<string, ProgramCapabilities.CapabilityFailure>()
+            let nextCapabilityFailure = 0
+            const invocation = new AbortController()
+            const cancel = () => invocation.abort()
+            let deadlineElapsed = false
+            let deadlineTimer: ReturnType<typeof setTimeout> | undefined
+            let workerFetch: Promise<Response> | undefined
+            let bodyRead: Promise<string | undefined> | undefined
+            yield* Effect.addFinalizer(() => {
+              active = false
+              if (deadlineTimer !== undefined) clearTimeout(deadlineTimer)
+              request.signal.removeEventListener("abort", cancel)
+              invocation.abort()
+              const pending: Array<Promise<unknown>> = []
+              if (workerFetch !== undefined) pending.push(workerFetch)
+              if (bodyRead !== undefined) pending.push(bodyRead)
+              return Effect.promise(() => Promise.allSettled(pending)).pipe(Effect.asVoid)
+            })
+
+            request.signal.addEventListener("abort", cancel, { once: true })
+            if (request.signal.aborted) cancel()
+            const remaining = request.deadlineMillis - Date.now()
+            if (remaining <= 0) {
+              deadlineElapsed = true
+              cancel()
+            } else {
+              deadlineTimer = setTimeout(
+                () => {
+                  deadlineElapsed = true
+                  cancel()
+                },
+                Math.min(remaining, 2_147_483_647),
+              )
+            }
+            const beforeLoad = interruptionFailure(request, deadlineElapsed)
+            if (beforeLoad !== undefined) return yield* beforeLoad
+
+            const rpc = makeCapabilityRpc({
+              capabilities,
+              request,
+              grants,
+              signal: invocation.signal,
+              isActive: () => active && !request.signal.aborted && Date.now() < request.deadlineMillis,
+              recordFailure: (failure) => {
+                const failureId = `failure-${++nextCapabilityFailure}`
+                capabilityFailures.set(failureId, failure)
+                return failureId
+              },
+            })
+            const code: WorkerCode = {
+              compatibilityDate: options.compatibilityDate,
+              mainModule: runnerName,
+              modules: { ...source.record, [runnerName]: runner(request.entrypoint) },
+              globalOutbound: null,
+              env: {
+                TENET_CAPABILITIES: options.capabilityBinding(rpc),
+                TENET_PROTOCOL_VERSION: request.protocolVersion,
+                TENET_REQUEST_ID: request.requestId,
+                TENET_SOURCE_DIGEST: request.sourceDigest,
+                TENET_INPUT_CODEC: request.inputCodec,
+                TENET_OUTPUT_CODEC: request.outputCodec,
+              },
+              limits: { cpuMs: request.limits.cpuMillis, subRequests: request.limits.subrequests },
+            }
+            const response = yield* Effect.tryPromise({
+              try: () => {
+                workerFetch = options.loader
                   .load(code)
                   .getEntrypoint()
                   .fetch(
@@ -366,45 +394,58 @@ export const make = (options: Options): SandboxExecutor.Interface =>
                       signal: invocation.signal,
                       body: `{"protocolVersion":${JSON.stringify(request.protocolVersion)},"requestId":${JSON.stringify(request.requestId)},"input":${encodedInput}}`,
                     }),
-                  ),
-                abort,
-              ]),
-            catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
-          })
-          if (!active || request.signal.aborted)
-            return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-          if (deadlineElapsed || Date.now() >= request.deadlineMillis)
-            return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-          const text = yield* Effect.tryPromise({
-            try: () => Promise.race([readBounded(response, request.limits.outputBytes), abort]),
-            catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
-          })
-          if (!active || request.signal.aborted)
-            return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-          if (deadlineElapsed || Date.now() >= request.deadlineMillis)
-            return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-          const result = yield* decodeWorkerResponse(response, text, request, capabilityFailures)
-          if (!active || request.signal.aborted)
-            return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-          if (deadlineElapsed || Date.now() >= request.deadlineMillis)
-            return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-          return result
-        } finally {
-          active = false
-          clearTimeout(deadlineTimer)
-          request.signal.removeEventListener("abort", cancel)
-          invocation.abort()
-        }
+                  )
+                const abort = new Promise<never>((_, reject) => {
+                  invocation.signal.addEventListener("abort", () => reject(new Error("interrupted")), { once: true })
+                })
+                return Promise.race([workerFetch, abort])
+              },
+              catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
+            })
+            const afterExecution = interruptionFailure(request, deadlineElapsed)
+            if (afterExecution !== undefined) return yield* afterExecution
+            const text = yield* Effect.tryPromise({
+              try: () => {
+                bodyRead = readBounded(response, request.limits.outputBytes, invocation.signal)
+                return bodyRead
+              },
+              catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
+            })
+            const afterOutput = interruptionFailure(request, deadlineElapsed)
+            if (afterOutput !== undefined) return yield* afterOutput
+            const result = yield* decodeWorkerResponse(response, text, request, capabilityFailures)
+            const afterDecode = interruptionFailure(request, deadlineElapsed)
+            if (afterDecode !== undefined) return yield* afterDecode
+            return result
+          }),
+        )
       }),
   })
+}
 
 /** @experimental Construct an explicitly disabled Worker Loader boundary. */
 export const makeUnavailable = (message = "Worker Loader is unavailable"): SandboxExecutor.Interface =>
   SandboxExecutor.SandboxExecutor.of({
-    identity: Object.freeze({
-      implementation: "@tenetkit/cloudflare/dynamic-workers",
-      protocolVersion: SandboxExecutor.protocolVersion,
-      available: false,
+    identity: SandboxExecutor.declareIdentity({
+      provider: "cloudflare",
+      implementation: { name: "@tenetkit/cloudflare/dynamic-workers", version: "1" },
+      runtime: { name: "cloudflare-workers", version: "not-configured" },
+      template: { name: "tenetkit-program-runner", version: SandboxExecutor.protocolVersion },
+      physicalIsolation: "none",
+      persistence: "none",
+      network: {
+        posture: "none",
+        enforcement: { status: "unenforced", reason: "Worker Loader is unavailable" },
+      },
+      limits: {
+        deadlineMillis: { status: "unenforced", reason: "Worker Loader is unavailable" },
+        cpuMillis: { status: "unenforced", reason: "Worker Loader is unavailable" },
+        subrequests: { status: "unenforced", reason: "Worker Loader is unavailable" },
+        outputBytes: { status: "unenforced", reason: "Worker Loader is unavailable" },
+        filesystem: { status: "unenforced", reason: "Worker Loader is unavailable" },
+        processes: { status: "unenforced", reason: "Worker Loader is unavailable" },
+      },
+      knownLimitations: [message],
     }),
     execute: () => SandboxExecutor.SandboxUnavailable.make({ message }),
   })

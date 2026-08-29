@@ -50,3 +50,6 @@ export namespace TestModel {
   export type TruncationPoint = import("./model/service.js").TruncationPoint
   export type TurnStep = import("./model/service.js").TurnStep
 }
+
+export { providerConformance as sandboxExecutorConformance } from "./sandbox-executor.js"
+export type { Options as SandboxExecutorConformanceOptions } from "./sandbox-executor.js"

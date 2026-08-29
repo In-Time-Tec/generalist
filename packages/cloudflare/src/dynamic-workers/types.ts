@@ -8,7 +8,7 @@ export interface WorkerCode {
   readonly modules: Readonly<Record<string, string>>
   readonly globalOutbound: null
   readonly env: WorkerEnvironment
-  readonly limits: { readonly cpuMs: number; readonly subrequests: number }
+  readonly limits: { readonly cpuMs: number; readonly subRequests: number }
 }
 
 /** @experimental Values injected into the generated protocol Worker. */

@@ -36,8 +36,28 @@ content digest before loading, disables global outbound access, and supplies onl
 binding plus non-secret protocol identity constants. The host must turn the supplied RPC implementation into a
 Cloudflare service binding, normally with a request-scoped `ctx.exports` loopback binding.
 
-The adapter passes `limits.cpuMs` and `limits.subrequests` as the dynamic-worker stage contract. The pinned local
-`workerd` does not currently provide observable enforcement evidence for these two WorkerCode fields, so releases
-that require those resource guarantees must remain disabled until the target Cloudflare environment confirms them.
-Deadline, cancellation, output size, source identity, codec identity, and closed capability authority are enforced by
-the adapter independently.
+The executor identity is a schema-backed, immutable declaration of the provider, adapter/runtime/template versions,
+fresh-worker persistence, physical isolation boundary, default-deny network posture, exact enforcement owner for each
+limit, and bounded known limitations. It contains no credentials or mutable Worker IDs. Admission runs before module
+normalization or `loader.load()` and fails rather than weakening any requested guarantee. `makeUnavailable()` declares
+every guarantee unenforced and cannot admit production execution.
+
+The adapter passes `limits.cpuMs` and `limits.subRequests` to Worker Loader for every fresh execution. Deadline and
+caller cancellation abort the guest request and active host callbacks; the callback fence closes before return. Output
+is counted while reading the response stream and the reader is cancelled on overflow, deadline, or caller cancellation.
+The complete protocol version, request, source digest, and input/output codec identity must match the response envelope.
+
+The exported `tenetkit/test` provider suite and the VM Worker Loader fixture prove adapter protocol semantics, fresh
+module/global state, exact capability closure, ambient host denial, bounded output, interruption, and cleanup. The
+pinned local `workerd --experimental` test proves the real Worker Loader accepts `subRequests`, creates a fresh worker
+for each `load()`, exposes no parent environment or process-spawn API, and enforces `globalOutbound: null`. Neither test
+proves Cloudflare's production physical-isolation implementation or production CPU/subrequest governors.
+
+Production CPU/subrequest enforcement and production-observable freshness and egress behavior require the opt-in
+credentialed gate. Set
+`TENETKIT_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_URL` and
+`TENETKIT_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_TOKEN` for a deployed harness that exposes
+`/sandbox-conformance/{cpu,subrequests,isolation}` with the response contract in
+`test/dynamic-workers-live.test.ts`. Without that gate, local results are protocol/runtime evidence only and must not be
+reported as production resource-enforcement evidence. Even the live gate proves only behavior visible through the
+request boundary; Cloudflare's documentation and assurance material, not this suite, own the physical-isolate claim.

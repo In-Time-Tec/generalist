@@ -2525,18 +2525,16 @@ describe("ExecutionHost", () => {
           }),
         ],
       })
-      const sandbox = SandboxExecutor.makeTest(
-        () =>
-          Effect.gen(function* () {
-            const capabilities = yield* ProgramCapabilities.ProgramCapabilities
-            const results = yield* capabilities.mapAgents({
-              operation: "workers",
-              selection: "worker",
-              members: [{ member: "only", input: "perform child work" }],
-            })
-            return results.map((member) => member.result.text)
-          }),
-        { ...SandboxExecutor.testIdentity, fixture: `early-failure-map:${earlyFailure.name}` },
+      const sandbox = SandboxExecutor.makeTest(() =>
+        Effect.gen(function* () {
+          const capabilities = yield* ProgramCapabilities.ProgramCapabilities
+          const results = yield* capabilities.mapAgents({
+            operation: "workers",
+            selection: "worker",
+            members: [{ member: "only", input: "perform child work" }],
+          })
+          return results.map((member) => member.result.text)
+        }),
       )
       const staticResolver = ExecutableResolver.makeStatic([
         { _tag: "Program", executable, program, sandbox, bindings },
@@ -2780,19 +2778,17 @@ describe("ExecutionHost", () => {
           }),
         ],
       })
-      const sandbox = SandboxExecutor.makeTest(
-        () =>
-          Effect.gen(function* () {
-            yield* Effect.sync(() => void ++sandboxCalls)
-            const host = yield* ProgramCapabilities.ProgramCapabilities
-            const results = yield* host.mapAgents({
-              operation: "workers",
-              selection: "worker",
-              members: [{ member: "only", input: "perform child work" }],
-            })
-            return results.map((member) => `${member.member}:${member.result.text}`)
-          }),
-        { ...SandboxExecutor.testIdentity, fixture: "failed-agent-map" },
+      const sandbox = SandboxExecutor.makeTest(() =>
+        Effect.gen(function* () {
+          yield* Effect.sync(() => void ++sandboxCalls)
+          const host = yield* ProgramCapabilities.ProgramCapabilities
+          const results = yield* host.mapAgents({
+            operation: "workers",
+            selection: "worker",
+            members: [{ member: "only", input: "perform child work" }],
+          })
+          return results.map((member) => `${member.member}:${member.result.text}`)
+        }),
       )
       const staticResolver = ExecutableResolver.makeStatic([
         { _tag: "Program", executable, program, sandbox, bindings },

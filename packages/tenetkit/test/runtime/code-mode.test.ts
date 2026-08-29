@@ -100,15 +100,13 @@ const fixture = () => {
         ),
     }),
   )
-  const sandbox = SandboxExecutor.makeTest(
-    () =>
-      Effect.flatMap(ProgramCapabilities.ProgramCapabilities, () =>
-        Effect.sync(() => {
-          counts.capability++
-          return "program-result"
-        }),
-      ),
-    { ...SandboxExecutor.testIdentity, fixture: "code-mode" },
+  const sandbox = SandboxExecutor.makeTest(() =>
+    Effect.flatMap(ProgramCapabilities.ProgramCapabilities, () =>
+      Effect.sync(() => {
+        counts.capability++
+        return "program-result"
+      }),
+    ),
   )
   const staticRoot = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(rootAgent, model) }])
   const resolver = ExecutableResolver.ExecutableResolver.of({

@@ -77,7 +77,7 @@ it.effect("loads exact cold WorkerCode with only the capability binding and pinn
       compatibilityDate: "2026-08-19",
       mainModule: "__tenetkit_runner.js",
       globalOutbound: null,
-      limits: { cpuMs: 50, subrequests: 3 },
+      limits: { cpuMs: 50, subRequests: 3 },
     })
     expect(Object.keys(loaded[0]!.env).toSorted()).toEqual([
       "TENET_CAPABILITIES",
@@ -89,6 +89,100 @@ it.effect("loads exact cold WorkerCode with only the capability binding and pinn
     ])
     expect(loaded[0]!.modules["__tenetkit_runner.js"]).toContain("capabilityFailureId")
     expect(second.requestId).toBe(first.requestId)
+  }),
+)
+
+it.effect("rejects every malformed or identity-mismatched Worker result as a protocol violation", () =>
+  Effect.gen(function* () {
+    const input = request()
+    const exact = {
+      protocolVersion: input.protocolVersion,
+      requestId: input.requestId,
+      sourceDigest: input.sourceDigest,
+      inputCodec: input.inputCodec,
+      outputCodec: input.outputCodec,
+      output: null,
+    }
+    for (const malformed of [
+      { ...exact, protocolVersion: "0" },
+      { ...exact, requestId: "other" },
+      { ...exact, sourceDigest: "other" },
+      { ...exact, inputCodec: "other" },
+      { ...exact, outputCodec: "other" },
+      { ...exact, unexpected: true },
+      { output: null },
+    ]) {
+      const executor = make({
+        compatibilityDate: "2026-08-19",
+        capabilityBinding: (rpc) => rpc,
+        loader: {
+          load: () => ({
+            getEntrypoint: () => ({ fetch: async () => Response.json(malformed) }),
+          }),
+        },
+      })
+      expect(
+        yield* executor
+          .execute(input)
+          .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip),
+      ).toBeInstanceOf(SandboxExecutor.SandboxProtocolViolation)
+    }
+  }),
+)
+
+it.effect("rejects an unsupported admission limit before source normalization or Worker loading", () =>
+  Effect.gen(function* () {
+    let loads = 0
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (rpc) => rpc,
+      loader: {
+        load: () => {
+          loads += 1
+          throw new Error("must not load")
+        },
+      },
+    })
+    const failure = yield* executor
+      .execute({
+        ...request(),
+        modules: [{ name: "program.js", source: "export default (" }],
+        deadlineMillis: Date.now() + 2_147_493_647,
+      })
+      .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
+    expect(failure).toMatchObject({
+      _tag: "@tenetkit/core/SandboxGuaranteeUnavailable",
+      guarantee: "deadlineMillis",
+    })
+    expect(loads).toBe(0)
+  }),
+)
+
+it.effect("maps provider CPU and subrequest enforcement failures to exact request limits", () =>
+  Effect.gen(function* () {
+    for (const [message, resource, limit] of [
+      ["CPU time limit exceeded", "cpu", 50],
+      ["subrequest limit exceeded", "subrequests", 3],
+    ] as const) {
+      const executor = make({
+        compatibilityDate: "2026-08-19",
+        capabilityBinding: (rpc) => rpc,
+        loader: {
+          load: () => {
+            throw new Error(message)
+          },
+        },
+      })
+      expect(
+        yield* executor
+          .execute(request())
+          .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip),
+      ).toMatchObject({
+        _tag: "@tenetkit/core/SandboxResourceExceeded",
+        resource,
+        limit,
+      })
+    }
   }),
 )
 
@@ -483,12 +577,28 @@ it.effect("does not consume a typed capability envelope for a non-500 response",
 
 it.effect("streams output through the byte bound before decoding", () =>
   Effect.gen(function* () {
+    const chunk = new TextEncoder().encode("x".repeat(64))
+    let pulls = 0
+    let cancelled = false
     const executor = make({
       compatibilityDate: "2026-08-19",
       capabilityBinding: (rpc) => rpc,
       loader: {
         load: () => ({
-          getEntrypoint: () => ({ fetch: async () => new Response("x".repeat(2_000)) }),
+          getEntrypoint: () => ({
+            fetch: async () =>
+              new Response(
+                new ReadableStream<Uint8Array>({
+                  pull: (controller) => {
+                    pulls += 1
+                    controller.enqueue(chunk)
+                  },
+                  cancel: () => {
+                    cancelled = true
+                  },
+                }),
+              ),
+          }),
         }),
       },
     })
@@ -496,6 +606,8 @@ it.effect("streams output through the byte bound before decoding", () =>
       .execute({ ...request(), limits: { cpuMillis: 50, subrequests: 3, outputBytes: 128 } })
       .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
     expect(failure).toMatchObject({ _tag: "@tenetkit/core/SandboxResourceExceeded", resource: "output", limit: 128 })
+    expect(cancelled).toBe(true)
+    expect(pulls).toBeLessThanOrEqual(4)
   }),
 )
 
@@ -509,9 +621,12 @@ it.effect("fences a late Worker response after cancellation", () =>
       loader: {
         load: () => ({
           getEntrypoint: () => ({
-            fetch: () =>
-              new Promise<Response>((resolve) => {
+            fetch: (workerRequest) =>
+              new Promise<Response>((resolve, reject) => {
                 complete = resolve
+                workerRequest.signal.addEventListener("abort", () => reject(new Error("Worker stopped")), {
+                  once: true,
+                })
               }),
           }),
         }),
@@ -528,9 +643,150 @@ it.effect("fences a late Worker response after cancellation", () =>
   }),
 )
 
+it.effect("stops the Worker and closes host callbacks before Effect interruption returns", () =>
+  Effect.gen(function* () {
+    let rpc: CapabilityRpc | undefined
+    let resolveStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      resolveStarted = resolve
+    })
+    let workerStopped = false
+    let hostCalls = 0
+    const observed = ProgramCapabilities.ProgramCapabilities.of({
+      ...capabilities,
+      callTool: (input) =>
+        Effect.sync(() => {
+          hostCalls += 1
+          return input.input
+        }),
+    })
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (value) => {
+        rpc = value
+        return value
+      },
+      loader: {
+        load: () => ({
+          getEntrypoint: () => ({
+            fetch: (workerRequest) =>
+              new Promise<Response>((_resolve, reject) => {
+                resolveStarted()
+                workerRequest.signal.addEventListener(
+                  "abort",
+                  () => {
+                    workerStopped = true
+                    reject(new Error("Worker stopped"))
+                  },
+                  { once: true },
+                )
+              }),
+          }),
+        }),
+      },
+    })
+    const fiber = yield* executor
+      .execute(request())
+      .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, observed), Effect.forkChild)
+    yield* Effect.promise(() => started)
+    yield* Fiber.interrupt(fiber)
+    expect(workerStopped).toBe(true)
+
+    const denied = yield* Effect.promise(async () => {
+      try {
+        await rpc!.call({
+          protocolVersion: "1",
+          requestId: "run-1:attempt-1",
+          operation: "callTool",
+          input: { operation: "late", tool: "echo", input: null },
+        })
+        return false
+      } catch {
+        return true
+      }
+    })
+    expect(denied).toBe(true)
+    expect(hostCalls).toBe(0)
+  }),
+)
+
+it.effect("interrupts an active host capability before returning and rejects later calls", () =>
+  Effect.gen(function* () {
+    const controller = new AbortController()
+    let rpc: CapabilityRpc | undefined
+    let resolveStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      resolveStarted = resolve
+    })
+    let interrupted = false
+    let hostCalls = 0
+    const blocking = ProgramCapabilities.ProgramCapabilities.of({
+      ...capabilities,
+      callTool: () =>
+        Effect.sync(() => {
+          hostCalls += 1
+          resolveStarted()
+        }).pipe(
+          Effect.andThen(Effect.never),
+          Effect.onInterrupt(() =>
+            Effect.sync(() => {
+              interrupted = true
+            }),
+          ),
+        ),
+    })
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (value) => {
+        rpc = value
+        return value
+      },
+      loader: {
+        load: (code) => ({
+          getEntrypoint: () => ({
+            fetch: async () => {
+              await code.env.TENET_CAPABILITIES.call({
+                protocolVersion: "1",
+                requestId: "run-1:attempt-1",
+                operation: "callTool",
+                input: { operation: "blocked", tool: "echo", input: null },
+              })
+              return new Response("unreachable")
+            },
+          }),
+        }),
+      },
+    })
+    const fiber = yield* executor
+      .execute(request(controller.signal))
+      .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, blocking), Effect.forkChild)
+    yield* Effect.promise(() => started)
+    controller.abort()
+    expect(yield* Fiber.join(fiber).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxCancelled)
+    expect(interrupted).toBe(true)
+    expect(hostCalls).toBe(1)
+
+    const denied = yield* Effect.promise(async () => {
+      try {
+        await rpc!.call({
+          protocolVersion: "1",
+          requestId: "run-1:attempt-1",
+          operation: "callTool",
+          input: { operation: "late", tool: "echo", input: null },
+        })
+        return false
+      } catch {
+        return true
+      }
+    })
+    expect(denied).toBe(true)
+    expect(hostCalls).toBe(1)
+  }),
+)
+
 it.effect("fences cancellation and deadline while reading a delayed response body", () =>
   Effect.gen(function* () {
-    const execute = (input: SandboxExecutor.Request, reading: () => void) =>
+    const execute = (input: SandboxExecutor.Request, reading: () => void, cancelled: () => void) =>
       make({
         compatibilityDate: "2026-08-19",
         capabilityBinding: (rpc) => rpc,
@@ -541,6 +797,7 @@ it.effect("fences cancellation and deadline while reading a delayed response bod
                 new Response(
                   new ReadableStream<Uint8Array>({
                     pull: reading,
+                    cancel: cancelled,
                   }),
                 ),
             }),
@@ -555,27 +812,34 @@ it.effect("fences cancellation and deadline while reading a delayed response bod
     const bodyStarted = new Promise<void>((resolve) => {
       bodyReading = resolve
     })
-    const cancelled = yield* execute(request(controller.signal), bodyReading).pipe(Effect.forkChild)
+    let cancelledBody = false
+    const cancelled = yield* execute(request(controller.signal), bodyReading, () => {
+      cancelledBody = true
+    }).pipe(Effect.forkChild)
     yield* Effect.promise(() => bodyStarted)
+    yield* Effect.yieldNow
     controller.abort()
     expect(yield* Fiber.join(cancelled).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxCancelled)
+    expect(cancelledBody).toBe(true)
 
     let deadlineReading!: () => void
     const deadlineBodyStarted = new Promise<void>((resolve) => {
       deadlineReading = resolve
     })
-    const deadline = yield* execute({ ...request(), deadlineMillis: Date.now() + 50 }, deadlineReading).pipe(
-      Effect.forkChild,
-    )
+    let deadlineBodyCancelled = false
+    const deadline = yield* execute({ ...request(), deadlineMillis: Date.now() + 50 }, deadlineReading, () => {
+      deadlineBodyCancelled = true
+    }).pipe(Effect.forkChild)
     yield* Effect.promise(() => deadlineBodyStarted)
     expect(yield* Fiber.join(deadline).pipe(Effect.flip)).toBeInstanceOf(SandboxExecutor.SandboxDeadlineExceeded)
+    expect(deadlineBodyCancelled).toBe(true)
   }),
 )
 
 it.effect("provides an explicit typed unavailable executor", () =>
   Effect.gen(function* () {
     const unavailable = makeUnavailable("feature disabled")
-    expect(unavailable.identity).toMatchObject({ available: false })
+    expect(unavailable.identity).toMatchObject({ physicalIsolation: "none", persistence: "none" })
     expect(
       yield* unavailable
         .execute(request())

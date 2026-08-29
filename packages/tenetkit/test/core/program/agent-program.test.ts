@@ -161,7 +161,7 @@ const runWith =
   (effect) =>
     provideScoped(
       ProgramHost.layerDirect({
-        sandbox: SandboxExecutor.makeTest(fixture, { ...SandboxExecutor.testIdentity, fixture: "agent-program" }),
+        sandbox: SandboxExecutor.makeTest(fixture),
         bindings: live,
       }),
       effect,
@@ -196,10 +196,7 @@ it.effect("denies bindings outside the exact manifest closure and rejects pin mi
   Effect.scoped(
     Effect.gen(function* () {
       const closed = program("closed", { steps: false, agents: false })
-      const fixture = SandboxExecutor.makeTest(() => Effect.succeed({ value: 1 }), {
-        ...SandboxExecutor.testIdentity,
-        fixture: "closed-program",
-      })
+      const fixture = SandboxExecutor.makeTest(() => Effect.succeed({ value: 1 }))
       const extra = yield* provideScoped(
         ProgramHost.layerDirect({ sandbox: fixture, bindings: bindings() }),
         AgentProgram.run(closed, { value: 1 }),

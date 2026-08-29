@@ -58,22 +58,20 @@ export const programFixture = () => {
     steps: [],
     agents: [],
   })
-  const sandbox = SandboxExecutor.makeTest(
-    () =>
-      Effect.gen(function* () {
-        const host = yield* ProgramCapabilities.ProgramCapabilities
-        const first = yield* host.callTool({ operation: "echo", tool: "echo", input: "value" })
-        const replayed = yield* host.callTool({ operation: "echo", tool: "echo", input: "value" })
-        yield* host.log({ operation: "summary", level: "info", message: "finished" })
-        yield* Effect.sync(() => void ++logs)
-        const decodeText = Schema.decodeUnknownEffect(Schema.String)
-        const mapSchemaFailure = (error: Schema.SchemaError) =>
-          ProgramCapabilities.ProgramSchemaFailure.make({ boundary: "tool-output", message: String(error) })
-        const firstText = yield* decodeText(first).pipe(Effect.mapError(mapSchemaFailure))
-        const replayedText = yield* decodeText(replayed).pipe(Effect.mapError(mapSchemaFailure))
-        return `${firstText}|${replayedText}`
-      }),
-    { ...SandboxExecutor.testIdentity, fixture: "program" },
+  const sandbox = SandboxExecutor.makeTest(() =>
+    Effect.gen(function* () {
+      const host = yield* ProgramCapabilities.ProgramCapabilities
+      const first = yield* host.callTool({ operation: "echo", tool: "echo", input: "value" })
+      const replayed = yield* host.callTool({ operation: "echo", tool: "echo", input: "value" })
+      yield* host.log({ operation: "summary", level: "info", message: "finished" })
+      yield* Effect.sync(() => void ++logs)
+      const decodeText = Schema.decodeUnknownEffect(Schema.String)
+      const mapSchemaFailure = (error: Schema.SchemaError) =>
+        ProgramCapabilities.ProgramSchemaFailure.make({ boundary: "tool-output", message: String(error) })
+      const firstText = yield* decodeText(first).pipe(Effect.mapError(mapSchemaFailure))
+      const replayedText = yield* decodeText(replayed).pipe(Effect.mapError(mapSchemaFailure))
+      return `${firstText}|${replayedText}`
+    }),
   )
   const resolver = ExecutableResolver.makeStatic([
     { _tag: "Program", executable: programExecutable, program, sandbox, bindings },
@@ -109,16 +107,14 @@ export const approvalProgramFixture = () => {
     steps: [],
     agents: [],
   })
-  const sandbox = SandboxExecutor.makeTest(
-    () =>
-      Effect.sync(() => void ++sandboxes).pipe(
-        Effect.andThen(
-          Effect.flatMap(ProgramCapabilities.ProgramCapabilities, (host) =>
-            host.callTool({ operation: "echo", tool: "echo", input: "approved" }),
-          ),
+  const sandbox = SandboxExecutor.makeTest(() =>
+    Effect.sync(() => void ++sandboxes).pipe(
+      Effect.andThen(
+        Effect.flatMap(ProgramCapabilities.ProgramCapabilities, (host) =>
+          host.callTool({ operation: "echo", tool: "echo", input: "approved" }),
         ),
       ),
-    { ...SandboxExecutor.testIdentity, fixture: "approval-program" },
+    ),
   )
   return {
     resolver: ExecutableResolver.makeStatic([
@@ -179,22 +175,20 @@ export const agentMapProgramFixture = () => {
       }),
     ],
   })
-  const sandbox = SandboxExecutor.makeTest(
-    () =>
-      Effect.gen(function* () {
-        const host = yield* ProgramCapabilities.ProgramCapabilities
-        const results = yield* host.mapAgents({
-          operation: "workers",
-          selection: "worker",
-          members: [
-            { member: "third", input: "three" },
-            { member: "first", input: "one" },
-            { member: "second", input: "two" },
-          ],
-        })
-        return results.map((member) => `${member.member}:${member.result.text}`)
-      }),
-    { ...SandboxExecutor.testIdentity, fixture: "agent-map-program" },
+  const sandbox = SandboxExecutor.makeTest(() =>
+    Effect.gen(function* () {
+      const host = yield* ProgramCapabilities.ProgramCapabilities
+      const results = yield* host.mapAgents({
+        operation: "workers",
+        selection: "worker",
+        members: [
+          { member: "third", input: "three" },
+          { member: "first", input: "one" },
+          { member: "second", input: "two" },
+        ],
+      })
+      return results.map((member) => `${member.member}:${member.result.text}`)
+    }),
   )
   const finish = Response.makePart("finish", {
     reason: "stop",

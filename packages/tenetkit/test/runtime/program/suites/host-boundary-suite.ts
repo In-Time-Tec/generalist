@@ -70,7 +70,7 @@ const makeFixture = (
     _tag: "Program",
     executable,
     program,
-    sandbox: SandboxExecutor.makeTest(execute, { ...SandboxExecutor.testIdentity, fixture: `boundary:${name}` }),
+    sandbox: SandboxExecutor.makeTest(execute),
     bindings,
   }
   const registration: StaticExecutable =
