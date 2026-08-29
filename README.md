@@ -114,6 +114,12 @@ const durableTools = ToolExecutor.layerRouter([
 - Current behavior: [`docs/features/`](docs/features/)
 - Vocabulary: [`CONTEXT.md`](CONTEXT.md)
 
+## License and contributions
+
+TenetKit and its published packages are available under the [MIT License](LICENSE). The npm packages are public, but this repository remains private. Package consumers receive the compiled JavaScript, declarations, README, and license in each package tarball; the package license permits use, modification, and redistribution, but package access does not grant repository or unpublished source access.
+
+External contributors can request repository access through the path in [CONTRIBUTING.md](CONTRIBUTING.md). That policy also records review and contributor-agreement expectations. Report vulnerabilities using the private disclosure path in [SECURITY.md](SECURITY.md), not a public issue.
+
 ## Repository layout
 
 | Path                 | Purpose                                                                      |
