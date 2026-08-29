@@ -15,10 +15,12 @@
     "@effect/ai-openai-compat": "catalog:",
     "@effect/ai-openrouter": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
+    "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@smithy/types": "catalog:",
     "effect": "catalog:",
-    "foldkit": "catalog:peer"
+    "foldkit": "catalog:peer",
+    "vitest": "catalog:"
   },
   "files": [
     "dist",
@@ -82,6 +84,10 @@
     "./test": {
       "types": "./dist/test/index.d.ts",
       "import": "./dist/test/index.js"
+    },
+    "./test/runtime-driver": {
+      "types": "./dist/test/runtime-driver/index.d.ts",
+      "import": "./dist/test/runtime-driver/index.js"
     },
     "./a2a": {
       "types": "./dist/interoperability/a2a/index.d.ts",
@@ -263,6 +269,9 @@
     "@effect/sql-sqlite-bun": {
       "optional": true
     },
+    "@effect/vitest": {
+      "optional": true
+    },
     "@modelcontextprotocol/sdk": {
       "optional": true
     },
@@ -270,6 +279,9 @@
       "optional": true
     },
     "foldkit": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   }
