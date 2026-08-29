@@ -7,13 +7,13 @@ import {
   catalogVersion,
   compressedSizeLimits,
   forbiddenPackageExports,
-  packageExports,
   packedEffectDependencies,
   packedProviderDependencies,
   packages,
   packageNames,
   sortRecord,
   tarballName,
+  wildcardExportExamples,
 } from "./package-smoke-config.js"
 
 class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@tenetkit/scripts/PackageSmokeFailed", {
@@ -325,6 +325,17 @@ const program = Effect.gen(function* () {
     return { packedManifests, tarballs }
   })
   const { packedManifests, tarballs } = yield* packAndValidatePackages
+  const packageExports = sorted(
+    [
+      ...Object.values(packedManifests).flatMap((manifest) =>
+        Object.keys(manifest.exports)
+          .filter((specifier) => !specifier.includes("*"))
+          .map((specifier) => (specifier === "." ? manifest.name : `${manifest.name}${specifier.slice(1)}`)),
+      ),
+      ...wildcardExportExamples,
+    ],
+    (left, right) => left.localeCompare(right),
+  )
 
   const integrationPeers = Object.fromEntries(
     Object.entries(packedManifests.tenetkit?.peerDependencies ?? {}).filter(
