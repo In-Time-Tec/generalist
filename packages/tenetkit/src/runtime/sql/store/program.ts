@@ -446,7 +446,7 @@ export const suspendProgramOperation: {
       UPDATE tenetkit_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation} AND status = 'reserved'
     `
-    yield* suspendParent(hub, input)
+    yield* suspendParent(hub, { ...input, waits: [input.wait] })
     return yield* requiredOperation(input.runId, input.operation)
   }),
 )
@@ -465,7 +465,7 @@ export const admitProgramAgents: {
         fan_out_id = ${receipt.fanOutId}, child_run_ids_json = ${encodeJsonValue(receipt.childRunIds)}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation} AND status = 'reserved'
     `
-    yield* suspendParent(hub, { ...input, checkpoint: { _tag: "Program", version: "1" } })
+    yield* suspendParent(hub, { ...input, waits: [input.wait], checkpoint: { _tag: "Program", version: "1" } })
     return yield* requiredOperation(input.runId, input.operation)
   }),
 )

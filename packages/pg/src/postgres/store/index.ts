@@ -39,19 +39,14 @@ import { transactionRunner, nextId } from "../events/transaction-events.js"
 import { eventStream } from "../events/event-stream.js"
 import { postgresClaims } from "./claims.js"
 import { postgresOperations, type RunFn } from "./ops.js"
-import { hasAdmission, loadRunWait } from "tenetkit/runtime/driver/sql/store/statements"
+import { hasAdmission, loadRunWait, nowIso, transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import { WaitResolution } from "tenetkit/runtime/driver/run/wait"
 import { fanOutStoreMethods } from "./fan-out.js"
 import { deferCancelledFanOutParent, cancelRunFor } from "./cancel.js"
 import "tenetkit/runtime/driver/sql/tree-replay"
 import "tenetkit/runtime/driver/sql/inspection/service"
 import { withConsistentSnapshot } from "tenetkit/runtime/driver/sql/inspection/transaction"
-import {
-  StringArray,
-  decodePinnedEffect,
-  decodeStoredPinnedEffect,
-  encodeJson,
-} from "tenetkit/runtime/driver/sql/codec/codecs"
+import { decodePinnedEffect, decodeStoredPinnedEffect, encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
 import { suspend } from "./suspend.js"
 import {
   afterTerminal,
@@ -246,34 +241,30 @@ export const postgresServices = (options: PostgresOptions) =>
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status))
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
-            if (loaded.respondedWaitIds.has(input.waitId)) {
-              const prior = yield* loadRunWait(loaded.runId, input.waitId)
-              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
-              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
-            }
             if (loaded.cancellationRequested) {
               return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            if (loaded.activeWaitId !== input.waitId) {
-              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
-            }
-            const responded = [...loaded.respondedWaitIds, input.waitId]
-            const resolution: WaitResolution = input.resolution
-            const closed = yield* sql<{ wait_id: string }>`
-              UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
-              WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'open'
-              RETURNING wait_id
-            `
-            if (closed.length === 0) {
-              const prior = yield* loadRunWait(loaded.runId, input.waitId)
-              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, resolution)) return
+            const prior = yield* loadRunWait(loaded.runId, input.waitId)
+            if (prior !== undefined && prior.status !== "open") {
+              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
               return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            yield* sql`
-              UPDATE tenetkit_runs
-              SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
-              WHERE run_id = ${loaded.runId}
-            `
+            if (prior === undefined) {
+              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
+            }
+            const resolution: WaitResolution = input.resolution
+            const closed = yield* transitionRunWait({
+              runId: loaded.runId,
+              waitId: input.waitId,
+              status: "responded",
+              resolution,
+              closedAt: yield* nowIso,
+            })
+            if (closed !== 1) {
+              const transitioned = yield* loadRunWait(loaded.runId, input.waitId)
+              if (transitioned?.resolution !== undefined && Equal.equals(transitioned.resolution, resolution)) return
+              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+            }
             yield* sql`
               UPDATE tenetkit_program_operations SET status = 'reserved'
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
@@ -294,21 +285,17 @@ export const postgresServices = (options: PostgresOptions) =>
             const response = yield* approvalResponse(input)
             if (response._tag === "Duplicate") return
             const loaded = yield* requireRun(input.runId)
-            const responded = [...loaded.respondedWaitIds, response.waitId]
             const resolution: WaitResolution = input.decision
-            const closed = yield* sql<{ wait_id: string }>`
-              UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
-              WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'open'
-              RETURNING wait_id
-            `
-            if (closed.length === 0) {
+            const closed = yield* transitionRunWait({
+              runId: loaded.runId,
+              waitId: response.waitId,
+              status: "responded",
+              resolution,
+              closedAt: yield* nowIso,
+            })
+            if (closed !== 1) {
               return yield* ApprovalStale.make({ runId: loaded.runId, approvalId: input.approvalId })
             }
-            yield* sql`
-              UPDATE tenetkit_runs
-              SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
-              WHERE run_id = ${loaded.runId}
-            `
             yield* sql`
               UPDATE tenetkit_program_operations SET status = 'reserved'
               WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'waiting'
@@ -331,20 +318,25 @@ export const postgresServices = (options: PostgresOptions) =>
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
             if (loaded.cancellationRequested) return
-            if (loaded.activeWaitId === undefined || loaded.activeWaitId !== input.name) return
+            const wait = yield* loadRunWait(loaded.runId, input.name)
+            if (wait?.status !== "open") return
             const resolution: WaitResolution = {
               _tag: "Signal",
               name: input.name,
               ...(input.payload === undefined ? undefined : { payload: input.payload }),
             }
-            yield* sql`
-              UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
-              WHERE run_id = ${loaded.runId} AND wait_id = ${loaded.activeWaitId} AND status = 'open'
-            `
+            const closed = yield* transitionRunWait({
+              runId: loaded.runId,
+              waitId: wait.waitId,
+              status: "signaled",
+              resolution,
+              closedAt: yield* nowIso,
+            })
+            if (closed !== 1) return
             yield* appendEvent(
               transactionHub,
               loaded,
-              { _tag: "RunResumed", waitId: loaded.activeWaitId, resolution },
+              { _tag: "RunResumed", waitId: wait.waitId, resolution },
               "running",
             )
           }),
@@ -444,34 +436,30 @@ export const postgresServices = (options: PostgresOptions) =>
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
-            if (loaded.respondedWaitIds.has(input.waitId)) {
-              const prior = yield* loadRunWait(loaded.runId, input.waitId)
-              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
-              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
-            }
             if (loaded.cancellationRequested) {
               return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            if (loaded.activeWaitId !== input.waitId) {
-              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
-            }
-            const responded = [...loaded.respondedWaitIds, input.waitId]
-            const resolution: WaitResolution = input.resolution
-            const closed = yield* sql<{ wait_id: string }>`
-              UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
-              WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'open'
-              RETURNING wait_id
-            `
-            if (closed.length === 0) {
-              const prior = yield* loadRunWait(loaded.runId, input.waitId)
-              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, resolution)) return
+            const prior = yield* loadRunWait(loaded.runId, input.waitId)
+            if (prior !== undefined && prior.status !== "open") {
+              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
               return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            yield* sql`
-              UPDATE tenetkit_runs
-              SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
-              WHERE run_id = ${loaded.runId}
-            `
+            if (prior === undefined) {
+              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
+            }
+            const resolution: WaitResolution = input.resolution
+            const closed = yield* transitionRunWait({
+              runId: loaded.runId,
+              waitId: input.waitId,
+              status: "responded",
+              resolution,
+              closedAt: yield* nowIso,
+            })
+            if (closed !== 1) {
+              const transitioned = yield* loadRunWait(loaded.runId, input.waitId)
+              if (transitioned?.resolution !== undefined && Equal.equals(transitioned.resolution, resolution)) return
+              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+            }
             yield* sql`
               UPDATE tenetkit_program_operations SET status = 'reserved'
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'

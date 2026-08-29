@@ -4,7 +4,7 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import type { RunInspection } from "../../run.js"
 import { loadChildReadiness } from "./child/capacity.js"
-import { appendEvent, loadRun, loadRunWait } from "./statements.js"
+import { appendEvent, loadRun, loadRunWaitsByStatus } from "./statements.js"
 import type { EventHub } from "../subscribers.js"
 
 type ActivateResult = Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable | SqlError, SqlClient.SqlClient>
@@ -13,7 +13,7 @@ const inspection = (runId: string): ActivateResult =>
   Effect.gen(function* () {
     const run = yield* loadRun(runId)
     if (run === undefined) return yield* RunNotFound.make({ runId })
-    const wait = yield* loadRunWait(runId, run.activeWaitId)
+    const waits = yield* loadRunWaitsByStatus(runId, "open")
     const childReadiness = yield* loadChildReadiness(runId)
     const result: RunInspection = {
       runId: run.runId,
@@ -22,12 +22,12 @@ const inspection = (runId: string): ActivateResult =>
       executableManifest: run.executableManifest,
       depth: run.depth,
       treePolicy: run.treePolicy,
+      waits,
       lastSequence: run.lastSequence,
       durability: "durable",
     }
     if (run.parentRunId !== undefined) Object.assign(result, { parentRunId: run.parentRunId })
     if (childReadiness !== undefined) Object.assign(result, { childReadiness })
-    if (wait !== undefined) Object.assign(result, { wait })
     return result
   })
 

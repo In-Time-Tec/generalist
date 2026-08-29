@@ -72,13 +72,20 @@ const program = Effect.gen(function* () {
   if (!Schema.is(AgentEvent.AgentSuspended)(failure)) {
     return yield* Effect.die("expected the run to suspend")
   }
-  yield* Console.log(`suspended reason=${failure.reason} tool=${failure.tool_name} token=${failure.token}`)
+  const [wait] = failure.waits
+  if (wait === undefined) {
+    return yield* Effect.die("expected an approval wait")
+  }
+  yield* Console.log(`suspended reason=${wait.reason} tool=${wait.call.name} token=${wait.token}`)
   const resumed = yield* Effect.scoped(
     Effect.flatMap(Layer.build(approvedLayers), (services) =>
       Agent.generate(agent, {
         prompt,
         history: transcript,
-        resume: { suspension: failure },
+        resume: {
+          suspension: failure,
+          resolutions: [{ waitId: wait.waitId, resolution: { _tag: "Approved" } }],
+        },
       }).pipe(Effect.provideContext(services)),
     ),
   )

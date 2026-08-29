@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Ref, Schema } from "effect"
-import { AgentEvent, Approvals, NestedOperation, ToolContext } from "../../../../src/index.js"
+import { Approvals, NestedOperation, ToolContext } from "../../../../src/index.js"
 import { Runtime, RunStore } from "../../../../src/runtime/index.js"
 import {
   make as makeNestedOperations,
@@ -8,7 +8,7 @@ import {
   nestedOperationKey,
 } from "../../../../src/runtime/operation/nested-operations.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
-import { assistantAddress, textPrompt } from "../../execution/fixtures.js"
+import { assistantAddress, suspension, textPrompt } from "../../execution/fixtures.js"
 
 const OPERATION_KEY = "outer-operation"
 
@@ -325,15 +325,15 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
           if (!Schema.is(NestedOperation.NestedOperationSuspended)(failure)) throw new Error("expected suspension")
           const expected = nestedApprovalId(nestedOperationKey({ operationKey: OPERATION_KEY, ordinal: 0 }))
           expect(failure.token).toBe(expected)
-          const suspension = AgentEvent.AgentSuspended.make({
+          const suspended = suspension({
+            waitId: failure.token,
             token: failure.token,
             reason: "approval",
-            tool_call_id: "call:nested",
-            tool_name: "write",
-            tool_params: {},
-            tool_call_batch: [],
+            toolCallId: "call:nested",
+            toolName: "write",
+            toolParams: {},
           })
-          const wait = yield* nested.waitFor(suspension)
+          const wait = yield* nested.waitFor(suspended.waits[0]!)
           expect(wait?.waitId).toBe(expected)
           expect(wait?.reason._tag).toBe("Approval")
         }),

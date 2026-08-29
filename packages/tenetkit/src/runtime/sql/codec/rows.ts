@@ -21,7 +21,6 @@ export interface RunRow {
   readonly max_subagents: number
   readonly parent_run_id: string | null
   readonly invocation_id: string | null
-  readonly active_wait_id: string | null
   readonly attempt: number
   readonly attempt_fence: number
   readonly last_sequence: number
@@ -29,7 +28,6 @@ export interface RunRow {
   readonly cancel_reason: string | null
   readonly terminal_event_id: string | null
   readonly accepted_sequence: number
-  readonly responded_wait_ids_json: string
   readonly driver_checkpoint_json: string | null
   readonly suspension_json: string | null
   readonly continuation_json: string | null
@@ -73,6 +71,7 @@ export interface LaneRow {
 
 export interface WaitRow {
   readonly wait_id: string
+  readonly authored_order: number
   readonly reason: string
   readonly status: "open" | "responded" | "signaled" | "cancelled"
   readonly response_json: string | null
@@ -94,7 +93,6 @@ export interface DecodedRun {
   readonly treePolicy: TreePolicy
   readonly parentRunId?: string
   readonly invocationId?: string
-  readonly activeWaitId?: string
   readonly attempt: number
   readonly attemptFence: number
   readonly lastSequence: number
@@ -102,7 +100,6 @@ export interface DecodedRun {
   readonly cancelReason?: string
   readonly terminalEventId?: string
   readonly acceptedSequence: number
-  readonly respondedWaitIds: ReadonlySet<string>
   readonly ownerWorkerId?: string
   readonly admittedAt: string
   readonly leaseExpiresAt?: string

@@ -5,7 +5,6 @@ import { NestedOperation } from "../../core/tools/public/nested-operation.js"
 import type { Request } from "../../core/tools/nested-operation.js"
 import { ToolContext } from "../../core/tools/public/tool-context.js"
 import type { AgentEvent } from "../../core/agent/public/event.js"
-import { canonicalSuspensionCall } from "../../core/agent/suspension.js"
 import type { ExecutionClaim, ExecutionRecord, Interface as RunStoreInterface } from "../run/store.js"
 import { approvalReason, type WaitReason } from "../run/wait.js"
 
@@ -22,7 +21,7 @@ interface PendingApproval {
 /** @experimental Runtime-owned nested durable operations plus the waits they open. */
 export interface Interface extends NestedOperation.Interface {
   readonly waitFor: (
-    suspension: AgentEvent.AgentSuspended,
+    wait: AgentEvent.AgentSuspended["waits"][number],
   ) => Effect.Effect<{ readonly waitId: string; readonly reason: WaitReason } | undefined>
 }
 
@@ -69,7 +68,7 @@ export const make = (input: {
       })
 
     const resolvedApproval = (approvalId: string) =>
-      input.claimed.suspension?.token === approvalId ? input.claimed.resolution : undefined
+      input.claimed.resolutions.find((entry) => entry.waitId === approvalId)?.resolution
 
     function run<A, E, R>(
       request: Request<A, E>,
@@ -197,14 +196,12 @@ export const make = (input: {
               const resolution = yield* Option.getOrElse(approvals, () => autoApprove).resolve({
                 _tag: "Pending",
                 token: approvalId,
-                call: canonicalSuspensionCall(
-                  Response.makePart("tool-call", {
-                    id: approvalId,
-                    name: capability,
-                    params: approval.request ?? request.payload,
-                    providerExecuted: false,
-                  }),
-                ),
+                call: Response.toolCallPart({
+                  id: approvalId,
+                  name: capability,
+                  params: approval.request ?? request.payload,
+                  providerExecuted: false,
+                }),
                 agentName: capability,
                 turn: 0,
                 sessionId: context.sessionId,
@@ -266,10 +263,10 @@ export const make = (input: {
       })
     }
 
-    const waitFor: Interface["waitFor"] = (suspension) =>
+    const waitFor: Interface["waitFor"] = (wait) =>
       Ref.get(pending).pipe(
         Effect.map((current) => {
-          const approval = current.get(suspension.token)
+          const approval = current.get(wait.token)
           if (approval === undefined) return undefined
           return {
             waitId: approval.approvalId,

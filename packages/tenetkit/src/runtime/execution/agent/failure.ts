@@ -32,7 +32,7 @@ const summary = (failure: SummaryFailure): string | undefined => {
     return `Run budget exhausted for ${failure.dimension}: requested ${failure.requested}, remaining ${remaining}`
   }
   if (Schema.is(AgentEvent.ResumeMismatch)(failure)) {
-    return `Agent resume ${failure.reason} for ${failure.received.tool_name} call ${failure.received.tool_call_id}`
+    return `Agent resume ${failure.reason} for waits ${failure.received.waits.map((wait) => wait.waitId).join(", ")}`
   }
   if (Schema.is(AgentEvent.TurnLimitExceeded)(failure)) {
     return `Turn limit of ${failure.limit} reached at turn ${failure.turn} with ${pendingCalls(failure.pending)}`

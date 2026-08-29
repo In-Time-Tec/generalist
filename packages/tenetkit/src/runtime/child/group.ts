@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Function, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { FanOutMemberStatus, FanOutStatus, MAX_FAN_OUT_MEMBERS, type FanOutInspection } from "./fan-out.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
@@ -197,14 +197,14 @@ const ChildMetadata = Schema.Struct({
   parentRunId: Schema.optionalKey(Schema.String),
   parentToolCallId: Schema.optionalKey(Schema.String),
 })
-const ChildSuspension = Schema.Struct({
-  tool_name: Schema.Literals([toolName, "code_mode"]),
-  token: Schema.String,
-})
-const GroupSuspension = Schema.Struct({
-  tool_name: Schema.Literals([awaitGroupToolName, runGroupToolName]),
-  token: Schema.String,
-  tool_params: Schema.optionalKey(Schema.Unknown),
+const AgentWaits = Schema.Struct({
+  waits: Schema.Array(
+    Schema.Struct({
+      waitId: Schema.String,
+      token: Schema.String,
+      call: Schema.Struct({ id: Schema.String, name: Schema.String, params: Schema.Unknown }),
+    }),
+  ),
 })
 
 const SerializedMetadata = Schema.Record(Schema.String, Schema.Unknown)
@@ -279,9 +279,45 @@ export const ownsChildSuspension = (input: {
 }): boolean => {
   const metadata = Schema.decodeOption(ChildMetadata)(input.metadata)
   if (metadata._tag === "None" || metadata.value.runtimeChildTool !== true) return false
-  if (metadata.value.parentRunId !== input.parentRunId || metadata.value.parentToolCallId !== input.waitId) return false
-  const suspension = Schema.decodeUnknownOption(ChildSuspension)(input.suspension)
-  return suspension._tag === "Some" && suspension.value.token === input.childRunId
+  if (metadata.value.parentRunId !== input.parentRunId || metadata.value.parentToolCallId === undefined) return false
+  const suspension = Schema.decodeUnknownOption(AgentWaits)(input.suspension)
+  return (
+    suspension._tag === "Some" &&
+    suspension.value.waits.some(
+      (wait) =>
+        wait.waitId === input.waitId &&
+        wait.call.id === metadata.value.parentToolCallId &&
+        wait.token === input.childRunId &&
+        (wait.call.name === toolName || wait.call.name === "code_mode"),
+    )
+  )
+}
+
+/** @experimental Return the exact aggregate wait owned by one direct child. */
+export const waitIdForChild = (input: {
+  readonly parentRunId: string
+  readonly childRunId: string
+  readonly metadata: SerializedMetadata
+  readonly suspension: unknown
+}): string | undefined => {
+  const decoded = Schema.decodeOption(ChildMetadata)(input.metadata)
+  if (
+    decoded._tag === "None" ||
+    decoded.value.runtimeChildTool !== true ||
+    decoded.value.parentRunId !== input.parentRunId
+  ) {
+    return undefined
+  }
+  const toolCallId = decoded.value.parentToolCallId
+  if (toolCallId === undefined) return undefined
+  const suspension = Schema.decodeUnknownOption(AgentWaits)(input.suspension)
+  if (suspension._tag === "None") return undefined
+  return suspension.value.waits.find(
+    (wait) =>
+      wait.call.id === toolCallId &&
+      wait.token === input.childRunId &&
+      (wait.call.name === toolName || wait.call.name === "code_mode"),
+  )?.waitId
 }
 
 /** @experimental Project one persisted fan-out inspection into the model-facing ordered child-group result. */
@@ -312,11 +348,46 @@ export const resultFromInspection = (inspection: FanOutInspection): GroupResult 
 
 /** @experimental Return the owned group named by an await-child-group suspension, if any. */
 export const groupIdFromSuspension = <Suspension>(suspension: Suspension): string | undefined => {
-  const decodedSuspension = Schema.decodeUnknownOption(GroupSuspension)(suspension)
+  const decodedSuspension = Schema.decodeUnknownOption(AgentWaits)(suspension)
   if (decodedSuspension._tag === "None") return undefined
-  if (decodedSuspension.value.tool_name === runGroupToolName) return decodedSuspension.value.token
-  const decodedParameters = Schema.decodeUnknownOption(AwaitGroupParameters)(decodedSuspension.value.tool_params)
-  return decodedParameters._tag === "Some" && decodedParameters.value.groupId === decodedSuspension.value.token
-    ? decodedParameters.value.groupId
-    : undefined
+  for (const wait of decodedSuspension.value.waits) {
+    if (wait.call.name === runGroupToolName) return wait.token
+    if (wait.call.name !== awaitGroupToolName) continue
+    const decodedParameters = Schema.decodeUnknownOption(AwaitGroupParameters)(wait.call.params)
+    if (decodedParameters._tag === "Some" && decodedParameters.value.groupId === wait.token) return wait.token
+  }
+  return undefined
 }
+
+/** @experimental Every exact aggregate wait that owns one child group, in authored order. */
+export const groupWaitsFromSuspension = <Suspension>(
+  suspension: Suspension,
+): ReadonlyArray<{ readonly groupId: string; readonly waitId: string }> => {
+  const decodedSuspension = Schema.decodeUnknownOption(AgentWaits)(suspension)
+  if (decodedSuspension._tag === "None") return []
+  return decodedSuspension.value.waits.flatMap((wait) => {
+    if (wait.call.name === runGroupToolName) return [{ groupId: wait.token, waitId: wait.waitId }]
+    if (wait.call.name !== awaitGroupToolName) return []
+    const decodedParameters = Schema.decodeUnknownOption(AwaitGroupParameters)(wait.call.params)
+    return decodedParameters._tag === "Some" && decodedParameters.value.groupId === wait.token
+      ? [{ groupId: wait.token, waitId: wait.waitId }]
+      : []
+  })
+}
+
+/** @experimental Return the exact wait that owns one child group in an aggregate Agent suspension. */
+export const waitIdForGroup: {
+  (groupId: string): <Suspension>(suspension: Suspension) => string | undefined
+  <Suspension>(suspension: Suspension, groupId: string): string | undefined
+} = Function.dual(2, <Suspension>(suspension: Suspension, groupId: string): string | undefined => {
+  const decodedSuspension = Schema.decodeUnknownOption(AgentWaits)(suspension)
+  if (decodedSuspension._tag === "None") return undefined
+  for (const wait of decodedSuspension.value.waits) {
+    if (wait.token !== groupId) continue
+    if (wait.call.name === runGroupToolName) return wait.waitId
+    if (wait.call.name !== awaitGroupToolName) continue
+    const decodedParameters = Schema.decodeUnknownOption(AwaitGroupParameters)(wait.call.params)
+    if (decodedParameters._tag === "Some" && decodedParameters.value.groupId === groupId) return wait.waitId
+  }
+  return undefined
+})

@@ -12,6 +12,7 @@ import {
 } from "tenetkit/runtime/driver/sql/store/child/settlement"
 import { markOperationCancellations } from "tenetkit/runtime/driver/sql/store/operation/operations"
 import { afterTerminal, appendEvent, loadRun, settleParent } from "./runtime.js"
+import { loadRunWaitsByStatus, nowIso, transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import { cancelOwnedFanOuts } from "./fan-out.js"
 import { reconcileProgramCancellation } from "tenetkit/runtime/driver/sql/store/program"
 import type { DecodedRun } from "tenetkit/runtime/driver/sql/codec/rows"
@@ -83,6 +84,24 @@ const settleCancellation = (
 const shouldSettleCancellation = (terminal: boolean, executing: boolean, current: DecodedRun): boolean =>
   !terminal && !executing && !isTerminal(current.status)
 
+const closeOpenWaits = (runId: string) =>
+  Effect.gen(function* () {
+    const closedAt = yield* nowIso
+    for (const wait of yield* loadRunWaitsByStatus(runId, "open")) {
+      const affected = yield* transitionRunWait({
+        runId,
+        waitId: wait.waitId,
+        status: "cancelled",
+        closedAt,
+      })
+      if (affected !== 1) {
+        return yield* RuntimeUnavailable.make({
+          message: `Wait ${wait.waitId} cancellation lost its open transition`,
+        })
+      }
+    }
+  })
+
 export const cancelRunFor = (input: { readonly sql: SqlClient.SqlClient; readonly hub: EventHub }) => {
   const cancelRun = (
     runId: string,
@@ -111,10 +130,7 @@ export const cancelRunFor = (input: { readonly sql: SqlClient.SqlClient; readonl
         current = (yield* loadRun(runId))!
       }
       if (!terminal) yield* reconcileProgramCancellation(runId, reason ?? current.cancelReason)
-      yield* input.sql`
-        UPDATE tenetkit_run_waits SET status = 'cancelled', closed_at = NOW()
-        WHERE run_id = ${runId} AND status = 'open'
-      `
+      yield* closeOpenWaits(runId)
       if ((yield* cancelChildren(input, cancelRun, runId, reason)) > 0) current = (yield* loadRun(runId))!
       if (shouldSettleCancellation(terminal, executing, current)) yield* settleCancellation(input, current, reason)
     })

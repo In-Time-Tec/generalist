@@ -333,6 +333,13 @@ const AgentLoopEventSchema = Schema.Union([
     result: ToolResult,
     ...optionalMetadata,
   }),
+  Schema.TaggedStruct("ToolExecutionWaiting", {
+    turn: Schema.Finite,
+    call: ToolCall,
+    waitId: Schema.String,
+    token: Schema.String,
+    ...optionalMetadata,
+  }),
   Schema.TaggedStruct("HandoffRequested", {
     turn: Schema.Finite,
     handoffId: Schema.String,

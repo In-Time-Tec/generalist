@@ -27,6 +27,7 @@ import {
   resume,
   settleAdmittedCancellation,
   signal,
+  suspend as suspendRun,
 } from "tenetkit/runtime/driver/sql/store/control"
 import {
   expireRunningOperation,
@@ -46,13 +47,7 @@ import {
   requireExecutionClaim,
   retryExecution,
 } from "tenetkit/runtime/driver/sql/store/execution"
-import {
-  appendEvent,
-  hasAdmission,
-  loadEventsAfter,
-  loadRun,
-  nowIso,
-} from "tenetkit/runtime/driver/sql/store/statements"
+import { hasAdmission, loadEventsAfter, loadRun, nowIso } from "tenetkit/runtime/driver/sql/store/statements"
 import { make as makeEventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import {
   admitSteering,
@@ -80,10 +75,7 @@ import { inspectionStoreMethods } from "./inspection.js"
 import { initializeReadCommitted, mysqlClaims } from "./claims.js"
 import { admitFanOut, inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
 import { encodeExecutableRef, encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
-import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
 import { ProgramCapabilities } from "tenetkit"
-import { groupIdFromSuspension, resultFromInspection } from "tenetkit/runtime/driver/child/group"
-import { encodeReason, WaitResolution } from "tenetkit/runtime/driver/run/wait"
 import { ExecutionCheckpoint, ExecutionSuspension } from "tenetkit/runtime/driver/execution/state"
 import { transactionRunner } from "../transaction/events.js"
 import { settlementNotifications } from "tenetkit/runtime/driver/sql/settlement-notifications"
@@ -93,23 +85,12 @@ import { reconcileCancellationRequested } from "tenetkit/runtime/driver/sql/sess
 import { cancelSessionRuns } from "../session/cancellation.js"
 import { mysqlModelResponseOperationsWithDefaults } from "./model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
-import { loadTerminalEvent } from "tenetkit/runtime/driver/sql/store/child/settlement"
-import { reconcileChildWait } from "../session/reconcile-child-wait.js"
-import { revokeExecutionSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
   readonly maxConnections?: number
   readonly pollInterval?: Duration.Input
 }
-const suspensionChild = (token: string | undefined) =>
-  Effect.gen(function* () {
-    if (token === undefined) return {}
-    const child = yield* loadRun(token)
-    if (child?.terminalEventId === undefined) return { child }
-    return { child, terminalEvent: yield* loadTerminalEvent(child.terminalEventId) }
-  })
-
 export type MysqlStoreError =
   | SchemaDirty
   | SchemaChecksumMismatch
@@ -182,87 +163,7 @@ export const mysqlServices = (
         }
         return yield* effect
       })
-    const suspend = (
-      input: Parameters<RunStoreInterface["suspend"]>[0],
-    ): Effect.Effect<
-      void,
-      RunNotFound | RuntimeUnavailable | import("effect/unstable/sql/SqlError").SqlError,
-      SqlClient.SqlClient
-    > =>
-      Effect.gen(function* () {
-        const loaded = yield* loadRun(input.runId)
-        if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
-        const opened = yield* nowIso
-        const executableRef = yield* Effect.try({
-          try: () => checkpointRef(loaded.executableRef, loaded.executableManifest, input.checkpoint),
-          catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-        })
-        yield* sql`
-          UPDATE tenetkit_runs SET
-            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
-            executable_ref_json = ${encodeExecutableRef(executableRef)},
-            suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
-            continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
-              THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
-              ELSE continuation_json END,
-            updated_at = ${opened}
-          WHERE run_id = ${input.runId}
-        `
-        yield* sql`
-          INSERT INTO tenetkit_run_waits (run_id, wait_id, reason, status, response_json, opened_at, closed_at)
-          VALUES (${loaded.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, ${opened}, NULL)
-          ON DUPLICATE KEY UPDATE reason = VALUES(reason), status = 'open', response_json = NULL,
-            opened_at = VALUES(opened_at), closed_at = NULL
-        `
-        yield* appendEvent(
-          transactionHub,
-          loaded,
-          { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } },
-          "waiting",
-        )
-        const { child, terminalEvent } = yield* suspensionChild(input.suspension.token)
-        if (child !== undefined && terminalEvent !== undefined) {
-          yield* reconcileChildWait({
-            hub: transactionHub,
-            parent: (yield* loadRun(loaded.runId))!,
-            child,
-            event: terminalEvent,
-          })
-        }
-        const groupId = groupIdFromSuspension(input.suspension)
-        if (groupId !== undefined) {
-          const rows = yield* sql<{ parent_run_id: string; status: string }>`
-            SELECT parent_run_id, status FROM tenetkit_fan_outs WHERE fan_out_id = ${groupId}
-          `
-          const group = rows[0]
-          if (group?.parent_run_id === loaded.runId && group.status !== "running") {
-            const resolution = {
-              _tag: "Signal" as const,
-              name: input.wait.waitId,
-              payload: resultFromInspection(
-                yield* inspectFanOut(groupId).pipe(
-                  Effect.mapError(() => RuntimeUnavailable.make({ message: `child group ${groupId} disappeared` })),
-                ),
-              ),
-            }
-            const closed = yield* nowIso
-            yield* sql`
-              UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
-              WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
-            `
-            yield* appendEvent(
-              transactionHub,
-              (yield* loadRun(loaded.runId))!,
-              { _tag: "RunResumed", waitId: input.wait.waitId, resolution },
-              "running",
-            )
-          }
-        }
-        yield* sql`
-          UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}
-        `
-        yield* revokeExecutionSessionWriteClaim(input)
-      })
+    const suspend = (input: Parameters<RunStoreInterface["suspend"]>[0]) => suspendRun(transactionHub, input)
     const saveExecution = (input: Parameters<RunStoreInterface["saveExecution"]>[0]) =>
       Effect.gen(function* () {
         yield* requireExecutionClaim(input)
@@ -309,7 +210,17 @@ export const mysqlServices = (
         run(
           lockRun(input.runId).pipe(
             Effect.andThen(requireExecutionClaim(input)),
-            Effect.andThen(admitProgramChild(transactionHub, input)),
+            Effect.andThen(
+              Effect.forEach(input.children, (child) =>
+                admitProgramChild(transactionHub, {
+                  runId: input.runId,
+                  ownerId: input.ownerId,
+                  attemptFence: input.attemptFence,
+                  session: input.session,
+                  ...child,
+                }),
+              ),
+            ),
             Effect.tap(() => suspend(input)),
           ),
         ),

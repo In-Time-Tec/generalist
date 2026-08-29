@@ -2,13 +2,24 @@ import { Effect, Equal, Function } from "effect"
 import type { RespondInput as RespondApprovalInput } from "../../operation/approval.js"
 import { ApprovalMismatch, ApprovalStale, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
-import type { MemoryState } from "../state.js"
+import { openRunWaits, waitMapKey, type MemoryState, type StoredRun } from "../state.js"
 import { respond } from "./control.js"
 
-const waitIsInactive = (
-  run: MemoryState["runs"] extends ReadonlyMap<string, infer StoredRun> ? StoredRun : never,
-): boolean =>
-  run.wait?.status !== "open" || run.cancellationRequested || isTerminal(run.status) || run.activeWaitId === undefined
+const staleApproval = (state: MemoryState, run: StoredRun, input: RespondApprovalInput) =>
+  Effect.gen(function* () {
+    if (!run.cancellationRequested && !isTerminal(run.status)) {
+      const expected = openRunWaits(state, run.runId).find((wait) => wait.reason._tag === "Approval")
+      if (expected?.reason._tag === "Approval") {
+        return yield* ApprovalMismatch.make({
+          runId: run.runId,
+          approvalId: input.approvalId,
+          mismatch: "approval-id",
+          expectedApprovalId: expected.reason.request.approvalId,
+        })
+      }
+    }
+    return yield* ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId })
+  })
 
 export const respondApproval: {
   (
@@ -25,31 +36,14 @@ export const respondApproval: {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
     const run = state.runs.get(input.runId)
     if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
-    const requested = run.events.findLast(
-      (event) =>
-        event._tag === "RunWaiting" &&
-        event.wait.reason._tag === "Approval" &&
-        event.wait.reason.request.approvalId === input.approvalId,
-    )
-    if (requested?._tag === "RunWaiting") {
-      const responded = run.events.find(
-        (event) =>
-          event.sequence > requested.sequence && event._tag === "RunResumed" && event.waitId === requested.wait.waitId,
-      )
-      if (responded?._tag === "RunResumed") {
-        if (Equal.equals(responded.resolution, input.decision)) return state
-        return yield* ApprovalMismatch.make({
-          runId: run.runId,
-          approvalId: input.approvalId,
-          mismatch: "decision",
-        })
-      }
+    const active = state.waits.get(waitMapKey(run.runId, input.approvalId))
+    if (active !== undefined && active.status !== "open") {
+      if (active.resolution !== undefined && Equal.equals(active.resolution, input.decision)) return state
+      return yield* ApprovalMismatch.make({ runId: run.runId, approvalId: input.approvalId, mismatch: "decision" })
     }
-    if (waitIsInactive(run)) {
-      return yield* ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId })
+    if (active === undefined || run.cancellationRequested || isTerminal(run.status)) {
+      return yield* staleApproval(state, run, input)
     }
-    const active = run.wait
-    if (active === undefined) return yield* ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId })
     if (active.reason._tag !== "Approval") {
       return yield* ApprovalMismatch.make({
         runId: run.runId,

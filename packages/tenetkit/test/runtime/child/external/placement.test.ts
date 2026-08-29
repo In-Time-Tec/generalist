@@ -304,7 +304,7 @@ const suite = <E>(
             settlementId: "settlement:wait",
             outcome,
           })
-          expect((yield* store.loadExecution(parent.runId)).resolution).toMatchObject({
+          expect((yield* store.loadExecution(parent.runId)).resolutions[0]?.resolution).toMatchObject({
             _tag: "ToolResult",
             result: outcome,
           })

@@ -4,7 +4,7 @@ import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../../sql/errors.js"
 import { activeChildCount } from "./child/capacity.js"
-import type { MemoryState } from "../state.js"
+import { runWaits, type MemoryState } from "../state.js"
 import { checkpointRef } from "../../executable/manifest.js"
 import { appendLifecycle, attemptStartedEvent } from "../append.js"
 
@@ -31,6 +31,9 @@ const executionRecord = (
     attempt: run.attempt,
     attemptFence: run.attemptFence,
     cancellationRequested: run.cancellationRequested,
+    resolutions: runWaits(state, run.runId).flatMap((wait) =>
+      wait.resolution === undefined ? [] : [{ waitId: wait.waitId, resolution: wait.resolution }],
+    ),
     registrations: run.registrations,
   }
   if (run.parentRunId !== undefined) record = { ...record, parentRunId: run.parentRunId }
@@ -38,7 +41,6 @@ const executionRecord = (
   if (run.ownerId !== undefined) record = { ...record, ownerId: run.ownerId }
   if (run.checkpoint !== undefined) record = { ...record, checkpoint: run.checkpoint }
   if (run.suspension !== undefined) record = { ...record, suspension: run.suspension }
-  if (run.wait?.resolution !== undefined) record = { ...record, resolution: run.wait.resolution }
   if (run.continuation !== undefined) record = { ...record, continuation: run.continuation }
   return record
 }

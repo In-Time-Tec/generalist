@@ -11,24 +11,29 @@ import {
 } from "../../errors.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
-import { ExecutionCheckpoint, ExecutionSuspension, type ExecutionResult } from "../../execution/state.js"
+import type { ExecutionResult } from "../../execution/state.js"
 import type { CancelInput, RespondInput, SignalInput } from "../../service.js"
 import type { RespondInput as RespondApprovalInput } from "../../operation/approval.js"
 import { isTerminal } from "../../run.js"
 import type { RunFailure } from "../../run/event.js"
-import { encodeReason, WaitResolution } from "../../run/wait.js"
-import { checkpointRef } from "../../executable/manifest.js"
-import { StringArray, encodeExecutableRef, encodeJson } from "../codec/codecs.js"
-import { encodeContinuation } from "../../run/steering.js"
-import { afterTerminal, appendEvent, loadRun, loadRunWait, nowIso, settleParent } from "./statements.js"
+import { WaitResolution } from "../../run/wait.js"
+import { encodeJson } from "../codec/codecs.js"
+import {
+  afterTerminal,
+  appendEvent,
+  loadRun,
+  loadRunWait,
+  loadRunWaitsByStatus,
+  nowIso,
+  settleParent,
+  transitionRunWait,
+} from "./statements.js"
 import type { EventHub } from "../subscribers.js"
 import type { DecodedRun } from "../codec/rows.js"
 import { reconcileProgramCancellation } from "./program.js"
 import { PendingRunOutcome, type ExecutionClaim } from "../../run/store.js"
-import { groupIdFromSuspension, resultFromInspection } from "../../child/group.js"
-import { inspectFanOut } from "./fan-out/service.js"
 import { approvalResponse } from "../respond-approval.js"
-import { hasPendingCancellationWork, loadTerminalEvent, reconcileChildWaitWith } from "./child/settlement.js"
+import { hasPendingCancellationWork } from "./child/settlement.js"
 import { markOperationCancellations } from "./operation/operations.js"
 import { revokeExecutionSessionWriteClaim } from "../session/claim.js"
 
@@ -62,7 +67,6 @@ type CompleteInput = ExecutionClaim & { readonly runId: string; readonly result:
 type FailInput = ExecutionClaim & { readonly runId: string; readonly error: RunFailure }
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
 type AgentEventInput = { readonly runId: string; readonly event: EmittableAgentLoopEvent }
-type SuspendInput = Parameters<import("../../run/store.js").Interface["suspend"]>[0]
 
 const cancellationEvent = (reason: string | undefined) =>
   reason === undefined ? { _tag: "RunCancelled" as const } : { _tag: "RunCancelled" as const, reason }
@@ -151,10 +155,18 @@ const cancelRun = (
     })
     yield* sql`UPDATE tenetkit_external_child_placements SET cancel_requested = ${cancellationRequested}
       WHERE parent_run_id = ${run.runId} AND settlement_id IS NULL`
-    yield* sql`
-      UPDATE tenetkit_run_waits SET status = 'cancelled', closed_at = ${yield* nowIso}
-      WHERE run_id = ${run.runId} AND status = 'open'
-    `
+    const closedAt = yield* nowIso
+    for (const wait of yield* loadRunWaitsByStatus(run.runId, "open")) {
+      const affected = yield* transitionRunWait({
+        runId: run.runId,
+        waitId: wait.waitId,
+        status: "cancelled",
+        closedAt,
+      })
+      if (affected !== 1) {
+        return yield* RuntimeUnavailable.make({ message: `Wait ${wait.waitId} cancellation lost its open transition` })
+      }
+    }
     if (yield* cancelDescendants(hub, run.runId, reason)) current = (yield* loadRun(run.runId))!
     yield* finishCancellation(hub, run, current, executing, reason)
   })
@@ -167,28 +179,27 @@ export const respond: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.respondedWaitIds.has(input.waitId)) {
-      const prior = yield* loadRunWait(run.runId, input.waitId)
-      if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
-      return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
-    }
     if (run.cancellationRequested) {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (run.activeWaitId !== input.waitId) {
+    const prior = yield* loadRunWait(run.runId, input.waitId)
+    if (prior !== undefined && prior.status !== "open") {
+      if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
+      return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
+    }
+    if (prior === undefined) {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
-    const responded = [...run.respondedWaitIds, input.waitId]
     const updated = yield* nowIso
     const resolution: WaitResolution = input.resolution
-    yield* sql`
-      UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
-      WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'open'
-    `
-    yield* sql`
-      UPDATE tenetkit_runs SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = ${updated}
-      WHERE run_id = ${run.runId}
-    `
+    const affected = yield* transitionRunWait({
+      runId: run.runId,
+      waitId: input.waitId,
+      status: "responded",
+      resolution,
+      closedAt: updated,
+    })
+    if (affected !== 1) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     yield* sql`
       UPDATE tenetkit_program_operations SET status = 'reserved'
       WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
@@ -222,22 +233,25 @@ export const signal: {
   (input: SignalInput): (hub: EventHub) => UndefinedEffect
 } = Function.dual(2, (hub: EventHub, input: SignalInput) =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     if (run.cancellationRequested) return
-    if (run.activeWaitId === undefined) return
-    if (run.activeWaitId !== input.name) return
+    const wait = yield* loadRunWait(run.runId, input.name)
+    if (wait?.status !== "open") return
     const updated = yield* nowIso
     const resolution: WaitResolution =
       input.payload === undefined
         ? { _tag: "Signal", name: input.name }
         : { _tag: "Signal", name: input.name, payload: input.payload }
-    yield* sql`
-      UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
-      WHERE run_id = ${run.runId} AND wait_id = ${run.activeWaitId} AND status = 'open'
-    `
-    yield* appendEvent(hub, run, { _tag: "RunResumed", waitId: run.activeWaitId, resolution }, "running")
+    const affected = yield* transitionRunWait({
+      runId: run.runId,
+      waitId: wait.waitId,
+      status: "signaled",
+      resolution,
+      closedAt: updated,
+    })
+    if (affected !== 1) return
+    yield* appendEvent(hub, run, { _tag: "RunResumed", waitId: wait.waitId, resolution }, "running")
   }),
 )
 export const cancel: {
@@ -356,119 +370,35 @@ export const fail: {
     yield* revokeExecutionSessionWriteClaim(input)
   }),
 )
-export const suspend: {
-  (hub: EventHub, input: SuspendInput): UndefinedEffect
-  (input: SuspendInput): (hub: EventHub) => UndefinedEffect
-} = Function.dual(2, (hub: EventHub, input: SuspendInput) => {
-  const checkpoint = input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)
-  const continuationChanged = input.continuation === undefined ? 0 : 1
-  const continuation =
-    input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)
-  return Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const run = yield* requireRun(input.runId)
-    if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    const executableRef = yield* Effect.try({
-      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    const opened = yield* nowIso
-    yield* sql`
-      UPDATE tenetkit_runs SET
-        driver_checkpoint_json = COALESCE(${checkpoint}, driver_checkpoint_json),
-        executable_ref_json = ${encodeExecutableRef(executableRef)},
-        suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
-        continuation_json = CASE WHEN ${continuationChanged} = 1
-          THEN ${continuation}
-          ELSE continuation_json END,
-        updated_at = ${opened}
-      WHERE run_id = ${input.runId}
-    `
-    yield* sql`
-      INSERT INTO tenetkit_run_waits (run_id, wait_id, reason, status, response_json, opened_at, closed_at)
-      VALUES (${run.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, ${opened}, NULL)
-      ON CONFLICT(run_id, wait_id) DO UPDATE SET
-        status = 'open',
-        reason = excluded.reason,
-        opened_at = excluded.opened_at,
-        closed_at = NULL
-    `
-    yield* appendEvent(hub, run, { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } }, "waiting")
-    const child = input.suspension.token === undefined ? undefined : yield* loadRun(input.suspension.token)
-    const terminalEvent =
-      child?.terminalEventId === undefined ? undefined : yield* loadTerminalEvent(child.terminalEventId)
-    if (child !== undefined && terminalEvent !== undefined) {
-      yield* reconcileChildWaitWith({
-        hub,
-        parent: (yield* loadRun(run.runId))!,
-        child,
-        event: terminalEvent,
-        append: appendEvent,
-      })
-    }
-    const groupId = groupIdFromSuspension(input.suspension)
-    if (groupId !== undefined) {
-      const rows = yield* sql<{ parent_run_id: string; status: string }>`
-        SELECT parent_run_id, status FROM tenetkit_fan_outs WHERE fan_out_id = ${groupId}
-      `
-      const group = rows[0]
-      if (group?.parent_run_id === run.runId && group.status !== "running") {
-        const resolution = {
-          _tag: "Signal" as const,
-          name: input.wait.waitId,
-          payload: resultFromInspection(
-            yield* inspectFanOut(groupId).pipe(
-              Effect.mapError(() => RuntimeUnavailable.make({ message: `child group ${groupId} disappeared` })),
-            ),
-          ),
-        }
-        const closed = yield* nowIso
-        yield* sql`
-          UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
-          WHERE run_id = ${run.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
-        `
-        yield* appendEvent(
-          hub,
-          (yield* loadRun(run.runId))!,
-          { _tag: "RunResumed", waitId: input.wait.waitId, resolution },
-          "running",
-        )
-      }
-    }
-    yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
-    yield* revokeExecutionSessionWriteClaim(input)
-  })
-})
+export { suspend } from "./control/suspend.js"
 export const resume: {
   (hub: EventHub, input: ResumeInput): ResumeEffect
   (input: ResumeInput): (hub: EventHub) => ResumeEffect
 } = Function.dual(2, (hub: EventHub, input: ResumeInput) =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     if (run.cancellationRequested) {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (run.respondedWaitIds.has(input.waitId)) {
-      const prior = yield* loadRunWait(run.runId, input.waitId)
+    const prior = yield* loadRunWait(run.runId, input.waitId)
+    if (prior !== undefined && prior.status !== "open") {
       if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
       return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (run.activeWaitId !== input.waitId) {
+    if (prior === undefined) {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
-    const responded = [...run.respondedWaitIds, input.waitId]
     const resolution: WaitResolution = input.resolution
     const updated = yield* nowIso
-    yield* sql`
-      UPDATE tenetkit_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
-      WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'open'
-    `
-    yield* sql`
-      UPDATE tenetkit_runs SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = ${updated}
-      WHERE run_id = ${run.runId}
-    `
+    const affected = yield* transitionRunWait({
+      runId: run.runId,
+      waitId: input.waitId,
+      status: "responded",
+      resolution,
+      closedAt: updated,
+    })
+    if (affected !== 1) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     const current = (yield* loadRun(run.runId))!
     yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
   }),

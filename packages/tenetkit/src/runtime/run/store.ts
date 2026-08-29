@@ -188,7 +188,7 @@ export interface Interface {
   readonly admitProgramChildAndSuspend: (
     input: AdmitProgramChildAndSuspendInput,
   ) => Effect.Effect<
-    RunReceipt,
+    ReadonlyArray<RunReceipt>,
     | RunNotFound
     | RunTerminal
     | IdempotencyConflict
@@ -302,7 +302,7 @@ export interface Interface {
   readonly suspend: (
     input: ExecutionClaim & {
       readonly runId: string
-      readonly wait: RunWait
+      readonly waits: ReadonlyArray<RunWait>
       readonly suspension: ExecutionSuspension
       readonly checkpoint?: ExecutionCheckpoint
       readonly continuation?: ExecutionContinuation | null

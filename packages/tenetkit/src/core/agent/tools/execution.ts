@@ -1,6 +1,6 @@
 import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentSuspended, AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
+import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./result.js"
 import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "../service.js"
 import type { AgentRunState } from "../run-state.js"
@@ -18,13 +18,14 @@ import { cancellableOperation, supportsCancellation } from "../../tools/tool-exe
 import { bound } from "../../tools/tool-output.js"
 import { type Registry, get } from "../../tools/tool-registry.js"
 import { ToolContext, type Progress } from "../../tools/tool-context.js"
-import { canonicalSuspensionCall, suspended } from "../suspension.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
 import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillSourceError } from "../../context/skill-source.js"
-import { intercept } from "../../durable/driver/run.js"
-import { operationKey } from "../../durable/driver/interpreter.js"
+import { intercept, updateToolBatch } from "../../durable/driver/run.js"
+import { operationKey as makeOperationKey } from "../../durable/driver/interpreter.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
+import { updateCall } from "./checkpoint.js"
+import { applyToolOutcome } from "./checkpoint-operation.js"
 
 type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
@@ -53,7 +54,6 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
 export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext: ToolExecutionContext<T, R>) => {
   const {
     options,
-    state,
     isSkillActivationCall,
     agent,
     staticToolkit,
@@ -83,18 +83,16 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
     outcome: Outcome,
     droppedProgress: number,
     registry: Registry,
+    durableOperationKey: string,
   ): Effect.Effect<Event, RunError> => {
     const metadata = droppedProgress === 0 ? {} : { metadata: { toolProgress: { dropped: droppedProgress } } }
-    const completed = (result: PendingToolResult): Effect.Effect<Event> =>
-      Effect.sync(() => {
-        state.pending.set(toolCallIndex, result)
-        return { _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }
-      })
+    const completionEvent = (result: PendingToolResult): Effect.Effect<Event> =>
+      Effect.succeed({ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata })
     switch (outcome._tag) {
       case "Success":
-        return completed(successResult(call, outcome))
+        return completionEvent(successResult(call, outcome))
       case "DomainFailure":
-        return completed(domainFailureResult(call, outcome))
+        return completionEvent(domainFailureResult(call, outcome))
       case "Suspend":
         return Effect.gen(function* () {
           const propagation = options.suspensionPropagation ?? "propagate"
@@ -103,27 +101,17 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
               reason: "suspended" as const,
               message: `Tool ${call.name} suspended (${outcome.token})`,
             }
-            return yield* completed(
+            return yield* completionEvent(
               domainFailureResult(call, { _tag: "DomainFailure", failure, encodedFailure: failure }),
             )
           }
-          const invocationPath =
-            handoffState === undefined ? undefined : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-          const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
-          const suspensionContext: Parameters<typeof suspended>[5] = {
-            active_tools: toolNames(registry),
-            activated_skills: activatedSkills,
-          }
-          return yield* suspended(
+          return {
+            _tag: "ToolExecutionWaiting",
+            turn,
             call,
-            toolCallBatch,
-            toolCallIndex,
-            outcome.token,
-            "tool-wait",
-            invocationPath === undefined || invocationPath.length === 0
-              ? suspensionContext
-              : { ...suspensionContext, invocation_path: invocationPath },
-          )
+            waitId: durableOperationKey,
+            token: outcome.token,
+          } satisfies Event
         })
     }
   }
@@ -273,7 +261,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
           const emitSemaphore = yield* Semaphore.make(1)
           const signal = yield* Effect.abortSignal
           const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-          const durableOperationKey = operationKey(logicalId, "tool", turn, call.id, call.name)
+          const durableOperationKey = makeOperationKey(logicalId, "tool", turn, call.id, call.name)
           const invocation = options.invocation ?? {}
           const emit = emitProgress(turn, call, progressQueue, droppedProgress, emitSemaphore)
           const contextBase = {
@@ -299,6 +287,9 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
             requestExecutor !== undefined && supportsCancellation(requestExecutor, request)
               ? { cancellation: cancellableOperation(request) }
               : {}
+          const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
+          const invocationPath =
+            handoffState === undefined ? [] : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
           const executionBase = executionFor(
             turn,
             call,
@@ -315,6 +306,14 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
               turn,
               input: { turn, callId: call.id, name: call.name, ...cancellation },
               replayPolicy,
+              applyCheckpoint: applyToolOutcome({
+                callIndex: request.toolCallIndex,
+                call,
+                operationKey: durableOperationKey,
+                activatedSkills,
+                invocationPath,
+                collapseSuspension: options.suspensionPropagation === "collapse-to-domain-failure",
+              }),
             },
             executionBase,
           ).pipe(
@@ -331,7 +330,16 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
               Effect.flatMap((outcome) =>
                 Ref.get(droppedProgress).pipe(
                   Effect.flatMap((dropped) =>
-                    outcomeEvent(turn, request.toolCallBatch, request.toolCallIndex, call, outcome, dropped, registry),
+                    outcomeEvent(
+                      turn,
+                      request.toolCallBatch,
+                      request.toolCallIndex,
+                      call,
+                      outcome,
+                      dropped,
+                      registry,
+                      durableOperationKey,
+                    ),
                   ),
                 ),
               ),
@@ -430,7 +438,14 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
             Stream.flatMap((decision) => {
               switch (decision._tag) {
                 case "Execute":
-                  return executeApproved(turn, call, resolvedRequest, registry)
+                  return Stream.unwrap(
+                    updateToolBatch((checkpoint) =>
+                      updateCall(checkpoint, {
+                        callIndex: toolCallIndex,
+                        state: { _tag: "Ready", stage: "execution" },
+                      }),
+                    ).pipe(Effect.map(() => executeApproved(turn, call, resolvedRequest, registry))),
+                  )
                 case "Deny":
                   return Stream.fail(
                     FrameworkFailure.make({
@@ -440,30 +455,27 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
                     }),
                   )
                 case "Suspend":
-                  return Stream.unwrap(
+                  return Stream.fromEffect(
                     Effect.gen(function* () {
                       const invocationPath =
                         handoffState === undefined
-                          ? undefined
+                          ? []
                           : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-                      const suspension = {
-                        token: decision.suspension.token,
-                        reason: "approval" as const,
-                        tool_call_index: toolCallIndex,
-                        tool_call_id: call.id,
-                        tool_name: call.name,
-                        tool_params: call.params,
-                        tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
-                        active_tools: activeTools,
-                        activated_skills: activatedSkills,
-                      }
-                      return Stream.fail(
-                        invocationPath === undefined || invocationPath.length === 0
-                          ? AgentSuspended.make(suspension)
-                          : AgentSuspended.make({ ...suspension, invocation_path: invocationPath }),
+                      yield* updateToolBatch((checkpoint) =>
+                        updateCall(checkpoint, {
+                          callIndex: toolCallIndex,
+                          state: {
+                            _tag: "Waiting",
+                            reason: "approval",
+                            waitId: decision.token,
+                            token: decision.token,
+                          },
+                          activatedSkills,
+                          invocationPath,
+                        }),
                       )
                     }),
-                  )
+                  ).pipe(Stream.drain)
               }
             }),
           ),

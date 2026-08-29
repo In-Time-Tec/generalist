@@ -194,7 +194,6 @@ export interface RespondInput {
   readonly runId: string
   readonly waitId: string
   readonly resolution: Exclude<WaitResolution, { readonly _tag: "Signal" }>
-  readonly idempotencyKey?: string
 }
 
 export interface SignalInput {

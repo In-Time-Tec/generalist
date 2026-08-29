@@ -51,7 +51,7 @@ describePostgres("PostgreSQL process tracer", () => {
             ownerId: "tracer-a",
             attemptFence: a[0]!.attemptFence,
             session: a[0]!.session,
-            wait: openWait({ waitId: "gate", reason: "external" }),
+            waits: [openWait({ waitId: "gate", reason: "external" })],
             suspension: suspension({ waitId: "gate" }),
           })
           yield* runtime.signal({ runId: first.runId, name: "gate" })

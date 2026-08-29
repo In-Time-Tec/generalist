@@ -4,7 +4,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../errors.js"
-import { appendEvent, loadRun, loadRunWait, nowIso } from "./statements.js"
+import { appendEvent, loadRun, loadRunWaits, nowIso } from "./statements.js"
 import type { DecodedRun } from "../codec/rows.js"
 import { checkpointRef } from "../../executable/manifest.js"
 import { encodeExecutableRef, encodeJson } from "../codec/codecs.js"
@@ -50,7 +50,7 @@ const executionRecord = (
   run: DecodedRun,
   childCount: number,
   registrations: ExecutionRecord["registrations"],
-  resolution?: ExecutionRecord["resolution"],
+  resolutions: ExecutionRecord["resolutions"],
 ): ExecutionRecord => {
   const record: ExecutionRecord = {
     runId: run.runId,
@@ -65,6 +65,7 @@ const executionRecord = (
     attempt: run.attempt,
     attemptFence: run.attemptFence,
     cancellationRequested: run.cancellationRequested,
+    resolutions,
     registrations,
   }
   if (run.parentRunId !== undefined) Object.assign(record, { parentRunId: run.parentRunId })
@@ -72,7 +73,6 @@ const executionRecord = (
   if (run.ownerWorkerId !== undefined) Object.assign(record, { ownerId: run.ownerWorkerId })
   if (run.driverCheckpoint !== undefined) Object.assign(record, { checkpoint: run.driverCheckpoint })
   if (run.suspension !== undefined) Object.assign(record, { suspension: run.suspension })
-  if (resolution !== undefined) Object.assign(record, { resolution })
   if (run.continuation !== undefined) Object.assign(record, { continuation: run.continuation })
   return record
 }
@@ -80,9 +80,11 @@ const executionRecord = (
 export const loadExecution = (runId: string) =>
   Effect.gen(function* () {
     const run = yield* requireRun(runId)
-    const wait = yield* loadRunWait(run.runId, run.activeWaitId)
+    const resolutions = (yield* loadRunWaits(run.runId)).flatMap((wait) =>
+      wait.resolution === undefined ? [] : [{ waitId: wait.waitId, resolution: wait.resolution }],
+    )
     const registrations = yield* loadRegistrations(runId)
-    return executionRecord(run, yield* activeChildCount(runId), registrations, wait?.resolution)
+    return executionRecord(run, yield* activeChildCount(runId), registrations, resolutions)
   })
 
 export const releaseExecution = (input: ExecutionClaim) =>
@@ -191,10 +193,12 @@ export const claimExecution: {
       yield* appendEvent(hub, claimed, { _tag: "RunAttemptStarted", attempt: claimed.attempt }, "running")
     }
     const started = run.status === "queued" ? yield* requireRun(input.runId) : claimed
-    const wait = yield* loadRunWait(started.runId, started.activeWaitId)
+    const resolutions = (yield* loadRunWaits(started.runId)).flatMap((wait) =>
+      wait.resolution === undefined ? [] : [{ waitId: wait.waitId, resolution: wait.resolution }],
+    )
     const registrations = yield* loadRegistrations(input.runId)
     return {
-      ...executionRecord(started, yield* activeChildCount(input.runId), registrations, wait?.resolution),
+      ...executionRecord(started, yield* activeChildCount(input.runId), registrations, resolutions),
       ownerId: input.ownerId,
       session,
     }

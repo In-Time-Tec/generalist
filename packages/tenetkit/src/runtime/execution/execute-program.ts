@@ -79,7 +79,7 @@ export const executeProgram = (input: {
               ...claim,
               suspension: error,
               checkpoint: { _tag: "Program", version: "1" },
-              wait: { ...wait, status: "open", openedAt },
+              waits: [{ ...wait, status: "open", openedAt }],
             })
           })
         }),

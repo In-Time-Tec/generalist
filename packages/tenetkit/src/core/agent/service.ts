@@ -36,10 +36,10 @@ import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "../turn/policy.
 import { streamInternal } from "./run.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
 import type { ObjectSchema } from "./loop/context.js"
+import type { ToolBatchResolution } from "./tools/checkpoint.js"
 
 export { close, withTools } from "./lifecycle/definition.js"
 export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
-import type { ResumeResolution } from "./lifecycle/resume.js"
 export const AgentTypeId = "tenetkit/core/Agent"
 /** @experimental Agent-owned metadata values. */
 export type AgentMetadata = Readonly<Record<string, Schema.Json>>
@@ -253,7 +253,7 @@ export function make<
 
 export interface Resume {
   readonly suspension: AgentSuspended
-  readonly resolution?: ResumeResolution
+  readonly resolutions?: ReadonlyArray<ToolBatchResolution>
 }
 /** @experimental Bounded buffering behavior for tool progress events. */
 export type ProgressOverflowPolicy =

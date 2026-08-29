@@ -1,8 +1,13 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
-import { AgentEvent } from "../../../../src/index.js"
 import { ChildRuns, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { assistantAddress, completedResult, openWait, textPrompt } from "../../execution/fixtures.js"
+import {
+  assistantAddress,
+  completedResult,
+  openWait,
+  suspension as agentSuspension,
+  textPrompt,
+} from "../../execution/fixtures.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 
 export interface ChildRunsRunGroupSuiteOptions<StoreError, Extra = never> {
@@ -45,13 +50,12 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
     })
 
   const suspension = (groupId: string) =>
-    AgentEvent.AgentSuspended.make({
+    agentSuspension({
+      waitId: "group-call",
       token: groupId,
-      reason: "tool-wait",
-      tool_call_id: "group-call",
-      tool_name: ChildRuns.runGroupToolName,
-      tool_params: { concurrency: 3, members },
-      tool_call_batch: [],
+      toolCallId: "group-call",
+      toolName: ChildRuns.runGroupToolName,
+      toolParams: { concurrency: 3, members },
     })
 
   const childSuspension = (input: {
@@ -61,19 +65,18 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
     readonly label?: string
     readonly prompt: string
   }) =>
-    AgentEvent.AgentSuspended.make({
+    agentSuspension({
+      waitId: input.toolCallId,
       token: input.childRunId,
-      reason: "tool-wait",
-      tool_call_id: input.toolCallId,
-      tool_name: ChildRuns.toolName,
-      tool_params: Object.assign(
+      toolCallId: input.toolCallId,
+      toolName: ChildRuns.toolName,
+      toolParams: Object.assign(
         {
           selection: input.selection,
           prompt: input.prompt,
         },
         input.label === undefined ? undefined : { label: input.label },
       ),
-      tool_call_batch: [],
     })
 
   const admittedChild = (children: ReturnType<typeof ChildRuns.make>, parentRunId: string, label: string) => {
@@ -102,7 +105,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const child = yield* admittedChild(context.children, context.runId, "success")
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: child.input.toolCallId }),
+            waits: [openWait({ waitId: child.input.toolCallId })],
             suspension: childSuspension({ ...child.input, childRunId: child.childRunId }),
           })
           const large = "終🚀".repeat(7_000)
@@ -114,19 +117,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const parentRun = yield* context.runtime.inspect(context.runId)
           expect(parentRun).toMatchObject({
             status: "running",
-            wait: {
-              waitId: child.input.toolCallId,
-              status: "responded",
-              resolution: {
-                _tag: "ToolResult",
-                result: {
-                  _tag: "Succeeded",
-                  childRunId: child.childRunId,
-                  label: child.input.label,
-                  text: large,
-                },
-              },
-            },
+            waits: [],
           })
           expect(yield* context.children.invoke(child.input)).toMatchObject({
             _tag: "Success",
@@ -139,6 +130,19 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           })
           const history = yield* context.runtime.history({ runId: context.runId, limit: 100 })
           expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
+          expect(history.find((event) => event._tag === "RunResumed")).toMatchObject({
+            _tag: "RunResumed",
+            waitId: child.input.toolCallId,
+            resolution: {
+              _tag: "ToolResult",
+              result: {
+                _tag: "Succeeded",
+                childRunId: child.childRunId,
+                label: child.input.label,
+                text: large,
+              },
+            },
+          })
           expect(
             history.find((event) => event._tag === "ChildLinked" && event.childRunId === child.childRunId),
           ).toMatchObject({
@@ -163,28 +167,29 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           })
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: child.input.toolCallId }),
+            waits: [openWait({ waitId: child.input.toolCallId })],
             suspension: childSuspension({ ...child.input, childRunId: child.childRunId }),
           })
 
           expect(yield* context.runtime.inspect(context.runId)).toMatchObject({
             status: "running",
-            wait: {
-              status: "responded",
-              resolution: {
-                _tag: "ToolResult",
-                result: {
-                  _tag: "Failed",
-                  childRunId: child.childRunId,
-                  label: child.input.label,
-                  message: "failed before wait",
-                },
-              },
-            },
+            waits: [],
           })
           const history = yield* context.runtime.history({ runId: context.runId, limit: 100 })
           expect(history.filter((event) => event._tag === "RunWaiting")).toHaveLength(1)
           expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
+          expect(history.find((event) => event._tag === "RunResumed")).toMatchObject({
+            _tag: "RunResumed",
+            resolution: {
+              _tag: "ToolResult",
+              result: {
+                _tag: "Failed",
+                childRunId: child.childRunId,
+                label: child.input.label,
+                message: "failed before wait",
+              },
+            },
+          })
         }),
       ),
     )
@@ -197,28 +202,29 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const child = yield* admittedChild(context.children, context.runId, "cancel")
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: child.input.toolCallId }),
+            waits: [openWait({ waitId: child.input.toolCallId })],
             suspension: childSuspension({ ...child.input, childRunId: child.childRunId }),
           })
           yield* context.runtime.cancel({ runId: child.childRunId, reason: "cancelled by test" })
 
           expect(yield* context.runtime.inspect(context.runId)).toMatchObject({
             status: "running",
-            wait: {
-              status: "responded",
-              resolution: {
-                _tag: "ToolResult",
-                result: {
-                  _tag: "Cancelled",
-                  childRunId: child.childRunId,
-                  label: child.input.label,
-                  reason: "cancelled by test",
-                },
-              },
-            },
+            waits: [],
           })
           const history = yield* context.runtime.history({ runId: context.runId, limit: 100 })
           expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
+          expect(history.find((event) => event._tag === "RunResumed")).toMatchObject({
+            _tag: "RunResumed",
+            resolution: {
+              _tag: "ToolResult",
+              result: {
+                _tag: "Cancelled",
+                childRunId: child.childRunId,
+                label: child.input.label,
+                reason: "cancelled by test",
+              },
+            },
+          })
         }),
       ),
     )
@@ -231,7 +237,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const child = yield* admittedChild(context.children, context.runId, "race")
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: child.input.toolCallId }),
+            waits: [openWait({ waitId: child.input.toolCallId })],
             suspension: childSuspension({ ...child.input, childRunId: child.childRunId }),
           })
           const childClaim = yield* context.store.claimExecution({ runId: child.childRunId, ownerId: "child" })
@@ -320,12 +326,12 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
 
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: "group-call" }),
+            waits: [openWait({ waitId: "group-call" })],
             suspension: suspension(groupId),
           })
           expect(yield* context.runtime.inspect(context.runId)).toMatchObject({
             status: "waiting",
-            wait: { waitId: "group-call", status: "open", reason: { _tag: "ToolWait" } },
+            waits: [{ waitId: "group-call", status: "open", reason: { _tag: "ToolWait" } }],
           })
 
           const large = "終🚀".repeat(7_000)
@@ -388,14 +394,13 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           ).toBeInstanceOf(Errors.RuntimeUnavailable)
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: input.toolCallId }),
-            suspension: AgentEvent.AgentSuspended.make({
+            waits: [openWait({ waitId: input.toolCallId })],
+            suspension: agentSuspension({
+              waitId: input.toolCallId,
               token: groupId,
-              reason: "tool-wait",
-              tool_call_id: input.toolCallId,
-              tool_name: ChildRuns.runGroupToolName,
-              tool_params: { members },
-              tool_call_batch: [],
+              toolCallId: input.toolCallId,
+              toolName: ChildRuns.runGroupToolName,
+              toolParams: { members },
             }),
           })
           yield* context.store.complete({
@@ -425,7 +430,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           })
           expect(yield* context.runtime.inspect(context.runId)).toMatchObject({
             status: "running",
-            wait: { waitId: input.toolCallId, status: "signaled" },
+            waits: [],
           })
           const history = yield* context.runtime.history({ runId: context.runId, limit: 100 })
           expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
@@ -467,14 +472,13 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const outerInspection = yield* context.runtime.inspectFanOut(outerId)
           yield* context.store.suspend({
             ...firstClaim,
-            wait: openWait({ waitId: outerInput.toolCallId }),
-            suspension: AgentEvent.AgentSuspended.make({
+            waits: [openWait({ waitId: outerInput.toolCallId })],
+            suspension: agentSuspension({
+              waitId: outerInput.toolCallId,
               token: outerId,
-              reason: "tool-wait",
-              tool_call_id: outerInput.toolCallId,
-              tool_name: ChildRuns.runGroupToolName,
-              tool_params: { concurrency: outerInput.concurrency, members: outerInput.members },
-              tool_call_batch: [],
+              toolCallId: outerInput.toolCallId,
+              toolName: ChildRuns.runGroupToolName,
+              toolParams: { concurrency: outerInput.concurrency, members: outerInput.members },
             }),
           })
 
@@ -492,14 +496,13 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const innerInspection = yield* context.runtime.inspectFanOut(innerId)
           yield* context.store.suspend({
             ...leftClaim,
-            wait: openWait({ waitId: innerInput.toolCallId }),
-            suspension: AgentEvent.AgentSuspended.make({
+            waits: [openWait({ waitId: innerInput.toolCallId })],
+            suspension: agentSuspension({
+              waitId: innerInput.toolCallId,
               token: innerId,
-              reason: "tool-wait",
-              tool_call_id: innerInput.toolCallId,
-              tool_name: ChildRuns.runGroupToolName,
-              tool_params: { concurrency: innerInput.concurrency, members: innerInput.members },
-              tool_call_batch: [],
+              toolCallId: innerInput.toolCallId,
+              toolName: ChildRuns.runGroupToolName,
+              toolParams: { concurrency: innerInput.concurrency, members: innerInput.members },
             }),
           })
 
@@ -557,14 +560,13 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const inspection = yield* context.runtime.inspectFanOut(groupId)
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: input.toolCallId }),
-            suspension: AgentEvent.AgentSuspended.make({
+            waits: [openWait({ waitId: input.toolCallId })],
+            suspension: agentSuspension({
+              waitId: input.toolCallId,
               token: groupId,
-              reason: "tool-wait",
-              tool_call_id: input.toolCallId,
-              tool_name: ChildRuns.runGroupToolName,
-              tool_params: { concurrency: 1, members: [member] },
-              tool_call_batch: [],
+              toolCallId: input.toolCallId,
+              toolName: ChildRuns.runGroupToolName,
+              toolParams: { concurrency: 1, members: [member] },
             }),
           })
           yield* context.runtime.cancel({
@@ -605,7 +607,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           const groupId = outcome._tag === "Suspend" ? outcome.token : ""
           yield* context.store.suspend({
             ...claim,
-            wait: openWait({ waitId: "group-call" }),
+            waits: [openWait({ waitId: "group-call" })],
             suspension: suspension(groupId),
           })
           yield* context.runtime.cancel({ runId: context.runId, reason: "stop" })

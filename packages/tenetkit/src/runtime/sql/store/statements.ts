@@ -6,14 +6,12 @@ import { decodePinned, type ExecutableManifest, type ExecutableRef } from "../..
 import type { Message } from "../../messaging/message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
 import {
-  StringArray,
   decodeJson,
   decodeEvent,
   decodeQueue,
   encodeExecutableManifest,
   encodeExecutableRef,
   encodeEvent,
-  encodeJson,
   encodeMessage,
   encodeQueue,
 } from "../codec/codecs.js"
@@ -114,22 +112,18 @@ export function loadEventsAfter(...args: [string, number] | [number]) {
 
 export function loadRunWait(
   runId: string,
-  waitId?: string,
+  waitId: string,
 ): Effect.Effect<RunWait | undefined, SqlError, SqlClient.SqlClient>
 export function loadRunWait(
-  waitId?: string,
+  waitId: string,
 ): (runId: string) => Effect.Effect<RunWait | undefined, SqlError, SqlClient.SqlClient>
-export function loadRunWait(...args: [string?, string?]) {
+export function loadRunWait(...args: [string, string?]) {
   const [runIdOrWaitId, waitId] = args
   if (args.length < 2) return (runId: string) => loadRunWait(runId, runIdOrWaitId)
-  if (runIdOrWaitId === undefined) throw new TypeError("loadRunWait requires a run id")
   const runId = runIdOrWaitId
   return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows =
-      waitId === undefined
-        ? yield* sql<WaitRow>`SELECT * FROM tenetkit_run_waits WHERE run_id = ${runId} ORDER BY opened_at DESC LIMIT 1`
-        : yield* sql<WaitRow>`SELECT * FROM tenetkit_run_waits WHERE run_id = ${runId} AND wait_id = ${waitId}`
+    const rows = yield* sql<WaitRow>`SELECT * FROM tenetkit_run_waits WHERE run_id = ${runId} AND wait_id = ${waitId!}`
     const row = rows[0]
     if (row === undefined) return undefined
     const openedAt = asIso(row.opened_at)!
@@ -147,6 +141,32 @@ export function loadRunWait(...args: [string?, string?]) {
     ) satisfies RunWait
   })
 }
+
+export const loadRunWaits = (runId: string): Effect.Effect<ReadonlyArray<RunWait>, SqlError, SqlClient.SqlClient> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows =
+      yield* sql<WaitRow>`SELECT * FROM tenetkit_run_waits WHERE run_id = ${runId} ORDER BY authored_order ASC, wait_id ASC`
+    return yield* Effect.forEach(rows, (row) => loadRunWait(runId, row.wait_id)).pipe(
+      Effect.map((waits) => waits.filter((wait): wait is RunWait => wait !== undefined)),
+    )
+  })
+
+export const loadRunWaitsByStatus: {
+  (status: RunWait["status"]): (runId: string) => Effect.Effect<ReadonlyArray<RunWait>, SqlError, SqlClient.SqlClient>
+  (runId: string, status: RunWait["status"]): Effect.Effect<ReadonlyArray<RunWait>, SqlError, SqlClient.SqlClient>
+} = Function.dual(2, (runId: string, status: RunWait["status"]) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows =
+      yield* sql<WaitRow>`SELECT * FROM tenetkit_run_waits WHERE run_id = ${runId} AND status = ${status} ORDER BY authored_order ASC, wait_id ASC`
+    return yield* Effect.forEach(rows, (row) => loadRunWait(runId, row.wait_id)).pipe(
+      Effect.map((waits) => waits.filter((wait): wait is RunWait => wait !== undefined)),
+    )
+  }),
+)
+
+export { transitionRunWait } from "./wait-transition.js"
 type EventField = RunEvent extends RunEvent ? unknown : never
 type AppendInput = object & { readonly _tag: string }
 export interface EventPartial {
@@ -210,9 +230,6 @@ export const appendEvent: {
       VALUES (${run.rootRunId}, ${treeRoot.last_position}, ${run.runId}, ${sequence}, ${event.eventId})
     `
       const status = nextStatus ?? run.status
-      let activeWaitId: string | null = run.activeWaitId ?? null
-      if (event._tag === "RunWaiting") activeWaitId = event.wait.waitId
-      if (event._tag === "RunResumed") activeWaitId = null
       const terminalEventId = isTerminalEvent(event) ? event.eventId : (run.terminalEventId ?? null)
       const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested
       const cancelReason =
@@ -225,7 +242,6 @@ export const appendEvent: {
         UPDATE tenetkit_runs SET
           status = ${status},
           last_sequence = ${sequence},
-          active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
           cancellation_requested = ${sqlBool(sql, cancellationRequested)},
           cancel_reason = ${cancelReason},
@@ -244,7 +260,6 @@ export const appendEvent: {
         UPDATE tenetkit_runs SET
           status = ${status},
           last_sequence = ${sequence},
-          active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
           cancellation_requested = ${sqlBool(sql, cancellationRequested)},
           cancel_reason = ${cancelReason},
@@ -420,16 +435,16 @@ export const insertRun = (input: {
     yield* sql`
       INSERT INTO tenetkit_runs (
         run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-        executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
+        executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents, parent_run_id, invocation_id, attempt, attempt_fence,
         last_sequence, cancellation_requested, cancel_reason, terminal_event_id, accepted_sequence,
-        responded_wait_ids_json, created_at, updated_at
+        created_at, updated_at
       ) VALUES (
         ${input.runId}, ${input.status}, ${input.message.to}, ${input.message.sessionId}, ${input.message.id},
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
         ${input.rootRunId}, ${input.depth}, ${input.treePolicy.maxDepth}, ${input.treePolicy.maxSubagents}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
-        NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, ${sqlBool(sql, false)}, NULL, NULL, ${input.acceptedSequence},
-        ${encodeJson(StringArray, [])}, ${created}, ${created}
+        ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, ${sqlBool(sql, false)}, NULL, NULL, ${input.acceptedSequence},
+        ${created}, ${created}
       )
     `
     if (input.runId === input.rootRunId) {

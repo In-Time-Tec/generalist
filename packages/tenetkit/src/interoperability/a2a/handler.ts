@@ -193,7 +193,7 @@ const makeExecutor = (runtime: RuntimeInterface, deployment: Deployment): AgentE
       const snapshot = yield* runtime.snapshot(context.taskId)
       const task = yield* fromRuntime(runtime, context.taskId)
       bus.publish(AgentEvent.task(task))
-      const wait = snapshot.run.wait
+      const wait = snapshot.run.waits[0]
       if (snapshot.run.status !== "waiting" || wait === undefined || wait.status !== "open") {
         return yield* TaskNotWaiting.make({
           taskId: context.taskId,
@@ -211,7 +211,6 @@ const makeExecutor = (runtime: RuntimeInterface, deployment: Deployment): AgentE
           runId: context.taskId,
           waitId: wait.waitId,
           resolution: { _tag: "ToolResult", result: prompt, encodedResult: prompt },
-          idempotencyKey: context.userMessage.messageId,
         })
       }
       yield* follow(runtime, task, snapshot.cursor, bus)

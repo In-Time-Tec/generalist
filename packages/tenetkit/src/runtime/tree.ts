@@ -372,12 +372,17 @@ const canProgress = (index: TreeIndex, runId: string, memo: Map<string, boolean>
   const run = index.runs.get(runId)
   if (run === undefined || isTerminal(run.status) || run.status === "needs-resolution") return decide(false)
   if (run.status !== "waiting") return decide(true)
-  const wait = run.wait
-  if (wait === undefined || wait.status !== "open") return decide(true)
-  if (wait.reason._tag !== "ToolWait") return decide(false)
-  const linked = index.childrenByWait.get(`${runId}\u0000${wait.waitId}`)
-  if (linked === undefined) return decide(true)
-  return decide(linked.some((child) => isTerminal(child.status) || canProgress(index, child.runId, memo)))
+  if (run.waits.length === 0) return decide(true)
+  return decide(
+    run.waits.some((wait) => {
+      if (wait.reason._tag !== "ToolWait") return false
+      const linked = index.childrenByWait.get(`${runId}\u0000${wait.waitId}`)
+      return (
+        linked === undefined ||
+        linked.some((child) => isTerminal(child.status) || canProgress(index, child.runId, memo))
+      )
+    }),
+  )
 }
 
 const isSettled = (inspection: Inspection, settlement: NonNullable<WatchInput["settlement"]>): boolean => {

@@ -218,13 +218,14 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       system,
       supplemental,
     })
+    const recoveredToolCheckpoint = yield* recoverToolCheckpoint({ options, chat })
     return {
       resume,
       compactionService,
       activeSession,
       resumeChat,
       validatedResume,
-      recoveredToolCheckpoint: yield* recoverToolCheckpoint({ options, chat }),
+      recoveredToolCheckpoint,
       staticCandidates,
       staticRegistry,
       staticToolkit,

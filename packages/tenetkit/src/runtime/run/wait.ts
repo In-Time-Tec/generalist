@@ -12,6 +12,10 @@ export const WaitResolution = Schema.Union([
 ])
 export type WaitResolution = typeof WaitResolution.Type
 
+/** @experimental One exact terminal resolution targeted to one durable wait. */
+export const WaitResponse = Schema.Struct({ waitId: Schema.String, resolution: WaitResolution })
+export type WaitResponse = typeof WaitResponse.Type
+
 /** @experimental Typed reason and request payload for one durable wait. */
 export const WaitReason = Schema.Union([
   Schema.TaggedStruct("ToolWait", {}),

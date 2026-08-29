@@ -1,4 +1,4 @@
-import { Cause, Context, DateTime, Effect, Exit, Function, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Exit, Function, Layer, Option, Ref, Schema, Semaphore, Stream } from "effect"
 import {
   type DriverCheckpoint,
   type DriverOperation,
@@ -30,6 +30,7 @@ import {
 } from "../loop-driver.js"
 import type { HandoffControlState } from "../../agent/handoff/state.js"
 import { OperationOutcomeResolution } from "./operation-outcome.js"
+import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 /** @experimental Operation scheduled at one agent-loop effect boundary. */
 export interface OperationSpec {
   readonly kind: DriverOperationKind
@@ -37,6 +38,7 @@ export interface OperationSpec {
   readonly input: unknown
   readonly replayPolicy: ReplayPolicy
   readonly turn?: number
+  readonly applyCheckpoint?: (checkpoint: DriverCheckpoint, outcome: OperationOutcome) => DriverCheckpoint
 }
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
 type PersistedReplayValue = Extract<OperationOutcome, { readonly _tag: "Succeeded" }>["value"]
@@ -48,7 +50,13 @@ const operationFrom = (input: {
   readonly kind: DriverOperationKind
   readonly input: unknown
   readonly replayPolicy: ReplayPolicy
-}): DriverOperation => ({ ...input, inputDigest: inputDigest(input.input) })
+}): DriverOperation => ({
+  key: input.key,
+  kind: input.kind,
+  input: input.input,
+  replayPolicy: input.replayPolicy,
+  inputDigest: inputDigest(input.input),
+})
 const modelCallOrdinal = (spec: OperationSpec): number | undefined => {
   if (spec.kind !== "model" && spec.kind !== "structured-output") return undefined
   return Option.getOrUndefined(Schema.decodeUnknownOption(ModelOperationInput)(spec.input))?.modelCallOrdinal
@@ -99,14 +107,12 @@ export interface Interface {
       },
     ): Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices>
   }
-  readonly recordSuspension: (input: {
-    readonly waitId: string
-    readonly reason: string
-    readonly token: string
-  }) => Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted>
-  readonly bindResume: (
-    token: string,
-  ) => Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted>
+  readonly setToolBatch: (
+    checkpoint: ToolBatchCheckpoint | undefined,
+  ) => Effect.Effect<void, DriverError | DriverStateInvalid>
+  readonly updateToolBatch: (
+    update: (checkpoint: ToolBatchCheckpoint) => ToolBatchCheckpoint,
+  ) => Effect.Effect<ToolBatchCheckpoint, DriverError | DriverStateInvalid>
   readonly recorded: Effect.Effect<ReadonlyArray<RecordedOperation>>
   readonly abortPending: (
     error: OperationFailure,
@@ -154,6 +160,7 @@ export const make = (input: {
     const checkpointRef = yield* Ref.make(input.initial)
     const recordedRef = yield* Ref.make<ReadonlyArray<RecordedOperation>>([])
     const activePendingRef = yield* Ref.make<string | undefined>(undefined)
+    const commitSemaphore = yield* Semaphore.make(1)
     const journal = input.journal ?? noopJournal
     const schedule = (spec: OperationSpec) =>
       Effect.gen(function* () {
@@ -195,7 +202,7 @@ export const make = (input: {
         before = yield* chargeScheduled(before, spec.kind)
         const operationTurn = yield* OperationTurn.resolve(before.turn, spec.turn)
         yield* Ref.set(checkpointRef, before)
-        const { turn: _turn, ...pending } = spec
+        const { turn: _turn, applyCheckpoint: _applyCheckpoint, ...pending } = spec
         const scheduled = withPending(before, pending, operationTurn)
         yield* Ref.set(checkpointRef, scheduled)
         const decision = yield* input.driver.decide(scheduled)
@@ -217,36 +224,43 @@ export const make = (input: {
       operation: DriverOperation,
       outcome: OperationOutcome,
       nested = false,
+      applyCheckpoint?: OperationSpec["applyCheckpoint"],
     ): Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay> =>
-      Effect.gen(function* () {
-        let before = yield* Ref.get(checkpointRef)
-        if (nested) {
-          if (outcome._tag === "Succeeded" && operation.kind === "handoff") {
-            before = yield* applyHandoffCommit(before, outcome.value)
+      commitSemaphore.withPermit(
+        Effect.gen(function* () {
+          let before = yield* Ref.get(checkpointRef)
+          if (nested) {
+            if (outcome._tag === "Succeeded" && operation.kind === "handoff") {
+              before = yield* applyHandoffCommit(before, outcome.value)
+            }
+            if (applyCheckpoint !== undefined) before = applyCheckpoint(before, outcome)
             yield* Ref.set(checkpointRef, before)
+            yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: before }])
+            yield* journal.onCompleted(operation, outcome, before)
+            return
           }
-          yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: before }])
-          yield* journal.onCompleted(operation, outcome, before)
-          return
-        }
-        const after = outcome._tag === "Unknown" ? before : yield* input.driver.apply(before, outcome)
-        yield* Ref.set(checkpointRef, after)
-        yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: after }])
-        yield* journal.onCompleted(operation, outcome, after)
-        yield* Ref.set(activePendingRef, undefined)
-      })
+          let after = outcome._tag === "Unknown" ? before : yield* input.driver.apply(before, outcome)
+          if (applyCheckpoint !== undefined) after = applyCheckpoint(after, outcome)
+          yield* Ref.set(checkpointRef, after)
+          yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: after }])
+          yield* journal.onCompleted(operation, outcome, after)
+          yield* Ref.set(activePendingRef, undefined)
+        }),
+      )
     const applyReplay = (
       operation: DriverOperation,
       replay: OperationOutcome,
       nested: boolean,
+      applyCheckpoint?: OperationSpec["applyCheckpoint"],
     ): Effect.Effect<void, DriverError | DriverStateInvalid> =>
       Effect.gen(function* () {
         const before = yield* Ref.get(checkpointRef)
+        let after = before
         if (nested && replay._tag === "Succeeded" && operation.kind === "handoff") {
-          yield* Ref.set(checkpointRef, yield* applyHandoffCommit(before, replay.value))
-        } else if (!nested) {
-          yield* Ref.set(checkpointRef, yield* input.driver.apply(before, replay))
-        }
+          after = yield* applyHandoffCommit(before, replay.value)
+        } else if (!nested && replay._tag !== "Unknown") after = yield* input.driver.apply(before, replay)
+        if (applyCheckpoint !== undefined) after = applyCheckpoint(after, replay)
+        yield* Ref.set(checkpointRef, after)
       })
     const run = <A, E, R>(
       spec: OperationSpec,
@@ -255,8 +269,8 @@ export const make = (input: {
       Effect.gen(function* () {
         const { operation, replay, nested } = yield* schedule(spec)
         if (replay !== undefined) {
+          yield* applyReplay(operation, replay, nested, spec.applyCheckpoint)
           yield* guardUnknownNeverReplay(operation, replay)
-          yield* applyReplay(operation, replay, nested)
           if (replay._tag === "Succeeded") return decodeReplay<A>(replay.value)
           if (replay._tag === "Failed") return yield* Effect.fail(decodeReplay<E>(replay.error))
           return yield* DriverUnknownReplay.make({ operationKey: operation.key, operationId: replay.operationId })
@@ -266,8 +280,8 @@ export const make = (input: {
         const outcome = OperationOutcomeResolution.outcomeFromExit(operation, exit)
         if (outcome !== undefined) {
           yield* outcome._tag === "Unknown"
-            ? Effect.uninterruptible(commit(operation, outcome, nested))
-            : commit(operation, outcome, nested)
+            ? Effect.uninterruptible(commit(operation, outcome, nested, spec.applyCheckpoint))
+            : commit(operation, outcome, nested, spec.applyCheckpoint)
         }
         return yield* Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause)
       })
@@ -290,8 +304,8 @@ export const make = (input: {
             const { operation, replay, nested } = yield* schedule(spec)
             const codec = options?.successCodec
             if (replay !== undefined) {
+              yield* applyReplay(operation, replay, nested, spec.applyCheckpoint)
               yield* guardUnknownNeverReplay(operation, replay)
-              yield* applyReplay(operation, replay, nested)
               if (replay._tag === "Succeeded") {
                 if (codec !== undefined) return codec.replay(decodeReplay<Success>(replay.value))
                 const values = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown))(replay.value)
@@ -315,8 +329,8 @@ export const make = (input: {
                 if (outcome === undefined) return Stream.failCause(cause)
                 const persist =
                   outcome._tag === "Unknown"
-                    ? Effect.uninterruptible(commit(operation, outcome, nested))
-                    : commit(operation, outcome, nested)
+                    ? Effect.uninterruptible(commit(operation, outcome, nested, spec.applyCheckpoint))
+                    : commit(operation, outcome, nested, spec.applyCheckpoint)
                 return Stream.fromEffect(persist).pipe(Stream.drain, Stream.concat(Stream.failCause(cause)))
               }),
               Stream.onExit((exit) =>
@@ -324,7 +338,7 @@ export const make = (input: {
                   if (Exit.isSuccess(exit) || !Cause.hasInterrupts(exit.cause)) return
                   const outcome = OperationOutcomeResolution.outcomeFromExit(operation, exit)
                   if (outcome === undefined) return
-                  yield* Effect.uninterruptible(commit(operation, outcome, nested))
+                  yield* Effect.uninterruptible(commit(operation, outcome, nested, spec.applyCheckpoint))
                 }).pipe(Effect.orDie),
               ),
               Stream.concat(
@@ -332,42 +346,44 @@ export const make = (input: {
                   Effect.gen(function* () {
                     if (codec?.isComplete?.() === false) return
                     const value = codec === undefined ? emitted : codec.complete()
-                    yield* Effect.interruptible(commit(operation, { _tag: "Succeeded", value }, nested))
+                    yield* Effect.interruptible(
+                      commit(operation, { _tag: "Succeeded", value }, nested, spec.applyCheckpoint),
+                    )
                   }),
                 ).pipe(Stream.drain),
               ),
             )
           }),
         ),
-      recordSuspension: (suspension) =>
-        run(
-          {
-            kind: "wait",
-            key: suspension.waitId,
-            input: suspension,
-            replayPolicy: "pure",
-          },
-          Effect.succeed({ waitId: suspension.waitId, reason: suspension.reason, token: suspension.token }),
-        ).pipe(Effect.asVoid),
-      bindResume: (token) =>
+      setToolBatch: (toolBatch) =>
         Effect.gen(function* () {
           const current = yield* Ref.get(checkpointRef)
           const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
             Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
           )
-          if (state.suspensionToken !== undefined && state.suspensionToken !== token) {
-            return yield* DriverError.make({ message: "Resume token does not match driver suspension checkpoint" })
-          }
-          yield* run(
-            {
-              kind: "wait",
-              key: `resume:${token}`,
-              input: { token },
-              replayPolicy: "pure",
-            },
-            Effect.succeed({ waitId: `resume:${token}`, reason: "resume", token }),
-          )
+          const nextState =
+            toolBatch === undefined ? (({ toolBatch: _toolBatch, ...rest }) => rest)(state) : { ...state, toolBatch }
+          const next = { ...current, state: nextState }
+          yield* Ref.set(checkpointRef, next)
+          yield* journal.onCheckpoint(next)
         }),
+      updateToolBatch: (update) =>
+        commitSemaphore.withPermit(
+          Effect.gen(function* () {
+            const current = yield* Ref.get(checkpointRef)
+            const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
+              Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+            )
+            if (state.toolBatch === undefined) {
+              return yield* DriverStateInvalid.make({ message: "Tool batch checkpoint is missing" })
+            }
+            const toolBatch = update(state.toolBatch)
+            const next = { ...current, state: { ...state, toolBatch } }
+            yield* Ref.set(checkpointRef, next)
+            yield* journal.onCheckpoint(next)
+            return toolBatch
+          }),
+        ),
       abortPending: (error) =>
         Effect.gen(function* () {
           const before = yield* Ref.get(checkpointRef)

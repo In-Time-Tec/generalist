@@ -1,9 +1,9 @@
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
-import { AgentEvent, ToolContext, ToolExecutor } from "../../../../src/index.js"
+import { ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { ChildRuns, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { assistantAddress, completedResult, parentRelativeOptions } from "../../execution/fixtures.js"
+import { assistantAddress, completedResult, parentRelativeOptions, suspension } from "../../execution/fixtures.js"
 import { tempDbPath } from "../../sql/scenario.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 
@@ -52,13 +52,12 @@ const childRunsLayer = Layer.succeed(
 const childGroupRouteLayer = Layer.merge(toolContextLayer, childRunsLayer)
 
 const groupSuspension = (waitId: string, groupId: string) =>
-  AgentEvent.AgentSuspended.make({
+  suspension({
+    waitId,
     token: groupId,
-    reason: "tool-wait",
-    tool_call_id: waitId,
-    tool_name: ChildRuns.awaitGroupToolName,
-    tool_params: { groupId },
-    tool_call_batch: [],
+    toolCallId: waitId,
+    toolName: ChildRuns.awaitGroupToolName,
+    toolParams: { groupId },
   })
 
 const openGroupWait = (waitId: string) => ({
@@ -184,7 +183,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       expect(waiting).toEqual({ _tag: "Suspend", token: receipt.groupId })
       yield* store.suspend({
         ...parentClaim,
-        wait: openGroupWait("await-group"),
+        waits: [openGroupWait("await-group")],
         suspension: groupSuspension("await-group", receipt.groupId),
       })
 
@@ -204,8 +203,10 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
 
       const parentInspection = yield* runtime.inspect(parent.runId)
       expect(parentInspection.status).toBe("running")
-      expect(parentInspection.wait).toMatchObject({ waitId: "await-group", status: "signaled" })
-      const resolution = parentInspection.wait?.resolution
+      expect(parentInspection.waits).toEqual([])
+      const resolution = (yield* store.loadExecution(parent.runId)).resolutions.find(
+        (entry) => entry.waitId === "await-group",
+      )?.resolution
       expect(resolution?._tag).toBe("Signal")
       const resumed = yield* Schema.decodeUnknownEffect(ChildRuns.GroupResult)(
         resolution?._tag === "Signal" ? resolution.payload : undefined,
@@ -251,14 +252,13 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       const groupId = outcome._tag === "Suspend" ? outcome.token : ""
       yield* store.suspend({
         ...claim,
-        wait: openGroupWait("run-group"),
-        suspension: AgentEvent.AgentSuspended.make({
+        waits: [openGroupWait("run-group")],
+        suspension: suspension({
+          waitId: "run-group",
           token: groupId,
-          reason: "tool-wait",
-          tool_call_id: "run-group",
-          tool_name: ChildRuns.runGroupToolName,
-          tool_params: { concurrency: 3, members: groupMembers },
-          tool_call_batch: [],
+          toolCallId: "run-group",
+          toolName: ChildRuns.runGroupToolName,
+          toolParams: { concurrency: 3, members: groupMembers },
         }),
       })
       const inspection = yield* runtime.inspectFanOut(groupId)
@@ -307,7 +307,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
         result: completedResult("first result"),
       })
       const resumed = yield* runtime.inspect(parent.runId)
-      expect(resumed).toMatchObject({ status: "running", wait: { waitId: "run-group", status: "signaled" } })
+      expect(resumed).toMatchObject({ status: "running", waits: [] })
       const replay = yield* children.runGroup(input)
       expect(replay._tag).toBe("Success")
       const result = yield* Schema.decodeUnknownEffect(ChildRuns.GroupResult)(
@@ -347,7 +347,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       ).toEqual({ _tag: "Suspend", token: receipt.groupId })
       yield* store.suspend({
         ...parentClaim,
-        wait: openGroupWait("cancel-await"),
+        waits: [openGroupWait("cancel-await")],
         suspension: groupSuspension("cancel-await", receipt.groupId),
       })
       yield* runtime.cancel({ runId: parent.runId, reason: "stop group" })
@@ -408,14 +408,13 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           }
           yield* store.suspend({
             ...parentClaim,
-            wait: openGroupWait("sqlite-run-group"),
-            suspension: AgentEvent.AgentSuspended.make({
+            waits: [openGroupWait("sqlite-run-group")],
+            suspension: suspension({
+              waitId: "sqlite-run-group",
               token: groupId,
-              reason: "tool-wait",
-              tool_call_id: "sqlite-run-group",
-              tool_name: ChildRuns.runGroupToolName,
-              tool_params: { concurrency: 3, members: groupMembers },
-              tool_call_batch: [],
+              toolCallId: "sqlite-run-group",
+              toolName: ChildRuns.runGroupToolName,
+              toolParams: { concurrency: 3, members: groupMembers },
             }),
           })
           return { parentRunId: parent.runId, singletonRunId, receipt, input }
@@ -430,7 +429,7 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           const store = yield* RunStore.RunStore
           expect(yield* runtime.inspect(admitted.parentRunId)).toMatchObject({
             status: "waiting",
-            wait: { waitId: "sqlite-run-group", status: "open" },
+            waits: [{ waitId: "sqlite-run-group", status: "open" }],
           })
           const recursive = yield* runtime.spawn({
             parentRunId: admitted.singletonRunId,
@@ -456,7 +455,7 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           })
           const parent = yield* runtime.inspect(admitted.parentRunId)
           expect(parent.status).toBe("running")
-          expect(parent.wait).toMatchObject({ status: "signaled" })
+          expect(parent.waits).toEqual([])
         }).pipe(Effect.provideContext(context)),
       ),
     )
@@ -468,7 +467,10 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           const store = yield* RunStore.RunStore
           const children = ChildRuns.make(store)
           const parent = yield* runtime.inspect(admitted.parentRunId)
-          const resolution = parent.wait?.resolution
+          expect(parent.waits).toEqual([])
+          const resolution = (yield* store.loadExecution(admitted.parentRunId)).resolutions.find(
+            (entry) => entry.waitId === admitted.input.toolCallId,
+          )?.resolution
           const result = yield* Schema.decodeUnknownEffect(ChildRuns.GroupResult)(
             resolution?._tag === "Signal" ? resolution.payload : undefined,
           )
@@ -565,14 +567,13 @@ it.live("resumes one labelled singleton from canonical child settlement across S
           const childRunId = outcome._tag === "Suspend" ? outcome.token : ""
           yield* store.suspend({
             ...claim,
-            wait: openGroupWait(input.toolCallId),
-            suspension: AgentEvent.AgentSuspended.make({
+            waits: [openGroupWait(input.toolCallId)],
+            suspension: suspension({
+              waitId: input.toolCallId,
               token: childRunId,
-              reason: "tool-wait",
-              tool_call_id: input.toolCallId,
-              tool_name: ChildRuns.toolName,
-              tool_params: { selection: input.selection, label: input.label, prompt: input.prompt },
-              tool_call_batch: [],
+              toolCallId: input.toolCallId,
+              toolName: ChildRuns.toolName,
+              toolParams: { selection: input.selection, label: input.label, prompt: input.prompt },
             }),
           })
           return { input, childRunId }
@@ -587,7 +588,7 @@ it.live("resumes one labelled singleton from canonical child settlement across S
           const store = yield* RunStore.RunStore
           expect(yield* runtime.inspect(admitted.input.parentRunId)).toMatchObject({
             status: "waiting",
-            wait: { waitId: admitted.input.toolCallId, status: "open" },
+            waits: [{ waitId: admitted.input.toolCallId, status: "open" }],
           })
           yield* store.complete({
             ...(yield* store.claimExecution({ runId: admitted.childRunId, ownerId: "child" })),
@@ -595,16 +596,17 @@ it.live("resumes one labelled singleton from canonical child settlement across S
           })
           expect(yield* runtime.inspect(admitted.input.parentRunId)).toMatchObject({
             status: "running",
-            wait: {
-              status: "responded",
-              resolution: {
-                _tag: "ToolResult",
-                result: {
-                  _tag: "Succeeded",
-                  childRunId: admitted.childRunId,
-                  label: admitted.input.label,
-                  text: "persisted singleton result",
-                },
+            waits: [],
+          })
+          expect((yield* store.loadExecution(admitted.input.parentRunId)).resolutions[0]).toMatchObject({
+            waitId: admitted.input.toolCallId,
+            resolution: {
+              _tag: "ToolResult",
+              result: {
+                _tag: "Succeeded",
+                childRunId: admitted.childRunId,
+                label: admitted.input.label,
+                text: "persisted singleton result",
               },
             },
           })

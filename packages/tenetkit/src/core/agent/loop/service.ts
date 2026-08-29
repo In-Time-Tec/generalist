@@ -10,35 +10,37 @@ import {
 } from "../../model/telemetry/events.js"
 import { TurnPolicyError, type Decision, type TurnOverrides, type TurnPolicy } from "../../turn/policy.js"
 import type { LanguageModelNotRegistered } from "../../model/registry.js"
-import type { AnyToolCall } from "../tools/result.js"
+import type { AnyToolCall, PendingToolResult } from "../tools/result.js"
 import { resolvedToolResult, type ToolCheckpoint } from "../suspension.js"
+import {
+  completed as checkpointCompleted,
+  pendingResult,
+  projectableResults,
+  resolutionFor,
+  updateCall,
+  waits as batchWaits,
+} from "../tools/checkpoint.js"
 import type { RunError } from "../service.js"
 import type { Input } from "../../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "../message.js"
-import type {
-  LoopServices,
-  ObjectSchema,
-  RunLoopContext,
-  SchemaServicesD,
-  StructuredRunConfig,
-  TurnServices,
-} from "./context.js"
+import type { LoopServices, ObjectSchema, RunLoopContext, StructuredRunConfig, TurnServices } from "./context.js"
 import type { Request } from "../../tools/tool-executor.js"
 import { select } from "../../tools/tool-registry.js"
 import {
   checkpoint as driverCheckpoint,
   intercept,
   logicalOperationId,
-  recordSuspension,
-  setHandoffState,
+  setToolBatch,
+  updateToolBatch,
 } from "../../durable/driver/run.js"
-import { operationKey, type DriverInterpreter } from "../../durable/driver/interpreter.js"
+import { operationKey } from "../../durable/driver/interpreter.js"
 import { LoopDriverState, modelCallOrdinal } from "../../durable/loop-driver-state.js"
-import { HandoffRequirementsMissing, type HandoffRunState, takePendingContinuation } from "../handoff/state.js"
+import { HandoffRequirementsMissing, type HandoffRunState } from "../handoff/state.js"
 import { DriverStateInvalid } from "../../durable/service.js"
-import { terminalCompletedEvent, TurnFinish, turnCompletedEvent } from "../model-turn/finish.js"
+import { terminalCompletedEvent, turnCompletedEvent } from "../model-turn/finish.js"
 import { schedule as scheduleTools } from "../tools/scheduler.js"
 import { isClosed } from "../lifecycle/closure-identity.js"
+import { afterTurnFor } from "./after-turn.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: TurnPolicy<never> }
@@ -73,15 +75,10 @@ export const make = <
     deliverPending,
     flushTelemetry,
     telemetryIdentity,
-    checkpointPending,
     checkpointSuspended,
     pendingResults,
     toolCallEvents,
     resumeApproved,
-    rememberTurn,
-    withSystem,
-    steeringDrainedEvent,
-    isTurnPolicyDecision,
     handoffStateRef,
   } = context
   const structuredFinalEvents = (
@@ -192,112 +189,7 @@ export const make = <
       }),
     )
   }
-  const afterTurn = (
-    turn: number,
-  ): Effect.Effect<
-    {
-      readonly events: Stream.Stream<
-        Event,
-        RunError,
-        LanguageModel.LanguageModel | SchemaServicesD<StructuredOutputSchema>
-      >
-      readonly next?: {
-        readonly prompt: Prompt.RawInput
-        readonly overrides?: TurnOverrides
-      }
-      readonly structuredTurn?: number
-    },
-    AgentError | TurnPolicyError | RunError,
-    R | DriverInterpreter
-  > =>
-    Effect.gen(function* () {
-      const pending = pendingResults()
-      const transcript = yield* checkpointPending(turn, pending)
-      const path = yield* syncSession(turn, transcript)
-      yield* rememberTurn(turn, transcript, pending.length === 0, path)
-      const completed: Event = turnCompletedEvent(state, turn, transcript)
-      if (pending.length === 0) {
-        const followUp = yield* takeFollowUp()
-        if (followUp.length > 0) {
-          return {
-            events: Stream.fromIterable<Event>([completed, steeringDrainedEvent(turn, "followUp", followUp)]),
-            next: { prompt: promptFromSteeringInputs(followUp) },
-          }
-        }
-        if (structured !== undefined) {
-          return {
-            events: Stream.fromIterable<Event>([completed]),
-            structuredTurn: turn + 1,
-          }
-        }
-        if (state.text.length === 0) {
-          return {
-            events: Stream.concat(
-              Stream.fromIterable<Event>([completed]),
-              Stream.fail(TurnFinish.missingOutputFailure(state, turn)),
-            ),
-          }
-        }
-        return {
-          events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(state, turn, transcript)]),
-        }
-      }
-      const evaluated = yield* decidePolicy({
-        turn: turn + 1,
-        history: transcript,
-        pendingToolResults: pending,
-      })
-      if (!isTurnPolicyDecision(evaluated)) {
-        return yield* TurnPolicyError.make({
-          message: "TurnPolicy returned an invalid decision; Stop decisions must include a reason",
-          cause: evaluated,
-        })
-      }
-      const decision = evaluated
-      if (decision._tag === "Stop") {
-        const pendingCalls = pending.map((result) => ({
-          tool_call_id: result.id,
-          tool_name: result.name,
-        }))
-        return {
-          events: Stream.concat(
-            Stream.fromIterable<Event>([completed]),
-            Stream.fail(TurnFinish.policyStopFailure(decision, turn + 1, pendingCalls)),
-          ),
-        }
-      }
-      state.pending.clear()
-      const steering = yield* takeSteering()
-      const basePrompt = steering.length === 0 ? Prompt.empty : promptFromSteeringInputs(steering)
-      let continuationOverrides = decision.overrides
-      let continuationPrompt = basePrompt
-      if (handoffStateRef !== undefined) {
-        const pendingContinuation = yield* takePendingContinuation(handoffStateRef, (handoff) =>
-          setHandoffState(handoff),
-        )
-        if (pendingContinuation !== undefined) {
-          continuationPrompt =
-            steering.length === 0
-              ? Prompt.make(pendingContinuation.prompt)
-              : Prompt.concat(basePrompt, Prompt.make(pendingContinuation.prompt))
-          continuationOverrides = {
-            ...decision.overrides,
-            ...pendingContinuation.overrides,
-          }
-        }
-      }
-      const prompt =
-        continuationOverrides?.instructions === undefined
-          ? continuationPrompt
-          : withSystem(continuationOverrides.instructions, continuationPrompt)
-      const next = continuationOverrides === undefined ? { prompt } : { prompt, overrides: continuationOverrides }
-      return {
-        events: Stream.fromIterable<Event>(
-          steering.length === 0 ? [completed] : [completed, steeringDrainedEvent(turn, "steering", steering)],
-        ),
-        next,
-      }
-    })
+  const afterTurn = afterTurnFor({ context, decidePolicy, takeFollowUp, takeSteering, promptFromSteeringInputs })
   const resetTurnState = (turn: number) =>
     Stream.sync(() => {
       state.turn = turn
@@ -356,14 +248,13 @@ export const make = <
           readonly overrides?: TurnOverrides
         }
       | undefined
+    let alreadyProjectedPending: ReadonlyArray<PendingToolResult> | undefined
     const currentTurn = resetTurnState(turn).pipe(
       Stream.concat(
         Stream.unwrap(
           Effect.all({ tools: Ref.get(toolState), activeAgent: activeAgent() }).pipe(
             Effect.map(({ tools, activeAgent: resumedAgent }) => {
-              const suspension = checkpoint.suspension
-              const activeTools = suspension?.active_tools
-              const registry = activeTools === undefined ? tools.registry : select(tools.registry, activeTools)
+              const registry = select(tools.registry, checkpoint.checkpoint.activeTools)
               const calls = checkpoint.toolCallBatch.map((call) =>
                 Response.makePart("tool-call", {
                   id: call.id,
@@ -374,51 +265,95 @@ export const make = <
                 }),
               )
               const toolCallBatch: Request["toolCallBatch"] = { calls }
-              const suspendedIndex = suspension?.tool_call_index ?? 0
-              if (suspension !== undefined && calls[suspendedIndex] === undefined) {
-                return Stream.fail(
-                  AgentError.make({ message: "Suspension tool call index is outside its batch", turn }),
-                )
-              }
-              const executions = checkpoint.unresolvedToolCallIndexes.flatMap((toolCallIndex) => {
+              const executions = checkpoint.checkpoint.calls.flatMap((entry, toolCallIndex) => {
                 const call = calls[toolCallIndex]
-                return call === undefined ? [] : [{ call, toolCallIndex }]
+                return call === undefined ? [] : [{ call, entry, toolCallIndex }]
               })
               const execute = ({
                 call,
+                entry,
                 toolCallIndex,
               }: {
                 readonly call: AnyToolCall
+                readonly entry: ToolCheckpoint["checkpoint"]["calls"][number]
                 readonly toolCallIndex: number
               }): ReturnType<typeof toolCallEvents> => {
-                const resolution = options.resume?.resolution
-                if (suspension !== undefined && toolCallIndex === suspendedIndex && resolution?._tag === "Approved") {
-                  return resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
+                if (entry.state._tag === "Completed") {
+                  return Stream.empty
                 }
-                if (
-                  suspension !== undefined &&
-                  toolCallIndex === suspendedIndex &&
-                  resolution !== undefined &&
-                  resolution._tag !== "Approved"
-                ) {
+                if (entry.state._tag === "Unknown" || entry.state._tag === "Cancelled") {
+                  return Stream.fail(
+                    AgentError.make({ message: `Tool call ${call.id} is ${entry.state._tag.toLowerCase()}`, turn }),
+                  )
+                }
+                if (entry.state._tag === "Waiting") {
+                  const resolution = resolutionFor(options.resume?.resolutions ?? [], entry.state.waitId)
+                  if (resolution === undefined) return Stream.empty
+                  if (resolution._tag === "Approved") {
+                    return Stream.unwrap(
+                      updateToolBatch((current) =>
+                        updateCall(current, {
+                          callIndex: toolCallIndex,
+                          state: { _tag: "Ready", stage: "execution" },
+                        }),
+                      ).pipe(Effect.map(() => resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry))),
+                    )
+                  }
                   return Stream.fromEffect(
-                    Effect.sync(() => {
+                    Effect.gen(function* () {
                       const result = resolvedToolResult(call, resolution)
-                      state.pending.set(toolCallIndex, result)
+                      yield* updateToolBatch((current) => checkpointCompleted(current, toolCallIndex, result))
                       return { _tag: "ToolExecutionCompleted" as const, turn, call, result }
                     }),
                   )
                 }
-                return toolCallEvents(turn, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
+                return entry.state.stage === "execution"
+                  ? resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
+                  : toolCallEvents(turn, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
               }
-              return scheduleTools(executions, resumedAgent.toolScheduling, execute)
+              return scheduleTools(executions, resumedAgent.toolScheduling, {
+                execute,
+                afterStage: () =>
+                  Effect.gen(function* () {
+                    const current = yield* driverCheckpoint
+                    const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
+                      Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+                    )
+                    if (driverState.toolBatch === undefined) return
+                    for (const [index, result] of projectableResults(
+                      driverState.toolBatch,
+                      checkpoint.projectedResults,
+                      new Set(state.pending.keys()),
+                    )) {
+                      state.pending.set(index, result)
+                    }
+                    const waits = batchWaits(driverState.toolBatch)
+                    if (waits.length > 0) {
+                      return yield* AgentSuspended.make({ checkpoint: driverState.toolBatch, waits })
+                    }
+                    if (
+                      state.pending.size === 0 &&
+                      driverState.toolBatch.calls.length > 0 &&
+                      driverState.toolBatch.calls.every(
+                        (entry) =>
+                          entry.state._tag === "Completed" &&
+                          checkpoint.projectedResults.has(`${entry.call.id}\0${entry.call.name}`),
+                      )
+                    ) {
+                      alreadyProjectedPending = driverState.toolBatch.calls.flatMap((entry) =>
+                        entry.state._tag === "Completed" ? [pendingResult(entry.state.result)] : [],
+                      )
+                    }
+                  }),
+              })
             }),
           ),
         ),
       ),
+      Stream.concat(Stream.fromEffect(setToolBatch(undefined)).pipe(Stream.drain)),
       Stream.concat(
         Stream.unwrap(
-          afterTurn(turn).pipe(
+          afterTurn(turn, alreadyProjectedPending).pipe(
             Effect.map((result) => {
               next = result.next
               return result.events
@@ -433,8 +368,8 @@ export const make = <
       Stream.suspend(() => (next === undefined ? Stream.empty : runTurn(turn + 1, next.prompt, next.overrides))),
     )
   }
-  const startTurn = options.turnStart ?? options.driverCheckpoint?.turn ?? 0
   const toolCheckpoint = validatedResume ?? recoveredToolCheckpoint
+  const startTurn = options.turnStart ?? options.driverCheckpoint?.turn ?? toolCheckpoint?.checkpoint.turn ?? 0
   const runStream =
     toolCheckpoint === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(toolCheckpoint, startTurn)
   const guardedStream = runStream.pipe(
@@ -448,11 +383,6 @@ export const make = <
         return Stream.unwrap(
           Effect.gen(function* () {
             const checkpoint = yield* checkpointSuspended(state.turn, pendingResults(), suspension)
-            yield* recordSuspension({
-              waitId: suspension.tool_call_id,
-              reason: suspension.reason,
-              token: suspension.token,
-            })
             yield* syncSession(state.turn, checkpoint)
             return Stream.concat(
               Stream.fromIterable<Event>([turnCompletedEvent(state, state.turn, checkpoint)]),

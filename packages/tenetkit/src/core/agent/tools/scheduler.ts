@@ -1,9 +1,14 @@
-import { Function, Stream } from "effect"
+import { Cause, Effect, Function, Stream } from "effect"
 
 import type { ToolSchedulingPolicy } from "../service.js"
 
 interface ScheduledCall {
   readonly call: { readonly name: string }
+}
+
+interface StageHandlers<A extends ScheduledCall, B, E, R, E2, R2> {
+  readonly execute: (call: A) => Stream.Stream<B, E, R>
+  readonly afterStage: (stage: ReadonlyArray<A>) => Effect.Effect<void, E2, R2>
 }
 
 /** @experimental Default safe policy: every framework-executed call is an exclusive barrier. */
@@ -59,25 +64,47 @@ const stages = <A extends ScheduledCall>(
  * barrier. Inner streams merge live; callers retain result order separately by the original call index.
  */
 export const schedule: {
-  <A extends ScheduledCall, B, E, R>(
+  <A extends ScheduledCall, B, E, R, E2, R2>(
     policy: ToolSchedulingPolicy,
-    execute: (call: A) => Stream.Stream<B, E, R>,
-  ): (calls: ReadonlyArray<A>) => Stream.Stream<B, E, R>
-  <A extends ScheduledCall, B, E, R>(
+    handlers: StageHandlers<A, B, E, R, E2, R2>,
+  ): (calls: ReadonlyArray<A>) => Stream.Stream<B, E | E2, R | R2>
+  <A extends ScheduledCall, B, E, R, E2, R2>(
     calls: ReadonlyArray<A>,
     policy: ToolSchedulingPolicy,
-    execute: (call: A) => Stream.Stream<B, E, R>,
-  ): Stream.Stream<B, E, R>
+    handlers: StageHandlers<A, B, E, R, E2, R2>,
+  ): Stream.Stream<B, E | E2, R | R2>
 } = Function.dual(
   3,
-  <A extends ScheduledCall, B, E, R>(
+  <A extends ScheduledCall, B, E, R, E2, R2>(
     calls: ReadonlyArray<A>,
     policy: ToolSchedulingPolicy,
-    execute: (call: A) => Stream.Stream<B, E, R>,
-  ): Stream.Stream<B, E, R> =>
+    handlers: StageHandlers<A, B, E, R, E2, R2>,
+  ): Stream.Stream<B, E | E2, R | R2> =>
     Stream.fromIterable(stages(calls, policy)).pipe(
-      Stream.flatMap((stage) =>
-        Stream.fromIterable(stage).pipe(Stream.flatMap(execute, { concurrency: policy.maxConcurrency })),
-      ),
+      Stream.flatMap((stage) => {
+        const failures = new Array<Cause.Cause<E> | undefined>(stage.length)
+        const settled = Stream.fromIterable(stage.map((call, index) => ({ call, index }))).pipe(
+          Stream.flatMap(
+            ({ call, index }) =>
+              handlers.execute(call).pipe(
+                Stream.catchCause((cause) =>
+                  Stream.sync(() => {
+                    failures[index] = cause
+                  }).pipe(Stream.drain),
+                ),
+              ),
+            { concurrency: policy.maxConcurrency },
+          ),
+        )
+        return settled.pipe(
+          Stream.concat(
+            Stream.suspend(() => {
+              const failure = failures.find((cause) => cause !== undefined)
+              if (failure !== undefined) return Stream.failCause<E | E2>(failure)
+              return Stream.fromEffect(handlers.afterStage(stage)).pipe(Stream.drain)
+            }),
+          ),
+        )
+      }),
     ),
 )

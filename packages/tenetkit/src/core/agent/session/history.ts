@@ -68,7 +68,7 @@ const validateResume = (
   history: Prompt.Prompt,
   received: import("../event.js").AgentSuspended,
 ): Effect.Effect<SuspensionCheckpoint, ResumeMismatch> => {
-  const expected = suspensionCheckpoint(history.content)
+  const expected = suspensionCheckpoint(history.content, received)
   if (expected === undefined) return ResumeMismatch.make({ reason: "checkpoint-not-found", received })
   return sameSuspension(expected.suspension, received)
     ? Effect.succeed(expected)

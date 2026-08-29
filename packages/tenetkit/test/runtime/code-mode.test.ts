@@ -30,7 +30,10 @@ const budget = {
   logBytes: 100,
   outputBytes: 1_000,
 }
-const rootAgent = Agent.make({ name: "code-mode-root" })
+const rootAgent = Agent.make({
+  name: "code-mode-root",
+  toolScheduling: { maxConcurrency: 3, parallelSafe: [] },
+})
 const root = AgentManifest.fromLiveAgent(rootAgent, {
   model: modelPin,
   tools: [],
@@ -66,7 +69,8 @@ const finish = Response.makePart("finish", {
   response: undefined,
 })
 
-const fixture = () => {
+const fixture = (options: { readonly calls?: number } = {}) => {
+  const calls = options.calls ?? 1
   const counts = { model: 0, capability: 0 }
   const model = Layer.effect(
     LanguageModel.LanguageModel,
@@ -78,19 +82,21 @@ const fixture = () => {
             Stream.fromIterable<Response.StreamPartEncoded>(
               call === 0
                 ? [
-                    Response.makePart("tool-call", {
-                      id: "code-1",
-                      name: "code_mode",
-                      params: {
-                        source: "return 'program-result'",
-                        input: "run program",
-                        tools: [],
-                        agents: [],
-                        steps: [],
-                        budget,
-                      },
-                      providerExecuted: false,
-                    }),
+                    ...Array.from({ length: calls }, (_, index) =>
+                      Response.makePart("tool-call", {
+                        id: `code-${index + 1}`,
+                        name: "code_mode",
+                        params: {
+                          source: `return 'program-result-${index + 1}'`,
+                          input: `run program ${index + 1}`,
+                          tools: [],
+                          agents: [],
+                          steps: [],
+                          budget,
+                        },
+                        providerExecuted: false,
+                      }),
+                    ),
                     finish,
                   ]
                 : [Response.makePart("text-delta", { id: "answer", delta: "root-complete" }), finish],
@@ -218,6 +224,79 @@ describe("Runtime code_mode Program children", () => {
       )
     })
 
+    standalone.live(`${backend} atomically admits and settles simultaneous authored Code Mode children`, () => {
+      const filename = tempDbPath("code-mode-plural")
+      const { resolver, counts } = fixture({ calls: 3 })
+      const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
+      const scenario = Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        const rootRunId = (yield* runtime.start({
+          executable,
+          registrations,
+          sessionId: `code-mode-plural:${backend}`,
+          idempotencyKey: "root",
+          prompt: "use code mode three times",
+        })).runId
+        const waitIds = ["code-1", "code-2", "code-3"].map(
+          (toolCallId) => `${rootRunId}:tool:0:${toolCallId}:code_mode`,
+        )
+
+        yield* scheduler.tick
+        yield* scheduler.idle
+
+        const waiting = yield* runtime.inspect(rootRunId)
+        expect(waiting.status).toBe("waiting")
+        expect(waiting.waits.map(({ waitId, status }) => ({ waitId, status }))).toEqual(
+          waitIds.map((waitId) => ({ waitId, status: "open" })),
+        )
+        const admitted = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs
+        expect(admitted).toHaveLength(4)
+        expect(admitted.filter((run) => run.parentRunId === rootRunId).map((run) => run.run.runId)).toEqual(
+          ["code-1", "code-2", "code-3"].map(
+            (toolCallId) => `run_code_${Pins.digest({ parentRunId: rootRunId, toolCallId }).slice(0, 32)}`,
+          ),
+        )
+        expect(counts).toEqual({ model: 1, capability: 0 })
+        const operationIds = yield* Effect.forEach(waitIds, (operationKey) =>
+          store
+            .getOperationByKey({ runId: rootRunId, operationKey })
+            .pipe(
+              Effect.flatMap((operation) =>
+                operation === undefined
+                  ? Effect.die(`missing Code Mode operation ${operationKey}`)
+                  : Effect.succeed(operation.operationId),
+              ),
+            ),
+        )
+        expect(new Set(operationIds).size).toBe(3)
+
+        yield* Effect.forEach(Array.from({ length: 12 }), () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), {
+          discard: true,
+        })
+
+        expect(counts).toEqual({ model: 2, capability: 3 })
+        expect((yield* runtime.inspect(rootRunId)).waits).toEqual([])
+        expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
+        expect(
+          yield* Effect.forEach(waitIds, (operationKey) =>
+            store
+              .getOperationByKey({ runId: rootRunId, operationKey })
+              .pipe(Effect.map((operation) => operation?.operationId)),
+          ),
+        ).toEqual(operationIds)
+        expect(
+          (yield* runtime.history({ runId: rootRunId, limit: 100 }))
+            .filter((event) => event._tag === "RunResumed")
+            .map((event) => event.waitId),
+        ).toEqual(waitIds)
+      })
+      return backend === "memory"
+        ? withLayer(Runtime.layerMemory(options))(scenario)
+        : withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(scenario)
+    })
+
     {
       const { resolver } = fixture()
       const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
@@ -254,10 +333,10 @@ describe("Runtime code_mode Program children", () => {
   for (const crashPoint of ["before-admission", "after-atomic-admission"] as const) {
     standalone.live(`sqlite preserves the Code Mode boundary after a crash ${crashPoint}`, () => {
       const filename = tempDbPath(`code-mode-${crashPoint}`)
-      const { resolver, counts } = fixture()
+      const { resolver, counts } = fixture({ calls: 3 })
       const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
       let rootRunId = ""
-      let childRunId = ""
+      let childRunIds: ReadonlyArray<string> = []
       const crash = withLayer(SqliteRuntime.layerSqlite({ ...options, filename }))(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -291,10 +370,10 @@ describe("Runtime code_mode Program children", () => {
           const tree = (yield* runtime.treeCheckpoint(rootRunId)).inspection
           expect(counts.model).toBe(1)
           expect(counts.capability).toBe(0)
-          expect(tree.runs).toHaveLength(crashPoint === "before-admission" ? 1 : 2)
+          expect(tree.runs).toHaveLength(crashPoint === "before-admission" ? 1 : 4)
           if (crashPoint === "after-atomic-admission") {
             expect((yield* runtime.inspect(rootRunId)).status).toBe("waiting")
-            childRunId = tree.runs.find((run) => run.parentRunId === rootRunId)!.run.runId
+            childRunIds = tree.runs.filter((run) => run.parentRunId === rootRunId).map((run) => run.run.runId)
           }
           yield* Fiber.interrupt(fiber)
           yield* Scope.close(scope, Exit.succeed(undefined))
@@ -314,14 +393,16 @@ describe("Runtime code_mode Program children", () => {
             discard: true,
           })
           expect(counts.model).toBe(2)
-          expect(counts.capability).toBe(1)
+          expect(counts.capability).toBe(3)
           expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
           const tree = (yield* runtime.treeCheckpoint(rootRunId)).inspection
-          expect(tree.runs).toHaveLength(2)
-          const recoveredChild = tree.runs.find((run) => run.parentRunId === rootRunId)!.run.runId
-          const expectedChild = `run_code_${Pins.digest({ parentRunId: rootRunId, toolCallId: "code-1" }).slice(0, 32)}`
-          expect(recoveredChild).toBe(expectedChild)
-          if (childRunId !== "") expect(recoveredChild).toBe(childRunId)
+          expect(tree.runs).toHaveLength(4)
+          const recoveredChildren = tree.runs.filter((run) => run.parentRunId === rootRunId).map((run) => run.run.runId)
+          const expectedChildren = ["code-1", "code-2", "code-3"].map(
+            (toolCallId) => `run_code_${Pins.digest({ parentRunId: rootRunId, toolCallId }).slice(0, 32)}`,
+          )
+          expect(recoveredChildren).toEqual(expectedChildren)
+          if (childRunIds.length > 0) expect(recoveredChildren).toEqual(childRunIds)
         }),
       )
       return crash.pipe(Effect.andThen(reopen))

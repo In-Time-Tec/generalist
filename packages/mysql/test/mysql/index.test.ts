@@ -5,6 +5,9 @@ import { messagingMailboxSuite } from "../../../tenetkit/test/runtime/messaging/
 import { messagingPolicySuite } from "../../../tenetkit/test/runtime/messaging/suites/policy.js"
 import { messagingSendOperationSuite } from "../../../tenetkit/test/runtime/messaging/suites/send-operation.js"
 import { claimReadyWorker } from "../../../tenetkit/test/runtime/run/queued-activation.js"
+import { assistantAddress } from "../../../tenetkit/test/runtime/execution/fixtures.js"
+import { driverConformance, type ClaimExecution } from "tenetkit/test/runtime-driver"
+import { Effect } from "effect"
 import { mysqlAvailable, mysqlDatabase, mysqlMessagingLayer, mysqlLayer } from "./runtime/environment.js"
 
 /**
@@ -37,4 +40,25 @@ messagingDurabilitySuite({
   storeLayer: database.provision(mysqlLayer(database.url)),
   activate,
   skip,
+})
+
+const conformanceDatabase = mysqlDatabase("runtime-driver-conformance")
+const conformanceLayer = conformanceDatabase.provision(mysqlLayer(conformanceDatabase.url))
+const conformanceClaim: ClaimExecution = (services, { runId, workerId }) => {
+  const claims = services.claims
+  if (claims === undefined) return Effect.die("MySQL conformance layer does not provide RunClaims")
+  return Effect.gen(function* () {
+    const claimed = yield* claims.claimReadyRuns({ workerId, limit: 16, lease: "10 seconds" })
+    const run = claimed.find((candidate) => candidate.run.runId === runId)
+    if (run === undefined) return yield* Effect.die(`MySQL did not claim conformance Run ${runId}`)
+    return { runId, ownerId: run.workerId, attemptFence: run.attemptFence, session: run.session }
+  }).pipe(Effect.orDie)
+}
+
+driverConformance({
+  name: "MySQL",
+  address: assistantAddress,
+  layer: conformanceLayer,
+  skip,
+  capabilities: { runtime: { claim: conformanceClaim } },
 })

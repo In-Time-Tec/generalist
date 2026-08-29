@@ -291,6 +291,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
                 epoch: "1",
               },
               cancellationRequested: false,
+              resolutions: [],
               registrations: registrationsFor(assistantRef),
             }),
           ),

@@ -1,7 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Option, Stream, Tracer } from "effect"
 import { Response } from "effect/unstable/ai"
-import { AgentEvent } from "../../../../src/index.js"
 import { Approval, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import {
   assistantAddress,
@@ -43,7 +42,7 @@ const admitWaitWithClaimedChild = (waitId: string) =>
     yield* store.claimExecution({ runId: child.runId, ownerId: "child" })
     yield* store.suspend({
       ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })),
-      wait: openWait({ waitId, reason: "signal" }),
+      waits: [openWait({ waitId, reason: "signal" })],
       suspension: suspension({ waitId }),
     })
     return { runtime, store, runId: parent.runId }
@@ -96,7 +95,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
-        wait: openWait({ waitId: "wait:1" }),
+        waits: [openWait({ waitId: "wait:1" })],
         suspension: suspension({ waitId: "wait:1" }),
       })
       yield* runtime.respond({
@@ -147,28 +146,28 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
         ...claim,
         event: { _tag: "ApprovalRequested", turn: 0, call, request: approvalRequest },
       })
-      const approvalSuspension = suspension({ waitId: "approval:delete-draft", reason: "approval" })
       yield* store.suspend({
         ...claim,
-        suspension: AgentEvent.AgentSuspended.make({
-          token: approvalSuspension.token,
-          reason: approvalSuspension.reason,
-          tool_call_batch: approvalSuspension.tool_call_batch,
-          tool_call_id: call.id,
-          tool_name: call.name,
-          tool_params: call.params,
-        }),
-        wait: {
+        suspension: suspension({
           waitId: "approval:delete-draft",
-          reason: {
-            _tag: "Approval",
-            request: approvalRequest,
+          reason: "approval",
+          toolCallId: call.id,
+          toolName: call.name,
+          toolParams: call.params,
+        }),
+        waits: [
+          {
+            waitId: "approval:delete-draft",
+            reason: {
+              _tag: "Approval",
+              request: approvalRequest,
+            },
+            status: "open",
+            openedAt: "2026-08-03T00:00:00.000Z",
           },
-          status: "open",
-          openedAt: "2026-08-03T00:00:00.000Z",
-        },
+        ],
       })
-      expect((yield* runtime.inspect(receipt.runId)).wait).toMatchObject({
+      expect((yield* runtime.inspect(receipt.runId)).waits[0]).toMatchObject({
         reason: {
           _tag: "Approval",
           request: {

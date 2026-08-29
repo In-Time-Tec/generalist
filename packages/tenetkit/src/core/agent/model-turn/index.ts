@@ -23,13 +23,13 @@ import type { TurnOverrides } from "../../turn/policy.js"
 import { wrapDriverAttempt } from "./driver.js"
 import type { AttemptCompleted, AttemptEvent, CompletedModelOperation } from "../../model/operation.js"
 import { captureFinishPart, captureStructuredUsage, modelBudgetCharge } from "./finish.js"
-import { schedule as scheduleTools } from "../tools/scheduler.js"
 import { classifyOtherFailure, isToolNameCollision, providerOutput, singleFailure } from "./parts.js"
 import { projectCommittedResponse } from "./commit.js"
 import { attemptResponse, replayMessages } from "./response.js"
 import { make as makeActiveTurn } from "./active.js"
 import { make as makeRetryableOverflow } from "./retryable-overflow.js"
 import { validateContext } from "../../context/session.js"
+import { scheduleBatch, type ToolExecution } from "./tool-batch.js"
 
 export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
@@ -421,11 +421,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
         Effect.map((transformedPrompt): Stream.Stream<Event, RunError, ModelTurnServices<T, R>> => {
           let nextToolCallIndex = 0
           const calls = new Array<AnyToolCall>()
-          const executions = new Array<{
-            readonly call: AnyToolCall
-            readonly messages: ReadonlyArray<Prompt.Message>
-            readonly toolCallIndex: number
-          }>()
+          const executions = new Array<ToolExecution>()
           const toolCallBatch: Request["toolCallBatch"] = { calls }
           const accepted: Stream.Stream<
             Event,
@@ -467,9 +463,17 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
           const tools: Stream.Stream<Event, RunError, R | ModelTurnServices<T, never>> = Stream.suspend(() => {
             Object.freeze(calls)
             Object.freeze(toolCallBatch)
-            return scheduleTools(executions, toolScheduling, ({ call, messages, toolCallIndex }) =>
-              toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
-            )
+            if (calls.length === 0) return Stream.empty
+            return scheduleBatch({
+              turn,
+              calls,
+              executions,
+              toolScheduling,
+              activeTools: activeRegistry.entries.map((entry) => String(entry.tool.name)),
+              pending: context.state.pending,
+              execute: ({ call, messages, toolCallIndex }) =>
+                toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
+            })
           })
           return Stream.fromIterable<Stream.Stream<Event, RunError, ModelTurnServices<T, R>>>([
             accepted,

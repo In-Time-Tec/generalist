@@ -1,13 +1,12 @@
 /* oxlint-disable no-accumulating-spread */
-import { DateTime, Effect, Function, Option } from "effect"
-import { RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
+import { DateTime, Effect, Equal, Function, Option } from "effect"
+import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { CancelInput } from "../../service.js"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
 import type { ExecutionResult } from "../../execution/state.js"
 import type { RunFailure } from "../../run/event.js"
-import type { RunWait, WaitResolution } from "../../run/wait.js"
-import { checkpointRef } from "../../executable/manifest.js"
+import type { WaitResolution } from "../../run/wait.js"
 import {
   appendAgentEvent,
   appendLifecycle,
@@ -16,27 +15,23 @@ import {
   completedEvent,
   failedEvent,
   resumedEvent,
-  waitingEvent,
   rejectIfTerminal,
 } from "../append.js"
 import { afterTerminal } from "../lanes.js"
-import type { MemoryState, StoredRun } from "../state.js"
+import { openRunWaits, waitMapKey, type MemoryState, type StoredRun } from "../state.js"
 import { reconcileFanOut } from "./fan-out/service.js"
 import { ProgramCapabilities } from "../../../core/index.js"
-import { groupIdFromSuspension, resultFromInspection } from "../../child/group.js"
-import { hasUnsettledChild, reconcileChildWait, settleParentChild } from "./child/settlement.js"
+import { hasUnsettledChild, settleParentChild } from "./child/settlement.js"
 import { hasPendingOperationCancellation, markOperationCancellations } from "./operation/cancellation.js"
+import { closeWait } from "./control/wait.js"
 
 type SignalResult = Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable>
 type CancelResult = Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable>
-type SuspendInput = import("../../run/store.js").ExecutionClaim & {
-  readonly wait: RunWait
-  readonly suspension: import("../../execution/state.js").ExecutionSuspension
-  readonly checkpoint?: import("../../execution/state.js").ExecutionCheckpoint
-  readonly continuation?: import("../../run/steering.js").ExecutionContinuation | null
-}
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
-type ResumeResult = Effect.Effect<MemoryState, RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable>
+type ResumeResult = Effect.Effect<
+  MemoryState,
+  RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
+>
 
 const getRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -51,24 +46,33 @@ const hasUnknownOperation = (state: MemoryState, runId: string): boolean =>
   [...state.operations.values()].some((operation) => operation.runId === runId && operation.status === "unknown") ||
   [...state.programOperations.values()].some((operation) => operation.runId === runId && operation.status === "unknown")
 
-const reconcileProgramCancellation = (state: MemoryState, runId: string, reason?: string): MemoryState => {
-  const programOperations = new Map(state.programOperations)
-  const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
-  for (const [key, operation] of programOperations) {
-    if (operation.runId === runId && ["reserved", "running", "waiting"].includes(operation.status)) {
-      programOperations.set(key, { ...operation, status: "failed", error: failure })
+const reconcileProgramCancellation = (
+  state: MemoryState,
+  runId: string,
+  reason?: string,
+): Effect.Effect<MemoryState, RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const programOperations = new Map(state.programOperations)
+    const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
+    for (const [key, operation] of programOperations) {
+      if (operation.runId === runId && ["reserved", "running", "waiting"].includes(operation.status)) {
+        programOperations.set(key, { ...operation, status: "failed", error: failure })
+      }
     }
-  }
-  const programStates = new Map(state.programStates)
-  const programState = programStates.get(runId)
-  if (programState !== undefined) programStates.set(runId, { ...programState, activeSlots: 0 })
-  const runs = new Map(state.runs)
-  const run = runs.get(runId)
-  if (run?.wait?.status === "open") {
-    runs.set(runId, { ...run, wait: { ...run.wait, status: "cancelled" } })
-  }
-  return { ...state, runs, programOperations, programStates }
-}
+    const programStates = new Map(state.programStates)
+    const programState = programStates.get(runId)
+    if (programState !== undefined) programStates.set(runId, { ...programState, activeSlots: 0 })
+    let next: MemoryState = { ...state, programOperations, programStates }
+    const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+    for (const wait of openRunWaits(next, runId)) {
+      const transitioned = closeWait(next, { runId, waitId: wait.waitId, status: "cancelled", closedAt })
+      if (transitioned.affected !== 1) {
+        return yield* RuntimeUnavailable.make({ message: `Wait ${wait.waitId} cancellation lost its open transition` })
+      }
+      next = transitioned.state
+    }
+    return next
+  })
 
 const finalizeCancellingParent = (state: MemoryState, runId: string): Effect.Effect<MemoryState, RuntimeUnavailable> =>
   Effect.gen(function* () {
@@ -84,7 +88,7 @@ const finalizeCancellingParent = (state: MemoryState, runId: string): Effect.Eff
     ) {
       return state
     }
-    const reconciled = reconcileProgramCancellation(state, runId, run.cancelReason)
+    const reconciled = yield* reconcileProgramCancellation(state, runId, run.cancelReason)
     const [event, cancelled] = yield* appendLifecycle(reconciled, runId, cancelledEvent(run.cancelReason), "cancelled")
     let next = cancelled
     const settled = next.runs.get(runId)!
@@ -160,7 +164,7 @@ const completeCancellation = (state: MemoryState, run: StoredRun): Effect.Effect
       runs.set(run.runId, released)
       return { ...state, runs }
     }
-    const reconciled = reconcileProgramCancellation(state, run.runId, run.cancelReason)
+    const reconciled = yield* reconcileProgramCancellation(state, run.runId, run.cancelReason)
     const [event, cancelled] = yield* appendLifecycle(
       reconciled,
       run.runId,
@@ -209,7 +213,7 @@ export const cancel: {
       next = requested
     }
     if (!terminal) next = markOperationCancellations(next, run.runId)
-    if (!terminal) next = reconcileProgramCancellation(next, run.runId, input.reason ?? run.cancelReason)
+    if (!terminal) next = yield* reconcileProgramCancellation(next, run.runId, input.reason ?? run.cancelReason)
     next = yield* cancelDescendants(next, run, input.reason)
     if (cancellationStopsBeforeFinalize(run, terminal)) return next
     const current = next.runs.get(run.runId)
@@ -289,7 +293,7 @@ export const fail: {
         runs.set(run.runId, released)
         return { ...state, runs }
       }
-      const reconciled = reconcileProgramCancellation(state, run.runId, run.cancelReason)
+      const reconciled = yield* reconcileProgramCancellation(state, run.runId, run.cancelReason)
       const [event, cancelled] = yield* appendLifecycle(
         reconciled,
         run.runId,
@@ -322,72 +326,7 @@ export const fail: {
   }),
 )
 
-export const suspend: {
-  (input: SuspendInput): (state: MemoryState) => SignalResult
-  (state: MemoryState, input: SuspendInput): SignalResult
-} = Function.dual(2, (state: MemoryState, input: SuspendInput) =>
-  Effect.gen(function* () {
-    const run = yield* getRun(state, input.runId)
-    const terminal = rejectIfTerminal(run)
-    if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
-    const executableRef = yield* Effect.try({
-      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    const runs = new Map(state.runs)
-    const { checkpoint: _previousCheckpoint, ...withoutCheckpoint } = run
-    let updated: StoredRun = {
-      ...withoutCheckpoint,
-      executableRef,
-      wait: input.wait,
-      suspension: input.suspension,
-    }
-    if (input.checkpoint !== undefined) updated = { ...updated, checkpoint: input.checkpoint }
-    if (input.continuation !== undefined && input.continuation !== null) {
-      updated = { ...updated, continuation: input.continuation }
-    }
-    if (input.continuation === null) {
-      const { continuation: _previousContinuation, ...withoutContinuation } = updated
-      runs.set(run.runId, withoutContinuation)
-    } else runs.set(run.runId, updated)
-    const [, next] = yield* appendLifecycle({ ...state, runs }, run.runId, waitingEvent(input.wait), "waiting")
-    const waitingRuns = new Map(next.runs)
-    const { ownerId: _previousOwnerId, ...waiting } = waitingRuns.get(run.runId)!
-    waitingRuns.set(run.runId, waiting)
-    const released = { ...next, runs: waitingRuns }
-    const child = Option.flatMap(Option.fromNullishOr(input.suspension.token), (token) =>
-      Option.fromNullishOr(released.runs.get(token)),
-    ).pipe(Option.getOrUndefined)
-    const terminalEvent = child?.events.find(
-      (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
-    )
-    if (child !== undefined && terminalEvent !== undefined) {
-      const reconciled = yield* reconcileChildWait(released, released.runs.get(run.runId)!, child, terminalEvent)
-      if (reconciled !== released) return reconciled
-    }
-    const groupId = groupIdFromSuspension(input.suspension)
-    const group = groupId === undefined ? undefined : released.fanOuts.get(groupId)
-    if (group === undefined || group.parentRunId !== run.runId || group.status === "running") return released
-    const resolution = {
-      _tag: "Signal" as const,
-      name: input.wait.waitId,
-      payload: resultFromInspection(group),
-    }
-    const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-    const resumedRuns = new Map(released.runs)
-    resumedRuns.set(run.runId, {
-      ...resumedRuns.get(run.runId)!,
-      wait: { ...input.wait, status: "signaled", resolution, closedAt },
-    })
-    const [, resumed] = yield* appendLifecycle(
-      { ...released, runs: resumedRuns },
-      run.runId,
-      resumedEvent(input.wait.waitId, resolution),
-      "running",
-    )
-    return resumed
-  }),
-)
+export { suspend } from "./control/suspend.js"
 
 export const resume: {
   (input: ResumeInput): (state: MemoryState) => ResumeResult
@@ -400,17 +339,23 @@ export const resume: {
     if (run.cancellationRequested) {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
-    if (run.activeWaitId !== input.waitId) {
-      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+    const prior = state.waits.get(waitMapKey(run.runId, input.waitId))
+    if (prior !== undefined && prior.status !== "open") {
+      if (prior.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return state
+      return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
     }
+    if (prior === undefined) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-    const runs = new Map(state.runs)
-    runs.set(run.runId, {
-      ...run,
-      wait: { ...run.wait!, status: "responded", resolution: input.resolution, closedAt },
+    const transitioned = closeWait(state, {
+      runId: run.runId,
+      waitId: input.waitId,
+      status: "responded",
+      resolution: input.resolution,
+      closedAt,
     })
+    if (transitioned.affected !== 1) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     const [, next] = yield* appendLifecycle(
-      { ...state, runs },
+      transitioned.state,
       run.runId,
       resumedEvent(input.waitId, input.resolution),
       "running",

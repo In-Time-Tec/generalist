@@ -6,6 +6,7 @@ import { MysqlClient } from "@effect/sql-mysql2"
 import { MysqlRunSchema } from "@tenetkit/mysql"
 import { Errors, Runtime, RunStore } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
@@ -57,6 +58,53 @@ const exactRegistrations = () => {
 
 describeMysql("mysql run store", () => {
   beforeAll(database.provisioned, 60_000)
+  it.live("returns exactly one then zero rows for a conditional wait transition", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const waitId = uniqueSession("affected-wait")
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("affected-session"),
+          idempotencyKey: waitId,
+          prompt: textPrompt("wait"),
+        })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "affected-row" })
+        yield* store.suspend({
+          ...claim,
+          waits: [openWait({ waitId })],
+          suspension: suspension({ waitId }),
+        })
+        const affected = yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          return yield* sql.withTransaction(
+            Effect.all(
+              [
+                transitionRunWait({
+                  runId: receipt.runId,
+                  waitId,
+                  status: "responded",
+                  resolution: { _tag: "ToolResult", result: "done", encodedResult: "done" },
+                  closedAt: "2026-08-29T00:00:00.000Z",
+                }),
+                transitionRunWait({
+                  runId: receipt.runId,
+                  waitId,
+                  status: "responded",
+                  resolution: { _tag: "ToolResult", result: "done", encodedResult: "done" },
+                  closedAt: "2026-08-29T00:00:00.000Z",
+                }),
+              ],
+              { concurrency: 1 },
+            ),
+          )
+        }).pipe(scopedWith(mysqlClient(url)))
+        expect(affected).toEqual([1, 0])
+      }).pipe(scopedWith(mysqlLayer(url))),
+    ),
+  )
+
   it.live("paginates every Run in deterministic keyset order beyond one scheduler window", () =>
     withSchema(
       Effect.gen(function* () {
@@ -273,7 +321,7 @@ describeMysql("mysql run store", () => {
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
           session: claimed.session,
-          wait: openWait({ waitId: "wait:direct-resume" }),
+          waits: [openWait({ waitId: "wait:direct-resume" })],
           suspension: suspension({ waitId: "wait:direct-resume" }),
         })
         const resolution = { _tag: "Denied" as const, reason: "mysql exact resolution" }
@@ -779,10 +827,10 @@ describeMysql("mysql run store", () => {
         const approvalWait = openWait({ waitId: "approval", reason: "approval" })
         yield* store.suspend({
           ...suspending,
-          wait: approvalWait,
+          waits: [approvalWait],
           suspension: suspension({ waitId: "approval", reason: "approval" }),
         })
-        expect((yield* runtime.inspect(receipt.runId)).wait).toMatchObject({
+        expect((yield* runtime.inspect(receipt.runId)).waits[0]).toMatchObject({
           waitId: approvalWait.waitId,
           reason: approvalWait.reason,
           status: "open",

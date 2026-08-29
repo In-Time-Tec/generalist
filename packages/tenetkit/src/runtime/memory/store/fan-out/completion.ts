@@ -1,10 +1,11 @@
 import { DateTime, Effect } from "effect"
-import { groupIdFromSuspension, resultFromInspection } from "../../../child/group.js"
+import { resultFromInspection, waitIdForGroup } from "../../../child/group.js"
 import { isTerminal } from "../../../run.js"
 import { appendLifecycle, resumedEvent } from "../../append.js"
 import type { RuntimeUnavailable } from "../../../errors.js"
-import type { MemoryState, StoredFanOut, StoredRun } from "../../state.js"
+import { waitMapKey, type MemoryState, type StoredFanOut, type StoredRun } from "../../state.js"
 import type { RemainderAction } from "./remainder.js"
+import { closeWait } from "../control/wait.js"
 
 interface MemberCounts {
   readonly succeeded: number
@@ -57,30 +58,37 @@ const settlePendingParent = (input: CompletionInput): Effect.Effect<MemoryState,
 const resumeGroupWait = (input: CompletionInput): Effect.Effect<MemoryState, RuntimeUnavailable> =>
   Effect.gen(function* () {
     const parent = input.state.runs.get(input.fanOut.parentRunId)
-    if (
-      parent === undefined ||
-      isTerminal(parent.status) ||
-      parent.activeWaitId === undefined ||
-      parent.wait === undefined ||
-      groupIdFromSuspension(parent.suspension) !== input.fanOut.fanOutId
-    ) {
+    const waitId = parent === undefined ? undefined : waitIdForGroup(parent.suspension, input.fanOut.fanOutId)
+    const wait = waitId === undefined ? undefined : input.state.waits.get(waitMapKey(parent!.runId, waitId))
+    if (parent === undefined || isTerminal(parent.status) || wait?.status !== "open") {
       return input.state
     }
     const group = input.state.fanOuts.get(input.fanOut.fanOutId)
     if (group === undefined) return input.state
     const resolution = {
       _tag: "Signal" as const,
-      name: parent.activeWaitId,
+      name: wait.waitId,
       payload: resultFromInspection(group),
     }
     const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     const runs = new Map(input.state.runs)
     const { ownerId: _, ...releasedParent } = parent
-    runs.set(parent.runId, { ...releasedParent, wait: { ...parent.wait, status: "signaled", resolution, closedAt } })
-    const [, resumed] = yield* appendLifecycle(
+    runs.set(parent.runId, releasedParent)
+    const transitioned = closeWait(
       { ...input.state, runs },
+      {
+        runId: parent.runId,
+        waitId: wait.waitId,
+        status: "signaled",
+        resolution,
+        closedAt,
+      },
+    )
+    if (transitioned.affected !== 1) return input.state
+    const [, resumed] = yield* appendLifecycle(
+      transitioned.state,
       parent.runId,
-      resumedEvent(parent.activeWaitId, resolution),
+      resumedEvent(wait.waitId, resolution),
       "running",
     )
     return resumed
@@ -92,27 +100,34 @@ const resumeProgramOperation = (input: CompletionInput): Effect.Effect<MemorySta
     const operationEntry = [...input.state.programOperations.entries()].find(
       ([, operation]) => operation.fanOutId === input.fanOut.fanOutId && operation.status === "waiting",
     )
-    if (
-      operationEntry === undefined ||
-      parent === undefined ||
-      isTerminal(parent.status) ||
-      parent.activeWaitId !== operationEntry[1].waitId ||
-      parent.wait === undefined
-    ) {
+    if (operationEntry === undefined || parent === undefined || isTerminal(parent.status)) {
       return input.state
     }
     const [operationKey, operation] = operationEntry
     const operationWaitId = operation.waitId
     if (operationWaitId === undefined) return input.state
+    const wait = input.state.waits.get(waitMapKey(parent.runId, operationWaitId))
+    if (wait?.status !== "open") return input.state
     const resolution = { _tag: "Signal" as const, name: operationWaitId }
     const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     const runs = new Map(input.state.runs)
     const { ownerId: _, ...releasedParent } = parent
-    runs.set(parent.runId, { ...releasedParent, wait: { ...parent.wait, status: "signaled", resolution, closedAt } })
+    runs.set(parent.runId, releasedParent)
     const programOperations = new Map(input.state.programOperations)
     programOperations.set(operationKey, { ...operation, status: "running" })
-    const [, resumed] = yield* appendLifecycle(
+    const transitioned = closeWait(
       { ...input.state, runs, programOperations },
+      {
+        runId: parent.runId,
+        waitId: operationWaitId,
+        status: "signaled",
+        resolution,
+        closedAt,
+      },
+    )
+    if (transitioned.affected !== 1) return input.state
+    const [, resumed] = yield* appendLifecycle(
+      transitioned.state,
       parent.runId,
       resumedEvent(operationWaitId, resolution),
       "running",

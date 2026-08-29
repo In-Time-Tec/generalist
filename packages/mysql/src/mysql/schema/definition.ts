@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const MIGRATION_NAME = "tenetkit_runtime"
 export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
 export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
@@ -43,7 +43,6 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   max_subagents INTEGER NOT NULL,
   parent_run_id VARCHAR(255),
   invocation_id VARCHAR(255),
-  active_wait_id VARCHAR(255),
   attempt INT NOT NULL DEFAULT 0,
   attempt_fence INT NOT NULL DEFAULT 0,
   last_sequence INT NOT NULL DEFAULT -1,
@@ -51,7 +50,6 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   cancel_reason TEXT,
   terminal_event_id VARCHAR(255),
   accepted_sequence BIGINT NOT NULL,
-  responded_wait_ids_json LONGTEXT NOT NULL,
   driver_checkpoint_json LONGTEXT,
   suspension_json LONGTEXT,
   continuation_json LONGTEXT,
@@ -98,6 +96,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS tenetkit_run_waits (
   run_id VARCHAR(255) NOT NULL,
   wait_id VARCHAR(255) NOT NULL,
+  authored_order INT NOT NULL,
   reason TEXT NOT NULL,
   status VARCHAR(32) NOT NULL,
   response_json LONGTEXT,

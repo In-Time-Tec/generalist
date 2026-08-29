@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
-import { AgentSuspended } from "../../core/agent/event.js"
 import type { Address } from "../../runtime/address.js"
 import { IdempotencyConflict, RunIdConflict } from "../../runtime/errors.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
@@ -14,6 +13,7 @@ import { Runtime, type Interface as RuntimeInterface } from "../../runtime/servi
 import { StaleClaim } from "../../runtime/sql/errors.js"
 import { RunClaims, type Interface as RunClaimsInterface } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
+import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 
 /** @experimental A multi-worker claim without the driver's decoded persisted Run representation. */
 export interface WorkerClaim {
@@ -228,20 +228,15 @@ const registerRuntime = <LayerError, ClaimsLayerError>(
         const waitId = `${id.idempotencyKey}:signal`
         yield* services.store.suspend({
           ...claim,
-          wait: {
-            waitId,
-            reason: { _tag: "Signal", name: waitId },
-            status: "open",
-            openedAt: "2026-08-29T00:00:00.000Z",
-          },
-          suspension: AgentSuspended.make({
-            token: waitId,
-            reason: "tool-wait",
-            tool_call_id: waitId,
-            tool_name: "conformance",
-            tool_params: {},
-            tool_call_batch: [],
-          }),
+          waits: [
+            {
+              waitId,
+              reason: { _tag: "Signal", name: waitId },
+              status: "open",
+              openedAt: "2026-08-29T00:00:00.000Z",
+            },
+          ],
+          suspension: toolSuspension([waitId]),
         })
         yield* services.runtime.signal({ runId: receipt.runId, name: waitId })
         const resumed = yield* capability.claim(services, { runId: receipt.runId, workerId: "control-b" })
@@ -257,6 +252,12 @@ const registerRuntime = <LayerError, ClaimsLayerError>(
           events.map((event) => `${receipt.runId}:${event.sequence}`),
         )
       }),
+    ),
+  )
+
+  it.effect("keeps plural waits independent, idempotent, and insert-once", () =>
+    provide(options, (services) =>
+      pluralWaitsConformance({ name: options.name, address: options.address, services, capability }),
     ),
   )
 }

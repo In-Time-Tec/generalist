@@ -52,9 +52,6 @@ export interface StoredRun {
   readonly parentRunId?: string
   readonly childReadiness?: ChildReadiness
   readonly invocationId?: string
-  readonly activeWaitId?: string
-  readonly wait?: RunWait
-  readonly respondedWaitIds: ReadonlySet<string>
   readonly lastSequence: number
   readonly attempt: number
   readonly attemptFence: number
@@ -101,6 +98,7 @@ export interface MemoryState {
   readonly nextSteeringCounter: number
   readonly nextMessageCounter: number
   readonly runs: ReadonlyMap<string, StoredRun>
+  readonly waits: ReadonlyMap<string, RunWait>
   readonly sessions: ReadonlyMap<string, MemorySession>
   readonly treeRoots: ReadonlyMap<string, TreeRoot>
   readonly lanes: ReadonlyMap<string, Lane>
@@ -156,6 +154,7 @@ export const emptyState = (input: {
   nextSteeringCounter: 1,
   nextMessageCounter: 1,
   runs: new Map(),
+  waits: new Map(),
   sessions: new Map(),
   treeRoots: new Map(),
   lanes: new Map(),
@@ -178,6 +177,29 @@ export const operationMapKey: {
   (operationId: string): (runId: string) => string
   (runId: string, operationId: string): string
 } = Function.dual(2, (runId: string, operationId: string): string => `${runId}\0${operationId}`)
+
+export const waitMapKey: {
+  (waitId: string): (runId: string) => string
+  (runId: string, waitId: string): string
+} = Function.dual(2, (runId: string, waitId: string): string => `${runId}\0${waitId}`)
+
+export const runWaits: {
+  (runId: string): (state: MemoryState) => ReadonlyArray<RunWait>
+  (state: MemoryState, runId: string): ReadonlyArray<RunWait>
+} = Function.dual(
+  2,
+  (state: MemoryState, runId: string): ReadonlyArray<RunWait> =>
+    [...state.waits.entries()].filter(([key]) => key.startsWith(`${runId}\0`)).map(([, wait]) => wait),
+)
+
+export const openRunWaits: {
+  (runId: string): (state: MemoryState) => ReadonlyArray<RunWait>
+  (state: MemoryState, runId: string): ReadonlyArray<RunWait>
+} = Function.dual(
+  2,
+  (state: MemoryState, runId: string): ReadonlyArray<RunWait> =>
+    runWaits(state, runId).filter((wait) => wait.status === "open"),
+)
 
 export const agentNameKey: {
   (name: string): (scope: string) => string

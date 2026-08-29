@@ -3,15 +3,24 @@ import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from
 import type { Cursor } from "../../cursor.js"
 import type { RunInspection } from "../../run.js"
 import type { RunEvent } from "../../run/event.js"
-import type { MemoryState, SubscriberError, SubscriberQueue, TreeSubscriberQueue } from "../state.js"
+import {
+  openRunWaits,
+  type MemoryState,
+  type SubscriberError,
+  type SubscriberQueue,
+  type TreeSubscriberQueue,
+} from "../state.js"
 
-export const toInspection = (
-  run: MemoryState["runs"] extends ReadonlyMap<string, infer R> ? R : never,
-): RunInspection => {
+type StoredRun = MemoryState["runs"] extends ReadonlyMap<string, infer R> ? R : never
+
+export const toInspection: {
+  (run: StoredRun): (state: MemoryState) => RunInspection
+  (state: MemoryState, run: StoredRun): RunInspection
+} = Function.dual(2, (state: MemoryState, run: StoredRun): RunInspection => {
   const optionals = () => {
     const parent = run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }
     const readiness = run.childReadiness === undefined ? parent : { ...parent, childReadiness: run.childReadiness }
-    return run.wait === undefined ? readiness : { ...readiness, wait: run.wait }
+    return readiness
   }
   return {
     runId: run.runId,
@@ -20,11 +29,12 @@ export const toInspection = (
     executableManifest: run.executableManifest,
     depth: run.depth,
     treePolicy: run.treePolicy,
+    waits: openRunWaits(state, run.runId),
     lastSequence: run.lastSequence,
     durability: "ephemeral",
     ...optionals(),
   }
-}
+})
 
 export const inspectRun: {
   (runId: string): (state: MemoryState) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
@@ -35,7 +45,7 @@ export const inspectRun: {
     if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
     const run = state.runs.get(runId)
     if (run === undefined) return Effect.fail(RunNotFound.make({ runId }))
-    return Effect.succeed(toInspection(run))
+    return Effect.succeed(toInspection(state, run))
   },
 )
 

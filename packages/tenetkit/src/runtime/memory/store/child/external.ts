@@ -24,7 +24,7 @@ import { activateRoot as activateAdmittedRoot } from "../activate.js"
 import { activeChildCount, promoteChildCapacity } from "./capacity.js"
 import { cancel as cancelRun, respond, suspend } from "../control.js"
 import { requireExecutionClaim } from "../execution.js"
-import type { MemoryState } from "../../state.js"
+import { openRunWaits, type MemoryState } from "../../state.js"
 
 const immutableEqual = (placement: Placement, input: ReserveInput): boolean =>
   placement.placementId === input.placementId &&
@@ -92,6 +92,7 @@ const reserve = (state: MemoryState, input: ReserveInput) =>
             ...input,
             session: input.session,
             ...input.parentSuspension,
+            waits: [input.parentSuspension.wait],
           })
     return [placement, next] as const
   })
@@ -146,8 +147,7 @@ const settle = (
       parent !== undefined &&
       !isTerminal(parent.status) &&
       !parent.cancellationRequested &&
-      parent.activeWaitId === placement.waitId &&
-      parent.wait?.status === "open"
+      openRunWaits(next, parent.runId).some((wait) => wait.waitId === placement.waitId)
     ) {
       next = yield* respond(next, {
         runId: parent.runId,
@@ -180,10 +180,10 @@ const rootView = (state: MemoryState, stored: ExternalRoot) =>
       executableManifest: run.executableManifest,
       depth: run.depth,
       treePolicy: run.treePolicy,
+      waits: openRunWaits(state, run.runId),
       lastSequence: run.lastSequence,
       durability: "ephemeral",
     }
-    if (run.wait !== undefined) Object.assign(inspection, { wait: run.wait })
     const projection: InspectionRun = {
       inspection,
       rootRunId: run.rootRunId,

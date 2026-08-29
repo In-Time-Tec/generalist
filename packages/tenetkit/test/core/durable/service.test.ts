@@ -1864,18 +1864,26 @@ describe("DurableDriver Agent.stream integration", () => {
           }).pipe(Stream.runDrain, Effect.flip)
           if (suspended._tag !== "tenetkit/core/AgentSuspended") return expect.unreachable()
           expect(
-            scheduled.some((operation) => operation.kind === "wait" && operation.key === suspended.tool_call_id),
-          ).toBe(true)
+            scheduled.filter((operation) => operation.kind === "tool" && operation.key === suspended.waits[0]?.waitId),
+          ).toHaveLength(1)
+          expect(scheduled.some((operation) => operation.kind === "wait")).toBe(false)
           streamPhase = "resume"
           yield* Agent.stream(agent, {
             prompt: "ignored",
             logicalOperationId: "suspend-run",
             sessionId: "driver-suspend",
-            resume: { suspension: suspended },
+            resume: {
+              suspension: suspended,
+              resolutions: [
+                {
+                  waitId: suspended.waits[0]!.waitId,
+                  resolution: { _tag: "ToolResult", result: "done", encodedResult: "done" },
+                },
+              ],
+            },
           }).pipe(Stream.runDrain)
-          expect(
-            scheduled.some((operation) => operation.kind === "wait" && operation.key === "resume:wait-token-1"),
-          ).toBe(true)
+          expect(scheduled.filter((operation) => operation.kind === "tool")).toHaveLength(1)
+          expect(scheduled.some((operation) => operation.kind === "wait")).toBe(false)
         }),
       )
     })

@@ -61,22 +61,9 @@ const terminalToolState = (state: MemoryState, runId: string, event: RunEvent) =
   return Effect.succeed(state)
 }
 
-const updateWait = (updated: MutableStoredRun, run: StoredRun, event: RunEvent): void => {
-  if (event._tag === "RunWaiting") {
-    updated.activeWaitId = event.wait.waitId
-    updated.wait = event.wait
-  } else if (event._tag === "RunResumed") {
-    delete updated.activeWaitId
-    if (run.wait !== undefined) updated.wait = run.wait
-  } else if (run.activeWaitId !== undefined) {
-    updated.activeWaitId = run.activeWaitId
-  }
-}
-
 const updateOptionalRunFields = (updated: MutableStoredRun, run: StoredRun, event: RunEvent): void => {
   if (run.parentRunId !== undefined) updated.parentRunId = run.parentRunId
   if (run.invocationId !== undefined) updated.invocationId = run.invocationId
-  updateWait(updated, run, event)
   if (event._tag === "RunCancellationRequested") {
     if (event.reason !== undefined) updated.cancelReason = event.reason
     else if (run.cancelReason !== undefined) updated.cancelReason = run.cancelReason
@@ -161,7 +148,6 @@ export const appendEvent: {
         address: run.address,
         message: run.message,
         rootRunId: run.rootRunId,
-        respondedWaitIds: run.respondedWaitIds,
         lastSequence: sequence,
         attempt: event._tag === "RunAttemptStarted" ? event.attempt : run.attempt,
         cancellationRequested: event._tag === "RunCancellationRequested" ? true : run.cancellationRequested,

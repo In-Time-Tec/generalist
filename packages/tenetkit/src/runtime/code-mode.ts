@@ -12,6 +12,7 @@ import type {
 } from "./run/store.js"
 import type { ExecutionCheckpoint } from "./execution/state.js"
 import type { ExecutionContinuation } from "./run/steering.js"
+import type { RunWait } from "./run/wait.js"
 import { make as makeAddress } from "./address.js"
 import { make as makeMessage } from "./messaging/message.js"
 import { narrow as narrowRegistrations } from "./executable/registration.js"
@@ -219,6 +220,7 @@ export interface Interface {
   readonly admitSuspension: (input: {
     readonly suspension: AgentEvent.AgentSuspended
     readonly openedAt: string
+    readonly waits: ReadonlyArray<RunWait>
     readonly checkpoint?: ExecutionCheckpoint
     readonly continuation?: ExecutionContinuation | null
   }) => Effect.Effect<void, ProgramAdmissionFailed>
@@ -290,14 +292,13 @@ export const make = (input: {
         },
       })
       return {
-        ...input.claim,
         childRunId,
         invocationId: request.toolCallId,
         message,
         executableRef: executable.ref,
         executableManifest: executable.manifest,
         registrations,
-      } satisfies AdmitProgramChildInput
+      } satisfies Omit<AdmitProgramChildInput, keyof ExecutionClaim>
     })
   const admissionFailure = (failure: { readonly message?: string }) =>
     ProgramAdmissionFailed.make({
@@ -319,33 +320,37 @@ export const make = (input: {
           return Effect.succeed({ _tag: "DomainFailure" as const, failure: typed, encodedFailure: typed })
         }),
       ),
-    admitSuspension: ({ suspension, openedAt, ...state }) =>
-      Schema.decodeUnknownEffect(parameters, { onExcessProperty: "error" })(suspension.tool_params).pipe(
-        Effect.flatMap((decoded) => prepare({ ...decoded, toolCallId: suspension.tool_call_id })),
-        Effect.filterOrFail(
-          (prepared) => prepared.childRunId === suspension.token,
-          () => ProgramAdmissionFailed.make({ message: "code_mode suspension token does not match its child Run" }),
-        ),
-        Effect.flatMap((prepared) =>
-          input.store.admitProgramChildAndSuspend({
-            ...prepared,
-            ...state,
-            suspension,
-            wait: {
-              waitId: suspension.tool_call_id,
-              reason: { _tag: "ToolWait" },
-              status: "open",
-              openedAt,
-            },
+    admitSuspension: ({ suspension, openedAt: _openedAt, waits, ...state }) =>
+      Effect.gen(function* () {
+        const codeWaits = suspension.waits.filter((candidate) => candidate.call.name === "code_mode")
+        const children = yield* Effect.forEach(codeWaits, (wait) =>
+          Effect.gen(function* () {
+            const decoded = yield* Schema.decodeUnknownEffect(parameters, { onExcessProperty: "error" })(
+              wait.call.params,
+            )
+            const prepared = yield* prepare({ ...decoded, toolCallId: wait.call.id })
+            if (prepared.childRunId !== wait.token) {
+              return yield* ProgramAdmissionFailed.make({
+                message: "code_mode suspension token does not match its child Run",
+              })
+            }
+            return prepared
           }),
-        ),
-        Effect.asVoid,
-        Effect.mapError(admissionFailure),
-      ),
+        )
+        const [first, ...rest] = children
+        if (first === undefined) return yield* ProgramAdmissionFailed.make({ message: "code_mode wait is missing" })
+        return yield* input.store.admitProgramChildAndSuspend({
+          ...input.claim,
+          ...state,
+          children: [first, ...rest],
+          suspension,
+          waits,
+        })
+      }).pipe(Effect.asVoid, Effect.mapError(admissionFailure)),
   }
 }
 
-/** @experimental Add the Runtime-owned declaration without changing the resolved Agent identity. */
+/** @experimental Add the Runtime-owned parallel-safe declaration without changing the resolved Agent identity. */
 export const withTool: {
   (
     implementation: Interface,
@@ -359,7 +364,16 @@ export const withTool: {
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent.Agent<Tools, R>,
     implementation: Interface,
-  ): Agent.Agent<Tools, R> => Agent.withTools(agent, [implementation.tool]),
+  ): Agent.Agent<Tools, R> => {
+    const extended = Agent.withTools(agent, [implementation.tool])
+    return {
+      ...extended,
+      toolScheduling: {
+        ...extended.toolScheduling,
+        parallelSafe: [...extended.toolScheduling.parallelSafe, "code_mode"],
+      },
+    }
+  },
 )
 
 /** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */

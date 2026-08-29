@@ -4,7 +4,7 @@ import { RunNotFound } from "../../errors.js"
 import { projectRunSnapshot, projectTreeCheckpoint } from "../../execution/inspection.js"
 import { make as makeTreeCursor } from "../../tree/cursor.js"
 import { decodeEvent } from "../codec/codecs.js"
-import { decodeRunEffect, loadRunWait } from "../store/statements.js"
+import { decodeRunEffect, loadRunWaitsByStatus } from "../store/statements.js"
 import type { EventRow, RunRow } from "../codec/rows.js"
 import type { ChildReadiness } from "../../child/readiness.js"
 
@@ -43,7 +43,7 @@ const loadRuns = (rootRunId: string) =>
     return yield* Effect.forEach(rows, (row) =>
       Effect.gen(function* () {
         const run = yield* decodeRunEffect(row)
-        const wait = yield* loadRunWait(run.runId, run.activeWaitId)
+        const waits = yield* loadRunWaitsByStatus(run.runId, "open")
         const inspection = {
           runId: run.runId,
           status: run.status,
@@ -51,13 +51,13 @@ const loadRuns = (rootRunId: string) =>
           executableManifest: run.executableManifest,
           depth: run.depth,
           treePolicy: run.treePolicy,
+          waits,
           lastSequence: run.lastSequence,
           durability: "durable" as const,
         }
         if (run.parentRunId !== undefined) Object.assign(inspection, { parentRunId: run.parentRunId })
         const childReadiness = readiness.get(run.runId)
         if (childReadiness !== undefined) Object.assign(inspection, { childReadiness })
-        if (wait !== undefined) Object.assign(inspection, { wait })
         const result = {
           inspection,
           rootRunId: run.rootRunId,

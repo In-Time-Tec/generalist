@@ -1,4 +1,4 @@
-import { Effect, Equal, Function, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Effect, Function, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, ToolNameCollision } from "./event.js"
 import { type Item, type MemoryError, projectTranscript } from "../context/memory.js"
@@ -9,7 +9,7 @@ import type { SkillSourceError } from "../context/skill-source.js"
 import type { Agent, RunError, RunOptions } from "./service.js"
 import { withSystem } from "./message.js"
 import { activateSkillFailure, activateSkillSuccess, activateSkillToolName } from "./skill-tool.js"
-import { suspensionCheckpointOption, unresolvedToolCall } from "./suspension.js"
+import { checkpointFromHistory } from "./suspension.js"
 import type { AnyToolCall, PendingToolResult } from "./tools/result.js"
 import { type AgentRunState, make as makeProviderOutputState } from "./model-turn/provider-output-state.js"
 import { make as makeModelTurn } from "./model-turn/index.js"
@@ -29,11 +29,10 @@ import {
   type RecallInput,
   type RememberInput,
   type RunStream,
-  type SuspensionMetadata,
   suspensionApplicationIdentity,
   RunSupport,
 } from "./loop/run-support.js"
-import { intercept, bindResume, setHandoffState } from "../durable/driver/run.js"
+import { intercept, setHandoffState, setToolBatch } from "../durable/driver/run.js"
 import { type HandoffRunState, make as makeHandoffStateRef, takePendingContinuation } from "./handoff/state-ref.js"
 import type { ObjectSchema, StructuredRunConfig } from "./loop/context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
@@ -98,58 +97,17 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       ) =>
         Effect.gen(function* () {
           const withPending = yield* appendPending(turn, pending)
-          const unresolved = unresolvedToolCall(withPending.content, suspension.tool_call_id)
-          if (
-            unresolved === undefined ||
-            unresolved.call.id !== suspension.tool_call_id ||
-            unresolved.call.name !== suspension.tool_name ||
-            !Equal.equals(unresolved.call.params, suspension.tool_params)
-          ) {
+          if (checkpointFromHistory(withPending.content, suspension.checkpoint) === undefined) {
             return yield* AgentError.make({
-              message: "Suspension does not match the unresolved checkpoint call",
+              message: "Suspension does not match the authored tool-batch checkpoint",
               turn,
             })
           }
-          const metadata: SuspensionMetadata = {
-            token: suspension.token,
-            reason: suspension.reason,
-            tool_call_batch_ids: suspension.tool_call_batch.map((call) => call.id),
-          }
-          if (suspension.tool_call_index !== undefined) metadata.tool_call_index = suspension.tool_call_index
-          if (suspension.active_tools !== undefined) metadata.active_tools = suspension.active_tools
-          if (suspension.activated_skills !== undefined) metadata.activated_skills = suspension.activated_skills
-          const messages = withPending.content.map((message, messageIndex): Prompt.Message => {
-            if (message.role !== "assistant") return message
-            return Prompt.makeMessage("assistant", {
-              content: message.content.map((part, partIndex): Prompt.AssistantMessagePart => {
-                if (part.type !== "tool-call") return part
-                const { [suspensionCheckpointOption]: _priorCheckpoint, ...partOptions } = part.options
-                if (messageIndex === unresolved.messageIndex && partIndex === unresolved.partIndex) {
-                  return Prompt.makePart("tool-call", {
-                    id: part.id,
-                    name: part.name,
-                    params: part.params,
-                    providerExecuted: part.providerExecuted,
-                    options: { ...partOptions, [suspensionCheckpointOption]: metadata },
-                  })
-                }
-                return Prompt.makePart("tool-call", {
-                  id: part.id,
-                  name: part.name,
-                  params: part.params,
-                  providerExecuted: part.providerExecuted,
-                  options: partOptions,
-                })
-              }),
-              options: message.options,
-            })
-          })
-          const checkpoint = Prompt.fromMessages(messages)
           const path = yield* syncSession(turn, withPending)
           const parentId = path.at(-1)?.id ?? null
           yield* applyCompactionResult(
             turn,
-            { _tag: "Microcompact", history: checkpoint, prompt: Prompt.empty },
+            { _tag: "Microcompact", history: withPending, prompt: Prompt.empty },
             parentId,
             suspensionApplicationIdentity(suspension),
           )
@@ -404,7 +362,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       const interpreterServices = yield* Layer.build(layerForRun(agent, options, baseInitialPrompt, runBudget))
       const withInterpreter = <A, E, RInner>(effect: Effect.Effect<A, E, RInner>) =>
         effect.pipe(Effect.provideContext(interpreterServices))
-      if (validatedResume !== undefined) yield* withInterpreter(bindResume(validatedResume.suspension.token))
+      if (validatedResume !== undefined) yield* withInterpreter(setToolBatch(validatedResume.checkpoint))
       const loadInitialPrompt = () =>
         options.resume === undefined && recoveredToolCheckpoint === undefined
           ? recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)

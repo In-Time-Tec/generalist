@@ -1,6 +1,6 @@
 import { Effect, Exit, Layer, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Agent, Approvals, Permissions, Tool, Toolkit } from "tenetkit"
+import { Agent, AgentEvent, Approvals, Permissions, Tool, Toolkit } from "tenetkit"
 import { decodeConfig as decodeOpenRouterConfig } from "tenetkit/ai/openrouter"
 import { TestModel } from "tenetkit/test"
 import { SqlClient } from "effect/unstable/sql"
@@ -284,6 +284,7 @@ export class SqlObject {
           yield* sql.unsafe("UPDATE workerd_probe SET requests = requests + 1 WHERE id = 1")
           const probeCount = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
           const cancellationRunId = `workerd-cancellation-${probeCount[0]?.requests ?? 0}`
+          const pluralRunId = `workerd-plural-${probeCount[0]?.requests ?? 0}`
           const cancellationExecutable = test("workerd-cancellation", "1")
           const cancellationMessage = makeMessage({
             id: cancellationRunId,
@@ -292,6 +293,14 @@ export class SqlObject {
             prompt: Prompt.make("cancel"),
             idempotencyKey: cancellationRunId,
             correlationId: cancellationRunId,
+          })
+          const pluralMessage = makeMessage({
+            id: pluralRunId,
+            to: Address.make("agent:test"),
+            sessionId: "session",
+            prompt: Prompt.make("wait for three responses"),
+            idempotencyKey: pluralRunId,
+            correlationId: pluralRunId,
           })
           yield* activationSchema
           const committedAlarm = 4_000_000_000_000
@@ -306,12 +315,12 @@ export class SqlObject {
               run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
               executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents,
               attempt, attempt_fence, last_sequence, cancellation_requested, accepted_sequence,
-              responded_wait_ids_json, created_at, updated_at
+              created_at, updated_at
             ) VALUES (
               ${runId}, 'running', 'agent:test', 'session', ${runId}, '{}', 'digest', ${runId},
               '{}', '{}', ${runId}, 0, 4, 4,
               1, 1, -1, 0, 1,
-              '[]', '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z'
+              '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z'
             )
           `
           yield* sql.withTransaction(
@@ -356,6 +365,119 @@ export class SqlObject {
             ...claim,
             error: AgentExecutionFailure.make({ message: "execution interrupted" }),
           })
+          yield* store.admitStart({
+            runId: pluralRunId,
+            message: pluralMessage,
+            executableRef: cancellationExecutable.ref,
+            executableManifest: cancellationExecutable.manifest,
+            registrations: [],
+            treePolicy: { maxDepth: 4, maxSubagents: 4 },
+            initialChildren: [],
+            initialFanOuts: [],
+          })
+          const pluralClaim = yield* store.claimExecution({ runId: pluralRunId, ownerId: "workerd" })
+          const pluralWaitIds = ["a", "b", "c"].map((suffix) => `${pluralRunId}:${suffix}`)
+          const pluralCalls = pluralWaitIds.map((waitId) => ({
+            type: "tool-call" as const,
+            id: waitId,
+            name: "workerd-conformance",
+            params: {},
+            providerExecuted: false,
+            metadata: {},
+          }))
+          const pluralSuspension = AgentEvent.AgentSuspended.make({
+            checkpoint: {
+              turn: 0,
+              calls: pluralCalls.map((call) => ({
+                call,
+                operationKey: `workerd:${call.id}`,
+                state: { _tag: "Waiting" as const, reason: "tool-wait" as const, waitId: call.id, token: call.id },
+              })),
+              activeTools: ["workerd-conformance"],
+              activatedSkills: [],
+              invocationPath: [],
+            },
+            waits: pluralCalls.map((call, callIndex) => ({
+              waitId: call.id,
+              token: call.id,
+              reason: "tool-wait" as const,
+              callIndex,
+              call,
+            })),
+          })
+          yield* store.suspend({
+            ...pluralClaim,
+            waits: pluralWaitIds.map((waitId) => ({
+              waitId,
+              reason: { _tag: "ToolWait" as const },
+              status: "open" as const,
+              openedAt: "2026-08-29T00:00:00.000Z",
+            })),
+            suspension: pluralSuspension,
+          })
+          const suffixes = (waits: ReadonlyArray<{ readonly waitId: string }>) =>
+            waits.map(({ waitId }) => waitId.slice(waitId.lastIndexOf(":") + 1))
+          const pluralInitialOrder = suffixes((yield* store.inspect(pluralRunId)).waits)
+          const firstResolution = { _tag: "ToolResult" as const, result: "first", encodedResult: "first" }
+          yield* store.respond({ runId: pluralRunId, waitId: pluralWaitIds[0]!, resolution: firstResolution })
+          yield* store.respond({
+            runId: pluralRunId,
+            waitId: pluralWaitIds[2]!,
+            resolution: { _tag: "ToolResult", result: "third", encodedResult: "third" },
+          })
+          const pluralRemainingAfterOutOfOrder = suffixes((yield* store.inspect(pluralRunId)).waits)
+          yield* store.respond({ runId: pluralRunId, waitId: pluralWaitIds[0]!, resolution: firstResolution })
+          const pluralConflictingTag = yield* store
+            .respond({
+              runId: pluralRunId,
+              waitId: pluralWaitIds[0]!,
+              resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
+            })
+            .pipe(Effect.match({ onFailure: (error) => error._tag, onSuccess: () => "success" }))
+          yield* store.respond({
+            runId: pluralRunId,
+            waitId: pluralWaitIds[1]!,
+            resolution: { _tag: "ToolResult", result: "second", encodedResult: "second" },
+          })
+          const pluralFinalOpen = (yield* store.inspect(pluralRunId)).waits.length
+          const pluralEvents = yield* store.history({ runId: pluralRunId, cursor: -1, limit: 100 })
+          const pluralResumeEvents = pluralEvents.filter((event) => event._tag === "RunResumed").length
+          const pluralRows = yield* sql<{ readonly wait_id: string }>`
+            SELECT wait_id FROM tenetkit_run_waits WHERE run_id = ${pluralRunId} ORDER BY authored_order
+          `
+          const pluralAuthoredHistory = suffixes(pluralRows.map(({ wait_id: waitId }) => ({ waitId })))
+
+          let transitionAffected: readonly [number, number] = [-1, -1]
+          yield* Effect.exit(
+            sql.withTransaction(
+              Effect.gen(function* () {
+                const probeWaitId = `${pluralRunId}:affected-row-probe`
+                yield* sql`
+                  INSERT INTO tenetkit_run_waits
+                    (run_id, wait_id, authored_order, reason, status, response_json, opened_at, closed_at)
+                  VALUES
+                    (${pluralRunId}, ${probeWaitId}, 3, '{"_tag":"ToolWait"}', 'open', NULL,
+                     '2026-08-29T00:00:00.000Z', NULL)
+                `
+                const first = yield* sql<{ readonly wait_id: string }>`
+                  UPDATE tenetkit_run_waits
+                  SET status = 'responded', response_json = '{"_tag":"ToolResult","result":"probe","encodedResult":"probe"}',
+                      closed_at = '2026-08-29T00:00:01.000Z'
+                  WHERE run_id = ${pluralRunId} AND wait_id = ${probeWaitId} AND status = 'open'
+                  RETURNING wait_id
+                `
+                const duplicate = yield* sql<{ readonly wait_id: string }>`
+                  UPDATE tenetkit_run_waits
+                  SET status = 'responded', response_json = '{"_tag":"ToolResult","result":"probe","encodedResult":"probe"}',
+                      closed_at = '2026-08-29T00:00:01.000Z'
+                  WHERE run_id = ${pluralRunId} AND wait_id = ${probeWaitId} AND status = 'open'
+                  RETURNING wait_id
+                `
+                transitionAffected = [first.length, duplicate.length]
+                return yield* RuntimeUnavailable.make({ message: "roll back affected-row probe" })
+              }),
+            ),
+          )
           const cancellationTerminal = yield* sql<{ readonly status: string }>`
             SELECT status FROM tenetkit_runs WHERE run_id = ${cancellationRunId}
           `
@@ -398,6 +520,13 @@ export class SqlObject {
             alarm: yield* Effect.promise(() => storage.getAlarm()),
             schemaVersion: schemaRow.version,
             migrations,
+            transitionAffected,
+            pluralInitialOrder,
+            pluralRemainingAfterOutOfOrder,
+            pluralConflictingTag,
+            pluralFinalOpen,
+            pluralResumeEvents,
+            pluralAuthoredHistory,
           })
         }).pipe(Effect.provideContext(context)),
       ),

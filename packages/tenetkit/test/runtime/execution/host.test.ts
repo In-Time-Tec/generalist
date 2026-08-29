@@ -5,7 +5,6 @@ import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Scope, Stream } fr
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
-  AgentEvent,
   AgentManifest,
   AgentProgram,
   Compaction,
@@ -33,7 +32,7 @@ import {
   RunEvent,
   RunStore,
 } from "../../../src/runtime/index.js"
-import { assistant, assistantRef, registrationsFor, researcherRef } from "./fixtures.js"
+import { assistant, assistantRef, registrationsFor, researcherRef, suspension } from "./fixtures.js"
 import { provideScoped } from "./scoped-provide.js"
 import { tempDbPath } from "../sql/scenario.js"
 import { ActiveExecutions, layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
@@ -1052,7 +1051,8 @@ describe("ExecutionHost", () => {
           throw new Error(failed?._tag === "RunFailed" ? failed.error.message : "run failed")
         }
         expect(waiting.status).toBe("waiting")
-        expect(waiting.wait?.waitId).toBe("wait-call-10")
+        const waitId = `${receipt.runId}:tool:9:wait-call-10:wait_for_human`
+        expect(waiting.waits[0]?.waitId).toBe(waitId)
         const persisted = yield* store.loadExecution(receipt.runId)
         expect(persisted.checkpoint !== undefined && "driverVersion" in persisted.checkpoint).toBe(true)
         if (persisted.checkpoint === undefined || !("driverVersion" in persisted.checkpoint)) return
@@ -1064,7 +1064,11 @@ describe("ExecutionHost", () => {
         if (Option.isSome(durableSession)) {
           expect(Session.buildContext(yield* durableSession.value.path()).content.length).toBeGreaterThan(0)
         }
-        expect(persisted.suspension?.token).toBe("approval-token")
+        expect(
+          persisted.suspension?._tag === "tenetkit/core/AgentSuspended"
+            ? persisted.suspension.waits[0]?.token
+            : undefined,
+        ).toBe("approval-token")
         expect(lifecycle).toEqual([
           "admission resolver acquired",
           "admission resolver finalized",
@@ -1079,8 +1083,7 @@ describe("ExecutionHost", () => {
           lifecycle.length = 0
           yield* runtime.respond({
             runId: receipt.runId,
-            waitId: "wait-call-10",
-            idempotencyKey: "response:1",
+            waitId,
             resolution: { _tag: "ToolResult", result: "approved", encodedResult: "approved" },
           })
           expect((yield* store.loadExecution(receipt.runId)).suspension).toBeDefined()
@@ -1089,7 +1092,9 @@ describe("ExecutionHost", () => {
 
           const completed = yield* runtime.inspect(receipt.runId)
           expect((yield* store.loadExecution(receipt.runId)).suspension).toBeUndefined()
-          expect(suspensionAtFinalModel).toMatchObject({ token: "approval-token", tool_call_id: "wait-call-10" })
+          expect(suspensionAtFinalModel).toMatchObject({
+            waits: [{ token: "approval-token", call: { id: "wait-call-10" } }],
+          })
           if (completed.status === "failed") {
             const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
             const failure = history.find((event) => event._tag === "RunFailed")
@@ -1235,7 +1240,12 @@ describe("ExecutionHost", () => {
           yield* host.execute(yield* store.claimExecution({ runId: parent.runId, ownerId: "parent:first" }))
           expect(yield* runtime.inspect(parent.runId)).toMatchObject({
             status: "waiting",
-            wait: { waitId: "hosted-group-call", status: "open" },
+            waits: [
+              {
+                waitId: `${parent.runId}:tool:0:hosted-group-call:run_child_group`,
+                status: "open",
+              },
+            ],
           })
           const history = yield* runtime.history({ runId: parent.runId, limit: 100 })
           const fanOut = history.find((event) => event._tag === "FanOutAdmitted")
@@ -1477,25 +1487,25 @@ describe("ExecutionHost", () => {
         store.claimExecution({ runId: receipt.runId, ownerId }).pipe(Effect.flatMap((claim) => host.execute(claim)))
 
       yield* execute("first")
+      const firstWaitId = `${receipt.runId}:tool:1:wait-call-2:wait_for_human`
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
         status: "waiting",
-        wait: { waitId: "wait-call-2" },
+        waits: [{ waitId: firstWaitId }],
       })
       yield* runtime.respond({
         runId: receipt.runId,
-        waitId: "wait-call-2",
-        idempotencyKey: "response:first",
+        waitId: firstWaitId,
         resolution: { _tag: "ToolResult", result: "second", encodedResult: "second" },
       })
       yield* execute("second")
+      const secondWaitId = `${receipt.runId}:tool:2:wait-call-3:wait_for_human`
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
         status: "waiting",
-        wait: { waitId: "wait-call-3" },
+        waits: [{ waitId: secondWaitId }],
       })
       yield* runtime.respond({
         runId: receipt.runId,
-        waitId: "wait-call-3",
-        idempotencyKey: "response:second",
+        waitId: secondWaitId,
         resolution: { _tag: "ToolResult", result: "third", encodedResult: "third" },
       })
 
@@ -2439,36 +2449,36 @@ describe("ExecutionHost", () => {
         prompt: "suspend",
       })
       const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "atomic-worker" })
-      const suspension = AgentEvent.AgentSuspended.make({
-        token: "approval",
+      const suspensionValue = suspension({
+        waitId: "approval",
         reason: "approval",
-        tool_call_id: "approval",
-        tool_name: "approve",
-        tool_params: {},
-        tool_call_batch: [],
+        toolCallId: "approval",
+        toolName: "approve",
       })
       expect((yield* store.loadExecution(receipt.runId)).suspension).toBeUndefined()
-      expect((yield* runtime.inspect(receipt.runId)).wait).toBeUndefined()
+      expect((yield* runtime.inspect(receipt.runId)).waits).toEqual([])
       yield* store.suspend({
         ...claim,
-        suspension,
+        suspension: suspensionValue,
         checkpoint,
-        wait: {
-          waitId: "approval",
-          reason: {
-            _tag: "Approval",
-            request: { approvalId: "approval", operation: "approval", capability: "test", input: {} },
+        waits: [
+          {
+            waitId: "approval",
+            reason: {
+              _tag: "Approval",
+              request: { approvalId: "approval", operation: "approval", capability: "test", input: {} },
+            },
+            status: "open",
+            openedAt: "2026-08-04T00:00:00.000Z",
           },
-          status: "open",
-          openedAt: "2026-08-04T00:00:00.000Z",
-        },
+        ],
       })
       const execution = yield* store.loadExecution(receipt.runId)
       const inspection = yield* runtime.inspect(receipt.runId)
-      expect(execution.suspension).toEqual(suspension)
+      expect(execution.suspension).toEqual(suspensionValue)
       expect(execution.checkpoint).toEqual(checkpoint)
       expect(inspection.status).toBe("waiting")
-      expect(inspection.wait?.waitId).toBe("approval")
+      expect(inspection.waits[0]?.waitId).toBe("approval")
     }).pipe(
       scopedWith(
         Runtime.layerMemory({
@@ -3008,7 +3018,7 @@ describe("ExecutionHost", () => {
           })
           expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
             status: "running",
-            wait: { status: "signaled" },
+            waits: [],
           })
           expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })).toMatchObject({
             status: "running",

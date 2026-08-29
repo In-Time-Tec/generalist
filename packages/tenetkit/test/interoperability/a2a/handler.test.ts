@@ -92,7 +92,7 @@ interface StoredRun {
   status: Run.RunStatus
   events: Array<RunEvent.RunEvent>
   pending: Array<RunEvent.RunEvent>
-  wait?: Run.RunInspection["wait"]
+  waits: Run.RunInspection["waits"]
 }
 
 const makeRuntime = (acceptedSequence = 0) => {
@@ -108,10 +108,11 @@ const makeRuntime = (acceptedSequence = 0) => {
       executableManifest: executable.manifest,
       depth: 0,
       treePolicy: TreePolicy.defaultTreePolicy,
+      waits: run.waits,
       lastSequence: run.events.at(-1)?.sequence ?? -1,
       durability: "ephemeral" as const,
     }
-    return run.wait === undefined ? common : { ...common, wait: run.wait }
+    return common
   }
 
   const runtime: Runtime.Interface = {
@@ -126,6 +127,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       runs.set(runId, {
         status: "queued",
         events: [accepted(runId)],
+        waits: [],
         pending: shouldWait
           ? [attempt(runId), waiting(runId)]
           : [attempt(runId), shouldRunProgram ? completedProgram(runId, 2) : completed(runId, 2)],
@@ -147,11 +149,15 @@ const makeRuntime = (acceptedSequence = 0) => {
             if (event._tag === "RunAttemptStarted") run.status = "running"
             if (event._tag === "RunWaiting") {
               run.status = "waiting"
-              run.wait = event.wait
+              run.waits = [...run.waits, event.wait]
             }
             if (event._tag === "RunResumed") {
               run.status = "running"
-              run.wait = { ...run.wait!, status: "responded", closedAt: event.occurredAt }
+              run.waits = run.waits.map((wait) =>
+                wait.waitId === event.waitId
+                  ? { ...wait, status: "responded", resolution: event.resolution, closedAt: event.occurredAt }
+                  : wait,
+              )
             }
             if (event._tag === "RunCompleted") run.status = "succeeded"
             if (event._tag === "RunCancelled") run.status = "cancelled"

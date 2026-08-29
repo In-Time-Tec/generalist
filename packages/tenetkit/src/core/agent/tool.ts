@@ -128,7 +128,7 @@ export interface AgentToolToolkit<_Name extends string, Parameters extends Schem
 
 const errorMessage = (error: typeof Schema.Unknown.Type): string => {
   if (Schema.is(AgentSuspended)(error)) {
-    return `suspended on ${error.tool_name}: ${error.reason}`
+    return `suspended on ${error.waits.map((wait) => `${wait.call.name}: ${wait.reason}`).join(", ")}`
   }
   if (Schema.is(AgentError)(error)) {
     return `failed on turn ${error.turn}: ${error.message}`

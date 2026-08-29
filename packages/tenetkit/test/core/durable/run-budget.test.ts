@@ -18,6 +18,7 @@ import {
 } from "../../../src/core/index"
 import { withProviderFinish } from "../provider-finish.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
+import { suspension } from "../../runtime/execution/fixtures.js"
 
 const echoTool = Tool.make("echo", {
   parameters: Schema.Struct({ text: Schema.String }),
@@ -592,17 +593,15 @@ describe("RunBudget Agent.stream integration", () => {
             Agent.stream(agent, {
               prompt: Prompt.make("stale"),
               resume: {
-                suspension: AgentEvent.AgentSuspended.make({
-                  token: "stale-token",
+                suspension: suspension({
+                  waitId: "call-stale",
                   reason: "approval",
-                  tool_call_id: "call-stale",
-                  tool_name: "gated",
-                  tool_params: { text: "x" },
-                  tool_call_batch: [],
-                  active_tools: ["gated"],
-                  activated_skills: [],
+                  token: "stale-token",
+                  toolCallId: "call-stale",
+                  toolName: "gated",
+                  toolParams: { text: "x" },
                 }),
-                resolution: { _tag: "Approved" },
+                resolutions: [{ waitId: "call-stale", resolution: { _tag: "Approved" } }],
               },
             }),
           ).pipe(Effect.flip)

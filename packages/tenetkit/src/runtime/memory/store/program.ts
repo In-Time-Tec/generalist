@@ -322,7 +322,7 @@ export const admitProgramAgents: {
     programOperations.set(key(input.runId, input.operation), record)
     const waitingState = yield* suspend(
       { ...admittedState, programOperations },
-      { ...input, suspension: input.suspension, wait: input.wait, checkpoint: { _tag: "Program", version: "1" } },
+      { ...input, suspension: input.suspension, waits: [input.wait], checkpoint: { _tag: "Program", version: "1" } },
     )
     return [record, revokeSession(waitingState, input)] as const
   }),
@@ -358,7 +358,7 @@ export const suspendProgramOperation: {
       {
         ...input,
         suspension: input.suspension,
-        wait: input.wait,
+        waits: [input.wait],
       },
     )
     return [record, revokeSession(waiting, input)] as const

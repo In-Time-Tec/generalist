@@ -33,11 +33,11 @@ export const activateRoot: {
     if (run.parentRunId !== undefined) {
       return yield* RuntimeUnavailable.make({ message: `run ${runId} is not a root` })
     }
-    if (run.status !== "queued" || run.cancellationRequested) return [toInspection(run), state] as const
+    if (run.status !== "queued" || run.cancellationRequested) return [toInspection(state, run), state] as const
     if (run.children.length > 0) {
       return yield* RuntimeUnavailable.make({ message: `run ${runId} has initial children` })
     }
     const [, activated] = yield* appendLifecycle(state, runId, attemptStartedEvent(run.attempt + 1), "running")
-    return [toInspection(activated.runs.get(runId)!), activated] as const
+    return [toInspection(activated, activated.runs.get(runId)!), activated] as const
   }),
 )

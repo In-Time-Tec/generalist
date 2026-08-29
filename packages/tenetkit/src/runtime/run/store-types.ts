@@ -11,7 +11,7 @@ import type {
 import type { Message, Metadata } from "../messaging/message.js"
 import type { AddressInvalid } from "../execution/agent/directory.js"
 import type { MailboxBounds } from "../messaging/mailbox.js"
-import type { RunWait, WaitResolution } from "./wait.js"
+import type { RunWait, WaitResponse } from "./wait.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/state.js"
 import type { ExecutableManifest, ExecutableRef } from "../executable/manifest.js"
@@ -56,9 +56,13 @@ export interface AdmitProgramChildInput extends ExecutionClaim {
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
-/** @experimental Atomic Code Mode child admission and parent suspension. */
-export interface AdmitProgramChildAndSuspendInput extends AdmitProgramChildInput {
-  readonly wait: RunWait
+/** @experimental Atomic Code Mode child admissions and parent suspension. */
+export interface AdmitProgramChildAndSuspendInput extends ExecutionClaim {
+  readonly children: readonly [
+    Omit<AdmitProgramChildInput, keyof ExecutionClaim>,
+    ...ReadonlyArray<Omit<AdmitProgramChildInput, keyof ExecutionClaim>>,
+  ]
+  readonly waits: ReadonlyArray<RunWait>
   readonly suspension: ExecutionSuspension
   readonly checkpoint?: ExecutionCheckpoint
   readonly continuation?: ExecutionContinuation | null
@@ -145,7 +149,7 @@ export interface ExecutionRecord {
   readonly cancellationRequested: boolean
   readonly checkpoint?: ExecutionCheckpoint
   readonly suspension?: ExecutionSuspension
-  readonly resolution?: WaitResolution
+  readonly resolutions: ReadonlyArray<WaitResponse>
   readonly continuation?: ExecutionContinuation
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }

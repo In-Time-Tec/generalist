@@ -40,7 +40,7 @@ export const stateFromRun = (run: RunInspection): TaskState => {
     case "cancelling":
       return TaskState.TASK_STATE_WORKING
     case "waiting":
-      return run.wait?.reason._tag === "Approval"
+      return run.waits[0]?.reason._tag === "Approval"
         ? TaskState.TASK_STATE_AUTH_REQUIRED
         : TaskState.TASK_STATE_INPUT_REQUIRED
     case "needs-resolution":
@@ -64,15 +64,16 @@ const contextIdFrom = (runId: string, events: ReadonlyArray<RunEvent>): string =
 
 const statusFrom = (run: RunInspection, events: ReadonlyArray<RunEvent>, contextId: string): TaskStatus => {
   const terminal = terminalEvent(events)
+  const wait = run.waits[0]
   let text: string | undefined
   if (terminal?._tag === "RunFailed") text = terminal.error.message
   if (terminal?._tag === "RunCancelled") text = terminal.reason ?? "Task canceled."
-  if (run.status === "waiting" && run.wait !== undefined) text = `Waiting for ${run.wait.reason._tag}.`
+  if (run.status === "waiting" && wait !== undefined) text = `Waiting for ${wait.reason._tag}.`
   return {
     state: stateFromRun(run),
     message:
-      text === undefined ? undefined : agentMessage(run.runId, contextId, terminal?.eventId ?? run.wait!.waitId, text),
-    timestamp: terminal?.occurredAt ?? run.wait?.openedAt,
+      text === undefined ? undefined : agentMessage(run.runId, contextId, terminal?.eventId ?? wait!.waitId, text),
+    timestamp: terminal?.occurredAt ?? wait?.openedAt,
   }
 }
 

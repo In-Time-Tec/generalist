@@ -61,7 +61,18 @@ export const programStoreMethods = (input: {
   return {
     admitProgramChild: (operation) => fenced(operation, admitProgramChild(input.hub, operation)),
     admitProgramChildAndSuspend: (operation) =>
-      fenced(operation, admitProgramChild(input.hub, operation).pipe(Effect.tap(() => suspend(input.hub, operation)))),
+      fenced(
+        operation,
+        Effect.forEach(operation.children, (child) =>
+          admitProgramChild(input.hub, {
+            runId: operation.runId,
+            ownerId: operation.ownerId,
+            attemptFence: operation.attemptFence,
+            session: operation.session,
+            ...child,
+          }),
+        ).pipe(Effect.tap(() => suspend(input.hub, operation))),
+      ),
     reserveProgramOperation: (operation) => fenced(operation, reserveProgramOperation(operation)),
     admitProgramAgents: (operation) => fenced(operation, admitProgramAgents(input.hub, operation, suspend)),
     suspendProgramOperation: (operation) => fenced(operation, suspendProgramOperation(input.hub, operation, suspend)),

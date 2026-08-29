@@ -35,23 +35,42 @@ export const programWait = (input: {
 export const approvedFor: {
   (operation: string): (claimed: import("../run/store.js").ExecutionRecord) => boolean
   (claimed: import("../run/store.js").ExecutionRecord, operation: string): boolean
-} = Function.dual(
-  2,
-  (claimed: import("../run/store.js").ExecutionRecord, operation: string): boolean =>
+} = Function.dual(2, (claimed: import("../run/store.js").ExecutionRecord, operation: string): boolean => {
+  const waitInput = {
+    runId: claimed.runId,
+    operation,
+    capability: operation,
+    request: undefined,
+    reason: "approval",
+  } as const
+  const token = claimed.suspension?._tag === "tenetkit/core/ProgramSuspended" ? claimed.suspension.token : undefined
+  const wait = programWait(token === undefined ? waitInput : { ...waitInput, token })
+  return (
     claimed.suspension?._tag === "tenetkit/core/ProgramSuspended" &&
     claimed.suspension.operation === operation &&
     claimed.suspension.reason === "approval" &&
-    claimed.resolution?._tag === "Approved",
-)
+    claimed.resolutions.find((entry) => entry.waitId === wait.waitId)?.resolution._tag === "Approved"
+  )
+})
 
 export const deniedFor: {
   (operation: string): (claimed: import("../run/store.js").ExecutionRecord) => string | undefined
   (claimed: import("../run/store.js").ExecutionRecord, operation: string): string | undefined
-} = Function.dual(2, (claimed: import("../run/store.js").ExecutionRecord, operation: string): string | undefined =>
-  claimed.suspension?._tag === "tenetkit/core/ProgramSuspended" &&
-  claimed.suspension.operation === operation &&
-  claimed.suspension.reason === "approval" &&
-  claimed.resolution?._tag === "Denied"
-    ? (claimed.resolution.reason ?? "approval denied")
-    : undefined,
-)
+} = Function.dual(2, (claimed: import("../run/store.js").ExecutionRecord, operation: string): string | undefined => {
+  const waitInput = {
+    runId: claimed.runId,
+    operation,
+    capability: operation,
+    request: undefined,
+    reason: "approval",
+  } as const
+  const token = claimed.suspension?._tag === "tenetkit/core/ProgramSuspended" ? claimed.suspension.token : undefined
+  const wait = programWait(token === undefined ? waitInput : { ...waitInput, token })
+  const resolution = claimed.resolutions.find((entry) => entry.waitId === wait.waitId)?.resolution
+  return claimed.suspension?._tag === "tenetkit/core/ProgramSuspended" &&
+    claimed.suspension.operation === operation &&
+    claimed.suspension.reason === "approval" &&
+    resolution?._tag === "Denied"
+    ? (resolution.reason ?? "approval denied")
+    : undefined
+})

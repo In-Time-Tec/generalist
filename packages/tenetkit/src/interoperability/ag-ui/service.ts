@@ -123,40 +123,41 @@ export const layer = (options: LayerOptions): Layer.Layer<AgUi, never, Runtime> 
               const receivedWaitIds = input.resume.map(
                 (entry: NonNullable<RunAgentInput["resume"]>[number]) => entry.interruptId,
               )
-              const entry = input.resume.length === 1 ? input.resume[0] : undefined
+              const waits = new Map(current.run.waits.map((wait) => [wait.waitId, wait] as const))
               if (
-                current.run.wait?.status !== "open" ||
-                entry === undefined ||
-                entry.status !== "resolved" ||
-                entry.interruptId !== current.run.wait.waitId
+                current.run.status !== "waiting" ||
+                new Set(receivedWaitIds).size !== receivedWaitIds.length ||
+                input.resume.some((entry) => entry.status !== "resolved" || !waits.has(entry.interruptId))
               ) {
+                const expectedWaitId = current.run.waits[0]?.waitId
                 const mismatch =
-                  current.run.wait?.status === "open"
-                    ? {
-                        runId: input.runId,
-                        expectedWaitId: current.run.wait.waitId,
-                        receivedWaitIds,
-                      }
-                    : { runId: input.runId, receivedWaitIds }
+                  expectedWaitId === undefined
+                    ? { runId: input.runId, receivedWaitIds }
+                    : { runId: input.runId, expectedWaitId, receivedWaitIds }
                 return yield* ResumeMismatch.make(mismatch)
               }
-              const payload = yield* Schema.decodeUnknownEffect(Schema.Json)(entry.payload).pipe(
-                Effect.mapError(() => InputRejected.make({ reason: "invalid-resume" })),
-              )
               cursor = current.cursor
-              if (current.run.wait.reason._tag === "Approval") {
-                yield* runtime.respondApproval({
-                  runId: input.runId,
-                  approvalId: current.run.wait.reason.request.approvalId,
-                  decision: payload === false ? { _tag: "Denied" } : { _tag: "Approved" },
-                })
-              } else {
-                yield* runtime.respond({
-                  runId: input.runId,
-                  waitId: entry.interruptId,
-                  resolution: { _tag: "ToolResult", result: payload, encodedResult: payload },
-                  idempotencyKey: `ag-ui:${input.runId}:${entry.interruptId}`,
-                })
+              const resolutions = yield* Effect.forEach(input.resume, (entry) =>
+                Schema.decodeUnknownEffect(Schema.Json)(entry.payload).pipe(
+                  Effect.map((payload) => ({ entry, payload })),
+                  Effect.mapError(() => InputRejected.make({ reason: "invalid-resume" })),
+                ),
+              )
+              for (const { entry, payload } of resolutions) {
+                const wait = waits.get(entry.interruptId)!
+                if (wait.reason._tag === "Approval") {
+                  yield* runtime.respondApproval({
+                    runId: input.runId,
+                    approvalId: wait.reason.request.approvalId,
+                    decision: payload === false ? { _tag: "Denied" } : { _tag: "Approved" },
+                  })
+                } else {
+                  yield* runtime.respond({
+                    runId: input.runId,
+                    waitId: entry.interruptId,
+                    resolution: { _tag: "ToolResult", result: payload, encodedResult: payload },
+                  })
+                }
               }
             } else {
               const final = yield* finalPrompt(input)

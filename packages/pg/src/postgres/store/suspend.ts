@@ -1,4 +1,4 @@
-import { Effect, Function, Option } from "effect"
+import { Effect, Equal, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
@@ -9,29 +9,126 @@ import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run
 import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
 import { encodeExecutableRef, encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import { encodeReason, WaitResolution } from "tenetkit/runtime/driver/run/wait"
+import { encodeReason } from "tenetkit/runtime/driver/run/wait"
 import { lockRun } from "../runs/locks.js"
 import { appendEvent, requireRun } from "./runtime.js"
 import { requireExecutionClaim } from "tenetkit/runtime/driver/sql/store/execution"
-import { groupIdFromSuspension, resultFromInspection } from "tenetkit/runtime/driver/child/group"
+import { groupWaitsFromSuspension, resultFromInspection } from "tenetkit/runtime/driver/child/group"
 import { inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
 import { ExecutionCheckpoint, ExecutionSuspension } from "tenetkit/runtime/driver/execution/state"
 import { loadTerminalEvent, reconcileChildWaitWith } from "tenetkit/runtime/driver/sql/store/child/settlement"
 import { revokeSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
+import { loadRunWait, nowIso, transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
+import type { DecodedRun } from "tenetkit/runtime/driver/sql/codec/rows"
 
+type SuspendInput = Parameters<RunStoreInterface["suspend"]>[0]
 type SuspendEffect = Effect.Effect<
   undefined,
   RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | StaleClaim,
   SqlClient.SqlClient
 >
 
-const suspensionChild = (token: string | undefined) =>
-  token === undefined ? Effect.succeed(Option.none()) : requireRun(token).pipe(Effect.option)
+const suspensionTokens = (suspension: SuspendInput["suspension"]): ReadonlyArray<string> => {
+  if (suspension._tag === "tenetkit/core/AgentSuspended") return suspension.waits.map((wait) => wait.token)
+  return suspension.token === undefined ? [] : [suspension.token]
+}
+
+const persistWaits = (runId: string, waits: SuspendInput["waits"]) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const inserted: Array<(typeof waits)[number]> = []
+    const identities = new Set<string>()
+    for (const [authoredOrder, requested] of waits.entries()) {
+      if (requested.status !== "open" || identities.has(requested.waitId)) {
+        return yield* RuntimeUnavailable.make({ message: `Invalid wait batch for Run ${runId}` })
+      }
+      identities.add(requested.waitId)
+      const prior = yield* loadRunWait(runId, requested.waitId)
+      if (prior === undefined) {
+        yield* sql`
+          INSERT INTO tenetkit_run_waits (
+            run_id, wait_id, authored_order, reason, status, response_json, due_at, owner_worker_id, lease_expires_at, opened_at, closed_at
+          ) VALUES (
+            ${runId}, ${requested.waitId}, ${authoredOrder}, ${encodeReason(requested.reason)}, 'open', NULL, NULL, NULL, NULL, NOW(), NULL
+          )
+        `
+        inserted.push(requested)
+      } else if (prior.status !== "open" || !Equal.equals(prior.reason, requested.reason)) {
+        return yield* RuntimeUnavailable.make({ message: `Wait ${requested.waitId} cannot be reopened or changed` })
+      }
+    }
+    return inserted
+  })
+
+const appendWaits = (hub: EventHub, loaded: DecodedRun, inserted: SuspendInput["waits"]) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    let current = loaded
+    for (const wait of inserted) {
+      yield* appendEvent(hub, current, { _tag: "RunWaiting", wait }, "waiting")
+      current = yield* requireRun(loaded.runId)
+    }
+    if (inserted.length === 0) {
+      yield* sql`UPDATE tenetkit_runs SET status = 'waiting', updated_at = NOW() WHERE run_id = ${loaded.runId}`
+    }
+  })
+
+const reconcileChildren = (hub: EventHub, runId: string, tokens: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    for (const token of tokens) {
+      const child = yield* requireRun(token).pipe(Effect.option)
+      if (child._tag === "None" || child.value.terminalEventId === undefined) continue
+      const terminalEvent = yield* loadTerminalEvent(child.value.terminalEventId)
+      if (terminalEvent === undefined) continue
+      yield* reconcileChildWaitWith({
+        hub,
+        parent: yield* requireRun(runId),
+        child: child.value,
+        event: terminalEvent,
+        append: appendEvent,
+      })
+    }
+  })
+
+const reconcileGroups = (hub: EventHub, runId: string, suspension: SuspendInput["suspension"]) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    for (const owned of groupWaitsFromSuspension(suspension)) {
+      const rows = yield* sql<{ parent_run_id: string; status: string }>`
+        SELECT parent_run_id, status FROM tenetkit_fan_outs WHERE fan_out_id = ${owned.groupId}
+      `
+      const group = rows[0]
+      if (group?.parent_run_id !== runId || group.status === "running") continue
+      const resolution = {
+        _tag: "Signal" as const,
+        name: owned.waitId,
+        payload: resultFromInspection(
+          yield* inspectFanOut(owned.groupId).pipe(
+            Effect.mapError(() => RuntimeUnavailable.make({ message: `child group ${owned.groupId} disappeared` })),
+          ),
+        ),
+      }
+      const affected = yield* transitionRunWait({
+        runId,
+        waitId: owned.waitId,
+        status: "signaled",
+        resolution,
+        closedAt: yield* nowIso,
+      })
+      if (affected !== 1) continue
+      yield* appendEvent(
+        hub,
+        yield* requireRun(runId),
+        { _tag: "RunResumed", waitId: owned.waitId, resolution },
+        "running",
+      )
+    }
+  })
 
 export const suspend: {
-  (input: Parameters<RunStoreInterface["suspend"]>[0]): (hub: EventHub) => SuspendEffect
-  (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]): SuspendEffect
-} = Function.dual(2, (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
+  (input: SuspendInput): (hub: EventHub) => SuspendEffect
+  (hub: EventHub, input: SuspendInput): SuspendEffect
+} = Function.dual(2, (hub: EventHub, input: SuspendInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* lockRun(input.runId)
@@ -56,57 +153,10 @@ export const suspend: {
         updated_at = NOW()
       WHERE run_id = ${input.runId}
     `
-    yield* sql`
-      INSERT INTO tenetkit_run_waits (
-        run_id, wait_id, reason, status, response_json, due_at, owner_worker_id, lease_expires_at, opened_at, closed_at
-      ) VALUES (
-        ${loaded.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, NULL, NULL, NULL, NOW(), NULL
-      )
-      ON CONFLICT (run_id, wait_id) DO UPDATE SET
-        status = 'open', reason = EXCLUDED.reason, response_json = NULL, opened_at = EXCLUDED.opened_at, closed_at = NULL
-    `
-    yield* appendEvent(hub, loaded, { _tag: "RunWaiting", wait: input.wait }, "waiting")
-    const child = yield* suspensionChild(input.suspension.token)
-    if (child._tag === "Some" && child.value.terminalEventId !== undefined) {
-      const terminalEvent = yield* loadTerminalEvent(child.value.terminalEventId)
-      if (terminalEvent !== undefined) {
-        yield* reconcileChildWaitWith({
-          hub,
-          parent: yield* requireRun(loaded.runId),
-          child: child.value,
-          event: terminalEvent,
-          append: appendEvent,
-        })
-      }
-    }
-    const groupId = groupIdFromSuspension(input.suspension)
-    if (groupId !== undefined) {
-      const rows = yield* sql<{ parent_run_id: string; status: string }>`
-        SELECT parent_run_id, status FROM tenetkit_fan_outs WHERE fan_out_id = ${groupId}
-      `
-      const group = rows[0]
-      if (group?.parent_run_id === loaded.runId && group.status !== "running") {
-        const resolution = {
-          _tag: "Signal" as const,
-          name: input.wait.waitId,
-          payload: resultFromInspection(
-            yield* inspectFanOut(groupId).pipe(
-              Effect.mapError(() => RuntimeUnavailable.make({ message: `child group ${groupId} disappeared` })),
-            ),
-          ),
-        }
-        yield* sql`
-          UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
-          WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
-        `
-        yield* appendEvent(
-          hub,
-          yield* requireRun(loaded.runId),
-          { _tag: "RunResumed", waitId: input.wait.waitId, resolution },
-          "running",
-        )
-      }
-    }
+    const inserted = yield* persistWaits(loaded.runId, input.waits)
+    yield* appendWaits(hub, loaded, inserted)
+    yield* reconcileChildren(hub, loaded.runId, suspensionTokens(input.suspension))
+    yield* reconcileGroups(hub, loaded.runId, input.suspension)
     yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
     if (!(yield* revokeSessionWriteClaim(input.session))) {
       return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} Session write binding was not revoked` })

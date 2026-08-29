@@ -90,13 +90,16 @@ export const interceptStream: {
     ),
 )
 
-/** @experimental */
-export const recordSuspension = (input: { readonly waitId: string; readonly reason: string; readonly token: string }) =>
-  Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.recordSuspension(input))
+/** @internal Replace the one current authored-order tool batch checkpoint. */
+export const setToolBatch = (toolBatch: import("../../agent/tools/checkpoint.js").ToolBatchCheckpoint | undefined) =>
+  Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.setToolBatch(toolBatch))
 
-/** @experimental */
-export const bindResume = (token: string) =>
-  Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.bindResume(token))
+/** @internal Apply one exact tool-call state transition to the current batch checkpoint. */
+export const updateToolBatch = (
+  update: (
+    checkpoint: import("../../agent/tools/checkpoint.js").ToolBatchCheckpoint,
+  ) => import("../../agent/tools/checkpoint.js").ToolBatchCheckpoint,
+) => Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.updateToolBatch(update))
 
 /** @experimental */
 export const abortPending = (error: typeof Schema.Unknown.Type) =>

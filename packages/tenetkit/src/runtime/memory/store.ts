@@ -15,7 +15,7 @@ import type { LayerOptions } from "../service.js"
 import { emptyState, idempotencyKey, type MemoryPublication, type MemoryState } from "./state.js"
 import { admitSend, admitSpawn, admitStart } from "./store/admit.js"
 import { activateRoot, activationOf } from "./store/activate.js"
-import { admitProgramChild } from "./store/child/admit-program-child.js"
+import { admitProgramChild, admitProgramChildrenAndSuspend } from "./store/child/admit-program-child.js"
 import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store/control.js"
 import { respondApproval } from "./store/approval.js"
 import { isTerminal } from "../run.js"
@@ -184,12 +184,7 @@ const makeStoreServices = (options: LayerOptions) =>
       admitSpawn: (input) => modifyState((state) => admitSpawn(state, input)),
       admitProgramChild: (input) => fencedModify(input, (state) => admitProgramChild(state, input)),
       admitProgramChildAndSuspend: (input) =>
-        fencedModify(input, (state) =>
-          Effect.gen(function* () {
-            const [receipt, admitted] = yield* admitProgramChild(state, input)
-            return [receipt, revokeSession(yield* suspend(admitted, input), input)] as const
-          }),
-        ),
+        fencedModify(input, (state) => admitProgramChildrenAndSuspend(state, input)),
       events: (input) => followEvents(stateRef, input),
       respond: (input) => update((state) => respond(state, input)),
       respondApproval: (input) => update((state) => respondApproval(state, input)),
@@ -231,7 +226,7 @@ const makeStoreServices = (options: LayerOptions) =>
               const run = state.runs.get(runId)
               if (run === undefined) return yield* RunNotFound.make({ runId })
               const projection = {
-                inspection: toInspection(run),
+                inspection: toInspection(state, run),
                 rootRunId: run.rootRunId,
                 events: run.events,
                 firstTreePosition: 0,
@@ -264,7 +259,7 @@ const makeStoreServices = (options: LayerOptions) =>
               for (const run of state.runs.values()) {
                 if (run.rootRunId !== rootRunId) continue
                 const projection = {
-                  inspection: toInspection(run),
+                  inspection: toInspection(state, run),
                   rootRunId,
                   events: run.events,
                   firstTreePosition: first.get(run.runId) ?? -1,
@@ -349,7 +344,7 @@ const makeStoreServices = (options: LayerOptions) =>
               .slice(start)
               .filter((run) => input.status === undefined || run.status === input.status)
             const ordered = (input.order ?? "newest") === "oldest" ? filtered : filtered.toReversed()
-            return ordered.slice(0, input.limit).map(toInspection)
+            return ordered.slice(0, input.limit).map((run) => toInspection(state, run))
           }),
         ),
       complete: (input) =>

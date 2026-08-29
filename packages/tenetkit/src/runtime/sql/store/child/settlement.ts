@@ -1,13 +1,13 @@
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { ownsChildSuspension, resultFromChildEvent } from "../../../child/group.js"
+import { resultFromChildEvent, waitIdForChild } from "../../../child/group.js"
 import { isTerminal, type RunStatus } from "../../../run.js"
 import type { RunEvent } from "../../../run/event.js"
-import { WaitResolution } from "../../../run/wait.js"
-import { decodeEvent, encodeJson } from "../../codec/codecs.js"
+import { decodeEvent } from "../../codec/codecs.js"
 import type { DecodedRun } from "../../codec/rows.js"
 import type { EventHub } from "../../subscribers.js"
+import { transitionRunWait } from "../wait-transition.js"
 
 type EventPartial = Pick<Extract<RunEvent, { readonly _tag: "RunResumed" }>, "_tag" | "waitId" | "resolution">
 type AppendFn<E, R> = (
@@ -82,46 +82,34 @@ export const reconcileChildWaitWith = <E, R>(input: {
   readonly append: AppendFn<E, R>
 }): Effect.Effect<boolean, E | SqlError, R | SqlClient.SqlClient> =>
   Effect.gen(function* () {
+    const waitId = waitIdForChild({
+      parentRunId: input.parent.runId,
+      childRunId: input.child.runId,
+      metadata: input.child.message.metadata,
+      suspension: input.parent.suspension,
+    })
     if (
       isTerminal(input.parent.status) ||
       input.parent.cancellationRequested ||
-      input.parent.activeWaitId === undefined ||
-      (input.event._tag !== "RunCompleted" &&
-        input.event._tag !== "RunFailed" &&
-        input.event._tag !== "RunCancelled") ||
-      !ownsChildSuspension({
-        parentRunId: input.parent.runId,
-        waitId: input.parent.activeWaitId,
-        childRunId: input.child.runId,
-        metadata: input.child.message.metadata,
-        suspension: input.parent.suspension,
-      })
+      waitId === undefined ||
+      (input.event._tag !== "RunCompleted" && input.event._tag !== "RunFailed" && input.event._tag !== "RunCancelled")
     ) {
       return false
     }
-    const sql = yield* SqlClient.SqlClient
-    const wait = (yield* sql<{ status: string }>`
-      SELECT status FROM tenetkit_run_waits
-      WHERE run_id = ${input.parent.runId} AND wait_id = ${input.parent.activeWaitId}
-    `)[0]
-    if (wait?.status !== "open") return false
     const result = resultFromChildEvent({
       childRunId: input.child.runId,
       metadata: input.child.message.metadata,
       event: input.event,
     })
     const resolution = { _tag: "ToolResult" as const, result, encodedResult: result }
-    const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-    yield* sql`
-      UPDATE tenetkit_run_waits
-      SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
-      WHERE run_id = ${input.parent.runId} AND wait_id = ${input.parent.activeWaitId} AND status = 'open'
-    `
-    yield* input.append(
-      input.hub,
-      input.parent,
-      { _tag: "RunResumed", waitId: input.parent.activeWaitId, resolution },
-      "running",
-    )
+    const affected = yield* transitionRunWait({
+      runId: input.parent.runId,
+      waitId,
+      status: "responded",
+      resolution,
+      closedAt: yield* DateTime.now.pipe(Effect.map(DateTime.formatIso)),
+    })
+    if (affected !== 1) return false
+    yield* input.append(input.hub, input.parent, { _tag: "RunResumed", waitId, resolution }, "running")
     return true
   })

@@ -18,10 +18,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       yield* store.suspend({
         ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
-        wait: openWait({ waitId: "wait:inspection" }),
+        waits: [openWait({ waitId: "wait:inspection" })],
         suspension: suspension({ waitId: "wait:inspection" }),
       })
-      expect((yield* runtime.inspect(receipt.runId)).wait).toEqual(openWait({ waitId: "wait:inspection" }))
+      expect((yield* runtime.inspect(receipt.runId)).waits).toEqual([openWait({ waitId: "wait:inspection" })])
       yield* runtime.respond({
         runId: receipt.runId,
         waitId: "wait:inspection",
@@ -29,7 +29,13 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       })
       const snapshot = yield* runtime.snapshot(receipt.runId)
       expect(snapshot.cursor).toBe(snapshot.run.lastSequence)
-      expect(snapshot.run.wait?.resolution?._tag).toBe("ToolResult")
+      expect(snapshot.run.waits).toEqual([])
+      expect((yield* store.loadExecution(receipt.runId)).resolutions).toEqual([
+        {
+          waitId: "wait:inspection",
+          resolution: { _tag: "ToolResult", result: "accepted", encodedResult: "accepted" },
+        },
+      ])
       expect(yield* Run.decodeSnapshot(yield* Run.encodeSnapshot(snapshot))).toEqual(snapshot)
       const mismatchedInspection = Object.assign({}, snapshot.run, {
         executableManifest: alternateAssistantRef.manifest,

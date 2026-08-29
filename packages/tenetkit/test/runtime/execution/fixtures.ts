@@ -181,14 +181,38 @@ export const openWait = (options: OpenWaitOptions): OpenWait => {
 export interface SuspensionOptions {
   readonly waitId: string
   readonly reason?: "tool-wait" | "approval"
+  readonly token?: string
+  readonly toolCallId?: string
+  readonly toolName?: string
+  readonly toolParams?: unknown
+  readonly operationKey?: string
 }
 
-export const suspension = (options: SuspensionOptions): AgentEvent.AgentSuspended =>
-  AgentEvent.AgentSuspended.make({
-    token: options.waitId,
-    reason: options.reason ?? "tool-wait",
-    tool_call_id: options.waitId,
-    tool_name: "test",
-    tool_params: {},
-    tool_call_batch: [],
+export const suspension = (options: SuspensionOptions): AgentEvent.AgentSuspended => {
+  const reason = options.reason ?? "tool-wait"
+  const token = options.token ?? options.waitId
+  const call = {
+    type: "tool-call" as const,
+    id: options.toolCallId ?? options.waitId,
+    name: options.toolName ?? "test",
+    params: options.toolParams ?? {},
+    providerExecuted: false,
+    metadata: {},
+  }
+  return AgentEvent.AgentSuspended.make({
+    checkpoint: {
+      turn: 0,
+      calls: [
+        {
+          call,
+          operationKey: options.operationKey ?? `test:${options.waitId}`,
+          state: { _tag: "Waiting", reason, waitId: options.waitId, token },
+        },
+      ],
+      activeTools: [call.name],
+      activatedSkills: [],
+      invocationPath: [],
+    },
+    waits: [{ waitId: options.waitId, token, reason, callIndex: 0, call }],
   })
+}

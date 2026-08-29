@@ -2,9 +2,26 @@ import { Effect, Equal } from "effect"
 import type { RespondInput } from "../operation/approval.js"
 import { ApprovalMismatch, ApprovalStale, RunNotFound } from "../errors.js"
 import { isTerminal } from "../run.js"
-import { loadRun, loadRunWait } from "./store/statements.js"
+import { loadRun, loadRunWait, loadRunWaitsByStatus } from "./store/statements.js"
+import type { DecodedRun } from "./codec/rows.js"
 
 export type ApprovalResponse = { readonly _tag: "Duplicate" } | { readonly _tag: "Respond"; readonly waitId: string }
+
+const staleApproval = (run: DecodedRun, input: RespondInput, requestedMissing: boolean) =>
+  Effect.gen(function* () {
+    if (!isTerminal(run.status) && !run.cancellationRequested && requestedMissing) {
+      const expected = (yield* loadRunWaitsByStatus(run.runId, "open")).find((wait) => wait.reason._tag === "Approval")
+      if (expected?.reason._tag === "Approval") {
+        return yield* ApprovalMismatch.make({
+          runId: run.runId,
+          approvalId: input.approvalId,
+          mismatch: "approval-id",
+          expectedApprovalId: expected.reason.request.approvalId,
+        })
+      }
+    }
+    return yield* ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId })
+  })
 
 /** Validate one approval identity and decision inside the store's control transaction. */
 export const approvalResponse = (input: RespondInput) =>
@@ -22,13 +39,10 @@ export const approvalResponse = (input: RespondInput) =>
         mismatch: "decision",
       })
     }
-    if (isTerminal(run.status) || run.cancellationRequested || run.activeWaitId === undefined) {
-      return yield* ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId })
+    if (isTerminal(run.status) || run.cancellationRequested || requested?.status !== "open") {
+      return yield* staleApproval(run, input, requested === undefined)
     }
-    const active = yield* loadRunWait(run.runId, run.activeWaitId)
-    if (active === undefined || active.status !== "open") {
-      return yield* ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId })
-    }
+    const active = requested
     if (active.reason._tag !== "Approval") {
       return yield* ApprovalMismatch.make({
         runId: run.runId,

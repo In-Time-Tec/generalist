@@ -37,11 +37,11 @@ import { enforceChildAdmission } from "../admit-send.js"
 import type { EventHub } from "../../subscribers.js"
 import { associateRegistrations, loadRegistrations } from "../../executable/registrations.js"
 import { narrow } from "../../../executable/registration.js"
-import { groupIdFromSuspension, resultFromInspection } from "../../../child/group.js"
-import { WaitResolution } from "../../../run/wait.js"
+import { resultFromInspection, waitIdForGroup } from "../../../child/group.js"
 import { Prompt } from "effect/unstable/ai"
 import { activeChildCount, promoteChildCapacity } from "../child/capacity.js"
 import { FanOutJoinResolution } from "./join.js"
+import { transitionRunWait } from "../wait-transition.js"
 type FanOutEffect = Effect.Effect<
   FanOutReceipt,
   | ChildSelectionMissing
@@ -390,16 +390,11 @@ export const reconcileFanOutWith: {
       const parent = yield* finishParent
       let resumeParent = parent === undefined ? undefined : yield* loadRun(parent.runId)
       const resumeGroupWait = Effect.gen(function* () {
-        if (
-          resumeParent === undefined ||
-          isTerminal(resumeParent.status) ||
-          resumeParent.activeWaitId === undefined ||
-          groupIdFromSuspension(resumeParent.suspension) !== row.fan_out_id
-        )
-          return
+        const waitId = resumeParent === undefined ? undefined : waitIdForGroup(resumeParent.suspension, row.fan_out_id)
+        if (resumeParent === undefined || isTerminal(resumeParent.status) || waitId === undefined) return
         const resolution = {
           _tag: "Signal" as const,
-          name: resumeParent.activeWaitId,
+          name: waitId,
           payload: resultFromInspection(
             yield* inspectFanOut(row.fan_out_id).pipe(
               Effect.mapError(() =>
@@ -409,17 +404,16 @@ export const reconcileFanOutWith: {
           ),
         }
         const closedAt = yield* nowIso
-        yield* sql`
-        UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
-        WHERE run_id = ${resumeParent.runId} AND wait_id = ${resumeParent.activeWaitId} AND status = 'open'
-      `
+        const affected = yield* transitionRunWait({
+          runId: resumeParent.runId,
+          waitId,
+          status: "signaled",
+          resolution,
+          closedAt,
+        })
+        if (affected !== 1) return
         yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
-        yield* append(
-          hub,
-          (yield* loadRun(resumeParent.runId))!,
-          { _tag: "RunResumed", waitId: resumeParent.activeWaitId, resolution },
-          "running",
-        )
+        yield* append(hub, (yield* loadRun(resumeParent.runId))!, { _tag: "RunResumed", waitId, resolution }, "running")
         resumeParent = yield* loadRun(resumeParent.runId)
       })
       yield* resumeGroupWait
@@ -433,19 +427,22 @@ export const reconcileFanOutWith: {
           resumeParent === undefined ||
           isTerminal(resumeParent.status) ||
           operation === undefined ||
-          operation.wait_id === null ||
-          resumeParent.activeWaitId !== operation.wait_id
+          operation.wait_id === null
         )
           return
         const resolution = { _tag: "Signal" as const, name: operation.wait_id }
         const closedAt = yield* nowIso
+        const affected = yield* transitionRunWait({
+          runId: resumeParent.runId,
+          waitId: operation.wait_id,
+          status: "signaled",
+          resolution,
+          closedAt,
+        })
+        if (affected !== 1) return
         yield* sql`
         UPDATE tenetkit_program_operations SET status = 'running'
         WHERE run_id = ${operation.run_id} AND operation_name = ${operation.operation_name} AND status = 'waiting'
-      `
-        yield* sql`
-        UPDATE tenetkit_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
-        WHERE run_id = ${resumeParent.runId} AND wait_id = ${operation.wait_id} AND status = 'open'
       `
         yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
         yield* append(

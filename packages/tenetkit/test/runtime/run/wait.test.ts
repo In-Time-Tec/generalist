@@ -17,8 +17,8 @@ it("keeps a waitId that collides with a reason name a plain waitId", () => {
   for (const waitId of ["approval", "signal", "tool-wait", "timer", "external"] as const) {
     expect(openWait({ waitId }).waitId).toBe(waitId)
     expect(openWait({ waitId }).reason).toEqual({ _tag: "ToolWait" })
-    expect(suspension({ waitId }).token).toBe(waitId)
-    expect(suspension({ waitId }).reason).toBe("tool-wait")
+    expect(suspension({ waitId }).waits[0]?.token).toBe(waitId)
+    expect(suspension({ waitId }).waits[0]?.reason).toBe("tool-wait")
   }
 })
 
@@ -28,8 +28,8 @@ it("honors an explicit approval reason and an omitted reason", () => {
     request: { approvalId: "approval", operation: "approval", capability: "test", input: {} },
   })
   expect(openWait({ waitId: "approval" }).reason).toEqual({ _tag: "ToolWait" })
-  expect(suspension({ waitId: "approval", reason: "approval" }).reason).toBe("approval")
-  expect(suspension({ waitId: "approval" }).reason).toBe("tool-wait")
+  expect(suspension({ waitId: "approval", reason: "approval" }).waits[0]?.reason).toBe("approval")
+  expect(suspension({ waitId: "approval" }).waits[0]?.reason).toBe("tool-wait")
 })
 
 it("produces waits and suspensions that survive their persisted encodings", () => {

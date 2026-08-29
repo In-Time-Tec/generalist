@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { AgentEvent } from "../../../../src/index.js"
 import { Address, ChildAdmission, Errors, Message, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import {
   assistantAddress,
@@ -8,6 +7,7 @@ import {
   completedResult,
   registrationsFor,
   researcherRef,
+  suspension,
   textPrompt,
 } from "../../execution/fixtures.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
@@ -363,29 +363,89 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
           )
           expect(yield* context.children.listDirect(context.runId)).toHaveLength(0)
 
-          const suspension = AgentEvent.AgentSuspended.make({
+          const suspended = suspension({
+            waitId: "program-child",
             token: programInput.childRunId,
-            reason: "tool-wait",
-            tool_call_id: "program-child",
-            tool_name: "code_mode",
-            tool_params: {},
-            tool_call_batch: [],
+            toolCallId: "program-child",
+            toolName: "code_mode",
+            toolParams: {},
           })
           expect(
             yield* store
               .admitProgramChildAndSuspend({
-                ...programInput,
-                wait: {
-                  waitId: "program-child",
-                  reason: { _tag: "ToolWait" },
-                  status: "open",
-                  openedAt: "2026-08-12T00:00:00.000Z",
-                },
-                suspension,
+                ...claim,
+                children: [programInput],
+                waits: [
+                  {
+                    waitId: "program-child",
+                    reason: { _tag: "ToolWait" },
+                    status: "open",
+                    openedAt: "2026-08-12T00:00:00.000Z",
+                  },
+                ],
+                suspension: suspended,
               })
               .pipe(Effect.flip),
           ).toBeInstanceOf(Errors.ChildDepthExceeded)
           expect(yield* context.children.listDirect(context.runId)).toHaveLength(0)
+          expect(yield* runtime.inspect(context.runId)).not.toMatchObject({ status: "waiting" })
+        }),
+      ),
+    )
+
+    it.live("rolls back every Program child when a later atomic batch admission fails validation", () =>
+      provide(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const context = yield* root({ maxDepth: 1, maxSubagents: 1 })
+          yield* activate(context.runId)
+          const claim = yield* context.store.claimExecution({
+            runId: context.runId,
+            ownerId: "program-batch-bound",
+          })
+          const programInput = (suffix: string) => ({
+            childRunId: `${context.runId}:program-child:${suffix}`,
+            invocationId: `program-child:${suffix}`,
+            message: Message.make({
+              id: `program-child:${suffix}`,
+              to: Address.make(`program-child:${context.runId}`),
+              sessionId: `${context.runId}:program-child`,
+              prompt: textPrompt(`program child ${suffix}`),
+              idempotencyKey: `program-child:${suffix}`,
+              correlationId: context.runId,
+            }),
+            executableRef: researcherRef.ref,
+            executableManifest: researcherRef.manifest,
+            registrations: registrationsFor(researcherRef),
+          })
+          const first = programInput("first")
+          const second = { ...programInput("second"), registrations: [] }
+          const suspended = suspension({
+            waitId: "program-batch",
+            token: first.childRunId,
+            toolCallId: "program-batch",
+            toolName: "code_mode",
+            toolParams: {},
+          })
+          const failure = yield* context.store
+            .admitProgramChildAndSuspend({
+              ...claim,
+              children: [first, second],
+              waits: [
+                {
+                  waitId: "program-batch",
+                  reason: { _tag: "ToolWait" },
+                  status: "open",
+                  openedAt: "2026-08-12T00:00:00.000Z",
+                },
+              ],
+              suspension: suspended,
+            })
+            .pipe(Effect.flip)
+          expect(failure).toBeInstanceOf(Errors.RuntimeUnavailable)
+          expect(yield* context.children.listDirect(context.runId)).toEqual([])
+          expect((yield* runtime.inspect(first.childRunId).pipe(Effect.option))._tag).toBe("None")
+          expect((yield* runtime.inspect(second.childRunId).pipe(Effect.option))._tag).toBe("None")
           expect(yield* runtime.inspect(context.runId)).not.toMatchObject({ status: "waiting" })
         }),
       ),

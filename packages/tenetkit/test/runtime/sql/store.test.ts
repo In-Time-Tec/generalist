@@ -73,7 +73,7 @@ const admitWaitWithClaimedChild = (waitId: string) =>
     yield* store.claimExecution({ runId: child.runId, ownerId: "child" })
     yield* store.suspend({
       ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })),
-      wait: openWait({ waitId, reason: "signal" }),
+      waits: [openWait({ waitId, reason: "signal" })],
       suspension: suspension({ waitId }),
     })
     return { runtime, store, runId: parent.runId }
@@ -940,7 +940,7 @@ it.live("persists only complete atomic failure, unknown, and suspension states a
       ...claim,
       checkpoint,
       suspension: suspension({ waitId: "approval", reason: "approval" }),
-      wait: openWait({ waitId: "approval", reason: "approval" }),
+      waits: [openWait({ waitId: "approval", reason: "approval" })],
     })
   })
   const reopen = Effect.gen(function* () {
@@ -959,11 +959,9 @@ it.live("persists only complete atomic failure, unknown, and suspension states a
     expect(execution.checkpoint).toEqual(checkpoint)
     expect(execution.suspension).toMatchObject({
       _tag: "tenetkit/core/AgentSuspended",
-      token: "approval",
-      reason: "approval",
-      tool_call_id: "approval",
+      waits: [{ waitId: "approval", token: "approval", reason: "approval", call: { id: "approval" } }],
     })
-    expect((yield* runtime.inspect(runIds.Suspended!)).wait?.waitId).toBe("approval")
+    expect((yield* runtime.inspect(runIds.Suspended!)).waits[0]?.waitId).toBe("approval")
     expect((yield* runtime.inspect(runIds.Suspended!)).status).toBe("waiting")
   })
   return Effect.gen(function* () {
@@ -989,7 +987,7 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
       yield* store.suspend({
         ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
-        wait: openWait({ waitId: "wait:sqlite" }),
+        waits: [openWait({ waitId: "wait:sqlite" })],
         suspension: suspension({ waitId: "wait:sqlite" }),
       })
       yield* runtime.respond({
@@ -1000,8 +998,15 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
     })
     const reopen = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
       const inspection = yield* runtime.inspect("run:sqlite:caller")
-      expect(inspection.wait?.resolution).toEqual({ _tag: "ToolResult", result: "yes", encodedResult: "yes" })
+      expect(inspection.waits).toEqual([])
+      expect((yield* store.loadExecution("run:sqlite:caller")).resolutions).toEqual([
+        {
+          waitId: "wait:sqlite",
+          resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
+        },
+      ])
       expect((yield* runtime.snapshot("run:sqlite:caller")).cursor).toBe(inspection.lastSequence)
       expect((yield* runtime.history({ runId: "run:sqlite:caller", limit: 1 })).length).toBe(1)
       expect((yield* runtime.list({ limit: 10 })).map((run) => run.runId)).toContain("run:sqlite:caller")
@@ -1037,7 +1042,7 @@ layer(sqliteLayer(tempDbPath("direct-resume")))(
         const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "direct-resume" })
         yield* store.suspend({
           ...claim,
-          wait: openWait({ waitId: "wait:direct-resume" }),
+          waits: [openWait({ waitId: "wait:direct-resume" })],
           suspension: suspension({ waitId: "wait:direct-resume" }),
         })
         const resolution = {
@@ -1194,7 +1199,7 @@ layer(sqliteLayer(tempDbPath("control")))("response signal and cancel bypass the
       yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: waiting.runId, ownerId: "test" })),
         runId: waiting.runId,
-        wait: openWait({ waitId: "approval", reason: "approval" }),
+        waits: [openWait({ waitId: "approval", reason: "approval" })],
         suspension: suspension({ waitId: "approval", reason: "approval" }),
       })
       expect((yield* runtime.inspect(successor.runId)).status).toBe("queued")
@@ -1203,7 +1208,7 @@ layer(sqliteLayer(tempDbPath("control")))("response signal and cancel bypass the
       yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: waiting.runId, ownerId: "test" })),
         runId: waiting.runId,
-        wait: openWait({ waitId: "signal-me", reason: "signal" }),
+        waits: [openWait({ waitId: "signal-me", reason: "signal" })],
         suspension: suspension({ waitId: "signal-me" }),
       })
       yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })

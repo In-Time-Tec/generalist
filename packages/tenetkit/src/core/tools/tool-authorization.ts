@@ -1,7 +1,6 @@
 import { Cause, Context, Effect, Layer, Schema } from "effect"
 import type { Prompt, Response, Tool } from "effect/unstable/ai"
-import { AgentSuspended, type ApprovalRequest } from "../agent/event.js"
-import { canonicalSuspensionCall } from "../agent/suspension.js"
+import type { ApprovalRequest } from "../agent/event.js"
 import { PermissionError, evaluateWithRules, type RuleStoreInterface } from "../policy/permissions.js"
 
 type Approvals = import("../policy/approvals.js").Interface
@@ -39,7 +38,7 @@ export interface Deny {
 /** @experimental The run must suspend before the tool can execute. */
 export interface Suspend {
   readonly _tag: "Suspend"
-  readonly suspension: AgentSuspended
+  readonly token: string
 }
 /** @experimental The one final decision for a tool execution attempt. */
 export type ToolAuthorization = Execute | Deny | Suspend
@@ -90,16 +89,7 @@ const approvalRequired = (request: Request): Effect.Effect<boolean> => {
 
 const suspend = (request: Request, token: string): Suspend => ({
   _tag: "Suspend",
-  suspension: AgentSuspended.make({
-    token,
-    reason: "approval",
-    tool_call_id: request.call.id,
-    tool_name: request.call.name,
-    tool_params: request.call.params,
-    tool_call_batch: [canonicalSuspensionCall(request.call)],
-    active_tools: request.activeTools,
-    activated_skills: request.activatedSkills,
-  }),
+  token,
 })
 
 /** @experimental Build the authorizer from its three required policy seams. */

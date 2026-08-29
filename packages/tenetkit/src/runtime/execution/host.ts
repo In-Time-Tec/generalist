@@ -1,4 +1,4 @@
-import { Cause, Context, DateTime, Effect, Layer, Option, Ref, type Scope, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Ref, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { Agent } from "../../core/index.js"
 import { AgentEvent } from "../../core/agent/public/event.js"
@@ -16,7 +16,6 @@ import { hostContext, sessionBinding } from "./context.js"
 import { make as makeNestedOperations } from "../operation/nested-operations.js"
 import { make as makeExecutionInterruption } from "./interruption.js"
 import { executeProgram } from "./execute-program.js"
-import { approvalReason } from "../run/wait.js"
 import { make as makeAgentExecutionFailure } from "./agent/failure.js"
 import { make as makeExecutionRetry } from "./retry.js"
 import { ExecutionResolution } from "./resolution.js"
@@ -40,6 +39,7 @@ import {
   type PreparedCompletion,
   type RunOptionsInput,
 } from "./completion/operations.js"
+import { suspend as suspendAgent } from "./agent/suspend.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -384,38 +384,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         Effect.provideContext(context),
                         Effect.exit,
                       )
-                      const suspendAgent = (suspension: AgentEvent.AgentSuspended) =>
-                        Effect.gen(function* () {
-                          const openedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-                          const latest = yield* store.loadExecution(runId)
-                          const durableState = Object.assign(
-                            {},
-                            latest.checkpoint === undefined ? undefined : { checkpoint: latest.checkpoint },
-                            latest.continuation === undefined ? undefined : { continuation: latest.continuation },
-                          )
-                          if (codeMode !== undefined && suspension.tool_name === "code_mode") {
-                            return yield* codeMode.admitSuspension({ suspension, openedAt, ...durableState })
-                          }
-                          const nestedWait = yield* nested.waitFor(suspension)
-                          const wait = nestedWait ?? {
-                            waitId: suspension.reason === "approval" ? suspension.token : suspension.tool_call_id,
-                            reason:
-                              suspension.reason === "approval"
-                                ? approvalReason({
-                                    approvalId: suspension.token,
-                                    operation: suspension.tool_call_id,
-                                    capability: suspension.tool_name,
-                                    input: suspension.tool_params,
-                                  })
-                                : { _tag: "ToolWait" as const },
-                          }
-                          yield* store.suspend({
-                            ...claim,
-                            suspension,
-                            ...durableState,
-                            wait: { ...wait, status: "open", openedAt },
-                          })
-                        })
                       const settleExit = Effect.gen(function* () {
                         yield* preview.clear
                         if (exit._tag === "Success") {
@@ -429,7 +397,16 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         const reason = exit.cause.reasons.length === 1 ? exit.cause.reasons[0] : undefined
                         if (runTerminalReason(reason)) return
                         const suspension = suspendedReason(reason)
-                        if (suspension !== undefined) return yield* suspendAgent(suspension)
+                        if (suspension !== undefined) {
+                          return yield* suspendAgent({
+                            runId,
+                            claim,
+                            store,
+                            nested,
+                            ...(codeMode === undefined ? undefined : { codeMode }),
+                            suspension,
+                          })
+                        }
                         if ((yield* store.inspect(runId)).status === "needs-resolution") return
                         const retry = yield* interruption.retry(isProgramChild, executionRetry.retry(store, claim))
                         if (retry !== undefined) {

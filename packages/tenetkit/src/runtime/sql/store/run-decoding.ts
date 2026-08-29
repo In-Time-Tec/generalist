@@ -4,7 +4,7 @@ import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution/state.
 import { RuntimeUnavailable } from "../../errors.js"
 import { PendingRunOutcome } from "../../run/store.js"
 import { decodeContinuation } from "../../run/steering.js"
-import { StringArray, decodeJson, decodeMessage, decodePinnedExecutable } from "../codec/codecs.js"
+import { decodeJson, decodeMessage, decodePinnedExecutable } from "../codec/codecs.js"
 import type { DecodedRun, RunRow } from "../codec/rows.js"
 
 const asBool = (value: number | boolean | string): boolean => value === true || value === "true" || Number(value) === 1
@@ -17,7 +17,6 @@ const asIso = (value: string | Date | null | undefined): string | undefined => {
 const assignRunOptionals = (result: DecodedRun, row: RunRow, checkpoint: ExecutionCheckpoint | undefined): void => {
   Object.assign(result, row.parent_run_id === null ? {} : { parentRunId: row.parent_run_id })
   Object.assign(result, row.invocation_id === null ? {} : { invocationId: row.invocation_id })
-  Object.assign(result, row.active_wait_id === null ? {} : { activeWaitId: row.active_wait_id })
   Object.assign(result, row.cancel_reason === null ? {} : { cancelReason: row.cancel_reason })
   Object.assign(result, row.terminal_event_id === null ? {} : { terminalEventId: row.terminal_event_id })
   Object.assign(result, row.owner_worker_id == null ? {} : { ownerWorkerId: row.owner_worker_id })
@@ -73,7 +72,6 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     lastSequence: row.last_sequence,
     cancellationRequested: asBool(row.cancellation_requested),
     acceptedSequence: row.accepted_sequence,
-    respondedWaitIds: new Set(decodeJson(StringArray, row.responded_wait_ids_json)),
   }
   assignRunOptionals(result, row, checkpoint)
   return result

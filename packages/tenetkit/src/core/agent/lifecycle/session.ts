@@ -2,7 +2,8 @@ import { Effect, Option, Ref } from "effect"
 import { Chat } from "effect/unstable/ai"
 import { type DirectoryInterface, type Interface as SessionStore, SessionDirectory } from "../../context/session.js"
 import { Compaction } from "../../turn/compaction.js"
-import { AgentError } from "../event.js"
+import { AgentError, ResumeMismatch } from "../event.js"
+import { validResolutions } from "../suspension.js"
 import { type Interface as ToolContextInterface, ToolContext } from "../../tools/tool-context.js"
 import type { RunOptions } from "../service.js"
 import {
@@ -34,6 +35,15 @@ const acquireSession = (
 
 export const setupSession = (options: RunOptions) =>
   Effect.gen(function* () {
+    if (
+      options.resume !== undefined &&
+      !validResolutions(options.resume.suspension, options.resume.resolutions ?? [])
+    ) {
+      return yield* ResumeMismatch.make({
+        reason: "identity-mismatch",
+        received: options.resume.suspension,
+      })
+    }
     const compactionService = yield* Effect.serviceOption(Compaction)
     const sessionDirectory = yield* Effect.serviceOption(SessionDirectory)
     const toolContext = yield* Effect.serviceOption(ToolContext)

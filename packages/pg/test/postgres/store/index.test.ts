@@ -15,6 +15,7 @@ import {
   RunTree,
 } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/postgres/schema.js"
 import {
@@ -79,7 +80,7 @@ const admitWaitForCancellation = (waitId: string) =>
       ownerId: parentClaim.workerId,
       attemptFence: parentClaim.attemptFence,
       session: parentClaim.session,
-      wait: openWait({ waitId }),
+      waits: [openWait({ waitId })],
       suspension: suspension({ waitId }),
     })
     yield* Effect.gen(function* () {
@@ -164,6 +165,53 @@ const finish = Response.makePart("finish", {
 })
 
 describePostgres("PostgreSQL run store", () => {
+  it.live("returns exactly one then zero rows for a conditional wait transition", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const waitId = uniqueSession("affected-wait")
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("affected-session"),
+          idempotencyKey: waitId,
+          prompt: textPrompt("wait"),
+        })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "affected-row" })
+        yield* store.suspend({
+          ...claim,
+          waits: [openWait({ waitId })],
+          suspension: suspension({ waitId }),
+        })
+        const affected = yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          return yield* sql.withTransaction(
+            Effect.all(
+              [
+                transitionRunWait({
+                  runId: receipt.runId,
+                  waitId,
+                  status: "responded",
+                  resolution: { _tag: "ToolResult", result: "done", encodedResult: "done" },
+                  closedAt: "2026-08-29T00:00:00.000Z",
+                }),
+                transitionRunWait({
+                  runId: receipt.runId,
+                  waitId,
+                  status: "responded",
+                  resolution: { _tag: "ToolResult", result: "done", encodedResult: "done" },
+                  closedAt: "2026-08-29T00:00:00.000Z",
+                }),
+              ],
+              { concurrency: 1 },
+            ),
+          )
+        }).pipe(scopedWith(postgresClient(url)))
+        expect(affected).toEqual([1, 0])
+      }).pipe(scopedWith(postgresLayer(url))),
+    ),
+  )
+
   it.live("atomically checkpoints, bounds replay, and hands off to live tree changes", () =>
     withSchema(
       Effect.gen(function* () {
@@ -463,7 +511,7 @@ describePostgres("PostgreSQL run store", () => {
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
           session: claimed.session,
-          wait: openWait({ waitId: "wait:direct-resume" }),
+          waits: [openWait({ waitId: "wait:direct-resume" })],
           suspension: suspension({ waitId: "wait:direct-resume" }),
         })
         const resolution = { _tag: "Denied" as const, reason: "postgres exact resolution" }
@@ -1219,7 +1267,7 @@ describePostgres("PostgreSQL run store", () => {
         }
         yield* driver.suspend({
           ...claim,
-          wait: openWait({ waitId: "approval", reason: "approval" }),
+          waits: [openWait({ waitId: "approval", reason: "approval" })],
           suspension: suspension({ waitId: "approval", reason: "approval" }),
         })
         expect((yield* runtime.inspect(successor.runId)).status).toBe("queued")
@@ -1234,7 +1282,7 @@ describePostgres("PostgreSQL run store", () => {
         }
         yield* driver.suspend({
           ...claim,
-          wait: openWait({ waitId: "signal-me", reason: "signal" }),
+          waits: [openWait({ waitId: "signal-me", reason: "signal" })],
           suspension: suspension({ waitId: "signal-me" }),
         })
         yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })
@@ -1531,7 +1579,7 @@ describePostgres("PostgreSQL run store", () => {
             ownerId: "race-w",
             attemptFence: claimed!.attemptFence,
             session: claimed!.session,
-            wait: openWait({ waitId: "approval", reason: "approval" }),
+            waits: [openWait({ waitId: "approval", reason: "approval" })],
             suspension: suspension({ waitId: "approval", reason: "approval" }),
           })
 
@@ -1588,12 +1636,12 @@ describePostgres("PostgreSQL run store", () => {
         expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
         yield* store.suspend({
           ...claim,
-          wait: openWait({ waitId: "approval" }),
+          waits: [openWait({ waitId: "approval" })],
           suspension: suspension({ waitId: "approval" }),
         })
         const inspection = yield* runtime.inspect(runId)
         expect(inspection.status).toBe("cancelling")
-        expect(inspection.wait).toMatchObject({ status: "cancelled" })
+        expect(inspection.waits).toEqual([])
       }).pipe(scopedWith(postgresLayer(url))),
     ),
   )

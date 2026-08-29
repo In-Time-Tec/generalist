@@ -93,7 +93,7 @@ const blockRootOnChild = (sessionId: string, invocationId: string) =>
     yield* store.suspend({
       ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
       runId: root.runId,
-      wait: openWait({ waitId: invocationId }),
+      waits: [openWait({ waitId: invocationId })],
       suspension: suspension({ waitId: invocationId }),
     })
     return { runtime, store, root, child, childClaim }
@@ -473,7 +473,7 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* store.suspend({
         ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
         runId: root.runId,
-        wait: openWait({ waitId: "approval:root", reason: "approval" }),
+        waits: [openWait({ waitId: "approval:root", reason: "approval" })],
         suspension: suspension({ waitId: "approval:root", reason: "approval" }),
       })
       const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
@@ -488,7 +488,7 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* store.suspend({
         ...childClaim,
         runId: child.runId,
-        wait: openWait({ waitId: "approval:child", reason: "approval" }),
+        waits: [openWait({ waitId: "approval:child", reason: "approval" })],
         suspension: suspension({ waitId: "approval:child", reason: "approval" }),
       })
       const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
@@ -572,7 +572,7 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* store.suspend({
         ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
         runId: root.runId,
-        wait: openWait({ waitId: "gate", reason: "external" }),
+        waits: [openWait({ waitId: "gate", reason: "external" })],
         suspension: suspension({ waitId: "gate" }),
       })
       const blocked = (yield* RunTree.checkpoint(root.runId)).inspection
@@ -600,6 +600,7 @@ layer(memoryLayer)("RunTree", (it) => {
                     treePolicy: rootRun.treePolicy,
                     lastSequence: rootRun.lastSequence,
                     durability: rootRun.durability,
+                    waits: [],
                   }
                 : {
                     runId: rootRun.runId,
@@ -610,7 +611,7 @@ layer(memoryLayer)("RunTree", (it) => {
                     treePolicy: rootRun.treePolicy,
                     lastSequence: rootRun.lastSequence,
                     durability: rootRun.durability,
-                    wait,
+                    waits: [wait],
                   },
           },
         ],
@@ -622,10 +623,7 @@ layer(memoryLayer)("RunTree", (it) => {
         { events: [second], cursor: late, hasMore: false },
       ]
       const checkpoints: ReadonlyArray<RunTree.Checkpoint> = [
-        {
-          inspection: inspectionWith({ ...openWait({ waitId: "gate", reason: "external" }), status: "responded" }),
-          cursor: early,
-        },
+        { inspection: inspectionWith(undefined), cursor: early },
         { inspection: inspectionWith(undefined), cursor: early },
         { inspection: inspectionWith(openWait({ waitId: "gate", reason: "external" })), cursor: late },
         { inspection: inspectionWith(openWait({ waitId: "gate", reason: "external" })), cursor: late },

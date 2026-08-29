@@ -41,7 +41,6 @@ const decodedRun: DecodedRun = {
   lastSequence: 0,
   cancellationRequested: false,
   acceptedSequence: 0,
-  respondedWaitIds: new Set(),
   admittedAt: "2026-08-28T00:00:00.000Z",
 }
 
@@ -84,6 +83,7 @@ const storeService = (status: RunStatus): StoreInterface =>
         treePolicy: decodedRun.treePolicy,
         lastSequence: decodedRun.lastSequence,
         durability: "durable",
+        waits: [],
       } satisfies RunInspection),
   })
 

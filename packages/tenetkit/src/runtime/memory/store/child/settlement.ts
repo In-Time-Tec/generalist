@@ -4,8 +4,9 @@ import { ownsChildSuspension, resultFromChildEvent } from "../../../child/group.
 import { isTerminal } from "../../../run.js"
 import type { RunEvent } from "../../../run/event.js"
 import { appendLifecycle, childReadinessChangedEvent, childSettledEvent, resumedEvent } from "../../append.js"
-import type { MemoryState, StoredRun } from "../../state.js"
+import { openRunWaits, type MemoryState, type StoredRun } from "../../state.js"
 import { admitChildSettlement } from "../directory.js"
+import { closeWait } from "../control/wait.js"
 
 const isChildTerminalEvent = (
   event: RunEvent,
@@ -43,19 +44,20 @@ export const reconcileChildWait: {
   ): Effect.Effect<MemoryState, RuntimeUnavailable>
 } = Function.dual(4, (state: MemoryState, parent: StoredRun, child: StoredRun, event: RunEvent) =>
   Effect.gen(function* () {
+    const wait = openRunWaits(state, parent.runId).find((candidate) =>
+      ownsChildSuspension({
+        parentRunId: parent.runId,
+        waitId: candidate.waitId,
+        childRunId: child.runId,
+        metadata: child.message.metadata,
+        suspension: parent.suspension,
+      }),
+    )
     if (
       !isChildTerminalEvent(event) ||
       isTerminal(parent.status) ||
       parent.cancellationRequested ||
-      parent.activeWaitId === undefined ||
-      parent.wait?.status !== "open" ||
-      !ownsChildSuspension({
-        parentRunId: parent.runId,
-        waitId: parent.activeWaitId,
-        childRunId: child.runId,
-        metadata: child.message.metadata,
-        suspension: parent.suspension,
-      })
+      wait === undefined
     ) {
       return state
     }
@@ -64,14 +66,22 @@ export const reconcileChildWait: {
     const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     const runs = new Map(state.runs)
     const { ownerId: _, ...released } = parent
-    runs.set(parent.runId, {
-      ...released,
-      wait: { ...parent.wait, status: "responded", resolution, closedAt },
-    })
-    const [, resumed] = yield* appendLifecycle(
+    runs.set(parent.runId, released)
+    const transitioned = closeWait(
       { ...state, runs },
+      {
+        runId: parent.runId,
+        waitId: wait.waitId,
+        status: "responded",
+        resolution,
+        closedAt,
+      },
+    )
+    if (transitioned.affected !== 1) return state
+    const [, resumed] = yield* appendLifecycle(
+      transitioned.state,
       parent.runId,
-      resumedEvent(parent.activeWaitId, resolution),
+      resumedEvent(wait.waitId, resolution),
       "running",
     )
     return resumed

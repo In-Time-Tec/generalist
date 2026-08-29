@@ -4,6 +4,7 @@ import type { Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
 import type { CompletedModelResponse } from "../model/response/builder.js"
 import { Diagnostics as SessionSyncDiagnostics } from "../context/session-sync.js"
 import { StopReason } from "../turn/policy.js"
+import { ToolBatchCheckpoint, ToolBatchWait } from "./tools/checkpoint.js"
 /** @experimental Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
 
@@ -102,6 +103,16 @@ export interface ToolExecutionCompleted {
       readonly dropped: number
     }
   }
+}
+
+/** @experimental A tool reached a durable wait without disturbing admitted siblings. */
+export interface ToolExecutionWaiting {
+  readonly _tag: "ToolExecutionWaiting"
+  readonly turn: number
+  readonly call: Response.ToolCallPart<string, unknown>
+  readonly waitId: string
+  readonly token: string
+  readonly metadata?: Metadata
 }
 
 /** @experimental Stable identity for one authorization request. */
@@ -210,6 +221,7 @@ export type Event =
   | ToolExecutionStarted
   | ToolProgress
   | ToolExecutionCompleted
+  | ToolExecutionWaiting
   | HandoffRequested
   | HandoffCompleted
   | HandoffRejectedEvent
@@ -321,31 +333,13 @@ export class ToolNameCollision extends Schema.TaggedError<ToolNameCollision>()("
 }) {}
 
 /**
- * @experimental The run suspended: a tool outcome was `Suspend` or an approval
- * decision was `Pending`. The run did NOT finish; the host resolves `token`
- * out-of-band and re-enters via `RunOptions.resume` with this exact suspension.
- * Field shape deliberately mirrors a tool call so durable hosts can persist it.
+ * @experimental The run suspended with one or more exact authored-order waits.
+ * The run did NOT finish; the host resolves waits out-of-band and re-enters via
+ * `RunOptions.resume` with this exact batch checkpoint.
  */
 export class AgentSuspended extends Schema.TaggedError<AgentSuspended>()("tenetkit/core/AgentSuspended", {
-  token: Schema.String,
-  reason: Schema.Literals(["tool-wait", "approval"]),
-  tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  tool_call_id: Schema.String,
-  tool_name: Schema.String,
-  tool_params: Schema.Unknown,
-  tool_call_batch: Schema.Array(
-    Schema.Struct({
-      type: Schema.Literal("tool-call"),
-      id: Schema.String,
-      name: Schema.String,
-      params: Schema.Unknown,
-      providerExecuted: Schema.Boolean,
-      metadata: Response.ProviderMetadata,
-    }),
-  ),
-  active_tools: Schema.optional(Schema.Array(Schema.String)),
-  activated_skills: Schema.optional(Schema.Array(Schema.String)),
-  invocation_path: Schema.optional(Schema.Array(Schema.String)),
+  checkpoint: ToolBatchCheckpoint,
+  waits: Schema.Array(ToolBatchWait),
 }) {}
 
 /** @experimental A resume identity did not match the current authoritative suspension checkpoint. */

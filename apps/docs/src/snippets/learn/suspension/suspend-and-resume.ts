@@ -69,11 +69,18 @@ const program = Effect.gen(function* () {
       (error) => Effect.succeed(error),
     ),
   )
-  yield* Console.log(`suspended reason=${suspension.reason} tool=${suspension.tool_name} token=${suspension.token}`)
+  const [wait] = suspension.waits
+  if (wait === undefined) {
+    return yield* Effect.die("expected an approval wait")
+  }
+  yield* Console.log(`suspended reason=${wait.reason} tool=${wait.call.name} token=${wait.token}`)
   const result = yield* Agent.generate(agent, {
     prompt: "",
     history: transcript,
-    resume: { suspension },
+    resume: {
+      suspension,
+      resolutions: [{ waitId: wait.waitId, resolution: { _tag: "Approved" } }],
+    },
   })
   yield* Console.log(result.text)
 })

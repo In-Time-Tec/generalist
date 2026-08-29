@@ -7,7 +7,6 @@ import type { ExecutableManifest, ExecutableRef } from "tenetkit/runtime/driver/
 import type { Message } from "tenetkit/runtime/driver/messaging/message"
 import { isTerminal, type RunStatus } from "tenetkit/runtime/driver/run"
 import {
-  StringArray,
   decodeMessage,
   decodeEvent,
   decodeQueue,
@@ -184,9 +183,6 @@ export const appendEvent: {
       VALUES (${run.rootRunId}, ${treeRoot.last_position}, ${run.runId}, ${sequence}, ${event.eventId})
     `
       const status = nextStatus ?? run.status
-      let activeWaitId: string | null = run.activeWaitId ?? null
-      if (event._tag === "RunWaiting") activeWaitId = event.wait.waitId
-      if (event._tag === "RunResumed") activeWaitId = null
       const terminalEventId = isTerminalEvent(event) ? event.eventId : (run.terminalEventId ?? null)
       const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested
       const cancelReason =
@@ -197,7 +193,6 @@ export const appendEvent: {
         yield* sql`
         UPDATE tenetkit_runs SET
           status = ${status},
-          active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
           cancellation_requested = ${cancellationRequested},
           cancel_reason = ${cancelReason},
@@ -215,7 +210,6 @@ export const appendEvent: {
         yield* sql`
         UPDATE tenetkit_runs SET
           status = ${status},
-          active_wait_id = ${activeWaitId},
           terminal_event_id = ${terminalEventId},
           cancellation_requested = ${cancellationRequested},
           cancel_reason = ${cancelReason},
@@ -446,16 +440,16 @@ export const insertRun = (input: {
     yield* sql`
       INSERT INTO tenetkit_runs (
         run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-        executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
+        executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents, parent_run_id, invocation_id, attempt, attempt_fence,
         last_sequence, cancellation_requested, cancel_reason, terminal_event_id, accepted_sequence,
-        responded_wait_ids_json, owner_worker_id, lease_expires_at, created_at, updated_at
+        owner_worker_id, lease_expires_at, created_at, updated_at
       ) VALUES (
         ${input.runId}, ${input.status}, ${input.message.to}, ${input.message.sessionId}, ${input.message.id},
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
         ${input.rootRunId}, ${input.depth}, ${input.treePolicy.maxDepth}, ${input.treePolicy.maxSubagents}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
-        NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, FALSE, NULL, NULL, ${input.acceptedSequence},
-        ${encodeJson(StringArray, [])}, NULL, NULL, NOW(), NOW()
+        ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, FALSE, NULL, NULL, ${input.acceptedSequence},
+        NULL, NULL, NOW(), NOW()
       )
     `
     if (input.runId === input.rootRunId) {

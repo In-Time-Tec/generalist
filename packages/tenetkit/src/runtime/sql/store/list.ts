@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { RunInspection, RunStatus } from "../../run.js"
-import { decodeRunEffect, loadRunWait } from "./statements.js"
+import { decodeRunEffect, loadRunWaitsByStatus } from "./statements.js"
 import type { RunRow } from "../codec/rows.js"
 
 export const listRuns = (input: {
@@ -31,7 +31,7 @@ export const listRuns = (input: {
     return yield* Effect.forEach(rows, (row) =>
       Effect.gen(function* () {
         const loaded = yield* decodeRunEffect(row)
-        const activeWait = yield* loadRunWait(loaded.runId, loaded.activeWaitId)
+        const waits = yield* loadRunWaitsByStatus(loaded.runId, "open")
         const inspection: RunInspection = {
           runId: loaded.runId,
           status: loaded.status,
@@ -39,11 +39,11 @@ export const listRuns = (input: {
           executableManifest: loaded.executableManifest,
           depth: loaded.depth,
           treePolicy: loaded.treePolicy,
+          waits,
           lastSequence: loaded.lastSequence,
           durability: "durable",
         }
         if (loaded.parentRunId !== undefined) Object.assign(inspection, { parentRunId: loaded.parentRunId })
-        if (activeWait !== undefined) Object.assign(inspection, { wait: activeWait })
         return inspection
       }),
     )

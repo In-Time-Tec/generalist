@@ -164,20 +164,22 @@ describe("AgUi", () => {
         executableManifest: executable.manifest,
         depth: 0,
         treePolicy: TreePolicy.defaultTreePolicy,
-        wait: {
-          waitId: "wait-1",
-          reason: {
-            _tag: "Approval" as const,
-            request: {
-              approvalId: "wait-1",
-              operation: "tool-call-1",
-              capability: "test-tool",
-              input: {},
+        waits: [
+          {
+            waitId: "wait-1",
+            reason: {
+              _tag: "Approval" as const,
+              request: {
+                approvalId: "wait-1",
+                operation: "tool-call-1",
+                capability: "test-tool",
+                input: {},
+              },
             },
+            status: "open" as const,
+            openedAt: "2026-08-03T00:00:00.000Z",
           },
-          status: "open" as const,
-          openedAt: "2026-08-03T00:00:00.000Z",
-        },
+        ],
         lastSequence: 3,
         durability: "ephemeral" as const,
       },
@@ -234,6 +236,7 @@ describe("AgUi", () => {
         executableManifest: executable.manifest,
         depth: 0,
         treePolicy: TreePolicy.defaultTreePolicy,
+        waits: [],
         lastSequence: 8,
         durability: "ephemeral" as const,
       },
@@ -279,6 +282,7 @@ describe("AgUi", () => {
         executableManifest: executable.manifest,
         depth: 0,
         treePolicy: TreePolicy.defaultTreePolicy,
+        waits: [],
         lastSequence: 12,
         durability: "durable" as const,
       },

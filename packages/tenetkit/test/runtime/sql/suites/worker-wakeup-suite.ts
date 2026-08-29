@@ -39,7 +39,6 @@ const decodedRun: DecodedRun = {
   lastSequence: 0,
   cancellationRequested: false,
   acceptedSequence: 0,
-  respondedWaitIds: new Set(),
   admittedAt: "2026-08-29T00:00:00.000Z",
 }
 

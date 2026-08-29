@@ -14,7 +14,7 @@ import {
   researcherRef,
   suspension,
 } from "./fixtures.js"
-import { Agent, AgentEvent } from "../../../src/index.js"
+import { Agent } from "../../../src/index.js"
 import { closedTestAgent } from "../run/identity.js"
 import { makeStatic } from "../../../src/runtime/executable/resolver.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
@@ -32,14 +32,7 @@ const finish = Response.makePart("finish", {
 })
 
 const childSuspension = (childRunId: string, waitId: string) =>
-  AgentEvent.AgentSuspended.make({
-    token: childRunId,
-    reason: "tool-wait",
-    tool_call_id: waitId,
-    tool_name: ChildRuns.toolName,
-    tool_params: {},
-    tool_call_batch: [],
-  })
+  suspension({ waitId, token: childRunId, toolName: ChildRuns.toolName })
 
 for (const backend of ["memory", "sqlite"] as const) {
   {
@@ -227,7 +220,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
           yield* store.suspend({
             ...parentClaim,
-            wait: openWait({ waitId: "child-tool" }),
+            waits: [openWait({ waitId: "child-tool" })],
             suspension: childSuspension(childOutcome.token, "child-tool"),
           })
           yield* store.complete({
@@ -575,7 +568,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
             yield* store.suspend({
               ...parentClaim,
-              wait: openWait({ waitId: "order-child" }),
+              waits: [openWait({ waitId: "order-child" })],
               suspension: childSuspension(childOutcome.token, "order-child"),
             })
             const later = yield* runtime.send({
@@ -638,7 +631,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
             yield* store.suspend({
               ...parentClaim,
-              wait: openWait({ waitId: "backlog-child" }),
+              waits: [openWait({ waitId: "backlog-child" })],
               suspension: childSuspension(childOutcome.token, "backlog-child"),
             })
             yield* store.complete({
@@ -682,7 +675,7 @@ for (const backend of ["memory", "sqlite"] as const) {
               })
               yield* store.suspend({
                 ...blockedClaim,
-                wait: openWait({ waitId: `starve-approval-${index}`, reason: "approval" }),
+                waits: [openWait({ waitId: `starve-approval-${index}`, reason: "approval" })],
                 suspension: suspension({ waitId: `starve-approval-${index}`, reason: "approval" }),
               })
             }
@@ -702,7 +695,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
             yield* store.suspend({
               ...parentClaim,
-              wait: openWait({ waitId: "starve-child" }),
+              waits: [openWait({ waitId: "starve-child" })],
               suspension: childSuspension(childOutcome.token, "starve-child"),
             })
             yield* store.complete({
@@ -821,7 +814,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           if (outcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
           yield* store.suspend({
             ...parentClaim,
-            wait: openWait({ waitId: "child-tool" }),
+            waits: [openWait({ waitId: "child-tool" })],
             suspension: childSuspension(outcome.token, "child-tool"),
           })
           yield* scheduler.tick
@@ -829,8 +822,10 @@ for (const backend of ["memory", "sqlite"] as const) {
           expect((yield* runtime.inspect(outcome.token)).status).toBe("succeeded")
           yield* scheduler.tick
           const parentInspection = yield* runtime.inspect(parent.runId)
-          expect(parentInspection.wait?.waitId).toBe("child-tool")
-          expect(parentInspection.wait?.status).toBe("responded")
+          expect(parentInspection.waits).toEqual([])
+          expect(yield* runtime.history({ runId: parent.runId, limit: 100 })).toContainEqual(
+            expect.objectContaining({ _tag: "RunResumed", waitId: "child-tool" }),
+          )
         }),
       )
     })
@@ -900,7 +895,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           if (outcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
           yield* store.suspend({
             ...parentClaim,
-            wait: openWait({ waitId: "child-tool" }),
+            waits: [openWait({ waitId: "child-tool" })],
             suspension: childSuspension(outcome.token, "child-tool"),
           })
           yield* store.complete({
@@ -909,7 +904,10 @@ for (const backend of ["memory", "sqlite"] as const) {
           })
           yield* scheduler.tick
           const parentInspection = yield* runtime.inspect(parent.runId)
-          expect(parentInspection.wait?.status).toBe("responded")
+          expect(parentInspection.waits).toEqual([])
+          expect(yield* runtime.history({ runId: parent.runId, limit: 100 })).toContainEqual(
+            expect.objectContaining({ _tag: "RunResumed", waitId: "child-tool" }),
+          )
           expect((yield* runtime.inspect(blocking.runId)).status).toBe("running")
 
           yield* Deferred.succeed(release, undefined)

@@ -48,8 +48,8 @@ import { make as DurableDriver_makeLoopDriver } from "../loop-driver.js"
 import {
   intercept as DurableDriver_intercept,
   interceptStream as DurableDriver_interceptStream,
-  recordSuspension as DurableDriver_recordSuspension,
-  bindResume as DurableDriver_bindResume,
+  setToolBatch as DurableDriver_setToolBatch,
+  updateToolBatch as DurableDriver_updateToolBatch,
   abortPending as DurableDriver_abortPending,
   chargeUsage as DurableDriver_chargeUsage,
   setBudget as DurableDriver_setBudget,
@@ -101,8 +101,8 @@ export const DurableDriver = {
   makeLoopDriver: DurableDriver_makeLoopDriver,
   intercept: DurableDriver_intercept,
   interceptStream: DurableDriver_interceptStream,
-  recordSuspension: DurableDriver_recordSuspension,
-  bindResume: DurableDriver_bindResume,
+  setToolBatch: DurableDriver_setToolBatch,
+  updateToolBatch: DurableDriver_updateToolBatch,
   abortPending: DurableDriver_abortPending,
   chargeUsage: DurableDriver_chargeUsage,
   setBudget: DurableDriver_setBudget,
@@ -161,8 +161,8 @@ export namespace DurableDriver {
   export type makeLoopDriver = typeof import("../loop-driver.js").make
   export type intercept = typeof import("../driver/run.js").intercept
   export type interceptStream = typeof import("../driver/run.js").interceptStream
-  export type recordSuspension = typeof import("../driver/run.js").recordSuspension
-  export type bindResume = typeof import("../driver/run.js").bindResume
+  export type setToolBatch = typeof import("../driver/run.js").setToolBatch
+  export type updateToolBatch = typeof import("../driver/run.js").updateToolBatch
   export type abortPending = typeof import("../driver/run.js").abortPending
   export type chargeUsage = typeof import("../driver/run.js").chargeUsage
   export type setBudget = typeof import("../driver/run.js").setBudget

@@ -175,7 +175,6 @@ const addMember = (
       parentRunId: parent.runId,
       childReadiness: readiness,
       invocationId: `${input.fanOutId}:${member.key}`,
-      respondedWaitIds: new Set(),
       lastSequence: -1,
       attempt: 0,
       attemptFence: 0,

@@ -296,32 +296,130 @@ const unusedExecutor = ToolExecutor.layerTest({
 
 type ToolCallParams = Response.ToolCallPartEncoded["params"]
 
-const toolCallPart = (id: string, name: string, params: ToolCallParams) =>
-  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+const toolCallPart = (id: string, name: string, params: ToolCallParams): Response.ToolCallPart<string, unknown> =>
+  Response.toolCallPart({ id, name, params, providerExecuted: false })
 
 const providerToolCallPart = (id: string, name: string, params: ToolCallParams) =>
-  Response.makePart("tool-call", { id, name, params, providerExecuted: true })
+  Response.toolCallPart({ id, name, params, providerExecuted: true })
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
 const reasoningDelta = (delta: string) => Response.makePart("reasoning-delta", { id: "reasoning", delta })
 
-const replaceSuspension = (
-  suspension: AgentEvent.AgentSuspended,
-  changes: Partial<Omit<AgentEvent.AgentSuspended, "_tag">>,
-) =>
-  AgentEvent.AgentSuspended.make({
-    token: changes.token ?? suspension.token,
-    reason: changes.reason ?? suspension.reason,
-    tool_call_index: changes.tool_call_index ?? suspension.tool_call_index,
-    tool_call_id: changes.tool_call_id ?? suspension.tool_call_id,
-    tool_name: changes.tool_name ?? suspension.tool_name,
-    tool_params: changes.tool_params ?? suspension.tool_params,
-    tool_call_batch: changes.tool_call_batch ?? suspension.tool_call_batch,
-    active_tools: changes.active_tools ?? suspension.active_tools,
-    activated_skills: changes.activated_skills ?? suspension.activated_skills,
-    invocation_path: changes.invocation_path ?? suspension.invocation_path,
+interface SuspensionChanges {
+  readonly token?: string
+  readonly reason?: "approval" | "tool-wait"
+  readonly tool_call_id?: string
+  readonly tool_name?: string
+  readonly tool_params?: ToolCallParams
+  readonly tool_call_batch?: ReadonlyArray<Response.ToolCallPart<string, unknown>>
+  readonly active_tools?: ReadonlyArray<string>
+  readonly activated_skills?: ReadonlyArray<string>
+}
+
+type CheckpointCall = AgentEvent.AgentSuspended["checkpoint"]["calls"][number]
+
+const replacementValue = <Value>(
+  targeted: boolean,
+  changed: Value | undefined,
+  replacement: Value | undefined,
+  current: Value,
+): Value => (targeted ? changed : undefined) ?? replacement ?? current
+
+const replaceCheckpointCall = (
+  entry: CheckpointCall,
+  index: number,
+  targetIndex: number,
+  changes: SuspensionChanges,
+): CheckpointCall => {
+  const replacement = changes.tool_call_batch?.[index]
+  const targeted = index === targetIndex
+  const call = Response.toolCallPart({
+    id: replacementValue(targeted, changes.tool_call_id, replacement?.id, entry.call.id),
+    name: replacementValue(targeted, changes.tool_name, replacement?.name, entry.call.name),
+    params: replacementValue(targeted, changes.tool_params, replacement?.params, entry.call.params),
+    providerExecuted: replacement?.providerExecuted ?? entry.call.providerExecuted,
+    metadata: replacement?.metadata ?? entry.call.metadata,
   })
+  const state =
+    targeted && entry.state._tag === "Waiting"
+      ? {
+          ...entry.state,
+          token: changes.token ?? entry.state.token,
+          reason: changes.reason ?? entry.state.reason,
+        }
+      : entry.state
+  return { ...entry, call, state }
+}
+
+const replaceSuspension = (suspension: AgentEvent.AgentSuspended, changes: SuspensionChanges) => {
+  const targetIndex = suspension.waits[0]?.callIndex ?? 0
+  const calls = suspension.checkpoint.calls.map((entry, index) =>
+    replaceCheckpointCall(entry, index, targetIndex, changes),
+  )
+  const checkpoint = {
+    ...suspension.checkpoint,
+    calls,
+    activeTools: changes.active_tools ?? suspension.checkpoint.activeTools,
+    activatedSkills: changes.activated_skills ?? suspension.checkpoint.activatedSkills,
+  }
+  return AgentEvent.AgentSuspended.make({
+    checkpoint,
+    waits: calls.flatMap((entry, callIndex) =>
+      entry.state._tag === "Waiting"
+        ? [
+            {
+              waitId: entry.state.waitId,
+              token: entry.state.token,
+              reason: entry.state.reason,
+              callIndex,
+              call: entry.call,
+            },
+          ]
+        : [],
+    ),
+  })
+}
+
+const toolResultResolution = <Result>(suspension: AgentEvent.AgentSuspended, callId: string, result: Result) => {
+  const wait = suspension.waits.find((entry) => entry.call.id === callId)
+  if (wait === undefined) throw new Error(`missing wait for ${callId}`)
+  return {
+    waitId: wait.waitId,
+    resolution: { _tag: "ToolResult" as const, result, encodedResult: result },
+  }
+}
+
+const suspendedCall = (
+  call: Response.ToolCallPart<string, unknown>,
+  token: string,
+  reason: "approval" | "tool-wait" = "tool-wait",
+): AgentEvent.AgentSuspended => {
+  const waitId = reason === "approval" ? token : `test:${call.id}`
+  const checkpointCall = Response.makePart("tool-call", {
+    id: call.id,
+    name: call.name,
+    params: call.params,
+    providerExecuted: call.providerExecuted,
+    metadata: call.metadata,
+  })
+  return AgentEvent.AgentSuspended.make({
+    checkpoint: {
+      turn: 0,
+      calls: [
+        {
+          call: checkpointCall,
+          operationKey: `test:${call.id}`,
+          state: { _tag: "Waiting", reason, waitId, token },
+        },
+      ],
+      activeTools: [call.name],
+      activatedSkills: [],
+      invocationPath: [],
+    },
+    waits: [{ waitId, token, reason, callIndex: 0, call: checkpointCall }],
+  })
+}
 
 const responseMetadataPart = (id: string): Response.StreamPartEncoded => ({
   type: "response-metadata",
@@ -1258,8 +1356,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(handled).toBe(false)
         expect(Schema.is(AgentEvent.AgentSuspended)(error)).toBe(true)
         if (Schema.is(AgentEvent.AgentSuspended)(error)) {
-          expect(error.reason).toBe("approval")
-          expect(error.tool_name).toBe("gated")
+          expect(error.waits[0]?.reason).toBe("approval")
+          expect(error.waits[0]?.call.name).toBe("gated")
         }
       }),
     ] as const
@@ -1760,13 +1858,16 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: suspendedTranscript,
-            resume: { suspension: failure },
+            resume: {
+              suspension: failure,
+              resolutions: [toolResultResolution(failure, "resumable-call", "restored")],
+            },
             toolOutputMaxBytes: 256,
           }),
         )
 
         expect(resumed.at(-1)?._tag).toBe("Completed")
-        expect(executorCalls).toBe(2)
+        expect(executorCalls).toBe(1)
         expect(bodyReads).toBe(2)
       }),
     ] as const
@@ -2818,10 +2919,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ])
         expect(failure._tag).toBe("tenetkit/core/AgentSuspended")
         if (failure._tag === "tenetkit/core/AgentSuspended") {
-          expect(failure.reason).toBe("approval")
-          expect(failure.token).toBe("permission:tool-call-permission-ask")
-          expect(failure.tool_name).toBe("gated")
-          expect(failure.tool_params).toEqual({ text: "ask" })
+          expect(failure.waits[0]?.reason).toBe("approval")
+          expect(failure.waits[0]?.token).toBe("permission:tool-call-permission-ask")
+          expect(failure.waits[0]?.call.name).toBe("gated")
+          expect(failure.waits[0]?.call.params).toEqual({ text: "ask" })
         }
       }),
     ] as const
@@ -6039,7 +6140,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: { suspension },
+            resume: {
+              suspension,
+              resolutions: [toolResultResolution(suspension, "tool-call-resume-structured", "resumed")],
+            },
             output: { schema: objectSchema },
           }),
         ).pipe(Effect.withTracer(tracer))
@@ -6047,7 +6151,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(calls).toBe(2)
         expect(sawResumedToolResult).toBe(true)
         expect(events.map((event) => event._tag)).toEqual([
-          "ToolExecutionStarted",
           "ToolExecutionCompleted",
           "TurnCompleted",
           "TurnStarted",
@@ -6824,11 +6927,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
           expect(failure._tag).toBe("tenetkit/core/AgentSuspended")
           if (failure._tag === "tenetkit/core/AgentSuspended") {
-            expect(failure.token).toBe("wait-1")
-            expect(failure.reason).toBe("tool-wait")
-            expect(failure.tool_call_id).toBe("tool-call-wait")
-            expect(failure.tool_name).toBe("echo")
-            expect(failure.tool_params).toEqual({ text: "hold" })
+            expect(failure.waits[0]?.token).toBe("wait-1")
+            expect(failure.waits[0]?.reason).toBe("tool-wait")
+            expect(failure.waits[0]?.call.id).toBe("tool-call-wait")
+            expect(failure.waits[0]?.call.name).toBe("echo")
+            expect(failure.waits[0]?.call.params).toEqual({ text: "hold" })
           }
         }),
       ] as const,
@@ -6879,18 +6982,21 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         if (suspension._tag !== "tenetkit/core/AgentSuspended" || checkpoint === undefined) {
           return yield* Effect.die("missing provider metadata suspension checkpoint")
         }
-        expect(suspension.tool_call_batch[0]?.metadata).toEqual({})
+        expect(suspension.checkpoint.calls[0]?.call.metadata).toEqual({})
 
         const events = yield* Stream.runCollect(
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: { suspension },
+            resume: {
+              suspension,
+              resolutions: [toolResultResolution(suspension, "provider-metadata-wait", "done")],
+            },
           }),
         )
 
         expect(events.at(-1)?._tag).toBe("Completed")
-        expect(executions).toBe(2)
+        expect(executions).toBe(1)
         expect(modelCalls).toBe(2)
       }),
     ] as const
@@ -7007,29 +7113,31 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: suspendedTranscript,
-            resume: { suspension },
+            resume: {
+              suspension,
+              resolutions: [toolResultResolution(suspension, "tool-call-child", { text: "child complete" })],
+            },
           }),
         )
 
         expect(resumed.at(-1)?._tag).toBe("Completed")
         expect(ordinaryExecutions).toBe(1)
-        expect(suspendedExecutions).toBe(2)
+        expect(suspendedExecutions).toBe(1)
         expect(laterExecutions).toBe(1)
-        expect(resumedPrompt.match(/tool-call-ordinary/g)).toHaveLength(3)
+        expect(resumedPrompt.match(/tool-call-ordinary/g)).toHaveLength(2)
         expect(resumedPrompt.match(/README\.md/g)).toHaveLength(1)
-        expect(resumedPrompt.match(/tool-call-child/g)).toHaveLength(3)
+        expect(resumedPrompt.match(/tool-call-child/g)).toHaveLength(2)
         expect(resumedPrompt.match(/child complete/g)).toHaveLength(1)
       }),
     ] as const
   })
 
-  ItLayer.make(it, "starts concurrent suspending sibling calls and completes them across resume", () => {
+  ItLayer.make(it, "resolves simultaneous authored-order waits without replaying siblings", () => {
     const callIds = ["delegation-first", "delegation-second", "delegation-third"] as const
     const executions = new Map<string, number>()
     let allStarted: Deferred.Deferred<void> | undefined
     let checkpoint: Prompt.Prompt | undefined
     let modelCalls = 0
-    let phase = 0
     return [
       Layer.mergeAll(
         modelLayer(() => {
@@ -7043,18 +7151,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             Effect.gen(function* () {
               const id = request.call.id
               executions.set(id, (executions.get(id) ?? 0) + 1)
-              if (phase === 0) {
-                if (executions.size === callIds.length && allStarted !== undefined) {
-                  yield* Deferred.succeed(allStarted, undefined)
-                }
-                if (allStarted === undefined) return yield* Effect.die("missing delegation barrier")
-                yield* Deferred.await(allStarted)
-                return { _tag: "Suspend" as const, token: `wait-${id}` }
+              if (executions.size === callIds.length && allStarted !== undefined) {
+                yield* Deferred.succeed(allStarted, undefined)
               }
-              if (phase === 1 && id !== "delegation-first") {
-                return { _tag: "Suspend" as const, token: `wait-again-${id}` }
-              }
-              return { _tag: "Success" as const, result: id, encodedResult: id }
+              if (allStarted === undefined) return yield* Effect.die("missing delegation barrier")
+              yield* Deferred.await(allStarted)
+              return { _tag: "Suspend" as const, token: `wait-${id}` }
             }),
         }),
         Approvals.layerAutoApprove,
@@ -7083,42 +7185,83 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           return yield* Effect.die("missing concurrent suspension checkpoint")
         }
         expect([...executions.keys()]).toEqual(callIds)
+        expect(suspension.waits.map((wait) => wait.call.id)).toEqual(callIds)
+        expect(modelCalls).toBe(1)
 
-        phase = 1
-        let secondCheckpoint: Prompt.Prompt | undefined
-        const secondSuspension = yield* Agent.stream(agent, {
+        let checkpointAfterFirst: Prompt.Prompt | undefined
+        const afterFirst = yield* Agent.stream(agent, {
           prompt: "ignored",
           history: checkpoint,
-          resume: { suspension },
+          resume: {
+            suspension,
+            resolutions: [toolResultResolution(suspension, "delegation-first", "delegation-first")],
+          },
           sessionId,
         }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
-              if (event._tag === "TurnCompleted") secondCheckpoint = event.transcript
+              if (event._tag === "TurnCompleted") checkpointAfterFirst = event.transcript
             }),
           ),
           Stream.runDrain,
           Effect.flip,
         )
-        if (secondSuspension._tag !== "tenetkit/core/AgentSuspended" || secondCheckpoint === undefined) {
-          return yield* Effect.die("missing second concurrent suspension checkpoint")
+        if (afterFirst._tag !== "tenetkit/core/AgentSuspended" || checkpointAfterFirst === undefined) {
+          return yield* Effect.die("missing first partial suspension checkpoint")
         }
-        expect(secondSuspension.tool_call_id).toBe("delegation-second")
-        expect(toolResultIds(secondCheckpoint)).toEqual(["delegation-first"])
+        expect(afterFirst.waits.map((wait) => wait.call.id)).toEqual(["delegation-second", "delegation-third"])
+        expect(toolResultIds(checkpointAfterFirst)).toEqual(["delegation-first"])
         expect(executions).toEqual(
           new Map([
-            ["delegation-first", 2],
-            ["delegation-second", 2],
-            ["delegation-third", 2],
+            ["delegation-first", 1],
+            ["delegation-second", 1],
+            ["delegation-third", 1],
           ]),
         )
+        expect(modelCalls).toBe(1)
 
-        phase = 2
+        let checkpointAfterThird: Prompt.Prompt = checkpointAfterFirst
+        const afterThird = yield* Agent.stream(agent, {
+          prompt: "ignored",
+          history: checkpointAfterFirst,
+          resume: {
+            suspension: afterFirst,
+            resolutions: [toolResultResolution(afterFirst, "delegation-third", "delegation-third")],
+          },
+          sessionId,
+        }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpointAfterThird = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (afterThird._tag !== "tenetkit/core/AgentSuspended") {
+          return yield* Effect.die(
+            `missing second partial suspension checkpoint: ${afterThird._tag} ${"message" in afterThird ? afterThird.message : ""}`,
+          )
+        }
+        expect(afterThird.waits.map((wait) => wait.call.id)).toEqual(["delegation-second"])
+        expect(toolResultIds(checkpointAfterThird)).toEqual(["delegation-first"])
+        expect(executions).toEqual(
+          new Map([
+            ["delegation-first", 1],
+            ["delegation-second", 1],
+            ["delegation-third", 1],
+          ]),
+        )
+        expect(modelCalls).toBe(1)
+
         const events = yield* Stream.runCollect(
           Agent.stream(agent, {
             prompt: "ignored",
-            history: secondCheckpoint,
-            resume: { suspension: secondSuspension },
+            history: checkpointAfterThird,
+            resume: {
+              suspension: afterThird,
+              resolutions: [toolResultResolution(afterThird, "delegation-second", "delegation-second")],
+            },
             sessionId,
           }),
         )
@@ -7126,15 +7269,147 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(events.at(-1)?._tag).toBe("Completed")
         expect(executions).toEqual(
           new Map([
-            ["delegation-first", 2],
-            ["delegation-second", 3],
-            ["delegation-third", 3],
+            ["delegation-first", 1],
+            ["delegation-second", 1],
+            ["delegation-third", 1],
           ]),
         )
         const completed = events.at(-1)
         if (completed?._tag !== "Completed") return yield* Effect.die("missing completed transcript")
+        expect(toolResultIds(completed.transcript)).toEqual(callIds)
         const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         expect(Session.buildContext(path).content).toEqual(completed.transcript.content)
+        expect(modelCalls).toBe(2)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "settles two approvals and one tool wait before crossing a later exclusive barrier", () => {
+    const exclusiveTool = Tool.make("exclusive", {
+      description: "Exclusive barrier",
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.Unknown,
+    })
+    const executions = new Map<string, number>()
+    let checkpoint: Prompt.Prompt | undefined
+    let modelCalls = 0
+    const execute = (id: string) => executions.set(id, (executions.get(id) ?? 0) + 1)
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.fromIterable([
+              toolCallPart("approval-first", "gated", { text: "first" }),
+              toolCallPart("tool-wait-second", "echo", { text: "second" }),
+              toolCallPart("approval-third", "gated", { text: "third" }),
+              toolCallPart("exclusive-fourth", "exclusive", { text: "fourth" }),
+            ])
+          }
+          expect(toolResultIds(options.prompt)).toEqual([
+            "approval-first",
+            "tool-wait-second",
+            "approval-third",
+            "exclusive-fourth",
+          ])
+          return Stream.make(textDelta("mixed waits completed"))
+        }),
+        ToolExecutor.layerTest({
+          execute: (request) => {
+            execute(request.call.id)
+            return request.call.id === "tool-wait-second"
+              ? Effect.succeed({ _tag: "Suspend", token: "tool-wait-token" })
+              : Effect.succeed({
+                  _tag: "Success",
+                  result: request.call.id,
+                  encodedResult: request.call.id,
+                })
+          },
+        }),
+        Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "mixed-authored-waits",
+          toolkit: Toolkit.make(gatedTool, echoTool, exclusiveTool),
+          toolScheduling: { maxConcurrency: 3, parallelSafe: ["gated", "echo"] },
+        })
+        const first = yield* Agent.stream(agent, { prompt: "run mixed waits" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (first._tag !== "tenetkit/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing mixed-wait suspension")
+        }
+        expect(first.waits.map((wait) => [wait.call.id, wait.reason])).toEqual([
+          ["approval-first", "approval"],
+          ["tool-wait-second", "tool-wait"],
+          ["approval-third", "approval"],
+        ])
+        expect(executions).toEqual(new Map([["tool-wait-second", 1]]))
+        expect(modelCalls).toBe(1)
+
+        let checkpointAfterPartial: Prompt.Prompt | undefined
+        const approvalFirst = first.waits.find((wait) => wait.call.id === "approval-first")!
+        const afterPartial = yield* Agent.stream(agent, {
+          prompt: "ignored",
+          history: checkpoint,
+          resume: {
+            suspension: first,
+            resolutions: [
+              { waitId: approvalFirst.waitId, resolution: { _tag: "Approved" } },
+              toolResultResolution(first, "tool-wait-second", "tool-wait-second"),
+            ],
+          },
+        }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpointAfterPartial = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (afterPartial._tag !== "tenetkit/core/AgentSuspended" || checkpointAfterPartial === undefined) {
+          return yield* Effect.die("missing partial mixed-wait suspension")
+        }
+        expect(afterPartial.waits.map((wait) => wait.call.id)).toEqual(["approval-third"])
+        expect(toolResultIds(checkpointAfterPartial)).toEqual(["approval-first", "tool-wait-second"])
+        expect(executions).toEqual(
+          new Map([
+            ["tool-wait-second", 1],
+            ["approval-first", 1],
+          ]),
+        )
+        expect(executions.has("exclusive-fourth")).toBe(false)
+        expect(modelCalls).toBe(1)
+
+        const approvalThird = afterPartial.waits[0]!
+        const completed = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "ignored",
+            history: checkpointAfterPartial,
+            resume: {
+              suspension: afterPartial,
+              resolutions: [{ waitId: approvalThird.waitId, resolution: { _tag: "Approved" } }],
+            },
+          }),
+        )
+        expect(completed.at(-1)?._tag).toBe("Completed")
+        expect(executions).toEqual(
+          new Map([
+            ["tool-wait-second", 1],
+            ["approval-first", 1],
+            ["approval-third", 1],
+            ["exclusive-fourth", 1],
+          ]),
+        )
         expect(modelCalls).toBe(2)
       }),
     ] as const
@@ -7173,11 +7448,15 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           return yield* Effect.die("missing suspension checkpoint")
         }
 
+        const received = AgentEvent.AgentSuspended.make({
+          checkpoint: suspension.checkpoint,
+          waits: suspension.waits.map((wait, index) => (index === 0 ? { ...wait, token: "fabricated-token" } : wait)),
+        })
         const mismatch = yield* Agent.stream(agent, {
           prompt: "ignored",
           history: checkpoint,
           resume: {
-            suspension: replaceSuspension(suspension, { token: "fabricated-token" }),
+            suspension: received,
           },
         }).pipe(Stream.runDrain, Effect.flip)
 
@@ -7236,11 +7515,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: { suspension: failure, resolution: { _tag: "Approved" } },
+            resume: {
+              suspension: failure,
+              resolutions: [{ waitId: failure.waits[0]!.waitId, resolution: { _tag: "Approved" } }],
+            },
           }),
         )
 
-        expect(failure.active_tools).toEqual(["gated"])
+        expect(failure.checkpoint.activeTools).toEqual(["gated"])
         expect(approvalResolutions).toBe(1)
         expect(executions).toBe(1)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
@@ -7290,11 +7572,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           replaceSuspension(suspension, { tool_call_id: "substituted-call" }),
           replaceSuspension(suspension, { tool_name: "gated" }),
           replaceSuspension(suspension, { tool_params: { text: "substituted" } }),
-          replaceSuspension(suspension, { reason: "approval" }),
-          replaceSuspension(suspension, { active_tools: [] }),
-          replaceSuspension(suspension, { activated_skills: ["substituted-skill"] }),
           replaceSuspension(suspension, {
-            tool_call_batch: suspension.tool_call_batch.map((call) =>
+            tool_call_batch: suspension.checkpoint.calls.map(({ call }) =>
               Response.makePart("tool-call", {
                 id: call.id,
                 name: call.name,
@@ -7313,8 +7592,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }).pipe(Stream.runDrain, Effect.flip)
           expect(failure).toMatchObject({
             _tag: "tenetkit/core/ResumeMismatch",
-            reason: "identity-mismatch",
-            expected: suspension,
+            reason: "checkpoint-not-found",
             received,
           })
         }
@@ -7338,14 +7616,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const staleCall = toolCallPart("stale-call", "echo", { text: "stale" })
-        const received = AgentEvent.AgentSuspended.make({
-          token: "stale-token",
-          reason: "tool-wait",
-          tool_call_id: "stale-call",
-          tool_name: "echo",
-          tool_params: { text: "stale" },
-          tool_call_batch: [staleCall],
-        })
+        const received = suspendedCall(staleCall, "stale-token")
         const agent = Agent.make({ name: "missing-resume-agent", toolkit: Toolkit.make(echoTool) })
         const failure = yield* Agent.stream(agent, {
           prompt: "ignored",
@@ -7363,44 +7634,36 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "normalizes custom authorization suspensions to the attempted call snapshot", () => {
-    const forgedCall = toolCallPart("forged-call", "echo", { text: "forged" })
-    const forged = AgentEvent.AgentSuspended.make({
-      token: "custom-token",
-      reason: "approval",
-      tool_call_id: "forged-call",
-      tool_name: "echo",
-      tool_params: { text: "forged" },
-      tool_call_batch: [forgedCall],
-      active_tools: ["echo", "gated"],
-      activated_skills: ["forged-skill"],
-    })
-    return [
-      Layer.mergeAll(
-        modelLayer(() => Stream.make(toolCallPart("actual-call", "gated", { text: "actual" }))),
-        ToolExecutor.layerTest({ execute: () => Effect.die("suspended call must not execute") }),
-        ModelMiddleware.layerIdentity,
-      ),
-      Effect.gen(function* () {
-        const agent = Agent.make({
-          name: "normalized-suspension-agent",
-          toolkit: Toolkit.make(gatedTool),
-          authorization: { authorize: () => Effect.succeed({ _tag: "Suspend" as const, suspension: forged }) },
-        })
+  ItLayer.make(
+    it,
+    "normalizes custom authorization tokens to the attempted call snapshot",
+    () =>
+      [
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(toolCallPart("actual-call", "gated", { text: "actual" }))),
+          ToolExecutor.layerTest({ execute: () => Effect.die("suspended call must not execute") }),
+          ModelMiddleware.layerIdentity,
+        ),
+        Effect.gen(function* () {
+          const agent = Agent.make({
+            name: "normalized-suspension-agent",
+            toolkit: Toolkit.make(gatedTool),
+            authorization: { authorize: () => Effect.succeed({ _tag: "Suspend" as const, token: "custom-token" }) },
+          })
 
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "suspend" })))
+          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "suspend" })))
 
-        expect(failure._tag).toBe("tenetkit/core/AgentSuspended")
-        if (failure._tag !== "tenetkit/core/AgentSuspended") return expect.unreachable()
-        expect(failure.token).toBe("custom-token")
-        expect(failure.tool_call_id).toBe("actual-call")
-        expect(failure.tool_name).toBe("gated")
-        expect(failure.tool_params).toEqual({ text: "actual" })
-        expect(failure.active_tools).toEqual(["gated"])
-        expect(failure.activated_skills).toEqual([])
-      }),
-    ] as const
-  })
+          expect(failure._tag).toBe("tenetkit/core/AgentSuspended")
+          if (failure._tag !== "tenetkit/core/AgentSuspended") return expect.unreachable()
+          expect(failure.waits[0]?.token).toBe("custom-token")
+          expect(failure.waits[0]?.call.id).toBe("actual-call")
+          expect(failure.waits[0]?.call.name).toBe("gated")
+          expect(failure.waits[0]?.call.params).toEqual({ text: "actual" })
+          expect(failure.checkpoint.activeTools).toEqual(["gated"])
+          expect(failure.checkpoint.activatedSkills).toEqual([])
+        }),
+      ] as const,
+  )
 
   ItLayer.make(it, "rejects an authorization resume whose params differ from the checkpoint", () => {
     let checkpoint: Prompt.Prompt | undefined
@@ -7507,11 +7770,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: { suspension: failure },
+            resume: {
+              suspension: failure,
+              resolutions: [{ waitId: failure.waits[0]!.waitId, resolution: { _tag: "Approved" } }],
+            },
           }),
         )
 
-        expect(failure.activated_skills).toEqual(["resumable-review"])
+        expect(failure.checkpoint.activatedSkills).toEqual(["resumable-review"])
         expect(executions).toBe(1)
         expect(modelCalls).toBe(3)
       }),
@@ -7626,7 +7892,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: { suspension: suspended },
+            resume: {
+              suspension: suspended,
+              resolutions: [{ waitId: suspended.waits[0]!.waitId, resolution: { _tag: "Approved" } }],
+            },
           }),
         )
 
@@ -7644,7 +7913,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           received: suspended,
         })
         expect(executions).toBe(1)
-        expect(approvalChecks).toBe(2)
+        expect(approvalChecks).toBe(1)
         expect(modelCalls).toBe(3)
       }),
     ] as const
@@ -7896,9 +8165,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
           expect(failure._tag).toBe("tenetkit/core/AgentSuspended")
           if (failure._tag === "tenetkit/core/AgentSuspended") {
-            expect(failure.token).toBe("approval:tool-call-pending")
-            expect(failure.reason).toBe("approval")
-            expect(failure.tool_name).toBe("gated")
+            expect(failure.waits[0]?.token).toBe("approval:tool-call-pending")
+            expect(failure.waits[0]?.reason).toBe("approval")
+            expect(failure.waits[0]?.call.name).toBe("gated")
           }
         }),
       ] as const,

@@ -163,6 +163,7 @@ export const reserve: {
         ...input,
         session: input.session,
         ...input.parentSuspension,
+        waits: [input.parentSuspension.wait],
       })
     }
     return (yield* load(input.placementId))!
@@ -225,7 +226,6 @@ const settle = (
       parent !== undefined &&
       !isTerminal(parent.status) &&
       !parent.cancellationRequested &&
-      parent.activeWaitId === placement.waitId &&
       wait?.status === "open"
     ) {
       yield* respond(hub, {

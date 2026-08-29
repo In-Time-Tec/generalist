@@ -5,7 +5,7 @@ import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run
 import { loadRunSnapshot, loadTreeCheckpoint } from "tenetkit/runtime/driver/sql/inspection/service"
 import { sessionRoots } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { loadChildReadiness } from "tenetkit/runtime/driver/sql/store/child/capacity"
-import { loadRunWait } from "tenetkit/runtime/driver/sql/store/statements"
+import { loadRunWaitsByStatus } from "tenetkit/runtime/driver/sql/store/statements"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { loadTreeReplay } from "tenetkit/runtime/driver/sql/tree-replay"
 import { loadEventsAfter, loadRun, requireRun } from "./runtime.js"
@@ -27,7 +27,7 @@ export const inspectionStoreMethods = (deps: {
     deps.runNoTxn(
       Effect.gen(function* () {
         const loaded = yield* requireRun(runId)
-        const wait = yield* loadRunWait(runId, loaded.activeWaitId)
+        const waits = yield* loadRunWaitsByStatus(runId, "open")
         const childReadiness = yield* loadChildReadiness(runId)
         return {
           runId: loaded.runId,
@@ -36,11 +36,11 @@ export const inspectionStoreMethods = (deps: {
           executableManifest: loaded.executableManifest,
           depth: loaded.depth,
           treePolicy: loaded.treePolicy,
+          waits,
           lastSequence: loaded.lastSequence,
           durability: "durable" as const,
           ...(loaded.parentRunId === undefined ? undefined : { parentRunId: loaded.parentRunId }),
           ...(childReadiness === undefined ? undefined : { childReadiness }),
-          ...(wait === undefined ? undefined : { wait }),
         }
       }),
     ),

@@ -64,18 +64,18 @@ export interface RunInspection {
   readonly childReadiness?: ChildReadiness
   readonly depth: number
   readonly treePolicy: TreePolicy
-  readonly wait?: RunWait
+  readonly waits: ReadonlyArray<RunWait>
   readonly lastSequence: number
   readonly durability: "ephemeral" | "durable"
 }
 
 /** @experimental Encoded durable Run inspection. */
 export interface RunInspectionEncoded
-  extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "wait"> {
+  extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "waits"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
   readonly executableManifest: typeof ExecutableManifest.Encoded
-  readonly wait?: typeof RunWait.Encoded
+  readonly waits: ReadonlyArray<typeof RunWait.Encoded>
 }
 
 const hasValidExecutable = (value: {
@@ -100,7 +100,7 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
   childReadiness: Schema.optionalKey(ChildReadiness),
   depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   treePolicy: TreePolicy,
-  wait: Schema.optionalKey(RunWait),
+  waits: Schema.Array(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   durability: Schema.Literals(["ephemeral", "durable"]),
 }).pipe(
@@ -309,18 +309,19 @@ export interface Run {
   readonly parentRunId?: RunId
   readonly depth: number
   readonly treePolicy: TreePolicy
-  readonly wait?: RunWait
+  readonly waits: ReadonlyArray<RunWait>
   readonly lastSequence: number
   readonly attempt: number
 }
 
 /** @experimental Encoded durable Run state. */
-export interface RunEncoded extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "wait"> {
+export interface RunEncoded
+  extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "waits"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
   readonly executableManifest: typeof ExecutableManifest.Encoded
   readonly rootRunId: typeof RunId.Encoded
-  readonly wait?: typeof RunWait.Encoded
+  readonly waits: ReadonlyArray<typeof RunWait.Encoded>
 }
 
 export const Run: Schema.Codec<Run, RunEncoded> = Schema.Struct({
@@ -334,7 +335,7 @@ export const Run: Schema.Codec<Run, RunEncoded> = Schema.Struct({
   parentRunId: Schema.optionalKey(RunId),
   depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   treePolicy: TreePolicy,
-  wait: Schema.optionalKey(RunWait),
+  waits: Schema.Array(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).pipe(

@@ -136,7 +136,7 @@ describe("durable Agent Programs", () => {
           prompt: "run",
         })
         yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
-        const waiting = (yield* runtime.inspect(receipt.runId)).wait
+        const waiting = (yield* runtime.inspect(receipt.runId)).waits[0]
         expect(waiting).toMatchObject({
           waitId: "approval:echo",
           reason: {
@@ -200,7 +200,7 @@ describe("durable Agent Programs", () => {
       })
       runId = receipt.runId
       yield* host.execute(yield* store.claimExecution({ runId, ownerId: "approval-before-reopen" }))
-      expect((yield* runtime.inspect(runId)).wait).toMatchObject({
+      expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({
         reason: {
           _tag: "Approval",
           request: { approvalId: "approval:echo", operation: "echo", capability: "echo" },
@@ -213,7 +213,7 @@ describe("durable Agent Programs", () => {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const host = yield* ExecutionHost.ExecutionHost
-        expect((yield* runtime.inspect(runId)).wait).toMatchObject({
+        expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({
           status: "open",
           reason: {
             _tag: "Approval",
@@ -223,7 +223,7 @@ describe("durable Agent Programs", () => {
         yield* Approval.approve({ runId, approvalId: "approval:echo" })
         expect(yield* store.loadExecution(runId)).toMatchObject({
           suspension: { operation: "echo", reason: "approval" },
-          resolution: { _tag: "Approved" },
+          resolutions: [{ waitId: "approval:echo", resolution: { _tag: "Approved" } }],
         })
         yield* host.execute(yield* store.claimExecution({ runId, ownerId: "approval-after-reopen" }))
         expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
@@ -261,8 +261,7 @@ describe("durable Agent Programs", () => {
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
         } else {
           yield* runtime.cancel({ runId: receipt.runId, reason: "operator cancelled" })
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-          expect((yield* runtime.inspect(receipt.runId)).wait?.status).toBe("cancelled")
+          expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "cancelled", waits: [] })
         }
         expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
           status: "failed",
@@ -524,8 +523,7 @@ describe("durable Agent Programs", () => {
         yield* executeReady
         const admitted = yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })
         yield* runtime.cancel({ runId: receipt.runId, reason: "cancel admitted Program tree" })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-        expect((yield* runtime.inspect(receipt.runId)).wait?.status).toBe("cancelled")
+        expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "cancelled", waits: [] })
         for (const childRunId of admitted?.childRunIds ?? []) {
           expect((yield* runtime.inspect(childRunId)).status).toBe("cancelled")
         }

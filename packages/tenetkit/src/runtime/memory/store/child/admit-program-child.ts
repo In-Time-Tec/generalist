@@ -11,11 +11,13 @@ import {
 import { decodePinned, equals } from "../../../executable/manifest.js"
 import { narrow } from "../../../executable/registration.js"
 import type { RunReceipt } from "../../../run.js"
-import type { AdmitProgramChildInput } from "../../../run/store.js"
+import type { AdmitProgramChildInput, Interface as RunStoreInterface } from "../../../run/store.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { childDigest } from "../../digest.js"
 import { idempotencyKey, type MemoryState, type StoredRun } from "../../state.js"
 import { readinessForAdmission } from "./capacity.js"
+import { suspend } from "../control/suspend.js"
+import { revokeSession } from "../execution.js"
 
 type AdmitProgramChildResult = Effect.Effect<
   readonly [RunReceipt, MemoryState],
@@ -111,7 +113,6 @@ export const admitProgramChild: {
       parentRunId: parent.runId,
       childReadiness,
       invocationId: input.invocationId,
-      respondedWaitIds: new Set(),
       lastSequence: -1,
       attempt: 0,
       attemptFence: 0,
@@ -150,5 +151,40 @@ export const admitProgramChild: {
     const idempotency = new Map(next.idempotency)
     idempotency.set(key, { digest, executable, receipt })
     return [receipt, { ...next, idempotency }] as const
+  }),
+)
+
+type AdmitChildrenInput = Parameters<RunStoreInterface["admitProgramChildAndSuspend"]>[0]
+type AdmitChildrenResult = Effect.Effect<
+  readonly [ReadonlyArray<RunReceipt>, MemoryState],
+  | RunNotFound
+  | RunTerminal
+  | IdempotencyConflict
+  | RunIdConflict
+  | RuntimeUnavailable
+  | ChildDepthExceeded
+  | ChildLimitExceeded
+>
+
+/** Atomically admit one authored child batch and persist the parent's aggregate suspension. */
+export const admitProgramChildrenAndSuspend: {
+  (input: AdmitChildrenInput): (state: MemoryState) => AdmitChildrenResult
+  (state: MemoryState, input: AdmitChildrenInput): AdmitChildrenResult
+} = Function.dual(2, (state: MemoryState, input: AdmitChildrenInput) =>
+  Effect.gen(function* () {
+    const receipts: Array<RunReceipt> = []
+    let admitted = state
+    for (const child of input.children) {
+      const [receipt, next] = yield* admitProgramChild(admitted, {
+        runId: input.runId,
+        ownerId: input.ownerId,
+        attemptFence: input.attemptFence,
+        session: input.session,
+        ...child,
+      })
+      receipts.push(receipt)
+      admitted = next
+    }
+    return [receipts, revokeSession(yield* suspend(admitted, input), input)] as const
   }),
 )

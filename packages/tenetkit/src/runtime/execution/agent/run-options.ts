@@ -47,7 +47,9 @@ export const make = (input: {
   if (turnStart !== undefined) Object.assign(options, { turnStart })
   if (Option.isSome(suspension)) {
     const resume: NonNullable<HostedRunOptions["resume"]> = { suspension: suspension.value }
-    if (input.execution.resolution !== undefined) Object.assign(resume, { resolution: input.execution.resolution })
+    const waitIds = new Set(suspension.value.waits.map((wait) => wait.waitId))
+    const resolutions = input.execution.resolutions.filter((entry) => waitIds.has(entry.waitId))
+    if (resolutions.length > 0) Object.assign(resume, { resolutions })
     Object.assign(options, { resume })
   }
   return options

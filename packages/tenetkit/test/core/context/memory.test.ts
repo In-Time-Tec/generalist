@@ -486,7 +486,15 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           prompt: "ignored on resume",
           history: checkpoint,
           memory: { key },
-          resume: { suspension },
+          resume: {
+            suspension,
+            resolutions: [
+              {
+                waitId: suspension.waits[0]!.waitId,
+                resolution: { _tag: "ToolResult", result: "ok", encodedResult: "ok" },
+              },
+            ],
+          },
         })
 
         expect(result.text).toBe("done")
@@ -577,7 +585,15 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           prompt: "ignored on resume",
           history: checkpoint,
           memory: { key },
-          resume: { suspension: failure },
+          resume: {
+            suspension: failure,
+            resolutions: [
+              {
+                waitId: failure.waits[0]!.waitId,
+                resolution: { _tag: "ToolResult", result: "ok", encodedResult: "ok" },
+              },
+            ],
+          },
         })
 
         expect(result.text).toBe("done")

@@ -13,12 +13,6 @@ import { LoopDriverState, type PendingOperation } from "./loop-driver-state.js"
 import { HandoffCommit, type HandoffControlState } from "../agent/handoff/state.js"
 import { isCompletedModelOperation } from "../model/operation.js"
 
-const WaitOutcome = Schema.Struct({
-  waitId: Schema.optionalKey(Schema.String),
-  reason: Schema.optionalKey(Schema.String),
-  token: Schema.optionalKey(Schema.String),
-})
-
 /** @experimental */
 export interface LoopDriverOptions {
   readonly logicalOperationId: string
@@ -169,20 +163,6 @@ const applySucceededOutcome = (
   Effect.gen(function* () {
     let nextState: LoopDriverState = (({ pending: _pending, ...rest }) => rest)(state)
     const budget = checkpoint.budget
-    if (pending.kind === "wait") {
-      const waitInput = yield* Schema.decodeUnknownEffect(WaitOutcome)(outcome.value).pipe(
-        Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid wait outcome: ${String(error)}` })),
-      )
-      if (pending.key.startsWith("resume:")) {
-        nextState = (({ wait: _wait, suspensionToken: _token, ...rest }) => rest)(nextState)
-      } else {
-        const wait = { waitId: waitInput.waitId ?? waitInput.token ?? "wait", reason: waitInput.reason ?? "suspended" }
-        if (waitInput.token !== undefined) Object.assign(wait, { replayToken: waitInput.token })
-        nextState = { ...nextState, wait }
-        if (waitInput.token !== undefined) Object.assign(nextState, { suspensionToken: waitInput.token })
-      }
-      return encodeCheckpoint(checkpoint, nextState, budget)
-    }
     if (pending.kind === "handoff") {
       const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(outcome.value).pipe(
         Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${String(error)}` })),
@@ -245,12 +225,6 @@ export const make = (options: LoopDriverOptions): DurableAgentDriver => ({
         } satisfies DriverDecision
       }
       if (state.pending === undefined) {
-        if (state.wait !== undefined) {
-          return {
-            _tag: "Wait",
-            wait: state.wait,
-          } satisfies DriverDecision
-        }
         return yield* DriverStateInvalid.make({ message: "Loop driver decide without pending operation or wait" })
       }
       return {

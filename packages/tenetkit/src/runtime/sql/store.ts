@@ -40,7 +40,7 @@ import {
 } from "./store/operation/operations.js"
 import { recoverRunningOperations } from "./store/operation/recovery.js"
 import { resolveOperation } from "./store/operation/resolution.js"
-import { hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store/statements.js"
+import { hasAdmission, loadEventsAfter, loadRun, loadRunWaitsByStatus } from "./store/statements.js"
 import { commitInterruptedModelResponse } from "./model-response/interrupted-model-response.js"
 import {
   claimExecution,
@@ -215,7 +215,17 @@ const makeSqliteStoreServices = (
       admitProgramChildAndSuspend: (input) =>
         runBuffered((transactionHub) =>
           requireExecutionClaim(input).pipe(
-            Effect.andThen(admitProgramChild(transactionHub, input)),
+            Effect.andThen(
+              Effect.forEach(input.children, (child) =>
+                admitProgramChild(transactionHub, {
+                  runId: input.runId,
+                  ownerId: input.ownerId,
+                  attemptFence: input.attemptFence,
+                  session: input.session,
+                  ...child,
+                }),
+              ),
+            ),
             Effect.tap(() => suspend(transactionHub, input)),
           ),
         ),
@@ -253,7 +263,7 @@ const makeSqliteStoreServices = (
           Effect.gen(function* () {
             const loaded = yield* loadRun(runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId })
-            const activeWait = yield* loadRunWait(runId, loaded.activeWaitId)
+            const waits = yield* loadRunWaitsByStatus(runId, "open")
             const childReadiness = yield* loadChildReadiness(runId)
             const inspection = {
               runId: loaded.runId,
@@ -262,12 +272,12 @@ const makeSqliteStoreServices = (
               executableManifest: loaded.executableManifest,
               depth: loaded.depth,
               treePolicy: loaded.treePolicy,
+              waits,
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
             }
             if (loaded.parentRunId !== undefined) Object.assign(inspection, { parentRunId: loaded.parentRunId })
             if (childReadiness !== undefined) Object.assign(inspection, { childReadiness })
-            if (activeWait !== undefined) Object.assign(inspection, { wait: activeWait })
             return inspection
           }),
         ),
