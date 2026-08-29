@@ -132,10 +132,7 @@ export interface StoredFanOut {
   readonly members: ReadonlyArray<FanOutMemberResult>
 }
 
-export const laneKey: {
-  (sessionId: string): (address: Address) => string
-  (address: Address, sessionId: string): string
-} = Function.dual(2, (address: Address, sessionId: string): string => `${address}\0${sessionId}`)
+export const laneKey = (sessionId: string): string => sessionId
 
 export const idempotencyKey: {
   (sessionId: string, key: string): (address: Address) => string

@@ -229,14 +229,14 @@ export const appendEvent: {
 )
 
 export const promoteHead: {
-  (address: string, sessionId: string): (hub: EventHub) => StoreEffect<void>
-  (hub: EventHub, address: string, sessionId: string): StoreEffect<void>
-} = Function.dual(3, (hub: EventHub, address: string, sessionId: string) =>
+  (sessionId: string): (hub: EventHub) => StoreEffect<void>
+  (hub: EventHub, sessionId: string): StoreEffect<void>
+} = Function.dual(2, (hub: EventHub, sessionId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ head_run_id: string | null; queue_json: string }>`
       SELECT head_run_id, queue_json FROM tenetkit_lanes
-      WHERE address = ${address} AND session_id = ${sessionId}
+      WHERE session_id = ${sessionId}
       FOR UPDATE
     `
     const lane = lanes[0]
@@ -247,7 +247,7 @@ export const promoteHead: {
     if (lane.head_run_id !== headId) {
       yield* sql`
         UPDATE tenetkit_lanes SET head_run_id = ${headId}
-        WHERE address = ${address} AND session_id = ${sessionId}
+        WHERE session_id = ${sessionId}
       `
     }
     yield* loadRun(headId)
@@ -255,26 +255,26 @@ export const promoteHead: {
 )
 
 export const removeFromLane: {
-  (sessionId: string, runId: string): (address: string) => SqlOnlyEffect<void>
-  (address: string, sessionId: string, runId: string): SqlOnlyEffect<void>
-} = Function.dual(3, (address: string, sessionId: string, runId: string) =>
+  (runId: string): (sessionId: string) => SqlOnlyEffect<void>
+  (sessionId: string, runId: string): SqlOnlyEffect<void>
+} = Function.dual(2, (sessionId: string, runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ queue_json: string }>`
       SELECT queue_json FROM tenetkit_lanes
-      WHERE address = ${address} AND session_id = ${sessionId}
+      WHERE session_id = ${sessionId}
       FOR UPDATE
     `
     const lane = lanes[0]
     if (lane === undefined) return
     const queue = decodeQueue(lane.queue_json).filter((id) => id !== runId)
     if (queue.length === 0) {
-      yield* sql`DELETE FROM tenetkit_lanes WHERE address = ${address} AND session_id = ${sessionId}`
+      yield* sql`DELETE FROM tenetkit_lanes WHERE session_id = ${sessionId}`
     } else {
       yield* sql`
         UPDATE tenetkit_lanes
         SET queue_json = ${encodeQueue(queue)}, head_run_id = ${queue[0]!}
-        WHERE address = ${address} AND session_id = ${sessionId}
+        WHERE session_id = ${sessionId}
       `
     }
   }),
@@ -285,8 +285,8 @@ export const afterTerminal: {
   (hub: EventHub, run: DecodedRun): StoreEffect<void>
 } = Function.dual(2, (hub: EventHub, run: DecodedRun) =>
   Effect.gen(function* () {
-    yield* removeFromLane(run.address, run.sessionId, run.runId)
-    yield* promoteHead(hub, run.address, run.sessionId)
+    yield* removeFromLane(run.sessionId, run.runId)
+    yield* promoteHead(hub, run.sessionId)
   }),
 )
 
@@ -461,21 +461,21 @@ export const insertRun = (input: {
   })
 
 export const enqueueLane: {
-  (sessionId: string, runId: string): (address: string) => LaneEffect
-  (address: string, sessionId: string, runId: string): LaneEffect
-} = Function.dual(3, (address: string, sessionId: string, runId: string) =>
+  (runId: string): (sessionId: string) => LaneEffect
+  (sessionId: string, runId: string): LaneEffect
+} = Function.dual(2, (sessionId: string, runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ accepted_sequence: string | number; queue_json: string; head_run_id: string | null }>`
       SELECT accepted_sequence, queue_json, head_run_id FROM tenetkit_lanes
-      WHERE address = ${address} AND session_id = ${sessionId}
+      WHERE session_id = ${sessionId}
       FOR UPDATE
     `
     const lane = lanes[0]
     if (lane === undefined) {
       yield* sql`
-        INSERT INTO tenetkit_lanes (address, session_id, accepted_sequence, queue_json, head_run_id)
-        VALUES (${address}, ${sessionId}, 0, ${encodeQueue([runId])}, ${runId})
+        INSERT INTO tenetkit_lanes (session_id, accepted_sequence, queue_json, head_run_id)
+        VALUES (${sessionId}, 0, ${encodeQueue([runId])}, ${runId})
       `
       return { acceptedSequence: 0, isHead: true }
     }
@@ -485,7 +485,7 @@ export const enqueueLane: {
     yield* sql`
       UPDATE tenetkit_lanes
       SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)}, head_run_id = ${head}
-      WHERE address = ${address} AND session_id = ${sessionId}
+      WHERE session_id = ${sessionId}
     `
     return { acceptedSequence, isHead: head === runId }
   }),

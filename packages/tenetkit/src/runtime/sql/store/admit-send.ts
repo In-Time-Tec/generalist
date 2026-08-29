@@ -155,20 +155,20 @@ export const admitSend: {
       const runId = input.runId ?? (yield* nextId("run"))
       const lanes = yield* sql<{ accepted_sequence: number; queue_json: string }>`
       SELECT accepted_sequence, queue_json FROM tenetkit_lanes
-      WHERE address = ${input.message.to} AND session_id = ${input.message.sessionId}
+      WHERE session_id = ${input.message.sessionId}
     `
       const lane = lanes[0]
       const { acceptedSequence, queue } = appendLane(lane, runId)
       if (lane === undefined) {
         yield* sql`
-        INSERT INTO tenetkit_lanes (address, session_id, accepted_sequence, queue_json)
-        VALUES (${input.message.to}, ${input.message.sessionId}, ${acceptedSequence}, ${encodeQueue(queue)})
+        INSERT INTO tenetkit_lanes (session_id, accepted_sequence, queue_json)
+        VALUES (${input.message.sessionId}, ${acceptedSequence}, ${encodeQueue(queue)})
       `
       } else {
         yield* sql`
         UPDATE tenetkit_lanes
         SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)}
-        WHERE address = ${input.message.to} AND session_id = ${input.message.sessionId}
+        WHERE session_id = ${input.message.sessionId}
       `
       }
       yield* insertRun({
@@ -197,7 +197,7 @@ export const admitSend: {
         "queued",
       )
       if (options?.promote !== false && queue[0] === runId) {
-        yield* promoteHead(hub, input.message.to, input.message.sessionId)
+        yield* promoteHead(hub, input.message.sessionId)
       }
       return { runId, messageId: input.message.id, acceptedSequence, duplicate: false }
     }),

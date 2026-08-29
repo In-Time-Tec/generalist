@@ -13,12 +13,10 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   applied_at TIMESTAMPTZ NOT NULL
 )`,
   `CREATE TABLE IF NOT EXISTS tenetkit_lanes (
-  address TEXT NOT NULL,
-  session_id TEXT NOT NULL,
+  session_id TEXT PRIMARY KEY,
   accepted_sequence BIGINT NOT NULL,
   queue_json TEXT NOT NULL,
-  head_run_id TEXT,
-  PRIMARY KEY (address, session_id)
+  head_run_id TEXT
 )`,
   `CREATE TABLE IF NOT EXISTS tenetkit_runs (
   run_id TEXT PRIMARY KEY,

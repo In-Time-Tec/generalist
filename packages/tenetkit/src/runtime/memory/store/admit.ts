@@ -165,7 +165,7 @@ export const admitSend: {
       const treeRoots = new Map(withId.treeRoots)
       treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [], subscribers: new Map() })
       let next: MemoryState = { ...withId, runs, treeRoots }
-      const enqueued = enqueueLane(next, input.message.to, input.message.sessionId, runId)
+      const enqueued = enqueueLane(next, input.message.sessionId, runId)
       next = enqueued.state
       const [, acceptedState] = yield* appendLifecycle(
         next,
@@ -175,7 +175,7 @@ export const admitSend: {
       )
       next = acceptedState
       if (enqueued.isHead && promote) {
-        next = yield* promoteHead(next, input.message.to, input.message.sessionId)
+        next = yield* promoteHead(next, input.message.sessionId)
       }
       const receipt: RunReceipt = {
         runId,
@@ -261,7 +261,7 @@ export const admitStart: {
         return [startReceipt(receipt, childRunIds, fanOuts), admitted] as const
       }
       const lanes = new Map(admitted.lanes)
-      lanes.delete(laneKey(input.message.to, input.message.sessionId))
+      lanes.delete(laneKey(input.message.sessionId))
       let next: MemoryState = { ...admitted, lanes }
       const childRunIds: Array<string> = []
       for (const child of input.initialChildren) {

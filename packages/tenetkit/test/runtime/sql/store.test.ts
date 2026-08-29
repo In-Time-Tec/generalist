@@ -37,6 +37,7 @@ import {
   suspension,
   parentRelativeOptions,
   researcher,
+  researcherAddress,
   researcherRef,
   textPrompt,
   registrationsFor,
@@ -1137,6 +1138,35 @@ layer(sqliteLayer(tempDbPath("fifo")))("fifo blocks successors until head termin
       yield* driver.complete({
         ...(yield* driver.claimExecution({ runId: head.runId, ownerId: "test" })),
         runId: head.runId,
+        result: completedResult("done"),
+      })
+      expect((yield* runtime.inspect(blocked.runId)).status).toBe("running")
+    }),
+  )
+
+  suite.effect("serializes one Session across different addresses", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const driver = yield* RunStore.RunStore
+      const sessionId = "session:sqlite-cross-address"
+      const head = yield* runtime.send({
+        to: assistantAddress,
+        sessionId,
+        idempotencyKey: "same-key",
+        prompt: textPrompt("assistant"),
+      })
+      const blocked = yield* runtime.send({
+        to: researcherAddress,
+        sessionId,
+        idempotencyKey: "same-key",
+        prompt: textPrompt("researcher"),
+      })
+
+      expect(blocked.runId).not.toBe(head.runId)
+      expect(blocked.acceptedSequence).toBe(1)
+      expect((yield* runtime.inspect(blocked.runId)).status).toBe("queued")
+      yield* driver.complete({
+        ...(yield* driver.claimExecution({ runId: head.runId, ownerId: "test" })),
         result: completedResult("done"),
       })
       expect((yield* runtime.inspect(blocked.runId)).status).toBe("running")

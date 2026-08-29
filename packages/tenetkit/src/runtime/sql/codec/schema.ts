@@ -14,11 +14,9 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   applied_at TEXT NOT NULL
 )`,
   `CREATE TABLE IF NOT EXISTS tenetkit_lanes (
-  address TEXT NOT NULL,
-  session_id TEXT NOT NULL,
+  session_id TEXT PRIMARY KEY,
   accepted_sequence INTEGER NOT NULL,
-  queue_json TEXT NOT NULL,
-  PRIMARY KEY (address, session_id)
+  queue_json TEXT NOT NULL
 )`,
   `CREATE TABLE IF NOT EXISTS tenetkit_runs (
   run_id TEXT PRIMARY KEY,
@@ -192,7 +190,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   UNIQUE (target_session_id, sequence)
 )`,
   `CREATE INDEX IF NOT EXISTS tenetkit_messages_pending_idx ON tenetkit_messages(target_session_id, delivered_run_id, sequence)`,
-  `CREATE INDEX IF NOT EXISTS tenetkit_runs_lane_idx ON tenetkit_runs(address, session_id, status)`,
+  `CREATE INDEX IF NOT EXISTS tenetkit_runs_lane_idx ON tenetkit_runs(session_id, status)`,
   `CREATE INDEX IF NOT EXISTS tenetkit_runs_schedule_idx ON tenetkit_runs(status, created_at, run_id)`,
   `CREATE INDEX IF NOT EXISTS tenetkit_run_operations_status_idx ON tenetkit_run_operations(status)`,
   `CREATE TABLE IF NOT EXISTS tenetkit_fan_outs (

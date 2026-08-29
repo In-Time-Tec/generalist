@@ -257,15 +257,15 @@ export const appendEvent: {
     }),
 )
 
-export function promoteHead(hub: EventHub, address: string, sessionId: string): TerminalEffect
-export function promoteHead(address: string, sessionId: string): (hub: EventHub) => TerminalEffect
-export function promoteHead(...args: [EventHub, string, string] | [string, string]) {
-  if (args.length === 2) return (hub: EventHub) => promoteHead(hub, args[0], args[1])
-  const [hub, address, sessionId] = args
+export function promoteHead(sessionId: string): (hub: EventHub) => TerminalEffect
+export function promoteHead(hub: EventHub, sessionId: string): TerminalEffect
+export function promoteHead(...args: [EventHub, string] | [string]) {
+  if (args.length === 1) return (hub: EventHub) => promoteHead(hub, args[0])
+  const [hub, sessionId] = args
   return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ queue_json: string }>`
-      SELECT queue_json FROM tenetkit_lanes WHERE address = ${address} AND session_id = ${sessionId}
+      SELECT queue_json FROM tenetkit_lanes WHERE session_id = ${sessionId}
     `
     const lane = lanes[0]
     if (lane === undefined) return
@@ -280,32 +280,25 @@ export function promoteHead(...args: [EventHub, string, string] | [string, strin
   })
 }
 
-export function removeFromLane(
-  address: string,
-  sessionId: string,
-  runId: string,
-): Effect.Effect<void, SqlError, SqlClient.SqlClient>
-export function removeFromLane(
-  sessionId: string,
-  runId: string,
-): (address: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
-export function removeFromLane(...args: [string, string, string] | [string, string]) {
-  if (args.length === 2) return (address: string) => removeFromLane(address, args[0], args[1])
-  const [address, sessionId, runId] = args
+export function removeFromLane(runId: string): (sessionId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
+export function removeFromLane(sessionId: string, runId: string): Effect.Effect<void, SqlError, SqlClient.SqlClient>
+export function removeFromLane(...args: [string, string] | [string]) {
+  if (args.length === 1) return (sessionId: string) => removeFromLane(sessionId, args[0])
+  const [sessionId, runId] = args
   return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ queue_json: string; accepted_sequence: number }>`
-      SELECT queue_json, accepted_sequence FROM tenetkit_lanes WHERE address = ${address} AND session_id = ${sessionId}
+      SELECT queue_json, accepted_sequence FROM tenetkit_lanes WHERE session_id = ${sessionId}
     `
     const lane = lanes[0]
     if (lane === undefined) return
     const queue = decodeQueue(lane.queue_json).filter((id) => id !== runId)
     if (queue.length === 0) {
-      yield* sql`DELETE FROM tenetkit_lanes WHERE address = ${address} AND session_id = ${sessionId}`
+      yield* sql`DELETE FROM tenetkit_lanes WHERE session_id = ${sessionId}`
     } else {
       yield* sql`
         UPDATE tenetkit_lanes SET queue_json = ${encodeQueue(queue)}
-        WHERE address = ${address} AND session_id = ${sessionId}
+        WHERE session_id = ${sessionId}
       `
     }
   })
@@ -322,8 +315,8 @@ export function afterTerminal(...args: [EventHub, DecodedRun] | [DecodedRun]) {
   if (args.length === 1) return (hub: EventHub) => afterTerminal(hub, args[0])
   const [hub, run] = args
   return Effect.gen(function* () {
-    yield* removeFromLane(run.address, run.sessionId, run.runId)
-    yield* promoteHead(hub, run.address, run.sessionId)
+    yield* removeFromLane(run.sessionId, run.runId)
+    yield* promoteHead(hub, run.sessionId)
   })
 }
 

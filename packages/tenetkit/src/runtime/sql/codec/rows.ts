@@ -66,7 +66,6 @@ export interface OperationRow {
 }
 
 export interface LaneRow {
-  readonly address: string
   readonly session_id: string
   readonly accepted_sequence: number
   readonly queue_json: string

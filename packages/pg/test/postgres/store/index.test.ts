@@ -24,6 +24,7 @@ import {
   completedResult,
   openWait,
   suspension,
+  researcherAddress,
   researcherRef,
   registrationsFor,
   textPrompt,
@@ -675,6 +676,44 @@ describePostgres("PostgreSQL run store", () => {
         const claimedNext = yield* claims.claimReadyRuns({ workerId: "w1", limit: 2, lease: "10 seconds" })
         expect(claimedNext.map((item) => item.run.runId)).toEqual([blocked.runId])
         expect((yield* runtime.inspect(blocked.runId)).status).toBe("running")
+      }).pipe(scopedWith(postgresLayer(url))),
+    ),
+  )
+
+  it.live("serializes one Session across different addresses", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const claims = yield* RunClaims.RunClaims
+        const sessionId = uniqueSession("cross-address")
+        const head = yield* runtime.send({
+          to: assistantAddress,
+          sessionId,
+          idempotencyKey: "same-key",
+          prompt: textPrompt("assistant"),
+        })
+        const blocked = yield* runtime.send({
+          to: researcherAddress,
+          sessionId,
+          idempotencyKey: "same-key",
+          prompt: textPrompt("researcher"),
+        })
+
+        expect(blocked.runId).not.toBe(head.runId)
+        expect(blocked.acceptedSequence).toBe(1)
+        const [claimedHead] = yield* claims.claimReadyRuns({ workerId: "cross-address", limit: 2 })
+        expect(claimedHead?.run.runId).toBe(head.runId)
+        expect((yield* runtime.inspect(blocked.runId)).status).toBe("queued")
+        yield* claims.commitWithClaim({
+          runId: head.runId,
+          workerId: claimedHead!.workerId,
+          attemptFence: claimedHead!.attemptFence,
+          transition: "complete",
+          result: completedResult("assistant"),
+        })
+        expect((yield* claims.claimReadyRuns({ workerId: "cross-address", limit: 2 }))[0]?.run.runId).toBe(
+          blocked.runId,
+        )
       }).pipe(scopedWith(postgresLayer(url))),
     ),
   )

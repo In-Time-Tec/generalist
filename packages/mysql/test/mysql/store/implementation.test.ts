@@ -13,6 +13,7 @@ import {
   completedResult,
   openWait,
   suspension,
+  researcherAddress,
   researcherRef,
   textPrompt,
 } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
@@ -573,6 +574,44 @@ describeMysql("mysql run store", () => {
         }).pipe(scopedWith(mysqlClient(url)))
         expect(ownership[0]).toEqual({ owner_worker_id: null, lease_expires_at: null })
         expect((yield* claims.claimReadyRuns({ workerId: "owner-c", limit: 1 }))[0]?.run.runId).toBe(next.runId)
+      }).pipe(scopedWith(mysqlLayer(url))),
+    ),
+  )
+
+  it.live("serializes one Session across different addresses", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const claims = yield* RunClaims.RunClaims
+        const sessionId = uniqueSession("cross-address")
+        const head = yield* runtime.send({
+          to: assistantAddress,
+          sessionId,
+          idempotencyKey: "same-key",
+          prompt: textPrompt("assistant"),
+        })
+        const blocked = yield* runtime.send({
+          to: researcherAddress,
+          sessionId,
+          idempotencyKey: "same-key",
+          prompt: textPrompt("researcher"),
+        })
+
+        expect(blocked.runId).not.toBe(head.runId)
+        expect(blocked.acceptedSequence).toBe(1)
+        const [claimedHead] = yield* claims.claimReadyRuns({ workerId: "cross-address", limit: 2 })
+        expect(claimedHead?.run.runId).toBe(head.runId)
+        expect((yield* runtime.inspect(blocked.runId)).status).toBe("queued")
+        yield* claims.commitWithClaim({
+          runId: head.runId,
+          workerId: claimedHead!.workerId,
+          attemptFence: claimedHead!.attemptFence,
+          transition: "complete",
+          result: completedResult("assistant"),
+        })
+        expect((yield* claims.claimReadyRuns({ workerId: "cross-address", limit: 2 }))[0]?.run.runId).toBe(
+          blocked.runId,
+        )
       }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )

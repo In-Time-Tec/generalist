@@ -1,7 +1,15 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Stream } from "effect"
 import { Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { assistantAddress, completedResult, memoryLayer, openWait, suspension, textPrompt } from "../fixtures.js"
+import {
+  assistantAddress,
+  completedResult,
+  memoryLayer,
+  openWait,
+  researcherAddress,
+  suspension,
+  textPrompt,
+} from "../fixtures.js"
 
 layer(memoryLayer)("Runtime FIFO lanes", (it) => {
   it.effect("keeps only the lane head runnable until it settles", () =>
@@ -30,6 +38,36 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       expect((yield* runtime.inspect(first.runId)).status).toBe("succeeded")
       expect((yield* runtime.inspect(second.runId)).status).toBe("running")
       expect(second.acceptedSequence).toBe(1)
+    }),
+  )
+
+  it.effect("serializes one Session across different addresses without collapsing idempotency", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const driver = yield* RunStore.RunStore
+      const first = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:cross-address",
+        idempotencyKey: "same-key",
+        prompt: textPrompt("assistant"),
+      })
+      const second = yield* runtime.send({
+        to: researcherAddress,
+        sessionId: "session:cross-address",
+        idempotencyKey: "same-key",
+        prompt: textPrompt("researcher"),
+      })
+
+      expect(second.runId).not.toBe(first.runId)
+      expect(second.acceptedSequence).toBe(1)
+      expect((yield* runtime.inspect(first.runId)).status).toBe("running")
+      expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
+
+      yield* driver.complete({
+        ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
+        result: completedResult("assistant"),
+      })
+      expect((yield* runtime.inspect(second.runId)).status).toBe("running")
     }),
   )
 

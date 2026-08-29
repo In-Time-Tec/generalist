@@ -35,6 +35,10 @@ const inspect = (filename: string) => {
     .query<{ name: string }, []>("PRAGMA table_info(tenetkit_run_operations)")
     .all()
     .map((row) => row.name)
+  const laneColumns = db
+    .query<{ name: string }, []>("PRAGMA table_info(tenetkit_lanes)")
+    .all()
+    .map((row) => row.name)
   const meta = db
     .query<{ version: number; checksum: string }, []>("SELECT version, checksum FROM tenetkit_schema_meta WHERE id = 1")
     .get()
@@ -80,6 +84,7 @@ const inspect = (filename: string) => {
   ])
   expect(operationColumns).toContain("resolution_idempotency_key")
   expect(operationColumns).toContain("resolution_json")
+  expect(laneColumns).toEqual(["session_id", "accepted_sequence", "queue_json"])
   expect(tables).toEqual([
     "tenetkit_agent_names",
     "tenetkit_executable_registrations",

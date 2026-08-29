@@ -22,11 +22,9 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   lock_key VARCHAR(512) PRIMARY KEY
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS tenetkit_lanes (
-  address VARCHAR(255) NOT NULL,
-  session_id VARCHAR(255) NOT NULL,
+  session_id VARCHAR(255) PRIMARY KEY,
   accepted_sequence BIGINT NOT NULL,
-  queue_json LONGTEXT NOT NULL,
-  PRIMARY KEY (address, session_id)
+  queue_json LONGTEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS tenetkit_runs (
   run_id VARCHAR(255) PRIMARY KEY,

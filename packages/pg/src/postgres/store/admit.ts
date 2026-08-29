@@ -106,7 +106,7 @@ export const admitSend: {
           return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
       }
       const runId = input.runId ?? (yield* nextId("run"))
-      const enqueued = yield* enqueueLane(input.message.to, input.message.sessionId, runId)
+      const enqueued = yield* enqueueLane(input.message.sessionId, runId)
       yield* insertRun({
         runId,
         status: "queued",
