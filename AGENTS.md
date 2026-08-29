@@ -1,61 +1,88 @@
 # TenetKit
 
-TenetKit is an Effect-native agent framework over `effect/unstable/ai` with an optional native durable Runtime. Core stays standalone and must never depend on Relay or another durable runtime.
-
-## Contracts and docs
-
-- TenetKit is pre-1.0. Keep one current contract; update every caller and delete superseded paths instead of adding compatibility versions unless a staged migration is explicitly required.
-- `PRODUCT.md` owns product direction, audience, and exclusions. Do not turn it into a feature list.
-- `CONTEXT.md` owns vocabulary, ownership, and system boundaries.
-- `PLAN.md` owns unfinished work, target interface changes, dependency order, deletion scope, and release acceptance for the TenetKit and Rika clean break. Source and feature docs still own implemented behavior.
-- `docs/features/` states current behavior and rules code relies on. `docs/decisions/` records an important choice and its reason. `docs/tradeoffs/` records a meaningful gain, cost, and rejected option only when useful.
-- Keep internal docs standalone and minimal. Do not add numbered architecture records, status/date/author metadata, templates, indexes, ledgers, repeated related-doc lists, history, or plans. Do not add Markdown meaning, structure, or snippet validation.
-- Public user guides live in the docs app and package READMEs. README files own use and setup.
-
-## Effect TypeScript
-
-- Write Effect-native programs: typed Effects, services, Layers, schemas, streams, scopes, schedules, and structured concurrency. Do not build Promise-first code and wrap it later.
-- Before using an Effect API, inspect the pinned source and types in `node_modules`. `repos/effect` is read-only research material; never edit, format, lint, test, build, or import from `repos/*`.
-- Keep expected failures typed. Preserve requirements, interruption, resource lifetimes, and bounded concurrency in public signatures.
-- Use Effect platform services instead of raw time, randomness, environment, filesystem, process, HTTP, socket, and terminal APIs when Effect owns the concern.
-- Runtime execution belongs only at process, test-host, or framework boundaries. Every resource and fiber must have a visible owner.
-- Tests use `@effect/vitest`, test Layers, and deterministic Effect services. Tests live under `test/`, mirroring `src/`.
-
-## Code and packages
-
-- TenetKit core depends on `effect` only. Never import `@relayfx/*`; ast-grep enforces this.
-- Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly. Do not add a second payload or tool format.
-- Follow the construction-verb canon: `make` constructs an in-memory value, `register` records it for later lookup, and `start` begins a hosted Runtime `Execution`. Do not use `create` as a synonym for `make` or `register`.
-- Name Layer constructors `layer` or with a noun after `layer` (`layerMemory`, `layerNoop`, `layerIdentity`, `layerConfig`). Put parameters in `layer(options)`; do not add Layer aliases or flag-in-a-name variants.
-- Model boundary failures with `Schema.TaggedErrorClass`, tag them `@<scope>/<package>/<Name>`, and name the class for the failure condition without forcing an `Error` suffix.
-- Tag `Context.Service` classes `@<scope>/<package>/<module-path>/<ServiceClass>`; `effecttsgo/deterministic-keys` derives the key from the file path and enforces it. Boundary error tags stay `@<scope>/<package>/<Name>` because they are wire identities that must survive a file move.
-- Every exported symbol carries `@experimental` while Effect AI is unstable.
-- Public modules use intentional package-root namespaces. Services expose `Interface`, `Context.Service`, explicit Layers, schema-backed boundary errors, and a `layerTest` or `layerMemory` for behavior-bearing seams.
-- Prefer direct imports. Do not add wrapper files, catch-all `utils`/`helpers`/`common`/`lib` directories, or namespace imports.
-- Keep each package `src` file under 500 lines; `oxlint`'s `max-lines` rule enforces it. A few cohesive engine files are recorded exceptions in `.oxlintrc.json`; split a file rather than adding to that list.
-- Do not put rationale in code comments. Put stable behavior in types, tests, `CONTEXT.md`, feature docs, decision docs, tradeoff docs, or package READMEs.
+TenetKit is an Effect-native agent framework over `effect/unstable/ai`. The `tenetkit` package provides the
+process-local agent loop and an optional durable Runtime; `@tenetkit/pg`, `@tenetkit/mysql`, and
+`@tenetkit/cloudflare` provide host-specific storage and runtime adapters.
 
 ## Commands
 
-Use Bun, Turbo, oxlint, ast-grep, Prettier, and Vitest. Root scripts are supported workflows, not shortcuts for every tool invocation.
+Use the Bun version pinned in `package.json`.
 
 ```bash
-bun install
-bun run dev
-bun run format
-bun run typecheck
-bun run test
-bun run build
-bun run check
+bun install --frozen-lockfile       # install the locked workspace
+bun run dev                         # run the docs app
+bun run build                       # build every workspace
+bun run format                      # format the repository
+```
+
+Run the narrowest useful check while editing:
+
+```bash
+bun --bun vitest run packages/tenetkit/test/<path>.test.ts --no-file-parallelism
+bun --cwd packages/tenetkit run typecheck
+bun --cwd packages/pg run test
+bun prettier --check <paths>
+```
+
+Replace the package directory or test path as needed. PostgreSQL tests require `TENETKIT_DATABASE_URL` (or
+`DATABASE_URL`), and MySQL tests require `TENETKIT_MYSQL_URL` (or `MYSQL_URL`); those suites skip when their database
+is unavailable.
+
+Before review, run the full checks:
+
+```bash
+bun run check                        # build, formatting, repository rules, lint, and typecheck
+bun run test                         # build and run the complete Vitest suite
+```
+
+For changes to public exports, package manifests, dependencies, or release output, also run:
+
+```bash
 bun run package
 ```
 
-Keep the core command set small and use no colon-named root scripts. Real package, release, migration, and install workflows may have plain names. Do not add aliases for Git, vendored repositories, Docker, status, logs, watch, coverage, or trivial underlying tool commands. Pass arguments to the supported command or invoke the tool directly.
+This is the representative downstream compatibility check. It packs all four public packages, validates their
+contents and export maps, installs the tarballs into clean isolated Bun and npm consumers, typechecks and bundles a
+consumer, imports the public entrypoints under Node and Bun, and verifies that consumers get one Effect installation.
 
-## GREENFIELD PROJECT — BREAKING CHANGES ARE WELCOME!!!
+## Boundaries
 
-- THIS PROJECT HAS NO USERS!!! IT IS GREENFIELD!!!
-- DO NOT ASSUME THAT THE EXISTING FOUNDATION, ARCHITECTURE, OR IMPLEMENTATION IS CORRECT!!! BE SKEPTICAL, INVESTIGATE THE REAL PROBLEM, AND VERIFY THE BEST APPROACH!!!
-- CHANGE THE UNDERLYING FOUNDATION OR ARCHITECTURE WHEN EVIDENCE SHOWS THAT A DIFFERENT DESIGN IS BETTER!!! LARGE REFACTORS ARE ENCOURAGED WHEN THEY PRODUCE THE RIGHT LONG-TERM SYSTEM!!!
-- IMPLEMENT THE RIGHT FIX THAT WILL SCALE LONG TERM, NOT THE SMALLEST PATCH!!! DO NOT PAPER OVER A DESIGN PROBLEM WITH A LOCAL WORKAROUND!!!
-- BREAKING CHANGES ARE WELCOME!!! DO NOT PRESERVE LEGACY CODE OR BACKWARD COMPATIBILITY!!! REMOVE REPLACED CODE, OBSOLETE PATHS, AND TRANSITIONAL SHIMS!!!
+- Core must stay usable without Relay or another durable runtime. Never import `@relayfx/*` from TenetKit; repository
+  checks enforce this.
+- Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly. Do not add a parallel payload or tool format.
+- Keep Effects lazy and run them only at process, framework, or test-host boundaries. Preserve typed failures,
+  requirements, interruption, scopes, and bounded concurrency.
+- Use Effect platform services instead of raw filesystem, process, HTTP, time, randomness, socket, or terminal APIs
+  when Effect owns that boundary. Every resource and fiber needs a visible scope owner.
+- Use `Schema` at serialized and untrusted boundaries. Boundary failures use `Schema.TaggedErrorClass`; behavior-bearing
+  service seams provide a test or memory Layer.
+- Public exports remain `@experimental` while Effect AI is unstable. Prefer direct imports and intentional package-root
+  namespaces; do not add wrapper barrels or generic `utils`, `helpers`, `common`, or `lib` directories.
+- `make` constructs an in-memory value, `register` records it for lookup, and `start` begins a hosted Runtime
+  `Execution`. Layer constructors are named `layer` or `layer<Noun>`.
+- Tests use `@effect/vitest`, deterministic Effect services, and live under `test/` mirroring `src/`.
+- Inspect the pinned Effect source and types in `node_modules` before using an unfamiliar API. `repos/effect` is
+  read-only reference material: never edit, import, format, build, or test it.
+- This project is pre-1.0 and has no compatibility promise. Keep one current contract, update all callers, and delete
+  replaced paths instead of adding shims.
+
+`PRODUCT.md` owns product direction and exclusions. `CONTEXT.md` owns vocabulary and system boundaries. `PLAN.md` owns
+unfinished work and dependency order. `docs/features/` records current behavior; package READMEs and the docs app own
+public usage.
+
+## Release
+
+Do not publish from a workstation. A release change must:
+
+1. Add the user-visible change to `CHANGELOG.md`.
+2. Set one lockstep semantic version in the root manifest and
+   `packages/{tenetkit,pg,mysql,cloudflare}/package.json`.
+3. Pass `bun run check`, `bun run test` with PostgreSQL and MySQL available, and `bun run package`.
+4. Land the exact release commit on both `main` and `release`, then create the immutable `v<version>` tag at that
+   commit.
+5. Push the tag to start `.github/workflows/publish.yml`. That workflow rebuilds and verifies the package assets,
+   publishes one GitHub release and the four exact tarballs to npm, and checks registry integrity. Its manual dispatch
+   is only for reconciling an existing tag and requires the tag plus its full 40-character commit SHA.
+
+Pushing branches or tags, merging, publishing, and deploying change shared state; do them only when the user explicitly
+asks.
