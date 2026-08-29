@@ -1,5 +1,6 @@
+import { workerWakeupSuite } from "./suites/worker-wakeup-suite.js"
 import { expect, it } from "@effect/vitest"
-import { DateTime, Deferred, Effect, Ref } from "effect"
+import { DateTime, Deferred, Effect, Ref, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { TestClock } from "effect/testing"
 import { Address, Message } from "../../../src/runtime/index.js"
@@ -13,6 +14,8 @@ import { RunClaims, type ClaimedRun, type Interface as ClaimsInterface } from ".
 import { RunStore, type Interface as StoreInterface } from "../../../src/runtime/run/store.js"
 import type { RunInspection, RunStatus } from "../../../src/runtime/run.js"
 import { assistantRef } from "../execution/fixtures.js"
+
+workerWakeupSuite({ makeExecutableResolver, makeRunStore, makeWorker })
 
 const decodedRun: DecodedRun = {
   runId: "run:worker",
@@ -49,8 +52,11 @@ const claimed = {
   leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(0)),
 } satisfies ClaimedRun
 
+const quietChanges = Stream.concat(Stream.succeed(undefined), Stream.never)
+
 const claimsService = (refreshLease: ClaimsInterface["refreshLease"]): ClaimsInterface =>
   RunClaims.of({
+    changes: quietChanges,
     claimReadyRuns: () => Effect.succeed([claimed]),
     refreshLease,
     releaseClaim: () => Effect.void,
@@ -173,9 +179,13 @@ it.effect("refills capacity while another Run remains active", () =>
         run: { ...claimed.run, runId },
       })
       const claims = RunClaims.of({
+        changes: quietChanges,
         claimReadyRuns: () =>
           Ref.getAndUpdate(claimBatch, (value) => value + 1).pipe(
-            Effect.map((batch) => (batch === 0 ? [run("run:blocked"), run("run:unrelated")] : [run("run:refill")])),
+            Effect.map((batch) => {
+              if (batch === 0) return [run("run:blocked"), run("run:unrelated")]
+              return batch === 1 ? [run("run:refill")] : []
+            }),
           ),
         refreshLease: () => Effect.succeed(true),
         releaseClaim: () => Effect.void,
@@ -194,7 +204,7 @@ it.effect("refills capacity while another Run remains active", () =>
         workerId: "worker-a",
         concurrency: 2,
         lease: "1 second",
-        pollInterval: "10 millis",
+        fallbackInterval: "10 millis",
       }).pipe(
         Effect.provideService(ExecutionHost, host),
         Effect.provideService(RunStore, storeService("running")),
@@ -203,18 +213,18 @@ it.effect("refills capacity while another Run remains active", () =>
       yield* worker.run.pipe(Effect.forkScoped)
       yield* Deferred.await(blockedStarted)
       yield* Deferred.await(unrelatedStarted)
-      yield* TestClock.adjust("11 millis")
-      expect((yield* Deferred.poll(refillStarted))._tag).toBe("Some")
+      yield* Deferred.await(refillStarted)
     }),
   ),
 )
 
-it.effect("reports poll freshness, capacity, active work, claim age, and the last failure", () =>
+it.effect("reports scan, wakeup, fallback, capacity, claim age, and the last failure", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const release = yield* Deferred.make<void>()
       const attempts = yield* Ref.make(0)
       const claims = RunClaims.of({
+        changes: quietChanges,
         claimReadyRuns: () =>
           Ref.getAndUpdate(attempts, (value) => value + 1).pipe(
             Effect.flatMap((attempt) =>
@@ -237,8 +247,9 @@ it.effect("reports poll freshness, capacity, active work, claim age, and the las
         Effect.provideService(RunClaims, claims),
       )
       expect(yield* worker.status).toEqual({
-        poll: { _tag: "Starting" },
-        lastSuccessfulPollAt: undefined,
+        scan: { _tag: "Starting" },
+        wakeup: { _tag: "Starting" },
+        lastFallbackAt: undefined,
         lastFailure: undefined,
         active: 0,
         capacity: 2,
@@ -246,16 +257,14 @@ it.effect("reports poll freshness, capacity, active work, claim age, and the las
       })
       yield* Effect.result(worker.poll)
       const failed = yield* worker.status
-      expect(failed.poll._tag).toBe("Failed")
-      expect(failed.lastSuccessfulPollAt).toBeUndefined()
+      expect(failed.scan._tag).toBe("Failed")
       expect(failed.lastFailure?.message).toContain("database unavailable")
       expect(failed.active).toBe(0)
 
       yield* TestClock.adjust("25 millis")
       yield* worker.poll
       expect(yield* worker.status).toMatchObject({
-        poll: { _tag: "Succeeded", at: 25 },
-        lastSuccessfulPollAt: 25,
+        scan: { _tag: "Succeeded", at: 25 },
         active: 1,
         capacity: 2,
         oldestClaimAt: 25,
@@ -275,6 +284,7 @@ it.effect("continuous run survives an unavailable claim poll", () =>
       const started = yield* Deferred.make<void>()
       const polls = yield* Ref.make(0)
       const claims = RunClaims.of({
+        changes: quietChanges,
         claimReadyRuns: () =>
           Ref.getAndUpdate(polls, (value) => value + 1).pipe(
             Effect.flatMap((poll) =>
@@ -293,7 +303,7 @@ it.effect("continuous run survives an unavailable claim poll", () =>
         execute: () => Deferred.succeed(started, undefined),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({ workerId: "worker-a", pollInterval: "10 millis" }).pipe(
+      const worker = yield* makeWorker({ workerId: "worker-a", fallbackInterval: "10 millis" }).pipe(
         Effect.provideService(ExecutionHost, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
@@ -301,11 +311,11 @@ it.effect("continuous run survives an unavailable claim poll", () =>
       yield* worker.run.pipe(Effect.forkScoped)
       yield* Deferred.await(firstPolled)
       yield* Effect.yieldNow
-      expect((yield* worker.status).poll._tag).toBe("Failed")
+      expect((yield* worker.status).scan._tag).toBe("Failed")
       yield* TestClock.adjust("10 millis")
       yield* Deferred.await(started)
       expect(yield* Ref.get(polls)).toBeGreaterThanOrEqual(2)
-      expect((yield* worker.status).poll._tag).toBe("Succeeded")
+      expect((yield* worker.status).scan._tag).toBe("Succeeded")
     }),
   ),
 )
@@ -359,6 +369,7 @@ it.effect("replaces stale execution when the same Run is claimed with a newer fe
       const fences = yield* Ref.make<ReadonlyArray<number>>([])
       const observedFences = yield* Ref.make<ReadonlyArray<number>>([])
       const claims = RunClaims.of({
+        changes: quietChanges,
         claimReadyRuns: () =>
           Ref.getAndUpdate(claimIndex, (value) => value + 1).pipe(
             Effect.map((index): ReadonlyArray<ClaimedRun> => [{ ...claimed, attemptFence: index + 1 }]),
@@ -440,6 +451,7 @@ it.effect("releases an unobserved claim when claim observation defects", () =>
       const executedFences = yield* Ref.make<ReadonlyArray<number>>([])
       const releasedFences = yield* Ref.make<ReadonlyArray<number>>([])
       const claims = RunClaims.of({
+        changes: quietChanges,
         claimReadyRuns: () =>
           Ref.getAndUpdate(claimIndex, (value) => value + 1).pipe(
             Effect.map((index): ReadonlyArray<ClaimedRun> => [{ ...claimed, attemptFence: index + 1 }]),

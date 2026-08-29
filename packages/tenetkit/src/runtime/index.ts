@@ -400,7 +400,8 @@ export namespace RuntimeWorker {
   export type Interface = import("./sql/worker.js").Interface
   export type WorkerOptions = import("./sql/worker.js").WorkerOptions
   export type WorkerFailure = import("./sql/worker.js").WorkerFailure
-  export type WorkerPoll = import("./sql/worker.js").WorkerPoll
+  export type WorkerScan = import("./sql/worker.js").WorkerScan
+  export type WorkerWakeup = import("./sql/worker.js").WorkerWakeup
   export type WorkerStatus = import("./sql/worker.js").WorkerStatus
   export type layerWorker = typeof import("./sql/worker.js").layerWorker
 }

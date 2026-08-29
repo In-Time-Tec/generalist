@@ -1,7 +1,8 @@
-import { Effect, Schema } from "effect"
+import { Cause, Duration, Effect, Queue, Redacted, Schema, Stream } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
+import { Client, escapeIdentifier, type Notification } from "pg"
 import {
   AgentExecutionFailure,
   RunNotFound,
@@ -18,14 +19,76 @@ import { afterTerminal, appendEvent, completeRun, loadEventsAfter, loadRun, sett
 import { lockRunHierarchy } from "../runs/locks.js"
 import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
 import { ExecutionResult } from "tenetkit/runtime/driver/execution/state"
+import { NOTIFY_CHANNEL } from "../schema.js"
+import { notifyRun } from "../events/transaction-events.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 export type RunFn = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlR>,
 ) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
+const wakeupChanges = (config: PgClient.PgClientConfig, source: string) =>
+  Stream.callback<void, RuntimeUnavailable>(
+    (queue) => {
+      const client = new Client({
+        connectionString: config.url === undefined ? undefined : Redacted.value(config.url),
+        user: config.username,
+        host: config.host,
+        database: config.database,
+        password: config.password === undefined ? undefined : Redacted.value(config.password),
+        ssl: config.ssl,
+        port: config.port,
+        ...(config.stream === undefined ? undefined : { stream: config.stream }),
+        connectionTimeoutMillis:
+          config.connectTimeout === undefined ? undefined : Duration.toMillis(config.connectTimeout),
+        application_name: `tenetkit-runtime-worker:${source}`.slice(0, 63),
+        types: config.types,
+      })
+      const failure = (cause: unknown) =>
+        RuntimeUnavailable.make({ message: `PostgreSQL RunClaims wakeup listener failed: ${String(cause)}` })
+      const onNotification = (notification: Notification) => {
+        if (notification.channel === NOTIFY_CHANNEL) Queue.offerUnsafe(queue, undefined)
+      }
+      const onFailure = (cause: unknown) => Queue.failCauseUnsafe(queue, Cause.fail(failure(cause)))
+      const onEnd = () => onFailure("PostgreSQL listener connection ended")
+      const close = Effect.tryPromise(() => client.end()).pipe(Effect.ignore)
+      const acquire = Effect.acquireRelease(
+        Effect.sync(() => {
+          client.on("notification", onNotification)
+          client.on("error", onFailure)
+          client.on("end", onEnd)
+        }),
+        () =>
+          Effect.sync(() => {
+            client.off("notification", onNotification)
+            client.off("error", onFailure)
+            client.off("end", onEnd)
+          }).pipe(Effect.andThen(close)),
+      )
+      const connect = Effect.tryPromise({
+        try: () => client.connect(),
+        catch: failure,
+      }).pipe(
+        Effect.andThen(
+          Effect.tryPromise({
+            try: () => client.query(`LISTEN ${escapeIdentifier(NOTIFY_CHANNEL)}`),
+            catch: failure,
+          }),
+        ),
+        Effect.andThen(
+          Effect.sync(() => {
+            Queue.offerUnsafe(queue, undefined)
+          }),
+        ),
+      )
+      return acquire.pipe(Effect.andThen(connect))
+    },
+    { bufferSize: 1, strategy: "sliding" },
+  )
+
 export const postgresClaims = (input: {
-  readonly sql: SqlClient.SqlClient
+  readonly pg: PgClient.PgClient
+  readonly source: string
   readonly hub: EventHub
   readonly run: RunFn
   readonly cancelRun: (
@@ -35,6 +98,7 @@ export const postgresClaims = (input: {
 }): ClaimsInterface => {
   const { hub, run, cancelRun } = input
   return RunClaims.of({
+    changes: wakeupChanges(input.pg.config, input.source),
     claimReadyRuns: (claimInput) =>
       run(
         Effect.gen(function* () {
@@ -68,10 +132,13 @@ export const postgresClaims = (input: {
       ),
     releaseClaim: (releaseInput) =>
       run(
-        releaseClaim({
-          runId: releaseInput.runId,
-          workerId: releaseInput.workerId,
-          attemptFence: releaseInput.attemptFence,
+        Effect.gen(function* () {
+          yield* releaseClaim({
+            runId: releaseInput.runId,
+            workerId: releaseInput.workerId,
+            attemptFence: releaseInput.attemptFence,
+          })
+          yield* notifyRun(releaseInput.runId)
         }),
       ),
     commitWithClaim: (commitInput) =>

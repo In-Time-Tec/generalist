@@ -1,4 +1,4 @@
-import { Context, Duration, Effect } from "effect"
+import { Context, Duration, Effect, Stream } from "effect"
 import type { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import type { DecodedRun } from "../codec/rows.js"
 import type { StaleClaim } from "../errors.js"
@@ -11,6 +11,11 @@ export interface ClaimedRun {
 }
 
 export interface Interface {
+  /**
+   * Lossy hints that durable claim state may have changed. Every subscription first emits after
+   * its change source is ready, so consumers can close the subscribe-before-catch-up race.
+   */
+  readonly changes: Stream.Stream<void, RuntimeUnavailable>
   readonly claimReadyRuns: (input: {
     readonly workerId: string
     readonly limit: number

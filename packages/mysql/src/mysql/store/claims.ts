@@ -1,4 +1,4 @@
-import { DateTime, Duration, Effect, Schema } from "effect"
+import { DateTime, Duration, Effect, Schema, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
 import { AgentExecutionFailure, RuntimeUnavailable, failureMessage } from "tenetkit/runtime/driver/errors"
@@ -48,6 +48,7 @@ export const mysqlClaims = (input: {
 }): ClaimsInterface => {
   const { sql, hub, run, lockParent, clearClaim } = input
   return RunClaims.of({
+    changes: Stream.concat(Stream.succeed(undefined), Stream.never),
     claimReadyRuns: (claimInput) =>
       run(
         Effect.gen(function* () {

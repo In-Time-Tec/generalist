@@ -616,7 +616,7 @@ describeMysql("mysql run store", () => {
             workerId: "mysql-worker",
             concurrency: 2,
             lease: "5 seconds",
-            pollInterval: "50 millis",
+            fallbackInterval: "50 millis",
           }).pipe(Layer.provideMerge(mysqlLayer(url))),
         ),
       ),

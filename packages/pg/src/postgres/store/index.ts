@@ -479,6 +479,6 @@ export const postgresServices = (options: PostgresOptions) =>
       ...operations,
       ...programStoreMethods({ sql, hub: transactionHub, run, runNoTxn, lockRunHierarchy }),
     })
-    const claims = postgresClaims({ sql, hub: transactionHub, run, cancelRun })
+    const claims = postgresClaims({ pg, source, hub: transactionHub, run, cancelRun })
     return { store, claims }
   })

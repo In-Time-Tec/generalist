@@ -1,3 +1,4 @@
+import "./suites/worker-wakeup-suite.js"
 import { childAdmissionBoundsSuite } from "../../../../tenetkit/test/runtime/child/suites/admission-bounds.js"
 import { claimReadyWorker } from "../../../../tenetkit/test/runtime/run/queued-activation.js"
 import { postgresAvailable, postgresDatabase, postgresLayer } from "../database.js"

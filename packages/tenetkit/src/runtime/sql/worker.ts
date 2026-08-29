@@ -1,5 +1,19 @@
-import { Cause, Clock, Context, Duration, Effect, Exit, FiberMap, Layer, Ref, Scope } from "effect"
-import type { RuntimeUnavailable } from "../errors.js"
+import {
+  Cause,
+  Clock,
+  Context,
+  Duration,
+  Effect,
+  Exit,
+  FiberMap,
+  Layer,
+  Queue,
+  Ref,
+  Schedule,
+  Scope,
+  Stream,
+} from "effect"
+import { RuntimeUnavailable } from "../errors.js"
 import { RunClaims, type ClaimedRun } from "./run/claims.js"
 import { ExecutionHost } from "../execution/host.js"
 import { RunStore } from "../run/store.js"
@@ -9,7 +23,7 @@ export interface WorkerOptions {
   readonly workerId: string
   readonly concurrency?: number
   readonly lease?: Duration.Input
-  readonly pollInterval?: Duration.Input
+  readonly fallbackInterval?: Duration.Input
   readonly cancellationInterval?: Duration.Input
   readonly onClaim?: (claim: ClaimedRun) => Effect.Effect<void>
 }
@@ -19,14 +33,20 @@ export interface WorkerFailure {
   readonly message: string
 }
 
-export type WorkerPoll =
+export type WorkerScan =
   | { readonly _tag: "Starting" }
   | { readonly _tag: "Succeeded"; readonly at: number }
   | { readonly _tag: "Failed"; readonly at: number; readonly message: string }
 
+export type WorkerWakeup =
+  | { readonly _tag: "Starting" }
+  | { readonly _tag: "Ready"; readonly at: number }
+  | { readonly _tag: "Failed"; readonly at: number; readonly message: string }
+
 export interface WorkerStatus {
-  readonly poll: WorkerPoll
-  readonly lastSuccessfulPollAt: number | undefined
+  readonly scan: WorkerScan
+  readonly wakeup: WorkerWakeup
+  readonly lastFallbackAt: number | undefined
   readonly lastFailure: WorkerFailure | undefined
   readonly active: number
   readonly capacity: number
@@ -39,8 +59,9 @@ interface ActiveClaim {
 }
 
 interface WorkerState {
-  readonly poll: WorkerPoll
-  readonly lastSuccessfulPollAt: number | undefined
+  readonly scan: WorkerScan
+  readonly wakeup: WorkerWakeup
+  readonly lastFallbackAt: number | undefined
   readonly lastFailure: WorkerFailure | undefined
   readonly claims: ReadonlyMap<string, ActiveClaim>
 }
@@ -67,11 +88,14 @@ export const makeWorker = (
     const store = yield* RunStore
     const concurrency = options.concurrency ?? 1
     const lease = options.lease ?? "30 seconds"
-    const pollInterval = options.pollInterval ?? "200 millis"
+    const fallbackInterval = options.fallbackInterval ?? "30 seconds"
+    const wakeups = yield* Queue.sliding<void>(1)
+    yield* Effect.addFinalizer(() => Queue.shutdown(wakeups))
     const active = yield* FiberMap.make<string, void, never>()
     const state = yield* Ref.make<WorkerState>({
-      poll: { _tag: "Starting" },
-      lastSuccessfulPollAt: undefined,
+      scan: { _tag: "Starting" },
+      wakeup: { _tag: "Starting" },
+      lastFallbackAt: undefined,
       lastFailure: undefined,
       claims: new Map(),
     })
@@ -86,7 +110,7 @@ export const makeWorker = (
               const failure = { at, message: Cause.pretty(cause) }
               return Ref.update(state, (current) => ({
                 ...current,
-                poll: { _tag: "Failed" as const, ...failure },
+                scan: { _tag: "Failed" as const, ...failure },
                 lastFailure: failure,
               }))
             }),
@@ -103,6 +127,26 @@ export const makeWorker = (
               })),
             ),
           )
+
+    const recordWakeupFailure = (failure: RuntimeUnavailable) =>
+      Clock.currentTimeMillis.pipe(
+        Effect.flatMap((at) =>
+          Ref.update(state, (current) => ({
+            ...current,
+            wakeup: { _tag: "Failed" as const, at, message: failure.message },
+            lastFailure: { at, message: failure.message },
+          })),
+        ),
+      )
+
+    const recordWakeup = Clock.currentTimeMillis.pipe(
+      Effect.flatMap((at) =>
+        Ref.update(state, (current) => ({
+          ...current,
+          wakeup: { _tag: "Ready" as const, at },
+        })),
+      ),
+    )
 
     const watchCancellation = (runId: string): Effect.Effect<void, RuntimeUnavailable> =>
       Effect.sleep(cancellationInterval).pipe(
@@ -185,13 +229,18 @@ export const makeWorker = (
                         workerId: options.workerId,
                         attemptFence: item.attemptFence,
                       })
-                      .pipe(Effect.ensuring(removeClaim))
+                      .pipe(Effect.ensuring(removeClaim.pipe(Effect.andThen(Queue.offer(wakeups, undefined)))))
                   : Effect.void,
               ),
             )
-          yield* FiberMap.run(active, item.run.runId, executeClaim(item).pipe(Effect.ensuring(removeClaim)), {
-            startImmediately: true,
-          })
+          yield* FiberMap.run(
+            active,
+            item.run.runId,
+            executeClaim(item).pipe(Effect.ensuring(removeClaim.pipe(Effect.andThen(Queue.offer(wakeups, undefined))))),
+            {
+              startImmediately: true,
+            },
+          )
         }),
       )
 
@@ -209,21 +258,29 @@ export const makeWorker = (
       const at = yield* Clock.currentTimeMillis
       yield* Ref.update(state, (current) => ({
         ...current,
-        poll: { _tag: "Succeeded" as const, at },
-        lastSuccessfulPollAt: at,
+        scan: { _tag: "Succeeded" as const, at },
       }))
       return claimed
     }).pipe(Effect.tapCause(recordFailure))
 
-    const iteration = poll.pipe(
+    const drain: Effect.Effect<void, RuntimeUnavailable> = Effect.suspend(() =>
+      poll.pipe(
+        Effect.flatMap((claimed) =>
+          claimed.length === 0
+            ? Effect.void
+            : FiberMap.size(active).pipe(Effect.flatMap((size) => (size >= concurrency ? Effect.void : drain))),
+        ),
+      ),
+    )
+
+    const runDrain = drain.pipe(
       Effect.catchCause((cause) =>
         Cause.hasInterrupts(cause)
           ? Effect.interrupt
-          : Effect.logError("runtime-worker.poll-failed", cause).pipe(
+          : Effect.logError("runtime-worker.scan-failed", cause).pipe(
               Effect.annotateLogs({ "tenetkit.worker.id": options.workerId }),
             ),
       ),
-      Effect.andThen(Effect.sleep(pollInterval)),
     )
 
     const status = Ref.get(state).pipe(
@@ -232,13 +289,53 @@ export const makeWorker = (
         for (const claim of current.claims.values())
           if (oldestClaimAt === undefined || claim.claimedAt < oldestClaimAt) oldestClaimAt = claim.claimedAt
         return {
-          poll: current.poll,
-          lastSuccessfulPollAt: current.lastSuccessfulPollAt,
+          scan: current.scan,
+          wakeup: current.wakeup,
+          lastFallbackAt: current.lastFallbackAt,
           lastFailure: current.lastFailure,
           active: current.claims.size,
           capacity: concurrency,
           oldestClaimAt,
         }
+      }),
+    )
+
+    const sourceEnded = RuntimeUnavailable.make({ message: "Run claim wakeup source ended" })
+    const listen = Stream.concat(claims.changes, Stream.fail(sourceEnded)).pipe(
+      Stream.tap(() => recordWakeup),
+      Stream.tapError((failure) =>
+        recordWakeupFailure(failure).pipe(
+          Effect.andThen(
+            Effect.logWarning("runtime-worker.wakeup-failed").pipe(
+              Effect.annotateLogs({
+                "tenetkit.worker.id": options.workerId,
+                "tenetkit.failure": failure.message,
+              }),
+            ),
+          ),
+        ),
+      ),
+      Stream.retry(Schedule.spaced("1 second")),
+      Stream.runForEach(() => Queue.offer(wakeups, undefined)),
+    )
+
+    const awaitWakeup = Effect.raceFirst(
+      Queue.take(wakeups).pipe(Effect.as("wakeup" as const)),
+      Effect.sleep(fallbackInterval).pipe(Effect.as("fallback" as const)),
+    ).pipe(
+      Effect.tap((reason) =>
+        reason === "wakeup"
+          ? Effect.void
+          : Clock.currentTimeMillis.pipe(
+              Effect.flatMap((at) => Ref.update(state, (current) => ({ ...current, lastFallbackAt: at }))),
+            ),
+      ),
+    )
+
+    const run = Effect.scoped(
+      Effect.gen(function* () {
+        yield* listen.pipe(Effect.forkScoped)
+        return yield* Effect.forever(awaitWakeup.pipe(Effect.andThen(runDrain)))
       }),
     )
 
@@ -248,7 +345,7 @@ export const makeWorker = (
       status,
       poll,
       idle: FiberMap.awaitEmpty(active),
-      run: Effect.forever(iteration),
+      run,
     }
   })
 

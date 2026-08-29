@@ -91,7 +91,7 @@ export const postgresWithWorker = (options: PostgresWorkerOptions): PostgresWork
     workerId: options.workerId,
     concurrency: options.concurrency ?? 4,
     lease: "5 seconds",
-    pollInterval: "50 millis",
+    fallbackInterval: "30 seconds",
   }).pipe(Layer.provideMerge(postgresLayer(options.url)))
 
 const serverUrl = postgresUrl ?? "postgres://postgres-unavailable"
