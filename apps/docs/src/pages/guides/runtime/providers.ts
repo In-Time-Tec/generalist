@@ -83,7 +83,7 @@ export const providers = definePage({
       expectedOutput: deterministicRegistryExpected,
     }),
     p(
-      code("Deterministic.layerOpenAi"),
+      code("layerOrDeterministic"),
       " installs the deterministic fallback always and OpenAI only when its API-key config is present. Missing key data selects deterministic-only registration; invalid values and configuration-source failures remain typed failures. The selection stays data, so each environment picks its own pair.",
     ),
     codeBlock({ label: "openai-or-deterministic.ts", source: openaiOrDeterministic }),

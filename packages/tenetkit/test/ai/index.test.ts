@@ -16,13 +16,15 @@ import {
   layer as anthropicLayer,
   toolJsonSchemaCompiler as anthropicToolJsonSchemaCompiler,
 } from "tenetkit/ai/anthropic"
-import { layerOpenAi as deterministicLayerOpenAi } from "tenetkit/ai/deterministic"
 import {
   classifyFailure as classifyOpenAiFailure,
   decodeConfig as decodeOpenAiConfig,
   layer as openAiLayer,
+  layerOrDeterministic as openAiLayerOrDeterministic,
   toolJsonSchemaCompiler as openAiToolJsonSchemaCompiler,
 } from "tenetkit/ai/openai"
+import { layer as openAiEmbeddingLayer } from "tenetkit/ai/openai-embedding"
+import { layer as openAiCompatibleEmbeddingLayer } from "tenetkit/ai/openai-compatible-embedding"
 import {
   decodeConfig as decodeChatCompletionsConfig,
   layer as chatCompletionsLayer,
@@ -34,7 +36,26 @@ import {
   layer as openRouterLayer,
   toolJsonSchemaCompiler as openRouterToolJsonSchemaCompiler,
 } from "tenetkit/ai/openrouter"
-import { Deterministic, Embedding, Presets } from "../../src/ai/index.js"
+import {
+  layerAzureOpenAi,
+  layerDeepseek,
+  layerGoogleAiStudio,
+  layerGroq,
+  layerMistral,
+  layerOllama,
+  layerXai,
+} from "tenetkit/ai/presets"
+import { Deterministic } from "../../src/ai/index.js"
+
+const Presets = {
+  layerAzureOpenAi,
+  layerDeepseek,
+  layerGoogleAiStudio,
+  layerGroq,
+  layerMistral,
+  layerOllama,
+  layerXai,
+}
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const unexpectedTool = Tool.make("unexpected", { parameters: Schema.Unknown, success: Schema.Unknown })
@@ -418,7 +439,7 @@ describe("providers", () => {
       const failure = yield* Effect.flip(
         Effect.scoped(
           Layer.build(
-            Deterministic.layerOpenAi({
+            openAiLayerOrDeterministic({
               model: "gpt-test",
               fallbackModel: "fallback",
               apiKey: Config.redacted("OPENAI_API_KEY"),
@@ -446,7 +467,7 @@ describe("providers", () => {
       const failure = yield* Effect.flip(
         Effect.scoped(
           Layer.build(
-            Deterministic.layerOpenAi({
+            openAiLayerOrDeterministic({
               model: "gpt-test",
               fallbackModel: "fallback",
               apiKey,
@@ -469,7 +490,7 @@ describe("providers", () => {
   )
 
   it.effect("selects deterministic-only registration concurrently when OpenAI configuration is absent", () => {
-    const fallbackLayer = Deterministic.layerOpenAi({
+    const fallbackLayer = openAiLayerOrDeterministic({
       model: "gpt-test",
       fallbackModel: "fallback",
       apiKey: Config.redacted("OPENAI_API_KEY"),
@@ -498,7 +519,7 @@ describe("providers", () => {
       const failure = yield* Effect.flip(
         Effect.scoped(
           Layer.build(
-            Deterministic.layerOpenAi({
+            openAiLayerOrDeterministic({
               model: "gpt-test",
               fallbackModel: "fallback",
               apiKey: Config.finite("OPENAI_API_KEY").pipe(Config.map((value) => Redacted.make(String(value)))),
@@ -588,17 +609,17 @@ describe("providers", () => {
 
   it("builds embedding layers without live calls", () => {
     const baseLayers = tuple(
-      Embedding.layer({ model: "text-embedding-3-small", apiKey }),
-      Embedding.layerCompatible({
+      openAiEmbeddingLayer({ model: "text-embedding-3-small", apiKey }),
+      openAiCompatibleEmbeddingLayer({
         model: "embed-test",
         baseUrl: "http://localhost:11434/v1",
         apiKey,
       }),
     )
     const fetchLayers = tuple(
-      Layer.provide(Embedding.layer({ model: "text-embedding-3-small", apiKey }), FetchHttpClient.layer),
+      Layer.provide(openAiEmbeddingLayer({ model: "text-embedding-3-small", apiKey }), FetchHttpClient.layer),
       Layer.provide(
-        Embedding.layerCompatible({ model: "embed-test", baseUrl: "http://localhost:11434/v1", apiKey }),
+        openAiCompatibleEmbeddingLayer({ model: "embed-test", baseUrl: "http://localhost:11434/v1", apiKey }),
         FetchHttpClient.layer,
       ),
     )
@@ -626,9 +647,9 @@ describe("providers", () => {
       Presets.layerOllama({ model: "model", apiKey }),
     )
     const fetchLayers = tuple(...baseLayers.map((providerLayer) => Layer.provide(providerLayer, FetchHttpClient.layer)))
-    const deterministicLayer = deterministicLayerOpenAi({ model: "gpt-test", fallbackModel: "fallback", apiKey })
+    const deterministicLayer = openAiLayerOrDeterministic({ model: "gpt-test", fallbackModel: "fallback", apiKey })
     const deterministicFetchLayer = Layer.provide(
-      deterministicLayerOpenAi({
+      openAiLayerOrDeterministic({
         model: "gpt-test",
         fallbackModel: "fallback",
         apiKey,
@@ -692,8 +713,8 @@ describe("providers", () => {
       Presets.layerOllama({ model: "model", apiKey }),
     ]
     const embeddingLayers = [
-      Embedding.layer({ model: "text-embedding-3-small", apiKey }),
-      Embedding.layerCompatible({
+      openAiEmbeddingLayer({ model: "text-embedding-3-small", apiKey }),
+      openAiCompatibleEmbeddingLayer({
         model: "embed-test",
         baseUrl: "http://localhost:11434/v1",
         apiKey,
@@ -723,7 +744,7 @@ describe("providers", () => {
       )
       const registered = yield* Effect.scoped(
         Layer.build(
-          deterministicLayerOpenAi({
+          openAiLayerOrDeterministic({
             model: "gpt-test",
             fallbackModel: "fallback",
             apiKey: countedApiKey,
@@ -764,7 +785,7 @@ describe("providers", () => {
     expect(openRouterLayer).toBeInstanceOf(Function)
     expect(responsesLayer).toBeInstanceOf(Function)
     expect(chatCompletionsLayer).toBeInstanceOf(Function)
-    expect(deterministicLayerOpenAi).toBeInstanceOf(Function)
+    expect(openAiLayerOrDeterministic).toBeInstanceOf(Function)
     expect(Presets.layerGroq).toBeInstanceOf(Function)
     expect(Presets.layerMistral).toBeInstanceOf(Function)
     expect(Presets.layerXai).toBeInstanceOf(Function)

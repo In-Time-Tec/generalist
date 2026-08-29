@@ -6,12 +6,11 @@ import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
+import type { RegistrationOptions } from "../model/registration.js"
+import { registration as registerDeterministic } from "./deterministic.js"
 
 /** @experimental */
-export interface RegistrationOptions {
-  readonly registrationKey?: string
-  readonly metadata?: ModelRegistry.Metadata
-}
+export type { RegistrationOptions } from "../model/registration.js"
 
 /** @experimental */
 export interface OpenAiInput extends RegistrationOptions {
@@ -355,3 +354,43 @@ export const layerConfig = (options?: Parameters<typeof OpenAiClient.layerConfig
         ? normalizeResponsesSse(client)
         : client.pipe(normalizeResponsesSse, options.transformClient),
   })
+
+/** @experimental */
+export interface DeterministicFallbackOptions extends LayerOptions {
+  readonly fallbackModel: string
+  readonly fallbackProvider?: string
+}
+
+const fallbackRegistrationOptions = (options: DeterministicFallbackOptions) => {
+  const required = { model: options.model }
+  const configured = options.config === undefined ? required : { ...required, config: options.config }
+  const registered =
+    options.registrationKey === undefined ? configured : { ...configured, registrationKey: options.registrationKey }
+  return options.metadata === undefined ? registered : { ...registered, metadata: options.metadata }
+}
+
+/** @experimental Selects OpenAI when its configured API key is present, otherwise the deterministic model. */
+export const layerOrDeterministic = (options: DeterministicFallbackOptions) =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const deterministic = yield* registerDeterministic({
+        provider: options.fallbackProvider ?? "deterministic",
+        model: options.fallbackModel,
+      })
+      const configuredApiKey = yield* Config.option(options.apiKey)
+      const openAiRegistration = yield* Option.match(configuredApiKey, {
+        onNone: () => Effect.succeedNone,
+        onSome: (apiKey) =>
+          Layer.build(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: Config.succeed(apiKey) })).pipe(
+            Effect.flatMap((context) =>
+              registration(fallbackRegistrationOptions(options)).pipe(Effect.provide(context)),
+            ),
+            Effect.asSome,
+          ),
+      })
+      return ModelRegistry.layer([
+        Effect.succeed(deterministic),
+        ...(Option.isSome(openAiRegistration) ? [Effect.succeed(openAiRegistration.value)] : []),
+      ])
+    }),
+  )

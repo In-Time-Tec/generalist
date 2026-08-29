@@ -1,6 +1,6 @@
 # TenetKit
 
-Effect-native agent framework. Import the core API from `tenetkit` and optional modules from tree-shakeable subpaths such as `tenetkit/runtime`, `tenetkit/ai`, and `tenetkit/mcp`.
+Effect-native agent framework. Import core from `tenetkit`. The `tenetkit/ai` entry contains only provider-neutral `Catalog`, `Deterministic`, and `ModelRoute`; install a selected optional provider peer and import its exact `tenetkit/ai/*` subpath.
 
 ## Durable tool cancellation
 

@@ -7,3 +7,5 @@ Public packages ship compiled ESM, declarations under `dist/`, and the repositor
 The command emits four versioned tarballs, `release-evidence.json`, and `SHA256SUMS`. A `v<version>` tag push for the committed lockstep version publishes those same six assets as a GitHub release and the exact four tarballs to npm. A manual run can reconcile one existing immutable tag and commit. Publication verifies registry integrity and never rebuilds downstream artifacts.
 
 Effect is one exact peer across TenetKit packages. Consumer verification proves one physical Effect installation for the workspace-pinned release candidate.
+
+Every public AI specifier has an exact dependency closure. The neutral `tenetkit/ai`, catalog, deterministic, and model-route entries install and typecheck with zero provider peers; each provider or embedding entry requires only its named optional peer. Packed smoke verifies full declarations for the zero-provider neutral entry and verifies runtime plus consumer types for an OpenRouter-only install.

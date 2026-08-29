@@ -1,13 +1,14 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { Anthropic, OpenRouter } from "tenetkit/ai"
+import { layer as anthropicLayer } from "tenetkit/ai/anthropic"
+import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "router" })
 
 const registryLayer = ModelRegistry.layerCombined([
-  Anthropic.layer({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
-  OpenRouter.layer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
+  anthropicLayer({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
+  openRouterLayer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
 ])
 
 const runWith = (selection: ModelRegistry.ModelSelection) =>

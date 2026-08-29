@@ -1,4 +1,4 @@
-import { OpenRouter } from "tenetkit/ai"
+import { layer as openRouterLayer, type LayerOptions as OpenRouterLayerOptions } from "tenetkit/ai/openrouter"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -98,11 +98,10 @@ const scriptedDeterministicModel: Layer.Layer<LanguageModel.LanguageModel> = Lay
 )
 
 /** @experimental */
-export type LayerOrDeterministicOptions = OpenRouter.LayerOptions
+export type LayerOrDeterministicOptions = OpenRouterLayerOptions
 
 /**
- * @experimental Copies the shape of `Deterministic.layerOpenAi`
- * (`packages/providers/src/deterministic.ts`), swapping OpenAI for
+ * @experimental Copies the shape of OpenAI's `layerOrDeterministic`, swapping OpenAI for
  * OpenRouter: try to build a real OpenRouter model layer from `options`, and
  * fall back to the scripted deterministic model above when the API key
  * config does not resolve. Unlike the packaged helper this returns a closed
@@ -113,7 +112,7 @@ export const layerOrDeterministic = (options: LayerOrDeterministicOptions): Laye
   Layer.unwrap(
     Effect.gen(function* () {
       const openRouterRegistration = yield* Effect.scoped(
-        Layer.build(Layer.provide(OpenRouter.layer(options), FetchHttpClient.layer)).pipe(
+        Layer.build(Layer.provide(openRouterLayer(options), FetchHttpClient.layer)).pipe(
           Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context))),
           Effect.map((registrations) => registrations[0]),
         ),

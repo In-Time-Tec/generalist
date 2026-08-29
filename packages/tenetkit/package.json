@@ -105,6 +105,10 @@
       "types": "./dist/ai/catalog/service.d.ts",
       "import": "./dist/ai/catalog/service.js"
     },
+    "./ai/model-route": {
+      "types": "./dist/ai/model/route.d.ts",
+      "import": "./dist/ai/model/route.js"
+    },
     "./ai/openai": {
       "types": "./dist/ai/provider/openai.d.ts",
       "import": "./dist/ai/provider/openai.js"
@@ -145,9 +149,13 @@
       "types": "./dist/ai/catalog/presets.d.ts",
       "import": "./dist/ai/catalog/presets.js"
     },
-    "./ai/embedding": {
-      "types": "./dist/ai/model/embedding.d.ts",
-      "import": "./dist/ai/model/embedding.js"
+    "./ai/openai-embedding": {
+      "types": "./dist/ai/model/openai-embedding.d.ts",
+      "import": "./dist/ai/model/openai-embedding.js"
+    },
+    "./ai/openai-compatible-embedding": {
+      "types": "./dist/ai/model/openai-compatible-embedding.d.ts",
+      "import": "./dist/ai/model/openai-compatible-embedding.js"
     },
     "./mcp/tools": {
       "types": "./dist/mcp/tools.d.ts",

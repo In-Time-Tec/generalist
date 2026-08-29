@@ -20,7 +20,7 @@ import { VectorStore } from "tenetkit/memory"
 import { OAuth, McpToolSource } from "tenetkit/mcp"
 import { route as mcpRoute, type McpTools, type Options as McpRouteOptions } from "tenetkit/mcp/tools"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
-import { AmazonBedrock, Catalog, OpenAi } from "tenetkit/ai"
+import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
 import { TestModel } from "tenetkit/test"
 import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
@@ -53,7 +53,7 @@ type ModelResilienceFailureResolver = Assert<
   Equal<ModelResilience.FailureResolver, import("tenetkit").ModelResilience.FailureResolver>
 >
 type SessionCanonical = Assert<
-  Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionStore, never, never]>
+  Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionDirectory, never, never]>
 >
 type ToolOutputCanonical = Assert<
   Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.ToolOutputStore, never, never]>
@@ -101,51 +101,14 @@ void SqliteRunStore.layerSqlite
 type ProviderCatalogSubpath = Assert<
   MemberEqual<ProviderRoot["Catalog"], typeof import("tenetkit/ai/catalog"), "layer">
 >
-type ProviderOpenAiSubpath = Assert<
-  MemberEqual<ProviderRoot["OpenAi"], typeof import("tenetkit/ai/openai"), "layer">
->
-type ProviderOpenAiAccountAuthSubpath = Assert<
-  MemberEqual<
-    ProviderRoot["OpenAiAccountAuth"],
-    typeof import("tenetkit/ai/openai-account-auth"),
-    "layer"
-  >
->
-type ProviderOpenAiAccountAuthHttpSubpath = Assert<
-  MemberEqual<
-    ProviderRoot["OpenAiAccountAuthHttp"],
-    typeof import("tenetkit/ai/openai-account-auth-http"),
-    "layer"
-  >
->
-type ProviderAnthropicSubpath = Assert<
-  MemberEqual<ProviderRoot["Anthropic"], typeof import("tenetkit/ai/anthropic"), "layer">
->
-type ProviderAmazonBedrockSubpath = Assert<
-  MemberEqual<ProviderRoot["AmazonBedrock"], typeof import("tenetkit/ai/amazon-bedrock"), "layer">
->
-type ProviderOpenRouterSubpath = Assert<
-  MemberEqual<ProviderRoot["OpenRouter"], typeof import("tenetkit/ai/openrouter"), "layer">
->
-type ProviderOpenAiResponsesSubpath = Assert<
-  MemberEqual<ProviderRoot["OpenAiResponses"], typeof import("tenetkit/ai/openai-responses"), "layer">
->
-type ProviderOpenAiChatCompletionsSubpath = Assert<
-  MemberEqual<
-    ProviderRoot["OpenAiChatCompletions"],
-    typeof import("tenetkit/ai/openai-chat-completions"),
-    "layer"
-  >
->
 type ProviderDeterministicSubpath = Assert<
   MemberEqual<ProviderRoot["Deterministic"], typeof import("tenetkit/ai/deterministic"), "layer">
 >
-type ProviderPresetsSubpath = Assert<
-  MemberEqual<ProviderRoot["Presets"], typeof import("tenetkit/ai/presets"), "layerGroq">
+type ProviderModelRouteSubpath = Assert<
+  MemberEqual<ProviderRoot["ModelRoute"], typeof import("tenetkit/ai/model-route"), "make">
 >
-type ProviderEmbeddingSubpath = Assert<
-  MemberEqual<ProviderRoot["Embedding"], typeof import("tenetkit/ai/embedding"), "layer">
->
+void Deterministic
+void ModelRoute
 type TransportClientSubpath = Assert<
   MemberEqual<TransportRoot["Client"], typeof import("tenetkit/transport/client"), "layerWebSocket">
 >

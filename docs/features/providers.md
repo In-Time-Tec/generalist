@@ -4,7 +4,7 @@ Core selects models through provider-agnostic `ModelRegistry` registrations. Reg
 
 The registry builds each selected model layer once in its own scope and reuses it for the registry lifetime. `operate` retains an optional semaphore permit for the whole Effect. `stream` retains its permit through stream consumption, including failure, interruption, and early downstream termination. Per-run model layers bypass registry selection.
 
-`tenetkit/ai` adapts upstream Effect AI providers, embeddings, deterministic models, and optional static model metadata. Core never imports provider SDKs.
+`tenetkit/ai` exports only provider-neutral `Catalog`, `Deterministic`, and `ModelRoute`. Provider adapters and embeddings are available only from exact subpaths, whose runtime and declaration closures require only `effect` and that subpath's documented optional peer. OpenAI owns `layerOrDeterministic`; the provider-free deterministic entry never imports OpenAI. OpenAI and OpenAI-compatible embeddings live at `tenetkit/ai/openai-embedding` and `tenetkit/ai/openai-compatible-embedding`. Amazon Bedrock is Node-only because its exact entry owns the AWS default credential chain. Core never imports provider SDKs.
 
 OpenRouter persisted request configuration is decoded against the pinned adapter's generated chat-request schema, excluding model and transport-owned message, response-format, tool, and streaming fields. Routing, provider preferences, plugins, and trace settings therefore retain their public typed shapes and reject excess or cross-provider fields. Each registration selects the same Anthropic, OpenAI, or default structured-output schema codec as the upstream adapter from its own model id.
 

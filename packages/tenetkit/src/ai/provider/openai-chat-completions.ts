@@ -5,7 +5,7 @@ import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
-import type { RegistrationOptions } from "./openai.js"
+import type { RegistrationOptions } from "../model/registration.js"
 
 /** @experimental */
 export interface OpenAiChatCompletionsInput extends RegistrationOptions {

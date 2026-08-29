@@ -1,7 +1,7 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "tenetkit"
 import { route } from "tenetkit/mcp/tools"
-import { OpenRouter } from "tenetkit/ai"
+import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {
@@ -19,7 +19,7 @@ const program = Effect.gen(function* () {
     Effect.flatMap(
       Layer.build(
         Layer.mergeAll(
-          OpenRouter.layer({
+          openRouterLayer({
             model: "openai/gpt-4o-mini",
             apiKey: Config.redacted("OPENROUTER_API_KEY"),
           }),

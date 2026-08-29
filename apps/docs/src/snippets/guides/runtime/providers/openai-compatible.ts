@@ -1,9 +1,10 @@
 import { Config, Layer } from "effect"
 import { ModelRegistry } from "tenetkit"
-import { OpenAiChatCompletions, OpenAiResponses } from "tenetkit/ai"
+import { layer as chatCompletionsLayer } from "tenetkit/ai/openai-chat-completions"
+import { layer as responsesLayer } from "tenetkit/ai/openai-responses"
 import { HttpClient } from "effect/unstable/http"
 
-const responses = OpenAiResponses.layer({
+const responses = responsesLayer({
   provider: "my-responses-endpoint",
   model: "reasoning-model",
   baseUrl: "https://models.example.com/v1",
@@ -11,7 +12,7 @@ const responses = OpenAiResponses.layer({
   config: { max_output_tokens: 8_192 },
 })
 
-const chatCompletions = OpenAiChatCompletions.layer({
+const chatCompletions = chatCompletionsLayer({
   provider: "my-chat-endpoint",
   model: "chat-model",
   baseUrl: "https://chat.example.com/v1",

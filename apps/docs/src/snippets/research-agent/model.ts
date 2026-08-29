@@ -1,4 +1,4 @@
-import { OpenRouter } from "tenetkit/ai"
+import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
 import { Config, Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -77,7 +77,7 @@ export const modelLayer: Layer.Layer<LanguageModel.LanguageModel> = Layer.unwrap
     const registration = yield* Effect.scoped(
       Layer.build(
         Layer.provide(
-          OpenRouter.layer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
+          openRouterLayer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
           FetchHttpClient.layer,
         ),
       ).pipe(

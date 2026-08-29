@@ -66,9 +66,10 @@ export const providersReference = definePage({
         [[code("./openrouter")], [code("layer"), ", ", code("layerConfig")]],
         [[code("./openai-responses")], [code("layer"), ", ", code("layerConfig"), ", ", code("decodeConfig")]],
         [[code("./openai-chat-completions")], [code("layer"), ", ", code("layerConfig"), ", ", code("decodeConfig")]],
-        [[code("./deterministic")], [code("layer"), ", ", code("layerOpenAi")]],
+        [[code("./deterministic")], [code("layer")]],
         [[code("./presets")], "The seven OpenAI-compatible presets"],
-        [[code("./embedding")], ["OpenAI and compatible embedding layers"]],
+        [[code("./openai-embedding")], ["OpenAI embedding layer"]],
+        [[code("./openai-compatible-embedding")], ["OpenAI-compatible embedding layer"]],
         [[code("./catalog")], [code("ModelCatalog"), " service, ", code("bundled"), " metadata, layers"]],
       ],
     ),
@@ -165,7 +166,7 @@ export const providersReference = definePage({
           ],
         ],
         [
-          [code("layerOpenAi(options)")],
+          [code("layerOrDeterministic(options)")],
           [
             "Registry layer with the deterministic fallback (",
             code("fallbackModel"),

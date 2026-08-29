@@ -6,7 +6,7 @@ import { HttpClient } from "effect/unstable/http"
 import { AiError, AnthropicStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
-import type { RegistrationOptions } from "./openai.js"
+import type { RegistrationOptions } from "../model/registration.js"
 
 /** @experimental */
 export interface AnthropicInput extends RegistrationOptions {

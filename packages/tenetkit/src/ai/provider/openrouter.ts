@@ -6,7 +6,7 @@ import { AiError, AnthropicStructuredOutput, LanguageModel, OpenAiStructuredOutp
 import { HttpClient } from "effect/unstable/http"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
-import type { RegistrationOptions } from "./openai.js"
+import type { RegistrationOptions } from "../model/registration.js"
 
 const {
   debug: _debug,

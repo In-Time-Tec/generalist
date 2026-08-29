@@ -35,9 +35,8 @@ Use `tenetkit` directly for process-local agents and chat streaming. Add `tenetk
 
 ```bash
 bun add effect tenetkit
-bun add tenetkit/ai tenetkit/mcp tenetkit/skills tenetkit/memory tenetkit/harness tenetkit/repl
-bun add tenetkit/runtime tenetkit/transport tenetkit/foldkit tenetkit/test
-bun add tenetkit/a2a tenetkit/ag-ui
+# Add only the peer for the provider you select, for example:
+bun add @effect/ai-openrouter
 ```
 
 GitHub releases and npm contain the same versioned package tarballs with compiled ESM and declarations for Node 22+ and Bun 1.3+.

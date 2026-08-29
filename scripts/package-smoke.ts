@@ -449,7 +449,8 @@ const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import(
 const { VectorStore } = await import("tenetkit/memory")
 const { HarnessState, HarnessStore } = await import("tenetkit/harness")
 const { McpToolSource } = await import("tenetkit/mcp")
-const { Catalog, OpenAi } = await import("tenetkit/ai")
+const { Catalog } = await import("tenetkit/ai")
+const OpenAi = await import("tenetkit/ai/openai")
 const skills = await import("tenetkit/skills")
 const { TestModel } = await import("tenetkit/test")
 const { Runtime, RunEvent } = await import("tenetkit/runtime")
@@ -527,6 +528,8 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
         effect: effectVersion,
         esbuild: rootManifest.workspaces.catalog.esbuild,
         tenetkit: tarballs.tenetkit,
+        typescript: rootManifest.workspaces.catalog.typescript,
+        "@types/node": rootManifest.workspaces.catalog["@types/node"],
       },
     }),
   )
@@ -534,9 +537,34 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
     path.join(coreConsumerDirectory, "runtime.mjs"),
     `import { Agent, Session } from "tenetkit"
 import { Runtime } from "tenetkit/runtime"
+import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
 if (Agent === undefined || Session === undefined) throw new Error("core export is missing")
 if (Runtime.layerMemory === undefined) throw new Error("generic Runtime export is missing")
+if (Catalog === undefined || Deterministic === undefined || ModelRoute === undefined) throw new Error("neutral AI export is missing")
 `,
+  )
+  yield* fileSystem.writeFileString(
+    path.join(coreConsumerDirectory, "typecheck.ts"),
+    `import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
+import { make } from "tenetkit/ai/model-route"
+void [Catalog, Deterministic, ModelRoute, make]
+`,
+  )
+  yield* fileSystem.writeFileString(
+    path.join(coreConsumerDirectory, "tsconfig.json"),
+    encodeJson({
+      compilerOptions: {
+        strict: true,
+        skipLibCheck: false,
+        lib: ["ESNext", "DOM", "DOM.Iterable"],
+        types: ["node"],
+        noEmit: true,
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        target: "ES2024",
+      },
+      include: ["typecheck.ts"],
+    }),
   )
   yield* fileSystem.writeFileString(
     path.join(coreConsumerDirectory, "root-bundle.ts"),
@@ -584,6 +612,66 @@ console.log(Runtime.layerMemory)
     )
   }
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], coreConsumerDirectory)
+  yield* run("bun", ["tsc", "--noEmit"], coreConsumerDirectory)
+
+  const openRouterConsumerDirectory = path.join(directory, "openrouter-consumer")
+  yield* fileSystem.makeDirectory(openRouterConsumerDirectory)
+  yield* fileSystem.writeFileString(
+    path.join(openRouterConsumerDirectory, "package.json"),
+    encodeJson({
+      name: "tenetkit-openrouter-consumer",
+      private: true,
+      type: "module",
+      dependencies: {
+        "@effect/ai-openrouter": rootManifest.workspaces.catalog["@effect/ai-openrouter"],
+        "@types/node": rootManifest.workspaces.catalog["@types/node"],
+        effect: effectVersion,
+        tenetkit: tarballs.tenetkit,
+        typescript: rootManifest.workspaces.catalog.typescript,
+      },
+    }),
+  )
+  yield* fileSystem.writeFileString(
+    path.join(openRouterConsumerDirectory, "proof.ts"),
+    `import { layer, type LayerOptions } from "tenetkit/ai/openrouter"
+const options = null as unknown as LayerOptions
+void [layer, options]
+`,
+  )
+  yield* fileSystem.writeFileString(
+    path.join(openRouterConsumerDirectory, "tsconfig.json"),
+    encodeJson({
+      compilerOptions: {
+        strict: true,
+        skipLibCheck: true,
+        lib: ["ESNext", "DOM", "DOM.Iterable"],
+        types: ["node"],
+        noEmit: true,
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        target: "ES2024",
+      },
+      include: ["proof.ts"],
+    }),
+  )
+  yield* run("bun", ["install", "--linker=isolated"], openRouterConsumerDirectory, {
+    BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache"),
+  })
+  yield* run("bun", ["tsc", "--noEmit"], openRouterConsumerDirectory)
+  yield* run(
+    "env",
+    [
+      "-u",
+      "NODE_PATH",
+      "-u",
+      "NODE_OPTIONS",
+      "node",
+      "--input-type=module",
+      "-e",
+      'await import("tenetkit/ai/openrouter")',
+    ],
+    openRouterConsumerDirectory,
+  )
 
   const npmConsumerDirectory = path.join(directory, "npm-consumer")
   yield* fileSystem.makeDirectory(npmConsumerDirectory)

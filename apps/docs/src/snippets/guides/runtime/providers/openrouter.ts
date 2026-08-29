@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { OpenRouter } from "tenetkit/ai"
+import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({
@@ -8,7 +8,7 @@ const agent = Agent.make({
   instructions: "Answer in one sentence.",
 })
 
-const registryLayer = OpenRouter.layer({
+const registryLayer = openRouterLayer({
   model: "openai/gpt-4o-mini",
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })

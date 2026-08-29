@@ -1,7 +1,6 @@
 import { Cause, Context, Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { ModelMiddleware } from "../../core/index.js"
-import { invokeGenerateObject, invokeGenerateText, invokeStreamText } from "../../core/model/service.js"
+import { adapt, invokeGenerateObject, invokeGenerateText, invokeStreamText } from "../../core/model/service.js"
 import { ModelRegistry } from "../../core/model/public/registry.js"
 
 /** @experimental */
@@ -91,7 +90,7 @@ const routeModel = (
         }),
       )
     })
-  return ModelMiddleware.adapt(candidates[0]!.model, {
+  return adapt(candidates[0]!.model, {
     generateText: (options) => effect((model) => invokeGenerateText(model, options)),
     generateObject: (options) => effect((model) => invokeGenerateObject(model, options)),
     streamText: (options) => stream((model) => invokeStreamText(model, options)),

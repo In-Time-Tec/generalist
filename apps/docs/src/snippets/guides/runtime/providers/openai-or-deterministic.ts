@@ -1,11 +1,11 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { Deterministic } from "tenetkit/ai"
+import { layerOrDeterministic } from "tenetkit/ai/openai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "release-notes" })
 
-const modelLayer = Deterministic.layerOpenAi({
+const modelLayer = layerOrDeterministic({
   model: "gpt-4o-mini",
   fallbackModel: "gpt-4o-mini",
   apiKey: Config.redacted("OPENAI_API_KEY"),
