@@ -1,16 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Persistence } from "effect/unstable/persistence"
-import {
-  Agent,
-  AgentManifest,
-  Approvals,
-  Chat,
-  LanguageModel,
-  ModelMiddleware,
-  Pins,
-  Response,
-  ToolExecutor,
-} from "tenetkit"
+import { Agent, AgentManifest, Approvals, LanguageModel, ModelMiddleware, Pins, Response, ToolExecutor } from "tenetkit"
 import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
@@ -50,16 +39,11 @@ const modelLayer = Layer.effect(
   }),
 )
 
-const persistenceLayer = Chat.layerPersisted({ storeId: "serve-transport-demo" }).pipe(
-  Layer.provide(Persistence.layerBackingMemory),
-)
-
 const agentServices = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
-  persistenceLayer,
 )
 
 const runtimeLayer = Runtime.layerMemory({

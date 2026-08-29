@@ -179,8 +179,13 @@ const observeCallPart = (context: CallContext, part: Response.AnyPart): void => 
 }
 
 const callCompleted = (context: CallContext): Effect.Effect<void> =>
-  Effect.flatMap(context.options.clock.currentTimeMillis, (completedAt) =>
-    context.options.emit(
+  Effect.gen(function* () {
+    context.options.onCallCompleted?.({
+      modelCallId: context.modelCallId,
+      failedAttemptUsage: context.state.failedAttemptUsage,
+    })
+    const completedAt = yield* context.options.clock.currentTimeMillis
+    yield* context.options.emit(
       Object.assign(
         {
           _tag: "ModelCallCompleted",
@@ -196,8 +201,8 @@ const callCompleted = (context: CallContext): Effect.Effect<void> =>
           : { failedAttemptUsage: context.state.failedAttemptUsage },
         context.state.finishReason === undefined ? undefined : { finishReason: context.state.finishReason },
       ),
-    ),
-  )
+    )
+  })
 
 const callFailed = (
   context: CallContext,

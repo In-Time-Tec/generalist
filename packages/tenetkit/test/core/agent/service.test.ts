@@ -15,8 +15,7 @@ import {
   Stream,
   Tracer,
 } from "effect"
-import { AiError, Chat, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
-import { Persistence } from "effect/unstable/persistence"
+import { AiError, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
@@ -64,6 +63,12 @@ void (() => {
   Agent.make("x")
   // @ts-expect-error Agent.make requires a name.
   Agent.make({})
+  const invalidRunOptions: Agent.RunOptions = {
+    prompt: "hello",
+    // @ts-expect-error Session is the sole durable conversation authority; RunOptions.persistence does not exist.
+    persistence: { chatId: "chat" },
+  }
+  void invalidRunOptions
 })
 
 const plainRequiredAgent = Agent.make({ name: "plain-required" })
@@ -84,24 +89,6 @@ const runMemoryRequired = Agent.generate(plainRequiredAgent, {
   prompt: "hello",
   memory: { key: { agent: "plain-required", subject: "memory-subject" } },
 })
-const persistedRequired = Agent.stream(plainRequiredAgent, {
-  prompt: "hello",
-  persistence: { chatId: "chat" },
-})
-const generatedPersistedRequired = Agent.generate(plainRequiredAgent, {
-  prompt: "hello",
-  persistence: { chatId: "chat" },
-})
-const persistedObjectRequired = Agent.stream(plainRequiredAgent, {
-  prompt: "hello",
-  persistence: { chatId: "chat" },
-  output: { schema: Schema.Struct({ value: Schema.String }) },
-})
-const generatedPersistedObjectRequired = Agent.generate(plainRequiredAgent, {
-  prompt: "hello",
-  persistence: { chatId: "chat" },
-  output: { schema: Schema.Struct({ value: Schema.String }) },
-})
 
 const structuredOutputSchema = Schema.Struct({ value: Schema.String })
 const plainStreamRequired = Agent.stream(plainRequiredAgent, { prompt: "hello" })
@@ -114,10 +101,6 @@ const decodingGenerated = Agent.generate(plainRequiredAgent, {
   prompt: "hello",
   output: { schema: structuredOutputSchema },
 })
-const optionalPersistenceOptions: Pick<Agent.RunOptions, "prompt" | "persistence"> = {
-  prompt: "hello",
-  persistence: { chatId: "chat" },
-}
 interface OptionalOutputOptions {
   readonly prompt: string
   readonly output?: { readonly schema: typeof structuredOutputSchema }
@@ -126,16 +109,12 @@ const optionalOutputOptions: OptionalOutputOptions = {
   prompt: "hello",
   output: { schema: structuredOutputSchema },
 }
-const optionalPersistenceRequired = Agent.stream(plainRequiredAgent, optionalPersistenceOptions)
 const optionalOutputRequired = Agent.stream(plainRequiredAgent, optionalOutputOptions)
 const optionalOutputGenerated = Agent.generate(plainRequiredAgent, optionalOutputOptions)
 type TextOrOutputOptions =
   | { readonly prompt: string }
   | { readonly prompt: string; readonly output: { readonly schema: typeof structuredOutputSchema } }
 const generateTextOrOutput = (options: TextOrOutputOptions) => Agent.generate(plainRequiredAgent, options)
-const curriedPersistenceRequired = Agent.stream({ prompt: "hello", persistence: { chatId: "chat" } })(
-  plainRequiredAgent,
-)
 const curriedOutputRequired = Agent.generate({ prompt: "hello", output: { schema: structuredOutputSchema } })(
   plainRequiredAgent,
 )
@@ -184,37 +163,10 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<Equal<StreamRequirements<typeof plainStreamRequired>, LanguageModel.LanguageModel>>,
   true satisfies Assert<Equal<EffectRequirements<typeof plainGenerateRequired>, LanguageModel.LanguageModel>>,
   true satisfies Assert<Equal<EffectSuccess<typeof plainGenerateRequired>, Agent.Result>>,
-  true satisfies Assert<
-    Equal<StreamRequirements<typeof persistedRequired>, LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime>
-  >,
-  true satisfies Assert<
-    Equal<
-      EffectRequirements<typeof generatedPersistedRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
-    >
-  >,
-  true satisfies Assert<
-    Equal<
-      StreamRequirements<typeof persistedObjectRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
-    >
-  >,
-  true satisfies Assert<
-    Equal<
-      EffectRequirements<typeof generatedPersistedObjectRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
-    >
-  >,
   true satisfies Assert<Equal<StreamRequirements<typeof runBoundaryModelProvided>, Memory.Memory | ModelDependency>>,
   true satisfies Assert<Equal<StreamRequirements<typeof decodingRequired>, LanguageModel.LanguageModel>>,
   true satisfies Assert<Equal<EffectRequirements<typeof decodingGenerated>, LanguageModel.LanguageModel>>,
   true satisfies Assert<Equal<EffectSuccess<typeof decodingGenerated>, Agent.ObjectResult<{ readonly value: string }>>>,
-  true satisfies Assert<
-    Equal<
-      StreamRequirements<typeof optionalPersistenceRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
-    >
-  >,
   true satisfies Assert<Equal<StreamRequirements<typeof optionalOutputRequired>, LanguageModel.LanguageModel>>,
   true satisfies Assert<Equal<EffectRequirements<typeof optionalOutputGenerated>, LanguageModel.LanguageModel>>,
   true satisfies Assert<
@@ -224,12 +176,6 @@ const agentRequirementProofs: ReadonlyArray<true> = [
     Equal<
       EffectSuccess<ReturnType<typeof generateTextOrOutput>>,
       Agent.Result | Agent.ObjectResult<{ readonly value: string }>
-    >
-  >,
-  true satisfies Assert<
-    Equal<
-      StreamRequirements<typeof curriedPersistenceRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
     >
   >,
   true satisfies Assert<Equal<EffectRequirements<typeof curriedOutputRequired>, LanguageModel.LanguageModel>>,
@@ -261,25 +207,6 @@ const agentRequirementProofs: ReadonlyArray<true> = [
         Agent.Agent<Record<"tool", Tool.Any>, LanguageModel.LanguageModel>
       >,
       false
-    >
-  >,
-  true satisfies Assert<
-    Equal<
-      IsAssignable<{ readonly prompt: "hello"; readonly persistence: { readonly chatId: "chat" } }, Agent.RunOptions>,
-      true
-    >
-  >,
-  true satisfies Assert<
-    Equal<
-      IsAssignable<
-        {
-          readonly prompt: "hello"
-          readonly history: "history"
-          readonly persistence: { readonly chatId: "chat" }
-        },
-        Agent.RunOptions
-      >,
-      true
     >
   >,
 ]
@@ -511,7 +438,7 @@ const retryTransientModelError = ModelResilience.layer({
   classify: (error) => (error === transientModelError ? "transient" : "terminal"),
 })
 
-layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) => {
+layer(unusedToolHandlerLayer)("Agent", (it) => {
   expect(agentRequirementProofs.every(Boolean)).toBe(true)
   expect(toolkitRequirementProof).toBe(true)
 
@@ -953,62 +880,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       }),
     ] as const
   })
-
-  ItLayer.make(it, "rejects history combined with persistence before model calls", () => {
-    let modelCalls = 0
-    return [
-      Layer.mergeAll(
-        modelLayer(() => {
-          modelCalls += 1
-          return Stream.make(textDelta("unexpected"))
-        }),
-        unusedExecutor,
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
-      ),
-      Effect.gen(function* () {
-        const run = Agent.stream(Agent.make({ name: "history-persistence-agent" }), {
-          prompt: "hello",
-          history: "prior history",
-          persistence: { chatId: "chat" },
-        })
-        const failure = yield* Stream.runDrain(run).pipe(
-          Effect.provide(Context.makeUnsafe<Chat.Persistence>(new Map())),
-          Effect.flip,
-        )
-
-        expect(failure._tag).toBe("tenetkit/core/AgentError")
-        expect(failure._tag === "tenetkit/core/AgentError" && failure.message).toBe(
-          "RunOptions.history and RunOptions.persistence are mutually exclusive",
-        )
-        expect(modelCalls).toBe(0)
-      }),
-    ] as const
-  })
-
-  ItLayer.make(it, "fails typed when persistence is set without Chat.Persistence", () => [
-    Layer.mergeAll(
-      modelLayer(() => Stream.make(textDelta("unexpected"))),
-      unusedExecutor,
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-    Effect.gen(function* () {
-      const run = Agent.stream(Agent.make({ name: "missing-persistence-agent" }), {
-        prompt: "hello",
-        persistence: { chatId: "chat" },
-      })
-      const failure = yield* Stream.runDrain(run).pipe(
-        Effect.provide(Context.makeUnsafe<Chat.Persistence>(new Map())),
-        Effect.flip,
-      )
-
-      expect(failure._tag).toBe("tenetkit/core/AgentError")
-      expect(failure._tag === "tenetkit/core/AgentError" && failure.message).toBe(
-        "RunOptions.persistence requires Chat.Persistence in context",
-      )
-    }),
-  ])
 
   ItLayer.make(
     it,
@@ -5671,89 +5542,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "fails typed before turn observers when the result checkpoint cannot persist", () => {
-    let saves = 0
-    let remembered = false
-    let policyEvaluated = false
-    const persistence = Layer.effect(
-      Chat.Persistence,
-      Chat.empty.pipe(
-        Effect.map((chat) => {
-          const persisted: Chat.Persisted = {
-            ...chat,
-            id: "checkpoint-save-failure",
-            save: Effect.suspend(() => {
-              saves += 1
-              return saves === 2
-                ? Effect.fail(
-                    AiError.make({
-                      module: "AgentCheckpointTest",
-                      method: "save",
-                      reason: AiError.UnknownError.make({ description: "checkpoint save failed" }),
-                    }),
-                  )
-                : Effect.void
-            }),
-          }
-          return Chat.Persistence.of({
-            get: () => Effect.succeed(persisted),
-            getOrCreate: () => Effect.succeed(persisted),
-          })
-        }),
-      ),
-    )
-
-    return [
-      Layer.mergeAll(
-        modelLayer(() => Stream.make(toolCallPart("checkpoint-save", "echo", { text: "persist" }))),
-        echoExecutor,
-        Memory.layerTest({
-          recall: () => Effect.succeed([]),
-          remember: () =>
-            Effect.sync(() => {
-              remembered = true
-            }),
-          forget: () => Effect.void,
-        }),
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
-        persistence,
-      ),
-      Effect.gen(function* () {
-        const events: Array<AgentEvent.Event> = []
-        const agent = Agent.make({
-          name: "checkpoint-save-failure-agent",
-          toolkit: Toolkit.make(echoTool),
-          policy: TurnPolicy.make(() =>
-            Effect.sync(() => {
-              policyEvaluated = true
-              return TurnPolicy.decision.continue()
-            }),
-          ),
-        })
-
-        const failure = yield* Agent.stream(agent, {
-          prompt: "persist the result checkpoint",
-          persistence: { chatId: "checkpoint-save-failure" },
-          memory: { key: { agent: "checkpoint-save-failure-agent", subject: "issue-67" } },
-        }).pipe(
-          Stream.runForEach((event) =>
-            Effect.sync(() => {
-              events.push(event)
-            }),
-          ),
-          Effect.flip,
-        )
-
-        expect(failure).toMatchObject({ _tag: "tenetkit/core/AgentError", turn: 0 })
-        expect(saves).toBe(2)
-        expect(remembered).toBe(false)
-        expect(policyEvaluated).toBe(false)
-        expect(events.some((event) => event._tag === "TurnCompleted")).toBe(false)
-      }),
-    ] as const
-  })
-
   ItLayer.make(it, "accumulates usage across tool-calling turns", () => {
     let calls = 0
     const firstUsage = usage({ total: 10, uncached: 8 }, { total: 2 })
@@ -8200,7 +7988,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         echoExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Chat.layerPersisted({ storeId: "journal-restart" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
+        Session.layerMemory,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "journal-restart-agent", toolkit: Toolkit.make(echoTool) })
@@ -8222,7 +8010,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           modelCallOrdinalStart: 40,
-          persistence: { chatId: "journal-restart" },
+          sessionId: "journal-restart",
         }).pipe(
           Stream.runDrain,
           Effect.provideService(DurableDriver.DriverJournalService, crashingJournal),
@@ -8243,7 +8031,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             Effect.sync(() => {
               scheduled.push(operation.key)
             }).pipe(Effect.as(undefined)),
-          onCompleted: () => Effect.void,
+          onCompleted: (_operation, _outcome, checkpoint) =>
+            Effect.sync(() => {
+              safeCheckpoint = checkpoint
+            }),
           onCheckpoint: (checkpoint) =>
             Effect.sync(() => {
               safeCheckpoint = checkpoint
@@ -8254,7 +8045,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           driverCheckpoint: pending!,
-          persistence: { chatId: "journal-restart" },
+          sessionId: "journal-restart",
         }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
         expect(scheduled.find((key) => key.includes(":model:"))).toBe(pendingKey)
         const turnStarted = events.find((event) => event._tag === "TurnStarted")
@@ -8289,7 +8080,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           driverCheckpoint: safeCheckpoint!,
-          persistence: { chatId: "journal-restart" },
+          sessionId: "journal-restart",
           turnStart: 13,
         }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, overrideJournal))
         expect(overrideScheduled.every(({ turn }) => turn >= 12)).toBe(true)

@@ -69,8 +69,6 @@ export const seamsAsServices = definePage({
       ", ",
       code("ModelMiddleware"),
       ", ",
-      code("Ai.Chat.Persistence"),
-      ", and ",
       code("Ai.Tokenizer.Tokenizer"),
       ".",
     ),

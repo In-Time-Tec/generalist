@@ -1,10 +1,8 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
   AgentManifest,
   Approvals,
-  Chat,
   LanguageModel,
   ModelMiddleware,
   Pins,
@@ -91,7 +89,6 @@ const agentServices = Layer.mergeAll(
     resolve: (pending) => Effect.succeed({ ...pending, token: "deploy-token-1" }),
   }),
   ModelMiddleware.layerIdentity,
-  Chat.layerPersisted({ storeId: "approval-demo" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )
 
 const runtimeLayer = Runtime.layerMemory({

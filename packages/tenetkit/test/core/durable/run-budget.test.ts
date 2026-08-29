@@ -1,8 +1,7 @@
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
-import { DateTime, Deferred, Effect, Layer, Option, Schema, Stream } from "effect"
+import { DateTime, Deferred, Effect, Layer, Option, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Persistence } from "effect/unstable/persistence"
+import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import type { DriverCheckpoint } from "../../../src/core/durable/driver/contract.js"
 import {
   Agent,
@@ -12,6 +11,7 @@ import {
   Compaction,
   DurableDriver,
   ModelMiddleware,
+  ModelResilience,
   RunBudget,
   Session,
   ToolExecutor,
@@ -42,6 +42,8 @@ const finishWithUsage = (input: number, output: number) =>
 
 const journalCapture = () => {
   const scheduled = new Array<{ readonly kind: string; readonly key: string }>()
+  const completedCheckpoints = new Array<DriverCheckpoint>()
+  const checkpointWrites = new Array<DriverCheckpoint>()
   let lastCheckpoint: DriverCheckpoint | undefined
   const journal: DurableDriver.DriverJournal = {
     onScheduled: (operation) =>
@@ -50,15 +52,19 @@ const journalCapture = () => {
       }).pipe(Effect.as(undefined)),
     onCompleted: (_operation, _outcome, checkpoint) =>
       Effect.sync(() => {
+        completedCheckpoints.push(checkpoint)
         lastCheckpoint = checkpoint
       }),
     onCheckpoint: (checkpoint) =>
       Effect.sync(() => {
+        checkpointWrites.push(checkpoint)
         lastCheckpoint = checkpoint
       }),
   }
   return {
     scheduled,
+    completedCheckpoints,
+    checkpointWrites,
     get lastCheckpoint() {
       return lastCheckpoint
     },
@@ -205,6 +211,120 @@ describe("RunBudget Agent.stream integration", () => {
         Effect.gen(function* () {
           yield* Agent.stream(agent, { prompt: "tokens" }).pipe(Stream.runDrain)
           expect(capture.lastCheckpoint?.budget.remaining.totalTokens).toBe(5)
+          expect(capture.completedCheckpoints.at(-1)?.budget.remaining.totalTokens).toBe(5)
+          expect(capture.checkpointWrites).toEqual([])
+        }),
+      )
+    })
+  }
+
+  {
+    const capture = journalCapture()
+    const malformed = AiError.make({
+      module: "RunBudgetTestLanguageModel",
+      method: "streamText",
+      reason: AiError.InvalidOutputError.make({
+        description: "retry with reported usage",
+        usage: { promptTokens: 7, completionTokens: 3, totalTokens: 10 },
+      }),
+    })
+    let calls = 0
+    const agent = Agent.make({
+      name: "retry-token-charge-agent",
+      toolkit: Toolkit.empty,
+      budget: { modelCalls: 1, totalTokens: 100 },
+    })
+    layer(
+      Layer.mergeAll(
+        Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () => {
+              calls += 1
+              return calls === 1
+                ? Stream.fail(malformed)
+                : withProviderFinish(
+                    Stream.make(
+                      Response.makePart("text-delta", { id: "text", delta: "recovered" }),
+                      finishWithUsage(11, 5),
+                    ),
+                  )
+            },
+          }),
+        ),
+        ModelResilience.layer({ retrySchedule: Schedule.recurs(1), classify: () => "transient" }).pipe(Layer.orDie),
+        capture.journalLayer,
+        unusedToolHandlerLayer,
+      ),
+    )("charges reported failed-attempt and terminal usage in one model commit", (it) => {
+      it.effect("charges every reported attempt exactly once", () =>
+        Effect.gen(function* () {
+          yield* Agent.stream(agent, { prompt: "retry tokens" }).pipe(Stream.runDrain)
+          expect(calls).toBe(2)
+          expect(capture.completedCheckpoints.at(-1)?.budget.remaining.totalTokens).toBe(74)
+          expect(capture.checkpointWrites).toEqual([])
+        }),
+      )
+    })
+  }
+
+  {
+    const capture = journalCapture()
+    let toolExecutions = 0
+    const agent = Agent.make({
+      name: "token-overrun-agent",
+      toolkit: Toolkit.make(echoTool),
+      budget: { modelCalls: 1, toolCalls: 1, totalTokens: 5 },
+    })
+    layer(
+      Layer.mergeAll(
+        Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () =>
+              withProviderFinish(
+                Stream.make(
+                  Response.makePart("tool-call", {
+                    id: "over-budget-tool",
+                    name: "echo",
+                    params: { text: "must not execute" },
+                    providerExecuted: false,
+                  }),
+                  finishWithUsage(6, 4),
+                ),
+              ),
+          }),
+        ),
+        ToolExecutor.layerTest({
+          execute: () =>
+            Effect.sync(() => {
+              toolExecutions += 1
+              return { _tag: "Success" as const, result: "unexpected", encodedResult: "unexpected" }
+            }),
+        }),
+        Approvals.layerAutoApprove,
+        capture.journalLayer,
+        unusedToolHandlerLayer,
+      ),
+    )("commits a paid response before stopping typed on token overrun", (it) => {
+      it.effect("stops before tool execution", () =>
+        Effect.gen(function* () {
+          const observed = new Array<AgentEvent.Event>()
+          const failure = yield* Agent.stream(agent, {
+            prompt: "overrun",
+            sessionId: "token-overrun-session",
+          }).pipe(
+            Stream.runForEach((event) => Effect.sync(() => void observed.push(event))),
+            Effect.flip,
+          )
+          expect(failure._tag).toBe("tenetkit/core/RunBudgetExhausted")
+          expect(toolExecutions).toBe(0)
+          expect(observed.some((event) => event._tag === "ModelResponseCommitted")).toBe(true)
+          expect(capture.completedCheckpoints.at(-1)?.budget.remaining.totalTokens).toBe(0)
+          expect(capture.completedCheckpoints.at(-1)?.state).toHaveProperty("postCommitFailure")
+          expect(capture.checkpointWrites).toEqual([])
         }),
       )
     })
@@ -394,9 +514,6 @@ describe("RunBudget Agent.stream integration", () => {
 
   {
     const capture = journalCapture()
-    const persistenceLayer = Chat.layerPersisted({ storeId: "budget-session-test" }).pipe(
-      Layer.provide(Persistence.layerBackingMemory),
-    )
     const agent = Agent.make({
       name: "session-budget-agent",
       toolkit: Toolkit.make(echoTool),
@@ -411,9 +528,7 @@ describe("RunBudget Agent.stream integration", () => {
         Session.layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         ModelMiddleware.layerIdentity,
-        persistenceLayer,
         capture.journalLayer,
-        Agent.layerRuntime,
         unusedToolHandlerLayer,
       ),
     )("records session sync operation keys", (it) => {
@@ -423,7 +538,6 @@ describe("RunBudget Agent.stream integration", () => {
             prompt: "sync",
             logicalOperationId: "logical-sync",
             sessionId: "session-sync",
-            persistence: { chatId: "chat-sync" },
           }).pipe(Stream.runDrain)
           expect(
             capture.scheduled.some((operation) => operation.kind === "memory" && operation.key.includes("sync")),

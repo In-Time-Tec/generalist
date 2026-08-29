@@ -2,7 +2,7 @@ import { Equal, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 
-/** @experimental First structurally divergent position between the durable projection and the authoritative Chat history. */
+/** @experimental First structurally divergent position between the Session projection and live Chat history. */
 export const Divergence = Schema.Struct({
   index: Schema.Finite,
   durableRole: Schema.optionalKey(Schema.String),
@@ -69,10 +69,10 @@ const coalesceParts = (parts: ReadonlyArray<Prompt.Part>): ReadonlyArray<Prompt.
  * The provider-agnostic Chat export encodes a user message whose content is a
  * multi-text-part array by keeping only the first text part, silently dropping the
  * rest. Coalescing adjacent text parts into one before that encoding is lossless —
- * providers already concatenate adjacent text — and keeps the persisted Chat history
+ * providers already concatenate adjacent text — and keeps the live Chat history
  * a faithful prefix of the durable session projection. It also canonicalizes a
  * message for structural comparison so a representation-only difference between the
- * durable projection and the authoritative Chat history never reads as divergence.
+ * live Chat projection and the authoritative Session history never reads as divergence.
  */
 export const coalesceAdjacentText = (message: Prompt.Message): Prompt.Message => {
   if (Schema.is(Schema.String)(message.content) || message.content.length < 2) return message

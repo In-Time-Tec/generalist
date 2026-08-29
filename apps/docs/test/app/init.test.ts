@@ -217,7 +217,6 @@ test("multi-agent guide preserves the two-channel child-run contract", () => {
     "Approvals",
     "ModelMiddleware",
     "sessionId",
-    "persistence.chatId",
     "runId",
     "Queue position",
     "Scheduling and run permits",

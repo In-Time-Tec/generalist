@@ -1,8 +1,10 @@
 import { DurableDriver } from "../../core/durable/public/driver.js"
-import { Effect, Option, Ref, Schema } from "effect"
+import { Effect, Function, Option, Ref, Schema } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import type { ExecutionClaim, Interface as RunStoreInterface } from "../run/store.js"
+import type { WorkerMutationError } from "../run/store-types.js"
 import type { ExecutionContinuation } from "../run/steering.js"
+import type { OperationRecord } from "../sql/operations.js"
 import {
   completedOperationRefValue,
   hydrateCompletedOperation,
@@ -24,11 +26,11 @@ export const commitDriverOperation = (input: {
   readonly outcome: DurableDriver.OperationOutcome
   readonly checkpoint: DurableDriver.DriverCheckpoint
   readonly prepared: PreparedCompletion
-}) => {
+}): Effect.Effect<OperationRecord, WorkerMutationError> => {
   const { store, claim, operation, operationId, outcome, checkpoint, prepared } = input
   if (operation.kind === "model" && outcome._tag === "Succeeded") {
     const event = liveModelResponseEvent(outcome.value)
-    if (Schema.is(RuntimeUnavailable)(event)) return event
+    if (Schema.is(RuntimeUnavailable)(event)) return Effect.fail(event)
     return store.commitModelResponse({ ...claim, operationId, outcome, checkpoint, ...prepared, event })
   }
   let completion: Parameters<RunStoreInterface["completeOperation"]>[0]["outcome"]
@@ -43,6 +45,32 @@ export const commitDriverOperation = (input: {
     ...prepared,
   })
 }
+
+/** Reconcile an ambiguous successful-model acknowledgement with one exact retry. */
+export const commitDriverOperationWithReconciliation = (
+  input: Parameters<typeof commitDriverOperation>[0],
+): ReturnType<typeof commitDriverOperation> => {
+  const commit = commitDriverOperation(input)
+  return input.operation.kind === "model" && input.outcome._tag === "Succeeded"
+    ? commit.pipe(Effect.catch(() => commitDriverOperation(input)))
+    : commit
+}
+
+export const journalFailure: {
+  (operationKey: string, cause: unknown): (phase: string) => DurableDriver.DriverError
+  (phase: string, operationKey: string, cause: unknown): DurableDriver.DriverError
+} = Function.dual(3, (phase: string, operationKey: string, cause: unknown) =>
+  DurableDriver.DriverError.make({ message: `Driver journal ${phase} failed for ${operationKey}`, cause }),
+)
+
+export const saveJournalCheckpoint = (input: {
+  readonly store: RunStoreInterface
+  readonly claim: ExecutionClaim
+  readonly checkpoint: DurableDriver.DriverCheckpoint
+}): Effect.Effect<void, DurableDriver.DriverError> =>
+  input.store
+    .saveExecution({ ...input.claim, checkpoint: input.checkpoint })
+    .pipe(Effect.mapError((error) => journalFailure("checkpoint", input.claim.runId, error)))
 
 export const hydratePersistedModelOperation = (input: {
   readonly store: RunStoreInterface
@@ -90,10 +118,17 @@ export const verifyCommittedModelEvent = (input: {
       return yield* RuntimeUnavailable.make({
         message: `committed model operation ${input.event.operationKey} is missing`,
       })
+    const reference = completedOperationRefValue(persisted.result)
+    if (reference?.transitionDigest === undefined) {
+      return yield* RuntimeUnavailable.make({
+        message: `committed model operation ${input.event.operationKey} has no transition identity`,
+      })
+    }
     yield* input.store.commitModelResponse({
       ...input.claim,
       operationId: persisted.operationId,
       outcome: { _tag: "Succeeded", value: persisted.result },
+      transitionDigest: reference.transitionDigest,
       event: input.event,
     })
   })

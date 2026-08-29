@@ -1,10 +1,8 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
   AgentManifest,
   Approvals,
-  Chat,
   LanguageModel,
   ModelMiddleware,
   Pins,
@@ -63,9 +61,6 @@ const toolExecutorLayer = Layer.unwrap(
     return ToolExecutor.layerToolkit(handledToolkit)
   }),
 )
-const persistenceLayer = Chat.layerPersisted({ storeId: "hitl-over-sse" }).pipe(
-  Layer.provide(Persistence.layerBackingMemory),
-)
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
   outputTokens: { total: 0, text: 0, reasoning: 0 },
@@ -89,7 +84,6 @@ const agentServices = Layer.mergeAll(
     resolve: (pending) => Effect.succeed({ ...pending, token: "approve-deploy-1" }),
   }),
   ModelMiddleware.layerIdentity,
-  persistenceLayer,
 )
 
 const runtimeLayer = Runtime.layerMemory({

@@ -26,6 +26,10 @@ export interface InstrumentOptions {
   readonly emit: (event: EventPayload) => Effect.Effect<void>
   readonly turn: number
   readonly identity?: IdentityCell
+  readonly onCallCompleted?: (completion: {
+    readonly modelCallId: string
+    readonly failedAttemptUsage: ModelProviderUsage | undefined
+  }) => void
   readonly resilience?: Resilience
   readonly logicalOperationId?: string
   readonly nextCallOrdinal?: (persisted?: number) => number

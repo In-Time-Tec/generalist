@@ -10,6 +10,7 @@ import type { Middleware } from "../../model/middleware.js"
 import type { ModelSelection, ModelRegistry } from "../../model/registry.js"
 import type { ModelResilience } from "../../model/resilience.js"
 import type { EventPayload as DeliveryEventPayload } from "../../model/telemetry/events.js"
+import type { ModelProviderUsage } from "../../model/attempt/observation.js"
 import type { Request } from "../../tools/tool-executor.js"
 import type { Registry } from "../../tools/tool-registry.js"
 import type { ToolContext } from "../../tools/tool-context.js"
@@ -44,6 +45,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
       | { readonly modelCallId: string; readonly modelAttemptId: string; readonly attempt: number }
       | undefined
   }
+  readonly modelCallUsage: ReadonlyMap<string, ModelProviderUsage | undefined>
   readonly instrumentModel: (model: LanguageModel.Service, turn: number) => LanguageModel.Service
   readonly chain: ReadonlyArray<Middleware>
   readonly preparePrompt: (
@@ -66,7 +68,6 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly compactionService: Option.Option<typeof import("../../turn/compaction.js").Compaction.Service>
   readonly state: AgentRunState
   readonly errorMessage: <E>(error: E) => string
-  readonly persisted: Chat.Persisted | undefined
   readonly toolCallEvents: (
     turn: number,
     batch: Request["toolCallBatch"],

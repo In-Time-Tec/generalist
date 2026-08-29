@@ -58,7 +58,6 @@ export const make = <
     state,
     chat,
     chain,
-    activeSession,
     steeringService,
     structured,
     validatedResume,
@@ -71,7 +70,6 @@ export const make = <
     withAgentModel,
     syncSession,
     applyCompactionResult,
-    savePersisted,
     deliverPending,
     flushTelemetry,
     telemetryIdentity,
@@ -150,7 +148,6 @@ export const make = <
           (yield* syncSession(structuredTurn, history)).at(-1)?.id ?? null,
           "structured-output",
         )
-        if (Option.isNone(activeSession)) yield* savePersisted(structuredTurn)
         const structuredOutput: StructuredOutput = {
           _tag: "StructuredOutput",
           turn: structuredTurn,
@@ -241,7 +238,6 @@ export const make = <
             ),
           }
         }
-        yield* savePersisted(turn)
         return {
           events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(state, turn, transcript)]),
         }

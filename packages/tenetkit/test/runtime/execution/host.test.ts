@@ -1487,6 +1487,123 @@ describe("ExecutionHost", () => {
     }).pipe(scopedWith(runtimeLayer))
   })
 
+  it.effect("atomically commits a paid model response before a token overrun stops execution", () => {
+    let toolExecutions = 0
+    const agent = Agent.make({
+      name: "token-overrun",
+      toolkit: Toolkit.make(waitTool),
+      budget: { modelCalls: 1, toolCalls: 1, totalTokens: 5 },
+    })
+    const ref = testExecutable(agent, "token-overrun-v1")
+    const address = Address.make("agent:token-overrun")
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.make(
+            Response.makePart("tool-call", {
+              id: "overrun-tool-call",
+              name: "wait_for_human",
+              params: { question: "must not execute" },
+              providerExecuted: false,
+            }),
+            Response.makePart("finish", {
+              reason: "stop",
+              usage: Response.Usage.make({
+                inputTokens: { total: 6, uncached: 6, cacheRead: undefined, cacheWrite: undefined },
+                outputTokens: { total: 4, text: 4, reasoning: undefined },
+              }),
+              response: undefined,
+            }),
+          ),
+      }),
+    )
+    const executor = ToolExecutor.layerTest({
+      execute: () =>
+        Effect.sync(() => {
+          toolExecutions += 1
+          return { _tag: "Success" as const, result: "unexpected", encodedResult: "unexpected" }
+        }),
+    })
+    const handlers = Toolkit.make(waitTool).toLayer({
+      wait_for_human: () => Effect.die("ToolExecutor test layer owns execution"),
+    })
+    const resolver = ExecutableResolver.ExecutableResolver.of({
+      resolve: () =>
+        Effect.succeed({
+          _tag: "Agent" as const,
+          agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)),
+          attestation: ref,
+        }),
+    })
+    const runtimeLayer = Runtime.layerMemory({
+      resolver,
+      addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
+      scheduler: { pollInterval: "1 day" },
+    })
+
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const host = yield* ExecutionHost.ExecutionHost
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: address,
+        sessionId: "session:token-overrun",
+        idempotencyKey: "message:token-overrun",
+        prompt: "run",
+      })
+      yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "token-overrun" }))
+
+      const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
+      const committed = history.filter((event) => event._tag === "ModelResponseCommitted")
+      const failed = history.find((event) => event._tag === "RunFailed")
+      expect(toolExecutions).toBe(0)
+      expect(committed).toHaveLength(1)
+      expect(committed[0]).toMatchObject({ budgetCharge: 10 })
+      expect(failed?._tag).toBe("RunFailed")
+      if (failed?._tag !== "RunFailed" || committed[0]?._tag !== "ModelResponseCommitted") {
+        return expect.unreachable()
+      }
+      expect(failed.error).toMatchObject({
+        failure: {
+          _tag: "tenetkit/core/RunBudgetExhausted",
+          dimension: "totalTokens",
+          requested: 10,
+          remaining: 5,
+        },
+      })
+
+      const execution = yield* store.loadExecution(receipt.runId)
+      expect(execution.checkpoint !== undefined && "driverVersion" in execution.checkpoint).toBe(true)
+      if (execution.checkpoint === undefined || !("driverVersion" in execution.checkpoint)) {
+        return expect.unreachable()
+      }
+      expect(execution.checkpoint.budget.remaining.totalTokens).toBe(0)
+      expect(execution.checkpoint.state).toHaveProperty("postCommitFailure")
+      const operation = yield* store.getOperationByKey({
+        runId: receipt.runId,
+        operationKey: committed[0].operationKey,
+      })
+      expect(operation?.status).toBe("succeeded")
+      expect(operation?.result).not.toHaveProperty("content")
+      const encodedResult = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(operation?.result).pipe(
+        Effect.orDie,
+      )
+      expect(encodedResult).not.toContain("must not execute")
+      expect(committed[0]).not.toHaveProperty("content")
+
+      const session = yield* store.sessionStore("session:token-overrun")
+      expect(Option.isSome(session)).toBe(true)
+      if (Option.isNone(session)) return expect.unreachable()
+      const path = yield* session.value.path()
+      const responses = path.filter((entry) => entry._tag === "ModelResponse")
+      expect(responses).toHaveLength(1)
+      expect(responses[0]?.id).toBe(committed[0].sessionEntryId)
+      expect(path.at(-1)).toMatchObject({ _tag: "Message", parentId: committed[0].sessionEntryId })
+    }).pipe(scopedWith(runtimeLayer))
+  })
+
   it.effect("interrupts an active model when Runtime.cancel commits cancellation", () =>
     Effect.gen(function* () {
       const started = yield* Deferred.make<void>()

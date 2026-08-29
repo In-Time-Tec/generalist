@@ -4,7 +4,6 @@ export const packageSmokeTypecheck = (
 ): string => `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
 import {
   Agent,
-  Chat,
   Handoff,
   LanguageModel,
   Memory,
@@ -68,15 +67,9 @@ const memoryAgent = Agent.make({
 type MemoryAgentRequirements = Assert<
   Equal<Agent.Requirements<typeof memoryAgent>, LanguageModel.LanguageModel | Memory.Memory>
 >
-const persistedRun = Agent.stream(memoryAgent, {
-  prompt: "hello",
-  persistence: { chatId: "package-smoke" },
-})
-type PersistedRunRequirements = Assert<
-  Equal<
-    StreamServices<typeof persistedRun>,
-    LanguageModel.LanguageModel | Memory.Memory | Chat.Persistence | Agent.Runtime
-  >
+const memoryRun = Agent.stream(memoryAgent, { prompt: "hello" })
+type MemoryRunRequirements = Assert<
+  Equal<StreamServices<typeof memoryRun>, LanguageModel.LanguageModel | Memory.Memory>
 >
 void Handoff
 type ProviderRoot = typeof import("tenetkit/ai")

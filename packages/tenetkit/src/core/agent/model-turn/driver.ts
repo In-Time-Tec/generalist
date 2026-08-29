@@ -82,6 +82,7 @@ const successCodec = (input: {
         sessionParentId: terminal.sessionParentId,
         replayFromHistory: terminal.replayFromHistory,
         content: encodedContent,
+        budgetCharge: terminal.budgetCharge,
       }
       if (terminal.response.usage !== undefined)
         Object.assign(value, { usage: Schema.encodeSync(Response.Usage)(terminal.response.usage) })
@@ -128,6 +129,7 @@ const successCodec = (input: {
             sessionParentId: operation.sessionParentId,
             replayFromHistory: operation.replayFromHistory,
             response,
+            budgetCharge: operation.budgetCharge,
           }
           input.completed(operation, attempt)
           return replayParts(input.operationId, attempt)

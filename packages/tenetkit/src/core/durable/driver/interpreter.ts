@@ -1,17 +1,14 @@
-import { Context, DateTime, Effect, Exit, Function, Layer, Option, Ref, Schema, Stream } from "effect"
-import type { Prompt } from "effect/unstable/ai"
+import { Cause, Context, DateTime, Effect, Exit, Function, Layer, Option, Ref, Schema, Stream } from "effect"
 import {
   type DriverCheckpoint,
   type DriverOperation,
   type OperationOutcome,
   type ReplayPolicy,
   type DriverOperationKind,
-  currentDriverVersion,
   inputDigest,
 } from "./contract.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
 import {
-  allocate,
   assertNotExpired,
   refundUnused,
   reserveChild,
@@ -27,13 +24,10 @@ import {
   chargeScheduled,
   applyHandoffCommit,
   chargeUsage as chargeCheckpointUsage,
-  type LoopDriverOptions,
-  make as makeLoopDriver,
   withBudget,
   withHandoffState,
   withPending,
 } from "../loop-driver.js"
-import type { Agent, RunOptions } from "../../agent/service.js"
 import type { HandoffControlState } from "../../agent/handoff/state.js"
 import { OperationOutcomeResolution } from "./operation-outcome.js"
 /** @experimental Operation scheduled at one agent-loop effect boundary. */
@@ -47,7 +41,6 @@ export interface OperationSpec {
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
 type PersistedReplayValue = Extract<OperationOutcome, { readonly _tag: "Succeeded" }>["value"]
 const ModelOperationInput = Schema.Struct({ modelCallOrdinal: Schema.Finite })
-const AgentInput = Schema.Struct({ toolkit: Schema.Unknown })
 const replaySchema = <A>() => Schema.declare((_value): _value is A => true)
 const decodeReplay = <A>(value: PersistedReplayValue): A => Schema.decodeUnknownSync(replaySchema<A>())(value)
 const operationFrom = (input: {
@@ -71,13 +64,13 @@ export interface DriverJournal {
   readonly onScheduled: (
     operation: DriverOperation,
     checkpoint: DriverCheckpoint,
-  ) => Effect.Effect<OperationOutcome | void>
+  ) => Effect.Effect<OperationOutcome | void, DriverError>
   readonly onCompleted: (
     operation: DriverOperation,
     outcome: OperationOutcome,
     checkpoint: DriverCheckpoint,
-  ) => Effect.Effect<void>
-  readonly onCheckpoint: (checkpoint: DriverCheckpoint) => Effect.Effect<void>
+  ) => Effect.Effect<void, DriverError>
+  readonly onCheckpoint: (checkpoint: DriverCheckpoint) => Effect.Effect<void, DriverError>
 }
 /** @experimental Optional host journal service merged into Agent.stream driver layers. */
 export class DriverJournalService extends Context.Service<DriverJournalService, DriverJournal>()(
@@ -118,11 +111,13 @@ export interface Interface {
   readonly abortPending: (
     error: OperationFailure,
   ) => Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay>
-  readonly chargeUsage: (usage: BudgetLimits) => Effect.Effect<void, RunBudgetExhausted>
-  readonly setBudget: (budget: RunBudget) => Effect.Effect<void>
-  readonly reserveChild: (grant: BudgetLimits) => Effect.Effect<RunBudget, RunBudgetExhausted | RunBudgetGrantWidened>
-  readonly refundChild: (child: RunBudget) => Effect.Effect<void>
-  readonly setHandoffState: (state: HandoffControlState) => Effect.Effect<void, DriverStateInvalid>
+  readonly chargeUsage: (usage: BudgetLimits) => Effect.Effect<void, DriverError | RunBudgetExhausted>
+  readonly setBudget: (budget: RunBudget) => Effect.Effect<void, DriverError>
+  readonly reserveChild: (
+    grant: BudgetLimits,
+  ) => Effect.Effect<RunBudget, DriverError | RunBudgetExhausted | RunBudgetGrantWidened>
+  readonly refundChild: (child: RunBudget) => Effect.Effect<void, DriverError>
+  readonly setHandoffState: (state: HandoffControlState) => Effect.Effect<void, DriverError | DriverStateInvalid>
 }
 /** @experimental */
 export class DriverUnknownReplay extends Schema.TaggedError<DriverUnknownReplay>()(
@@ -166,6 +161,7 @@ export const make = (input: {
         const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(before.state).pipe(
           Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
         )
+        if (state.postCommitFailure !== undefined) return yield* state.postCommitFailure
         if (state.pending !== undefined) {
           const pending = operationFrom(state.pending)
           const requested = operationFrom(spec)
@@ -283,7 +279,13 @@ export const make = (input: {
         stream: Stream.Stream<A, E, R>,
         options?: { readonly successCodec: StreamSuccessCodec<A, Success, ReplayError, ReplayServices> },
       ): Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices> =>
-        Stream.unwrap<A, E | DriverUnknownReplay | ReplayError, R | ReplayServices, OperationError<E>, never>(
+        Stream.unwrap<
+          A,
+          E | DriverError | DriverStateInvalid | DriverUnknownReplay | ReplayError,
+          R | ReplayServices,
+          OperationError<E>,
+          never
+        >(
           Effect.gen(function* () {
             const { operation, replay, nested } = yield* schedule(spec)
             const codec = options?.successCodec
@@ -307,20 +309,32 @@ export const make = (input: {
               Stream.tap((value) =>
                 Effect.sync(() => (codec === undefined ? void emitted!.push(value) : codec.observe(value))),
               ),
-              Stream.onExit((exit) =>
-                Effect.gen(function* () {
-                  let outcome: OperationOutcome | undefined
-                  if (Exit.isFailure(exit)) {
-                    outcome = OperationOutcomeResolution.outcomeFromExit(operation, exit)
-                  } else if (codec?.isComplete?.() !== false) {
-                    const value = codec === undefined ? emitted : codec.complete()
-                    outcome = { _tag: "Succeeded", value }
-                  }
-                  if (outcome === undefined) return
-                  yield* outcome._tag === "Unknown"
+              Stream.catchCause((cause) => {
+                if (Cause.hasInterrupts(cause)) return Stream.failCause(cause)
+                const outcome = OperationOutcomeResolution.outcomeFromExit(operation, Exit.failCause(cause))
+                if (outcome === undefined) return Stream.failCause(cause)
+                const persist =
+                  outcome._tag === "Unknown"
                     ? Effect.uninterruptible(commit(operation, outcome, nested))
                     : commit(operation, outcome, nested)
+                return Stream.fromEffect(persist).pipe(Stream.drain, Stream.concat(Stream.failCause(cause)))
+              }),
+              Stream.onExit((exit) =>
+                Effect.gen(function* () {
+                  if (Exit.isSuccess(exit) || !Cause.hasInterrupts(exit.cause)) return
+                  const outcome = OperationOutcomeResolution.outcomeFromExit(operation, exit)
+                  if (outcome === undefined) return
+                  yield* Effect.uninterruptible(commit(operation, outcome, nested))
                 }).pipe(Effect.orDie),
+              ),
+              Stream.concat(
+                Stream.fromEffect(
+                  Effect.gen(function* () {
+                    if (codec?.isComplete?.() === false) return
+                    const value = codec === undefined ? emitted : codec.complete()
+                    yield* Effect.interruptible(commit(operation, { _tag: "Succeeded", value }, nested))
+                  }),
+                ).pipe(Stream.drain),
               ),
             )
           }),
@@ -419,75 +433,6 @@ export const layerInline = (input: {
       return yield* make({ ...input, journal })
     }),
   )
-/** @experimental */
-export const layerForRun: {
-  <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
-    options: RunOptions,
-    prompt: Prompt.Prompt,
-    budget?: RunBudget,
-  ): (agent: Agent<Tools, R>) => Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
-  <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-    options: RunOptions,
-    prompt: Prompt.Prompt,
-    budget?: RunBudget,
-  ): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
-} = Function.dual(
-  (args) => args.length >= 1 && Schema.is(AgentInput)(args[0]),
-  <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-    options: RunOptions,
-    prompt: Prompt.Prompt,
-    budget?: RunBudget,
-  ): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid> => {
-    const sessionId = options.sessionId ?? agent.name
-    const logicalOperationId = options.logicalOperationId ?? sessionId
-    let driverOptions: LoopDriverOptions = {
-      logicalOperationId,
-      sessionId,
-    }
-    if (options.modelCallOrdinalStart !== undefined) {
-      driverOptions = { ...driverOptions, modelCallOrdinalStart: options.modelCallOrdinalStart }
-    }
-    const driver = makeLoopDriver(driverOptions)
-    const initial: Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> = Effect.gen(function* () {
-      if (options.driverCheckpoint === undefined) {
-        let driverInput: Parameters<typeof driver.initial>[0] = {
-          prompt,
-          budget: budget ?? allocate({}),
-        }
-        if (options.executableRef !== undefined) driverInput = { ...driverInput, executable: options.executableRef }
-        return yield* driver.initial(driverInput)
-      }
-      const checkpoint = options.driverCheckpoint
-      if (options.executableRef === undefined || checkpoint.executable === undefined) {
-        return yield* DriverStateInvalid.make({
-          message: "Persisted driver checkpoints require an explicit executable identity",
-        })
-      }
-      if (
-        checkpoint.driverVersion !== currentDriverVersion ||
-        checkpoint.executable?.executable !== options.executableRef?.executable ||
-        checkpoint.executable?.active !== options.executableRef?.active
-      ) {
-        return yield* DriverStateInvalid.make({
-          message: "Persisted driver checkpoint does not match the active Agent",
-        })
-      }
-      return checkpoint
-    })
-    return Layer.unwrap(
-      initial.pipe(
-        Effect.map((checkpoint) =>
-          layerInline({
-            driver,
-            initial: checkpoint,
-          }),
-        ),
-      ),
-    )
-  },
-)
 /** @experimental */
 export const layerTest = (input: {
   readonly driver: DurableAgentDriver

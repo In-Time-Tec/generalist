@@ -1,9 +1,8 @@
-import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
 import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
 import { Sse, Ws } from "tenetkit/transport"
 import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
-import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
 import { modelLayer } from "./model"
 import { cannedLayer } from "./search-provider"
@@ -132,17 +131,12 @@ export const toolExecutorLayer: Layer.Layer<ToolExecutor.ToolExecutor> = Layer.u
   }),
 ).pipe(Layer.provide(cannedLayer))
 
-const persistenceLayer = Chat.layerPersisted({ storeId: "research-agent" }).pipe(
-  Layer.provide(Persistence.layerBackingMemory),
-)
-
 const agentServices = Layer.mergeAll(
   modelLayer,
   toolExecutorLayer,
   toolkitLayer.pipe(Layer.provideMerge(cannedLayer)),
   approvalsLayer,
   ModelMiddleware.layerIdentity,
-  persistenceLayer,
 )
 
 export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExecutionHost.ExecutionHost> =

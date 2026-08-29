@@ -13,6 +13,7 @@ import {
   InvocationCoordinator,
   type Event as ModelTelemetryEvent,
   type EventPayload as ModelTelemetryEventPayload,
+  type ModelProviderUsage,
   generateId,
 } from "../../model/telemetry/events.js"
 import { Permissions, RuleStore } from "../../policy/permissions.js"
@@ -25,25 +26,13 @@ import type { Agent, RunOptions } from "../service.js"
 import { SetupHelpers, setupStaticTools } from "./construction.js"
 import { recoverToolCheckpoint } from "../tools/checkpoint-recovery.js"
 import { SetupOptions } from "./options.js"
-import { setupChat, setupPersistence } from "./persistence.js"
+import { setupChat, setupSession } from "./session.js"
 import { setupPromptContext } from "./resume.js"
 const { errorMessage } = SetupHelpers
 
 const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
   Effect.gen(function* () {
-    const persistence = yield* setupPersistence(options)
-    const {
-      persistenceOptions,
-      resume,
-      persistenceService,
-      runtimeService,
-      compactionService,
-      activeSession,
-      persisted,
-      recoveredHistory,
-      resumeChat,
-      validatedResume,
-    } = persistence
+    const { resume, compactionService, activeSession, resumeChat, validatedResume } = yield* setupSession(options)
     const { staticCandidates, staticRegistry, staticToolkit } = yield* setupStaticTools(agent)
     const executor = yield* Effect.serviceOption(ToolExecutor)
     const approvals = yield* Effect.serviceOption(Approvals)
@@ -130,6 +119,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
             ),
           )
     let modelCallOrdinal = restoredModelCallOrdinal ?? options.modelCallOrdinalStart ?? 0
+    const modelCallUsage = new Map<string, ModelProviderUsage | undefined>()
     const clock = yield* Clock.Clock
     const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service => {
       const baseInstrumentation = {
@@ -137,6 +127,12 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
         emit: emitTelemetry,
         turn,
         identity: telemetryIdentity,
+        onCallCompleted: (completion: {
+          readonly modelCallId: string
+          readonly failedAttemptUsage: ModelProviderUsage | undefined
+        }) => {
+          modelCallUsage.set(completion.modelCallId, completion.failedAttemptUsage)
+        },
         nextCallOrdinal: (persistedOrdinal: number | undefined) => {
           if (persistedOrdinal === undefined) return modelCallOrdinal++
           modelCallOrdinal = Math.max(modelCallOrdinal, persistedOrdinal + 1)
@@ -220,20 +216,14 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const { seedSystem, freshChat, chat } = yield* setupChat({
       options,
       activeSession,
-      persisted,
       resumeChat,
       system,
       supplemental,
     })
     return {
-      persistenceOptions,
       resume,
-      persistenceService,
-      runtimeService,
       compactionService,
       activeSession,
-      persisted,
-      recoveredHistory,
       resumeChat,
       validatedResume,
       recoveredToolCheckpoint: yield* recoverToolCheckpoint({ options, chat }),
@@ -273,6 +263,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       deliverPending,
       telemetryIdentity,
       modelCallOrdinal,
+      modelCallUsage,
       instrumentModel,
       modelRegistryService,
       permissionsService,

@@ -233,6 +233,31 @@ export const charge: {
     }),
 )
 
+/** @experimental Result of settling a paid model response against its token allocation. */
+export interface ModelTokenSettlement {
+  readonly budget: RunBudget
+  readonly exhausted: RunBudgetExhausted | undefined
+}
+
+/** @experimental Settle paid model tokens without discarding an already completed provider response. */
+export const settleModelTokens: {
+  (requested: number): (budget: RunBudget) => ModelTokenSettlement
+  (budget: RunBudget, requested: number): ModelTokenSettlement
+} = Function.dual(2, (budget: RunBudget, requested: number): ModelTokenSettlement => {
+  const remaining = budget.remaining.totalTokens
+  if (requested === 0 || remaining === undefined) return { budget, exhausted: undefined }
+  if (requested <= remaining) {
+    return {
+      budget: { ...budget, remaining: withLimit(budget.remaining, "totalTokens", remaining - requested) },
+      exhausted: undefined,
+    }
+  }
+  return {
+    budget: { ...budget, remaining: withLimit(budget.remaining, "totalTokens", 0) },
+    exhausted: RunBudgetExhausted.make({ dimension: "totalTokens", requested, remaining }),
+  }
+})
+
 /** @experimental */
 export const reserveChild: {
   (

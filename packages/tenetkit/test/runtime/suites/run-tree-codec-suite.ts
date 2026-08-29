@@ -38,6 +38,7 @@ const representativeEvents: ReadonlyArray<RunTree.TreeEvent> = [
       sessionId: "session:tree-codec",
       sessionParentId: "entry:input",
       sessionEntryId: "entry:model:1",
+      budgetCharge: 0,
       finishReason: "stop",
       digest: "digest:model:1",
     },

@@ -21,6 +21,7 @@ export interface ModelResponseCommitted {
   readonly sessionId: string
   readonly sessionParentId: string | null
   readonly sessionEntryId: string
+  readonly budgetCharge: number
   readonly digest: string
   readonly usage?: CompletedModelResponse["usage"]
   readonly finishReason?: Response.FinishReason

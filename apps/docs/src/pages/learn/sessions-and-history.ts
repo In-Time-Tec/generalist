@@ -7,12 +7,12 @@ export const sessionsAndHistory = definePage({
   navTitle: "Sessions & history",
   group: "Learn",
   description:
-    "The append-only session entry log, Effect AI prompt projection, and the three ways a run can carry history.",
+    "The append-only session entry log, Effect AI prompt projection, and the two ways a run can carry history.",
   content: [
     p(
       "TenetKit separates two ideas that most frameworks fuse: the record of a conversation, and the context a model sees. The record is an append-only log; the context is a pure function of a path through it. This page explains the ",
       code("Session"),
-      " seam and the three ways a run can carry history at all.",
+      " seam and the two ways a run can carry history at all.",
     ),
     h2("an-append-only-log", "An append-only log with a leaf pointer"),
     p(
@@ -68,8 +68,8 @@ export const sessionsAndHistory = definePage({
       link("/docs/guides/compaction", "How to stay inside the context window"),
       " covers the strategy that decides when TenetKit appends one for you.",
     ),
-    h2("three-ways-to-carry-history", "Three ways a run carries history"),
-    p("A run can be given its past in three mutually independent ways, each fitting a different owner:"),
+    h2("two-ways-to-carry-history", "Two ways a run carries history"),
+    p("A run can be given its past in two ways, each fitting a different owner:"),
     table(
       ["Run option", "Mechanism", "Use it when"],
       [
@@ -77,19 +77,6 @@ export const sessionsAndHistory = definePage({
           [code("history")],
           "The prior transcript is used verbatim as the initial chat, no system message prepended",
           "The host already owns transcript storage: resuming after suspension, replaying an exported transcript",
-        ],
-        [
-          [code("persistence.chatId")],
-          [
-            "The loop runs on a persisted ",
-            code("Ai.Chat"),
-            " via ",
-            code("Chat.layerPersisted"),
-            " and an application-scoped ",
-            code("Agent.layerRuntime"),
-            "; history accumulates across runs under one id",
-          ],
-          "You want multi-run conversations with storage delegated to an upstream persistence layer",
         ],
         [
           [code("sessionId"), " + ", code("SessionDirectory")],
@@ -102,9 +89,9 @@ export const sessionsAndHistory = definePage({
     ),
     p(
       code("history"),
-      " uses an ordinary run while ",
-      code("persistence.chatId"),
-      " sets persistence on the same run entrypoint. Both are fields of the same option type; choose the history owner that fits the host. The full ",
+      " is a process-local seed. ",
+      code("sessionId"),
+      " selects the authoritative Session when a SessionDirectory is present. The full ",
       code("RunOptions"),
       " field table lives in ",
       link("/docs/reference/core-agent", "Agent and run functions"),
@@ -116,9 +103,9 @@ export const sessionsAndHistory = definePage({
     p(
       "The tenetkit layers on this page are non-durable by design: ",
       code("Session.layerMemory"),
-      " is an application-scoped keyed directory of independent Ref-backed stores, and the persisted-chat layer in the examples backs onto memory too. Omitting ",
+      " is an application-scoped keyed directory of independent Ref-backed stores. Omitting ",
       code("sessionId"),
-      " leaves a run ephemeral even when the directory is present. For durable, addressable execution, tenetkit/runtime persists the canonical RunEvent stream and reconstructs the core driver across attempts. Application conversation storage can implement ",
+      " leaves a run ephemeral even when the directory is present. For durable, addressable execution, tenetkit/runtime stores the Session and canonical RunEvent stream and reconstructs the core driver across attempts. Application conversation storage can implement ",
       code("Session.DirectoryInterface"),
       " over its own database. The core/runtime split is covered in ",
       link("/docs/learn/native-runtime", "Core and Runtime: where durability lives"),

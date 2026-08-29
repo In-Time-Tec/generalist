@@ -1,6 +1,5 @@
-import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Persistence } from "effect/unstable/persistence"
-import { Agent, AgentManifest, Chat, Pins } from "tenetkit"
+import { Console, Effect, ManagedRuntime, Stream } from "effect"
+import { Agent, AgentManifest, Pins } from "tenetkit"
 import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
 import { TestModel } from "tenetkit/test"
 import { Sse } from "tenetkit/transport"
@@ -25,10 +24,7 @@ const registrations = executable.manifest.entries.flatMap((entry) =>
       ].map((pin) => ({ pin, codec: "example", version: "1", payload: { fixture: "transport-agent" } }))
     : [],
 )
-const agentServices = Layer.mergeAll(
-  TestModel.layer([TestModel.text("Hello from transport.")]),
-  Chat.layerPersisted({ storeId: "composition-guide-sessions" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
-)
+const agentServices = TestModel.layer([TestModel.text("Hello from transport.")])
 
 const runtimeLayer = Runtime.layerMemory({
   resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),

@@ -26,6 +26,7 @@ const completion = (operationKey: string, sessionParentId: string | null, text =
     replayFromHistory: false,
     content: Schema.encodeSync(Schema.Array(Response.TextPart))(response.content),
     finishReason: "stop" as const,
+    budgetCharge: 0,
   }
   const digest = Pins.digest(jsonValue(unsigned))
   return {
@@ -38,6 +39,7 @@ const completion = (operationKey: string, sessionParentId: string | null, text =
       modelAttemptId: "model-attempt:1",
       attempt: 0,
       response,
+      budgetCharge: 0,
       digest,
     },
   }
@@ -108,12 +110,23 @@ layer(memoryLayer)("atomic model response memory commit", (suite) => {
       ).toBe(false)
       expect((yield* sessionProjection(store, "session:model-commit-memory")).content).toHaveLength(1)
 
-      yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
-      yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
+      const checkpoint = { _tag: "Program" as const, version: "1" as const }
+      yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint })
+      yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint })
+      const divergentCheckpoint = yield* Effect.exit(
+        store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact }),
+      )
+      expect(divergentCheckpoint._tag).toBe("Failure")
+      expect((yield* store.loadExecution(receipt.runId)).checkpoint).toEqual(checkpoint)
       const divergentRetry = completion(operationKey, sessionParentId, "divergent retry")
       expect(
         (yield* Effect.exit(
-          store.commitModelResponse({ ...claim, operationId: operation.operationId, ...divergentRetry }),
+          store.commitModelResponse({
+            ...claim,
+            operationId: operation.operationId,
+            ...divergentRetry,
+            checkpoint,
+          }),
         ))._tag,
       ).toBe("Failure")
       const responses = (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter(
@@ -158,6 +171,113 @@ const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
   <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
+
+it.live("rolls back every SQLite model transition statement boundary", () => {
+  const filename = tempDbPath("model-response-boundaries")
+  const quote = (value: string) => value.replaceAll("'", "''")
+  return scopedWith(sqliteLayer(filename))(
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const checkpoints = [
+        {
+          name: "before_session_append",
+          trigger: (runId: string, sessionId: string) => `
+            CREATE TRIGGER fail_before_session_append
+            BEFORE INSERT ON tenetkit_session_entries
+            WHEN NEW.session_id = '${quote(sessionId)}' AND NEW.tag = 'ModelResponse'
+            BEGIN SELECT RAISE(ABORT, 'before session append'); END
+          `,
+        },
+        {
+          name: "after_session_before_operation",
+          trigger: (runId: string) => `
+            CREATE TRIGGER fail_after_session_before_operation
+            BEFORE UPDATE ON tenetkit_run_operations
+            WHEN NEW.run_id = '${quote(runId)}' AND NEW.status = 'succeeded'
+            BEGIN SELECT RAISE(ABORT, 'after session before operation'); END
+          `,
+        },
+        {
+          name: "after_operation_before_checkpoint",
+          trigger: (runId: string) => `
+            CREATE TRIGGER fail_after_operation_before_checkpoint
+            BEFORE UPDATE ON tenetkit_runs
+            WHEN NEW.run_id = '${quote(runId)}' AND EXISTS (
+              SELECT 1 FROM tenetkit_run_operations
+              WHERE run_id = NEW.run_id AND status = 'succeeded'
+            )
+            BEGIN SELECT RAISE(ABORT, 'after operation before checkpoint'); END
+          `,
+        },
+        {
+          name: "after_checkpoint_before_event",
+          trigger: (runId: string) => `
+            CREATE TRIGGER fail_after_checkpoint_before_event
+            BEFORE INSERT ON tenetkit_run_events
+            WHEN NEW.run_id = '${quote(runId)}' AND NEW.event_json LIKE '%"_tag":"ModelResponseCommitted"%'
+            BEGIN SELECT RAISE(ABORT, 'after checkpoint before event'); END
+          `,
+        },
+        {
+          name: "after_event_before_commit",
+          trigger: (runId: string) => `
+            CREATE TRIGGER fail_after_event_before_commit
+            BEFORE UPDATE ON tenetkit_tree_roots
+            WHEN EXISTS (
+              SELECT 1 FROM tenetkit_run_events
+              WHERE run_id = '${quote(runId)}'
+                AND event_json LIKE '%"_tag":"ModelResponseCommitted"%'
+            )
+            BEGIN SELECT RAISE(ABORT, 'after event before commit'); END
+          `,
+        },
+      ] as const
+
+      for (const boundary of checkpoints) {
+        const sessionId = `session:model-boundary:${boundary.name}`
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId,
+          idempotencyKey: `model-boundary:${boundary.name}`,
+          prompt: textPrompt("answer"),
+        })
+        const { store, claim, operation, operationKey, sessionParentId } = yield* schedule(receipt.runId)
+        const exact = completion(operationKey, sessionParentId)
+        const checkpoint = { _tag: "Program" as const, version: "1" as const }
+        const beforeHistory = yield* runtime.history({ runId: receipt.runId, limit: 100 })
+        const beforeExecution = yield* store.loadExecution(receipt.runId)
+        const database = new Database(filename)
+        database.run(boundary.trigger(receipt.runId, sessionId))
+
+        const failed = yield* Effect.exit(
+          store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint }),
+        )
+        expect(failed._tag, boundary.name).toBe("Failure")
+        expect(yield* runtime.history({ runId: receipt.runId, limit: 100 }), boundary.name).toEqual(beforeHistory)
+        expect(
+          (yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,
+          boundary.name,
+        ).toBe("running")
+        expect((yield* sessionProjection(store, sessionId)).content, boundary.name).toHaveLength(1)
+        expect((yield* store.loadExecution(receipt.runId)).checkpoint, boundary.name).toEqual(
+          beforeExecution.checkpoint,
+        )
+
+        database.run(`DROP TRIGGER fail_${boundary.name}`)
+        database.close()
+        yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint })
+        expect((yield* sessionProjection(store, sessionId)).content, boundary.name).toHaveLength(2)
+        expect((yield* store.loadExecution(receipt.runId)).checkpoint, boundary.name).toEqual(checkpoint)
+        expect(
+          (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter(
+            (event) => event._tag === "ModelResponseCommitted",
+          ),
+          boundary.name,
+        ).toHaveLength(1)
+      }
+    }),
+  )
+})
 
 it.live("keeps rolled-back SQLite model completion invisible until commit", () => {
   const filename = tempDbPath("model-response-rollback")

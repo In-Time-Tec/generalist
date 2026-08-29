@@ -329,7 +329,7 @@ export const asTool: {
             ),
           )
         const result = yield* runChild({ prompt, inheritedBudget: childBudget }).pipe(
-          Effect.ensuring(interpreter.value.refundChild(childBudget)),
+          Effect.ensuring(interpreter.value.refundChild(childBudget).pipe(Effect.orDie)),
         )
         return yield* resultFor(options.success, options.fromResult, result)
       })

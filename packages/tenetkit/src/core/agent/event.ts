@@ -38,6 +38,7 @@ export interface ModelResponseCommitted {
   readonly modelAttemptId: string
   readonly attempt: number
   readonly response: CompletedModelResponse<Record<string, Tool.Any>>
+  readonly budgetCharge: number
   readonly digest: string
   readonly metadata?: Metadata
 }

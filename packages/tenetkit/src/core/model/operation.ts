@@ -17,6 +17,7 @@ export interface CompletedModelOperation {
   readonly content: typeof ModelResponseContent.Encoded
   readonly usage?: typeof Response.Usage.Encoded
   readonly finishReason?: Response.FinishReason
+  readonly budgetCharge: number
   readonly digest: string
 }
 
@@ -31,6 +32,7 @@ const CompletedModelOperationFields = Schema.Struct({
   content: Schema.toEncoded(ModelResponseContent),
   usage: Schema.optionalKey(Schema.toEncoded(Response.Usage)),
   finishReason: Schema.optionalKey(Response.FinishReason),
+  budgetCharge: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)),
   digest: Schema.String,
 })
 
@@ -60,6 +62,7 @@ export interface AttemptCompleted {
   readonly sessionParentId: string | null
   readonly replayFromHistory: boolean
   readonly response: CompletedModelResponse<Record<string, Tool.Any>>
+  readonly budgetCharge: number
 }
 
 /** @internal Values crossing the durable model stream boundary. */

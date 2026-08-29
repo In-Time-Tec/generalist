@@ -5,8 +5,6 @@ import {
   defaultObjectPrompt as Agent_defaultObjectPrompt,
   stream as Agent_stream,
   generate as Agent_generate,
-  Runtime as Agent_Runtime,
-  layerRuntime as Agent_layerRuntime,
   ResumeResolution as Agent_ResumeResolution,
   AgentTypeId as Agent_AgentTypeId,
   close as Agent_close,
@@ -17,8 +15,6 @@ export const Agent = {
   defaultObjectPrompt: Agent_defaultObjectPrompt,
   stream: Agent_stream,
   generate: Agent_generate,
-  Runtime: Agent_Runtime,
-  layerRuntime: Agent_layerRuntime,
   ResumeResolution: Agent_ResumeResolution,
   AgentTypeId: Agent_AgentTypeId,
   close: Agent_close,
@@ -29,8 +25,6 @@ export namespace Agent {
   export type defaultObjectPrompt = typeof import("../service.js").defaultObjectPrompt
   export type stream = typeof import("../service.js").stream
   export type generate = typeof import("../service.js").generate
-  export type Runtime = import("../service.js").Runtime
-  export type layerRuntime = typeof import("../service.js").layerRuntime
   export type close = typeof import("../service.js").close
   export type withTools = typeof import("../service.js").withTools
   export type Any = import("../service.js").Any

@@ -73,7 +73,7 @@ export const coreAgentReference = definePage({
         [
           [code("Agent.stream")],
           [code("(agent: Agent<Tools, R>, options: O) => Stream<AgentEvent.Event, RunError, RunRequirements<R, O>>")],
-          "Streams text or schema-validated output; persistence and output are selected by options",
+          "Streams text or schema-validated output; output is selected by options",
         ],
         [
           [code("Agent.generate")],
@@ -127,11 +127,6 @@ export const coreAgentReference = definePage({
           ["Consult the Memory service for this run, overriding ", code("agent.memory"), " when present"],
         ],
         [
-          [code("persistence")],
-          [code("{ chatId: string; timeToLive?: Duration.Input }"), " (optional)"],
-          "Runs on a persisted chat",
-        ],
-        [
           [code("output")],
           [code("{ schema: S; name?: string; prompt?: Ai.Prompt.RawInput }"), " (optional)"],
           [
@@ -155,10 +150,6 @@ export const coreAgentReference = definePage({
       code("ToolExecutor"),
       " override can handle calls at runtime but does not discharge those configured requirements. Configured or run-specific memory adds ",
       code("Memory"),
-      ", and persistence options add ",
-      code("Chat.Persistence"),
-      " and an application-scoped ",
-      code("Agent.Runtime"),
       ". Ambient enhancements such as approvals, compaction, instructions, middleware, resilience, permissions, sessions, skills, steering, tokenization, tool execution overrides, and output spill remain optional.",
     ),
     table(
@@ -168,11 +159,6 @@ export const coreAgentReference = definePage({
         [[code("ModelRegistry.ModelRegistry")], ["When the agent has a ", code("model"), " default"]],
         [[code("Ai.Tool.HandlersFor<Tools>")], ["When local toolkit handlers execute in-process"]],
         [[code("Memory.Memory")], ["When agent or run configuration selects a memory key"]],
-        [[code("Ai.Chat.Persistence")], ["When RunOptions.persistence is set"]],
-        [
-          [code("Agent.Runtime")],
-          ["When RunOptions.persistence is set; provide Agent.layerRuntime once per application"],
-        ],
         [[code('S["DecodingServices"]')], ["When RunOptions.output.schema is set"]],
         [[code("ToolExecutor.ToolExecutor")], ["Optional override for remote, client, MCP, sandbox, or durable tools"]],
         [[code("Approvals.Approvals")], ["Ambient optional approval behavior"]],

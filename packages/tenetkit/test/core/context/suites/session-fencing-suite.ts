@@ -32,7 +32,7 @@ const unusedExecutor = ToolExecutor.layerTest({
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
-layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fencing", (it) => {
+layer(unusedToolHandlerLayer)("Session fencing", (it) => {
   ItLayer.make(it, "forwards the session owner token on every message append", () => {
     const appendOptions: Array<Session.AppendOptions | undefined> = []
     const capturingSession = Layer.effect(
@@ -213,7 +213,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
         )
         expect(Schema.is(AgentEvent.AgentError)(failure)).toBe(true)
         if (!Schema.is(AgentEvent.AgentError)(failure)) return
-        expect(failure.message).toBe("Session projection is not a prefix of authoritative Chat history")
+        expect(failure.message).toBe("Session projection is not a prefix of live Chat history")
         const diagnostics = failure.diagnostics
         expect(diagnostics?.sessionId).toBe("session-diverged")
         expect(diagnostics?.ownerToken).toBe("owner-diverged")

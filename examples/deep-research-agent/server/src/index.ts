@@ -1,11 +1,10 @@
 import { layer } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
-import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
 import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
 import { Sse, Ws } from "tenetkit/transport"
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
-import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
 import { layerOrDeterministic } from "./model"
 import { searchProviderLayer } from "./search-provider"
@@ -138,10 +137,6 @@ const routesLayer = HttpRouter.use((router) =>
   }),
 )
 
-const persistenceLayer = Chat.layerPersisted({ storeId: "deep-research-agent" }).pipe(
-  Layer.provide(Persistence.layerBackingMemory),
-)
-
 /** @experimental */
 export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provideMerge(searchProviderLayer))
 
@@ -167,7 +162,6 @@ const agentServices = Layer.mergeAll(
     resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
   }),
   ModelMiddleware.layerIdentity,
-  persistenceLayer,
 )
 
 /** @experimental */

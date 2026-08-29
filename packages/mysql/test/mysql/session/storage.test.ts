@@ -49,6 +49,7 @@ const completion = (operationKey: string, sessionParentId: string | null, text =
     replayFromHistory: false,
     content: Schema.encodeSync(Schema.Array(Response.TextPart))(response.content),
     finishReason: "stop" as const,
+    budgetCharge: 0,
   }
   const digest = Pins.digest(JSON.parse(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(unsigned)))
   return {
@@ -61,6 +62,7 @@ const completion = (operationKey: string, sessionParentId: string | null, text =
       modelAttemptId: "model-attempt:mysql",
       attempt: 0,
       response,
+      budgetCharge: 0,
       digest,
     },
   }

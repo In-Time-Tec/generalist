@@ -40,13 +40,11 @@ type CompactionContext = {
   }
   readonly chat: Chat.Service
   readonly system: string | undefined
-  readonly persisted: Chat.Persisted | undefined
   readonly options: RunOptions
   readonly state: AgentRunState
   readonly compactionService: Option.Option<typeof Compaction.Service>
   readonly tokenizerService: Option.Option<typeof Tokenizer.Tokenizer.Service>
   readonly deliverPending: Effect.Effect<void, import("../model/telemetry/events.js").DeliveryFailed>
-  readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
   readonly emitTelemetry: (event: import("../model/telemetry/events.js").EventPayload) => Effect.Effect<void>
   readonly prepareTelemetry: (event: import("../model/telemetry/events.js").EventPayload) => ModelTelemetryEvent
@@ -72,7 +70,6 @@ export const make = (context: CompactionContext) => {
     compactionService,
     tokenizerService,
     deliverPending,
-    savePersisted,
     undeliveredTelemetry,
     emitTelemetry,
     prepareTelemetry,
@@ -122,7 +119,6 @@ export const make = (context: CompactionContext) => {
             const before = buildContext(path.slice(0, -1))
             if (checkpoint?._tag === "Compaction" && promptEquivalence(before, transcript)) {
               yield* Ref.set(chat.history, withDerivedSystem({ system, projection }))
-              yield* savePersisted(turn)
               return cursorFromPath(path)
             }
             const diagnosticsBase = {
@@ -134,7 +130,7 @@ export const make = (context: CompactionContext) => {
             const diagnosticsInput =
               sessionOwnerToken === undefined ? diagnosticsBase : { ...diagnosticsBase, ownerToken: sessionOwnerToken }
             return yield* AgentError.make({
-              message: "Session projection is not a prefix of authoritative Chat history",
+              message: "Session projection is not a prefix of live Chat history",
               turn,
               diagnostics: diagnoseSessionSync(diagnosticsInput),
             })
@@ -257,7 +253,7 @@ export const make = (context: CompactionContext) => {
                   }),
                 ),
           ),
-          Effect.andThen(deliverPending.pipe(Effect.andThen(savePersisted(turn)))),
+          Effect.andThen(deliverPending),
         )
       },
       onSome: (session) =>
@@ -331,7 +327,6 @@ export const make = (context: CompactionContext) => {
                   state.reportedContextUsage = undefined
                 }),
               ),
-              Effect.andThen(restore(savePersisted(turn))),
             ),
           )
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),

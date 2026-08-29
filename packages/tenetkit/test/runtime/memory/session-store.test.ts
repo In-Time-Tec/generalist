@@ -344,7 +344,7 @@ const inspectFourChildReferences = (filename: string, expectedMarkers: ReadonlyA
   )
   expect(childOperations).toHaveLength(40)
   expect(childCommitted).toHaveLength(40)
-  expect(Math.max(...childOperations.map((row) => row.bytes))).toBeLessThanOrEqual(1_024)
+  expect(Math.max(...childOperations.map((row) => row.bytes))).toBeLessThanOrEqual(1_100)
   expect(
     Math.max(...childOperations.map((row) => row.bytes)) - Math.min(...childOperations.map((row) => row.bytes)),
   ).toBeLessThanOrEqual(64)

@@ -21,6 +21,7 @@ export interface CommitModelResponseInput extends ExecutionClaim {
   readonly checkpoint?: ExecutionCheckpoint
   readonly continuation?: import("../../run/steering.js").ExecutionContinuation | null
   readonly steeringEntryIds?: ReadonlyArray<string>
+  readonly transitionDigest?: string
   readonly event: LiveModelResponseCommitted
 }
 
@@ -37,6 +38,8 @@ export interface CompletedOperationRef {
   readonly sessionEntryId: string
   readonly usage?: (typeof CompletedModelResponse.Encoded)["usage"]
   readonly finishReason?: (typeof CompletedModelResponse.Encoded)["finishReason"]
+  readonly budgetCharge: number
+  readonly transitionDigest?: string
   readonly digest: string
 }
 
@@ -62,6 +65,20 @@ const jsonValue = (value: JsonInput): Schema.Json =>
   Schema.decodeSync(JsonFromString)(Schema.encodeSync(UnknownFromString)(value))
 const sameJson = <Left, Right>(left: Left, right: Right): boolean =>
   Pins.digest(jsonValue(left)) === Pins.digest(jsonValue(right))
+const continuationIdentity = (continuation: CommitModelResponseInput["continuation"]): Schema.Json => {
+  if (continuation === undefined) return { disposition: "unchanged" }
+  if (continuation === null) return { disposition: "cleared" }
+  return { disposition: "set", value: jsonValue(continuation) }
+}
+const transitionDigest = (input: CommitModelResponseInput): string =>
+  input.transitionDigest ??
+  Pins.digest(
+    jsonValue({
+      checkpoint: input.checkpoint ?? null,
+      continuation: continuationIdentity(input.continuation),
+      steeringEntryIds: input.steeringEntryIds ?? [],
+    }),
+  )
 const fail = (message: string) => RuntimeUnavailable.make({ message })
 const committedTag: ModelResponseCommitted["_tag"] = "ModelResponseCommitted"
 
@@ -81,6 +98,8 @@ const CompletedOperationRefValue = Schema.Struct({
   sessionEntryId: Schema.String,
   usage: Schema.optionalKey(Schema.toEncoded(Response.Usage)),
   finishReason: Schema.optionalKey(Response.FinishReason),
+  budgetCharge: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)),
+  transitionDigest: Schema.String,
   digest: Schema.String,
 })
 
@@ -94,6 +113,7 @@ const referenceFromOperation = (input: {
   readonly runId: string
   readonly sessionId: string
   readonly operation: CompletedOperation
+  readonly request: CommitModelResponseInput
 }): CompletedOperationRef =>
   Object.assign(
     {
@@ -105,6 +125,8 @@ const referenceFromOperation = (input: {
       sessionId: input.sessionId,
       sessionParentId: input.operation.sessionParentId,
       sessionEntryId: completedSessionEntryId({ runId: input.runId, operationKey: input.operation.operationId }),
+      budgetCharge: input.operation.budgetCharge,
+      transitionDigest: transitionDigest(input.request),
       digest: input.operation.digest,
     },
     input.operation.usage === undefined ? undefined : { usage: input.operation.usage },
@@ -124,6 +146,7 @@ const unsignedOperation = (input: {
     sessionParentId: input.reference.sessionParentId,
     replayFromHistory: false,
     content: input.content,
+    budgetCharge: input.reference.budgetCharge,
   }
   if (input.reference.usage !== undefined) Object.assign(operation, { usage: input.reference.usage })
   if (input.reference.finishReason !== undefined)
@@ -161,6 +184,7 @@ export const liveModelResponseEvent = (
       modelAttemptId: operation.modelAttemptId,
       attempt: operation.attempt,
       response: resolvedModelResponse(operation),
+      budgetCharge: operation.budgetCharge,
       digest,
     }
   } catch (error) {
@@ -197,6 +221,7 @@ const eventFromReference = (reference: CompletedOperationRef): ModelResponseComm
       sessionId: reference.sessionId,
       sessionParentId: reference.sessionParentId,
       sessionEntryId: reference.sessionEntryId,
+      budgetCharge: reference.budgetCharge,
       digest: reference.digest,
     },
     reference.usage === undefined
@@ -217,6 +242,9 @@ const validateReference = (input: {
   const entryId = completedSessionEntryId({ runId: input.request.runId, operationKey: input.record.operationKey })
   if (input.reference.sessionEntryId !== entryId) {
     return fail(`model operation ${input.request.operationId} Session entry identity diverges`)
+  }
+  if (input.reference.transitionDigest !== transitionDigest(input.request)) {
+    return fail(`model operation ${input.request.operationId} transition checkpoint diverges`)
   }
   return undefined
 }
@@ -258,7 +286,12 @@ const commitSource = (input: {
   const reference =
     rich === undefined
       ? persisted!
-      : referenceFromOperation({ runId: input.request.runId, sessionId: input.sessionId, operation: rich })
+      : referenceFromOperation({
+          runId: input.request.runId,
+          sessionId: input.sessionId,
+          operation: rich,
+          request: input.request,
+        })
   return [rich, reference]
 }
 
@@ -310,6 +343,7 @@ const eventPayload = (event: ModelResponseCommitted) =>
       sessionId: event.sessionId,
       sessionParentId: event.sessionParentId,
       sessionEntryId: event.sessionEntryId,
+      budgetCharge: event.budgetCharge,
       digest: event.digest,
     },
     event.usage === undefined
@@ -335,6 +369,7 @@ export const referenceFromEvent = (event: ModelResponseCommitted): CompletedOper
       sessionId: event.sessionId,
       sessionParentId: event.sessionParentId,
       sessionEntryId: event.sessionEntryId,
+      budgetCharge: event.budgetCharge,
       digest: event.digest,
     },
     event.usage === undefined

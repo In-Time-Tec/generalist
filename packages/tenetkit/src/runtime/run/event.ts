@@ -296,6 +296,10 @@ const AgentLoopEventSchema = Schema.Union([
     sessionId: Schema.String,
     sessionParentId: Schema.NullOr(Schema.String),
     sessionEntryId: Schema.String,
+    budgetCharge: Schema.Int.check(
+      Schema.isGreaterThanOrEqualTo(0),
+      Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+    ),
     digest: Schema.String,
     usage: Schema.optionalKey(Usage),
     finishReason: Schema.optionalKey(Response.FinishReason),

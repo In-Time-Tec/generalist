@@ -9,6 +9,7 @@ import {
   unbounded as RunBudget_unbounded,
   allocate as RunBudget_allocate,
   charge as RunBudget_charge,
+  settleModelTokens as RunBudget_settleModelTokens,
   reserveChild as RunBudget_reserveChild,
   narrowChild as RunBudget_narrowChild,
   refundUnused as RunBudget_refundUnused,
@@ -28,6 +29,7 @@ export const RunBudget = {
   unbounded: RunBudget_unbounded,
   allocate: RunBudget_allocate,
   charge: RunBudget_charge,
+  settleModelTokens: RunBudget_settleModelTokens,
   reserveChild: RunBudget_reserveChild,
   narrowChild: RunBudget_narrowChild,
   refundUnused: RunBudget_refundUnused,
@@ -46,6 +48,7 @@ export namespace RunBudget {
   export type make = typeof import("../run-budget.js").make
   export type allocate = typeof import("../run-budget.js").allocate
   export type charge = typeof import("../run-budget.js").charge
+  export type settleModelTokens = typeof import("../run-budget.js").settleModelTokens
   export type reserveChild = typeof import("../run-budget.js").reserveChild
   export type narrowChild = typeof import("../run-budget.js").narrowChild
   export type refundUnused = typeof import("../run-budget.js").refundUnused

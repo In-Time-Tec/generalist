@@ -4,12 +4,14 @@ import {
   type DriverCheckpoint,
   type DriverDecision,
   type DriverOperationKind,
+  type OperationOutcome,
   make as makeOperation,
 } from "./driver/contract.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver, type DriverInput } from "./service.js"
-import { charge, type RunBudget, type RunBudgetExhausted, type BudgetLimits } from "./run-budget.js"
+import { charge, settleModelTokens, type RunBudget, type RunBudgetExhausted, type BudgetLimits } from "./run-budget.js"
 import { LoopDriverState, type PendingOperation } from "./loop-driver-state.js"
 import { HandoffCommit, type HandoffControlState } from "../agent/handoff/state.js"
+import { isCompletedModelOperation } from "../model/operation.js"
 
 const WaitOutcome = Schema.Struct({
   waitId: Schema.optionalKey(Schema.String),
@@ -139,6 +141,80 @@ export const withHandoffState: {
     decodeState(checkpoint).pipe(Effect.map((state) => encodeCheckpoint(checkpoint, { ...state, handoff }))),
 )
 
+const rejectUnknownOutcome = (
+  outcome: Extract<OperationOutcome, { readonly _tag: "Unknown" }>,
+  pending: PendingOperation | undefined,
+): Effect.Effect<never, DriverError> => {
+  if (pending === undefined) {
+    return DriverError.make({
+      message: `Cannot apply unknown outcome ${outcome.operationId} without a pending operation`,
+    })
+  }
+  if (pending.replayPolicy === "never") {
+    return DriverError.make({
+      message: `Operation ${pending.key} with replay policy never cannot accept an unknown outcome`,
+    })
+  }
+  return DriverError.make({
+    message: `Unknown outcome ${outcome.operationId} requires host resolution before apply`,
+  })
+}
+
+const applySucceededOutcome = (
+  checkpoint: DriverCheckpoint,
+  pending: PendingOperation,
+  state: LoopDriverState,
+  outcome: Extract<OperationOutcome, { readonly _tag: "Succeeded" }>,
+): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
+  Effect.gen(function* () {
+    let nextState: LoopDriverState = (({ pending: _pending, ...rest }) => rest)(state)
+    const budget = checkpoint.budget
+    if (pending.kind === "wait") {
+      const waitInput = yield* Schema.decodeUnknownEffect(WaitOutcome)(outcome.value).pipe(
+        Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid wait outcome: ${String(error)}` })),
+      )
+      if (pending.key.startsWith("resume:")) {
+        nextState = (({ wait: _wait, suspensionToken: _token, ...rest }) => rest)(nextState)
+      } else {
+        const wait = { waitId: waitInput.waitId ?? waitInput.token ?? "wait", reason: waitInput.reason ?? "suspended" }
+        if (waitInput.token !== undefined) Object.assign(wait, { replayToken: waitInput.token })
+        nextState = { ...nextState, wait }
+        if (waitInput.token !== undefined) Object.assign(nextState, { suspensionToken: waitInput.token })
+      }
+      return encodeCheckpoint(checkpoint, nextState, budget)
+    }
+    if (pending.kind === "handoff") {
+      const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(outcome.value).pipe(
+        Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${String(error)}` })),
+      )
+      return yield* applyHandoffCommit(encodeCheckpoint(checkpoint, nextState, budget), commit)
+    }
+    if (pending.kind !== "model" || !isCompletedModelOperation(outcome.value)) {
+      return encodeCheckpoint(checkpoint, nextState, budget)
+    }
+    if (outcome.value.operationId !== pending.key) {
+      return yield* DriverStateInvalid.make({
+        message: `Completed model operation ${outcome.value.operationId} does not match ${pending.key}`,
+      })
+    }
+    const settled = settleModelTokens(budget, outcome.value.budgetCharge)
+    if (settled.exhausted !== undefined) nextState = { ...nextState, postCommitFailure: settled.exhausted }
+    return encodeCheckpoint(checkpoint, nextState, settled.budget)
+  })
+
+const applyOutcome = (
+  checkpoint: DriverCheckpoint,
+  outcome: OperationOutcome,
+): Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> =>
+  Effect.gen(function* () {
+    const state = yield* decodeState(checkpoint)
+    if (outcome._tag === "Unknown") return yield* rejectUnknownOutcome(outcome, state.pending)
+    if (state.pending === undefined) return encodeCheckpoint(checkpoint, state)
+    if (outcome._tag === "Succeeded") return yield* applySucceededOutcome(checkpoint, state.pending, state, outcome)
+    const { pending: _pending, ...rest } = state
+    return encodeCheckpoint(checkpoint, rest)
+  })
+
 /** @experimental Production durable driver backing inline Agent.stream runs. */
 export const make = (options: LoopDriverOptions): DurableAgentDriver => ({
   version: currentDriverVersion,
@@ -182,63 +258,7 @@ export const make = (options: LoopDriverOptions): DurableAgentDriver => ({
         operation: makeOperation(state.pending),
       } satisfies DriverDecision
     }),
-  apply: (checkpoint, outcome) =>
-    Effect.gen(function* () {
-      const state = yield* decodeState(checkpoint)
-      if (outcome._tag === "Unknown") {
-        const pending = state.pending
-        if (pending === undefined) {
-          return yield* DriverError.make({
-            message: `Cannot apply unknown outcome ${outcome.operationId} without a pending operation`,
-          })
-        }
-        if (pending.replayPolicy === "never") {
-          return yield* DriverError.make({
-            message: `Operation ${pending.key} with replay policy never cannot accept an unknown outcome`,
-          })
-        }
-        return yield* DriverError.make({
-          message: `Unknown outcome ${outcome.operationId} requires host resolution before apply`,
-        })
-      }
-      const pending = state.pending
-      if (pending === undefined) {
-        return encodeCheckpoint(checkpoint, state)
-      }
-      if (outcome._tag === "Failed") {
-        const { pending: _pending, ...rest } = state
-        return encodeCheckpoint(checkpoint, rest)
-      }
-      let nextState: LoopDriverState = (({ pending: _pending, ...rest }) => rest)(state)
-      const budget = checkpoint.budget
-      if (pending.kind === "wait") {
-        const waitInput = yield* Schema.decodeUnknownEffect(WaitOutcome)(outcome.value).pipe(
-          Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid wait outcome: ${String(error)}` })),
-        )
-        if (pending.key.startsWith("resume:")) {
-          nextState = (({ wait: _wait, suspensionToken: _token, ...rest }) => rest)(nextState)
-        } else {
-          const wait = {
-            waitId: waitInput.waitId ?? waitInput.token ?? "wait",
-            reason: waitInput.reason ?? "suspended",
-          }
-          if (waitInput.token !== undefined) Object.assign(wait, { replayToken: waitInput.token })
-          nextState = {
-            ...nextState,
-            wait,
-          }
-          if (waitInput.token !== undefined) Object.assign(nextState, { suspensionToken: waitInput.token })
-        }
-        return encodeCheckpoint(checkpoint, nextState, budget)
-      }
-      if (pending.kind === "handoff") {
-        const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(outcome.value).pipe(
-          Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${String(error)}` })),
-        )
-        return yield* applyHandoffCommit(encodeCheckpoint(checkpoint, nextState, budget), commit)
-      }
-      return encodeCheckpoint({ ...checkpoint, turn: checkpoint.turn }, nextState, budget)
-    }),
+  apply: applyOutcome,
 })
 
 /** @experimental Attach the next pending operation before interpreter decide. */

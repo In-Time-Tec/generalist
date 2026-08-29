@@ -1,8 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "../json.js"
-import { Effect, Exit, Layer, Option, Ref, Schema, Stream } from "effect"
-import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Persistence } from "effect/unstable/persistence"
+import { Effect, Exit, Layer, Option, Schema, Stream } from "effect"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
@@ -98,7 +97,7 @@ const failingPrompt: ModelMiddleware.Middleware = {
   transformPrompt: () => Effect.fail(AgentEvent.AgentError.make({ message: "prompt middleware boom", turn: 0 })),
 }
 
-layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddleware", (it) => {
+layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
   ItLayer.make(
     it,
     "identity default: empty chain behaves like the pre-middleware loop",
@@ -205,9 +204,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         return Effect.succeed(Option.some(part))
       },
     }
-    const persistenceLayer = Chat.layerPersisted({ storeId: "authority" }).pipe(
-      Layer.provide(Persistence.layerBackingMemory),
-    )
     return [
       Layer.mergeAll(
         modelLayer(() => {
@@ -237,7 +233,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           maybeCompact: (request) => Effect.sync(() => compactionRequests.push(request)).pipe(Effect.as(Option.none())),
         }),
         Session.layerMemory,
-        persistenceLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "authority-agent", toolkit: Toolkit.make(echoTool) })
@@ -246,12 +241,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
             prompt: "start",
             sessionId: "session-authority",
             memory: { key: memoryKey },
-            persistence: { chatId: "authority-chat" },
           }),
         )
-        const persistence = yield* Chat.Persistence
-        const persisted = yield* persistence.get("authority-chat")
-        const persistedHistory = yield* Ref.get(persisted.history)
         const sessionHistory = yield* Effect.scoped(
           Session.acquire("session-authority").pipe(
             Effect.flatMap((session) => session.path()),
@@ -262,7 +253,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         const completeViews = [
           Json.stringify(modelParts),
-          Json.stringify(persistedHistory.content),
+          Json.stringify(sessionHistory.content),
           Json.stringify(remembered.map((input) => input.transcript.content)),
           Json.stringify(compactionRequests.map((request) => request.history.content)),
         ]
@@ -333,14 +324,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
             }),
         }),
         ModelMiddleware.layer([duplicateIdMiddleware]),
-        Chat.layerPersisted({ storeId: "duplicate-id" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
+        Session.layerMemory,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "duplicate-id-agent", toolkit: Toolkit.make(gatedEchoTool) })
         const events: Array<AgentEvent.Event> = []
         const outcome = yield* Agent.stream(agent, {
           prompt: "call three times",
-          persistence: { chatId: "duplicate-id-chat" },
+          sessionId: "duplicate-id",
         }).pipe(
           Stream.runForEach((event) =>
             Effect.sync(() => {
@@ -349,9 +340,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           ),
           Effect.match({ onFailure: (error) => ({ error }), onSuccess: (value) => ({ value }) }),
         )
-        const persistence = yield* Chat.Persistence
-        const persisted = yield* persistence.get("duplicate-id-chat")
-        const history = Json.stringify((yield* Ref.get(persisted.history)).content)
+        const history = yield* Effect.scoped(
+          Session.acquire("duplicate-id").pipe(
+            Effect.flatMap((session) => session.path()),
+            Effect.map((path) => Json.stringify(Session.buildContext(path).content)),
+          ),
+        )
         const modelToolCalls = events.filter((event) => event._tag === "ModelPart" && event.part.type === "tool-call")
         const approvalRequests = events.filter((event) => event._tag === "ApprovalRequested")
         const executionStarted = events.filter((event) => event._tag === "ToolExecutionStarted")
@@ -565,9 +559,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         }
       },
     }
-    const persistenceLayer = Chat.layerPersisted({ storeId: "exit-authority" }).pipe(
-      Layer.provide(Persistence.layerBackingMemory),
-    )
     return [
       Layer.mergeAll(
         modelLayer(() =>
@@ -578,42 +569,41 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layer([exitMiddleware]),
-        persistenceLayer,
+        Session.layerMemory,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "exit-authority-agent", toolkit: Toolkit.make(echoTool) })
-        const persistence = yield* Chat.Persistence
-        const assertNotStored = (chatId: string) =>
-          Effect.gen(function* () {
-            const persisted = yield* persistence.get(chatId)
-            const serialized = Json.stringify((yield* Ref.get(persisted.history)).content)
-            expect(serialized).not.toContain("safe-exit")
-            expect(serialized).not.toContain("raw-exit")
-          })
+        const assertNotStored = (sessionId: string) =>
+          Effect.scoped(
+            Effect.gen(function* () {
+              const session = yield* Session.acquire(sessionId)
+              const serialized = Json.stringify(Session.buildContext(yield* session.path()).content)
+              expect(serialized).not.toContain("safe-exit")
+              expect(serialized).not.toContain("raw-exit")
+            }),
+          )
 
         exitMode = "typed"
-        const typed = yield* Effect.flip(
-          Stream.runDrain(Agent.stream(agent, { prompt: "typed", persistence: { chatId: "typed" } })),
-        )
+        const typed = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "typed", sessionId: "typed" })))
         expect(typed._tag).toBe("tenetkit/core/AgentError")
         yield* assertNotStored("typed")
 
         exitMode = "defect"
         const defect = yield* Effect.exit(
-          Stream.runDrain(Agent.stream(agent, { prompt: "defect", persistence: { chatId: "defect" } })),
+          Stream.runDrain(Agent.stream(agent, { prompt: "defect", sessionId: "defect" })),
         )
         expect(Exit.hasDies(defect)).toBe(true)
         yield* assertNotStored("defect")
 
         exitMode = "interrupt"
         const interrupt = yield* Effect.exit(
-          Stream.runDrain(Agent.stream(agent, { prompt: "interrupt", persistence: { chatId: "interrupt" } })),
+          Stream.runDrain(Agent.stream(agent, { prompt: "interrupt", sessionId: "interrupt" })),
         )
         expect(Exit.hasInterrupts(interrupt)).toBe(true)
         yield* assertNotStored("interrupt")
 
         exitMode = "early"
-        yield* Agent.stream(agent, { prompt: "early", persistence: { chatId: "early" } }).pipe(
+        yield* Agent.stream(agent, { prompt: "early", sessionId: "early" }).pipe(
           Stream.filter((event) => event._tag === "ModelPart"),
           Stream.take(1),
           Stream.runDrain,
@@ -623,30 +613,33 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
     ] as const
   })
 
-  ItLayer.make(it, "coalesces adjacent completed response text before persisting history", () => {
-    const persistenceLayer = Chat.layerPersisted({ storeId: "response-authority" }).pipe(
-      Layer.provide(Persistence.layerBackingMemory),
-    )
-    return [
-      Layer.mergeAll(
-        modelLayer(() => Stream.concat(assistantText("first", "."), assistantText("second", "answer"))),
-        unusedExecutor,
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
-        persistenceLayer,
-      ),
-      Effect.gen(function* () {
-        const agent = Agent.make({ name: "response-authority-agent" })
-        const persistence = yield* Chat.Persistence
-        yield* Stream.runDrain(Agent.stream(agent, { prompt: "complete", persistence: { chatId: "complete" } }))
-        const persisted = yield* persistence.get("complete")
-        const history = yield* Ref.get(persisted.history)
-        const response = history.content.at(-1)
-        expect(response?.role).toBe("assistant")
-        expect(response?.content).toEqual([expect.objectContaining({ type: "text", text: ".answer" })])
-      }),
-    ] as const
-  })
+  ItLayer.make(
+    it,
+    "coalesces adjacent completed response text before appending Session history",
+    () =>
+      [
+        Layer.mergeAll(
+          modelLayer(() => Stream.concat(assistantText("first", "."), assistantText("second", "answer"))),
+          unusedExecutor,
+          Approvals.layerAutoApprove,
+          ModelMiddleware.layerIdentity,
+          Session.layerMemory,
+        ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "response-authority-agent" })
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "complete", sessionId: "complete" }))
+          const history = yield* Effect.scoped(
+            Session.acquire("complete").pipe(
+              Effect.flatMap((session) => session.path()),
+              Effect.map(Session.buildContext),
+            ),
+          )
+          const response = history.content.at(-1)
+          expect(response?.role).toBe("assistant")
+          expect(response?.content).toEqual([expect.objectContaining({ type: "text", text: ".answer" })])
+        }),
+      ] as const,
+  )
 
   ItLayer.make(
     it,

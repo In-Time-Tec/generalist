@@ -44,7 +44,7 @@ export interface HandoffToolOptions {
 export interface FanOutChild<Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never> {
   readonly registration: Registration<Tools, R>
   readonly prompt: Prompt.RawInput
-  readonly options?: Omit<RunOptions, "prompt" | "output" | "memory" | "persistence">
+  readonly options?: Omit<RunOptions, "prompt" | "output" | "memory">
 }
 
 export type FanOutJoin =

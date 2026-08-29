@@ -20,7 +20,8 @@ import { make as makeSkillActivation } from "./tools/skill-activation.js"
 import { make as makeCompactionRuntime } from "./compaction-runtime.js"
 import { setupRun } from "./lifecycle/setup.js"
 import { make as makeRunLoop } from "./loop/service.js"
-import { layerForRun, operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
+import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
+import { layerForRun } from "../durable/driver/layer-for-run.js"
 import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import {
   isToolNameCollision,
@@ -45,19 +46,12 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
 ): RunStream<Tools, StructuredOutputSchema, R> =>
   Stream.unwrap(
     Effect.gen(function* () {
-      if (options.history !== undefined && options.persistence !== undefined) {
-        return yield* AgentError.make({
-          message: "RunOptions.history and RunOptions.persistence are mutually exclusive",
-          turn: 0,
-        })
-      }
       const setup = yield* setupRun(agent, options)
       // prettier-ignore
       const {
         compactionService,
         activeSession,
         system,
-        persisted,
         validatedResume,
         recoveredToolCheckpoint,
         staticToolkit,
@@ -78,6 +72,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         flushTelemetry,
         deliverPending,
         telemetryIdentity,
+        modelCallUsage,
         instrumentModel,
         steeringService,
         tokenizerService,
@@ -88,21 +83,15 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         seedSystem,
         chat,
       } = setup
-      const savePersisted = (turn: number): Effect.Effect<void, AgentError> =>
-        persisted === undefined
-          ? Effect.void
-          : persisted.save.pipe(
-              Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn, cause: error })),
-            )
       const appendPending = (
-        turn: number,
+        _turn: number,
         pending: ReadonlyArray<PendingToolResult>,
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         pending.length === 0
           ? Ref.get(chat.history)
           : Ref.updateAndGet(chat.history, (history: Prompt.Prompt) =>
               Prompt.concat(history, Prompt.fromResponseParts(pending)),
-            ).pipe(Effect.tap(() => savePersisted(turn)))
+            )
       const checkpointSuspended = (
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
@@ -165,7 +154,6 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
             parentId,
             suspensionApplicationIdentity(suspension),
           )
-          if (Option.isNone(activeSession)) yield* savePersisted(turn)
           return yield* Ref.get(chat.history)
         })
       const checkpointPending = (
@@ -344,13 +332,11 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         sessionOwnerToken,
         sessionAppendOptions,
         chat,
-        persisted,
         options,
         state,
         compactionService,
         tokenizerService,
         deliverPending,
-        savePersisted,
         undeliveredTelemetry,
         emitTelemetry,
         prepareTelemetry,
@@ -394,6 +380,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         resilienceService,
         activeModelResponse,
         telemetryIdentity,
+        modelCallUsage,
         instrumentModel,
         chain,
         preparePrompt,
@@ -406,7 +393,6 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         compactionService,
         state,
         errorMessage,
-        persisted,
         toolCallEvents,
       }
       const modelRuntime =
@@ -463,7 +449,6 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               withAgentModel,
               syncSession,
               applyCompactionResult,
-              savePersisted,
               deliverPending,
               flushTelemetry,
               telemetryIdentity,

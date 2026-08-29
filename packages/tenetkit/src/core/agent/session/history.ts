@@ -100,23 +100,14 @@ export const replayModelMessages = (input: {
       ),
   })
 
-/** @internal Rebuild a resume Chat from Session when no persisted Chat owns the live view. */
+/** @internal Rebuild a resume Chat from its authoritative Session projection. */
 export const resumeChat = (input: {
-  readonly persisted: Chat.Persisted | undefined
   readonly activeSession: Option.Option<SessionStore>
   readonly suppliedHistory: Prompt.RawInput | undefined
 }): Effect.Effect<Chat.Service, import("../../context/session.js").SessionStoreError> => {
   if (Option.isSome(input.activeSession)) {
-    return input.activeSession.value.path().pipe(
-      Effect.map(buildContext),
-      Effect.flatMap((projection) =>
-        input.persisted === undefined
-          ? Chat.fromPrompt(projection)
-          : Ref.set(input.persisted.history, projection).pipe(Effect.as(input.persisted)),
-      ),
-    )
+    return input.activeSession.value.path().pipe(Effect.map(buildContext), Effect.flatMap(Chat.fromPrompt))
   }
-  if (input.persisted !== undefined) return Effect.succeed(input.persisted)
   return input.suppliedHistory === undefined ? Chat.empty : Chat.fromPrompt(input.suppliedHistory)
 }
 

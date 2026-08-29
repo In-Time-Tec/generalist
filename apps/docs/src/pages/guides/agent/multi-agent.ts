@@ -17,7 +17,6 @@ const childChannels = `Parent Agent.generate
     │
     └── Channel 2: run options / orchestration (not implicitly inherited)
         ├── omitted sessionId means no Session
-        ├── persistence/chatId absent unless explicitly supplied
         └── transport runId, queue, and scheduling remain transport-owned`
 
 export const multiAgent = definePage({
@@ -41,7 +40,7 @@ export const multiAgent = definePage({
     p(
       "A nested child effect evaluates in the current Effect Context, so its service requirements remain ambient. That does not copy values out of the parent's ",
       code("RunOptions"),
-      ": child run identity and persistence are arguments to the child call, while transport identity and scheduling remain owned by the transport that launched the parent.",
+      ": child Session identity is an argument to the child call, while transport identity and scheduling remain owned by the transport that launched the parent.",
     ),
     codeBlock({ label: "Parent and child channels", language: "text", source: childChannels }),
     table(
@@ -63,11 +62,6 @@ export const multiAgent = definePage({
           [code("sessionId")],
           ["Child ", code("RunOptions")],
           "Not inherited; omission leaves the child ephemeral, while requesting the active parent's ID fails before model execution",
-        ],
-        [
-          [code("persistence.chatId")],
-          ["Child ", code("RunOptions")],
-          "Not inherited; omission uses a fresh chat rather than the parent's transcript or persistence record",
         ],
         [
           [code("runId")],
@@ -125,8 +119,6 @@ export const multiAgent = definePage({
       code("Effect.provide"),
       ". Because the child call omits ",
       code("sessionId"),
-      " and ",
-      code("persistence"),
       ", it has no Session and uses a fresh chat. It does not share the parent's transcript or enter its transport queue.",
     ),
     codeBlock({ label: "agent-as-tool.ts", source: agentAsTool, expectedOutput: agentAsToolExpected }),

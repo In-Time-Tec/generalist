@@ -48,6 +48,7 @@ const modelCompletion = (input: {
     replayFromHistory: false,
     content: encoded.content,
     finishReason: encoded.finishReason,
+    budgetCharge: 0,
   }
   const digest = Pins.digest(jsonValue(unsigned))
   return {
@@ -60,6 +61,7 @@ const modelCompletion = (input: {
       modelAttemptId: unsigned.modelAttemptId,
       attempt: 0,
       response,
+      budgetCharge: 0,
       digest,
     },
   }

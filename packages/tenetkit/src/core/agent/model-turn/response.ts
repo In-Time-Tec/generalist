@@ -6,11 +6,11 @@ import type { AttemptCompleted } from "../../model/operation.js"
 import { coalesceAdjacentText } from "../../context/session-sync.js"
 
 type PartIdentity = Pick<AttemptCompleted, "modelCallId" | "modelAttemptId" | "attempt">
-type Authority = ReturnType<Controller["begin"]>
+export type ResponseAuthority = ReturnType<Controller["begin"]>
 
 interface ActiveAttempt extends PartIdentity {
   readonly builder: ReturnType<typeof makeModelResponse<Record<string, Tool.Any>>>
-  readonly authority?: Authority
+  readonly authority?: ResponseAuthority
 }
 
 /** @internal Own one provider attempt builder and its optional Run-visible authority. */
@@ -55,7 +55,7 @@ export const attemptResponse = (input: {
     },
     complete: (identity: PartIdentity): CompletedModelResponse<Record<string, Tool.Any>> =>
       responseFor(identity).builder.complete(),
-    authority: (): Authority | undefined => active?.authority,
+    authority: (): ResponseAuthority | undefined => active?.authority,
     discard: (): void => {
       if (active?.authority !== undefined) control?.discard(active.authority)
     },
@@ -77,7 +77,7 @@ export const replayMessages = (input: {
 
 export const clearCommittedResponse = (input: {
   readonly service: Option.Option<Interface>
-  readonly authority: Authority | undefined
+  readonly authority: ResponseAuthority | undefined
 }): void => {
   if (Option.isSome(input.service) && input.authority !== undefined) {
     controller(input.service.value).clearCommitted(input.authority)

@@ -40,10 +40,10 @@ import {
   DriverUnknownReplay as DurableDriver_DriverUnknownReplay,
   guardUnknownNeverReplay as DurableDriver_guardUnknownNeverReplay,
   layerInline as DurableDriver_layerInline,
-  layerForRun as DurableDriver_layerForRun,
   layerTest as DurableDriver_layerTest,
   make as DurableDriver_makeInline,
 } from "../driver/interpreter.js"
+import { layerForRun as DurableDriver_layerForRun } from "../driver/layer-for-run.js"
 import { make as DurableDriver_makeLoopDriver } from "../loop-driver.js"
 import {
   intercept as DurableDriver_intercept,
@@ -156,7 +156,7 @@ export namespace DurableDriver {
   export type OperationSpec = import("../driver/interpreter.js").OperationSpec
   export type RecordedOperation = import("../driver/interpreter.js").RecordedOperation
   export type layerInline = typeof import("../driver/interpreter.js").layerInline
-  export type layerForRun = typeof import("../driver/interpreter.js").layerForRun
+  export type layerForRun = typeof import("../driver/layer-for-run.js").layerForRun
   export type layerTest = typeof import("../driver/interpreter.js").layerTest
   export type makeLoopDriver = typeof import("../loop-driver.js").make
   export type intercept = typeof import("../driver/run.js").intercept

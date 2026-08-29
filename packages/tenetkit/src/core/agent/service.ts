@@ -1,6 +1,6 @@
-import { type Duration, Effect, type Layer, Option, Schema, Stream, Types } from "effect"
+import { Effect, type Layer, Option, Schema, Stream, Types } from "effect"
 import { dual } from "effect/Function"
-import { AiError, Chat, LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import {
   AgentError,
   AgentSuspended,
@@ -35,10 +35,8 @@ import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "../turn/policy.
 
 import { streamInternal } from "./run.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
-import { Runtime } from "./persistence-lock.js"
 import type { ObjectSchema } from "./loop/context.js"
 
-export { Runtime, layerRuntime } from "./persistence-lock.js"
 export { close, withTools } from "./lifecycle/definition.js"
 export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
 import type { ResumeResolution } from "./lifecycle/resume.js"
@@ -264,7 +262,7 @@ export type ProgressOverflowPolicy =
   | { readonly _tag: "Sliding"; readonly capacity: number }
   | { readonly _tag: "Fail"; readonly capacity: number }
 
-/** @experimental Options for an agent run. Set `output` for structured output; set `persistence` for persisted chat. */
+/** @experimental Options for an agent run. Set `output` for structured output. */
 export interface RunOptions {
   /** User input for the first turn. Ignored when `resume` is set. */
   readonly prompt: Prompt.RawInput
@@ -316,10 +314,6 @@ export interface RunOptions {
   /** @experimental Consult the Memory service for this run. */
   readonly memory?: {
     readonly key: Key
-  }
-  readonly persistence?: {
-    readonly chatId: string
-    readonly timeToLive?: Duration.Input
   }
   readonly output?: {
     readonly schema: ObjectSchema
@@ -376,7 +370,6 @@ export interface ObjectResult<A> extends Result {
 }
 type SchemaFromOutput<Output> = Output extends { readonly schema: infer S extends ObjectSchema } ? S : never
 type SchemaOf<O> = SchemaFromOutput<PresentOption<O, "output">>
-type PersistenceRequirement<O> = [PresentOption<O, "persistence">] extends [never] ? never : Chat.Persistence | Runtime
 type SchemaServicesD<S extends ObjectSchema> = [unknown] extends [S["DecodingServices"]] ? never : S["DecodingServices"]
 type OutputRequirement<O> = [SchemaOf<O>] extends [never] ? never : SchemaServicesD<SchemaOf<O>>
 
@@ -385,7 +378,6 @@ export type RunRequirements<Tools extends Record<string, Tool.Any>, R, O> =
   | R
   | StaticToolServices<Tools>
   | OperationRequirements<O>
-  | PersistenceRequirement<O>
   | OutputRequirement<O>
 
 /** @experimental Result selected by one run option set. */
@@ -397,7 +389,7 @@ export type RunResult<O> = O extends unknown
       : Result | ObjectResult<SchemaOf<O>["Type"]>
   : never
 
-/** @experimental Stream an agent run as Events. Set options.output for structured output; set options.persistence for persisted chat. */
+/** @experimental Stream an agent run as Events. Set options.output for structured output. */
 export const stream: {
   <O extends RunOptions>(
     options: O,

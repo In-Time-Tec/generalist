@@ -1,6 +1,6 @@
 import type { Clock, Effect, Option, Ref, Schema, Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
-import type { AgentError, AgentSuspended, Event, SteeringDrained } from "../event.js"
+import type { AgentSuspended, Event, SteeringDrained } from "../event.js"
 import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
 import type { Agent, RunError } from "../service.js"
 import type { ModelTurnServices } from "../model-turn/context.js"
@@ -96,7 +96,6 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     parentId: string | null,
     applicationIdentity: string,
   ) => Effect.Effect<void, RunError, DriverInterpreter>
-  readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly deliverPending: Effect.Effect<void, DeliveryFailed>
   readonly flushTelemetry: () => ReadonlyArray<Event>
   readonly telemetryIdentity: {

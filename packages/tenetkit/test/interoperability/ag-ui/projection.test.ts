@@ -30,6 +30,7 @@ const committed = (content: RunEvent.CompletedModelResponse["content"]) => ({
     sessionId: "thread-1",
     sessionParentId: "entry:input",
     sessionEntryId: "entry:committed",
+    budgetCharge: 0,
     finishReason: "tool-calls" as const,
     digest: "committed-digest",
   },

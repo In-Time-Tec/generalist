@@ -25,8 +25,10 @@ import { make as makeAgentRunOptions } from "./agent/run-options.js"
 import { ModelPreviewLane, open as openModelPreview } from "./model-response/preview.js"
 import {
   clearDriverOperation,
-  commitDriverOperation,
+  commitDriverOperationWithReconciliation,
   hydratePersistedModelOperation,
+  journalFailure,
+  saveJournalCheckpoint,
   verifyCommittedModelEvent,
 } from "./model-response.js"
 import { Tools as ChildRunTools } from "../child/group.js"
@@ -269,7 +271,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                             yield* store.startOperation({ ...claim, operationId: record.operationId })
                             yield* Ref.update(activeOperationIds, (current) => new Set(current).add(record.operationId))
                             return undefined
-                          }).pipe(Effect.orDie),
+                          }).pipe(Effect.mapError((error) => journalFailure("schedule", operation.key, error))),
                         onCompleted: (operation, outcome, checkpoint) =>
                           Effect.gen(function* () {
                             const persisted = yield* store.getOperationByKey({ runId, operationKey: operation.key })
@@ -288,7 +290,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                                 new Error(`Scheduled operation ${operation.key} has no prepared state`),
                               )
                             }
-                            yield* commitDriverOperation({
+                            yield* commitDriverOperationWithReconciliation({
                               store,
                               claim,
                               operation,
@@ -304,8 +306,8 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                               operationKey: operation.key,
                               operationId,
                             })
-                          }).pipe(Effect.orDie),
-                        onCheckpoint: (checkpoint) => store.saveExecution({ ...claim, checkpoint }).pipe(Effect.orDie),
+                          }).pipe(Effect.mapError((error) => journalFailure("completion", operation.key, error))),
+                        onCheckpoint: (checkpoint) => saveJournalCheckpoint({ store, claim, checkpoint }),
                       }
                       const context = Context.merge(
                         baseContext,
@@ -475,7 +477,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
           Effect.catchTag("tenetkit/runtime/RunNotFound", () => Effect.succeed(false)),
           Effect.orDie,
         )
-        const execution = scopedExecution.pipe(
+        yield* scopedExecution.pipe(
           Effect.andThen(
             ProgramChildTerminal.commit(store, claim, deferredProgramChildTerminal, (error) =>
               interruption.settle({ reason: "failure", error }),
@@ -483,7 +485,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
           ),
           Effect.onInterrupt(() => Ref.set(afterExit, interruption.onInterrupt(cancellationRequested))),
         )
-        yield* execution
       }).pipe(Effect.orDie)
     const execute = (claim: ExecutionClaim): Effect.Effect<void> =>
       Effect.gen(function* () {
@@ -496,5 +497,4 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
       })
     return ExecutionHost.of({ execute, interrupt: (runId) => active.interrupt(runId) })
   })
-export const layer = (options: Options): Layer.Layer<ExecutionHost, never, RunStore | ActiveExecutions> =>
-  Layer.effect(ExecutionHost, make(options))
+export const layer = (options: Options) => Layer.effect(ExecutionHost, make(options))

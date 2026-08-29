@@ -1,11 +1,9 @@
 import { Effect, Layer, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
-import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
   AgentManifest,
   Approvals,
-  Chat,
   LanguageModel,
   ModelMiddleware,
   Pins,
@@ -163,7 +161,6 @@ const agentServices = Layer.mergeAll(
   }),
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
-  Chat.layerPersisted({ storeId: "research-agent" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )
 
 const runtimeLayer = Runtime.layerMemory({

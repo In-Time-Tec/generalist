@@ -1,7 +1,6 @@
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Cause, Effect, Function, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
-import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Persistence } from "effect/unstable/persistence"
+import { Cause, Deferred, Effect, Fiber, Function, Layer, Option, Schema, Scope, Stream } from "effect"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentManifest,
@@ -24,10 +23,6 @@ import { edgeCount, incrementEdge } from "../../../src/core/agent/handoff/state.
 import { applyHandoffCommit } from "../../../src/core/durable/loop-driver.js"
 import { Pin } from "../../../src/core/durable/pin.js"
 import { withDerivedSystem } from "../../../src/core/agent/session/history.js"
-
-const persistenceLayer = Chat.layerPersisted({ storeId: "durable-driver-test" }).pipe(
-  Layer.provide(Persistence.layerBackingMemory),
-)
 
 type JsonRoundTripValue = typeof Schema.Unknown.Type
 const roundTrip = (value: JsonRoundTripValue): JsonRoundTripValue => Json.parse(Json.stringify(value))
@@ -1220,7 +1215,49 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
-  it.effect("replays a settled compacted no-Session model request after outcome-before-checkpoint interruption", () =>
+  it.effect("surfaces a model completion acknowledgement failure through Agent.stream", () =>
+    Effect.gen(function* () {
+      const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+        onScheduled: () => Effect.void,
+        onCompleted: (operation: DurableDriver.DriverOperation) =>
+          operation.kind === "model"
+            ? Effect.fail(DurableDriver.DriverError.make({ message: "model completion unavailable" }))
+            : Effect.void,
+        onCheckpoint: () => Effect.void,
+      })
+      const modelLayer = Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: () =>
+            withProviderFinish(
+              Stream.make(
+                Response.makePart("tool-call", {
+                  id: "paid-call",
+                  name: "echo",
+                  params: { text: "must not execute" },
+                  providerExecuted: false,
+                }),
+              ),
+            ),
+        }),
+      )
+
+      const failure = yield* provideScoped(
+        Layer.mergeAll(modelLayer, journalLayer, unusedToolHandlerLayer),
+        Agent.stream(Agent.make({ name: "model-completion-failure", toolkit: Toolkit.make(echoTool) }), {
+          prompt: "reply",
+          sessionId: "model-completion-failure",
+        }).pipe(Stream.runDrain, Effect.flip),
+      )
+      expect(failure).toMatchObject({
+        _tag: "tenetkit/core/DriverError",
+        message: "model completion unavailable",
+      })
+    }),
+  )
+
+  it.effect("replays a settled compacted Session model request after outcome-before-checkpoint interruption", () =>
     Effect.gen(function* () {
       const rawPrompt = Prompt.fromMessages([
         Prompt.makeMessage("user", {
@@ -1274,6 +1311,8 @@ describe("DurableDriver Agent.stream integration", () => {
       let pendingCheckpoint: DurableDriver.DriverCheckpoint | undefined
       let settledOutcome: DurableDriver.OperationOutcome | undefined
       let replaySettled = false
+      const completionStarted = yield* Deferred.make<void>()
+      const completionRelease = yield* Deferred.make<void>()
       const journal: DurableDriver.DriverJournal = {
         onScheduled: (operation, checkpoint) =>
           Effect.sync(() => {
@@ -1286,8 +1325,13 @@ describe("DurableDriver Agent.stream integration", () => {
           if (operation.key !== targetOperation || replaySettled) return Effect.void
           return Effect.sync(() => {
             settledOutcome = outcome
-            throw new Error("simulated journal crash")
-          })
+          }).pipe(
+            Effect.andThen(Deferred.succeed(completionStarted, undefined)),
+            Effect.andThen(Deferred.await(completionRelease)),
+            Effect.andThen(
+              Effect.fail(DurableDriver.DriverError.make({ message: "simulated lost completion acknowledgement" })),
+            ),
+          )
         },
         onCheckpoint: () => Effect.void,
       }
@@ -1306,31 +1350,36 @@ describe("DurableDriver Agent.stream integration", () => {
           }),
           Layer.succeed(DurableDriver.DriverJournalService, journal),
           unusedToolHandlerLayer,
-          Agent.layerRuntime,
-          persistenceLayer,
+          Session.layerMemory,
         ),
         Effect.gen(function* () {
+          const sessionContext = (sessionId: string) =>
+            Effect.scoped(
+              Session.acquire(sessionId).pipe(
+                Effect.flatMap((session) => session.path()),
+                Effect.map(Session.buildContext),
+              ),
+            )
           const baseline = yield* Agent.stream(agent, {
             prompt: rawPrompt,
             logicalOperationId: "compacted-baseline",
             executableRef: executable.ref,
             sessionId: "compacted-baseline",
-            persistence: { chatId: "compacted-baseline" },
             compaction: { contextWindow: 1 },
           }).pipe(Stream.runCollect)
-          const persistence = yield* Chat.Persistence
-          const baselineChat = yield* persistence.get("compacted-baseline")
-          const baselineFinal = yield* Ref.get(baselineChat.history)
+          const baselineFinal = yield* sessionContext("compacted-baseline")
 
           activeRun = "recovery"
-          const interrupted = yield* Agent.stream(agent, {
+          const recoveryFiber = yield* Agent.stream(agent, {
             prompt: rawPrompt,
             logicalOperationId: "compacted-recovery",
             executableRef: executable.ref,
             sessionId: "compacted-recovery",
-            persistence: { chatId: "compacted-recovery" },
             compaction: { contextWindow: 1 },
-          }).pipe(Stream.runDrain, Effect.exit)
+          }).pipe(Stream.runDrain, Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(completionStarted)
+          yield* Deferred.succeed(completionRelease, undefined)
+          const interrupted = yield* Fiber.await(recoveryFiber)
           expect(interrupted._tag).toBe("Failure")
           expect(providerPrompts.recovery).toHaveLength(1)
           expect(pendingCheckpoint).toBeDefined()
@@ -1339,10 +1388,9 @@ describe("DurableDriver Agent.stream integration", () => {
           expect(pendingState.pending.key).toBe(targetOperation)
           expect(pendingState.pending.input.promptDigest).toMatch(/^[0-9a-f]{64}$/)
           if (settledOutcome?._tag === "Succeeded") {
-            expect(settledOutcome.value).toMatchObject({ replayFromHistory: true })
+            expect(settledOutcome.value).toMatchObject({ replayFromHistory: false })
           }
-          const recoveryChat = yield* persistence.get("compacted-recovery")
-          expect((yield* Ref.get(recoveryChat.history)).content).toEqual(compactedRequest.content)
+          expect((yield* sessionContext("compacted-recovery")).content).toEqual(compactedRequest.content)
 
           replaySettled = true
           const recovered = yield* Agent.stream(agent, {
@@ -1351,11 +1399,9 @@ describe("DurableDriver Agent.stream integration", () => {
             executableRef: executable.ref,
             driverCheckpoint: pendingCheckpoint!,
             sessionId: "compacted-recovery",
-            persistence: { chatId: "compacted-recovery" },
             compaction: { contextWindow: 1 },
           }).pipe(Stream.runCollect)
-          const recoveredChat = yield* persistence.get("compacted-recovery")
-          const recoveredFinal = yield* Ref.get(recoveredChat.history)
+          const recoveredFinal = yield* sessionContext("compacted-recovery")
 
           expect(normalizedCompactionInputs).toHaveLength(2)
           for (const input of normalizedCompactionInputs) {
@@ -1713,6 +1759,39 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
+  it.effect("surfaces successful stream acknowledgement failure in the typed channel", () =>
+    Effect.gen(function* () {
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream-ack", sessionId: "stream-ack" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("stream-ack"), budget: RunBudget.allocate({}) })
+      let completionAttempts = 0
+      const interpreter = yield* DurableDriver.makeInline({
+        driver,
+        initial,
+        journal: {
+          onScheduled: () => Effect.void,
+          onCompleted: () => {
+            completionAttempts += 1
+            return DurableDriver.DriverError.make({ message: "completion acknowledgement unavailable" })
+          },
+          onCheckpoint: () => Effect.void,
+        },
+      })
+
+      const failure = yield* interpreter
+        .runStream(
+          { kind: "tool", key: "stream-ack:tool", input: {}, replayPolicy: "pure" },
+          Stream.make("paid result"),
+        )
+        .pipe(Stream.runDrain, Effect.flip)
+
+      expect(failure).toMatchObject({
+        _tag: "tenetkit/core/DriverError",
+        message: "completion acknowledgement unavailable",
+      })
+      expect(completionAttempts).toBe(1)
+    }),
+  )
+
   it.effect("records a defective non-replayable stream as unknown after stream finalizers", () =>
     Effect.gen(function* () {
       const lifecycle: Array<string> = []
@@ -1771,8 +1850,7 @@ describe("DurableDriver Agent.stream integration", () => {
             : Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" }),
       }),
       journalLayer,
-      persistenceLayer,
-      Agent.layerRuntime,
+      Session.layerMemory,
       unusedToolHandlerLayer,
     )
     layer(services)("binds suspension checkpoints to resume tokens", (suite) => {
@@ -1783,7 +1861,6 @@ describe("DurableDriver Agent.stream integration", () => {
             prompt: "wait",
             logicalOperationId: "suspend-run",
             sessionId: "driver-suspend",
-            persistence: { chatId: "driver-suspend" },
           }).pipe(Stream.runDrain, Effect.flip)
           if (suspended._tag !== "tenetkit/core/AgentSuspended") return expect.unreachable()
           expect(
@@ -1794,7 +1871,6 @@ describe("DurableDriver Agent.stream integration", () => {
             prompt: "ignored",
             logicalOperationId: "suspend-run",
             sessionId: "driver-suspend",
-            persistence: { chatId: "driver-suspend" },
             resume: { suspension: suspended },
           }).pipe(Stream.runDrain)
           expect(

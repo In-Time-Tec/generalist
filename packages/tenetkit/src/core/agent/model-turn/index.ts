@@ -22,15 +22,15 @@ import type { RunError, ToolSchedulingPolicy } from "../service.js"
 import type { TurnOverrides } from "../../turn/policy.js"
 import { wrapDriverAttempt } from "./driver.js"
 import type { AttemptCompleted, AttemptEvent, CompletedModelOperation } from "../../model/operation.js"
-import { captureFinishPart, captureStructuredUsage, chargeAttemptUsageWith } from "./finish.js"
+import { captureFinishPart, captureStructuredUsage, modelBudgetCharge } from "./finish.js"
 import { schedule as scheduleTools } from "../tools/scheduler.js"
 import { classifyOtherFailure, isToolNameCollision, providerOutput, singleFailure } from "./parts.js"
-import { text as modelResponseText } from "../../model/response/builder.js"
-import { committedEvent } from "./commit.js"
-import { attemptResponse, clearCommittedResponse, replayMessages } from "./response.js"
+import { projectCommittedResponse } from "./commit.js"
+import { attemptResponse, replayMessages } from "./response.js"
 import { make as makeActiveTurn } from "./active.js"
 import { make as makeRetryableOverflow } from "./retryable-overflow.js"
 import { validateContext } from "../../context/session.js"
+
 export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
@@ -40,6 +40,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     resilienceService,
     activeModelResponse,
     telemetryIdentity,
+    modelCallUsage,
     instrumentModel,
     chain,
     preparePrompt,
@@ -50,7 +51,6 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     compactionService,
     state,
     errorMessage,
-    persisted,
     toolCallEvents,
   } = context
   const activeTurnInput: Parameters<typeof makeActiveTurn>[0] = {
@@ -370,6 +370,11 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                               replayFromHistory:
                                 sessionParentId === null && preparedState?.preparedPrompt.content.length === 0,
                               response,
+                              budgetCharge: modelBudgetCharge({
+                                usage: response.usage,
+                                failedAttemptUsage: modelCallUsage.get(identity.modelCallId),
+                                fallbackTokens: state.currentContextTokens,
+                              }),
                             }
                           }),
                         ),
@@ -442,35 +447,21 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
               partEvents(turn, part, { modelCallId, modelAttemptId, attempt }),
             ),
           )
-          const committed: Stream.Stream<Event, RunError, DriverInterpreter> = Stream.fromEffect(
+          const committed: Stream.Stream<Event, RunError, DriverInterpreter> = Stream.unwrap(
             Effect.suspend(() => {
               const operation = completedOperation
               const attempt = completedAttempt
               const responseAuthority = completedResponseAuthority
               if (operation === undefined || attempt === undefined)
                 return Effect.die(new Error("Model operation exhausted without a committed response"))
-              state.text = `${state.text}${modelResponseText(attempt.response)}`
-              return Ref.set(
-                chat.history,
-                Prompt.concat(
-                  Prompt.fromMessages(attempt.messages),
-                  Prompt.fromMessages(
-                    Prompt.fromResponseParts(attempt.response.content).content.map(coalesceAdjacentText),
-                  ),
-                ),
-              ).pipe(
-                Effect.andThen(
-                  Effect.flatMap(DriverInterpreter, (interpreter) => chargeAttemptUsageWith(interpreter, state)),
-                ),
-                Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
-                Effect.orDie,
-                Effect.andThen(
-                  Effect.sync(() =>
-                    clearCommittedResponse({ service: activeModelResponse, authority: responseAuthority }),
-                  ),
-                ),
-                Effect.as(committedEvent({ operation, attempt })),
-              )
+              return projectCommittedResponse({
+                operation,
+                attempt,
+                responseAuthority,
+                activeModelResponse,
+                state,
+                chat,
+              })
             }),
           )
           const tools: Stream.Stream<Event, RunError, R | ModelTurnServices<T, never>> = Stream.suspend(() => {

@@ -8,10 +8,8 @@ import {
   TurnLimitExceeded,
   TurnPolicyStopped,
 } from "../event.js"
-import { DriverInterpreter } from "../../durable/driver/interpreter.js"
-import type { RunBudgetExhausted } from "../../durable/run-budget.js"
-import type { RunError } from "../service.js"
 import type { AgentRunState } from "../run-state.js"
+import type { ModelProviderUsage } from "../../model/attempt/observation.js"
 
 const missingOutputFailure = (state: AgentRunState, turn: number) => {
   const common = {
@@ -63,37 +61,22 @@ export const terminalCompletedEvent: {
       : { _tag: "Completed", turns: turn + 1, text: state.text, transcript, usage: state.usage },
 )
 
-export const chargeAttemptUsageWith: {
-  (
-    state: Pick<AgentRunState, "finish" | "currentContextTokens">,
-  ): (
-    interpreter: import("../../durable/driver/interpreter.js").Interface,
-  ) => Effect.Effect<void, RunError | RunBudgetExhausted>
-  (
-    interpreter: import("../../durable/driver/interpreter.js").Interface,
-    state: Pick<AgentRunState, "finish" | "currentContextTokens">,
-  ): Effect.Effect<void, RunError | RunBudgetExhausted>
-} = Function.dual(
-  2,
-  (
-    interpreter: import("../../durable/driver/interpreter.js").Interface,
-    state: Pick<AgentRunState, "finish" | "currentContextTokens">,
-  ): Effect.Effect<void, RunError | RunBudgetExhausted> => {
-    const input = state.finish?.usage.inputTokens.total ?? 0
-    const output = state.finish?.usage.outputTokens.total ?? 0
-    const reported = input + output
-    const totalTokens = reported > 0 ? reported : state.currentContextTokens
-    return totalTokens === undefined || totalTokens <= 0 ? Effect.void : interpreter.chargeUsage({ totalTokens })
-  },
-)
+const safeTokenSum = (left: number, right: number): number => Math.min(left + right, Number.MAX_SAFE_INTEGER)
+const providerUsageTokens = (usage: ModelProviderUsage | undefined): number =>
+  usage?.totalTokens ?? safeTokenSum(usage?.inputTokens ?? 0, usage?.outputTokens ?? 0)
 
-export const chargeAttemptUsage = (
-  state: Pick<AgentRunState, "finish" | "currentContextTokens">,
-): Effect.Effect<
-  void,
-  RunError | RunBudgetExhausted,
-  import("../../durable/driver/interpreter.js").DriverInterpreter
-> => Effect.flatMap(DriverInterpreter, (interpreter) => chargeAttemptUsageWith(interpreter, state))
+export const modelBudgetCharge = (input: {
+  readonly usage: Response.Usage | undefined
+  readonly failedAttemptUsage: ModelProviderUsage | undefined
+  readonly fallbackTokens: number | undefined
+}): number => {
+  const finalReported =
+    input.usage === undefined
+      ? 0
+      : safeTokenSum(input.usage.inputTokens.total ?? 0, input.usage.outputTokens.total ?? 0)
+  const terminalCharge = finalReported > 0 ? finalReported : (input.fallbackTokens ?? 0)
+  return safeTokenSum(terminalCharge, providerUsageTokens(input.failedAttemptUsage))
+}
 
 export const captureFinishPart: {
   (part: Response.FinishPart): (state: AgentRunState) => Effect.Effect<void>
