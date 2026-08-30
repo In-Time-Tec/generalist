@@ -83,8 +83,8 @@ jobs:
       - name: Check
         run: bun run check
 
-      - name: Grant MySQL test databases
-        run: mysql -h 127.0.0.1 -P 33306 -uroot -ptenetkit -e "GRANT ALL PRIVILEGES ON \`tenetkit\_%\`.* TO 'tenetkit'@'%'; FLUSH PRIVILEGES;"
+      - name: Configure MySQL test databases
+        run: mysql -h 127.0.0.1 -P 33306 -uroot -ptenetkit -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT ALL PRIVILEGES ON \`tenetkit\_%\`.* TO 'tenetkit'@'%'; FLUSH PRIVILEGES;"
 
       - name: Test
         run: bun run test
