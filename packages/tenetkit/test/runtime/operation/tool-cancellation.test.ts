@@ -1,16 +1,18 @@
 import "./suites/sqlite-cancellation-reconciliation-suite.js"
 import { cancellationConvergenceSuite } from "./suites/cancellation-convergence-suite.js"
 import { expect, layer } from "@effect/vitest"
-import { Effect, Fiber } from "effect"
+import { Effect, Fiber, Layer } from "effect"
 import { LocalScheduler, Runtime, RunStore } from "../../../src/runtime/index.js"
-import { assistantAddress, parentRelativeOptions, textPrompt } from "../execution/fixtures.js"
+import { assistantAddress, parentRelativeOptions, resolverLayer, textPrompt } from "../execution/fixtures.js"
 import { tempDbPath } from "../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 
 cancellationConvergenceSuite({
   name: "memory",
-  storeLayer: Runtime.layerMemory({ ...parentRelativeOptions, scheduler: { pollInterval: "1 day" } }),
+  storeLayer: Runtime.layerMemory({ ...parentRelativeOptions, scheduler: { pollInterval: "1 day" } }).pipe(
+    Layer.provide(resolverLayer),
+  ),
 })
 
 cancellationConvergenceSuite({
@@ -19,18 +21,20 @@ cancellationConvergenceSuite({
     ...parentRelativeOptions,
     filename: tempDbPath("operation-cancellation-convergence"),
     scheduler: { pollInterval: "1 day" },
-  }),
+  }).pipe(Layer.provide(resolverLayer)),
 })
 
 for (const backend of ["memory", "sqlite"] as const) {
   const runtimeLayer =
     backend === "memory"
-      ? Runtime.layerMemory({ ...parentRelativeOptions, scheduler: { pollInterval: "1 day" } })
+      ? Runtime.layerMemory({ ...parentRelativeOptions, scheduler: { pollInterval: "1 day" } }).pipe(
+          Layer.provide(resolverLayer),
+        )
       : SqliteRuntime.layerSqlite({
           ...parentRelativeOptions,
           filename: tempDbPath("session-cancellation"),
           scheduler: { pollInterval: "1 day" },
-        })
+        }).pipe(Layer.provide(resolverLayer))
 
   layer(runtimeLayer)(`${backend} Session cancellation`, (it) => {
     it.effect("cancels every prior root tree and proves nested descendants terminal", () =>

@@ -1,4 +1,4 @@
-import { Clock, Duration, Effect, Exit, Fiber, Layer, RcMap, Ref, Scope, Semaphore, Stream } from "effect"
+import { Clock, Deferred, Duration, Effect, Exit, Fiber, Layer, RcMap, Ref, Scope, Semaphore, Stream } from "effect"
 import type { CellEvent, CellFailure, CellId, KernelUnavailable, RestartReason, SessionId } from "../cell.js"
 import {
   type Execution,
@@ -130,14 +130,25 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
       idleTimeToLive: options.idleTimeToLive,
     })
 
-    const retire = (sessionId: SessionId, lease: Lease): Effect.Effect<void> =>
+    const invalidateKilledLease = (sessionId: SessionId, lease: Lease): Effect.Effect<void> =>
       Effect.gen(function* () {
+        const snapshot = yield* store.load(sessionId).pipe(Effect.orElseSucceed(() => undefined))
         const retired = yield* Ref.modify(states, (all) => {
           const current = all.get(sessionId) ?? initialState
           if (current.lease?.generation !== lease.generation) return [false, all]
-          return [true, new Map(all).set(sessionId, { ...current, lease: undefined })]
+          return [
+            true,
+            new Map(all).set(sessionId, {
+              epoch: current.epoch + 1,
+              recovery: snapshot === undefined ? "restart-only" : "namespace",
+              lease: undefined,
+            }),
+          ]
         })
-        if (retired) yield* RcMap.invalidate(kernels, sessionId)
+        if (retired) {
+          yield* lease.kernel.kill.pipe(Effect.ignore)
+          yield* RcMap.invalidate(kernels, sessionId)
+        }
       }).pipe(Effect.uninterruptible)
 
     const capture = (sessionId: SessionId, lease: Lease): Effect.Effect<void> =>
@@ -161,20 +172,6 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
       sessionId: SessionId,
       use: (lease: Lease) => Effect.Effect<A, CellFailure>,
     ): Effect.Effect<A, CellFailure> => Effect.scoped(Effect.flatMap(RcMap.get(kernels, sessionId), use))
-
-    /**
-     * Enforce the profile's cell deadline from the host. The worker's `vm` watchdog terminates only
-     * synchronous evaluation, so a cell that awaits never reaches it; without a host-side ceiling a
-     * cell waiting on a hung request would hold its Session forever while the profile digest still
-     * claimed a bound. This runs one grace period behind the worker's own deadline so a cell the
-     * watchdog can terminate in place — with its namespace intact — is reported as the timeout it
-     * is, and the host only escalates when that did not happen.
-     */
-    const stopOverdueCell = (cellId: CellId, lease: Lease): Effect.Effect<void> =>
-      lease.kernel.interrupt(cellId, options.interruptGraceMillis).pipe(
-        Effect.flatMap((outcome) => (outcome === "Unresponsive" ? lease.kernel.kill.pipe(Effect.ignore) : Effect.void)),
-        Effect.ignore,
-      )
 
     const watchAbort = (signal: AbortSignal): Effect.Effect<void> =>
       Effect.callback<void>((resume) => {
@@ -217,14 +214,19 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
               deadlineMillis: options.profile.limits.cellDeadlineMillis,
               sequenceStart: prelude.length,
             })
-            yield* watchAbort(request.signal).pipe(
+            const strongInterruption = yield* Ref.make(false)
+            const invalidated = yield* Deferred.make<void>()
+            const stopStrongly = Ref.set(strongInterruption, true).pipe(
               Effect.andThen(lease.kernel.interrupt(request.cellId, options.interruptGraceMillis)),
+              Effect.flatMap((outcome) =>
+                outcome === "NotRunning" ? Effect.void : invalidateKilledLease(request.sessionId, lease),
+              ),
               Effect.ignore,
-              Effect.forkIn(cellScope),
+              Effect.ensuring(Deferred.succeed(invalidated, undefined)),
             )
+            yield* watchAbort(request.signal).pipe(Effect.andThen(stopStrongly), Effect.forkIn(cellScope))
             yield* Effect.sleep(options.profile.limits.cellDeadlineMillis + options.interruptGraceMillis).pipe(
-              Effect.andThen(stopOverdueCell(request.cellId, lease)),
-              Effect.ignore,
+              Effect.andThen(stopStrongly),
               Effect.forkIn(cellScope),
             )
             /**
@@ -243,13 +245,14 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
             const execution: Execution = {
               events: Stream.concat(Stream.fromIterable(prelude), Stream.fromQueue(started.events)),
               result: started.outcome.pipe(
-                Effect.onInterrupt(() =>
-                  lease.kernel.kill.pipe(Effect.ignore, Effect.andThen(retire(request.sessionId, lease))),
-                ),
-                Effect.onExit(() =>
-                  capture(request.sessionId, lease).pipe(
-                    Effect.andThen(Scope.close(cellScope, Exit.succeed(undefined))),
-                  ),
+                Effect.onInterrupt(() => invalidateKilledLease(request.sessionId, lease)),
+                Effect.onExit((exit) =>
+                  (Exit.isSuccess(exit)
+                    ? capture(request.sessionId, lease)
+                    : Ref.get(strongInterruption).pipe(
+                        Effect.flatMap((strong) => (strong ? Deferred.await(invalidated) : Effect.void)),
+                      )
+                  ).pipe(Effect.andThen(Scope.close(cellScope, Exit.succeed(undefined)))),
                 ),
               ),
             }
@@ -275,13 +278,15 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
           }),
         ),
       interrupt: (sessionId: SessionId, cellId: CellId) =>
-        Effect.flatMap(stateOf(sessionId), (state) =>
-          state.lease === undefined
+        Effect.flatMap(stateOf(sessionId), (state) => {
+          const lease = state.lease
+          return lease === undefined
             ? Effect.succeed<Interruption>({ sessionId, cellId, _tag: "NotRunning" })
-            : state.lease.kernel
-                .interrupt(cellId, options.interruptGraceMillis)
-                .pipe(Effect.map((tag): Interruption => ({ sessionId, cellId, _tag: tag }))),
-        ),
+            : lease.kernel.interrupt(cellId, options.interruptGraceMillis).pipe(
+                Effect.tap((tag) => (tag === "NotRunning" ? Effect.void : invalidateKilledLease(sessionId, lease))),
+                Effect.map((tag): Interruption => ({ sessionId, cellId, _tag: tag })),
+              )
+        }),
       restart: (sessionId: SessionId, reason: RestartReason) =>
         Effect.gen(function* () {
           const state = yield* stateOf(sessionId)

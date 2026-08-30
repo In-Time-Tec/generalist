@@ -42,11 +42,11 @@ type PostgresWorkerLayer = Layer.Layer<
   never
 >
 
-const resolver = ExecutableResolver.makeStatic([
+const resolverLayer = ExecutableResolver.layerStatic([
   { executable: assistantRef, agent: closedTestAgent(assistant) },
   { executable: researcherRef, agent: closedTestAgent(researcher) },
   { executable: analystRef, agent: closedTestAgent(analyst) },
-])
+]).pipe(Layer.orDie)
 const addresses = [
   { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
   { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
@@ -56,11 +56,10 @@ export const postgresLayer = (url: string) =>
   layer({
     url,
     source: "postgres-test",
-    resolver,
     addresses,
     subscriberQueueCapacity: 8,
     maxConnections: postgresTestMaxConnections,
-  })
+  }).pipe(Layer.provide(resolverLayer))
 
 /**
  * A PostgreSQL Runtime whose mailbox bounds and messaging policy the test chooses.
@@ -73,12 +72,11 @@ export const postgresMessagingLayer = (database: PostgresDatabase) => (overrides
     layer({
       url: database.url,
       source: "postgres-test",
-      resolver,
       addresses,
       subscriberQueueCapacity: 8,
       maxConnections: postgresTestMaxConnections,
       ...overrides,
-    }),
+    }).pipe(Layer.provide(resolverLayer)),
   )
 
 export interface PostgresWorkerOptions {

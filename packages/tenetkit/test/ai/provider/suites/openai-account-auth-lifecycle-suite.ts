@@ -22,10 +22,10 @@ import {
   deviceExchangeRedirect,
   deviceVerificationUrl,
   OpenAIAccountAuth,
-  OpenAIAccountAuthHost,
-  OpenAIAccountAuthHttp,
-  OpenAIAccountCredentialStore,
-  OpenAIAccountDevicePresenter,
+  BrowserAuthorization,
+  OAuthClient,
+  CredentialStore,
+  DeviceAuthorizationPresenter,
   StoreError,
   layer,
 } from "../../../../src/ai/provider/openai-account-auth.js"
@@ -75,10 +75,10 @@ const memoryStore = (initial: Option.Option<Disk> = Option.none()) => {
   let serialized = 0
   return {
     layer: Layer.effect(
-      OpenAIAccountCredentialStore,
+      CredentialStore,
       Effect.gen(function* () {
         const semaphore = yield* Semaphore.make(1)
-        return OpenAIAccountCredentialStore.of({
+        return CredentialStore.of({
           load: Effect.sync(() => value),
           save: (next) => Effect.sync(() => void (value = Option.some(next))),
           remove: Effect.sync(() => {
@@ -95,17 +95,17 @@ const memoryStore = (initial: Option.Option<Disk> = Option.none()) => {
     serialized: () => serialized,
   }
 }
-const unusedHttp = OpenAIAccountAuthHttp.of({
+const unusedHttp = OAuthClient.of({
   exchange: () => Effect.die("unused"),
   refresh: () => Effect.die("unused"),
   deviceStart: Effect.die("unused"),
   devicePoll: () => Effect.die("unused"),
 })
 const dependencies = (
-  store: Layer.Layer<OpenAIAccountCredentialStore>,
+  store: Layer.Layer<CredentialStore>,
   http = unusedHttp,
-  host: OpenAIAccountAuthHost["Service"] = OpenAIAccountAuthHost.of({ authorize: () => Effect.die("unused") }),
-  presenter: OpenAIAccountDevicePresenter["Service"] = OpenAIAccountDevicePresenter.of({
+  host: BrowserAuthorization["Service"] = BrowserAuthorization.of({ authorize: () => Effect.die("unused") }),
+  presenter: DeviceAuthorizationPresenter["Service"] = DeviceAuthorizationPresenter.of({
     device: () => Effect.void,
   }),
   deviceTimeout = 5_000,
@@ -115,9 +115,9 @@ const dependencies = (
       Layer.mergeAll(
         store,
         deterministicCrypto(),
-        Layer.succeed(OpenAIAccountAuthHttp, http),
-        Layer.succeed(OpenAIAccountAuthHost, host),
-        Layer.succeed(OpenAIAccountDevicePresenter, presenter),
+        Layer.succeed(OAuthClient, http),
+        Layer.succeed(BrowserAuthorization, host),
+        Layer.succeed(DeviceAuthorizationPresenter, presenter),
       ),
     ),
   )
@@ -143,10 +143,10 @@ describe("OpenAI account authentication lifecycle", () => {
   it.effect("persists browser tokens, returns redacted credentials, and blocks mismatched callback state", () => {
     const store = memoryStore()
     let exchanges = 0
-    const successHost = OpenAIAccountAuthHost.of({
+    const successHost = BrowserAuthorization.of({
       authorize: (_url, state) => Effect.succeed({ code: Redacted.make("code-secret"), state }),
     })
-    const http = OpenAIAccountAuthHttp.of({
+    const http = OAuthClient.of({
       ...unusedHttp,
       exchange: () =>
         Effect.sync(() => {
@@ -161,7 +161,7 @@ describe("OpenAI account authentication lifecycle", () => {
       expect(credential.generation).toBe(saved.generation)
       const encodedCredential = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(credential)
       expect(encodedCredential).not.toMatch(/refresh-secret|account-secret/)
-      const mismatch = OpenAIAccountAuthHost.of({
+      const mismatch = BrowserAuthorization.of({
         authorize: () => Effect.succeed({ code: Redacted.make("code-secret"), state: Redacted.make("wrong-secret") }),
       })
       const error = yield* Effect.flip(
@@ -180,7 +180,7 @@ describe("OpenAI account authentication lifecycle", () => {
   it.effect("preserves host cancellation and timeout as typed failures", () =>
     Effect.gen(function* () {
       for (const kind of ["cancelled", "timeout"] as const) {
-        const host = OpenAIAccountAuthHost.of({
+        const host = BrowserAuthorization.of({
           authorize: () => Effect.fail(AuthError.make({ kind, message: `safe ${kind}` })),
         })
         const error = yield* Effect.flip(
@@ -200,7 +200,7 @@ describe("OpenAI account authentication lifecycle", () => {
     const verifier = "verifier-secret"
     return Effect.gen(function* () {
       const codeChallenge = yield* challenge(verifier)
-      const http = OpenAIAccountAuthHttp.of({
+      const http = OAuthClient.of({
         ...unusedHttp,
         deviceStart: Effect.succeed({ device_auth_id: "device-secret", user_code: "ABCD", interval: "1" }),
         devicePoll: () =>
@@ -219,7 +219,7 @@ describe("OpenAI account authentication lifecycle", () => {
             return tokens()
           }),
       })
-      const presenter = OpenAIAccountDevicePresenter.of({
+      const presenter = DeviceAuthorizationPresenter.of({
         device: (value) => Effect.sync(() => void (prompt = value)),
       })
       const fiber = yield* Effect.forkChild(
@@ -243,7 +243,7 @@ describe("OpenAI account authentication lifecycle", () => {
   it.effect("rejects invalid device intervals and verifier/challenge mismatches", () =>
     Effect.gen(function* () {
       for (const interval of ["0", "-1", "wat", "1.5", "9007199254740992"]) {
-        const http = OpenAIAccountAuthHttp.of({
+        const http = OAuthClient.of({
           ...unusedHttp,
           deviceStart: Effect.succeed({ device_auth_id: "id", user_code: "code", interval }),
         })
@@ -255,7 +255,7 @@ describe("OpenAI account authentication lifecycle", () => {
         expect(error.kind).toBe("protocol")
       }
       let exchanges = 0
-      const mismatch = OpenAIAccountAuthHttp.of({
+      const mismatch = OAuthClient.of({
         ...unusedHttp,
         deviceStart: Effect.succeed({ device_auth_id: "id", user_code: "code", interval: "1" }),
         devicePoll: () =>
@@ -282,7 +282,7 @@ describe("OpenAI account authentication lifecycle", () => {
   it.effect("enforces a valid total device deadline even when the polling interval is longer", () => {
     let starts = 0
     let polls = 0
-    const longInterval = OpenAIAccountAuthHttp.of({
+    const longInterval = OAuthClient.of({
       ...unusedHttp,
       deviceStart: Effect.sync(() => {
         starts++
@@ -317,7 +317,7 @@ describe("OpenAI account authentication lifecycle", () => {
 
   it.effect("times device polling out, remains interruptible, and cannot exchange a late poll", () => {
     let exchanges = 0
-    const pending = OpenAIAccountAuthHttp.of({
+    const pending = OAuthClient.of({
       ...unusedHttp,
       deviceStart: Effect.succeed({ device_auth_id: "id", user_code: "code", interval: "1" }),
       devicePoll: () => Effect.succeed(Option.none()),
@@ -339,7 +339,7 @@ describe("OpenAI account authentication lifecycle", () => {
       const exit = yield* Fiber.await(interrupted)
       expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(true)
       const verifier = "verifier"
-      const late = OpenAIAccountAuthHttp.of({
+      const late = OAuthClient.of({
         ...pending,
         devicePoll: () =>
           Effect.sleep("5 seconds").pipe(
@@ -366,15 +366,15 @@ describe("OpenAI account authentication lifecycle", () => {
   })
 
   it.effect("reports every status and preserves unsafe store failures", () => {
-    const status = (load: OpenAIAccountCredentialStore["Service"]["load"]) =>
+    const status = (load: CredentialStore["Service"]["load"]) =>
       Effect.gen(function* () {
         return yield* (yield* OpenAIAccountAuth).status
       }).pipe(
         provideLayer(
           dependencies(
             Layer.succeed(
-              OpenAIAccountCredentialStore,
-              OpenAIAccountCredentialStore.of({
+              CredentialStore,
+              CredentialStore.of({
                 load,
                 save: () => Effect.void,
                 remove: Effect.succeed(false),
@@ -409,7 +409,7 @@ describe("OpenAI account authentication lifecycle", () => {
     const original = disk()
     const store = memoryStore(Option.some(original))
     let refreshes = 0
-    const http = OpenAIAccountAuthHttp.of({
+    const http = OAuthClient.of({
       ...unusedHttp,
       refresh: () =>
         Effect.sync(() => {
@@ -435,15 +435,15 @@ describe("OpenAI account authentication lifecycle", () => {
       const networkInterrupted = yield* Latch.make()
       let networkSaved = false
       const networkStore = Layer.succeed(
-        OpenAIAccountCredentialStore,
-        OpenAIAccountCredentialStore.of({
+        CredentialStore,
+        CredentialStore.of({
           load: Effect.succeed(Option.some(original)),
           save: () => Effect.sync(() => void (networkSaved = true)),
           remove: Effect.succeed(false),
           serialized: (effect) => effect,
         }),
       )
-      const blockedHttp = OpenAIAccountAuthHttp.of({
+      const blockedHttp = OAuthClient.of({
         ...unusedHttp,
         refresh: () =>
           networkStarted.open.pipe(
@@ -465,8 +465,8 @@ describe("OpenAI account authentication lifecycle", () => {
       const releaseSave = yield* Latch.make()
       let committed: Disk | undefined
       const commitStore = Layer.succeed(
-        OpenAIAccountCredentialStore,
-        OpenAIAccountCredentialStore.of({
+        CredentialStore,
+        CredentialStore.of({
           load: Effect.succeed(Option.some(original)),
           save: (value) =>
             saveStarted.open.pipe(
@@ -477,7 +477,7 @@ describe("OpenAI account authentication lifecycle", () => {
           serialized: (effect) => effect,
         }),
       )
-      const commitHttp = OpenAIAccountAuthHttp.of({
+      const commitHttp = OAuthClient.of({
         ...unusedHttp,
         refresh: () => Effect.succeed({ ...tokens(), refresh_token: "rotated-refresh-secret" }),
       })
@@ -500,7 +500,7 @@ describe("OpenAI account authentication lifecycle", () => {
   it.effect("rejects refreshed and stale generations belonging to another account without overwrite", () => {
     const original = disk()
     const store = memoryStore(Option.some(original))
-    const http = OpenAIAccountAuthHttp.of({
+    const http = OAuthClient.of({
       ...unusedHttp,
       refresh: () => Effect.succeed(tokens("other-account", "other-user")),
     })
@@ -538,7 +538,7 @@ describe("OpenAI account authentication lifecycle", () => {
         provideLayer(
           dependencies(
             store.layer,
-            OpenAIAccountAuthHttp.of({
+            OAuthClient.of({
               ...unusedHttp,
               refresh: () =>
                 Effect.sync(() => {
@@ -559,7 +559,7 @@ describe("OpenAI account authentication lifecycle", () => {
   it.effect("partial refresh inherits tokens, rotates generation, and initial incomplete exchange fails", () => {
     const original = disk()
     const store = memoryStore(Option.some(original))
-    const partial = OpenAIAccountAuthHttp.of({
+    const partial = OAuthClient.of({
       ...unusedHttp,
       refresh: () => Effect.succeed({ access_token: expiryJwt(1_900_000_000) }),
     })
@@ -569,10 +569,10 @@ describe("OpenAI account authentication lifecycle", () => {
       expect(saved.idToken).toBe(original.idToken)
       expect(saved.refreshToken).toBe(original.refreshToken)
       expect(refreshed.generation).not.toBe(original.generation)
-      const host = OpenAIAccountAuthHost.of({
+      const host = BrowserAuthorization.of({
         authorize: (_url, state) => Effect.succeed({ code: Redacted.make("code"), state }),
       })
-      const incomplete = OpenAIAccountAuthHttp.of({
+      const incomplete = OAuthClient.of({
         ...unusedHttp,
         exchange: () => Effect.succeed({ access_token: jwt() }),
       })
@@ -587,10 +587,10 @@ describe("OpenAI account authentication lifecycle", () => {
 
   it.effect("decodes access expiry independently and never exposes secrets or account IDs", () => {
     const store = memoryStore()
-    const host = OpenAIAccountAuthHost.of({
+    const host = BrowserAuthorization.of({
       authorize: (_url, state) => Effect.succeed({ code: Redacted.make("authorization-secret"), state }),
     })
-    const http = OpenAIAccountAuthHttp.of({
+    const http = OAuthClient.of({
       ...unusedHttp,
       exchange: () =>
         Effect.succeed({ access_token: expiryJwt(1_900_000_000), id_token: jwt(), refresh_token: "refresh-secret" }),

@@ -2,18 +2,13 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Ref } from "effect"
 import { Wire } from "tenetkit/transport"
-import {
-  makeHibernatingWebSocket,
-  type Attachment,
-  type HibernatingWebSocket,
-  type HibernatingWebSocketState,
-} from "../src/durable-objects/index.js"
+import { HibernatingWebSocket } from "../src/durable-objects/index.js"
 import { event, runtimeLayer } from "../../tenetkit/test/transport/fixtures.js"
 import { Runtime } from "tenetkit/runtime"
 
-type StoredAttachment = Attachment | { readonly version: number }
+type StoredAttachment = HibernatingWebSocket.Attachment | { readonly version: number }
 
-class FakeSocket implements HibernatingWebSocket {
+class FakeSocket implements HibernatingWebSocket.Socket {
   attachment: StoredAttachment = { version: 1, state: "unattached" }
   readonly sent: Array<string> = []
   readonly closes: Array<readonly [number | undefined, string | undefined]> = []
@@ -25,7 +20,7 @@ class FakeSocket implements HibernatingWebSocket {
   close(code?: number, reason?: string): void {
     this.closes.push([code, reason])
   }
-  serializeAttachment(attachment: Attachment): void {
+  serializeAttachment(attachment: HibernatingWebSocket.Attachment): void {
     this.attachment = structuredClone(attachment)
   }
   deserializeAttachment(): StoredAttachment {
@@ -36,12 +31,12 @@ class FakeSocket implements HibernatingWebSocket {
   }
 }
 
-class FakeState implements HibernatingWebSocketState {
-  readonly sockets: Array<HibernatingWebSocket> = []
-  acceptWebSocket(socket: HibernatingWebSocket): void {
+class FakeState implements HibernatingWebSocket.State {
+  readonly sockets: Array<HibernatingWebSocket.Socket> = []
+  acceptWebSocket(socket: HibernatingWebSocket.Socket): void {
     this.sockets.push(socket)
   }
-  getWebSockets(): ReadonlyArray<HibernatingWebSocket> {
+  getWebSockets(): ReadonlyArray<HibernatingWebSocket.Socket> {
     return this.sockets
   }
 }
@@ -52,7 +47,7 @@ describe("hibernating WebSocket", () => {
   it("reconstructs from attachments, uses bounded fuel, and persists after send", async () => {
     const state = new FakeState()
     const socket = new FakeSocket()
-    const first = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
+    const first = HibernatingWebSocket.make({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
     first.accept(socket)
     await first.webSocketMessage(
       socket,
@@ -61,7 +56,7 @@ describe("hibernating WebSocket", () => {
     expect(socket.sent).toHaveLength(1)
     expect(socket.attachment).toMatchObject({ version: 1, state: "attached", cursor: 0 })
 
-    const reconstructed = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 2 })
+    const reconstructed = HibernatingWebSocket.make({ state, runtime: runtime(), pageSize: 1, fuel: 2 })
     const flushed = await reconstructed.flush("run-1")
     expect(flushed.frames).toBe(2)
     expect(socket.attachment).toMatchObject({ cursor: 2 })
@@ -71,7 +66,7 @@ describe("hibernating WebSocket", () => {
   it("does not persist a cursor when send fails", async () => {
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1 })
+    const adapter = HibernatingWebSocket.make({ state, runtime: runtime(), pageSize: 1 })
     adapter.accept(socket)
     socket.failSend = true
     await expect(
@@ -85,7 +80,7 @@ describe("hibernating WebSocket", () => {
     const layer = runtimeLayer({ cancel: ({ runId }) => Ref.update(cancelled, (ids) => [...ids, runId]) })
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(layer) })
+    const adapter = HibernatingWebSocket.make({ state, runtime: runtime(layer) })
     adapter.accept(socket)
     await adapter.webSocketMessage(
       socket,
@@ -108,7 +103,7 @@ describe("hibernating WebSocket", () => {
   it("rejects malformed commands without resetting attachment", async () => {
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime() })
+    const adapter = HibernatingWebSocket.make({ state, runtime: runtime() })
     adapter.accept(socket)
     await adapter.webSocketMessage(socket, "not-json")
     expect(socket.closes).toEqual([[1002, "malformed-command"]])
@@ -118,7 +113,7 @@ describe("hibernating WebSocket", () => {
   it("never rewinds an attached same-run cursor", async () => {
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
+    const adapter = HibernatingWebSocket.make({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
     adapter.accept(socket)
     socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: 2 }
 
@@ -134,7 +129,7 @@ describe("hibernating WebSocket", () => {
   it("serializes concurrent flushes for one socket", async () => {
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
+    const adapter = HibernatingWebSocket.make({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
     adapter.accept(socket)
     socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: -1 }
 
@@ -149,7 +144,7 @@ describe("hibernating WebSocket", () => {
   it("serializes concurrent same-run attachment updates", async () => {
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
+    const adapter = HibernatingWebSocket.make({ state, runtime: runtime(), pageSize: 1, fuel: 1 })
     adapter.accept(socket)
     socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: 2 }
 
@@ -179,8 +174,8 @@ describe("hibernating WebSocket", () => {
     })
     const state = new FakeState()
     const socket = new FakeSocket()
-    const flushHandler = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
-    const messageHandler = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
+    const flushHandler = HibernatingWebSocket.make({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
+    const messageHandler = HibernatingWebSocket.make({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
     flushHandler.accept(socket)
     socket.attachment = { version: 1, state: "attached", runId: "run-1", cursor: -1 }
 
@@ -201,7 +196,7 @@ describe("hibernating WebSocket", () => {
     const layer = runtimeLayer({ cancel: ({ runId }) => Ref.update(cancelled, (ids) => [...ids, runId]) })
     const state = new FakeState()
     const socket = new FakeSocket()
-    const adapter = makeHibernatingWebSocket({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
+    const adapter = HibernatingWebSocket.make({ state, runtime: runtime(layer), pageSize: 1, fuel: 1 })
     adapter.accept(socket)
     const attach = await Effect.runPromise(Wire.encodeCommand({ _tag: "Attach", runId: "run-1", cursor: 2 }))
     const cancel = await Effect.runPromise(Wire.encodeCommand({ _tag: "Cancel", runId: "run-1" }))

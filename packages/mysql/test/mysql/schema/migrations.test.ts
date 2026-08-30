@@ -8,7 +8,7 @@ import {
   SchemaMigrationFailed,
   SchemaVersionUnsupported,
 } from "tenetkit/runtime/sql-driver"
-import { RunSchema } from "../../../src/mysql/schema/migrations.js"
+import { apply as applyRunSchema } from "../../../src/mysql/schema/migrations.js"
 import { SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import { inspectLogicalSqlSchema } from "../../../../tenetkit/test/runtime/sql/schema-conformance.js"
 import { mysqlAvailable, mysqlDatabase } from "../runtime/environment.js"
@@ -105,8 +105,8 @@ describeMysql("mysql schema baseline", () => {
     suite.effect("creates the current baseline and applies idempotently", () =>
       Effect.gen(function* () {
         yield* resetSchema
-        yield* RunSchema.apply("mysql-migration-test")
-        yield* RunSchema.apply("mysql-migration-test")
+        yield* applyRunSchema("mysql-migration-test")
+        yield* applyRunSchema("mysql-migration-test")
         yield* inspectSchema
         const snapshot = (yield* Metric.snapshot).find(
           (item) =>
@@ -126,7 +126,7 @@ describeMysql("mysql schema baseline", () => {
         yield* sql`CREATE TABLE tenetkit_runs (run_id VARCHAR(255) PRIMARY KEY)
           ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`
 
-        expect(yield* RunSchema.apply("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
+        expect(yield* applyRunSchema("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
         expect(
           yield* sql`SELECT TABLE_NAME AS table_name FROM information_schema.tables
           WHERE table_schema = DATABASE() AND table_name = 'tenetkit_schema_meta'`,
@@ -143,7 +143,7 @@ describeMysql("mysql schema baseline", () => {
         yield* resetSchema
         for (const statement of SCHEMA_STATEMENTS.slice(0, 4)) yield* sql.unsafe(statement).unprepared
 
-        expect(yield* RunSchema.apply("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
+        expect(yield* applyRunSchema("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
         expect(
           (yield* sql<{ table_name: string }>`
               SELECT TABLE_NAME AS table_name FROM information_schema.tables
@@ -160,10 +160,10 @@ describeMysql("mysql schema baseline", () => {
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
         yield* resetSchema
-        yield* RunSchema.apply("mysql-migration-test")
+        yield* applyRunSchema("mysql-migration-test")
         yield* sql`UPDATE tenetkit_sql_migrations SET name = 'wrong' WHERE migration_id = 1`
 
-        expect(yield* RunSchema.apply("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
+        expect(yield* applyRunSchema("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
         yield* resetSchema
       }),
     )
@@ -184,9 +184,9 @@ describeMysql("mysql schema baseline", () => {
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* resetSchema
-          yield* RunSchema.apply("mysql-migration-test")
+          yield* applyRunSchema("mysql-migration-test")
           yield* sql.unsafe(update)
-          expect(yield* RunSchema.apply("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(expected)
+          expect(yield* applyRunSchema("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(expected)
           yield* resetSchema
         }),
       )

@@ -1,13 +1,13 @@
 import { Effect, Option, Ref } from "effect"
 import { Chat, Prompt, Response, Tool } from "effect/unstable/ai"
 import type { Service } from "../../model/result/active-model-response.js"
-import { controller, type Controller } from "../../model/result/active-model-response-controller.js"
+import { writer, type Writer } from "../../model/result/active-model-response-writer.js"
 import { make as makeModelResponse, type CompletedModelResponse } from "../../model/response/builder.js"
 import type { AttemptCompleted } from "../../model/operation.js"
 import { coalesceAdjacentText } from "../../context/session-sync.js"
 
 type PartIdentity = Pick<AttemptCompleted, "modelCallId" | "modelAttemptId" | "attempt">
-export type ResponseAuthority = ReturnType<Controller["begin"]>
+export type ResponseAuthority = ReturnType<Writer["begin"]>
 
 interface ActiveAttempt extends PartIdentity {
   readonly builder: ReturnType<typeof makeModelResponse<Record<string, Tool.Any>>>
@@ -20,7 +20,7 @@ export const attemptResponse = (input: {
   readonly operationKey?: string
   readonly turn: number
 }) => {
-  const control = Option.isSome(input.service) ? controller(input.service.value) : undefined
+  const responseWriter = Option.isSome(input.service) ? writer(input.service.value) : undefined
   let active: ActiveAttempt | undefined
   let sessionParentId: string | null | undefined
   const responseFor = (identity: PartIdentity): ActiveAttempt => {
@@ -32,13 +32,13 @@ export const attemptResponse = (input: {
     ) {
       return active
     }
-    const attemptIdentity: Parameters<Controller["begin"]>[0] = {
+    const attemptIdentity: Parameters<Writer["begin"]>[0] = {
       turn: input.turn,
       ...identity,
     }
     if (input.operationKey !== undefined) Object.assign(attemptIdentity, { operationKey: input.operationKey })
     if (sessionParentId !== undefined) Object.assign(attemptIdentity, { sessionParentId })
-    const authority = control?.begin(attemptIdentity)
+    const authority = responseWriter?.begin(attemptIdentity)
     const next: ActiveAttempt = {
       ...identity,
       builder: makeModelResponse<Record<string, Tool.Any>>(),
@@ -52,13 +52,13 @@ export const attemptResponse = (input: {
     accept: (identity: PartIdentity, part: Response.StreamPart<Record<string, Tool.Any>>): void => {
       const response = responseFor(identity)
       response.builder.accept(part)
-      if (response.authority !== undefined) control?.install(response.authority, response.builder)
+      if (response.authority !== undefined) responseWriter?.install(response.authority, response.builder)
     },
     complete: (identity: PartIdentity): CompletedModelResponse<Record<string, Tool.Any>> =>
       responseFor(identity).builder.complete(),
     authority: (): ResponseAuthority | undefined => active?.authority,
     discard: (): void => {
-      if (active?.authority !== undefined) control?.discard(active.authority)
+      if (active?.authority !== undefined) responseWriter?.discard(active.authority)
     },
   }
 }
@@ -81,6 +81,6 @@ export const clearCommittedResponse = (input: {
   readonly authority: ResponseAuthority | undefined
 }): void => {
   if (Option.isSome(input.service) && input.authority !== undefined) {
-    controller(input.service.value).clearCommitted(input.authority)
+    writer(input.service.value).clearCommitted(input.authority)
   }
 }

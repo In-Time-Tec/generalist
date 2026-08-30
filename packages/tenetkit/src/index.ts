@@ -40,7 +40,7 @@ export * as Steering from "./core/turn/steering.js"
 export * as ToolAuthorization from "./core/tools/tool-authorization.js"
 export * as ToolContext from "./core/tools/tool-context.js"
 export * as ToolExecutor from "./core/tools/tool-executor.js"
-export * as Output from "./core/tools/tool-output.js"
+export * as ToolOutput from "./core/tools/tool-output.js"
 export * as ToolPlacement from "./core/tools/tool-placement.js"
 export * as Policy from "./core/turn/policy.js"
 

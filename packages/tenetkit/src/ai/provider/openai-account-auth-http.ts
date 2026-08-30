@@ -5,7 +5,7 @@ import {
   clientId,
   DevicePollResponse,
   DeviceStartResponse,
-  OpenAIAccountAuthHttp,
+  OAuthClient,
   issuer,
   TokenResponse,
 } from "./openai-account-auth.js"
@@ -25,8 +25,8 @@ const discard = (response: HttpClientResponse.HttpClientResponse) =>
   Stream.runDrain(response.stream).pipe(Effect.ignore)
 
 /** @experimental */
-export const layer: Layer.Layer<OpenAIAccountAuthHttp, never, HttpClient.HttpClient> = Layer.effect(
-  OpenAIAccountAuthHttp,
+export const layer: Layer.Layer<OAuthClient, never, HttpClient.HttpClient> = Layer.effect(
+  OAuthClient,
   Effect.gen(function* () {
     const client = yield* HttpClient.HttpClient
     const bounded = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -57,7 +57,7 @@ export const layer: Layer.Layer<OpenAIAccountAuthHttp, never, HttpClient.HttpCli
           ),
         ),
       )
-    return OpenAIAccountAuthHttp.of({
+    return OAuthClient.of({
       exchange: ({ code, verifier, redirectUri }) =>
         tokenRequest(
           HttpClientRequest.post(`${issuer}/oauth/token`).pipe(

@@ -75,13 +75,11 @@ const makeFixture = (
   }
   const registration: StaticExecutable =
     options?.services === undefined ? registrationBase : { ...registrationBase, services: options.services }
-  const resolver = ExecutableResolver.makeStatic([registration])
   return {
     address,
     layer: Runtime.layerMemory({
-      resolver,
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-    }),
+    }).pipe(Layer.provide(ExecutableResolver.layerStatic([registration]).pipe(Layer.orDie))),
   }
 }
 

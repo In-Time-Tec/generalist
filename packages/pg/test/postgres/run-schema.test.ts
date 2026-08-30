@@ -7,7 +7,7 @@ import {
   SchemaMigrationFailed,
   SchemaVersionUnsupported,
 } from "tenetkit/runtime/sql-driver"
-import { RunSchema } from "../../src/postgres/run-schema.js"
+import { apply as applyRunSchema } from "../../src/postgres/run-schema.js"
 import { SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "../../src/postgres/schema.js"
 import { inspectLogicalSqlSchema } from "../../../tenetkit/test/runtime/sql/schema-conformance.js"
 import { postgresAvailable, postgresDatabase } from "./database.js"
@@ -83,8 +83,8 @@ describePostgres("postgres schema baseline", () => {
       suite.effect("creates the current baseline and applies idempotently", () =>
         Effect.gen(function* () {
           yield* resetSchema
-          yield* RunSchema.apply("postgres-migration-test")
-          yield* RunSchema.apply("postgres-migration-test")
+          yield* applyRunSchema("postgres-migration-test")
+          yield* applyRunSchema("postgres-migration-test")
           yield* inspectSchema
         }),
       )
@@ -98,9 +98,7 @@ describePostgres("postgres schema baseline", () => {
         yield* resetSchema
         yield* sql`CREATE TABLE tenetkit_runs (run_id TEXT PRIMARY KEY)`
 
-        expect(yield* RunSchema.apply("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(
-          SchemaMigrationFailed,
-        )
+        expect(yield* applyRunSchema("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
         expect(
           yield* sql`SELECT table_name FROM information_schema.tables
           WHERE table_schema = current_schema() AND table_name = 'tenetkit_schema_meta'`,
@@ -137,12 +135,10 @@ describePostgres("postgres schema baseline", () => {
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
         yield* resetSchema
-        yield* RunSchema.apply("postgres-migration-test")
+        yield* applyRunSchema("postgres-migration-test")
         yield* sql`UPDATE tenetkit_sql_migrations SET name = 'wrong' WHERE migration_id = 1`
 
-        expect(yield* RunSchema.apply("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(
-          SchemaMigrationFailed,
-        )
+        expect(yield* applyRunSchema("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
       }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie))),
     )
   })
@@ -162,9 +158,9 @@ describePostgres("postgres schema baseline", () => {
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* resetSchema
-          yield* RunSchema.apply("postgres-migration-test")
+          yield* applyRunSchema("postgres-migration-test")
           yield* sql.unsafe(update)
-          expect(yield* RunSchema.apply("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(expected)
+          expect(yield* applyRunSchema("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(expected)
         }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie))),
       )
     })

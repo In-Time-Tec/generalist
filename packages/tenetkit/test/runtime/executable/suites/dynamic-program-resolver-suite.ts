@@ -154,7 +154,7 @@ const fixture = (options: { readonly revision?: string; readonly toolName?: stri
 const resolverFor = (
   reconstruction: ExecutableResolver.ProgramReconstruction,
   executable: ExecutableManifest.PinnedExecutable,
-): ExecutableResolver.Service =>
+): ReturnType<typeof ExecutableResolver.makeDynamic> =>
   ExecutableResolver.makeDynamic({
     agents: [
       {
@@ -176,7 +176,7 @@ describe("ExecutableResolver.makeDynamic", () => {
       expect(first.ref.executable).not.toBe(second.ref.executable)
       expect(first.ref.active).not.toBe(second.ref.active)
       const { reconstruction } = fixture()
-      const resolver = resolverFor(reconstruction, first)
+      const resolver = yield* resolverFor(reconstruction, first)
 
       for (const executable of [first, second]) {
         const resolution = yield* resolver
@@ -197,8 +197,9 @@ describe("ExecutableResolver.makeDynamic", () => {
     Effect.gen(function* () {
       const executable = executableFor("code-missing")
       const { reconstruction } = fixture()
+      const resolver = yield* resolverFor(reconstruction, executable)
       const failure = yield* Effect.flip(
-        resolverFor(reconstruction, executable)
+        resolver
           .resolve({
             runId: "run:missing",
             ...executable,
@@ -214,8 +215,9 @@ describe("ExecutableResolver.makeDynamic", () => {
     Effect.gen(function* () {
       const executable = executableFor("code-extra")
       const { reconstruction } = fixture()
+      const resolver = yield* resolverFor(reconstruction, executable)
       const failure = yield* Effect.flip(
-        resolverFor(reconstruction, executable)
+        resolver
           .resolve({
             runId: "run:extra",
             ...executable,
@@ -235,8 +237,9 @@ describe("ExecutableResolver.makeDynamic", () => {
     Effect.gen(function* () {
       const executable = executableFor("code-codec")
       const { reconstruction } = fixture()
+      const resolver = yield* resolverFor(reconstruction, executable)
       const failure = yield* Effect.flip(
-        resolverFor(reconstruction, executable)
+        resolver
           .resolve({
             runId: "run:codec",
             ...executable,
@@ -256,8 +259,9 @@ describe("ExecutableResolver.makeDynamic", () => {
     Effect.gen(function* () {
       const executable = executableFor("code-changed")
       const { reconstruction } = fixture()
+      const resolver = yield* resolverFor(reconstruction, executable)
       const failure = yield* Effect.flip(
-        resolverFor(reconstruction, executable)
+        resolver
           .resolve({ runId: "run:changed", ...executable, registrations: admittedRegistrations(executable, "2") })
           .pipe(Effect.scoped),
       )
@@ -270,8 +274,9 @@ describe("ExecutableResolver.makeDynamic", () => {
     Effect.gen(function* () {
       const executable = executableFor("code-handler")
       const { reconstruction } = fixture({ toolName: "shell" })
+      const resolver = yield* resolverFor(reconstruction, executable)
       const failure = yield* Effect.flip(
-        resolverFor(reconstruction, executable)
+        resolver
           .resolve({ runId: "run:handler", ...executable, registrations: admittedRegistrations(executable) })
           .pipe(Effect.scoped),
       )
@@ -287,7 +292,7 @@ describe("ExecutableResolver.makeDynamic", () => {
         const admitted = executableFor("code-agents")
         const registered = executableFor("code-registered")
         const { reconstruction, seenAgents } = fixture()
-        const resolver = resolverFor(reconstruction, registered)
+        const resolver = yield* resolverFor(reconstruction, registered)
 
         const program = yield* resolver
           .resolve({ runId: "run:agents", ...admitted, registrations: admittedRegistrations(admitted) })
@@ -316,7 +321,8 @@ describe("ExecutableResolver.makeDynamic", () => {
       const executable = executableFor("code-scope")
       const { reconstruction, released } = fixture()
       const scope = yield* Scope.make()
-      yield* resolverFor(reconstruction, executable)
+      const resolver = yield* resolverFor(reconstruction, executable)
+      yield* resolver
         .resolve({ runId: "run:scope", ...executable, registrations: admittedRegistrations(executable) })
         .pipe(Scope.provide(scope))
       expect(released).toEqual([])
@@ -365,8 +371,9 @@ describe("ExecutableResolver.makeDynamic", () => {
       })
       const narrowed = yield* ExecutableRegistration.narrow(admitted, registrationsFor(parent))
       const { reconstruction } = fixture()
+      const resolver = yield* resolverFor(reconstruction, admitted)
 
-      const resolution = yield* resolverFor(reconstruction, admitted)
+      const resolution = yield* resolver
         .resolve({ runId: "run:narrowed", ...admitted, registrations: narrowed })
         .pipe(Effect.scoped)
       expect(resolution._tag).toBe("Program")
@@ -381,8 +388,9 @@ describe("ExecutableResolver.makeDynamic", () => {
       const executable = executableFor("code-ref")
       const { reconstruction } = fixture()
       const ref = { executable: executable.ref.executable, active: Pins.makeProgram({ unknown: true }) }
+      const resolver = yield* resolverFor(reconstruction, executable)
       const failure = yield* Effect.flip(
-        resolverFor(reconstruction, executable)
+        resolver
           .resolve({
             runId: "run:ref",
             ref,

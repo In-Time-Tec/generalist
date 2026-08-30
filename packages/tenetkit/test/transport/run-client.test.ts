@@ -105,6 +105,23 @@ describe("RunClient", () => {
             }),
           ),
         )
+        suite.effect("rejects an invalid event capacity as a typed failure", () =>
+          Effect.scoped(
+            Effect.gen(function* () {
+              const socketCount = sockets.length
+              const failure = yield* RunClient.RunClient.use((client) =>
+                client.connect({
+                  url: "ws://test/runs",
+                  runId: "run-invalid",
+                  eventCapacity: 0,
+                }),
+              ).pipe(Effect.flip)
+
+              expect(Schema.is(RunClient.InvalidConnectOptions)(failure)).toBe(true)
+              expect(sockets).toHaveLength(socketCount)
+            }),
+          ),
+        )
       },
     )
   }

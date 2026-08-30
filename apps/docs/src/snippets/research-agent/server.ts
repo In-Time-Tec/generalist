@@ -140,10 +140,11 @@ const agentServices = Layer.mergeAll(
 )
 
 export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor> =
-  Runtime.layerMemory({
-    resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
-    addresses: [],
-  })
+  Runtime.layerMemory({ addresses: [] }).pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(Layer.orDie),
+    ),
+  )
 
 export const httpLayer: Layer.Layer<never, never, HttpServer.HttpServer> = HttpRouter.serve(
   Layer.mergeAll(routesLayer, HttpRouter.cors()),

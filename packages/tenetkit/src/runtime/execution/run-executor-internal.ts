@@ -3,12 +3,12 @@ import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
 import type { Event } from "../../core/agent/event.js"
 import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
-import { type DriverCheckpoint, type DriverJournal, DriverJournalService } from "../../core/durable/driver.js"
+import { type DriverCheckpoint, DriverJournal, type Journal } from "../../core/durable/driver.js"
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
 import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../errors-internal.js"
-import { matchesActiveRunOptions } from "../executable/resolver.js"
+import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
@@ -41,14 +41,15 @@ import {
   type RunOptionsInput,
 } from "./completion/operations.js"
 import { suspend as suspendAgent } from "./agent/suspend.js"
-import type { Options, Service } from "./run-executor.js"
+import type { Service } from "./run-executor.js"
 
-export const make = (options: Options): Effect.Effect<Service, never, RunStore | ActiveExecutions> =>
-  Effect.gen(function* () {
+export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> = Effect.gen(
+  function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
+    const resolver = yield* ExecutableResolver
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
-    const reconcileCancellation = yield* makeToolCancellation({ store, resolver: options.resolver })
+    const reconcileCancellation = yield* makeToolCancellation({ store, resolver })
     const executeClaim = (claim: ExecutionClaim, afterExit: Ref.Ref<Effect.Effect<void>>): Effect.Effect<void> =>
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
@@ -81,7 +82,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
         })
         const scopedExecution = Effect.scoped(
           Effect.gen(function* () {
-            const resolved = yield* ExecutionResolution.resolve(options.resolver, claimed, deferProgramChildFailure)
+            const resolved = yield* ExecutionResolution.resolve(resolver, claimed, deferProgramChildFailure)
             if (resolved === undefined) return
             if (resolved._tag === "Program") {
               yield* executeProgram({ claim, claimed, store, resolution: resolved })
@@ -174,7 +175,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
                           }
                         >(),
                       )
-                      const journal: DriverJournal = {
+                      const journal: Journal = {
                         onScheduled: (operation, checkpoint) =>
                           Effect.gen(function* () {
                             const [steeringEntryIds, steeringPrompt, steeringEvents] =
@@ -299,7 +300,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
                           }).pipe(Effect.mapError((error) => journalFailure("completion", operation.key, error))),
                         onCheckpoint: (checkpoint) => saveJournalCheckpoint({ store, claim, checkpoint }),
                       }
-                      const context = Context.merge(baseContext, Context.make(DriverJournalService, journal))
+                      const context = Context.merge(baseContext, Context.make(DriverJournal, journal))
                       if (
                         !matchesActiveRunOptions(claimed.executableRef, claimed.executableManifest, resolved.runOptions)
                       ) {
@@ -457,4 +458,5 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
         yield* active.run(claim.runId, executeClaim(claim, afterExit), settleAndRelease)
       })
     return { execute, interrupt: (runId) => active.interrupt(runId) }
-  })
+  },
+)

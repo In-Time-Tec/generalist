@@ -76,12 +76,15 @@ it.effect("delivers an addressed message at the next turn boundary without inter
       }),
     )
     const runtimeLayer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([
-        { executable: ref, agent: Agent.close(agent, model) },
-        { executable: childRef, agent: closedTestAgent(childAgent) },
-      ]),
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable: ref, agent: Agent.close(agent, model) },
+          { executable: childRef, agent: closedTestAgent(childAgent) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
 
     yield* provideScoped(
       runtimeLayer,
@@ -150,12 +153,15 @@ it.effect("carries the authoritative sender into the delivered prompt", () =>
       }),
     )
     const runtimeLayer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([
-        { executable: ref, agent: Agent.close(agent, model) },
-        { executable: childRef, agent: closedTestAgent(childAgent) },
-      ]),
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable: ref, agent: Agent.close(agent, model) },
+          { executable: childRef, agent: closedTestAgent(childAgent) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
 
     yield* provideScoped(
       runtimeLayer,
@@ -212,12 +218,15 @@ it.effect("holds a message for an idle target until its next Run drains it", () 
       }),
     )
     const runtimeLayer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([
-        { executable: ref, agent: Agent.close(agent, model) },
-        { executable: childRef, agent: closedTestAgent(childAgent) },
-      ]),
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable: ref, agent: Agent.close(agent, model) },
+          { executable: childRef, agent: closedTestAgent(childAgent) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
 
     yield* provideScoped(
       runtimeLayer,

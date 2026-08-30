@@ -149,5 +149,3 @@ export const apply = (
       ),
     )
   })
-
-export const RunSchema = { plan, check, apply, markDirty } as const

@@ -325,7 +325,7 @@ it.effect("resumes exact approval identity and completed replay without duplicat
         return text
       }),
   })
-  const journal: DurableDriver.DriverJournal = {
+  const journal: DurableDriver.Journal = {
     onScheduled: (operation) =>
       operation.key === operationKey && completedOutcome !== undefined ? Effect.succeed(completedOutcome) : Effect.void,
     onCompleted: (_operation, outcome) =>
@@ -404,5 +404,5 @@ it.effect("resumes exact approval identity and completed replay without duplicat
       result: { id: "gated-1", name: "gated", result: "approved", isFailure: false },
     })
     expect(handlerCalls).toBe(1)
-  }).pipe(Effect.provide(base), Effect.provideService(DurableDriver.DriverJournalService, journal))
+  }).pipe(Effect.provide(base), Effect.provideService(DurableDriver.DriverJournal, journal))
 })

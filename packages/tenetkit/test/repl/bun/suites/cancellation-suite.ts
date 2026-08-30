@@ -6,6 +6,51 @@ const delayThenWrite = (marker: string): string =>
   `await new Promise((resolve) => setTimeout(resolve, 2000)); await Bun.write(\`${marker}\`, "landed"); "done"`
 
 layer(platform, liveOptions)("Bun kernel cancellation", (it) => {
+  it.effect("replaces the kernel after an external abort and restores only the completed snapshot", () =>
+    withPool({
+      use: ({ pool, dataRoot }) =>
+        Effect.gen(function* () {
+          const fileSystem = yield* FileSystem.FileSystem
+          const started = `${dataRoot}/abort-started`
+          // oxlint-disable-next-line effecttsgo/abort-controller-in-effect -- This test exercises caller-owned AbortSignal cancellation.
+          const controller = new AbortController()
+          const first = yield* runCell({
+            pool,
+            sessionId: "s",
+            cellId: "c1",
+            code: "const completed = 40; process.pid",
+          })
+          const running = yield* Effect.forkChild(
+            Effect.exit(
+              runCell({
+                pool,
+                sessionId: "s",
+                cellId: "c2",
+                signal: controller.signal,
+                code: `const activeOnly = 2; await Bun.write(\`${started}\`, "started"); await new Promise(() => {})`,
+              }),
+            ),
+          )
+          while (!(yield* fileSystem.exists(started))) yield* Effect.sleep(10)
+          controller.abort()
+          yield* Fiber.join(running)
+
+          expect((yield* pool.interrupt("s", "c2"))._tag).toBe("NotRunning")
+          const restored = yield* runCell({
+            pool,
+            sessionId: "s",
+            cellId: "c3",
+            code: "[process.pid, completed + 2, typeof activeOnly].join('|')",
+          })
+          expect(restored.value).toBe(`${restored.value.split("|")[0]}|42|undefined`)
+          expect(restored.value.split("|")[0]).not.toBe(first.value)
+          expect(restored.epoch).toBe(1)
+          const inspection = yield* pool.inspect({ sessionId: "s" })
+          expect(inspection.recovery).toBe("namespace")
+        }),
+    }),
+  )
+
   /**
    * Cancelling a cell must stop the work, not merely stop waiting for it. A host that abandoned the
    * cell while it kept running would still let the cell's later side effects land, so this asserts
@@ -36,6 +81,8 @@ layer(platform, liveOptions)("Bun kernel cancellation", (it) => {
           yield* Fiber.interrupt(running)
           const reused = yield* runCell({ pool, sessionId: "s", cellId: "c3", code: "process.pid" })
           expect(reused.value).not.toBe(first.value)
+          expect(reused.epoch).toBe(1)
+          expect((yield* pool.interrupt("s", "c2"))._tag).toBe("NotRunning")
           /**
            * Watching for the marker past the moment the cell would have written it is stronger than
            * sleeping once and looking afterwards: a surviving cell fails the assertion as soon as

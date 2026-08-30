@@ -1493,14 +1493,16 @@ describePostgres("PostgreSQL run store", () => {
         const options = {
           url,
           maxConnections: postgresTestMaxConnections,
-          resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
+        const runtimeLayer = layer(options).pipe(
+          Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)),
+        )
         const workerLayer = RuntimeWorker.layer({
           workerId: "postgres-model-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
-        }).pipe(Layer.provideMerge(layer(options)))
+        }).pipe(Layer.provideMerge(runtimeLayer))
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const worker = yield* RuntimeWorker.RuntimeWorker
@@ -1512,7 +1514,7 @@ describePostgres("PostgreSQL run store", () => {
           })
           yield* worker.poll
           yield* Deferred.await(started)
-          yield* scopedWith(layer(options))(
+          yield* scopedWith(runtimeLayer)(
             Runtime.Runtime.pipe(
               Effect.flatMap((otherRuntime) =>
                 otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
@@ -1575,20 +1577,22 @@ describePostgres("PostgreSQL run store", () => {
         const handlers = Toolkit.make(tool).toLayer({
           block: () => Effect.die("ToolExecutor test layer owns execution"),
         })
-        const resolver = ExecutableResolver.makeStatic([
+        const resolver = yield* ExecutableResolver.makeStatic([
           { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
         ])
         const options = {
           url,
           maxConnections: postgresTestMaxConnections,
-          resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
+        const runtimeLayer = layer(options).pipe(
+          Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)),
+        )
         const workerLayer = RuntimeWorker.layer({
           workerId: "postgres-tool-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
-        }).pipe(Layer.provideMerge(layer(options)))
+        }).pipe(Layer.provideMerge(runtimeLayer))
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -1601,7 +1605,7 @@ describePostgres("PostgreSQL run store", () => {
           })
           yield* worker.poll
           yield* Deferred.await(started)
-          yield* scopedWith(layer(options))(
+          yield* scopedWith(runtimeLayer)(
             Runtime.Runtime.pipe(
               Effect.flatMap((otherRuntime) =>
                 otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),

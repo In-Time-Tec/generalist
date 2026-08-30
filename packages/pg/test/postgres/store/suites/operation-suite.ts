@@ -33,24 +33,22 @@ describePostgres("PostgreSQL Program store contract", () => {
     const options = {
       url: database0.url,
       maxConnections: postgresTestMaxConnections,
-      resolver: fixture.resolver,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
     }
-    layer(database0.provision(backendLayer(options)), { excludeTestServices: true })(
-      "enforces budgets, replay identity, and cancellation fences",
-      (it) => {
-        it.effect("enforces budgets, replay identity, and cancellation fences", () =>
-          programBudgetContract.pipe(
-            Effect.andThen(programReplayDivergenceContract),
-            Effect.andThen(programSettledReplayContract),
-            Effect.andThen(programCancellationFinalizerContract),
-            Effect.andThen(programCancellationFenceContract),
-          ),
-        )
-      },
-    )
+    layer(database0.provision(backendLayer(options).pipe(Layer.provide(fixture.resolverLayer))), {
+      excludeTestServices: true,
+    })("enforces budgets, replay identity, and cancellation fences", (it) => {
+      it.effect("enforces budgets, replay identity, and cancellation fences", () =>
+        programBudgetContract.pipe(
+          Effect.andThen(programReplayDivergenceContract),
+          Effect.andThen(programSettledReplayContract),
+          Effect.andThen(programCancellationFinalizerContract),
+          Effect.andThen(programCancellationFenceContract),
+        ),
+      )
+    })
   }
 
   {
@@ -59,7 +57,6 @@ describePostgres("PostgreSQL Program store contract", () => {
     const runtimeLayer = backendLayer({
       url: database1.url,
       maxConnections: postgresTestMaxConnections,
-      resolver: fixture.resolver,
       addresses: [
         {
           address: programAddress,
@@ -67,7 +64,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           registrations: registrationsFor(programExecutable),
         },
       ],
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database1.provision(runtimeLayer), { excludeTestServices: true })(
       "atomically records and replays Program tool and log operations",
       (it) => {
@@ -113,9 +110,8 @@ describePostgres("PostgreSQL Program store contract", () => {
         backendLayer({
           url: database.url,
           maxConnections: postgresTestMaxConnections,
-          resolver: fixture.resolver,
           addresses: [],
-        }),
+        }).pipe(Layer.provide(fixture.resolverLayer)),
       ),
     )
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
@@ -150,84 +146,82 @@ describePostgres("PostgreSQL Program store contract", () => {
     const options = {
       url: database2.url,
       maxConnections: postgresTestMaxConnections,
-      resolver: fixture.resolver,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
     }
-    layer(database2.provision(backendLayer(options)), { excludeTestServices: true })(
-      "atomically reserves one approval response and resumes the Program operation",
-      (it) => {
-        it.effect("atomically reserves one approval response and resumes the Program operation", () =>
-          Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims
-            const host = yield* RunExecutor.RunExecutor
-            const receipt = yield* runtime.send({
-              to: programAddress,
-              sessionId: "postgres-program-approval",
-              idempotencyKey: "postgres-program-approval",
-              prompt: "run",
-            })
-            runId = receipt.runId
-            const [first] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
-            yield* host.execute({
-              runId: receipt.runId,
-              ownerId: first!.workerId,
-              attemptFence: first!.attemptFence,
-              session: first!.session,
-            })
-            yield* Effect.all(
-              [
-                runtime.respond({
+    layer(database2.provision(backendLayer(options).pipe(Layer.provide(fixture.resolverLayer))), {
+      excludeTestServices: true,
+    })("atomically reserves one approval response and resumes the Program operation", (it) => {
+      it.effect("atomically reserves one approval response and resumes the Program operation", () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const claims = yield* RunClaims
+          const host = yield* RunExecutor.RunExecutor
+          const receipt = yield* runtime.send({
+            to: programAddress,
+            sessionId: "postgres-program-approval",
+            idempotencyKey: "postgres-program-approval",
+            prompt: "run",
+          })
+          runId = receipt.runId
+          const [first] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
+          yield* host.execute({
+            runId: receipt.runId,
+            ownerId: first!.workerId,
+            attemptFence: first!.attemptFence,
+            session: first!.session,
+          })
+          yield* Effect.all(
+            [
+              runtime.respond({
+                runId: receipt.runId,
+                waitId: "approval:echo",
+                resolution: { _tag: "Approved" },
+              }),
+              runtime.respond({
+                runId: receipt.runId,
+                waitId: "approval:echo",
+                resolution: { _tag: "Approved" },
+              }),
+            ],
+            { concurrency: "unbounded" },
+          )
+          expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
+            status: "reserved",
+          })
+        }).pipe(
+          Effect.andThen(
+            Effect.suspend(() =>
+              Effect.gen(function* () {
+                const runtime = yield* Runtime.Runtime
+                const store = yield* RunStore.RunStore
+                const claims = yield* RunClaims
+                const host = yield* RunExecutor.RunExecutor
+                const receipt = { runId }
+                const [resumed] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
+                expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
+                  suspension: { operation: "echo", reason: "approval" },
+                  resolutions: [{ waitId: "approval:echo", resolution: { _tag: "Approved" } }],
+                })
+                yield* host.execute({
                   runId: receipt.runId,
-                  waitId: "approval:echo",
-                  resolution: { _tag: "Approved" },
-                }),
-                runtime.respond({
-                  runId: receipt.runId,
-                  waitId: "approval:echo",
-                  resolution: { _tag: "Approved" },
-                }),
-              ],
-              { concurrency: "unbounded" },
-            )
-            expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
-              status: "reserved",
-            })
-          }).pipe(
-            Effect.andThen(
-              Effect.suspend(() =>
-                Effect.gen(function* () {
-                  const runtime = yield* Runtime.Runtime
-                  const store = yield* RunStore.RunStore
-                  const claims = yield* RunClaims
-                  const host = yield* RunExecutor.RunExecutor
-                  const receipt = { runId }
-                  const [resumed] = yield* claims.claimReadyRuns({ workerId: "postgres-program", limit: 1 })
-                  expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
-                    suspension: { operation: "echo", reason: "approval" },
-                    resolutions: [{ waitId: "approval:echo", resolution: { _tag: "Approved" } }],
-                  })
-                  yield* host.execute({
-                    runId: receipt.runId,
-                    ownerId: resumed!.workerId,
-                    attemptFence: resumed!.attemptFence,
-                    session: resumed!.session,
-                  })
-                  expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
-                  expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
-                    status: "succeeded",
-                  })
-                  expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
-                }),
-              ),
+                  ownerId: resumed!.workerId,
+                  attemptFence: resumed!.attemptFence,
+                  session: resumed!.session,
+                })
+                expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
+                expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
+                  status: "succeeded",
+                })
+                expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+              }),
             ),
           ),
-        )
-      },
-    )
+        ),
+      )
+    })
   }
 
   {
@@ -236,63 +230,61 @@ describePostgres("PostgreSQL Program store contract", () => {
     const options = {
       url: database3.url,
       maxConnections: postgresTestMaxConnections,
-      resolver: fixture.resolver,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
     }
-    layer(database3.provision(backendLayer(options)), { excludeTestServices: true })(
-      "does not reopen a cancelled Program approval operation",
-      (it) => {
-        it.effect("does not reopen a cancelled Program approval operation", () =>
-          Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims
-            const host = yield* RunExecutor.RunExecutor
-            const receipt = yield* runtime.send({
-              to: programAddress,
-              sessionId: "postgres-program-cancelled-approval",
-              idempotencyKey: "postgres-program-cancelled-approval",
-              prompt: "run",
-            })
-            const [claim] = yield* claims.claimReadyRuns({ workerId: "postgres-program-cancelled-approval", limit: 1 })
-            yield* host.execute({
-              runId: receipt.runId,
-              ownerId: claim!.workerId,
-              attemptFence: claim!.attemptFence,
-              session: claim!.session,
-            })
-            const operation = yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })
-            if (operation?.waitId === undefined) return yield* Effect.die("Program approval wait is missing")
-            yield* provideScoped(
-              postgresClient(database3.url),
-              Effect.gen(function* () {
-                const sql = yield* SqlClient.SqlClient
-                yield* sql`
+    layer(database3.provision(backendLayer(options).pipe(Layer.provide(fixture.resolverLayer))), {
+      excludeTestServices: true,
+    })("does not reopen a cancelled Program approval operation", (it) => {
+      it.effect("does not reopen a cancelled Program approval operation", () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const claims = yield* RunClaims
+          const host = yield* RunExecutor.RunExecutor
+          const receipt = yield* runtime.send({
+            to: programAddress,
+            sessionId: "postgres-program-cancelled-approval",
+            idempotencyKey: "postgres-program-cancelled-approval",
+            prompt: "run",
+          })
+          const [claim] = yield* claims.claimReadyRuns({ workerId: "postgres-program-cancelled-approval", limit: 1 })
+          yield* host.execute({
+            runId: receipt.runId,
+            ownerId: claim!.workerId,
+            attemptFence: claim!.attemptFence,
+            session: claim!.session,
+          })
+          const operation = yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })
+          if (operation?.waitId === undefined) return yield* Effect.die("Program approval wait is missing")
+          yield* provideScoped(
+            postgresClient(database3.url),
+            Effect.gen(function* () {
+              const sql = yield* SqlClient.SqlClient
+              yield* sql`
                 UPDATE tenetkit_runs SET status = 'running', owner_worker_id = 'postgres-program-cancelled-approval'
                 WHERE run_id = ${receipt.runId}
               `
-              }),
-            )
-            yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-            const response = yield* runtime
-              .respond({ runId: receipt.runId, waitId: operation.waitId, resolution: { _tag: "Approved" } })
-              .pipe(Effect.flip)
-            expect(response).toBeInstanceOf(Errors.WaitNotOpen)
-            yield* runtime.signal({ runId: receipt.runId, name: operation.waitId })
-            const resume = yield* store
-              .resume({ runId: receipt.runId, waitId: operation.waitId, resolution: { _tag: "Approved" } })
-              .pipe(Effect.flip)
-            expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
-            expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
-              status: "failed",
-            })
-            expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
-          }),
-        )
-      },
-    )
+            }),
+          )
+          yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+          const response = yield* runtime
+            .respond({ runId: receipt.runId, waitId: operation.waitId, resolution: { _tag: "Approved" } })
+            .pipe(Effect.flip)
+          expect(response).toBeInstanceOf(Errors.WaitNotOpen)
+          yield* runtime.signal({ runId: receipt.runId, name: operation.waitId })
+          const resume = yield* store
+            .resume({ runId: receipt.runId, waitId: operation.waitId, resolution: { _tag: "Approved" } })
+            .pipe(Effect.flip)
+          expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
+          expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
+            status: "failed",
+          })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+        }),
+      )
+    })
   }
 
   {
@@ -301,7 +293,6 @@ describePostgres("PostgreSQL Program store contract", () => {
     const runtimeLayer = backendLayer({
       url: database4.url,
       maxConnections: postgresTestMaxConnections,
-      resolver: fixture.resolver,
       addresses: [
         {
           address: fixture.address,
@@ -309,7 +300,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           registrations: registrationsFor(fixture.executable),
         },
       ],
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database4.provision(runtimeLayer), { excludeTestServices: true })(
       "claims Program children in order, wakes the parent, and settles cancellation",
       (it) => {
@@ -418,7 +409,6 @@ describePostgres("PostgreSQL Program store contract", () => {
     const runtimeLayer = backendLayer({
       url: database5.url,
       maxConnections: postgresTestMaxConnections,
-      resolver: fixture.resolver,
       addresses: [
         {
           address: programAddress,
@@ -426,7 +416,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           registrations: registrationsFor(programExecutable),
         },
       ],
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database5.provision(runtimeLayer), { excludeTestServices: true })(
       "resolves a crashed non-idempotent Program operation without redispatch",
       (it) => {

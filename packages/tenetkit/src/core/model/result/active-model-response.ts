@@ -1,7 +1,7 @@
 import { Context, Effect, Option } from "effect"
 import { Tool } from "effect/unstable/ai"
 import type { CompletedModelResponse } from "../response/builder.js"
-import { createController, installController } from "./active-model-response-controller.js"
+import { install, make as makeWriterState } from "./active-model-response-writer.js"
 
 /** @experimental Identity of the authoritative provider attempt for one model operation. */
 export interface AttemptIdentity {
@@ -33,11 +33,11 @@ export class ActiveModelResponse extends Context.Service<ActiveModelResponse, Se
 
 /** @experimental Make one opaque accumulator handle for a single Run. */
 export const make = (): Service => {
-  const state = createController()
+  const state = makeWriterState()
   const service = ActiveModelResponse.of({
     [HandleTypeId]: HandleTypeId,
     snapshot: state.snapshot,
   })
-  installController({ service, controller: state.controller })
+  install({ service, writer: state.writer })
   return service
 }

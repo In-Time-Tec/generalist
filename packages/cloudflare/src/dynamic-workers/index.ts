@@ -1,5 +1,5 @@
-/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/global-timers-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, effecttsgo/unnecessary-fail-yieldable-error, no-await-in-loop */
-import { Effect, Layer, Option, Result, Schema } from "effect"
+/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, effecttsgo/unnecessary-fail-yieldable-error, no-await-in-loop */
+import { Clock, Duration, Effect, Layer, Option, Result, Schema } from "effect"
 import { CodeExecutor, ProgramCapabilities } from "tenetkit"
 import { identity } from "./identity.js"
 import { capabilityFailurePrefix, normalize, runner, runnerName } from "./source.js"
@@ -63,17 +63,25 @@ const readBounded = async (response: Response, limit: number, signal: AbortSigna
       if (next.done) return text + decoder.decode()
       size += next.value.byteLength
       if (size > limit) {
-        await reader.cancel()
+        void reader.cancel().catch(() => undefined)
         return undefined
       }
       text += decoder.decode(next.value, { stream: true })
     }
   } finally {
     signal.removeEventListener("abort", abort)
-    if (signal.aborted) await reader.cancel().catch(() => undefined)
+    if (signal.aborted) void reader.cancel().catch(() => undefined)
     reader.releaseLock()
   }
 }
+
+const raceAbort = <A>(promise: Promise<A>, signal: AbortSignal): Promise<A> =>
+  new Promise<A>((resolve, reject) => {
+    const abort = () => reject(new Error("interrupted"))
+    signal.addEventListener("abort", abort, { once: true })
+    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort))
+    if (signal.aborted) abort()
+  })
 
 const capabilityName = (request: CapabilityRpcRequest): string | undefined => {
   switch (request.operation) {
@@ -205,8 +213,7 @@ const loaderFailure = (
   deadlineElapsed: boolean,
 ): CodeExecutor.ExecutionFailure => {
   if (request.signal.aborted) return CodeExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-  if (deadlineElapsed || Date.now() >= request.deadlineMillis)
-    return CodeExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+  if (deadlineElapsed) return CodeExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
   const message = safeMessage(cause)
   if (/cpu/i.test(message))
     return CodeExecutor.SandboxResourceExceeded.make({ resource: "cpu", limit: request.limits.cpuMillis })
@@ -292,8 +299,7 @@ const decodeWorkerResponse = (
 
 const interruptionFailure = (request: CodeExecutor.Request, deadlineElapsed: boolean) => {
   if (request.signal.aborted) return CodeExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
-  if (deadlineElapsed || Date.now() >= request.deadlineMillis)
-    return CodeExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+  if (deadlineElapsed) return CodeExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
   return undefined
 }
 
@@ -304,7 +310,7 @@ export const make = (options: Options): CodeExecutor.Service => {
     identity: executorIdentity,
     execute: (request) =>
       Effect.gen(function* () {
-        const now = Date.now()
+        const now = yield* Clock.currentTimeMillis
         if (request.signal.aborted)
           return yield* CodeExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
         if (now >= request.deadlineMillis)
@@ -324,33 +330,30 @@ export const make = (options: Options): CodeExecutor.Service => {
             const invocation = new AbortController()
             const cancel = () => invocation.abort()
             let deadlineElapsed = false
-            let deadlineTimer: ReturnType<typeof setTimeout> | undefined
-            let workerFetch: Promise<Response> | undefined
-            let bodyRead: Promise<string | undefined> | undefined
-            yield* Effect.addFinalizer(() => {
-              active = false
-              if (deadlineTimer !== undefined) clearTimeout(deadlineTimer)
-              request.signal.removeEventListener("abort", cancel)
-              invocation.abort()
-              const pending: Array<Promise<unknown>> = []
-              if (workerFetch !== undefined) pending.push(workerFetch)
-              if (bodyRead !== undefined) pending.push(bodyRead)
-              return Effect.promise(() => Promise.allSettled(pending)).pipe(Effect.asVoid)
-            })
+            yield* Effect.addFinalizer(() =>
+              Effect.sync(() => {
+                active = false
+                request.signal.removeEventListener("abort", cancel)
+                invocation.abort()
+              }),
+            )
 
             request.signal.addEventListener("abort", cancel, { once: true })
             if (request.signal.aborted) cancel()
-            const remaining = request.deadlineMillis - Date.now()
+            const currentTime = yield* Clock.currentTimeMillis
+            const remaining = request.deadlineMillis - currentTime
             if (remaining <= 0) {
               deadlineElapsed = true
               cancel()
             } else {
-              deadlineTimer = setTimeout(
-                () => {
-                  deadlineElapsed = true
-                  cancel()
-                },
-                Math.min(remaining, 2_147_483_647),
+              yield* Effect.sleep(Duration.millis(remaining)).pipe(
+                Effect.andThen(
+                  Effect.sync(() => {
+                    deadlineElapsed = true
+                    cancel()
+                  }),
+                ),
+                Effect.forkScoped,
               )
             }
             const beforeLoad = interruptionFailure(request, deadlineElapsed)
@@ -361,7 +364,7 @@ export const make = (options: Options): CodeExecutor.Service => {
               request,
               grants,
               signal: invocation.signal,
-              isActive: () => active && !request.signal.aborted && Date.now() < request.deadlineMillis,
+              isActive: () => active && !request.signal.aborted && !deadlineElapsed,
               recordFailure: (failure) => {
                 const failureId = `failure-${++nextCapabilityFailure}`
                 capabilityFailures.set(failureId, failure)
@@ -385,7 +388,7 @@ export const make = (options: Options): CodeExecutor.Service => {
             }
             const response = yield* Effect.tryPromise({
               try: () => {
-                workerFetch = options.loader
+                const workerFetch = options.loader
                   .load(code)
                   .getEntrypoint()
                   .fetch(
@@ -395,20 +398,14 @@ export const make = (options: Options): CodeExecutor.Service => {
                       body: `{"protocolVersion":${JSON.stringify(request.protocolVersion)},"requestId":${JSON.stringify(request.requestId)},"input":${encodedInput}}`,
                     }),
                   )
-                const abort = new Promise<never>((_, reject) => {
-                  invocation.signal.addEventListener("abort", () => reject(new Error("interrupted")), { once: true })
-                })
-                return Promise.race([workerFetch, abort])
+                return raceAbort(workerFetch, invocation.signal)
               },
               catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
             })
             const afterExecution = interruptionFailure(request, deadlineElapsed)
             if (afterExecution !== undefined) return yield* afterExecution
             const text = yield* Effect.tryPromise({
-              try: () => {
-                bodyRead = readBounded(response, request.limits.outputBytes, invocation.signal)
-                return bodyRead
-              },
+              try: () => readBounded(response, request.limits.outputBytes, invocation.signal),
               catch: (cause) => loaderFailure(cause, request, deadlineElapsed),
             })
             const afterOutput = interruptionFailure(request, deadlineElapsed)

@@ -27,7 +27,7 @@ const request: ToolAuthorization.Request = {
   sessionId: "session",
   onApprovalRequired: () => Effect.void,
 }
-const store = (rules: ReadonlyArray<Permissions.Rule> = []): Permissions.RuleStoreService => ({
+const store = (rules: ReadonlyArray<Permissions.Rule> = []): Permissions.RuleStore["Service"] => ({
   rules: Effect.succeed(rules),
   remember: () => Effect.void,
 })
@@ -109,7 +109,7 @@ describe("ToolAuthorization", () => {
   it.effect("remembers only the explicit rule carried by Approved", () =>
     Effect.gen(function* () {
       const remembered: Array<Permissions.Rule> = []
-      const ruleStore: Permissions.RuleStoreService = {
+      const ruleStore: Permissions.RuleStore["Service"] = {
         rules: Effect.succeed([]),
         remember: (rule) => Effect.sync(() => remembered.push(rule)),
       }

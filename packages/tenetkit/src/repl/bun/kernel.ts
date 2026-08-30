@@ -82,9 +82,9 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
 
     const settle = (cell: ActiveCell, outcome: Effect.Effect<CellResult, CellFailure>): Effect.Effect<void> =>
       Ref.set(cell.settled, true).pipe(
-        Effect.andThen(Deferred.completeWith(cell.outcome, outcome)),
         Effect.andThen(Queue.end(cell.events)),
         Effect.andThen(Ref.set(active, undefined)),
+        Effect.andThen(Deferred.completeWith(cell.outcome, outcome)),
         Effect.asVoid,
       )
 

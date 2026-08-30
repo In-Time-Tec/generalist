@@ -39,13 +39,13 @@ export {
 } from "./driver/tracer.js"
 export {
   DriverInterpreter,
-  DriverJournalService,
+  DriverJournal,
   DriverUnknownReplay,
   guardUnknownNeverReplay,
   layerInline,
   layerTest,
   make as makeInline,
-  type DriverJournal,
+  type Journal,
   type OperationSpec,
   type RecordedOperation,
   type StreamSuccessCodec,

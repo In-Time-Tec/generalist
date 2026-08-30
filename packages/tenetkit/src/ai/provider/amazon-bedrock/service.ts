@@ -90,9 +90,11 @@ export type Config = typeof ConfigSchema.Type
 
 /** @experimental Decodes persisted provider options into Bedrock request configuration. */
 type ConfigInput = typeof Schema.Unknown.Type
-const decodeConfigInput = Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })
+const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 
-export const decodeConfig = (options: ConfigInput): Config => decodeConfigInput(options ?? {})
+export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema.SchemaError> =>
+  decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
+
 /** @experimental */
 export interface Options extends RegistrationOptions {
   readonly model: string

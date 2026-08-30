@@ -1,33 +1,17 @@
 import { Effect, Layer } from "effect"
+import { Runtime, RunStore, type AgentDirectory, type Mailbox, type Messaging } from "../../../src/runtime/index.js"
 import {
-  ExecutableResolver,
-  Runtime,
-  RunStore,
-  type AgentDirectory,
-  type Mailbox,
-  type Messaging,
-} from "../../../src/runtime/index.js"
-import {
-  analyst,
-  analystRef,
-  assistant,
   assistantAddress,
   assistantRef,
   registrationsFor,
-  researcher,
   researcherAddress,
   researcherRef,
+  resolverLayer,
   textPrompt,
 } from "../execution/fixtures.js"
-import { closedTestAgent } from "../run/identity.js"
 import { provideScoped } from "../execution/scoped-provide.js"
 
 const options = {
-  resolver: ExecutableResolver.makeStatic([
-    { executable: assistantRef, agent: closedTestAgent(assistant) },
-    { executable: researcherRef, agent: closedTestAgent(researcher) },
-    { executable: analystRef, agent: closedTestAgent(analyst) },
-  ]),
   addresses: [
     { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
     { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
@@ -42,7 +26,8 @@ export interface MessagingOverrides {
 }
 
 /** A memory Runtime whose mailbox bounds and messaging policy the test chooses. */
-export const messagingLayer = (overrides: MessagingOverrides) => Runtime.layerMemory({ ...options, ...overrides })
+export const messagingLayer = (overrides: MessagingOverrides) =>
+  Runtime.layerMemory({ ...options, ...overrides }).pipe(Layer.provide(resolverLayer))
 
 /**
  * One backend the addressed-messaging suites run against.

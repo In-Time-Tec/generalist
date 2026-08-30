@@ -48,16 +48,19 @@ export const providersReference = definePage({
       [
         [
           [code("./openai")],
-          [code("layer"), ", ", code("layer"), ", ", code("credentialsFromAuth"), ", ", code("layerConfig")],
+          [code("layer"), ", ", code("decodeConfig"), ", ", code("credentialsFromAuth"), ", ", code("layerConfig")],
         ],
         [
           [code("./openai-account-auth")],
           ["OpenAI account OAuth protocol, token documents, lifecycle services, and host/storage seams"],
         ],
         [[code("./openai-account-auth-http")], "Standard OpenAI account authorization HTTP layer"],
-        [[code("./anthropic")], [code("layer"), ", ", code("layerConfig")]],
-        [[code("./amazon-bedrock")], [code("layer"), ", client, credentials, and request configuration"]],
-        [[code("./openrouter")], [code("layer"), ", ", code("layerConfig")]],
+        [[code("./anthropic")], [code("layer"), ", ", code("layerConfig"), ", ", code("decodeConfig")]],
+        [
+          [code("./amazon-bedrock")],
+          [code("layer"), ", ", code("decodeConfig"), ", client, credentials, and request configuration"],
+        ],
+        [[code("./openrouter")], [code("layer"), ", ", code("layerConfig"), ", ", code("decodeConfig")]],
         [[code("./openai-responses")], [code("layer"), ", ", code("layerConfig"), ", ", code("decodeConfig")]],
         [[code("./openai-chat-completions")], [code("layer"), ", ", code("layerConfig"), ", ", code("decodeConfig")]],
         [[code("./deterministic")], [code("layer")]],
@@ -90,6 +93,15 @@ export const providersReference = definePage({
       " is explicitly supplied, such as ",
       code("OpenAI.classifyFailure"),
       " for an endpoint known to preserve OpenAI failure semantics.",
+    ),
+    p(
+      "Every provider ",
+      code("decodeConfig"),
+      " is an effectful decoder. It returns an ",
+      code("Effect"),
+      " and rejects invalid persisted input through the typed ",
+      code("Schema.SchemaError"),
+      " error channel; it does not throw or synchronously return configuration.",
     ),
     h2("openai-protocols", "OpenAI protocol adapters"),
     table(

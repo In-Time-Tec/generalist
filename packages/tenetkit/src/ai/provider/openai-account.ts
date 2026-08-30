@@ -7,7 +7,7 @@ import {
 } from "../../core/model/registry.js"
 import { Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
-import type { Credential, AuthService } from "./openai-account-auth.js"
+import type { Credential, OpenAIAccountAuth } from "./openai-account-auth.js"
 import {
   type Config,
   type RegistrationOptions,
@@ -52,7 +52,10 @@ export interface OpenAIAccountCredentials {
   readonly refreshRejected: (generation: string) => Effect.Effect<OpenAIAccountCredential, OpenAIAccountCredentialError>
 }
 
-const credentialsFromAuthImpl = (service: AuthService, expectedFingerprint: string): OpenAIAccountCredentials => {
+const credentialsFromAuthImpl = (
+  service: OpenAIAccountAuth["Service"],
+  expectedFingerprint: string,
+): OpenAIAccountCredentials => {
   const mapCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
     Effect.mapError(() => OpenAIAccountCredentialError.make({ operation }))
   const accountCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
@@ -74,8 +77,8 @@ const credentialsFromAuthImpl = (service: AuthService, expectedFingerprint: stri
 
 /** @experimental */
 export const credentialsFromAuth: {
-  (service: AuthService, expectedFingerprint: string): OpenAIAccountCredentials
-  (expectedFingerprint: string): (service: AuthService) => OpenAIAccountCredentials
+  (service: OpenAIAccountAuth["Service"], expectedFingerprint: string): OpenAIAccountCredentials
+  (expectedFingerprint: string): (service: OpenAIAccountAuth["Service"]) => OpenAIAccountCredentials
 } = Function.dual(2, credentialsFromAuthImpl)
 
 /** @experimental */

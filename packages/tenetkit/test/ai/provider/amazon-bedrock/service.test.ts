@@ -134,28 +134,33 @@ const fakeClient = (options?: {
 })
 
 describe("Amazon Bedrock", () => {
-  it("decodes only canonical persisted adapter options", () => {
-    expect(
-      decodeConfig({
+  it.effect("decodes only canonical persisted adapter options", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* decodeConfig({
+          maxTokens: 8_192,
+          temperature: 0.2,
+          stopSequences: ["stop"],
+          additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 2_048 } },
+        }),
+      ).toEqual({
         maxTokens: 8_192,
         temperature: 0.2,
         stopSequences: ["stop"],
         additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 2_048 } },
-      }),
-    ).toEqual({
-      maxTokens: 8_192,
-      temperature: 0.2,
-      stopSequences: ["stop"],
-      additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 2_048 } },
-    })
-    expect(() => decodeConfig({ max_output_tokens: 8_192 })).toThrow()
-    expect(() => decodeConfig({ max_tokens: 8_192 })).toThrow()
-    expect(() => decodeConfig({ output_config: { effort: "high" } })).toThrow()
-    expect(() => decodeConfig({ maxTokens: 0 })).toThrow()
-    expect(() => decodeConfig({ additionalModelRequestFields: { invalid: undefined } })).toThrow()
-    expect(() => decodeConfig({ performanceConfig: { latency: "fast" } })).toThrow()
-    expect(() => decodeConfig({ guardrailConfig: { guardrailIdentifier: "guardrail" } })).toThrow()
-  })
+      })
+      const failures = yield* Effect.all([
+        Effect.flip(decodeConfig({ max_output_tokens: 8_192 })),
+        Effect.flip(decodeConfig({ max_tokens: 8_192 })),
+        Effect.flip(decodeConfig({ output_config: { effort: "high" } })),
+        Effect.flip(decodeConfig({ maxTokens: 0 })),
+        Effect.flip(decodeConfig({ additionalModelRequestFields: { invalid: undefined } })),
+        Effect.flip(decodeConfig({ performanceConfig: { latency: "fast" } })),
+        Effect.flip(decodeConfig({ guardrailConfig: { guardrailIdentifier: "guardrail" } })),
+      ])
+      expect(failures.every(Schema.isSchemaError)).toBe(true)
+    }),
+  )
 
   it.effect("keeps the explicit public runtime surface", () =>
     Effect.gen(function* () {

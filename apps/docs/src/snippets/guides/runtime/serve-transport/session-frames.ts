@@ -47,9 +47,12 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
   addresses: [],
-})
+}).pipe(
+  Layer.provide(
+    ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(Layer.orDie),
+  ),
+)
 
 const collectRun = (runId: string, cursor?: number) => {
   const options = { runId }

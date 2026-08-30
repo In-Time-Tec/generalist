@@ -311,29 +311,6 @@ const origin: Effect.Effect<
 })
 
 /**
- * @experimental Direct-child operations for code running inside an execution.
- *
- * Parentage and invocation identity come from the ambient `ToolContext`, so a caller names only the
- * work: a child cannot be admitted, listed, inspected, joined, or cancelled under another Run.
- */
-export interface AgentChildrenService {
-  readonly admit: (
-    input: AdmitParameters,
-  ) => Effect.Effect<AdmitReceipt, AdmitChildError | ChildParentageInvalid, ToolContext>
-  readonly listDirect: Effect.Effect<ReadonlyArray<ChildInspection>, ChildLookupError, ToolContext>
-  readonly inspect: (input: {
-    readonly childRunId: string
-  }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext>
-  readonly join: (input: {
-    readonly childRunId: string
-  }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext>
-  readonly cancel: (input: {
-    readonly childRunId: string
-    readonly reason?: string
-  }) => Effect.Effect<void, ChildLookupError, ToolContext>
-}
-
-/**
  * @experimental
  *
  * @effect-expect-leaking ToolContext
@@ -341,9 +318,25 @@ export interface AgentChildrenService {
  * service at Layer creation would let a caller admit and cancel children under another Run, which is
  * exactly the forgery this contract exists to prevent.
  */
-export class AgentChildren extends Context.Service<AgentChildren, AgentChildrenService>()(
-  "tenetkit/runtime/child/admission/AgentChildren",
-) {}
+export class AgentChildren extends Context.Service<
+  AgentChildren,
+  {
+    readonly admit: (
+      input: AdmitParameters,
+    ) => Effect.Effect<AdmitReceipt, AdmitChildError | ChildParentageInvalid, ToolContext>
+    readonly listDirect: Effect.Effect<ReadonlyArray<ChildInspection>, ChildLookupError, ToolContext>
+    readonly inspect: (input: {
+      readonly childRunId: string
+    }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext>
+    readonly join: (input: {
+      readonly childRunId: string
+    }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext>
+    readonly cancel: (input: {
+      readonly childRunId: string
+      readonly reason?: string
+    }) => Effect.Effect<void, ChildLookupError, ToolContext>
+  }
+>()("tenetkit/runtime/child/admission/AgentChildren") {}
 
 /**
  * @experimental Build in-execution direct-child operations over one RunStore.
@@ -360,7 +353,7 @@ export class AgentChildren extends Context.Service<AgentChildren, AgentChildrenS
  * process would reintroduce exactly the duplicate-child failure above, so restart safety is chosen
  * over speed here and the read must not be optimised away.
  */
-export const makeAgentChildren = (store: RunStoreService): AgentChildrenService => {
+export const makeAgentChildren = (store: RunStoreService): AgentChildren["Service"] => {
   const operations = make(store)
   const admitted = (runId: string, operationKey: string) =>
     Effect.map(operations.listDirect(runId), (children) => {

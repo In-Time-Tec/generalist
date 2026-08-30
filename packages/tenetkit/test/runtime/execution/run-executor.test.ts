@@ -32,7 +32,14 @@ import {
   RunEvent,
   RunStore,
 } from "../../../src/runtime/index.js"
-import { assistant, assistantRef, registrationsFor, researcherRef, suspension } from "./fixtures.js"
+import {
+  assistant,
+  assistantRef,
+  registrationsFor,
+  researcherRef,
+  resolverLayer as fixtureResolverLayer,
+  suspension,
+} from "./fixtures.js"
 import { provideScoped } from "./scoped-provide.js"
 import { tempDbPath } from "../sql/scenario.js"
 import { ActiveExecutions, layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
@@ -49,6 +56,8 @@ const summaryRoute = Schema.Struct({ route: Schema.Literal("summary-route:v2") }
 const operationMessages = Schema.Struct({ messages: Schema.Array(Schema.Unknown) })
 
 const isAdmission = (input: ExecutableResolver.Input): boolean => input.runId === "pending"
+const layerResolver = (resolver: ExecutableResolver.Service) =>
+  Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -103,13 +112,12 @@ const acknowledgementLayer = (filename: string) => {
   const handlers = toolkit.toLayer({
     acknowledgement_tool: () => Effect.die("ToolExecutor test layer owns execution"),
   })
-  const resolver = ExecutableResolver.makeStatic([
+  const resolverLayer = ExecutableResolver.layerStatic([
     { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-  ])
+  ]).pipe(Layer.orDie)
   return () =>
     SqliteRuntime.layerSqlite({
       filename,
-      resolver,
       addresses: [
         {
           address: acknowledgementAddress,
@@ -117,7 +125,7 @@ const acknowledgementLayer = (filename: string) => {
           registrations: registrationsFor(executable),
         },
       ],
-    })
+    }).pipe(Layer.provide(resolverLayer))
 }
 
 const scopedWith =
@@ -304,9 +312,8 @@ describe("RunExecutor", () => {
           }),
       })
       const runtimeLayer = Runtime.layerMemory({
-        resolver,
         addresses: [],
-      })
+      }).pipe(Layer.provide(layerResolver(resolver)))
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
@@ -335,8 +342,11 @@ describe("RunExecutor", () => {
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
       const agent = Agent.make({ name: "session-record-independence" })
       const executable = testExecutable(agent, "1")
-      const resolver = ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      const resolverLayer = ExecutableResolver.layerStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(
+        Layer.orDie,
+      )
+      const layerSqlite = () =>
+        SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
 
       const withWriter = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
@@ -398,8 +408,11 @@ describe("RunExecutor", () => {
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
       const agent = Agent.make({ name: "session-usage-roundtrip" })
       const executable = testExecutable(agent, "1")
-      const resolver = ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      const resolverLayer = ExecutableResolver.layerStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(
+        Layer.orDie,
+      )
+      const layerSqlite = () =>
+        SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
 
       const withWriter = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
@@ -473,8 +486,11 @@ describe("RunExecutor", () => {
       const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
       const agent = Agent.make({ name: "durable-session-store" })
       const executable = testExecutable(agent, "1")
-      const resolver = ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      const resolverLayer = ExecutableResolver.layerStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(
+        Layer.orDie,
+      )
+      const layerSqlite = () =>
+        SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
 
       const withWriter = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
@@ -562,7 +578,8 @@ describe("RunExecutor", () => {
             attestation: executable,
           }),
       })
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      const layerSqlite = () =>
+        SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(layerResolver(resolver)))
       const turn = (idempotencyKey: string, prompt: string) =>
         Effect.scoped(
           Effect.gen(function* () {
@@ -738,7 +755,8 @@ describe("RunExecutor", () => {
             }
           }),
       })
-      const layerSqlite = () => SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+      const layerSqlite = () =>
+        SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(layerResolver(resolver)))
       const receipt = yield* scopedWith(layerSqlite())(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -808,9 +826,8 @@ describe("RunExecutor", () => {
           }),
       })
       const runtimeLayer = Runtime.layerMemory({
-        resolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-      })
+      }).pipe(Layer.provide(layerResolver(resolver)))
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
@@ -891,10 +908,9 @@ describe("RunExecutor", () => {
           }),
       })
       const runtimeLayer = Runtime.layerMemory({
-        resolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 day" },
-      })
+      }).pipe(Layer.provide(layerResolver(resolver)))
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
@@ -979,9 +995,8 @@ describe("RunExecutor", () => {
 
       yield* scopedWith(
         Runtime.layerMemory({
-          resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        }),
+        }).pipe(Layer.provide(layerResolver(resolver))),
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -1017,7 +1032,6 @@ describe("RunExecutor", () => {
     const address = Address.make("agent:resolution-failure")
 
     const verify = (
-      resolver: ExecutableResolver.Service,
       expectedTag: string,
       key: string,
       finalized: Ref.Ref<boolean>,
@@ -1068,26 +1082,15 @@ describe("RunExecutor", () => {
       })
       yield* scopedWith(
         Runtime.layerMemory({
-          resolver: missing,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        }),
-      )(
-        verify(
-          missing,
-          "tenetkit/runtime/ExecutablePinMissing",
-          "missing",
-          missingFinalized,
-          missingAdmissionFinalized,
-        ),
-      )
+        }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, missing))),
+      )(verify("tenetkit/runtime/ExecutablePinMissing", "missing", missingFinalized, missingAdmissionFinalized))
       yield* scopedWith(
         Runtime.layerMemory({
-          resolver: mismatched,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        }),
+        }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, mismatched))),
       )(
         verify(
-          mismatched,
           "tenetkit/runtime/ExecutableIdentityMismatch",
           "mismatch",
           mismatchFinalized,
@@ -1173,9 +1176,8 @@ describe("RunExecutor", () => {
         }),
     })
     const runtimeLayer = Runtime.layerMemory({
-      resolver,
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-    })
+    }).pipe(Layer.provide(layerResolver(resolver)))
 
     return scopedWith(runtimeLayer)(
       Effect.gen(function* () {
@@ -1375,14 +1377,15 @@ describe("RunExecutor", () => {
         },
       }),
     )
-    const resolver = ExecutableResolver.makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }])
+    const resolverLayer = ExecutableResolver.layerStatic([
+      { executable: assistantRef, agent: Agent.close(assistant, model) },
+    ]).pipe(Layer.orDie)
     const layerSqlite = () =>
       SqliteRuntime.layerSqlite({
         filename,
-        resolver,
         addresses: [{ address, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
         scheduler: { pollInterval: "1 day" },
-      })
+      }).pipe(Layer.provide(resolverLayer))
 
     return Effect.gen(function* () {
       const admitted = yield* Effect.scoped(
@@ -1492,10 +1495,13 @@ describe("RunExecutor", () => {
       ordinaryToolkit.toLayer({ typescript: () => Effect.die("typescript must not execute") }),
     )
     const runtimeLayer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(profile, environment) }]),
       addresses: [],
       scheduler: { pollInterval: "1 day" },
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable, agent: Agent.close(profile, environment) }]).pipe(Layer.orDie),
+      ),
+    )
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -1628,10 +1634,9 @@ describe("RunExecutor", () => {
         }),
     })
     const runtimeLayer = Runtime.layerMemory({
-      resolver,
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
       scheduler: { pollInterval: "1 day" },
-    })
+    }).pipe(Layer.provide(layerResolver(resolver)))
 
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -1679,12 +1684,14 @@ describe("RunExecutor", () => {
     const agent = Agent.make({ name: "budget-exhausted", budget: { modelCalls: 0 } })
     const ref = testExecutable(agent, "budget-exhausted-v1")
     const address = Address.make("agent:budget-exhausted")
-    const resolver = ExecutableResolver.makeStatic([{ executable: ref, agent: closedTestAgent(agent) }])
     const runtimeLayer = Runtime.layerMemory({
-      resolver,
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
       scheduler: { pollInterval: "1 day" },
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable: ref, agent: closedTestAgent(agent) }]).pipe(Layer.orDie),
+      ),
+    )
 
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -1765,10 +1772,9 @@ describe("RunExecutor", () => {
         }),
     })
     const runtimeLayer = Runtime.layerMemory({
-      resolver,
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
       scheduler: { pollInterval: "1 day" },
-    })
+    }).pipe(Layer.provide(layerResolver(resolver)))
 
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -1874,9 +1880,8 @@ describe("RunExecutor", () => {
           }),
       })
       const runtimeLayer = Runtime.layerMemory({
-        resolver,
         addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-      })
+      }).pipe(Layer.provide(layerResolver(resolver)))
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -1938,14 +1943,18 @@ describe("RunExecutor", () => {
             Stream.fromEffect(Deferred.succeed(started, undefined)).pipe(Stream.flatMap(() => Stream.never)),
         }),
       )
-      const firstResolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, blockingModel) }])
       const runId = yield* scopedWith(
         SqliteRuntime.layerSqlite({
           filename,
-          resolver: firstResolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
           scheduler: { pollInterval: "1 hour" },
-        }),
+        }).pipe(
+          Layer.provide(
+            ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, blockingModel) }]).pipe(
+              Layer.orDie,
+            ),
+          ),
+        ),
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -1975,14 +1984,18 @@ describe("RunExecutor", () => {
           },
         }),
       )
-      const secondResolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, recoveredModel) }])
       yield* scopedWith(
         SqliteRuntime.layerSqlite({
           filename,
-          resolver: secondResolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
           scheduler: { pollInterval: "1 hour" },
-        }),
+        }).pipe(
+          Layer.provide(
+            ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, recoveredModel) }]).pipe(
+              Layer.orDie,
+            ),
+          ),
+        ),
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -2031,11 +2044,14 @@ describe("RunExecutor", () => {
       })
       const handlers = Toolkit.make(tool).toLayer({ block: () => Effect.die("ToolExecutor test layer owns execution") })
       const runtimeLayer = Runtime.layerMemory({
-        resolver: ExecutableResolver.makeStatic([
-          { executable: ref, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-        ]),
         addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-      })
+      }).pipe(
+        Layer.provide(
+          ExecutableResolver.layerStatic([
+            { executable: ref, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          ]).pipe(Layer.orDie),
+        ),
+      )
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -2118,12 +2134,16 @@ describe("RunExecutor", () => {
         finite_block: () => Effect.die("ToolExecutor test layer owns execution"),
       })
       const runtimeLayer = Runtime.layerMemory({
-        resolver: ExecutableResolver.makeStatic([
-          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-        ]),
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }).pipe(Layer.merge(activeExecutionsLayer))
+      }).pipe(
+        Layer.merge(activeExecutionsLayer),
+        Layer.provide(
+          ExecutableResolver.layerStatic([
+            { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          ]).pipe(Layer.orDie),
+        ),
+      )
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
@@ -2231,16 +2251,15 @@ describe("RunExecutor", () => {
         })
         const filename = tempDbPath(`uncertain-${backend}`)
         const layer = () =>
-          backend === "memory"
+          (backend === "memory"
             ? Runtime.layerMemory({
-                resolver,
                 addresses: [{ address, executable, registrations: registrationsFor(executable) }],
               })
             : SqliteRuntime.layerSqlite({
                 filename,
-                resolver,
                 addresses: [{ address, executable, registrations: registrationsFor(executable) }],
               })
+          ).pipe(Layer.provide(layerResolver(resolver)))
 
         const first = yield* scopedWith(layer())(
           Effect.gen(function* () {
@@ -2369,24 +2388,23 @@ describe("RunExecutor", () => {
       )
     }).pipe(
       scopedWith(
-        Runtime.layerMemory({
-          resolver: (() => {
-            const agent = Agent.make({ name: "fence" })
-            return ExecutableResolver.makeStatic([
-              { executable: testExecutable(agent, "1"), agent: closedTestAgent(agent) },
-            ])
-          })(),
-          addresses: (() => {
-            const agent = Agent.make({ name: "fence" })
-            return [
+        (() => {
+          const agent = Agent.make({ name: "fence" })
+          const executable = testExecutable(agent, "1")
+          return Runtime.layerMemory({
+            addresses: [
               {
                 address: Address.make("agent:fence"),
-                executable: testExecutable(agent, "1"),
-                registrations: registrationsFor(testExecutable(agent, "1")),
+                executable,
+                registrations: registrationsFor(executable),
               },
-            ]
-          })(),
-        }),
+            ],
+          }).pipe(
+            Layer.provide(
+              ExecutableResolver.layerStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(Layer.orDie),
+            ),
+          )
+        })(),
       ),
     ),
   )
@@ -2441,7 +2459,6 @@ describe("RunExecutor", () => {
     }).pipe(
       scopedWith(
         Runtime.layerMemory({
-          resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
           addresses: [
             {
               address: Address.make("agent:atomic-operation"),
@@ -2449,7 +2466,7 @@ describe("RunExecutor", () => {
               registrations: registrationsFor(assistantRef),
             },
           ],
-        }),
+        }).pipe(Layer.provide(fixtureResolverLayer)),
       ),
     ),
   )
@@ -2549,7 +2566,6 @@ describe("RunExecutor", () => {
     }).pipe(
       scopedWith(
         Runtime.layerMemory({
-          resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
           addresses: [
             {
               address: Address.make("agent:atomic-operation"),
@@ -2557,7 +2573,7 @@ describe("RunExecutor", () => {
               registrations: registrationsFor(assistantRef),
             },
           ],
-        }),
+        }).pipe(Layer.provide(fixtureResolverLayer)),
       ),
     ),
   )
@@ -2642,7 +2658,6 @@ describe("RunExecutor", () => {
     }).pipe(
       scopedWith(
         Runtime.layerMemory({
-          resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
           addresses: [
             {
               address: Address.make("agent:atomic-operation"),
@@ -2650,7 +2665,7 @@ describe("RunExecutor", () => {
               registrations: registrationsFor(assistantRef),
             },
           ],
-        }),
+        }).pipe(Layer.provide(fixtureResolverLayer)),
       ),
     ),
   )
@@ -2788,50 +2803,55 @@ describe("RunExecutor", () => {
           return results.map((member) => member.result.text)
         }),
       )
-      const staticResolver = ExecutableResolver.makeStatic([
-        { _tag: "Program", executable, program, executor: codeExecutor, handlers },
-        { _tag: "Agent", executable: childExecutable, agent: closedChild },
-      ])
-      const resolver = ExecutableResolver.ExecutableResolver.of({
-        resolve: (input) => {
-          const resolution = staticResolver.resolve(input)
-          if (input.runId === "pending" || input.ref.active !== pinnedChild.pin) return resolution
-          const finalized = Effect.addFinalizer(() => observeFinalizer("resolver"))
-          if (earlyFailure.name === "resolver failure") {
-            return finalized.pipe(
-              Effect.andThen(Errors.ExecutablePinMissing.make({ runId: input.runId, ref: input.ref })),
-            )
-          }
-          if (earlyFailure.name === "executable identity mismatch") {
-            return finalized.pipe(
-              Effect.andThen(resolution),
-              Effect.map((resolved) => ({ ...resolved, attestation: mismatchedExecutable })),
-            )
-          }
-          if (earlyFailure.name === "compaction-options mismatch") {
-            return finalized.pipe(
-              Effect.andThen(resolution),
-              Effect.map((resolved) =>
-                resolved._tag === "Agent"
-                  ? {
-                      ...resolved,
-                      runOptions: { compaction: { contextWindow: 32_768, reserveTokens: 2_048 } },
-                    }
-                  : resolved,
-              ),
-            )
-          }
-          return finalized.pipe(Effect.andThen(resolution))
-        },
-      })
+      const resolverLayer = Layer.effect(
+        ExecutableResolver.ExecutableResolver,
+        ExecutableResolver.makeStatic([
+          { _tag: "Program", executable, program, executor: codeExecutor, handlers },
+          { _tag: "Agent", executable: childExecutable, agent: closedChild },
+        ]).pipe(
+          Effect.map((staticResolver) =>
+            ExecutableResolver.ExecutableResolver.of({
+              resolve: (input) => {
+                const resolution = staticResolver.resolve(input)
+                if (input.runId === "pending" || input.ref.active !== pinnedChild.pin) return resolution
+                const finalized = Effect.addFinalizer(() => observeFinalizer("resolver"))
+                if (earlyFailure.name === "resolver failure") {
+                  return finalized.pipe(
+                    Effect.andThen(Errors.ExecutablePinMissing.make({ runId: input.runId, ref: input.ref })),
+                  )
+                }
+                if (earlyFailure.name === "executable identity mismatch") {
+                  return finalized.pipe(
+                    Effect.andThen(resolution),
+                    Effect.map((resolved) => ({ ...resolved, attestation: mismatchedExecutable })),
+                  )
+                }
+                if (earlyFailure.name === "compaction-options mismatch") {
+                  return finalized.pipe(
+                    Effect.andThen(resolution),
+                    Effect.map((resolved) =>
+                      resolved._tag === "Agent"
+                        ? {
+                            ...resolved,
+                            runOptions: { compaction: { contextWindow: 32_768, reserveTokens: 2_048 } },
+                          }
+                        : resolved,
+                    ),
+                  )
+                }
+                return finalized.pipe(Effect.andThen(resolution))
+              },
+            }),
+          ),
+        ),
+      ).pipe(Layer.orDie)
       const address = Address.make(`program:early-failure-map:${earlyFailure.name}`)
 
       return scopedWith(
         Runtime.layerMemory({
-          resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
           scheduler: { pollInterval: "1 day" },
-        }),
+        }).pipe(Layer.provide(resolverLayer)),
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -3042,34 +3062,40 @@ describe("RunExecutor", () => {
           return results.map((member) => `${member.member}:${member.result.text}`)
         }),
       )
-      const staticResolver = ExecutableResolver.makeStatic([
-        { _tag: "Program", executable, program, executor: codeExecutor, handlers },
-        { _tag: "Agent", executable: childExecutable, agent: closedChild },
-      ])
-      const resolver = ExecutableResolver.ExecutableResolver.of({
-        resolve: (input) =>
-          staticResolver
-            .resolve(input)
-            .pipe(
-              Effect.tap(() =>
-                input.ref.active === pinnedChild.pin
-                  ? Effect.addFinalizer(() => observeFinalizer("resolver", input.runId))
-                  : Effect.void,
-              ),
-            ),
-      })
+      const resolverLayer = Layer.effect(
+        ExecutableResolver.ExecutableResolver,
+        ExecutableResolver.makeStatic([
+          { _tag: "Program", executable, program, executor: codeExecutor, handlers },
+          { _tag: "Agent", executable: childExecutable, agent: closedChild },
+        ]).pipe(
+          Effect.map((staticResolver) =>
+            ExecutableResolver.ExecutableResolver.of({
+              resolve: (input) =>
+                staticResolver
+                  .resolve(input)
+                  .pipe(
+                    Effect.tap(() =>
+                      input.ref.active === pinnedChild.pin
+                        ? Effect.addFinalizer(() => observeFinalizer("resolver", input.runId))
+                        : Effect.void,
+                    ),
+                  ),
+            }),
+          ),
+        ),
+      ).pipe(Layer.orDie)
       const address = Address.make("program:failed-agent-map")
       const options = {
-        resolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 day" as const },
       }
 
-      return scopedWith(
+      const runtimeLayer = (
         backend === "memory"
           ? Runtime.layerMemory(options)
-          : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(`failed-agent-map-${backend}`) }),
-      )(
+          : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(`failed-agent-map-${backend}`) })
+      ).pipe(Layer.provide(resolverLayer))
+      return scopedWith(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const host = yield* RunExecutor.RunExecutor
@@ -3261,7 +3287,6 @@ describe("RunExecutor", () => {
     }).pipe(
       scopedWith(
         Runtime.layerMemory({
-          resolver,
           addresses: [
             {
               address: Address.make("agent:handoff-recovery"),
@@ -3269,7 +3294,7 @@ describe("RunExecutor", () => {
               registrations: registrationsFor(assistantRef),
             },
           ],
-        }),
+        }).pipe(Layer.provide(layerResolver(resolver))),
       ),
     )
   })

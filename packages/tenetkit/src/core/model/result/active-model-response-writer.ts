@@ -9,7 +9,7 @@ interface Authority {
 }
 
 /** @internal Core-only mutation authority hidden from the retained Runtime handle. */
-export interface Controller {
+export interface Writer {
   readonly begin: (identity: AttemptIdentity) => Authority
   readonly install: (authority: Authority, builder: Builder<Record<string, Tool.Any>>) => void
   readonly discard: (authority: Authority) => void
@@ -26,17 +26,17 @@ interface State {
     | undefined
 }
 
-interface OwnedController {
-  readonly controller: Controller
+interface WriterState {
+  readonly writer: Writer
   readonly snapshot: Effect.Effect<Option.Option<Snapshot>>
 }
 
-interface ControllerBinding {
+interface WriterBinding {
   readonly service: Service
-  readonly controller: Controller
+  readonly writer: Writer
 }
 
-const controllers = new WeakMap<Service, Controller>()
+const writers = new WeakMap<Service, Writer>()
 
 const hasSemanticContent = (response: CompletedModelResponse<Record<string, Tool.Any>>): boolean =>
   response.content.some((part) => {
@@ -52,7 +52,7 @@ const hasSemanticContent = (response: CompletedModelResponse<Record<string, Tool
     }
   })
 
-export const createController = (): OwnedController => {
+export const make = (): WriterState => {
   const state: State = { generation: 0, current: undefined }
   const owns = (authority: Authority): boolean =>
     authority.generation === state.generation && state.current?.authority === authority
@@ -65,7 +65,7 @@ export const createController = (): OwnedController => {
         ? Option.some(Object.freeze({ ...current.authority.identity, response }))
         : Option.none<Snapshot>()
     }),
-    controller: {
+    writer: {
       begin: (identity) => {
         const authority = { generation: state.generation + 1, identity: Object.freeze({ ...identity }) }
         state.generation = authority.generation
@@ -86,12 +86,12 @@ export const createController = (): OwnedController => {
   }
 }
 
-export const installController = (binding: ControllerBinding): void => {
-  controllers.set(binding.service, binding.controller)
+export const install = (binding: WriterBinding): void => {
+  writers.set(binding.service, binding.writer)
 }
 
-export const controller = (service: Service): Controller => {
-  const value = controllers.get(service)
+export const writer = (service: Service): Writer => {
+  const value = writers.get(service)
   if (value === undefined) throw new Error("ActiveModelResponse must be constructed with ActiveModelResponse.make")
   return value
 }

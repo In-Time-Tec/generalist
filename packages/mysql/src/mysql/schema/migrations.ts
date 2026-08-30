@@ -141,5 +141,3 @@ export const markDirty = (source: string) =>
     const sql = yield* SqlClient.SqlClient
     yield* sql`UPDATE ${sql(SCHEMA_META_TABLE)} SET dirty = 1 WHERE id = 1`
   }).pipe(Effect.mapError(migrationFailure(source, "failed to mark schema dirty")))
-
-export const RunSchema = { plan, check, apply, markDirty } as const

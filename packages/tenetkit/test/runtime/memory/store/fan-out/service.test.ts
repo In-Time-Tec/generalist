@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { provideScoped } from "../../../execution/scoped-provide.js"
-import { Effect, Ref, Schema } from "effect"
+import { Effect, Layer, Ref, Schema } from "effect"
 import { Agent } from "../../../../../src/index.js"
 import { Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../../../../../src/runtime/index.js"
 import { makeRuntime } from "../../../../../src/runtime/memory/layer.js"
@@ -267,19 +267,25 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
                 ),
               ),
       })
-      const racingRuntime = yield* provideScoped(
-        activeExecutionsLayer,
-        makeRuntime({
-          resolver: ExecutableResolver.makeStatic([
+      const status = yield* provideScoped(
+        Layer.merge(
+          activeExecutionsLayer,
+          ExecutableResolver.layerStatic([
             { executable: assistantRef, agent: closedTestAgent(assistant) },
             { executable: researcherRef, agent: closedTestAgent(researcher) },
-          ]),
+          ]).pipe(Layer.orDie),
+        ),
+        makeRuntime({
           addresses: [
             { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
           ],
-        }).pipe(Effect.provideService(RunStore.RunStore, racingStore)),
+        }).pipe(
+          Effect.provideService(RunStore.RunStore, racingStore),
+          Effect.flatMap((runtime) => runtime.awaitFanOut(receipt.fanOutId)),
+          Effect.map((inspection) => inspection.status),
+        ),
       )
-      expect((yield* racingRuntime.awaitFanOut(receipt.fanOutId)).status).toBe("succeeded")
+      expect(status).toBe("succeeded")
     }),
   )
 

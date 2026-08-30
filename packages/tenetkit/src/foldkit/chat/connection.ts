@@ -133,11 +133,13 @@ export const layerWebSocket = (options: {
 
       const session = ({ sessionId, afterSeq }: { readonly sessionId: string; readonly afterSeq?: number }) =>
         Effect.gen(function* () {
-          const connection = yield* client.connect(
-            afterSeq === undefined
-              ? { url: options.url, runId: sessionId }
-              : { url: options.url, runId: sessionId, cursor: afterSeq },
-          )
+          const connection = yield* client
+            .connect(
+              afterSeq === undefined
+                ? { url: options.url, runId: sessionId }
+                : { url: options.url, runId: sessionId, cursor: afterSeq },
+            )
+            .pipe(Effect.orDie)
           const owner = { runId: sessionId, connection }
           yield* Effect.acquireRelease(
             Ref.update(active, (current) => new Map(current).set(sessionId, owner)),

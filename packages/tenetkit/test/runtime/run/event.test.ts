@@ -1,7 +1,7 @@
 import "./suites/event-telemetry-suite.js"
 import { expect, it } from "@effect/vitest"
 import { ProgramCapabilities, ProgramRunner, CodeExecutor } from "../../../src/index.js"
-import { Effect, Schema, Stream, pipe } from "effect"
+import { Effect, Layer, Schema, Stream, pipe } from "effect"
 import { provideScoped } from "../execution/scoped-provide.js"
 import { Response } from "effect/unstable/ai"
 import { Errors, ExecutableResolver, LocalScheduler, RunEvent, Runtime, RunStore } from "../../../src/runtime/index.js"
@@ -285,10 +285,9 @@ it.live("makes a changed SQLite resolver identity terminal once without schedule
   const execute = provideScoped(
     SqliteRuntime.layerSqlite({
       filename,
-      resolver: changedResolver,
       addresses: [],
       scheduler: { pollInterval: "1 day" },
-    }),
+    }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, changedResolver))),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const scheduler = yield* LocalScheduler.LocalScheduler

@@ -51,7 +51,7 @@ const request = (source: string, input: Request["input"] = { value: 1 }, overrid
     ...identity,
     input,
     signal: new AbortController().signal,
-    deadlineMillis: Date.now() + 60_000,
+    deadlineMillis: 60_000,
     limits: { cpuMillis: 1_000, subrequests: 8, outputBytes: 4_096 },
     capabilities: [{ operation: "callTool", names: ["echo"] }],
     ...overrides,
@@ -215,18 +215,21 @@ export default async () => {
       Effect.gen(function* () {
         const source = "export default () => new Promise(() => {})"
         const controller = new AbortController()
-        const cancelled = yield* execute(options, request(source, undefined, { signal: controller.signal })).pipe(
-          Effect.forkChild,
-        )
+        const now = yield* Clock.currentTimeMillis
+        const cancelled = yield* execute(
+          options,
+          request(source, undefined, { signal: controller.signal, deadlineMillis: now + 60_000 }),
+        ).pipe(Effect.forkChild)
         yield* Effect.sleep("10 millis")
         controller.abort()
         expect(yield* Fiber.join(cancelled).pipe(Effect.flip)).toBeInstanceOf(SandboxCancelled)
 
-        const interrupted = yield* execute(options, request(source)).pipe(Effect.forkChild)
+        const interrupted = yield* execute(options, request(source, undefined, { deadlineMillis: now + 60_000 })).pipe(
+          Effect.forkChild,
+        )
         yield* Effect.sleep("10 millis")
         yield* Fiber.interrupt(interrupted)
 
-        const now = yield* Clock.currentTimeMillis
         expect(
           yield* execute(options, request(source, undefined, { deadlineMillis: now + 25 })).pipe(Effect.flip),
         ).toBeInstanceOf(SandboxDeadlineExceeded)
@@ -235,6 +238,7 @@ export default async () => {
 
     it.live("fences capability calls scheduled after termination", () =>
       Effect.gen(function* () {
+        const now = yield* Clock.currentTimeMillis
         let calls = 0
         const observed = ProgramCapabilities.of({
           ...capabilities,
@@ -244,13 +248,17 @@ export default async () => {
               return input.input
             }),
         })
-        const input = request(`
+        const input = request(
+          `
 export default (_input, capabilities) => {
   setTimeout(() => capabilities.call("callTool", {
     operation: "late", tool: "echo", input: "must-not-run"
   }).catch(() => {}), 10);
   return "done";
-};`)
+};`,
+          undefined,
+          { deadlineMillis: now + 60_000 },
+        )
         yield* provide(options, (executor) =>
           executor.execute(input).pipe(Effect.provideService(ProgramCapabilities, observed)),
         )

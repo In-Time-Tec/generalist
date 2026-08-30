@@ -11,7 +11,7 @@ describe("ExecutableResolver.makeStatic", () => {
     Effect.gen(function* () {
       const agent = Agent.make({ name: "attested", budget: { modelCalls: 2 } })
       const executable = pinnedTestExecutable(agent)
-      const resolver = ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
+      const resolver = yield* ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
 
       const resolution = yield* resolver
         .resolve({ runId: "run:attested", ...executable, registrations: [] })
@@ -23,32 +23,32 @@ describe("ExecutableResolver.makeStatic", () => {
     }),
   )
 
-  it("rejects a live Agent whose identity differs from the persisted manifest", () => {
-    const persisted = Agent.make({ name: "agent", instructions: "persisted", budget: { modelCalls: 2 } })
-    const executable = pinnedTestExecutable(persisted)
+  it.effect("rejects a live Agent whose identity differs from the persisted manifest", () =>
+    Effect.gen(function* () {
+      const persisted = Agent.make({ name: "agent", instructions: "persisted", budget: { modelCalls: 2 } })
+      const executable = pinnedTestExecutable(persisted)
 
-    expect(() =>
-      ExecutableResolver.makeStatic([
+      const identity = yield* ExecutableResolver.makeStatic([
         {
           executable,
           agent: closedTestAgent(Agent.make({ name: "agent", instructions: "different", budget: { modelCalls: 2 } })),
         },
-      ]),
-    ).toThrow(/does not match/)
-    expect(() =>
-      ExecutableResolver.makeStatic([
+      ]).pipe(Effect.flip)
+      expect(identity.message).toMatch(/does not match/)
+
+      const budget = yield* ExecutableResolver.makeStatic([
         { executable, agent: closedTestAgent(Agent.make({ name: "agent", instructions: "persisted" })) },
-      ]),
-    ).toThrow(/Budget must exactly match/)
-    const unexpectedTool = Tool.make("unexpected", { parameters: Schema.Struct({}), success: Schema.Void })
-    const withUnexpectedTool = Agent.make({
-      name: "agent",
-      instructions: "persisted",
-      budget: { modelCalls: 2 },
-      tools: [unexpectedTool],
-    })
-    expect(() =>
-      ExecutableResolver.makeStatic([
+      ]).pipe(Effect.flip)
+      expect(budget.message).toMatch(/Budget must exactly match/)
+
+      const unexpectedTool = Tool.make("unexpected", { parameters: Schema.Struct({}), success: Schema.Void })
+      const withUnexpectedTool = Agent.make({
+        name: "agent",
+        instructions: "persisted",
+        budget: { modelCalls: 2 },
+        tools: [unexpectedTool],
+      })
+      const tools = yield* ExecutableResolver.makeStatic([
         {
           executable,
           agent: Agent.close(
@@ -56,55 +56,59 @@ describe("ExecutableResolver.makeStatic", () => {
             Layer.merge(unusedModel, withUnexpectedTool.toolkit.toLayer({ unexpected: () => Effect.void })),
           ),
         },
-      ]),
-    ).toThrow(/Tool pins must exactly match/)
-  })
+      ]).pipe(Effect.flip)
+      expect(tools.message).toMatch(/Tool pins must exactly match/)
+    }),
+  )
 
-  it("rejects duplicate static executable references", () => {
-    const agent = Agent.make({ name: "duplicate" })
-    const executable = pinnedTestExecutable(agent)
-    expect(() =>
-      ExecutableResolver.makeStatic([
+  it.effect("rejects duplicate static executable references", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "duplicate" })
+      const executable = pinnedTestExecutable(agent)
+      const failure = yield* ExecutableResolver.makeStatic([
         { executable, agent: closedTestAgent(agent) },
         { executable, agent: closedTestAgent(agent) },
-      ]),
-    ).toThrow(/Duplicate static executable reference/)
-  })
+      ]).pipe(Effect.flip)
+      expect(failure.message).toMatch(/Duplicate static executable reference/)
+    }),
+  )
 
-  it("rejects missing or changed static compaction options", () => {
-    const agent = Agent.make({ name: "compacting" })
-    const compaction = {
-      service: Pins.makeCapability({ service: "compaction" }),
-      summaryModel: Pins.makeModel({ model: "summary" }),
-      contextWindow: 32_000,
-      reserveTokens: 2_000,
-      keepRecentTokens: 8_000,
-      strategyIdentity: "default:v1",
-      summaryPromptIdentity: "summary:v1",
-    }
-    const pinned = AgentManifest.fromLiveAgent(agent, {
-      model: Pins.makeModel({ model: "conversation" }),
-      tools: [],
-      skills: [],
-      services: [],
-      policy: { _tag: "Portable", policy: { _tag: "Forever" } },
-      compaction,
-      budget: {},
-      children: [],
-    })
-    const executable = ExecutableManifest.make({ root: pinned.pin, entries: [{ _tag: "Agent", ...pinned }] })
+  it.effect("rejects missing or changed static compaction options", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "compacting" })
+      const compaction = {
+        service: Pins.makeCapability({ service: "compaction" }),
+        summaryModel: Pins.makeModel({ model: "summary" }),
+        contextWindow: 32_000,
+        reserveTokens: 2_000,
+        keepRecentTokens: 8_000,
+        strategyIdentity: "default:v1",
+        summaryPromptIdentity: "summary:v1",
+      }
+      const pinned = AgentManifest.fromLiveAgent(agent, {
+        model: Pins.makeModel({ model: "conversation" }),
+        tools: [],
+        skills: [],
+        services: [],
+        policy: { _tag: "Portable", policy: { _tag: "Forever" } },
+        compaction,
+        budget: {},
+        children: [],
+      })
+      const executable = ExecutableManifest.make({ root: pinned.pin, entries: [{ _tag: "Agent", ...pinned }] })
 
-    expect(() => ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])).toThrow(
-      /compaction options do not match/,
-    )
-    expect(() =>
-      ExecutableResolver.makeStatic([
+      const missing = yield* ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(
+        Effect.flip,
+      )
+      expect(missing.message).toMatch(/compaction options do not match/)
+      const changed = yield* ExecutableResolver.makeStatic([
         {
           executable,
           agent: closedTestAgent(agent),
           runOptions: { compaction: { contextWindow: compaction.contextWindow, reserveTokens: 1_000 } },
         },
-      ]),
-    ).toThrow(/compaction options do not match/)
-  })
+      ]).pipe(Effect.flip)
+      expect(changed.message).toMatch(/compaction options do not match/)
+    }),
+  )
 })

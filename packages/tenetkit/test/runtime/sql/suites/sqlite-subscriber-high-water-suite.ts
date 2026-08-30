@@ -14,10 +14,15 @@ const scopedWith =
 const highWaterLayer = (capacity: number) =>
   SqliteRuntime.layerSqlite({
     filename: tempDbPath(`subscriber-high-water-${capacity}`),
-    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     subscriberQueueCapacity: capacity,
-  })
+  }).pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+        Layer.orDie,
+      ),
+    ),
+  )
 
 it.effect("replays a base larger than the bounded subscriber queue and follows live without lag", () =>
   scopedWith(highWaterLayer(2))(

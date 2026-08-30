@@ -1,5 +1,6 @@
 import { Layer } from "effect"
 import { ExternalChildStore } from "../child/external/store.js"
+import { ExecutableResolver } from "../executable/resolver.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
 import { RunExecutor } from "../execution/run-executor.js"
 import { make as makeRunExecutor } from "../execution/run-executor-internal.js"
@@ -11,22 +12,18 @@ import { Runtime, type LayerOptions } from "../service.js"
 import { layer as runtimeLayer } from "./layer/service.js"
 import { layerMemory as storeLayer } from "./store.js"
 
-export { serviceEffect as makeRuntime } from "./layer/service.js"
+export { makeRuntime } from "./layer/service.js"
 
-export const layer = (
+export const layerMemory = (
   options: LayerOptions,
-): Layer.Layer<Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler> => {
+): Layer.Layer<Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler, never, ExecutableResolver> => {
   const store = storeLayer(options)
   const active = activeExecutionsLayer
   const dependencies = Layer.mergeAll(store, active, modelPreviewLayer)
   const runtime = runtimeLayer(options).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(RunExecutor, makeRunExecutor({ workerId: "memory", resolver: options.resolver })).pipe(
-    Layer.provide(dependencies),
-  )
+  const host = Layer.effect(RunExecutor, makeRunExecutor).pipe(Layer.provide(dependencies))
   const scheduler = localSchedulerLayer({ workerId: "memory", ...options.scheduler }).pipe(
     Layer.provide(Layer.mergeAll(store, active, host)),
   )
   return Layer.mergeAll(runtime, host, store, scheduler)
 }
-
-export const layerMemory = layer

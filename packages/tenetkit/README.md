@@ -33,7 +33,7 @@ Provider packages can register the reusable `KernelProviderConformance.kernelPro
 
 Use `Agent.streamToolCalls` when another realtime or hosted model loop has completed an Effect AI tool call. Submit every call that must share authored ordering and concurrency in one non-empty batch. TenetKit strictly decodes the original tool schemas and applies the Agent's active-tool snapshot, authorization, scheduling, budget, deadline, `ToolExecutor`, `ToolContext`, output bound, durable replay, and suspension path without invoking a `LanguageModel`.
 
-Fresh admission requires `_tag: "Start"`, `calls`, `activeTools`, authorization `messages`, `sessionId`, `logicalOperationId`, and `turn`. Persist checkpoints through `DurableDriver.DriverJournalService`; recover with `_tag: "Resume"`, that exact `driverCheckpoint`, its matching `executableRef`, and the same authorization messages. Add `resume` only to resolve an emitted `AgentSuspended` wait. The recovery form does not accept replacement calls, active tools, indexes, identities, or budgets.
+Fresh admission requires `_tag: "Start"`, `calls`, `activeTools`, authorization `messages`, `sessionId`, `logicalOperationId`, and `turn`. Persist checkpoints through `DurableDriver.DriverJournal`; recover with `_tag: "Resume"`, that exact `driverCheckpoint`, its matching `executableRef`, and the same authorization messages. Add `resume` only to resolve an emitted `AgentSuspended` wait. The recovery form does not accept replacement calls, active tools, indexes, identities, or budgets.
 
 ## Durable tool cancellation
 

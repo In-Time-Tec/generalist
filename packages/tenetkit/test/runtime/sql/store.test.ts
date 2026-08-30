@@ -29,6 +29,7 @@ import {
   openWait,
   suspension,
   parentRelativeOptions,
+  resolverLayer,
   researcher,
   researcherAddress,
   researcherRef,
@@ -207,54 +208,55 @@ it.live("migrates and reopens a durable sqlite store", () =>
   }),
 )
 
-layer(SqliteRuntime.layerSqlite({ filename: tempDbPath("relative-selection"), ...parentRelativeOptions }))(
-  "resolves SQLite child selections relative to each persisted parent closure",
-  (suite) => {
-    suite.effect("resolves selections per persisted parent closure", () =>
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const first = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "sqlite:relative:first",
-          idempotencyKey: "parent",
-          prompt: "first",
-        })
-        const second = yield* runtime.send({
-          to: alternateAssistantAddress,
-          sessionId: "sqlite:relative:second",
-          idempotencyKey: "parent",
-          prompt: "second",
-        })
-        const firstChild = yield* runtime.spawn({
-          parentRunId: first.runId,
-          invocationId: "child",
-          selection: "researcher",
-          prompt: "child",
-        })
-        const secondChild = yield* runtime.spawn({
-          parentRunId: second.runId,
-          invocationId: "child",
-          selection: "researcher",
-          prompt: "child",
-        })
-        expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
-        expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
+layer(
+  SqliteRuntime.layerSqlite({ filename: tempDbPath("relative-selection"), ...parentRelativeOptions }).pipe(
+    Layer.provide(resolverLayer),
+  ),
+)("resolves SQLite child selections relative to each persisted parent closure", (suite) => {
+  suite.effect("resolves selections per persisted parent closure", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const first = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "sqlite:relative:first",
+        idempotencyKey: "parent",
+        prompt: "first",
+      })
+      const second = yield* runtime.send({
+        to: alternateAssistantAddress,
+        sessionId: "sqlite:relative:second",
+        idempotencyKey: "parent",
+        prompt: "second",
+      })
+      const firstChild = yield* runtime.spawn({
+        parentRunId: first.runId,
+        invocationId: "child",
+        selection: "researcher",
+        prompt: "child",
+      })
+      const secondChild = yield* runtime.spawn({
+        parentRunId: second.runId,
+        invocationId: "child",
+        selection: "researcher",
+        prompt: "child",
+      })
+      expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
+      expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
 
-        const before = yield* RunTree.checkpoint(first.runId)
-        const failure = yield* runtime
-          .spawn({
-            parentRunId: first.runId,
-            invocationId: "missing",
-            selection: "undeclared",
-            prompt: "missing",
-          })
-          .pipe(Effect.flip)
-        expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-        expect(yield* RunTree.checkpoint(first.runId)).toEqual(before)
-      }),
-    )
-  },
-)
+      const before = yield* RunTree.checkpoint(first.runId)
+      const failure = yield* runtime
+        .spawn({
+          parentRunId: first.runId,
+          invocationId: "missing",
+          selection: "undeclared",
+          prompt: "missing",
+        })
+        .pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
+      expect(yield* RunTree.checkpoint(first.runId)).toEqual(before)
+    }),
+  )
+})
 
 it.live("resumes tree replay from an opaque cursor after close and reopen", () =>
   Effect.gen(function* () {
@@ -324,9 +326,8 @@ it.live("rejects multi-worker configuration", () =>
         SqliteRuntime.layerSqlite({
           filename,
           multiWorker: true,
-          resolver: ExecutableResolver.makeStatic([]),
           addresses: [],
-        }),
+        }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
       )(Effect.void),
     )
     expect(Exit.isFailure(failed)).toBe(true)
@@ -338,18 +339,24 @@ layer(
   SqliteRuntime.layerSqlite({
     filename: tempDbPath("idem-attestation"),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-    resolver: ExecutableResolver.ExecutableResolver.of({
-      resolve: (input) =>
-        Effect.sync(() => {
-          if (input.runId === "pending") attestations += 1
-          return {
-            _tag: "Agent" as const,
-            agent: closedTestAgent(assistant),
-            attestation: { ref: assistantRef.ref, manifest: assistantRef.manifest },
-          }
+  }).pipe(
+    Layer.provide(
+      Layer.succeed(
+        ExecutableResolver.ExecutableResolver,
+        ExecutableResolver.ExecutableResolver.of({
+          resolve: (input) =>
+            Effect.sync(() => {
+              if (input.runId === "pending") attestations += 1
+              return {
+                _tag: "Agent" as const,
+                agent: closedTestAgent(assistant),
+                attestation: { ref: assistantRef.ref, manifest: assistantRef.manifest },
+              }
+            }),
         }),
-    }),
-  }),
+      ),
+    ),
+  ),
 )("attests once and reuses the admitted Run for a duplicate", (suite) => {
   suite.effect("attests once and reuses the admitted Run", () =>
     Effect.gen(function* () {
@@ -431,7 +438,6 @@ it.live("rejects an exact duplicate after the address binding changes", () => {
     yield* scopedWith(
       SqliteRuntime.layerSqlite({
         filename,
-        resolver: ExecutableResolver.makeStatic([]),
         addresses: [
           {
             address: assistantAddress,
@@ -439,7 +445,7 @@ it.live("rejects an exact duplicate after the address binding changes", () => {
             registrations: registrationsFor(alternateAssistantRef),
           },
         ],
-      }),
+      }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
     )(reopen)
   })
 })
@@ -715,37 +721,39 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
               ),
             ),
       })
-      const crashHost = yield* scopedWith(activeExecutionsLayer)(
-        makeRunExecutor({ workerId: "before-reopen", resolver: firstResolver }).pipe(
-          Effect.provideService(RunStore.RunStore, crashStore),
-        ),
+      return yield* scopedWith(activeExecutionsLayer)(
+        Effect.gen(function* () {
+          const crashHost = yield* makeRunExecutor.pipe(
+            Effect.provideService(RunStore.RunStore, crashStore),
+            Effect.provideService(ExecutableResolver.ExecutableResolver, firstResolver),
+          )
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:durable-handoff",
+            idempotencyKey: "durable-handoff",
+            prompt: "start with the supervisor",
+          })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-reopen" })
+          const fiber = yield* crashHost.execute(claim).pipe(Effect.forkIn(crashScope))
+          yield* Deferred.await(handoffCommitted)
+          const execution = yield* store.loadExecution(receipt.runId)
+          const checkpointState = yield* Schema.decodeUnknownEffect(CheckpointState)(
+            execution.checkpoint !== undefined && "state" in execution.checkpoint ? execution.checkpoint.state : {},
+          )
+          const operation = yield* store.getOperationByKey({
+            runId: receipt.runId,
+            operationKey: checkpointState?.handoff?.path[0]?.handoffId ?? "missing",
+          })
+          const session = yield* store.sessionReader("session:durable-handoff")
+          if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
+          const sessionPath = yield* session.value.path()
+          return { runId: receipt.runId, fiber, execution, operation, sessionPath }
+        }),
       )
-      const receipt = yield* runtime.send({
-        to: address,
-        sessionId: "session:durable-handoff",
-        idempotencyKey: "durable-handoff",
-        prompt: "start with the supervisor",
-      })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-reopen" })
-      const fiber = yield* crashHost.execute(claim).pipe(Effect.forkIn(crashScope))
-      yield* Deferred.await(handoffCommitted)
-      const execution = yield* store.loadExecution(receipt.runId)
-      const checkpointState = yield* Schema.decodeUnknownEffect(CheckpointState)(
-        execution.checkpoint !== undefined && "state" in execution.checkpoint ? execution.checkpoint.state : {},
-      )
-      const operation = yield* store.getOperationByKey({
-        runId: receipt.runId,
-        operationKey: checkpointState?.handoff?.path[0]?.handoffId ?? "missing",
-      })
-      const session = yield* store.sessionReader("session:durable-handoff")
-      if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
-      const sessionPath = yield* session.value.path()
-      return { runId: receipt.runId, fiber, execution, operation, sessionPath }
     })
     const committedResult = yield* scopedWith(
       SqliteRuntime.layerSqlite({
         filename,
-        resolver: firstResolver,
         addresses: [
           {
             address,
@@ -753,7 +761,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
             registrations: registrationsFor(admittedExecutable),
           },
         ],
-      }),
+      }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, firstResolver))),
     )(committed)
 
     yield* Fiber.interrupt(committedResult.fiber)
@@ -867,7 +875,6 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
     yield* scopedWith(
       SqliteRuntime.layerSqlite({
         filename,
-        resolver: reopenResolver,
         addresses: [
           {
             address,
@@ -875,7 +882,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
             registrations: registrationsFor(admittedExecutable),
           },
         ],
-      }),
+      }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, reopenResolver))),
     )(reopen)
   }),
 )
