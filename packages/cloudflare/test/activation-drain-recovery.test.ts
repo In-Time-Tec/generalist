@@ -427,12 +427,12 @@ it.live("recovers stale running and cancelling claims by status, raises fences, 
 
       const snapshots = yield* Metric.snapshot
       const recoveredClaims = snapshots.find(
-        (snapshot) => snapshot.id === "tenetkit_runtime_sql_do_incarnation_recovered_claims",
+        (snapshot) => snapshot.id === "tenetkit_runtime_sqlite_exclusive_recovered_claims",
       )
       expect(recoveredClaims?.type).toBe("Counter")
       if (recoveredClaims?.type === "Counter") expect(recoveredClaims.state.count).toBe(2)
       const recoveryDuration = snapshots.find(
-        (snapshot) => snapshot.id === "tenetkit_runtime_sql_do_incarnation_recovery_duration",
+        (snapshot) => snapshot.id === "tenetkit_runtime_sqlite_exclusive_recovery_duration",
       )
       expect(recoveryDuration?.type).toBe("Histogram")
       if (recoveryDuration?.type === "Histogram") expect(recoveryDuration.state.count).toBe(1)
