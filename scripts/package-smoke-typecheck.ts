@@ -10,8 +10,8 @@ import {
   ModelMiddleware,
   ModelRegistry,
   ModelResilience,
+  Output,
   Session,
-  ToolOutput,
 } from "tenetkit"
 import { A2A } from "tenetkit/a2a"
 import { AGUI } from "tenetkit/ag-ui"
@@ -56,8 +56,8 @@ type ModelResilienceFailureResolver = Assert<
 type SessionCanonical = Assert<
   Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionDirectory, never, never]>
 >
-type ToolOutputCanonical = Assert<
-  Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.Store, never, never]>
+type OutputCanonical = Assert<
+  Equal<LayerShape<typeof Output.layerMemory>, readonly [Output.Store, never, never]>
 >
 type VectorStoreCanonical = Assert<
   Equal<LayerShape<typeof VectorStore.layerMemory>, readonly [VectorStore.VectorStore, never, never]>
