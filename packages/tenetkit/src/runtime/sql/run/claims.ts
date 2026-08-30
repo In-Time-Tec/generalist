@@ -12,7 +12,7 @@ export interface ClaimedRun {
   readonly leaseExpiresAt: Date
 }
 
-export interface Interface {
+export interface Service {
   /**
    * Lossy hints that durable claim state may have changed. Every subscription first emits after
    * its change source is ready, so consumers can close the subscribe-before-catch-up race.
@@ -49,4 +49,4 @@ export interface Interface {
   }) => Effect.Effect<void, RunNotFound | RunTerminal | StaleClaim | StaleSessionClaim | RuntimeUnavailable>
 }
 
-export class RunClaims extends Context.Service<RunClaims, Interface>()("tenetkit/runtime/sql/run/claims/RunClaims") {}
+export class RunClaims extends Context.Service<RunClaims, Service>()("tenetkit/runtime/sql/run/claims/RunClaims") {}

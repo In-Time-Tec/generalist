@@ -80,7 +80,7 @@ export const cellAgent = definePage({
     h2("step-4-mount-a-host-module", "Step 4: Mount a host module"),
     p(
       "A cell that can only compute is not very useful. ",
-      code("HostBindingRegistry"),
+      code("HostModules"),
       " mounts named Schema-typed modules as kernel bindings, so a cell writes ",
       code("await workspace.read({ path })"),
       " directly. Add the module and run the whole tool route:",

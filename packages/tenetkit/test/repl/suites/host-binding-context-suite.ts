@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { ToolContext } from "tenetkit"
-import { HostBindingRegistry } from "../../../src/repl/index"
+import { HostModules } from "../../../src/repl/index"
 
 const Out = Schema.Struct({ seen: Schema.String })
 const Fail = Schema.TaggedStruct("Never", { reason: Schema.String })
@@ -21,7 +21,7 @@ const context = (sessionId: string) =>
  * surface was built with would answer every Session with one Session's identity. Every binding
  * derives its authority from that identity, so this pins which one a handler observes.
  */
-const whoami: HostBindingRegistry.AnyOperation<ToolContext.ToolContext> = {
+const whoami: HostModules.AnyOperation<ToolContext.ToolContext> = {
   name: "whoami",
   input: Schema.Struct({}),
   output: Out,
@@ -31,7 +31,7 @@ const whoami: HostBindingRegistry.AnyOperation<ToolContext.ToolContext> = {
 
 it.effect("answers with the calling Session identity rather than the one the surface was built with", () =>
   Effect.gen(function* () {
-    const registry = yield* HostBindingRegistry.make([{ name: "probe", operations: [whoami] }]).pipe(
+    const registry = yield* HostModules.make([{ name: "probe", operations: [whoami] }]).pipe(
       Effect.provideService(ToolContext.ToolContext, context("BUILD-TIME")),
     )
     const response = yield* registry

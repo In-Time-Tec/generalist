@@ -2,7 +2,7 @@ import { Clock, Effect, Layer, Schema, SynchronizedRef } from "effect"
 import {
   type Claim,
   type CommandClaim,
-  type Interface as KernelResourceStoreInterface,
+  type Service as KernelResourceStoreInterface,
   type KernelResourceFailure,
   KernelResourceRejected,
   KernelResourceStore,

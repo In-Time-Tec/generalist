@@ -11,7 +11,7 @@ import {
 import { OperationResolution, digest as resolutionDigest } from "tenetkit/runtime/driver/operation/resolution"
 import { isTerminal } from "tenetkit/runtime/driver/run"
 import { ExecutionCheckpoint } from "tenetkit/runtime/driver/execution/state"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "tenetkit/runtime/driver/sql/codec/codecs"
 import { canBlindRetry } from "tenetkit/runtime/driver/sql/operations"
 import type { DecodedRun, OperationRow } from "tenetkit/runtime/driver/sql/codec/rows"
@@ -68,7 +68,7 @@ export const postgresOperations = (input: {
   >
   readonly nextId: (prefix: string) => Effect.Effect<string>
 }): Pick<
-  RunStoreInterface,
+  RunStoreService,
   | "recordOperation"
   | "startOperation"
   | "completeOperation"
@@ -125,7 +125,7 @@ export const postgresOperations = (input: {
       `
       return { record: toOperationRecord(next[0]!), outcome: "unknown" as const }
     })
-  const existingOperation = (op: Parameters<RunStoreInterface["recordOperation"]>[0], prior: OperationRow) =>
+  const existingOperation = (op: Parameters<RunStoreService["recordOperation"]>[0], prior: OperationRow) =>
     Effect.gen(function* () {
       const consumed = yield* sql<{ readonly entry_id: string }>`
         SELECT entry_id FROM tenetkit_run_steering
@@ -138,7 +138,7 @@ export const postgresOperations = (input: {
       }
       return toOperationRecord(prior)
     })
-  const verifyPendingSteering = (op: Parameters<RunStoreInterface["recordOperation"]>[0]) =>
+  const verifyPendingSteering = (op: Parameters<RunStoreService["recordOperation"]>[0]) =>
     Effect.gen(function* () {
       const steeringEntryIds = op.steeringEntryIds ?? []
       const pending = yield* sql<{ readonly entry_id: string }>`
@@ -156,7 +156,7 @@ export const postgresOperations = (input: {
       return steeringEntryIds
     })
   const verifyCompletedOperation = (
-    op: Parameters<RunStoreInterface["completeOperation"]>[0],
+    op: Parameters<RunStoreService["completeOperation"]>[0],
     loaded: DecodedRun,
     row: OperationRow,
   ) =>
@@ -182,7 +182,7 @@ export const postgresOperations = (input: {
       }
       return current
     })
-  const verifyOperationSteering = (op: Parameters<RunStoreInterface["completeOperation"]>[0]) =>
+  const verifyOperationSteering = (op: Parameters<RunStoreService["completeOperation"]>[0]) =>
     Effect.gen(function* () {
       for (const entryId of new Set(op.steeringEntryIds ?? [])) {
         const rows = yield* sql<{ readonly consumed_operation_id: string | null }>`
@@ -194,7 +194,7 @@ export const postgresOperations = (input: {
         }
       }
     })
-  const persistOperationOutcome = (op: Parameters<RunStoreInterface["completeOperation"]>[0]) => {
+  const persistOperationOutcome = (op: Parameters<RunStoreService["completeOperation"]>[0]) => {
     if (op.outcome._tag === "Succeeded") {
       return sql`
         UPDATE tenetkit_run_operations

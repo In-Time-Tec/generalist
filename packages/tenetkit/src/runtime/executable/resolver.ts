@@ -1,12 +1,12 @@
 import { Context, Effect, Function, Layer, Schema, Scope } from "effect"
 import {
   AgentManifest,
-  ProgramBindings,
-  ProgramHost,
+  ProgramHandlers,
+  ProgramRunner,
   ProgramManifest,
   type AgentProgram,
   type Pins,
-  type SandboxExecutor,
+  type CodeExecutor,
 } from "../../core/index.js"
 import type { Agent } from "../../core/agent/public/service.js"
 import { decodePinned, ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
@@ -102,8 +102,8 @@ export const matchesActiveRunOptions: {
 export interface ProgramResolution {
   readonly _tag: "Program"
   readonly program: AgentProgram.Program<unknown, unknown, unknown, unknown>
-  readonly sandbox: SandboxExecutor.Interface
-  readonly bindings: ProgramBindings.Bindings
+  readonly executor: CodeExecutor.Service
+  readonly handlers: ProgramHandlers.Handlers
   readonly services?: Layer.Layer<never>
   readonly attestation: Attestation
 }
@@ -112,7 +112,7 @@ export interface ProgramResolution {
 export type Resolution = AgentResolution | ProgramResolution
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly resolve: (
     input: Input,
   ) => Effect.Effect<
@@ -123,7 +123,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ExecutableResolver extends Context.Service<ExecutableResolver, Interface>()(
+export class ExecutableResolver extends Context.Service<ExecutableResolver, Service>()(
   "tenetkit/runtime/executable/resolver/ExecutableResolver",
 ) {}
 
@@ -140,8 +140,8 @@ export interface StaticProgramExecutable {
   readonly _tag: "Program"
   readonly executable: PinnedExecutable
   readonly program: AgentProgram.Program<unknown, unknown, unknown, unknown>
-  readonly sandbox: SandboxExecutor.Interface
-  readonly bindings: ProgramBindings.Bindings
+  readonly executor: CodeExecutor.Service
+  readonly handlers: ProgramHandlers.Handlers
   readonly services?: Layer.Layer<never>
 }
 
@@ -161,7 +161,7 @@ const registerStatic = (executables: ReadonlyArray<StaticExecutable>): ReadonlyM
       if (active._tag !== "Program" || entry.program.pinned.pin !== attested.pin || attested.pin !== active.pin) {
         throw new TypeError(`Live Program does not match static executable reference: ${executable.ref.active}`)
       }
-      Effect.runSync(ProgramHost.validateBindings(entry.program.pinned, entry.bindings))
+      Effect.runSync(ProgramRunner.validateHandlers(entry.program.pinned, entry.handlers))
     } else {
       if (active._tag !== "Agent") {
         throw new TypeError(`Static Agent does not match active executable kind: ${executable.ref.active}`)
@@ -204,8 +204,8 @@ const staticResolution = (entry: StaticExecutable, attestation: Attestation): Re
     return {
       _tag: "Program",
       program: entry.program,
-      sandbox: entry.sandbox,
-      bindings: entry.bindings,
+      executor: entry.executor,
+      handlers: entry.handlers,
       attestation,
       ...Object.assign({}, entry.services === undefined ? undefined : { services: entry.services }),
     }
@@ -236,7 +236,7 @@ const resolveStatic = (
 }
 
 /** @experimental Construct an exact static resolver without resolving at admission or startup. */
-export const makeStatic = (executables: ReadonlyArray<StaticExecutable>): Interface => {
+export const makeStatic = (executables: ReadonlyArray<StaticExecutable>): Service => {
   const entries = registerStatic(executables)
   return ExecutableResolver.of({
     resolve: (input) => Effect.flatMap(verifiedInput(input), (pinned) => resolveStatic(entries, input, pinned)),
@@ -265,12 +265,12 @@ export interface CodecRequest extends CapabilityRequest {
   readonly boundary: "input" | "output"
 }
 
-/** @experimental Exact persisted authority for one reconstructed Program tool or step binding. */
+/** @experimental Exact persisted authority for one reconstructed Program tool or step handler. */
 export interface NamedCapabilityRequest extends CapabilityRequest {
   readonly name: string
 }
 
-/** @experimental Exact persisted authority for one reconstructed Program Agent binding. */
+/** @experimental Exact persisted authority for one reconstructed Program Agent handler. */
 export interface AgentCapabilityRequest extends CapabilityRequest {
   readonly selection: string
   readonly agent: Pins.AgentPin
@@ -292,21 +292,21 @@ export interface ServicesRequest {
  * resources finalized with the resolver scope.
  */
 export interface ProgramReconstruction {
-  readonly sandbox: (
+  readonly executor: (
     request: CapabilityRequest,
-  ) => Effect.Effect<SandboxExecutor.Interface, ReconstructionError, Scope.Scope>
+  ) => Effect.Effect<CodeExecutor.Service, ReconstructionError, Scope.Scope>
   readonly codec: (
     request: CodecRequest,
   ) => Effect.Effect<Schema.Codec<unknown, unknown>, ReconstructionError, Scope.Scope>
   readonly tool: (
     request: NamedCapabilityRequest,
-  ) => Effect.Effect<ProgramBindings.AnyTool, ReconstructionError, Scope.Scope>
+  ) => Effect.Effect<ProgramHandlers.AnyTool, ReconstructionError, Scope.Scope>
   readonly step: (
     request: NamedCapabilityRequest,
-  ) => Effect.Effect<ProgramBindings.AnyStep, ReconstructionError, Scope.Scope>
+  ) => Effect.Effect<ProgramHandlers.AnyStep, ReconstructionError, Scope.Scope>
   readonly agent: (
     request: AgentCapabilityRequest,
-  ) => Effect.Effect<ProgramBindings.AnyAgent, ReconstructionError, Scope.Scope>
+  ) => Effect.Effect<ProgramHandlers.AnyAgent, ReconstructionError, Scope.Scope>
   readonly services?: (request: ServicesRequest) => Effect.Effect<Layer.Layer<never>, ReconstructionError, Scope.Scope>
 }
 
@@ -331,7 +331,7 @@ const resolveProgram = (
         ? Effect.fail(ExecutableRegistrationMissing.make({ pin }))
         : Effect.succeed({ ...authority, pin, registration })
     }
-    const sandbox = yield* Effect.flatMap(required(entry.manifest.sandbox), reconstruction.sandbox)
+    const executor = yield* Effect.flatMap(required(entry.manifest.sandbox), reconstruction.executor)
     const inputCodec = yield* Effect.flatMap(required(entry.manifest.input), (request) =>
       reconstruction.codec({ ...request, boundary: "input" }),
     )
@@ -362,19 +362,19 @@ const resolveProgram = (
         })
       }),
     )
-    const bindings = yield* Effect.try({
+    const handlers = yield* Effect.try({
       try: () =>
-        ProgramBindings.make({
+        ProgramHandlers.make({
           tools,
           steps,
           agents,
         }),
       catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
     })
-    yield* ProgramHost.validateBindings(program, bindings).pipe(
+    yield* ProgramRunner.validateHandlers(program, handlers).pipe(
       Effect.mapError((mismatch) =>
         ExecutableRegistrationInvalid.make({
-          message: `reconstructed ${mismatch.kind} binding ${mismatch.name} ${mismatch.reason}: ${entry.pin}`,
+          message: `reconstructed ${mismatch.kind} handler ${mismatch.name} ${mismatch.reason}: ${entry.pin}`,
         }),
       ),
     )
@@ -385,8 +385,8 @@ const resolveProgram = (
     return {
       _tag: "Program" as const,
       program: { pinned: program, input: inputCodec, output: outputCodec },
-      sandbox,
-      bindings,
+      executor,
+      handlers,
       attestation: verifyAttestation(pinned),
       ...Object.assign({}, services === undefined ? undefined : { services }),
     }
@@ -399,7 +399,7 @@ const resolveProgram = (
 export const makeDynamic = (options: {
   readonly agents: ReadonlyArray<StaticAgentExecutable>
   readonly program: ProgramReconstruction
-}): Interface => {
+}): Service => {
   const entries = registerStatic(options.agents)
   return ExecutableResolver.of({
     resolve: (input) =>

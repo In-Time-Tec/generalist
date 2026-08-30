@@ -29,7 +29,7 @@ export const examples = definePage({
           [
             "A deterministic no-credential smoke eval over ",
             code("Agent.generate"),
-            " using the ModelRegistry.operate pattern",
+            " using the ModelRegistry.withModel pattern",
           ],
           [code("bun --cwd examples/eval-in-ci start")],
         ],
@@ -56,7 +56,7 @@ export const examples = definePage({
         [
           [code("mcp-agent")],
           [
-            "An agent over a fake in-memory MCP source using the ",
+            "An agent over a fake in-memory MCP client using the ",
             code("tenetkit/mcp/tools"),
             " adapter shape of a real connection",
           ],

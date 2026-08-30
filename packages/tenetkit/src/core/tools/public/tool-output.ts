@@ -22,6 +22,6 @@ export namespace ToolOutput {
   export type layerTest = typeof import("../tool-output.js").layerTest
   export type bound = typeof import("../tool-output.js").bound
   export type BoundedSuccess = import("../tool-output.js").BoundedSuccess
-  export type StoreInterface = import("../tool-output.js").StoreInterface
+  export type StoreService = import("../tool-output.js").StoreService
   export type ToolOutput = import("../tool-output.js").ToolOutput
 }

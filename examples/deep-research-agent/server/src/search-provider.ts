@@ -110,13 +110,13 @@ const ExaResponse = Schema.Struct({
 type ExaResult = typeof ExaResult.Type
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<SearchResult>>
 }
 
 /** @experimental */
-export class Service extends Context.Service<Service, Interface>()(
-  "@tenetkit/example-deep-research-agent-server/search-provider/Service",
+export class SearchProvider extends Context.Service<SearchProvider, Service>()(
+  "@tenetkit/example-deep-research-agent-server/search-provider/SearchProvider",
 ) {}
 
 const exaSearchBody = (query: string) => ({
@@ -160,8 +160,8 @@ const searchExa = (
 
 /** @experimental */
 export const cannedLayer = Layer.succeed(
-  Service,
-  Service.of({
+  SearchProvider,
+  SearchProvider.of({
     search: Effect.fn("SearchProvider.Canned.search")((query: string) => Effect.succeed(cannedResultsFor(query))),
   }),
 )
@@ -169,12 +169,12 @@ export const cannedLayer = Layer.succeed(
 /** @experimental */
 export const exaLayerFromApiKey = (
   apiKey: Redacted.Redacted<string>,
-): Layer.Layer<Service, never, HttpClient.HttpClient> =>
+): Layer.Layer<SearchProvider, never, HttpClient.HttpClient> =>
   Layer.effect(
-    Service,
+    SearchProvider,
     Effect.gen(function* () {
       const client = yield* HttpClient.HttpClient
-      return Service.of({
+      return SearchProvider.of({
         search: Effect.fn("SearchProvider.Exa.search")(function* (query: string) {
           return yield* searchExa(client, apiKey, query).pipe(Effect.orElseSucceed(() => cannedResultsFor(query)))
         }),
@@ -206,10 +206,10 @@ export const layer = Layer.unwrap(
 export const searchProviderLayer = layer
 
 /** @experimental */
-export const testLayer = (implementation: Interface) => Layer.succeed(Service, Service.of(implementation))
+export const testLayer = (implementation: Service) => Layer.succeed(SearchProvider, SearchProvider.of(implementation))
 
 /** @experimental */
 export const search = Effect.fn("SearchProvider.search.call")(function* (query: string) {
-  const searchProvider = yield* Service
+  const searchProvider = yield* SearchProvider
   return yield* searchProvider.search(query)
 })

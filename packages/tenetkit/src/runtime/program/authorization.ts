@@ -1,11 +1,11 @@
 import { Effect } from "effect"
-import { ProgramCapabilities, type ProgramBindings } from "../../core/index.js"
+import { ProgramCapabilities, type ProgramHandlers } from "../../core/index.js"
 import type { ExecutionRecord } from "../run/store.js"
 import { approvedFor, deniedFor } from "./approval.js"
 
 const authorize = (
   claimed: ExecutionRecord,
-  invocation: Pick<ProgramBindings.Invocation, "authorize">,
+  invocation: Pick<ProgramHandlers.Invocation, "authorize">,
   operation: string,
   capability: string,
 ): Effect.Effect<void, ProgramCapabilities.CapabilityFailure> => {

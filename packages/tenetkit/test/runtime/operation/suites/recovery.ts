@@ -4,9 +4,9 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Agent, Session, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { layer } from "../../../../src/ai/provider/openrouter.js"
-import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
-import { make as makeExecutionHost } from "../../../../src/runtime/execution/host.js"
+import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { assistant, assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
 import { closedTestAgent, testExecutable } from "../../run/identity.js"
@@ -16,7 +16,7 @@ export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
     options: Runtime.LayerOptions,
-  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExecutionHost.ExecutionHost | Extra, StoreError>
+  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor | Extra, StoreError>
   readonly claim?: (
     runId: string,
     ownerId: string,
@@ -100,7 +100,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const receipt = yield* runtime.start({
             executable,
             registrations: registrationsFor(executable),
@@ -201,7 +201,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const receipt = yield* runtime.send({
             to: address,
             sessionId,
@@ -412,7 +412,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: address,
               sessionId: `session:operation-recovery:${options.name}:crash`,
@@ -437,7 +437,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
             const recoveryClaim = yield* claim(receipt.runId, "process-after-crash")
             const recoveryActive = yield* Layer.build(Layer.fresh(activeExecutionsLayer))
-            const recoveryHost = yield* makeExecutionHost({
+            const recoveryHost = yield* makeRunExecutor({
               workerId: "process-after-crash",
               resolver,
             }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(recoveryActive))
@@ -540,7 +540,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.send({
               to: address,
               sessionId: `session:idempotent-recovery:${options.name}`,
@@ -564,7 +564,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             expect((yield* runtime.inspect(receipt.runId)).status).not.toBe("needs-resolution")
 
             const recoveryActive = yield* Layer.build(Layer.fresh(activeExecutionsLayer))
-            const recoveryHost = yield* makeExecutionHost({
+            const recoveryHost = yield* makeRunExecutor({
               workerId: "process-after-crash",
               resolver,
             }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(recoveryActive))

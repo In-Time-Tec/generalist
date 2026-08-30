@@ -1,6 +1,6 @@
 import { Effect, Option, Ref, Schema } from "effect"
 import type { ExecutionResult } from "../execution/state.js"
-import type { ExecutionClaim, ExecutionRecord, Interface as RunStore, WorkerMutationError } from "../run/store.js"
+import type { ExecutionClaim, ExecutionRecord, Service as RunStore, WorkerMutationError } from "../run/store.js"
 import type { RunFailure } from "../run/event.js"
 
 export type DeferredProgramChildTerminal =

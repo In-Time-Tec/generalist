@@ -1,11 +1,11 @@
 import { Console, Effect, ManagedRuntime, Option, Schema } from "effect"
-import { HostBindingRegistry } from "tenetkit/repl"
+import { HostModules } from "tenetkit/repl"
 
 class WorkspaceDenied extends Schema.TaggedError<WorkspaceDenied>()("@tenetkit/docs/WorkspaceDenied", {
   path: Schema.String,
 }) {}
 
-const readFile: HostBindingRegistry.AnyOperation = {
+const readFile: HostModules.AnyOperation = {
   name: "read",
   input: Schema.Struct({ path: Schema.String }),
   output: Schema.Struct({ text: Schema.String }),
@@ -18,10 +18,10 @@ const readFile: HostBindingRegistry.AnyOperation = {
   },
 }
 
-const workspace: HostBindingRegistry.Module = { name: "workspace", operations: [readFile] }
+const workspace: HostModules.Module = { name: "workspace", operations: [readFile] }
 
 const program = Effect.gen(function* () {
-  const registry = yield* HostBindingRegistry.HostBindingRegistry
+  const registry = yield* HostModules.HostModules
   const mounted = registry.descriptors.map((entry) => `${entry.module}.${entry.operations.join("/")}`)
   yield* Console.log(`mounted: ${mounted.join(" ")}`)
   const allowed = yield* registry.invoke({ module: "workspace", operation: "read", input: { path: "/w/a.ts" } })
@@ -32,11 +32,11 @@ const program = Effect.gen(function* () {
   yield* Console.log(`${missing._tag} module=${missing.module}`)
   const badInput = yield* Effect.flip(registry.invoke({ module: "workspace", operation: "read", input: { path: 7 } }))
   yield* Console.log(
-    Schema.is(HostBindingRegistry.HostBindingSchemaFailure)(badInput)
+    Schema.is(HostModules.HostModuleSchemaFailure)(badInput)
       ? `${badInput._tag} stage=${badInput.stage}`
       : badInput._tag,
   )
 })
 
-const runtime = ManagedRuntime.make(HostBindingRegistry.layer([workspace]))
+const runtime = ManagedRuntime.make(HostModules.layer([workspace]))
 await runtime.runPromise(program)

@@ -5,7 +5,7 @@ import { Deterministic } from "tenetkit/ai"
 const agent = Agent.make({ name: "eval-agent" })
 
 const program = Effect.gen(function* () {
-  const result = yield* ModelRegistry.operate(
+  const result = yield* ModelRegistry.withModel(
     { provider: "deterministic", model: "local" },
     Agent.generate(agent, { prompt: "Say the deterministic answer." }),
   )

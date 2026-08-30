@@ -52,7 +52,7 @@ export namespace Compaction {
   export type truncate = typeof import("./compaction.js").truncate
   export type layerTest = typeof import("./compaction.js").layerTest
   export type DefaultOptions = import("./compaction.js").DefaultOptions
-  export type Interface = import("./compaction.js").Interface
+  export type Service = import("./compaction.js").Service
   export type KeepRecentOptions = import("./compaction.js").KeepRecentOptions
   export type LayerOptions = import("./compaction.js").LayerOptions
   export type MicrocompactResult = import("./compaction.js").MicrocompactResult

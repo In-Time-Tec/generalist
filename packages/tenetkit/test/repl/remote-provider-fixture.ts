@@ -12,7 +12,7 @@ import {
 import type {
   Binding,
   Execution,
-  Interface as KernelPool,
+  Service as KernelPool,
   Inspection,
   Interruption,
   Restart,
@@ -24,7 +24,7 @@ import {
   type KernelProfile as Profile,
   make as makeKernelProfile,
 } from "../../src/repl/kernel-profile.js"
-import type { Claim, CommandClaim, Interface as ResourceStore, Lease } from "../../src/repl/kernel-resource-store.js"
+import type { Claim, CommandClaim, Service as ResourceStore, Lease } from "../../src/repl/kernel-resource-store.js"
 import { TestKernel } from "../../src/repl/index.js"
 
 interface NamespaceValue {

@@ -431,7 +431,7 @@ export const reconcileProgramCancellation: ReconcileProgramCancellation = Functi
 
 type SuspendParent = (
   hub: EventHub,
-  input: Parameters<import("../../run/store.js").Interface["suspend"]>[0],
+  input: Parameters<import("../../run/store.js").Service["suspend"]>[0],
 ) => Effect.Effect<void, WorkerMutationError, SqlClient.SqlClient>
 
 export const suspendProgramOperation: {

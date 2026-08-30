@@ -25,7 +25,7 @@ export class ModelMetadataNotFound extends Schema.TaggedError<ModelMetadataNotFo
 ) {}
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly lookup: (selection: {
     readonly provider: string
     readonly model: string
@@ -38,7 +38,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ModelCatalog extends Context.Service<ModelCatalog, Interface>()(
+export class ModelCatalog extends Context.Service<ModelCatalog, Service>()(
   "tenetkit/ai/catalog/service/ModelCatalog",
 ) {}
 
@@ -128,11 +128,11 @@ const mergeEntries = (
   return entries
 }
 
-const make = (entries: ReadonlyArray<ModelMetadata>): Interface => {
+const make = (entries: ReadonlyArray<ModelMetadata>): Service => {
   const byKey = new Map(entries.map((entry) => [metadataKey(entry), entry] as const))
 
-  const lookup: Interface["lookup"] = (selection) => Effect.succeed(byKey.get(metadataKey(selection)))
-  const require: Interface["require"] = (selection) =>
+  const lookup: Service["lookup"] = (selection) => Effect.succeed(byKey.get(metadataKey(selection)))
+  const require: Service["require"] = (selection) =>
     lookup(selection).pipe(
       Effect.flatMap((metadata) =>
         metadata === undefined
@@ -157,7 +157,7 @@ export const layerTest = (entries: ReadonlyArray<ModelMetadata>): Layer.Layer<Mo
   Layer.succeed(ModelCatalog, ModelCatalog.of(make(entries)))
 
 /** @experimental */
-export const lookup = Effect.fn("Catalog.lookup.call")(function* (selection: {
+export const lookup = Effect.fn("ModelCatalog.lookup.call")(function* (selection: {
   readonly provider: string
   readonly model: string
 }) {
@@ -166,7 +166,7 @@ export const lookup = Effect.fn("Catalog.lookup.call")(function* (selection: {
 })
 
 /** @experimental */
-export const require = Effect.fn("Catalog.require.call")(function* (selection: {
+export const require = Effect.fn("ModelCatalog.require.call")(function* (selection: {
   readonly provider: string
   readonly model: string
 }) {
@@ -175,7 +175,7 @@ export const require = Effect.fn("Catalog.require.call")(function* (selection: {
 })
 
 /** @experimental */
-export const all = Effect.fn("Catalog.all.call")(function* () {
+export const all = Effect.fn("ModelCatalog.all.call")(function* () {
   const catalog = yield* ModelCatalog
   return yield* catalog.all
 })

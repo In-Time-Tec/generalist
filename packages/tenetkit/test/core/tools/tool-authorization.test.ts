@@ -27,18 +27,18 @@ const request: ToolAuthorization.Request = {
   sessionId: "session",
   onApprovalRequired: () => Effect.void,
 }
-const store = (rules: ReadonlyArray<Permissions.Rule> = []): Permissions.RuleStoreInterface => ({
+const store = (rules: ReadonlyArray<Permissions.Rule> = []): Permissions.RuleStoreService => ({
   rules: Effect.succeed(rules),
   remember: () => Effect.void,
 })
-const permissions = (decision: Permissions.Decision): Permissions.Interface => ({
+const permissions = (decision: Permissions.Decision): Permissions.Service => ({
   evaluate: () => Effect.succeed(decision),
 })
 
 describe("ToolAuthorization", () => {
   it.effect("allows and denies in one pass", () =>
     Effect.gen(function* () {
-      const approvals: Approvals.Interface = { resolve: () => Effect.succeed({ _tag: "Approved" }) }
+      const approvals: Approvals.Service = { resolve: () => Effect.succeed({ _tag: "Approved" }) }
       expect(
         (yield* ToolAuthorization.make({
           permissions: permissions({ _tag: "Allow" }),
@@ -109,7 +109,7 @@ describe("ToolAuthorization", () => {
   it.effect("remembers only the explicit rule carried by Approved", () =>
     Effect.gen(function* () {
       const remembered: Array<Permissions.Rule> = []
-      const ruleStore: Permissions.RuleStoreInterface = {
+      const ruleStore: Permissions.RuleStoreService = {
         rules: Effect.succeed([]),
         remember: (rule) => Effect.sync(() => remembered.push(rule)),
       }

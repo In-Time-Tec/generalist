@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Brand, Effect, Result, Schema } from "effect"
-import { Authorship, HarnessEntry, HarnessState, Refinement } from "../../../src/harness/index.js"
+import { Authorship, Entry, State, Refinement } from "../../../src/harness/index.js"
 import { applied, at, entry, proposal, scope, update } from "../fixtures.js"
 
-const seeded = HarnessState.make({
+const seeded = State.make({
   scope,
   entries: [entry({ id: "target", kind: "memory", version: 5, content: "original" })],
 })
@@ -30,45 +30,45 @@ describe("Refinement.applyProposal accepts only an authored proposal", () => {
         at: at(2),
         edits: [{ _tag: "Create", kind: "memory", id: "learned", value: { title: "t", content: "c" } }],
       })
-      const result = Refinement.applyProposal(HarnessState.empty(scope), authored)
+      const result = Refinement.applyProposal(State.empty(scope), authored)
       expect(Result.isSuccess(result)).toBe(true)
       if (Result.isFailure(result)) return
-      const created = HarnessState.findEntry(result.success.state, "memory", "learned")!
+      const created = State.findEntry(result.success.state, "memory", "learned")!
       expect(created.version).toBe(1)
       expect(created.createdAt).toBe(at(2))
     }),
   )
 
   it("statically refuses a bare proposal shape at the authored apply seam", () => {
-    const bare: HarnessEntry.RefinementProposal = proposal({
+    const bare: Entry.RefinementProposal = proposal({
       edits: [{ _tag: "Create", kind: "memory", id: "forged", value: { title: "t", content: "c" } }],
     })
     // @ts-expect-error an unbranded proposal is not an authored proposal
-    Refinement.applyProposal(HarnessState.empty(scope), bare)
-    expect(Result.isSuccess(Refinement.applyTrustedProposal(HarnessState.empty(scope), bare))).toBe(true)
+    Refinement.applyProposal(State.empty(scope), bare)
+    expect(Result.isSuccess(Refinement.applyTrustedProposal(State.empty(scope), bare))).toBe(true)
   })
 
   it("statically refuses a decoded model payload at the authored apply seam", () => {
-    const decoded = Schema.decodeUnknownSync(HarnessEntry.RefinementProposal)(forgedJson)
+    const decoded = Schema.decodeUnknownSync(Entry.RefinementProposal)(forgedJson)
     // @ts-expect-error decoding model JSON as a trusted proposal no longer reaches the authored seam
-    Refinement.applyProposal(HarnessState.empty(scope), decoded)
+    Refinement.applyProposal(State.empty(scope), decoded)
     expect(decoded.edits[0]).toMatchObject({ revision: { version: 4242 } })
   })
 
   it("refuses a forged proposal whose cast erased the brand at runtime", () => {
-    const forgeBrand = Brand.nominal<HarnessEntry.AuthoredRefinementProposal>()
-    const forged = forgeBrand(Schema.decodeUnknownSync(HarnessEntry.RefinementProposal)(forgedJson))
-    const result = Refinement.applyProposal(HarnessState.empty(scope), forged)
+    const forgeBrand = Brand.nominal<Entry.AuthoredRefinementProposal>()
+    const forged = forgeBrand(Schema.decodeUnknownSync(Entry.RefinementProposal)(forgedJson))
+    const result = Refinement.applyProposal(State.empty(scope), forged)
     expect(Result.isFailure(result)).toBe(true)
     if (Result.isSuccess(result)) return
     expect(result.failure.reason).toBe("pinned-revision")
-    expect(HarnessState.findEntry(HarnessState.empty(scope), "memory", "forged")).toBeUndefined()
+    expect(State.findEntry(State.empty(scope), "memory", "forged")).toBeUndefined()
   })
 
   it("keeps a revision-pinned proposal working on the audited trusted route", () => {
-    const pinned = Schema.decodeUnknownSync(HarnessEntry.RefinementProposal)(forgedJson)
-    const result = Result.getOrThrow(Refinement.applyTrustedProposal(HarnessState.empty(scope), pinned))
-    expect(HarnessState.findEntry(result.state, "memory", "forged")!.version).toBe(4242)
+    const pinned = Schema.decodeUnknownSync(Entry.RefinementProposal)(forgedJson)
+    const result = Result.getOrThrow(Refinement.applyTrustedProposal(State.empty(scope), pinned))
+    expect(State.findEntry(result.state, "memory", "forged")!.version).toBe(4242)
   })
 
   it.effect("still applies a legitimately authored proposal at runtime", () =>
@@ -78,17 +78,17 @@ describe("Refinement.applyProposal accepts only an authored proposal", () => {
         at: at(2),
         edits: [{ _tag: "Create", kind: "memory", id: "legit", value: { title: "t", content: "c" } }],
       })
-      const result = Result.getOrThrow(Refinement.applyProposal(HarnessState.empty(scope), authored))
-      expect(HarnessState.findEntry(result.state, "memory", "legit")!.version).toBe(1)
+      const result = Result.getOrThrow(Refinement.applyProposal(State.empty(scope), authored))
+      expect(State.findEntry(result.state, "memory", "legit")!.version).toBe(1)
     }),
   )
 
   it.effect("refuses the forged payload on the authorship path it must now take", () =>
     Effect.gen(function* () {
       const failure = yield* Authorship.authorProposal(forgedJson).pipe(Effect.flip)
-      if (failure._tag !== "tenetkit/harness/AuthorshipRejected") throw failure
+      if (failure._tag !== "tenetkit/agent-guidance/AuthorshipRejected") throw failure
       expect(failure.reason).toBe("pinned-revision")
-      expect(HarnessState.findEntry(HarnessState.empty(scope), "memory", "forged")).toBeUndefined()
+      expect(State.findEntry(State.empty(scope), "memory", "forged")).toBeUndefined()
     }),
   )
 
@@ -101,7 +101,7 @@ describe("Refinement.applyProposal accepts only an authored proposal", () => {
     // @ts-expect-error a rollback proposal pins a revision, so it is not an authored proposal
     Refinement.applyProposal(change.state, inverse)
     const restored = Result.getOrThrow(Refinement.applyTrustedProposal(change.state, inverse))
-    const entryValue = HarnessState.findEntry(restored.state, "memory", "target")!
+    const entryValue = State.findEntry(restored.state, "memory", "target")!
     expect(entryValue.version).toBe(5)
     expect(entryValue.content).toBe("original")
   })
@@ -112,9 +112,9 @@ describe("Refinement.applyProposal accepts only an authored proposal", () => {
         { _tag: "Create" as const, kind: "memory" as const, id: "same", value: { title: "t", content: "c" } },
       ]
       const authored = yield* Authorship.authorProposal({ id: "model-1", at: at(2), edits })
-      const viaAuthored = Result.getOrThrow(Refinement.applyProposal(HarnessState.empty(scope), authored))
+      const viaAuthored = Result.getOrThrow(Refinement.applyProposal(State.empty(scope), authored))
       const viaTrusted = Result.getOrThrow(
-        Refinement.applyTrustedProposal(HarnessState.empty(scope), proposal({ id: "model-1", at: at(2), edits })),
+        Refinement.applyTrustedProposal(State.empty(scope), proposal({ id: "model-1", at: at(2), edits })),
       )
       expect(viaAuthored.state).toEqual(viaTrusted.state)
       expect(viaAuthored.event).toEqual(viaTrusted.event)

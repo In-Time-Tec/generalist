@@ -290,7 +290,7 @@ export const mysqlSessionStore = (options: {
   readonly claim: ExecutionClaim
   readonly run: RunFn
   readonly runNoTxn: RunFn
-}): Session.Interface => {
+}): Session.Service => {
   const { claim, run, runNoTxn } = options
   const sessionId = claim.session.sessionId
 

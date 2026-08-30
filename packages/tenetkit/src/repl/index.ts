@@ -135,7 +135,7 @@ export namespace KernelPool {
   export type Execution = import("./kernel-pool.js").Execution
   export type Inspection = import("./kernel-pool.js").Inspection
   export type InspectRequest = import("./kernel-pool.js").InspectRequest
-  export type Interface = import("./kernel-pool.js").Interface
+  export type Service = import("./kernel-pool.js").Service
   export type Interruption = import("./kernel-pool.js").Interruption
   export type Restart = import("./kernel-pool.js").Restart
 }
@@ -164,7 +164,7 @@ export const KernelStateStore = {
 } satisfies typeof import("./kernel-state-store.js")
 export namespace KernelStateStore {
   export type DroppedBinding = import("./kernel-state-store.js").DroppedBinding
-  export type Interface = import("./kernel-state-store.js").Interface
+  export type Service = import("./kernel-state-store.js").Service
   export type KernelStateStore = import("./kernel-state-store.js").KernelStateStore
   export type KernelStateUnavailable = import("./kernel-state-store.js").KernelStateUnavailable
   export type Manifest = import("./kernel-state-store.js").Manifest
@@ -174,36 +174,36 @@ export namespace KernelStateStore {
 }
 
 import {
-  HostBindingConflict as HostBindingRegistry_HostBindingConflict,
-  HostBindingNotFound as HostBindingRegistry_HostBindingNotFound,
-  HostBindingRegistry as HostBindingRegistry_HostBindingRegistry,
-  HostBindingSchemaFailure as HostBindingRegistry_HostBindingSchemaFailure,
-  layer as HostBindingRegistry_layer,
-  layerTest as HostBindingRegistry_layerTest,
-  make as HostBindingRegistry_make,
-} from "./host-binding-registry.js"
-export const HostBindingRegistry = {
-  HostBindingConflict: HostBindingRegistry_HostBindingConflict,
-  HostBindingNotFound: HostBindingRegistry_HostBindingNotFound,
-  HostBindingRegistry: HostBindingRegistry_HostBindingRegistry,
-  HostBindingSchemaFailure: HostBindingRegistry_HostBindingSchemaFailure,
-  layer: HostBindingRegistry_layer,
-  layerTest: HostBindingRegistry_layerTest,
-  make: HostBindingRegistry_make,
-} satisfies typeof import("./host-binding-registry.js")
-export namespace HostBindingRegistry {
-  export type AnyOperation<R = never> = import("./host-binding-registry.js").AnyOperation<R>
-  export type BindingFailure = import("./host-binding-registry.js").BindingFailure
-  export type Descriptor = import("./host-binding-registry.js").Descriptor
-  export type HostBindingConflict = import("./host-binding-registry.js").HostBindingConflict
-  export type HostBindingNotFound = import("./host-binding-registry.js").HostBindingNotFound
-  export type HostBindingRegistry = import("./host-binding-registry.js").HostBindingRegistry
-  export type HostBindingSchemaFailure = import("./host-binding-registry.js").HostBindingSchemaFailure
-  export type Interface = import("./host-binding-registry.js").Interface
-  export type Module<R = never> = import("./host-binding-registry.js").Module<R>
-  export type Request = import("./host-binding-registry.js").Request
-  export type Response = import("./host-binding-registry.js").Response
-  export type Tagged = import("./host-binding-registry.js").Tagged
+  HostModuleConflict as HostModules_HostModuleConflict,
+  HostModuleNotFound as HostModules_HostModuleNotFound,
+  HostModules as HostModules_HostModules,
+  HostModuleSchemaFailure as HostModules_HostModuleSchemaFailure,
+  layer as HostModules_layer,
+  layerTest as HostModules_layerTest,
+  make as HostModules_make,
+} from "./host-modules.js"
+export const HostModules = {
+  HostModuleConflict: HostModules_HostModuleConflict,
+  HostModuleNotFound: HostModules_HostModuleNotFound,
+  HostModules: HostModules_HostModules,
+  HostModuleSchemaFailure: HostModules_HostModuleSchemaFailure,
+  layer: HostModules_layer,
+  layerTest: HostModules_layerTest,
+  make: HostModules_make,
+} satisfies typeof import("./host-modules.js")
+export namespace HostModules {
+  export type AnyOperation<R = never> = import("./host-modules.js").AnyOperation<R>
+  export type BindingFailure = import("./host-modules.js").BindingFailure
+  export type Descriptor = import("./host-modules.js").Descriptor
+  export type HostModuleConflict = import("./host-modules.js").HostModuleConflict
+  export type HostModuleNotFound = import("./host-modules.js").HostModuleNotFound
+  export type HostModules = import("./host-modules.js").HostModules
+  export type HostModuleSchemaFailure = import("./host-modules.js").HostModuleSchemaFailure
+  export type Service = import("./host-modules.js").Service
+  export type Module<R = never> = import("./host-modules.js").Module<R>
+  export type Request = import("./host-modules.js").Request
+  export type Response = import("./host-modules.js").Response
+  export type Tagged = import("./host-modules.js").Tagged
 }
 
 import {

@@ -146,7 +146,7 @@ export const verifyInterruptedSessionEntry = (
  */
 export const claimedStore = (options: {
   readonly claim: ExecutionClaim
-}): Effect.Effect<Session.Interface, never, SqlClient.SqlClient> =>
+}): Effect.Effect<Session.Service, never, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const sessionId = options.claim.session.sessionId

@@ -12,8 +12,8 @@ import {
   ToolExecutor,
   Toolkit,
 } from "tenetkit"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
-import { Sse, Ws } from "tenetkit/transport"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { SSE, WebSocket } from "tenetkit/transport"
 
 const searchTool = Tool.make("web_search", {
   description: "Search the web",
@@ -82,13 +82,13 @@ const errorResponse = (status: number) => (error: Error) =>
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
-    const host = yield* ExecutionHost.ExecutionHost
+    const host = yield* RunExecutor.RunExecutor
     yield* host.execute(yield* store.claimExecution({ runId, ownerId: "http-server" }))
   })
 
 const routesLayer = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    yield* router.add("GET", "/ws", Ws.handle)
+    yield* router.add("GET", "/ws", WebSocket.handle)
 
     yield* router.add(
       "GET",
@@ -97,7 +97,7 @@ const routesLayer = HttpRouter.use((router) =>
         Effect.flatMap(({ pathParams }) =>
           Effect.gen(function* () {
             const request = yield* HttpServerRequest.HttpServerRequest
-            return yield* Sse.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
+            return yield* SSE.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
         Effect.catchTag("tenetkit/transport/InvalidCursor", errorResponse(400)),

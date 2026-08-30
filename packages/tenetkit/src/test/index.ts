@@ -51,8 +51,8 @@ export namespace TestModel {
   export type TurnStep = import("./model/service.js").TurnStep
 }
 
-export { providerConformance as sandboxExecutorConformance } from "./sandbox-executor.js"
-export type { Options as SandboxExecutorConformanceOptions } from "./sandbox-executor.js"
+export { codeExecutorConformance } from "./code-executor.js"
+export type { Options as CodeExecutorConformanceOptions } from "./code-executor.js"
 
 /** @experimental Reusable KernelPool provider lifecycle and remote ownership conformance. */
 export * as KernelProviderConformance from "./repl/kernel-provider.js"

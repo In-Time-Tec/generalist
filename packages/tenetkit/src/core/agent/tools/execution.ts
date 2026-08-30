@@ -20,7 +20,7 @@ import { type Registry, get } from "../../tools/tool-registry.js"
 import { ToolContext, type Progress } from "../../tools/tool-context.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
 import { activateSkillSuccess } from "../skill-tool.js"
-import type { Skill, SkillSourceError } from "../../context/skill-source.js"
+import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
 import { intercept, updateToolBatch } from "../../durable/driver/run.js"
 import { operationKey as makeOperationKey } from "../../durable/driver/interpreter.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
@@ -38,17 +38,17 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
   readonly agent: Agent<T, R>
   readonly staticToolkit: Toolkit.Toolkit<T>
   readonly chat: Chat.Service
-  readonly activeSession: Option.Option<import("../../context/session.js").Interface>
+  readonly activeSession: Option.Option<import("../../context/session.js").Service>
   readonly sessionId: string
   readonly executor: Option.Option<typeof ToolExecutor.Service>
   readonly authorizer: ToolAuthorizer<R>
   readonly skillRuntime:
-    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillSourceError> } }
+    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined
   readonly toolState: Ref.Ref<ToolState>
   readonly handoffState?: Ref.Ref<HandoffRunState>
   readonly progressPolicy: ProgressOverflowPolicy
-  readonly skillError: (turn: number, error: SkillSourceError) => AgentError
+  readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
 }
 
 export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext: ToolExecutionContext<T, R>) => {

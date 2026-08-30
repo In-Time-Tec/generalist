@@ -172,7 +172,7 @@ export interface DeletionRequest {
  * deletion, and only an exact resource compare-and-set in `confirmDeletion` may forget its mutable
  * ID after deletion is proven. Failed deletion stays visible through `pendingDeletion`.
  */
-export interface Interface {
+export interface Service {
   readonly acquire: (request: AcquireRequest) => Effect.Effect<Lease, KernelResourceFailure>
   readonly renew: (claim: Claim, leaseMillis: number) => Effect.Effect<Lease, KernelResourceFailure>
   readonly bind: (request: BindRequest) => Effect.Effect<Lease, KernelResourceFailure>
@@ -186,7 +186,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class KernelResourceStore extends Context.Service<KernelResourceStore, Interface>()(
+export class KernelResourceStore extends Context.Service<KernelResourceStore, Service>()(
   "tenetkit/repl/kernel-resource-store/KernelResourceStore",
 ) {}
 

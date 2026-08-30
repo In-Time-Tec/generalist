@@ -7,12 +7,12 @@ import {
   AgentProgram,
   ExecutableManifest,
   Pins,
-  ProgramBindings,
+  ProgramHandlers,
   ProgramCapabilities,
-  SandboxExecutor,
+  CodeExecutor,
 } from "../../src/index.js"
 import { CodeMode, ExecutableResolver, LocalScheduler, RunStore, Runtime } from "../../src/runtime/index.js"
-import { make as makeExecutionHost } from "../../src/runtime/execution/host.js"
+import { make as makeRunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
 import { tempDbPath } from "./sql/scenario.js"
 
@@ -106,7 +106,7 @@ const fixture = (options: { readonly calls?: number } = {}) => {
         ),
     }),
   )
-  const sandbox = SandboxExecutor.makeTest(() =>
+  const executor = CodeExecutor.makeTest(() =>
     Effect.flatMap(ProgramCapabilities.ProgramCapabilities, () =>
       Effect.sync(() => {
         counts.capability++
@@ -127,8 +127,8 @@ const fixture = (options: { readonly calls?: number } = {}) => {
       return Effect.succeed({
         _tag: "Program" as const,
         program,
-        sandbox,
-        bindings: ProgramBindings.make({ tools: [], agents: [], steps: [] }),
+        executor,
+        handlers: ProgramHandlers.make({ tools: [], agents: [], steps: [] }),
         attestation: { ref: input.ref, manifest: input.manifest },
       })
     },
@@ -359,7 +359,7 @@ describe("Runtime code_mode Program children", () => {
               return admitted.pipe(Effect.andThen(Deferred.succeed(reached, undefined)), Effect.andThen(Effect.never))
             },
           })
-          const host = yield* makeExecutionHost({ workerId: `crash:${crashPoint}`, resolver }).pipe(
+          const host = yield* makeRunExecutor({ workerId: `crash:${crashPoint}`, resolver }).pipe(
             Effect.provideService(RunStore.RunStore, crashStore),
             Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
           )

@@ -4,7 +4,7 @@ import {
   KernelStateStore,
   KernelStateUnavailable,
   Manifest,
-  type Interface,
+  type Service,
   type Snapshot,
 } from "../kernel-state-store.js"
 
@@ -34,7 +34,7 @@ const safeName = (sessionId: string): string => sessionId.replace(/[^A-Za-z0-9_-
  * owner-only, written through a same-directory temporary file plus rename so a reader never
  * observes a partial capture, and a corrupt manifest fails typed instead of being restored.
  */
-export const make = (options: Options): Effect.Effect<Interface, never, FileSystem.FileSystem | Path.Path> =>
+export const make = (options: Options): Effect.Effect<Service, never, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem
     const path = yield* Path.Path

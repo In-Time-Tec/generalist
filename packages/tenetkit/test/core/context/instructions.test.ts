@@ -7,7 +7,7 @@ const context: Instructions.RenderContext = { agentName: "agent", turn: 0 }
 const source = (
   id: string,
   render: (context: Instructions.RenderContext) => Option.Option<string>,
-): Instructions.ContextSource => ({ id, render: (input) => Effect.succeed(render(input)) })
+): Instructions.Source => ({ id, render: (input) => Effect.succeed(render(input)) })
 
 describe("Instructions", () => {
   it.effect("renders every source once and joins non-empty results in order", () =>

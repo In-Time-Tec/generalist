@@ -1,7 +1,7 @@
 import "./suites/registration-pinned-content-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { ExecutionHost, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { RunExecutor, Runtime, RunStore } from "../../../src/runtime/index.js"
 import { registrationsFor } from "../execution/fixtures.js"
 import { agentMapProgramFixture } from "../program/fixture.js"
 import { tempDbPath } from "../sql/scenario.js"
@@ -27,7 +27,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const root = yield* runtime.send({
             to: fixture.address,
             sessionId: backend,

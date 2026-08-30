@@ -158,12 +158,12 @@ const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
 /** @experimental */
 export function make(
   options: Options & { readonly summarize: SummarizeOptions },
-): Effect.Effect<Memory.Interface, never, SummaryModel>
+): Effect.Effect<Memory.Service, never, SummaryModel>
 /** @experimental */
-export function make(options?: WithoutSummaryOptions): Effect.Effect<Memory.Interface>
+export function make(options?: WithoutSummaryOptions): Effect.Effect<Memory.Service>
 /** @experimental */
-export function make(options: Options): Effect.Effect<Memory.Interface, never, SummaryModel>
-export function make(options: Options = {}): Effect.Effect<Memory.Interface, never, SummaryModel> {
+export function make(options: Options): Effect.Effect<Memory.Service, never, SummaryModel>
+export function make(options: Options = {}): Effect.Effect<Memory.Service, never, SummaryModel> {
   return Effect.gen(function* () {
     const summaryModel = yield* resolveSummaryModel(options)
     const states = yield* SynchronizedRef.make(HashMap.empty<string, KeyState>())
@@ -226,9 +226,6 @@ export function make(options: Options = {}): Effect.Effect<Memory.Interface, nev
     }
   })
 }
-
-/** @experimental */
-export const makeWorkingMemory = make
 
 /** @experimental */
 export function layer(

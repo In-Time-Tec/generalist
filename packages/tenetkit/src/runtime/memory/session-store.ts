@@ -403,7 +403,7 @@ export const reader = (config: {
 export const claimedStore = (config: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
   readonly claim: ExecutionClaim
-}): Session.Interface => {
+}): Session.Service => {
   const { stateRef, claim } = config
   const sessionId = claim.session.sessionId
   return {

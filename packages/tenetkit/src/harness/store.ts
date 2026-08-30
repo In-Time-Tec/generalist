@@ -1,35 +1,35 @@
 import { Context, Effect, Layer, Ref, Schema } from "effect"
-import { HarnessScope } from "./entry.js"
-import { HarnessState, empty } from "./state.js"
+import { GuidanceScope } from "./entry.js"
+import { GuidanceState, empty } from "./state.js"
 
-/** @experimental Why one harness store operation failed. */
-export const HarnessStoreRejection = Schema.Literals(["corrupt", "encode", "unreadable", "unwritable"])
+/** @experimental Why one guidance store operation failed. */
+export const StoreRejection = Schema.Literals(["corrupt", "encode", "unreadable", "unwritable"])
 /** @experimental */
-export type HarnessStoreRejection = typeof HarnessStoreRejection.Type
+export type StoreRejection = typeof StoreRejection.Type
 
-/** @experimental A harness store operation failed. */
-export class HarnessStoreError extends Schema.TaggedError<HarnessStoreError>()("tenetkit/harness/HarnessStoreError", {
-  reason: HarnessStoreRejection,
+/** @experimental A guidance store operation failed. */
+export class StoreError extends Schema.TaggedError<StoreError>()("tenetkit/agent-guidance/StoreError", {
+  reason: StoreRejection,
   scope: Schema.String,
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-/** @experimental Durable continual-harness state seam, keyed by scope. */
-export interface Interface {
-  readonly load: (scope: HarnessScope) => Effect.Effect<HarnessState, HarnessStoreError>
-  readonly save: (state: HarnessState) => Effect.Effect<void, HarnessStoreError>
+/** @experimental Durable Agent Guidance state seam, keyed by scope. */
+export interface Service {
+  readonly load: (scope: GuidanceScope) => Effect.Effect<GuidanceState, StoreError>
+  readonly save: (state: GuidanceState) => Effect.Effect<void, StoreError>
 }
 
 /** @experimental */
-export class HarnessStore extends Context.Service<HarnessStore, Interface>()("tenetkit/harness/store/HarnessStore") {}
+export class Store extends Context.Service<Store, Service>()("tenetkit/harness/store") {}
 
 /** @experimental An in-process store that starts empty and never persists beyond its own scope. */
-export const layerMemory: Layer.Layer<HarnessStore> = Layer.effect(
-  HarnessStore,
-  Ref.make(new Map<string, HarnessState>()).pipe(
+export const layerMemory: Layer.Layer<Store> = Layer.effect(
+  Store,
+  Ref.make(new Map<string, GuidanceState>()).pipe(
     Effect.map((states) =>
-      HarnessStore.of({
+      Store.of({
         load: (scope) => Ref.get(states).pipe(Effect.map((current) => current.get(scope) ?? empty(scope))),
         save: (state) => Ref.update(states, (current) => new Map(current).set(state.scope, state)).pipe(Effect.asVoid),
       }),
@@ -38,5 +38,4 @@ export const layerMemory: Layer.Layer<HarnessStore> = Layer.effect(
 )
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<HarnessStore> =>
-  Layer.succeed(HarnessStore, HarnessStore.of(implementation))
+export const layerTest = (implementation: Service): Layer.Layer<Store> => Layer.succeed(Store, Store.of(implementation))

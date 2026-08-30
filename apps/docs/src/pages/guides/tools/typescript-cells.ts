@@ -83,7 +83,7 @@ export const typescriptCells = definePage({
     ),
     h2("mount-host-modules", "3. Mount host modules into the namespace"),
     p(
-      code("HostBindingRegistry.make(modules)"),
+      code("HostModules.make(modules)"),
       " mounts named Schema-typed modules as kernel bindings, so a cell calls ",
       code("await workspace.read({ path })"),
       " directly. Duplicate module or operation names are rejected at mount. A declared operation failure is encoded and thrown inside the cell, so the model discriminates it as data; a request for something unmounted, or one that does not satisfy the declared schema, fails typed at the boundary with its stage.",

@@ -72,7 +72,7 @@ export const coreToolsReference = definePage({
         ],
         [[code("ToolExecutor.mcp({ toolkit, execute })")], "Route toolkit calls through an MCP adapter"],
         [[code("ToolExecutor.sandbox({ toolkit, execute })")], "Route toolkit calls to a workspace or sandbox runtime"],
-        [[code("ToolExecutor.layerTest(implementation)")], "Layer from an explicit interface"],
+        [[code("ToolExecutor.layerTest(implementation)")], "Layer from an explicit service"],
       ],
     ),
     p(

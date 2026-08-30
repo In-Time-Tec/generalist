@@ -3,7 +3,7 @@ import { Tool } from "effect/unstable/ai"
 import { Agent } from "../../core/index.js"
 import { ToolContext } from "../../core/tools/public/tool-context.js"
 import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
-import type { Interface as RunStoreInterface } from "../run/store.js"
+import type { Service as RunStoreService } from "../run/store.js"
 import { make as makeAddress } from "../address.js"
 import { make as makeMessage } from "../messaging/message.js"
 import { normalizePrompt } from "../memory/prompt.js"
@@ -50,7 +50,7 @@ type MutableInput = { -readonly [Key in keyof Input]: Input[Key] }
 type MutableGroupInput = { -readonly [Key in keyof StartGroupInput]: StartGroupInput[Key] }
 
 /** @experimental Runtime-owned child execution operations used by the model-facing routes. */
-export interface Interface {
+export interface Service {
   readonly invoke: (input: Input) => Effect.Effect<ToolExecutor.Outcome>
   readonly runGroup: (input: StartGroupInput) => Effect.Effect<ToolExecutor.Outcome>
   readonly startGroup: (input: StartGroupInput) => Effect.Effect<ToolExecutor.Outcome>
@@ -58,7 +58,7 @@ export interface Interface {
 }
 
 /** @experimental Runtime-owned child execution service. */
-export class ChildRuns extends Context.Service<ChildRuns, Interface>()("tenetkit/runtime/child/runs/ChildRuns") {}
+export class ChildRuns extends Context.Service<ChildRuns, Service>()("tenetkit/runtime/child/runs/ChildRuns") {}
 
 const success = <Result>(result: Result): ToolExecutor.Outcome => ({ _tag: "Success", result, encodedResult: result })
 
@@ -97,7 +97,7 @@ const schemaIssueMessage = (error: Schema.SchemaError): string =>
     .join("\n")
 
 /** @experimental Construct Runtime-owned child execution operations over one RunStore. */
-export const make = (store: RunStoreInterface): Interface => {
+export const make = (store: RunStoreService): Service => {
   interface Origin {
     parentToolCallId: string
     operationKey?: string
@@ -121,7 +121,7 @@ export const make = (store: RunStoreInterface): Interface => {
   type MutableReceiptChild = {
     -readonly [Key in keyof GroupReceipt["children"][number]]: GroupReceipt["children"][number][Key]
   }
-  const invoke: Interface["invoke"] = (input) =>
+  const invoke: Service["invoke"] = (input) =>
     Effect.gen(function* () {
       const idempotencyKey = `child-tool:${input.parentRunId}:${input.toolCallId}`
       const origin: Origin = { parentToolCallId: input.toolCallId }
@@ -243,13 +243,13 @@ export const make = (store: RunStoreInterface): Interface => {
       return { receipt: result, inspection }
     })
 
-  const startGroup: Interface["startGroup"] = (input) =>
+  const startGroup: Service["startGroup"] = (input) =>
     admitGroup(input).pipe(
       Effect.map(({ receipt }) => success(receipt)),
       Effect.catch((error) => Effect.succeed(domainFailure(error))),
     )
 
-  const runGroup: Interface["runGroup"] = (input) =>
+  const runGroup: Service["runGroup"] = (input) =>
     admitGroup(input).pipe(
       Effect.map(({ receipt, inspection }) =>
         inspection.status === "running"
@@ -259,7 +259,7 @@ export const make = (store: RunStoreInterface): Interface => {
       Effect.catch((error) => Effect.succeed(domainFailure(error))),
     )
 
-  const awaitGroup: Interface["awaitGroup"] = (input) =>
+  const awaitGroup: Service["awaitGroup"] = (input) =>
     store.inspectFanOut(input.groupId).pipe(
       Effect.map((inspection) => {
         if (inspection.parentRunId !== input.parentRunId) {
@@ -281,9 +281,9 @@ export const make = (store: RunStoreInterface): Interface => {
 const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
   readonly agent: Agent.Agent<Tools, R>
   readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
-  readonly implementation: Interface
-  readonly upstream: Option.Option<ToolExecutor.Interface>
-}): ToolExecutor.Interface => {
+  readonly implementation: Service
+  readonly upstream: Option.Option<ToolExecutor.Service>
+}): ToolExecutor.Service => {
   const upstream = Option.getOrUndefined(options.upstream)
   const upstreamCancellation =
     upstream?.cancel !== undefined

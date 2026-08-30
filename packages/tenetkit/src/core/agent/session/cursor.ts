@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect"
-import type { Entry, Interface as SessionStore } from "../../context/session.js"
+import type { Entry, Service as SessionStore } from "../../context/session.js"
 import { AgentError } from "../event.js"
 
 export const SessionCursor = Schema.Struct({ leafId: Schema.NullOr(Schema.String) })

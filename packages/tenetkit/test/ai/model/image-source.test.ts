@@ -54,7 +54,7 @@ const capture = (
   const call =
     operation === "streamText"
       ? ModelRegistry.stream(selection, LanguageModel.streamText({ prompt: input })).pipe(Stream.runDrain)
-      : ModelRegistry.operate(
+      : ModelRegistry.withModel(
           selection,
           operation === "generateObject"
             ? LanguageModel.generateObject({

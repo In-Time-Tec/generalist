@@ -115,7 +115,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     return common
   }
 
-  const runtime: Runtime.Interface = {
+  const runtime: Runtime.Service = {
     start: () => Effect.die("not used"),
     admit: () => Effect.die("not used"),
     activate: () => Effect.die("not used"),

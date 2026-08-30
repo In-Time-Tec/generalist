@@ -52,7 +52,7 @@ export namespace ToolExecutor {
   export type layerRouter = typeof import("../tool-executor.js").layerRouter
   export type layerTest = typeof import("../tool-executor.js").layerTest
   export type DomainFailure = import("../tool-executor.js").DomainFailure
-  export type Interface<R = import("../tool-context.js").ToolContext> = import("../tool-executor.js").Interface<R>
+  export type Service<R = import("../tool-context.js").ToolContext> = import("../tool-executor.js").Service<R>
   export type Outcome = import("../tool-executor.js").Outcome
   export type ReplayPolicy = import("../tool-executor.js").ReplayPolicy
   export type Route<R = import("../tool-context.js").ToolContext> = import("../tool-placement.js").Route<R>

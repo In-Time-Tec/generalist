@@ -16,7 +16,7 @@ export interface BoundedSuccess extends Success {
 }
 
 /** @experimental Stores tool-output overflow out of context. */
-export interface StoreInterface {
+export interface StoreService {
   readonly put: (
     toolCallId: string,
     content: ToolOutputContent,
@@ -24,7 +24,7 @@ export interface StoreInterface {
 }
 
 /** @experimental */
-export class ToolOutputStore extends Context.Service<ToolOutputStore, StoreInterface>()(
+export class ToolOutputStore extends Context.Service<ToolOutputStore, StoreService>()(
   "tenetkit/core/tools/tool-output/ToolOutputStore",
 ) {}
 
@@ -56,7 +56,7 @@ export const layerMemory: Layer.Layer<ToolOutputStore> = Layer.effect(
 )
 
 /** @experimental */
-export const layerTest = (implementation: StoreInterface): Layer.Layer<ToolOutputStore> =>
+export const layerTest = (implementation: StoreService): Layer.Layer<ToolOutputStore> =>
   Layer.succeed(ToolOutputStore, ToolOutputStore.of(implementation))
 
 const encoder = new TextEncoder()
@@ -114,7 +114,7 @@ const boundedInlineFromOriginal = (encoded: string, bytes: number, maxBytes: num
 })
 
 const optionalStore = (
-  store: StoreInterface,
+  store: StoreService,
   toolCallId: string,
   result: Success,
 ): Effect.Effect<

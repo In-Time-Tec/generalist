@@ -1,19 +1,10 @@
-import { layerPostgres, RunSchema } from "@tenetkit/pg"
+import { layer, RunSchema } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "tenetkit"
-import {
-  Address,
-  Cursor,
-  Errors,
-  ExecutionHost,
-  ExecutableResolver,
-  Runtime,
-  RunStore,
-  RunTree,
-} from "tenetkit/runtime"
+import { Address, Cursor, Errors, RunExecutor, ExecutableResolver, Runtime, RunStore, RunTree } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import { RuntimeWorker, layerWorker } from "tenetkit/runtime/driver/sql/worker"
@@ -1358,7 +1349,7 @@ describePostgres("PostgreSQL run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const claims = yield* RunClaims
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const sessionId = uniqueSession("cross-process-cancel")
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -1440,7 +1431,7 @@ describePostgres("PostgreSQL run store", () => {
           workerId: "postgres-model-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
-        }).pipe(Layer.provideMerge(layerPostgres(options)))
+        }).pipe(Layer.provideMerge(layer(options)))
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const worker = yield* RuntimeWorker
@@ -1452,7 +1443,7 @@ describePostgres("PostgreSQL run store", () => {
           })
           yield* worker.poll
           yield* Deferred.await(started)
-          yield* scopedWith(layerPostgres(options))(
+          yield* scopedWith(layer(options))(
             Runtime.Runtime.pipe(
               Effect.flatMap((otherRuntime) =>
                 otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
@@ -1528,7 +1519,7 @@ describePostgres("PostgreSQL run store", () => {
           workerId: "postgres-tool-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
-        }).pipe(Layer.provideMerge(layerPostgres(options)))
+        }).pipe(Layer.provideMerge(layer(options)))
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -1541,7 +1532,7 @@ describePostgres("PostgreSQL run store", () => {
           })
           yield* worker.poll
           yield* Deferred.await(started)
-          yield* scopedWith(layerPostgres(options))(
+          yield* scopedWith(layer(options))(
             Runtime.Runtime.pipe(
               Effect.flatMap((otherRuntime) =>
                 otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),

@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import { type Cursor, origin } from "../runtime/cursor.js"
-import { Runtime, type EventsError, type Interface, type ResolveModelResponseError } from "../runtime/service.js"
+import { Runtime, type EventsError, type Service, type ResolveModelResponseError } from "../runtime/service.js"
 import type { RunEvent } from "../runtime/run/event.js"
 import { observerCodec } from "./wire.js"
 
@@ -25,7 +25,7 @@ export interface PageInput {
 }
 
 const resolve = (
-  runtime: Interface,
+  runtime: Service,
   event: RunEvent,
 ): Effect.Effect<import("./wire.js").ResolvedRunEvent, ResolveModelResponseError> =>
   event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted"

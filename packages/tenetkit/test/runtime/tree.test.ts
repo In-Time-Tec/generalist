@@ -630,7 +630,7 @@ layer(memoryLayer)("RunTree", (it) => {
       ]
       const reads = yield* Ref.make(0)
       const inspects = yield* Ref.make(0)
-      const scripted: Runtime.Interface = {
+      const scripted: Runtime.Service = {
         ...runtime,
         treeChanges: () =>
           Stream.concat(

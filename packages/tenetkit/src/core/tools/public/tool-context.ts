@@ -12,6 +12,6 @@ export namespace ToolContext {
   export type ToolContext = import("../tool-context.js").ToolContext
   export type layerDefault = typeof import("../tool-context.js").layerDefault
   export type layerTest = typeof import("../tool-context.js").layerTest
-  export type Interface = import("../tool-context.js").Interface
+  export type Service = import("../tool-context.js").Service
   export type Progress = import("../tool-context.js").Progress
 }

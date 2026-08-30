@@ -33,7 +33,7 @@ const usage = Response.Usage.make({
 
 const finishPart = Response.makePart("finish", { reason: "stop", usage, response: undefined })
 
-const makeResilience = (input?: Partial<ModelResilience.Interface>): ModelResilience.Interface =>
+const makeResilience = (input?: Partial<ModelResilience.Service>): ModelResilience.Service =>
   Effect.runSync(ModelResilience.make(input))
 
 const languageModel = <Overrides extends object>(overrides: Overrides): LanguageModel.Service => {

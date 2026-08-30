@@ -89,7 +89,7 @@
       "types": "./dist/memory/index.d.ts",
       "import": "./dist/memory/index.js"
     },
-    "./harness": {
+    "./agent-guidance": {
       "types": "./dist/harness/index.d.ts",
       "import": "./dist/harness/index.js"
     },
@@ -121,7 +121,7 @@
       "types": "./dist/repl/index.d.ts",
       "import": "./dist/repl/index.js"
     },
-    "./ai/catalog": {
+    "./ai/model-catalog": {
       "types": "./dist/ai/catalog/service.d.ts",
       "import": "./dist/ai/catalog/service.js"
     },
@@ -165,7 +165,7 @@
       "types": "./dist/ai/provider/deterministic.d.ts",
       "import": "./dist/ai/provider/deterministic.js"
     },
-    "./ai/presets": {
+    "./ai/openai-compatible": {
       "types": "./dist/ai/catalog/presets.d.ts",
       "import": "./dist/ai/catalog/presets.js"
     },
@@ -185,7 +185,7 @@
       "types": "./dist/repl/bun/index.d.ts",
       "import": "./dist/repl/bun/index.js"
     },
-    "./transport/client": {
+    "./transport/run-client": {
       "types": "./dist/transport/client.d.ts",
       "import": "./dist/transport/client.js"
     },
@@ -197,9 +197,9 @@
       "types": "./dist/transport/sse.d.ts",
       "import": "./dist/transport/sse.js"
     },
-    "./transport/ws": {
-      "types": "./dist/transport/ws.d.ts",
-      "import": "./dist/transport/ws.js"
+    "./transport/websocket": {
+      "types": "./dist/transport/websocket.d.ts",
+      "import": "./dist/transport/websocket.js"
     },
     "./transport/wire": {
       "types": "./dist/transport/wire.d.ts",

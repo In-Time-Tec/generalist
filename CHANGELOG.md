@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Rename public APIs around established agent-framework vocabulary: `SkillCatalog`, `MCPClient`, `ProgramHandlers`, `ProgramRunner`, `CodeExecutor`, `RunExecutor`, `HostModules`, `ModelCatalog`, `OpenAICompatible`, `RunClient`, `SSE`, `WebSocket`, `AGUI`, and Agent Guidance. Public Effect service implementation shapes now use `Service` instead of `Interface`, provider and database adapter options are package-qualified, and Skill values expose flattened metadata with lazy `instructions`.
+
 ## 0.42.0
 
 - Return complete cell stdout, stderr, display payloads, and terminal values; remove output truncation events, accounting, and profile limits.

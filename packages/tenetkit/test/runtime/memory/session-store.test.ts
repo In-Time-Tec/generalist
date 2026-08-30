@@ -3,7 +3,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, ToolExecutor } from "../../../src/index.js"
-import { Address, ChildRuns, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Address, ChildRuns, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
 import { registrationsFor } from "../execution/fixtures.js"
 import { pinnedTestAgent } from "../run/identity.js"
 import { provideScoped } from "../execution/scoped-provide.js"
@@ -423,7 +423,7 @@ it.live("preserves 42 provider-free model calls across four durable children and
         fixture.runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           const parent = yield* runtime.send({
             to: fixture.address,
@@ -471,7 +471,7 @@ it.live("preserves 42 provider-free model calls across four durable children and
         fixture.runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
+          const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
           expect(
             yield* Effect.forEach(admitted.childRunIds, (runId) =>

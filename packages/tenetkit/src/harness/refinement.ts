@@ -1,10 +1,10 @@
 import { Function, Result, Schema } from "effect"
 import {
   AppliedRefinementEdit,
-  HarnessEntry,
-  HarnessId,
-  HarnessInstant,
-  HarnessSnapshotId,
+  GuidanceEntry,
+  GuidanceId,
+  GuidanceInstant,
+  GuidanceSnapshotId,
   RefinementEvent,
   RefinementProposal,
   editKey,
@@ -17,7 +17,7 @@ import {
   type RefinementEdit,
   type UpdateEdit,
 } from "./entry.js"
-import { HarnessState, findEntry, snapshotId, withEntries } from "./state.js"
+import { GuidanceState, findEntry, snapshotId, withEntries } from "./state.js"
 
 /** @experimental Why one proposal cannot be applied to one state. */
 export const RefinementRejection = Schema.Literals([
@@ -36,17 +36,17 @@ export type RefinementRejection = typeof RefinementRejection.Type
 
 /** @experimental One proposal was rejected and no state changed. */
 export class RefinementRejected extends Schema.TaggedError<RefinementRejected>()(
-  "tenetkit/harness/RefinementRejected",
+  "tenetkit/agent-guidance/RefinementRejected",
   {
     reason: RefinementRejection,
-    proposal: HarnessId,
+    proposal: GuidanceId,
     target: Schema.optionalKey(Schema.String),
     message: Schema.String,
   },
 ) {}
 
 /** @experimental The next state and the durable record of one applied proposal. */
-export const RefinementResult = Schema.Struct({ state: HarnessState, event: RefinementEvent })
+export const RefinementResult = Schema.Struct({ state: GuidanceState, event: RefinementEvent })
 /** @experimental */
 export type RefinementResult = typeof RefinementResult.Type
 
@@ -57,51 +57,51 @@ export interface ApplyOptions {
 }
 
 interface EditOutcome {
-  readonly state: HarnessState
+  readonly state: GuidanceState
   readonly applied: AppliedRefinementEdit
 }
 
 interface RejectionInput {
   reason: RefinementRejection
-  proposal: HarnessId
+  proposal: GuidanceId
   message: string
   target?: string
 }
 
 interface RefinementEventInput {
-  proposal: HarnessId
-  at: HarnessInstant
-  scope: HarnessState["scope"]
+  proposal: GuidanceId
+  at: GuidanceInstant
+  scope: GuidanceState["scope"]
   rationale?: string
   source?: string
-  before: HarnessSnapshotId
-  after: HarnessSnapshotId
+  before: GuidanceSnapshotId
+  after: GuidanceSnapshotId
   applied: ReadonlyArray<AppliedRefinementEdit>
 }
 
 interface InverseDeleteEdit {
   _tag: "Delete"
   kind: CreateEdit["kind"]
-  id: HarnessId
-  baseVersion?: HarnessEntry["version"]
+  id: GuidanceId
+  baseVersion?: GuidanceEntry["version"]
 }
 
 interface InverseUpdateEdit {
   _tag: "Update"
   kind: UpdateEdit["kind"]
-  id: HarnessId
+  id: GuidanceId
   value: ReturnType<typeof value>
-  baseVersion?: HarnessEntry["version"]
+  baseVersion?: GuidanceEntry["version"]
   revision: ReturnType<typeof revision>
 }
 
 interface RollbackProposalInput {
-  id: HarnessId
-  at: HarnessInstant
+  id: GuidanceId
+  at: GuidanceInstant
   rationale?: string
   source?: string
-  baseSnapshot: HarnessSnapshotId
-  rollbackOf: HarnessId
+  baseSnapshot: GuidanceSnapshotId
+  rollbackOf: GuidanceId
   edits: ReadonlyArray<RefinementEdit>
 }
 
@@ -111,7 +111,7 @@ export const isAuthored = (proposal: RefinementProposal): boolean =>
   proposal.edits.every((edit: RefinementEdit) => edit._tag === "Delete" || edit.revision === undefined)
 
 const rejection = (
-  proposal: HarnessId,
+  proposal: GuidanceId,
   reason: RefinementRejection,
   message: string,
   target?: string,
@@ -121,7 +121,7 @@ const rejection = (
   return RefinementRejected.make(input)
 }
 
-const createdEntry = (state: HarnessState, at: HarnessInstant, edit: CreateEdit): HarnessEntry => ({
+const createdEntry = (state: GuidanceState, at: GuidanceInstant, edit: CreateEdit): GuidanceEntry => ({
   id: edit.id,
   kind: edit.kind,
   scope: state.scope,
@@ -131,7 +131,7 @@ const createdEntry = (state: HarnessState, at: HarnessInstant, edit: CreateEdit)
   version: edit.revision?.version ?? 1,
 })
 
-const updatedEntry = (before: HarnessEntry, at: HarnessInstant, edit: UpdateEdit): HarnessEntry => ({
+const updatedEntry = (before: GuidanceEntry, at: GuidanceInstant, edit: UpdateEdit): GuidanceEntry => ({
   id: before.id,
   kind: before.kind,
   scope: before.scope,
@@ -142,18 +142,18 @@ const updatedEntry = (before: HarnessEntry, at: HarnessInstant, edit: UpdateEdit
 })
 
 const versionDrift = (
-  proposal: HarnessId,
+  proposal: GuidanceId,
   edit: UpdateEdit | DeleteEdit,
-  before: HarnessEntry,
+  before: GuidanceEntry,
 ): RefinementRejected | undefined =>
   edit.baseVersion === undefined || edit.baseVersion === before.version
     ? undefined
     : rejection(proposal, "version-drift", `entry version is ${before.version}, not ${edit.baseVersion}`, editKey(edit))
 
 const applyEdit = (
-  state: HarnessState,
-  proposal: HarnessId,
-  at: HarnessInstant,
+  state: GuidanceState,
+  proposal: GuidanceId,
+  at: GuidanceInstant,
   edit: RefinementEdit,
 ): Result.Result<EditOutcome, RefinementRejected> => {
   const before = findEntry(state, edit.kind, edit.id)
@@ -189,8 +189,8 @@ const applyEdit = (
 }
 
 const overCapacity = (
-  state: HarnessState,
-  proposal: HarnessId,
+  state: GuidanceState,
+  proposal: GuidanceId,
   maxEntriesPerKind: number | undefined,
 ): RefinementRejected | undefined => {
   if (maxEntriesPerKind === undefined) return undefined
@@ -221,16 +221,16 @@ export const applyTrustedProposal: {
   (
     proposal: RefinementProposal,
     options?: ApplyOptions,
-  ): (state: HarnessState) => Result.Result<RefinementResult, RefinementRejected>
+  ): (state: GuidanceState) => Result.Result<RefinementResult, RefinementRejected>
   (
-    state: HarnessState,
+    state: GuidanceState,
     proposal: RefinementProposal,
     options?: ApplyOptions,
   ): Result.Result<RefinementResult, RefinementRejected>
 } = Function.dual(
   (args) => "schemaVersion" in args[0],
   (
-    state: HarnessState,
+    state: GuidanceState,
     proposal: RefinementProposal,
     options: ApplyOptions = {},
   ): Result.Result<RefinementResult, RefinementRejected> => {
@@ -288,16 +288,16 @@ export const applyProposal: {
   (
     proposal: AuthoredRefinementProposal,
     options?: ApplyOptions,
-  ): (state: HarnessState) => Result.Result<RefinementResult, RefinementRejected>
+  ): (state: GuidanceState) => Result.Result<RefinementResult, RefinementRejected>
   (
-    state: HarnessState,
+    state: GuidanceState,
     proposal: AuthoredRefinementProposal,
     options?: ApplyOptions,
   ): Result.Result<RefinementResult, RefinementRejected>
 } = Function.dual(
   (args) => "schemaVersion" in args[0],
   (
-    state: HarnessState,
+    state: GuidanceState,
     proposal: AuthoredRefinementProposal,
     options: ApplyOptions = {},
   ): Result.Result<RefinementResult, RefinementRejected> =>
@@ -334,8 +334,8 @@ const inverse = (applied: AppliedRefinementEdit): RefinementEdit => {
 
 /** @experimental Identity of the inverse proposal of one applied refinement. */
 export interface RollbackOptions {
-  readonly id: HarnessId
-  readonly at: HarnessInstant
+  readonly id: GuidanceId
+  readonly at: GuidanceInstant
   readonly rationale?: string
   readonly source?: string
 }
@@ -358,4 +358,4 @@ export const rollbackProposal: {
 })
 
 /** @experimental The exact snapshot one rollback proposal restores. */
-export const rollbackTarget = (result: RefinementResult): HarnessSnapshotId => result.event.before
+export const rollbackTarget = (result: RefinementResult): GuidanceSnapshotId => result.event.before

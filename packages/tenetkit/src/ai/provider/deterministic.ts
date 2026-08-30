@@ -31,12 +31,12 @@ const deterministicModelLayer = Layer.effect(
 )
 
 /** @experimental */
-export interface DeterministicInput extends RegistrationOptions {
+export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model?: string
 }
 
-const deterministicRegistrationOptions = (input: DeterministicInput) => {
+const deterministicRegistrationOptions = (input: Options) => {
   const required = {
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
@@ -49,9 +49,9 @@ const deterministicRegistrationOptions = (input: DeterministicInput) => {
 }
 
 /** @experimental */
-export const registration = (input: DeterministicInput = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
+export const registration = (input: Options = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
   ModelRegistry.registration(deterministicRegistrationOptions(input))
 
 /** @experimental */
-export const layer = (input: DeterministicInput = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
+export const layer = (input: Options = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
   ModelRegistry.layer([registration(input)])

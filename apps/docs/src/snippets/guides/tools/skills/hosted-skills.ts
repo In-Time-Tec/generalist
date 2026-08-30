@@ -1,14 +1,14 @@
 import { Crypto, FileSystem, Layer, Path } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { SkillSource } from "tenetkit"
-import { GitHubCatalog, HttpCatalog, S3Catalog, SkillLoader } from "tenetkit/skills"
+import { SkillCatalog } from "tenetkit"
+import { GitHubCatalog, HttpCatalog, S3Catalog, FileSystemCatalog } from "tenetkit/skills"
 
 export const skills: Layer.Layer<
-  SkillSource.SkillSource,
-  SkillSource.SkillSourceError,
+  SkillCatalog.SkillCatalog,
+  SkillCatalog.SkillCatalogError,
   Crypto.Crypto | FileSystem.FileSystem | HttpClient.HttpClient | Path.Path
-> = SkillSource.layer<Crypto.Crypto | FileSystem.FileSystem | HttpClient.HttpClient | Path.Path>([
-  SkillLoader.make({ cwd: ".", roots: [".agents/skills"] }),
+> = SkillCatalog.layer<Crypto.Crypto | FileSystem.FileSystem | HttpClient.HttpClient | Path.Path>([
+  FileSystemCatalog.make({ cwd: ".", roots: [".agents/skills"] }),
   HttpCatalog.make({ manifestUrl: "https://skills.example.com/skills.json" }),
   S3Catalog.make({ bucket: "company-skills", region: "us-west-2", prefix: "support" }),
   GitHubCatalog.make({

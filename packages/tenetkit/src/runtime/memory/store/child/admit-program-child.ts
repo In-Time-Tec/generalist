@@ -11,7 +11,7 @@ import {
 import { decodePinned, equals } from "../../../executable/manifest.js"
 import { narrow } from "../../../executable/registration.js"
 import type { RunReceipt } from "../../../run.js"
-import type { AdmitProgramChildInput, Interface as RunStoreInterface } from "../../../run/store.js"
+import type { AdmitProgramChildInput, Service as RunStoreService } from "../../../run/store.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { childDigest } from "../../digest.js"
 import { idempotencyKey, type MemoryState, type StoredRun } from "../../state.js"
@@ -155,7 +155,7 @@ export const admitProgramChild: {
   }),
 )
 
-type AdmitChildrenInput = Parameters<RunStoreInterface["admitProgramChildAndSuspend"]>[0]
+type AdmitChildrenInput = Parameters<RunStoreService["admitProgramChildAndSuspend"]>[0]
 type AdmitChildrenResult = Effect.Effect<
   readonly [ReadonlyArray<RunReceipt>, MemoryState],
   | RunNotFound

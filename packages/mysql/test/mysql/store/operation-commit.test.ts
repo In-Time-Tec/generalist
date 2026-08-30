@@ -1,4 +1,4 @@
-import { layerMysql } from "@tenetkit/mysql"
+import { layer } from "@tenetkit/mysql"
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
@@ -16,7 +16,7 @@ operationRecoverySuite({
   skip: !mysqlAvailable,
   makeLayer: (options) =>
     database.provision(
-      layerMysql({
+      layer({
         ...options,
         url: database.url,
         source: "mysql-test",
@@ -57,7 +57,7 @@ toolCancellationSuite({
   skip: !mysqlAvailable,
   makeLayer: (options) =>
     database.provision(
-      layerMysql({
+      layer({
         ...options,
         url: database.url,
         source: "mysql-test",

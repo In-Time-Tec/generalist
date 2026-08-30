@@ -1,14 +1,14 @@
 import { expect } from "@effect/vitest"
 import { Clock, Effect, Option } from "effect"
 import { Pins, ProgramCapabilities } from "../../../src/index.js"
-import { Errors, ExecutionHost, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Errors, RunExecutor, Runtime, RunStore } from "../../../src/runtime/index.js"
 import { RunClaims } from "../../../src/runtime/sql/run/claims.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../src/runtime/run/store.js"
 import type { ProgramStoreFailure } from "../../../src/runtime/program/store.js"
 import { program, programAddress } from "./fixture.js"
 
 const reserve = (
-  store: RunStore.Interface,
+  store: RunStore.Service,
   execution: ExecutionClaim,
   operation: string,
   budget: typeof program.pinned.manifest.budget,
@@ -337,12 +337,12 @@ export const programUnknownOutcomeContract = (
 ): Effect.Effect<
   void,
   ProgramContractError | Errors.OperationResolutionConflict,
-  ProgramContractServices | ExecutionHost.ExecutionHost
+  ProgramContractServices | RunExecutor.RunExecutor
 > =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
-    const host = yield* ExecutionHost.ExecutionHost
+    const host = yield* RunExecutor.RunExecutor
     const execution = yield* claimProgram("unknown-outcome")
     const request = { operation: "echo", tool: "echo", input: "value" }
     yield* store.reserveProgramOperation({

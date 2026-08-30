@@ -1,10 +1,10 @@
 import { Effect, Option, Ref } from "effect"
 import { Chat } from "effect/unstable/ai"
-import { type DirectoryInterface, type Interface as SessionStore, SessionDirectory } from "../../context/session.js"
+import { type DirectoryInterface, type Service as SessionStore, SessionDirectory } from "../../context/session.js"
 import { Compaction } from "../../turn/compaction.js"
 import { AgentError, ResumeMismatch } from "../event.js"
 import { validResolutions } from "../suspension.js"
-import { type Interface as ToolContextInterface, ToolContext } from "../../tools/tool-context.js"
+import { type Service as ToolContextInterface, ToolContext } from "../../tools/tool-context.js"
 import type { RunOptions } from "../service.js"
 import {
   initialChat,

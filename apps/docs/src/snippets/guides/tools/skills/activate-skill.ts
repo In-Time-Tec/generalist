@@ -1,16 +1,11 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillSource, ToolExecutor } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillCatalog, ToolExecutor } from "tenetkit"
 
-const frontmatter: SkillSource.Frontmatter = {
+const releaseNotesSkill: SkillCatalog.Skill = {
   name: "release-notes",
   description: "Draft release notes from merged changes before announcing a version.",
   allowedTools: ["read_file", "search_docs"],
-}
-
-const releaseNotesSkill: SkillSource.Skill = {
-  frontmatter,
-  listing: SkillSource.makeListing(frontmatter),
-  body: Effect.succeed("Group changes by package and write one sentence per change."),
+  instructions: Effect.succeed("Group changes by package and write one sentence per change."),
   tools: [],
 }
 
@@ -55,7 +50,7 @@ const runtimeLayer = Layer.mergeAll(
   ToolExecutor.layerTest({ execute: () => Effect.die("activate_skill is handled by the loop, not the executor") }),
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
-  SkillSource.layerSkills([releaseNotesSkill]),
+  SkillCatalog.layerSkills([releaseNotesSkill]),
 )
 
 const runtime = ManagedRuntime.make(runtimeLayer)

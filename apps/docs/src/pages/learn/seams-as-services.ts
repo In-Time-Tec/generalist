@@ -49,7 +49,7 @@ export const seamsAsServices = definePage({
       " and takes the default path when the service is absent: ",
       code("Instructions"),
       ", ",
-      code("SkillSource"),
+      code("SkillCatalog"),
       ", ",
       code("Permissions"),
       ", ",

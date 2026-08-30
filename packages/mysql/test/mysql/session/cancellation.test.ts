@@ -1,4 +1,4 @@
-import { layerMysql } from "@tenetkit/mysql"
+import { layer as backendLayer } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Layer, Ref, Schema, Stream } from "effect"
@@ -41,7 +41,7 @@ describeMysql("mysql worker cancellation", () => {
 
   {
     const url = staleWorker.url
-    const runtimeLayer = layerMysql({
+    const runtimeLayer = backendLayer({
       url,
       source: "mysql-worker-test",
       resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
@@ -151,7 +151,7 @@ describeMysql("mysql worker cancellation", () => {
                 workerId: "mysql-model-worker",
                 cancellationInterval: "10 millis",
                 lease: "30 seconds",
-              }).pipe(Layer.provideMerge(layerMysql(options))),
+              }).pipe(Layer.provideMerge(backendLayer(options))),
               Effect.gen(function* () {
                 const runtime = yield* Runtime.Runtime
                 const worker = yield* RuntimeWorker
@@ -166,7 +166,7 @@ describeMysql("mysql worker cancellation", () => {
                 yield* worker.poll
                 yield* Deferred.await(started)
                 yield* provideScoped(
-                  layerMysql(options),
+                  backendLayer(options),
                   Effect.gen(function* () {
                     const remote = yield* Runtime.Runtime
                     yield* remote.cancel({ runId: receipt.runId, reason: "cancel from another runtime" })
@@ -239,7 +239,7 @@ describeMysql("mysql worker cancellation", () => {
               workerId: "mysql-tool-worker",
               cancellationInterval: "10 millis",
               lease: "30 seconds",
-            }).pipe(Layer.provideMerge(layerMysql(options))),
+            }).pipe(Layer.provideMerge(backendLayer(options))),
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
               const store = yield* RunStore.RunStore
@@ -253,7 +253,7 @@ describeMysql("mysql worker cancellation", () => {
               yield* worker.poll
               yield* Deferred.await(started)
               yield* provideScoped(
-                layerMysql(options),
+                backendLayer(options),
                 Effect.gen(function* () {
                   const remote = yield* Runtime.Runtime
                   yield* remote.cancel({ runId: receipt.runId, reason: "cancel from another runtime" })

@@ -1,6 +1,6 @@
 import { Effect, Option, Ref } from "effect"
 import { Chat, Prompt, Response, Tool } from "effect/unstable/ai"
-import { controller, type Controller, type Interface } from "../../model/result/active-model-response.js"
+import { controller, type Controller, type Service } from "../../model/result/active-model-response.js"
 import { make as makeModelResponse, type CompletedModelResponse } from "../../model/response/builder.js"
 import type { AttemptCompleted } from "../../model/operation.js"
 import { coalesceAdjacentText } from "../../context/session-sync.js"
@@ -15,7 +15,7 @@ interface ActiveAttempt extends PartIdentity {
 
 /** @internal Own one provider attempt builder and its optional Run-visible authority. */
 export const attemptResponse = (input: {
-  readonly service: Option.Option<Interface>
+  readonly service: Option.Option<Service>
   readonly operationKey?: string
   readonly turn: number
 }) => {
@@ -76,7 +76,7 @@ export const replayMessages = (input: {
   )
 
 export const clearCommittedResponse = (input: {
-  readonly service: Option.Option<Interface>
+  readonly service: Option.Option<Service>
   readonly authority: ResponseAuthority | undefined
 }): void => {
   if (Option.isSome(input.service) && input.authority !== undefined) {

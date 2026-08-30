@@ -97,16 +97,16 @@ export class MemoryError extends Schema.TaggedError<MemoryError>()("tenetkit/cor
 }) {}
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly recall: (input: RecallInput) => Effect.Effect<ReadonlyArray<Item>, MemoryError>
   readonly remember: (input: RememberInput) => Effect.Effect<void, MemoryError>
   readonly forget: (input: ForgetInput) => Effect.Effect<void, MemoryError>
 }
 
 /** @experimental */
-export class Memory extends Context.Service<Memory, Interface>()("tenetkit/core/context/memory") {}
+export class Memory extends Context.Service<Memory, Service>()("tenetkit/core/context/memory") {}
 
-const noop: Interface = {
+const noop: Service = {
   recall: () => Effect.succeed([]),
   remember: () => Effect.void,
   forget: () => Effect.void,
@@ -114,11 +114,11 @@ const noop: Interface = {
 
 /** @experimental */
 export const merge: {
-  (second: Interface): (first: Interface) => Interface
-  (first: Interface, second: Interface): Interface
+  (second: Service): (first: Service) => Service
+  (first: Service, second: Service): Service
 } = dual(
   2,
-  (first: Interface, second: Interface): Interface => ({
+  (first: Service, second: Service): Service => ({
     recall: (input) =>
       Effect.all([first.recall(input), second.recall(input)]).pipe(
         Effect.map(([firstItems, secondItems]) => [...firstItems, ...secondItems]),
@@ -132,5 +132,5 @@ export const merge: {
 export const layerNoop: Layer.Layer<Memory> = Layer.succeed(Memory, Memory.of(noop))
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<Memory> =>
+export const layerTest = (implementation: Service): Layer.Layer<Memory> =>
   Layer.succeed(Memory, Memory.of(implementation))

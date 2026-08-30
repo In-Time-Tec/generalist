@@ -20,11 +20,11 @@ export interface Pending extends AccessRequest {
 /** @experimental */
 export type Resolution = Approved | Denied | Pending
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly resolve: (pending: Pending) => Effect.Effect<Resolution>
 }
 /** @experimental Enforcement point for policy asks and `Ai.Tool.needsApproval`. */
-export class Approvals extends Context.Service<Approvals, Interface>()("tenetkit/core/policy/approvals") {}
+export class Approvals extends Context.Service<Approvals, Service>()("tenetkit/core/policy/approvals") {}
 /** @experimental Default: every request resolves Approved. */
 export const layerAutoApprove: Layer.Layer<Approvals> = Layer.succeed(
   Approvals,
@@ -36,5 +36,5 @@ export const layerDenyAll: Layer.Layer<Approvals> = Layer.succeed(
   Approvals.of({ resolve: () => Effect.succeed({ _tag: "Denied" }) }),
 )
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<Approvals> =>
+export const layerTest = (implementation: Service): Layer.Layer<Approvals> =>
   Layer.succeed(Approvals, Approvals.of(implementation))

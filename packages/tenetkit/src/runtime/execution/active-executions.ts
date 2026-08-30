@@ -23,7 +23,7 @@ const observeCancellation = (runId: string, target: Fiber.Fiber<void, unknown>) 
     }),
   )
 
-export interface Interface {
+export interface Service {
   readonly run: <E, R, R2 = never>(
     runId: string,
     execution: Effect.Effect<void, E, R>,
@@ -34,7 +34,7 @@ export interface Interface {
   readonly active: Effect.Effect<ReadonlySet<string>>
 }
 
-export class ActiveExecutions extends Context.Service<ActiveExecutions, Interface>()(
+export class ActiveExecutions extends Context.Service<ActiveExecutions, Service>()(
   "tenetkit/runtime/execution/active-executions/ActiveExecutions",
 ) {}
 

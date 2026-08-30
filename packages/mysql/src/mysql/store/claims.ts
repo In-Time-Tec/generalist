@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, Schema, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
 import { AgentExecutionFailure, RuntimeUnavailable, failureMessage } from "tenetkit/runtime/driver/errors"
-import { RunClaims, type ClaimedRun, type Interface as ClaimsInterface } from "tenetkit/runtime/driver/sql/run/claims"
+import { RunClaims, type ClaimedRun, type Service as ClaimsService } from "tenetkit/runtime/driver/sql/run/claims"
 import type { RunRow } from "tenetkit/runtime/driver/sql/codec/rows"
 import { appendEvent, loadRun } from "tenetkit/runtime/driver/sql/store/statements"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
@@ -47,7 +47,7 @@ export const mysqlClaims = (input: {
   readonly run: RunFn
   readonly lockParent: (runId: string) => Effect.Effect<void, SqlError>
   readonly clearClaim: (runId: string) => Effect.Effect<void, SqlError>
-}): ClaimsInterface => {
+}): ClaimsService => {
   const { sql, hub, run, lockParent, clearClaim } = input
   return RunClaims.of({
     changes: Stream.concat(Stream.succeed(undefined), Stream.never),

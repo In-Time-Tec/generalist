@@ -186,10 +186,10 @@ export interface RegisterInput {
 }
 
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly register: (input: RegisterInput) => Effect.Effect<void>
   readonly registrations: Effect.Effect<ReadonlyArray<Registration>>
-  readonly operate: <A, E, R>(
+  readonly withModel: <A, E, R>(
     selection: ModelSelection,
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | LanguageModelNotRegistered, Exclude<R, ModelEnvironment>>
@@ -200,7 +200,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ModelRegistry extends Context.Service<ModelRegistry, Interface>()(
+export class ModelRegistry extends Context.Service<ModelRegistry, Service>()(
   "tenetkit/core/model/registry/ModelRegistry",
 ) {}
 
@@ -293,7 +293,7 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
         Effect.map((items) => items.keys.map((key) => HashMap.getUnsafe(items.byKey, key).registration)),
       )
 
-      const operate = Effect.fn("ModelRegistry.operate")(function* <A, E, R>(
+      const withModel = Effect.fn("ModelRegistry.withModel")(function* <A, E, R>(
         selection: ModelSelection,
         effect: Effect.Effect<A, E, R>,
       ) {
@@ -339,7 +339,7 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
       return ModelRegistry.of({
         register,
         registrations,
-        operate,
+        withModel,
         stream,
       })
     }),
@@ -393,7 +393,7 @@ export const layerCombined: {
 /** @experimental In-memory model registry. */
 
 /** @experimental */
-export const layerTest = (implementation: Interface) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))
+export const layerTest = (implementation: Service) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))
 
 /** @experimental */
 export const register = Effect.fn("ModelRegistry.register.call")(function* (input: RegisterInput) {
@@ -408,7 +408,7 @@ export const registrations = Effect.fn("ModelRegistry.registrations.call")(funct
 })
 
 /** @experimental */
-export const operate: {
+export const withModel: {
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
   ): (
@@ -421,7 +421,7 @@ export const operate: {
 } = Function.dual(2, <A, E, R>(selection: ModelSelection, effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     const service = yield* ModelRegistry
-    return yield* service.operate(selection, effect)
+    return yield* service.withModel(selection, effect)
   }),
 )
 

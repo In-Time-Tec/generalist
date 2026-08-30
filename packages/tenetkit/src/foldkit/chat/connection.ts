@@ -78,7 +78,7 @@ export interface SessionConnection {
   readonly send: (command: AgentCommand) => Effect.Effect<void, AgentCommandError>
 }
 /** @experimental */
-export interface Interface {
+export interface Service {
   readonly session: (options: {
     readonly sessionId: string
     readonly afterSeq?: number
@@ -90,7 +90,7 @@ export interface Interface {
   readonly send: (command: AgentCommand) => Effect.Effect<void, AgentCommandError>
 }
 /** @experimental */
-export class AgentConnection extends Context.Service<AgentConnection, Interface>()(
+export class AgentConnection extends Context.Service<AgentConnection, Service>()(
   "tenetkit/foldkit/chat/connection/AgentConnection",
 ) {}
 
@@ -98,7 +98,7 @@ interface ActiveConnection {
   readonly runId: string
   readonly connection: Connection
 }
-type LegacyInterface = Omit<Interface, "session">
+type LegacyService = Omit<Service, "session">
 
 const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<never>> => {
   const reasons: Array<Cause.Reason<never>> = []
@@ -121,7 +121,7 @@ const statusIncoming = (status: ConnectionStatus): Option.Option<Incoming> => {
 }
 
 /** @experimental */
-export const layerTest = (implementation: Interface | LegacyInterface): Layer.Layer<AgentConnection> => {
+export const layerTest = (implementation: Service | LegacyService): Layer.Layer<AgentConnection> => {
   const session =
     "session" in implementation
       ? implementation.session

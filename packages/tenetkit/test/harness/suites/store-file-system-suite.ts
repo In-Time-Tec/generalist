@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Path, PlatformError } from "effect"
-import { FileSystemHarnessStore, HarnessState, HarnessStore, Refinement } from "../../../src/harness/index.js"
+import { FileSystemStore, State, Store, Refinement } from "../../../src/harness/index.js"
 import { applied, at, create, entry, proposal, scope } from "../fixtures.js"
 
 interface Disk {
@@ -22,7 +22,7 @@ const makeDisk = (): Disk => ({
 const systemError = (tag: "NotFound" | "PermissionDenied" | "AlreadyExists", method: string, path: string) =>
   PlatformError.systemError({
     _tag: tag,
-    module: "HarnessStoreTest",
+    module: "StoreTest",
     method,
     description: tag,
     pathOrDescriptor: path,
@@ -95,7 +95,7 @@ const diskLayer = (disk: Disk, faults: Faults = {}) =>
   })
 
 const storeLayer = (disk: Disk, faults: Faults = {}) =>
-  FileSystemHarnessStore.layer({ path: (value) => `/data/${value}/harness.json` }).pipe(
+  FileSystemStore.layer({ path: (value) => `/data/${value}/guidance.json` }).pipe(
     Layer.provide(Layer.merge(diskLayer(disk, faults), Path.layer)),
   )
 
@@ -107,23 +107,23 @@ const provide =
       Effect.scoped,
     )
 
-const stateWith = (id: string) => HarnessState.make({ scope, entries: [entry({ id, kind: "memory" })] })
+const stateWith = (id: string) => State.make({ scope, entries: [entry({ id, kind: "memory" })] })
 
 const temporaries = (disk: Disk): ReadonlyArray<string> =>
   [...disk.files.keys()].filter((path) => path.endsWith(".tmp"))
 
-describe("FileSystemHarnessStore", () => {
+describe("FileSystemStore", () => {
   it.effect("loads an empty state when no file exists", () =>
     Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
-      expect(yield* store.load(scope)).toEqual(HarnessState.empty(scope))
+      const store = yield* Store.Store
+      expect(yield* store.load(scope)).toEqual(State.empty(scope))
     }).pipe(provide(storeLayer(makeDisk()))),
   )
 
   it.effect("round-trips one exact state", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const state = applied({
         state: stateWith("a"),
         proposal: proposal({ edits: [create({ kind: "skill", id: "runner", value: { reference: "pkg.run" } })] }),
@@ -136,11 +136,11 @@ describe("FileSystemHarnessStore", () => {
   it.effect("uses the host-supplied path for each scope", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* store.save(stateWith("a"))
-      yield* store.save({ ...HarnessState.empty("global"), scope: "global" })
+      yield* store.save({ ...State.empty("global"), scope: "global" })
       expect([...disk.files.keys()].toSorted()).toEqual(
-        ["/data/global/harness.json", `/data/${scope}/harness.json`].toSorted(),
+        ["/data/global/guidance.json", `/data/${scope}/guidance.json`].toSorted(),
       )
     }).pipe(provide(storeLayer(disk)))
   })
@@ -148,22 +148,20 @@ describe("FileSystemHarnessStore", () => {
   it.effect("keeps scopes independent on disk", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* store.save(stateWith("a"))
-      yield* store.save(
-        HarnessState.make({ scope: "global", entries: [entry({ id: "b", kind: "skill", scope: "global" })] }),
-      )
-      expect(HarnessState.allEntries(yield* store.load(scope)).map((value) => value.id)).toEqual(["a"])
-      expect(HarnessState.allEntries(yield* store.load("global")).map((value) => value.id)).toEqual(["b"])
+      yield* store.save(State.make({ scope: "global", entries: [entry({ id: "b", kind: "skill", scope: "global" })] }))
+      expect(State.allEntries(yield* store.load(scope)).map((value) => value.id)).toEqual(["a"])
+      expect(State.allEntries(yield* store.load("global")).map((value) => value.id)).toEqual(["b"])
     }).pipe(provide(storeLayer(disk)))
   })
 
   it.effect("writes owner-only files into owner-only directories", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* store.save(stateWith("a"))
-      expect(disk.modes.get(`/data/${scope}/harness.json`)).toBe(0o600)
+      expect(disk.modes.get(`/data/${scope}/guidance.json`)).toBe(0o600)
       expect(disk.modes.get(`/data/${scope}`)).toBe(0o700)
     }).pipe(provide(storeLayer(disk)))
   })
@@ -171,7 +169,7 @@ describe("FileSystemHarnessStore", () => {
   it.effect("creates a missing directory before writing", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       expect(disk.directories.has(`/data/${scope}`)).toBe(false)
       yield* store.save(stateWith("a"))
       expect(disk.directories.has(`/data/${scope}`)).toBe(true)
@@ -181,9 +179,9 @@ describe("FileSystemHarnessStore", () => {
   it.effect("replaces atomically through a temporary file and rename", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* store.save(stateWith("a"))
-      const file = `/data/${scope}/harness.json`
+      const file = `/data/${scope}/guidance.json`
       expect(disk.renames).toHaveLength(1)
       expect(disk.renames[0]![1]).toBe(file)
       expect(disk.renames[0]![0]).not.toBe(file)
@@ -195,47 +193,47 @@ describe("FileSystemHarnessStore", () => {
   it.effect("never leaves a reader observing a partial state", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* store.save(stateWith("a"))
       const first = yield* store.load(scope)
       yield* store.save(stateWith("b"))
       const second = yield* store.load(scope)
-      expect(HarnessState.allEntries(first).map((value) => value.id)).toEqual(["a"])
-      expect(HarnessState.allEntries(second).map((value) => value.id)).toEqual(["b"])
+      expect(State.allEntries(first).map((value) => value.id)).toEqual(["a"])
+      expect(State.allEntries(second).map((value) => value.id)).toEqual(["b"])
     }).pipe(provide(storeLayer(disk)))
   })
 
   it.effect("keeps the prior state readable when a rename fails", () => {
     const disk = makeDisk()
     disk.directories.add(`/data/${scope}`)
-    disk.files.set(`/data/${scope}/harness.json`, JSON.stringify(stateWith("a")))
+    disk.files.set(`/data/${scope}/guidance.json`, JSON.stringify(stateWith("a")))
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const failure = yield* store.save(stateWith("b")).pipe(Effect.flip)
       expect(failure.reason).toBe("unwritable")
-      expect(HarnessState.allEntries(yield* store.load(scope)).map((value) => value.id)).toEqual(["a"])
+      expect(State.allEntries(yield* store.load(scope)).map((value) => value.id)).toEqual(["a"])
       expect(temporaries(disk)).toEqual([])
     }).pipe(provide(storeLayer(disk, { failRename: true })))
   })
 
   it.effect("fails typed on a corrupt file instead of resetting the scope", () => {
     const disk = makeDisk()
-    disk.files.set(`/data/${scope}/harness.json`, "{ not json")
+    disk.files.set(`/data/${scope}/guidance.json`, "{ not json")
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const failure = yield* store.load(scope).pipe(Effect.flip)
-      expect(failure._tag).toBe("tenetkit/harness/HarnessStoreError")
+      expect(failure._tag).toBe("tenetkit/agent-guidance/StoreError")
       expect(failure.reason).toBe("corrupt")
       expect(failure.scope).toBe(scope)
-      expect(disk.files.get(`/data/${scope}/harness.json`)).toBe("{ not json")
+      expect(disk.files.get(`/data/${scope}/guidance.json`)).toBe("{ not json")
     }).pipe(provide(storeLayer(disk)))
   })
 
-  it.effect("fails typed on well-formed JSON that is not a harness state", () => {
+  it.effect("fails typed on well-formed JSON that is not a guidance state", () => {
     const disk = makeDisk()
-    disk.files.set(`/data/${scope}/harness.json`, JSON.stringify({ schemaVersion: "2", scope }))
+    disk.files.set(`/data/${scope}/guidance.json`, JSON.stringify({ schemaVersion: "2", scope }))
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const failure = yield* store.load(scope).pipe(Effect.flip)
       expect(failure.reason).toBe("corrupt")
     }).pipe(provide(storeLayer(disk)))
@@ -245,18 +243,18 @@ describe("FileSystemHarnessStore", () => {
     const disk = makeDisk()
     const state = stateWith("a")
     disk.files.set(
-      `/data/${scope}/harness.json`,
+      `/data/${scope}/guidance.json`,
       JSON.stringify({ ...state, entries: { ...state.entries, memory: [{ ...state.entries.memory[0], version: 0 }] } }),
     )
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       expect((yield* store.load(scope).pipe(Effect.flip)).reason).toBe("corrupt")
     }).pipe(provide(storeLayer(disk)))
   })
 
   it.effect("fails typed when the directory cannot be created", () =>
     Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const failure = yield* store.save(stateWith("a")).pipe(Effect.flip)
       expect(failure.reason).toBe("unwritable")
       expect(failure.message).toContain("directory")
@@ -265,7 +263,7 @@ describe("FileSystemHarnessStore", () => {
 
   it.effect("fails typed when the file cannot be written", () =>
     Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const failure = yield* store.save(stateWith("a")).pipe(Effect.flip)
       expect(failure.reason).toBe("unwritable")
       expect(failure.scope).toBe(scope)
@@ -274,12 +272,12 @@ describe("FileSystemHarnessStore", () => {
 
   it.effect("fails typed when an existing file cannot be read", () =>
     Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const failure = yield* store.load(scope).pipe(Effect.flip)
       expect(failure.reason).toBe("unreadable")
     }).pipe(
       provide(
-        FileSystemHarnessStore.layer({ path: (value) => `/data/${value}/harness.json` }).pipe(
+        FileSystemStore.layer({ path: (value) => `/data/${value}/guidance.json` }).pipe(
           Layer.provide(
             Layer.merge(
               FileSystem.layerNoop({
@@ -297,7 +295,7 @@ describe("FileSystemHarnessStore", () => {
     const disk = makeDisk()
     const observed: Array<number> = []
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* Effect.forEach(
         [stateWith("a"), stateWith("b"), stateWith("c"), stateWith("d")],
         (state) => store.save(state).pipe(Effect.tap(() => Effect.sync(() => observed.push(temporaries(disk).length)))),
@@ -305,7 +303,7 @@ describe("FileSystemHarnessStore", () => {
       )
       expect(observed.every((count) => count === 0)).toBe(true)
       expect(disk.renames).toHaveLength(4)
-      expect(HarnessState.allEntries(yield* store.load(scope))).toHaveLength(1)
+      expect(State.allEntries(yield* store.load(scope))).toHaveLength(1)
     }).pipe(provide(storeLayer(disk)))
   })
 
@@ -322,7 +320,7 @@ describe("FileSystemHarnessStore", () => {
       },
     })
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* Effect.forEach([stateWith("a"), stateWith("b"), stateWith("c"), stateWith("d")], store.save, {
         concurrency: "unbounded",
       })
@@ -345,10 +343,10 @@ describe("FileSystemHarnessStore", () => {
       },
     }
     return Effect.gen(function* () {
-      const unguarded = yield* FileSystemHarnessStore.make({ path: (value) => `/data/${value}/harness.json` })
+      const unguarded = yield* FileSystemStore.make({ path: (value) => `/data/${value}/guidance.json` })
       yield* Effect.forEach(
         ["a", "b", "c", "d"].map((id) =>
-          HarnessState.make({
+          State.make({
             scope: `${scope}-${id}`,
             entries: [entry({ id, kind: "memory", scope: `${scope}-${id}` })],
           }),
@@ -363,7 +361,7 @@ describe("FileSystemHarnessStore", () => {
   it.effect("uses a distinct temporary name per save", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* store.save(stateWith("a"))
       yield* store.save(stateWith("b"))
       expect(new Set(disk.writes).size).toBe(disk.writes.length)
@@ -373,7 +371,7 @@ describe("FileSystemHarnessStore", () => {
   it.effect("keeps temporary files inside the destination directory", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       yield* store.save(stateWith("a"))
       expect(disk.writes.every((path) => path.startsWith(`/data/${scope}/`))).toBe(true)
     }).pipe(provide(storeLayer(disk)))
@@ -382,7 +380,7 @@ describe("FileSystemHarnessStore", () => {
   it.effect("survives the whole propose, apply, save, rollback cycle on disk", () => {
     const disk = makeDisk()
     return Effect.gen(function* () {
-      const store = yield* HarnessStore.HarnessStore
+      const store = yield* Store.Store
       const start = yield* store.load(scope)
       const change = applied({
         state: start,
@@ -395,7 +393,7 @@ describe("FileSystemHarnessStore", () => {
       })
       yield* store.save(undone.state)
       const final = yield* store.load(scope)
-      expect(HarnessState.snapshotId(final)).toBe(HarnessState.snapshotId(start))
+      expect(State.snapshotId(final)).toBe(State.snapshotId(start))
       expect(final.refinements.map((event) => event.proposal)).toEqual(["proposal-1", "rollback-1"])
     }).pipe(provide(storeLayer(disk)))
   })

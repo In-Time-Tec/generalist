@@ -5,7 +5,7 @@ import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { checkpointRef } from "tenetkit/runtime/driver/executable/manifest"
 import { isTerminal } from "tenetkit/runtime/driver/run"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
 import { encodeExecutableRef, encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
@@ -21,7 +21,7 @@ import { revokeSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/cla
 import { loadRunWait, nowIso, transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
 import type { DecodedRun } from "tenetkit/runtime/driver/sql/codec/rows"
 
-type SuspendInput = Parameters<RunStoreInterface["suspend"]>[0]
+type SuspendInput = Parameters<RunStoreService["suspend"]>[0]
 type SuspendEffect = Effect.Effect<
   undefined,
   RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | StaleClaim,

@@ -6,9 +6,9 @@ import {
   AgentManifest,
   ExecutableManifest,
   Pins,
-  ProgramBindings,
+  ProgramHandlers,
   ProgramManifest,
-  SandboxExecutor,
+  CodeExecutor,
 } from "../../../../src/index.js"
 import { Errors, ExecutableRegistration, ExecutableResolver } from "../../../../src/runtime/index.js"
 import { closedTestAgent, pinnedTestAgent } from "../../run/identity.js"
@@ -90,11 +90,11 @@ const fixture = (options: { readonly revision?: string; readonly toolName?: stri
       : Effect.void
   }
   const reconstruction: ExecutableResolver.ProgramReconstruction = {
-    sandbox: (request) =>
+    executor: (request) =>
       check(request).pipe(
         Effect.andThen(
           Effect.acquireRelease(
-            Effect.succeed(SandboxExecutor.makeTest(() => Effect.succeed(request.program.manifest.name))),
+            Effect.succeed(CodeExecutor.makeTest(() => Effect.succeed(request.program.manifest.name))),
             () => Effect.sync(() => void released.push("sandbox")),
           ),
         ),
@@ -103,7 +103,7 @@ const fixture = (options: { readonly revision?: string; readonly toolName?: stri
     tool: (request) =>
       check(request).pipe(
         Effect.as(
-          ProgramBindings.tool({
+          ProgramHandlers.tool({
             name: options.toolName ?? request.name,
             pin: request.pin,
             input: Schema.String,
@@ -117,7 +117,7 @@ const fixture = (options: { readonly revision?: string; readonly toolName?: stri
     step: (request) =>
       check(request).pipe(
         Effect.as(
-          ProgramBindings.step({
+          ProgramHandlers.step({
             name: request.name,
             pin: request.pin,
             input: Schema.String,
@@ -132,7 +132,7 @@ const fixture = (options: { readonly revision?: string; readonly toolName?: stri
       check(request).pipe(
         Effect.tap(() => Effect.sync(() => void seenAgents.push(request.agentManifest))),
         Effect.as(
-          ProgramBindings.agent({
+          ProgramHandlers.agent({
             selection: request.selection,
             agent: request.agent,
             inputPin: request.pin,
@@ -154,7 +154,7 @@ const fixture = (options: { readonly revision?: string; readonly toolName?: stri
 const resolverFor = (
   reconstruction: ExecutableResolver.ProgramReconstruction,
   executable: ExecutableManifest.PinnedExecutable,
-): ExecutableResolver.Interface =>
+): ExecutableResolver.Service =>
   ExecutableResolver.makeDynamic({
     agents: [
       {
@@ -186,9 +186,9 @@ describe("ExecutableResolver.makeDynamic", () => {
         if (resolution._tag !== "Program") return
         expect(resolution.attestation).toEqual({ ref: executable.ref, manifest: executable.manifest })
         expect(resolution.program.pinned.pin).toBe(executable.ref.active)
-        expect(resolution.bindings.tools.map((binding) => binding.name)).toEqual(["echo"])
-        expect(resolution.bindings.steps.map((binding) => binding.name)).toEqual(["shape"])
-        expect(resolution.bindings.agents.map((binding) => binding.selection)).toEqual(["worker"])
+        expect(resolution.handlers.tools.map((binding) => binding.name)).toEqual(["echo"])
+        expect(resolution.handlers.steps.map((binding) => binding.name)).toEqual(["shape"])
+        expect(resolution.handlers.agents.map((binding) => binding.selection)).toEqual(["worker"])
       }
     }),
   )
@@ -266,47 +266,49 @@ describe("ExecutableResolver.makeDynamic", () => {
     }),
   )
 
-  it.effect("fails typed when a reconstructed binding leaves the admitted manifest closure", () =>
+  it.effect("fails typed when a reconstructed handler leaves the admitted manifest closure", () =>
     Effect.gen(function* () {
-      const executable = executableFor("code-binding")
+      const executable = executableFor("code-handler")
       const { reconstruction } = fixture({ toolName: "shell" })
       const failure = yield* Effect.flip(
         resolverFor(reconstruction, executable)
-          .resolve({ runId: "run:binding", ...executable, registrations: admittedRegistrations(executable) })
+          .resolve({ runId: "run:handler", ...executable, registrations: admittedRegistrations(executable) })
           .pipe(Effect.scoped),
       )
       expect(failure).toMatchObject({ _tag: "tenetkit/runtime/ExecutableRegistrationInvalid" })
-      expect(failure.message).toMatch(/binding/)
+      expect(failure.message).toMatch(/handler/)
     }),
   )
 
-  it.effect("binds each Program Agent capability from the admitted closure and keeps static Agent resolution", () =>
-    Effect.gen(function* () {
-      const admitted = executableFor("code-agents")
-      const registered = executableFor("code-registered")
-      const { reconstruction, seenAgents } = fixture()
-      const resolver = resolverFor(reconstruction, registered)
+  it.effect(
+    "reconstructs each Program Agent capability from the admitted closure and keeps static Agent resolution",
+    () =>
+      Effect.gen(function* () {
+        const admitted = executableFor("code-agents")
+        const registered = executableFor("code-registered")
+        const { reconstruction, seenAgents } = fixture()
+        const resolver = resolverFor(reconstruction, registered)
 
-      const program = yield* resolver
-        .resolve({ runId: "run:agents", ...admitted, registrations: admittedRegistrations(admitted) })
-        .pipe(Effect.scoped)
-      expect(program._tag).toBe("Program")
-      expect(seenAgents).toEqual([pinnedChild.manifest])
+        const program = yield* resolver
+          .resolve({ runId: "run:agents", ...admitted, registrations: admittedRegistrations(admitted) })
+          .pipe(Effect.scoped)
+        expect(program._tag).toBe("Program")
+        expect(seenAgents).toEqual([pinnedChild.manifest])
 
-      const childRef = { executable: admitted.ref.executable, active: pinnedChild.pin }
-      const agent = yield* resolver
-        .resolve({
-          runId: "run:agents:child",
-          ref: childRef,
-          manifest: admitted.manifest,
-          registrations: admittedRegistrations({ ref: childRef, manifest: admitted.manifest }),
-        })
-        .pipe(Effect.scoped)
-      expect(agent._tag).toBe("Agent")
-      if (agent._tag !== "Agent") return
-      expect(agent.agent.open((live) => Object.is(live, child))).toBe(true)
-      expect(agent.attestation).toEqual({ ref: childRef, manifest: admitted.manifest })
-    }),
+        const childRef = { executable: admitted.ref.executable, active: pinnedChild.pin }
+        const agent = yield* resolver
+          .resolve({
+            runId: "run:agents:child",
+            ref: childRef,
+            manifest: admitted.manifest,
+            registrations: admittedRegistrations({ ref: childRef, manifest: admitted.manifest }),
+          })
+          .pipe(Effect.scoped)
+        expect(agent._tag).toBe("Agent")
+        if (agent._tag !== "Agent") return
+        expect(agent.agent.open((live) => Object.is(live, child))).toBe(true)
+        expect(agent.attestation).toEqual({ ref: childRef, manifest: admitted.manifest })
+      }),
   )
 
   it.effect("finalizes every reconstructed resource when the resolver scope closes", () =>

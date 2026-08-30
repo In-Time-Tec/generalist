@@ -4,8 +4,8 @@ import {
 } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Context, type Duration, Effect, Function, Layer, Option, type Scope } from "effect"
-import { OAuthPending, type Interface as OAuthInterface, OAuthProviderError } from "../oauth.js"
-import { fromTransport, type Interface, McpConnectionFailed, McpToolSource } from "../tool-source.js"
+import { OAuthPending, type Service as OAuthInterface, OAuthProviderError } from "../oauth.js"
+import { fromTransport, type Service, MCPConnectionFailed, MCPClient } from "../client.js"
 
 /** @experimental Process-local HTTP transport options. Construct request headers at this boundary. */
 export interface TransportOptions {
@@ -42,15 +42,15 @@ export const make = (options: TransportOptions): Transport => {
   return transport
 }
 
-const sanitizedConnectionError = (server: string): McpConnectionFailed =>
-  McpConnectionFailed.make({ server, message: "MCP connection failed" })
+const sanitizedConnectionError = (server: string): MCPConnectionFailed =>
+  MCPConnectionFailed.make({ server, message: "MCP connection failed" })
 
 const makeInterface = (
   options: Options,
-): Effect.Effect<Interface, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> => {
+): Effect.Effect<Service, MCPConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> => {
   const connect = Effect.try({
     try: () => make(options.transport),
-    catch: (error) => McpConnectionFailed.make({ server: options.name, message: String(error) }),
+    catch: (error) => MCPConnectionFailed.make({ server: options.name, message: String(error) }),
   }).pipe(
     Effect.flatMap((transport) =>
       options.callTimeout === undefined
@@ -64,9 +64,9 @@ const makeInterface = (
     Effect.gen(function* () {
       const before = yield* oauth.pending
       return yield* connect.pipe(
-        Effect.catchTag("tenetkit/mcp/McpConnectionFailed", () =>
+        Effect.catchTag("tenetkit/mcp/MCPConnectionFailed", () =>
           oauth.pending.pipe(
-            Effect.flatMap((current): Effect.Effect<never, McpConnectionFailed | OAuthPending> => {
+            Effect.flatMap((current): Effect.Effect<never, MCPConnectionFailed | OAuthPending> => {
               if (Option.isNone(current)) return Effect.fail(sanitizedConnectionError(options.name))
               if (Option.isSome(before) && before.value.url === current.value.url) {
                 return Effect.fail(sanitizedConnectionError(options.name))
@@ -83,20 +83,20 @@ const makeInterface = (
 /** @experimental */
 export const layer = (
   options: Options,
-): Layer.Layer<McpToolSource, McpConnectionFailed | OAuthPending | OAuthProviderError> =>
-  Layer.effect(McpToolSource, makeInterface(options))
+): Layer.Layer<MCPClient, MCPConnectionFailed | OAuthPending | OAuthProviderError> =>
+  Layer.effect(MCPClient, makeInterface(options))
 
 /** @experimental */
 export const layerTagged: {
   (
     options: Options,
   ): <Identifier>(
-    tag: Context.Key<Identifier, Interface>,
-  ) => Layer.Layer<Identifier, McpConnectionFailed | OAuthPending | OAuthProviderError>
+    tag: Context.Key<Identifier, Service>,
+  ) => Layer.Layer<Identifier, MCPConnectionFailed | OAuthPending | OAuthProviderError>
   <Identifier>(
-    tag: Context.Key<Identifier, Interface>,
+    tag: Context.Key<Identifier, Service>,
     options: Options,
-  ): Layer.Layer<Identifier, McpConnectionFailed | OAuthPending | OAuthProviderError>
-} = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Interface>, options: Options) =>
+  ): Layer.Layer<Identifier, MCPConnectionFailed | OAuthPending | OAuthProviderError>
+} = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Service>, options: Options) =>
   Layer.effect(tag, makeInterface(options)),
 )

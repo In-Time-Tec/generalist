@@ -14,17 +14,17 @@ import {
   ToolOutput,
 } from "tenetkit"
 import { A2A } from "tenetkit/a2a"
-import { AgUi } from "tenetkit/ag-ui"
+import { AGUI } from "tenetkit/ag-ui"
 import { VectorStore } from "tenetkit/memory"
-import { OAuth, McpToolSource } from "tenetkit/mcp"
+import { MCPClient, OAuth } from "tenetkit/mcp"
 import { make as makeMcpHttpTransport } from "tenetkit/mcp/client/http"
-import { route as mcpRoute, type McpTools, type Options as McpRouteOptions } from "tenetkit/mcp/tools"
+import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "tenetkit/mcp/tools"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
 import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
 import { TestModel } from "tenetkit/test"
 import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
-import { Client, Snapshot, Sse, Wire, Ws } from "tenetkit/transport"
+import { RunClient, Snapshot, SSE, WebSocket, Wire } from "tenetkit/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
@@ -77,23 +77,23 @@ type ProviderRoot = typeof import("tenetkit/ai")
 type TransportRoot = typeof import("tenetkit/transport")
 type RuntimeRoot = typeof import("tenetkit/runtime")
 type A2ARoot = typeof import("tenetkit/a2a")
-type AgUiRoot = typeof import("tenetkit/ag-ui")
+type AGUIRoot = typeof import("tenetkit/ag-ui")
 type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
-type AgUiCanonical = Assert<Equal<AgUiRoot["AgUi"], typeof AgUi>>
+type AGUICanonical = Assert<Equal<AGUIRoot["AGUI"], typeof AGUI>>
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
 type RunEventCanonical = Assert<Equal<RuntimeRoot["RunEvent"], typeof RunEvent>>
 type RuntimeAdmitInputCanonical = Assert<
-  Equal<Parameters<Runtime.Interface["admit"]>[0], Runtime.AdmitInput>
+  Equal<Parameters<Runtime.Service["admit"]>[0], Runtime.AdmitInput>
 >
 type RuntimeActivateInputCanonical = Assert<
-  Equal<Parameters<Runtime.Interface["activate"]>[0], Runtime.ActivateInput>
+  Equal<Parameters<Runtime.Service["activate"]>[0], Runtime.ActivateInput>
 >
 type SqliteRuntimeOptions = import("tenetkit/runtime/sqlite-bun").Runtime.Options
 type SqliteRunStoreOptions = import("tenetkit/runtime/sqlite-bun").RunStore.Options
 void SqliteRuntime.layerSqlite
 void SqliteRunStore.layerSqlite
 type ProviderCatalogSubpath = Assert<
-  MemberEqual<ProviderRoot["Catalog"], typeof import("tenetkit/ai/catalog"), "layer">
+  MemberEqual<ProviderRoot["ModelCatalog"], typeof import("tenetkit/ai/model-catalog"), "layer">
 >
 type ProviderDeterministicSubpath = Assert<
   MemberEqual<ProviderRoot["Deterministic"], typeof import("tenetkit/ai/deterministic"), "layer">
@@ -104,16 +104,16 @@ type ProviderModelRouteSubpath = Assert<
 void Deterministic
 void ModelRoute
 type TransportClientSubpath = Assert<
-  MemberEqual<TransportRoot["Client"], typeof import("tenetkit/transport/client"), "layerWebSocket">
+  MemberEqual<TransportRoot["RunClient"], typeof import("tenetkit/transport/run-client"), "layerWebSocket">
 >
 type TransportErrorsSubpath = Assert<
   MemberEqual<TransportRoot["Errors"], typeof import("tenetkit/transport/errors"), "TransportError">
 >
 type TransportSseSubpath = Assert<
-  MemberEqual<TransportRoot["Sse"], typeof import("tenetkit/transport/sse"), "respond">
+  MemberEqual<TransportRoot["SSE"], typeof import("tenetkit/transport/sse"), "respond">
 >
 type TransportWsSubpath = Assert<
-  MemberEqual<TransportRoot["Ws"], typeof import("tenetkit/transport/ws"), "handle">
+  MemberEqual<TransportRoot["WebSocket"], typeof import("tenetkit/transport/websocket"), "handle">
 >
 type TransportWireSubpath = Assert<
   MemberEqual<TransportRoot["Wire"], typeof import("tenetkit/transport/wire"), "producerCodec">
@@ -125,18 +125,18 @@ const cursor: Cursor.Cursor = Cursor.origin
 const snapshot = Snapshot.get("run:package-smoke")
 const producerCodec = Wire.producerCodec
 const observerCodec = Wire.observerCodec
-const webSocketClient = Client.layerWebSocket
+const webSocketClient = RunClient.layerWebSocket
 void cursor
 void snapshot
 void producerCodec
 void observerCodec
 void webSocketClient
-void Sse.streamSuccess
-void Sse.respond
-void Ws.handle
+void SSE.streamSuccess
+void SSE.respond
+void WebSocket.handle
 const reasoning: TestModel.ReasoningPart = TestModel.reasoning("package smoke")
 void reasoning
-const tokenStore: OAuth.TokenStoreInterface = {
+const tokenStore: OAuth.TokenStoreService = {
   load: () => Effect.succeed(Option.none()),
   save: (_server, tokens) => Effect.sync(() => void Redacted.value(tokens)),
   remove: () => Effect.void,
@@ -161,14 +161,11 @@ const proof = Effect.gen(function* () {
   return transport
 }).pipe(Effect.provide(oauthLayer))
 void proof
-const routeOptions: McpRouteOptions = {
+const connectOptions: MCPConnectOptions = {
   name: "package-smoke",
   transport: makeMcpHttpTransport({ url: "https://mcp.example/rpc" }),
 }
-const routed: Effect.Effect<
-  McpTools,
-  McpToolSource.McpConnectionFailed | OAuth.OAuthProviderError,
-  Scope.Scope
-> = mcpRoute(routeOptions)
-void routed
+const routed: Effect.Effect<MCPTools, MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError, Scope.Scope> =
+  mcpConnect(connectOptions)
+void connected
 `

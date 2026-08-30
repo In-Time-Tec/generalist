@@ -1,7 +1,7 @@
 import { Effect, Function, Option, Predicate, Pull, Schedule, Schema, Stream } from "effect"
 import { RunEvent } from "./run/event.js"
 import { CompactionInspection, isTerminal, RawUsageFact, RunInspection, RunOutcome } from "./run.js"
-import { Runtime, type Interface as RuntimeInterface } from "./service.js"
+import { Runtime, type Service as RuntimeService } from "./service.js"
 import { TreeCursor, type TreeCursor as TreeCursorType } from "./tree/cursor.js"
 export { TreeCursor }
 
@@ -310,7 +310,7 @@ export const awaitTerminal = (
 
 const recoveryWakeups = Stream.fromSchedule(Schedule.spaced("1 second")).pipe(Stream.map(() => undefined))
 
-const changes = (runtime: RuntimeInterface, rootRunId: string) =>
+const changes = (runtime: RuntimeService, rootRunId: string) =>
   Stream.merge(runtime.treeChanges(rootRunId), recoveryWakeups)
 
 export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./service.js").TreeEventsError, Runtime> =>

@@ -1,6 +1,6 @@
 import "./suites/event-telemetry-suite.js"
 import { expect, it } from "@effect/vitest"
-import { ProgramCapabilities, ProgramHost, SandboxExecutor } from "../../../src/index.js"
+import { ProgramCapabilities, ProgramRunner, CodeExecutor } from "../../../src/index.js"
 import { Effect, Schema, Stream, pipe } from "effect"
 import { provideScoped } from "../execution/scoped-provide.js"
 import { Response } from "effect/unstable/ai"
@@ -29,9 +29,9 @@ const failures: ReadonlyArray<RunFailureType> = [
   }),
   Errors.ExecutableRegistrationInvalid.make({ message: "invalid registration detail" }),
   Errors.ExecutableRegistrationMissing.make({ pin: "model:test" }),
-  SandboxExecutor.SandboxUnavailable.make({ message: "Worker Loader unavailable" }),
-  SandboxExecutor.SandboxExecutionFailure.make({ message: "sandbox detail" }),
-  SandboxExecutor.SandboxProtocolViolation.make({ message: "protocol detail" }),
+  CodeExecutor.SandboxUnavailable.make({ message: "Worker Loader unavailable" }),
+  CodeExecutor.SandboxExecutionFailure.make({ message: "sandbox detail" }),
+  CodeExecutor.SandboxProtocolViolation.make({ message: "protocol detail" }),
   ProgramCapabilities.ProgramCapabilityMissing.make({ capability: "tools" }),
   ProgramCapabilities.ProgramCapabilityDenied.make({ capability: "tools", operation: "search", reason: "denied" }),
   ProgramCapabilities.ProgramAuthorizationFailure.make({
@@ -56,8 +56,8 @@ const failures: ReadonlyArray<RunFailureType> = [
   ProgramCapabilities.ProgramOperationUnknown.make({ operation: "externalLookup" }),
   ProgramCapabilities.ProgramSuspended.make({ operation: "approval", reason: "approval", token: "wait:1" }),
   ProgramCapabilities.ProgramCancelled.make({ reason: "cancelled by caller" }),
-  ProgramHost.ProgramBindingMismatch.make({ kind: "tool", name: "search", reason: "pin changed" }),
-  ProgramHost.ProgramIdentityMismatch.make({ expected: "source-a", actual: "source-b" }),
+  ProgramRunner.ProgramHandlerMismatch.make({ kind: "tool", name: "search", reason: "pin changed" }),
+  ProgramRunner.ProgramIdentityMismatch.make({ expected: "source-a", actual: "source-b" }),
 ]
 
 const failedEvent = (error: RunFailureType) => ({

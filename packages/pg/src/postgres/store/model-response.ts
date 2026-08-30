@@ -3,7 +3,7 @@ import type { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { RuntimeUnavailable, type RunNotFound } from "tenetkit/runtime/driver/errors"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import type { DecodedRun, OperationRow } from "tenetkit/runtime/driver/sql/codec/rows"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { appendEvent, loadEventsAfter, toOperationRecord } from "./runtime.js"
@@ -29,7 +29,7 @@ import {
 } from "../sessions/session-store.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
-type CommitModelInput = Parameters<RunStoreInterface["commitModelResponse"]>[0]
+type CommitModelInput = Parameters<RunStoreService["commitModelResponse"]>[0]
 
 const verifyCompletedModelRetry = (input: {
   readonly current: ReturnType<typeof toOperationRecord>
@@ -93,7 +93,7 @@ export const postgresModelResponseOperations = (input: {
     | SqlError,
     SqlR
   >
-}): Pick<RunStoreInterface, "commitModelResponse" | "commitInterruptedModelResponse"> => {
+}): Pick<RunStoreService, "commitModelResponse" | "commitInterruptedModelResponse"> => {
   const { sql, hub, run, requireRun, requireClaim } = input
   const fenced = <A, E>(
     claim: import("tenetkit/runtime/driver/run/store").ExecutionClaim,

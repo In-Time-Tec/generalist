@@ -5,7 +5,7 @@ import { type Item, type MemoryError, projectTranscript } from "../context/memor
 import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext } from "../context/session.js"
 import { get, type Registry } from "../tools/tool-registry.js"
 import type { CompactionError } from "../turn/compaction.js"
-import type { SkillSourceError } from "../context/skill-source.js"
+import type { SkillCatalogError } from "../context/skill-catalog.js"
 import type { Agent, RunError, RunOptions } from "./service.js"
 import { withSystem } from "./message.js"
 import { activateSkillFailure, activateSkillSuccess, activateSkillToolName } from "./skill-tool.js"
@@ -167,7 +167,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
           ? makeHandoffStateRef(agent, activePin, restoredHandoff)
           : Effect.as(Effect.void, undefined)
       const handoffStateRef = yield* initializeHandoff()
-      const skillError = (turn: number, error: SkillSourceError): AgentError =>
+      const skillError = (turn: number, error: SkillCatalogError): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
       const restoreSkill = makeSkillActivation({ skillRuntime, toolState, skillError })
       const restoreActivatedSkills = (history: Prompt.Prompt): Effect.Effect<void, AgentError | ToolNameCollision> =>

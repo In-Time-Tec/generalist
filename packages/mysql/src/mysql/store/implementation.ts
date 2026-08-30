@@ -14,7 +14,7 @@ import {
 import { RunNotFound, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { checkpointRef } from "tenetkit/runtime/driver/executable/manifest"
 import type { LayerOptions } from "tenetkit/runtime/driver/service"
-import { RunStore, type Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import { RunStore, type Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "tenetkit/runtime/driver/sql/store/admit"
 import { activateRoot } from "tenetkit/runtime/driver/sql/store/activate"
 import {
@@ -86,23 +86,23 @@ import { cancelSessionRuns } from "../session/cancellation.js"
 import { mysqlModelResponseOperationsWithDefaults } from "./model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
 import { acknowledge, loadAcknowledged } from "tenetkit/runtime/driver/sql/acknowledgement"
-export interface MysqlStoreOptions extends LayerOptions {
+export interface Options extends LayerOptions {
   readonly url: string
   readonly source?: string
   readonly maxConnections?: number
   readonly pollInterval?: Duration.Input
 }
-export type MysqlStoreError =
+export type StoreError =
   | SchemaDirty
   | SchemaChecksumMismatch
   | SchemaVersionUnsupported
   | SchemaUpgradeRequired
   | SchemaMigrationFailed
 export const mysqlServices = (
-  options: MysqlStoreOptions,
+  options: Options,
 ): Effect.Effect<
-  { readonly store: RunStoreInterface; readonly claims: import("tenetkit/runtime/driver/sql/run/claims").Interface },
-  MysqlStoreError,
+  { readonly store: RunStoreService; readonly claims: import("tenetkit/runtime/driver/sql/run/claims").Service },
+  StoreError,
   SqlClient.SqlClient | Scope.Scope
 > =>
   Effect.gen(function* () {
@@ -164,8 +164,8 @@ export const mysqlServices = (
         }
         return yield* effect
       })
-    const suspend = (input: Parameters<RunStoreInterface["suspend"]>[0]) => suspendRun(transactionHub, input)
-    const saveExecution = (input: Parameters<RunStoreInterface["saveExecution"]>[0]) =>
+    const suspend = (input: Parameters<RunStoreService["suspend"]>[0]) => suspendRun(transactionHub, input)
+    const saveExecution = (input: Parameters<RunStoreService["saveExecution"]>[0]) =>
       Effect.gen(function* () {
         yield* requireExecutionClaim(input)
         const loaded = yield* loadRun(input.runId)

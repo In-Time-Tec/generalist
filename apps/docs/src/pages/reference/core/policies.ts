@@ -76,7 +76,7 @@ export const corePoliciesReference = definePage({
       [
         [[code("Approvals.layerAutoApprove")], "Every resolution returns Approved, the default choice"],
         [[code("Approvals.layerDenyAll")], "Every resolution returns Denied; useful in tests and lockdown"],
-        [[code("Approvals.layerTest(implementation)")], "Layer from an explicit interface"],
+        [[code("Approvals.layerTest(implementation)")], "Layer from an explicit service"],
       ],
     ),
     h2("permissions", "Permissions"),
@@ -126,7 +126,7 @@ export const corePoliciesReference = definePage({
         [[code("layerRuleset(ruleset)")], "Policy layer from a static ruleset"],
         [[code("layerAllowAll")], "Policy layer that allows every call"],
         [[code("layerRuleStoreMemory(initialRules?)")], "Non-durable in-memory remembered-rule store"],
-        [[code("layerTest"), " / ", code("layerRuleStoreTest")], "Layers from explicit interfaces"],
+        [[code("layerTest"), " / ", code("layerRuleStoreTest")], "Layers from explicit services"],
         [[code("PermissionError")], ["Tagged error with ", code("message")]],
       ],
     ),

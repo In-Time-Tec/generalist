@@ -20,7 +20,7 @@ import type { StartError } from "../../service.js"
 import type { StaleClaim, StaleSessionClaim } from "../../sql/errors.js"
 
 /** @experimental Cross-partition child placement operations supported by single-partition stores. */
-export interface Interface {
+export interface Service {
   readonly reserve: (
     input: ReserveInput,
   ) => Effect.Effect<
@@ -76,6 +76,6 @@ export interface Interface {
 }
 
 /** @experimental Atomic cross-partition child placement capability. */
-export class ExternalChildStore extends Context.Service<ExternalChildStore, Interface>()(
+export class ExternalChildStore extends Context.Service<ExternalChildStore, Service>()(
   "tenetkit/runtime/child/external/store/ExternalChildStore",
 ) {}

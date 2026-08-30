@@ -1,14 +1,14 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Path, PlatformError } from "effect"
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
-import { FileSystemHarnessStore, HarnessState, HarnessStore } from "../../../src/harness/index.js"
+import { FileSystemStore, State, Store } from "../../../src/harness/index.js"
 import { applied, create, entry, proposal, scope } from "../fixtures.js"
 
 const permissions = (mode: number): string => (mode & 0o777).toString(8).padStart(3, "0")
 
 const withStore = <A, E>(
   use: (input: {
-    readonly store: HarnessStore.Interface
+    readonly store: Store.Service
     readonly root: string
     readonly file: (value: string) => string
     readonly fileSystem: FileSystem.FileSystem
@@ -17,16 +17,16 @@ const withStore = <A, E>(
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-harness-" })
-    const file = (value: string) => path.join(root, value, "harness.json")
-    const store = yield* FileSystemHarnessStore.make({ path: file })
+    const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-guidance-" })
+    const file = (value: string) => path.join(root, value, "guidance.json")
+    const store = yield* FileSystemStore.make({ path: file })
     return yield* use({ store, root, file, fileSystem })
   }).pipe(Effect.scoped)
 
 const stateWith = (id: string, content: string) =>
-  HarnessState.make({ scope, entries: [entry({ id, kind: "memory", content })] })
+  State.make({ scope, entries: [entry({ id, kind: "memory", content })] })
 
-layer(Layer.merge(bunLayer, Path.layer))("FileSystemHarnessStore on a real filesystem", (it) => {
+layer(Layer.merge(bunLayer, Path.layer))("FileSystemStore on a real filesystem", (it) => {
   it.effect("round-trips one exact state through real files", () =>
     withStore(({ store }) =>
       Effect.gen(function* () {
@@ -47,9 +47,9 @@ layer(Layer.merge(bunLayer, Path.layer))("FileSystemHarnessStore on a real files
         yield* store.save(stateWith("a", "second"))
         yield* store.save(stateWith("a", "third"))
         const loaded = yield* store.load(scope)
-        expect(HarnessState.findEntry(loaded, "memory", "a")!.content).toBe("third")
+        expect(State.findEntry(loaded, "memory", "a")!.content).toBe("third")
         const directory = file(scope).slice(0, file(scope).lastIndexOf("/"))
-        expect((yield* fileSystem.readDirectory(directory)).toSorted()).toEqual(["harness.json"])
+        expect((yield* fileSystem.readDirectory(directory)).toSorted()).toEqual(["guidance.json"])
       }),
     ),
   )
@@ -87,11 +87,11 @@ layer(Layer.merge(bunLayer, Path.layer))("FileSystemHarnessStore on a real files
           concurrency: "unbounded",
         })
         const loaded = yield* store.load(scope)
-        const written = HarnessState.findEntry(loaded, "memory", "entry")!.content
+        const written = State.findEntry(loaded, "memory", "entry")!.content
         expect(contents).toContain(written)
         const target = file(scope)
         const directory = target.slice(0, target.lastIndexOf("/"))
-        expect((yield* fileSystem.readDirectory(directory)).toSorted()).toEqual(["harness.json"])
+        expect((yield* fileSystem.readDirectory(directory)).toSorted()).toEqual(["guidance.json"])
       }),
     ),
   )
@@ -103,8 +103,7 @@ layer(Layer.merge(bunLayer, Path.layer))("FileSystemHarnessStore on a real files
         const contents = ["one", "two", "three", "four"]
         const readers = Effect.forEach(
           Array.from({ length: 24 }),
-          () =>
-            store.load(scope).pipe(Effect.map((state) => HarnessState.findEntry(state, "memory", "entry")!.content)),
+          () => store.load(scope).pipe(Effect.map((state) => State.findEntry(state, "memory", "entry")!.content)),
           { concurrency: "unbounded" },
         )
         const writers = Effect.forEach(contents, (content) => store.save(stateWith("entry", content)), {

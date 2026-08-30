@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
-import { HarnessSnapshot, HarnessState } from "../../src/harness/index.js"
+import { Snapshot, State } from "../../src/harness/index.js"
 import { applied, create, entry, proposal, scope } from "./fixtures.js"
 
-const state = HarnessState.make({
+const state = State.make({
   scope,
   entries: [
     entry({ id: "a", kind: "memory", metadata: { pinned: true }, arguments: { limit: 3 } }),
@@ -12,19 +12,19 @@ const state = HarnessState.make({
   ],
 })
 
-const snapshot = HarnessSnapshot.snapshot(state)
+const snapshot = Snapshot.snapshot(state)
 const malformedVersion = Schema.decodeSync(Schema.Unknown)({ schemaVersion: "2" })
-const encode = (value: HarnessState.HarnessState): HarnessSnapshot.SnapshotPayload =>
-  Schema.decodeSync(HarnessSnapshot.SnapshotPayload)(HarnessSnapshot.encode(value))
+const encode = (value: State.GuidanceState): Snapshot.SnapshotPayload =>
+  Schema.decodeSync(Snapshot.SnapshotPayload)(Snapshot.encode(value))
 const malformedEntry = Schema.decodeSync(Schema.Unknown)({
   ...snapshot.payload,
   entries: [{ ...snapshot.payload.entries[0]!, version: 0 }],
 })
 
-describe("HarnessSnapshot", () => {
+describe("Snapshot", () => {
   it("pins the content-addressed identity of one state", () => {
-    expect(snapshot.id).toBe(HarnessState.snapshotId(state))
-    expect(snapshot.id).toMatch(/^harness-snapshot:v1:sha256:[0-9a-f]{64}$/)
+    expect(snapshot.id).toBe(State.snapshotId(state))
+    expect(snapshot.id).toMatch(/^guidance-snapshot:v1:sha256:[0-9a-f]{64}$/)
   })
 
   it("carries every entry in canonical order", () => {
@@ -38,25 +38,25 @@ describe("HarnessSnapshot", () => {
       state,
       proposal: proposal({ edits: [create({ kind: "memory", id: "later" })] }),
     }).state
-    const pinned = HarnessSnapshot.snapshot(withHistory)
+    const pinned = Snapshot.snapshot(withHistory)
     expect(pinned.payload).not.toHaveProperty("refinements")
-    expect(pinned.id).toBe(HarnessState.snapshotId(withHistory))
+    expect(pinned.id).toBe(State.snapshotId(withHistory))
   })
 
   it.effect("reconstructs the exact state from its registration payload", () =>
     Effect.gen(function* () {
-      const restored = yield* HarnessSnapshot.decode(snapshot.id, HarnessSnapshot.encode(state))
-      expect(HarnessState.allEntries(restored)).toEqual(HarnessState.allEntries(state))
-      expect(HarnessState.snapshotId(restored)).toBe(snapshot.id)
+      const restored = yield* Snapshot.decode(snapshot.id, Snapshot.encode(state))
+      expect(State.allEntries(restored)).toEqual(State.allEntries(state))
+      expect(State.snapshotId(restored)).toBe(snapshot.id)
       expect(restored.scope).toBe(scope)
     }),
   )
 
   it.effect("reconstructs an empty state", () =>
     Effect.gen(function* () {
-      const empty = HarnessState.empty(scope)
-      const restored = yield* HarnessSnapshot.decode(HarnessState.snapshotId(empty), HarnessSnapshot.encode(empty))
-      expect(HarnessState.allEntries(restored)).toEqual([])
+      const empty = State.empty(scope)
+      const restored = yield* Snapshot.decode(State.snapshotId(empty), Snapshot.encode(empty))
+      expect(State.allEntries(restored)).toEqual([])
     }),
   )
 
@@ -66,12 +66,9 @@ describe("HarnessSnapshot", () => {
         state,
         proposal: proposal({ edits: [create({ kind: "memory", id: "later" })] }),
       }).state
-      const restored = yield* HarnessSnapshot.decode(
-        HarnessState.snapshotId(withHistory),
-        HarnessSnapshot.encode(withHistory),
-      )
+      const restored = yield* Snapshot.decode(State.snapshotId(withHistory), Snapshot.encode(withHistory))
       expect(restored.refinements).toEqual([])
-      expect(HarnessState.snapshotId(restored)).toBe(HarnessState.snapshotId(withHistory))
+      expect(State.snapshotId(restored)).toBe(State.snapshotId(withHistory))
     }),
   )
 
@@ -81,52 +78,52 @@ describe("HarnessSnapshot", () => {
         state,
         proposal: proposal({ edits: [create({ kind: "memory", id: "extra" })] }),
       }).state
-      const failure = yield* HarnessSnapshot.decode(snapshot.id, HarnessSnapshot.encode(changed)).pipe(Effect.flip)
-      expect(failure._tag).toBe("tenetkit/harness/SnapshotMismatch")
-      if (failure._tag !== "tenetkit/harness/SnapshotMismatch") return
+      const failure = yield* Snapshot.decode(snapshot.id, Snapshot.encode(changed)).pipe(Effect.flip)
+      expect(failure._tag).toBe("tenetkit/agent-guidance/SnapshotMismatch")
+      if (failure._tag !== "tenetkit/agent-guidance/SnapshotMismatch") return
       expect(failure.expected).toBe(snapshot.id)
-      expect(failure.actual).toBe(HarnessState.snapshotId(changed))
+      expect(failure.actual).toBe(State.snapshotId(changed))
     }),
   )
 
-  it.effect("fails on a payload that is not a harness state", () =>
+  it.effect("fails on a payload that is not a guidance state", () =>
     Effect.gen(function* () {
-      const failure = yield* Schema.decodeUnknownEffect(HarnessSnapshot.SnapshotPayload)(malformedVersion).pipe(
-        Effect.flatMap((payload) => HarnessSnapshot.decode(snapshot.id, payload)),
-        Effect.mapError((error) => HarnessSnapshot.SnapshotInvalid.make({ message: String(error) })),
+      const failure = yield* Schema.decodeUnknownEffect(Snapshot.SnapshotPayload)(malformedVersion).pipe(
+        Effect.flatMap((payload) => Snapshot.decode(snapshot.id, payload)),
+        Effect.mapError((error) => Snapshot.SnapshotInvalid.make({ message: String(error) })),
         Effect.flip,
       )
-      expect(failure._tag).toBe("tenetkit/harness/SnapshotInvalid")
+      expect(failure._tag).toBe("tenetkit/agent-guidance/SnapshotInvalid")
     }),
   )
 
   it.effect("fails on an excess property in the payload", () =>
     Effect.gen(function* () {
       const payload = { ...encode(state), extra: 1 }
-      const failure = yield* HarnessSnapshot.decode(snapshot.id, payload).pipe(Effect.flip)
-      expect(failure._tag).toBe("tenetkit/harness/SnapshotInvalid")
+      const failure = yield* Snapshot.decode(snapshot.id, payload).pipe(Effect.flip)
+      expect(failure._tag).toBe("tenetkit/agent-guidance/SnapshotInvalid")
     }),
   )
 
   it.effect("fails on an out-of-contract entry in the payload", () =>
     Effect.gen(function* () {
-      const failure = yield* Schema.decodeUnknownEffect(HarnessSnapshot.SnapshotPayload)(malformedEntry).pipe(
-        Effect.flatMap((decoded) => HarnessSnapshot.decode(snapshot.id, decoded)),
-        Effect.mapError((error) => HarnessSnapshot.SnapshotInvalid.make({ message: String(error) })),
+      const failure = yield* Schema.decodeUnknownEffect(Snapshot.SnapshotPayload)(malformedEntry).pipe(
+        Effect.flatMap((decoded) => Snapshot.decode(snapshot.id, decoded)),
+        Effect.mapError((error) => Snapshot.SnapshotInvalid.make({ message: String(error) })),
         Effect.flip,
       )
-      expect(failure._tag).toBe("tenetkit/harness/SnapshotInvalid")
+      expect(failure._tag).toBe("tenetkit/agent-guidance/SnapshotInvalid")
     }),
   )
 
   it.effect("survives a JSON round trip of the registration payload", () => {
     const wire = Schema.decodeSync(Schema.fromJsonString(Schema.Unknown))(
-      Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(HarnessSnapshot.encode(state)),
+      Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(Snapshot.encode(state)),
     )
-    return Schema.decodeUnknownEffect(HarnessSnapshot.SnapshotPayload)(wire).pipe(
-      Effect.flatMap((payload) => HarnessSnapshot.decode(snapshot.id, payload)),
+    return Schema.decodeUnknownEffect(Snapshot.SnapshotPayload)(wire).pipe(
+      Effect.flatMap((payload) => Snapshot.decode(snapshot.id, payload)),
       Effect.map((restored) => {
-        expect(HarnessState.allEntries(restored)).toEqual(HarnessState.allEntries(state))
+        expect(State.allEntries(restored)).toEqual(State.allEntries(state))
       }),
     )
   })
@@ -134,27 +131,25 @@ describe("HarnessSnapshot", () => {
   it.effect("reconstructs the same state from entries in any payload order", () =>
     Effect.gen(function* () {
       const payload = encode(state)
-      const restored = yield* HarnessSnapshot.decode(snapshot.id, {
+      const restored = yield* Snapshot.decode(snapshot.id, {
         ...payload,
         entries: payload.entries.toReversed(),
       })
-      expect(HarnessState.allEntries(restored)).toEqual(HarnessState.allEntries(state))
+      expect(State.allEntries(restored)).toEqual(State.allEntries(state))
     }),
   )
 
   it("names a stable codec and version for durable registrations", () => {
-    expect(HarnessSnapshot.CODEC).toBe("tenetkit/harness/snapshot")
-    expect(HarnessSnapshot.VERSION).toBe("1")
+    expect(Snapshot.CODEC).toBe("tenetkit/agent-guidance/snapshot")
+    expect(Snapshot.VERSION).toBe("1")
   })
 
   it("round-trips its snapshot schema", () => {
-    const encoded = Schema.encodeSync(HarnessSnapshot.HarnessSnapshot)(snapshot)
-    expect(Schema.decodeSync(HarnessSnapshot.HarnessSnapshot)(encoded)).toEqual(snapshot)
+    const encoded = Schema.encodeSync(Snapshot.GuidanceSnapshot)(snapshot)
+    expect(Schema.decodeSync(Snapshot.GuidanceSnapshot)(encoded)).toEqual(snapshot)
   })
 
   it("rejects a malformed snapshot identity", () => {
-    expect(() =>
-      Schema.decodeSync(HarnessSnapshot.HarnessSnapshot)({ id: "nope", payload: snapshot.payload }),
-    ).toThrow()
+    expect(() => Schema.decodeSync(Snapshot.GuidanceSnapshot)({ id: "nope", payload: snapshot.payload })).toThrow()
   })
 })

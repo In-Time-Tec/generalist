@@ -225,7 +225,7 @@ export const CapabilityFailure = Schema.Union([
 export type CapabilityFailure = typeof CapabilityFailure.Type
 
 /** @experimental Encoded operations visible to sandboxed source. */
-export interface Interface {
+export interface Service {
   readonly discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>>
   readonly describeTool: (name: string) => Effect.Effect<ToolDescription, ProgramCapabilityMissing>
   readonly callTool: (input: ToolCallInput) => Effect.Effect<unknown, CapabilityFailure>
@@ -237,6 +237,6 @@ export interface Interface {
 }
 
 /** @experimental Host-owned encoded operations exposed only inside a sandbox execution. */
-export class ProgramCapabilities extends Context.Service<ProgramCapabilities, Interface>()(
+export class ProgramCapabilities extends Context.Service<ProgramCapabilities, Service>()(
   "tenetkit/core/program/capabilities/ProgramCapabilities",
 ) {}

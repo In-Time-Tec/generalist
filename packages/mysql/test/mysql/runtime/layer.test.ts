@@ -1,8 +1,8 @@
-import { layerMysql } from "@tenetkit/mysql"
+import { layer as backendLayer } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { ExecutionHost, Runtime, RunStore } from "tenetkit/runtime"
+import { RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { registrationsFor } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
 import { agentMapProgramFixture } from "../../../../tenetkit/test/runtime/program/fixture.js"
@@ -17,7 +17,7 @@ describeMysql("mysql runtime layer Program registration", () => {
 
   {
     const fixture = agentMapProgramFixture()
-    const runtimeLayer = layerMysql({
+    const runtimeLayer = backendLayer({
       url: database.url,
       source: "mysql-test",
       resolver: fixture.resolver,
@@ -37,7 +37,7 @@ describeMysql("mysql runtime layer Program registration", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const root = yield* runtime.send({
               to: fixture.address,
               sessionId: "registration-parity",

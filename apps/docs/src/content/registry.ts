@@ -4,7 +4,7 @@ import { dual } from "effect/Function"
 import { addressedMessaging } from "../pages/guides/agent/addressed-messaging"
 import { approvals } from "../pages/guides/agent/approvals"
 import { compaction } from "../pages/guides/agent/compaction"
-import { continualHarness } from "../pages/guides/agent/continual-harness"
+import { agentGuidance } from "../pages/guides/agent/guidance"
 import { defineTools } from "../pages/guides/tools/define-tools"
 import { durableCompositeTools } from "../pages/guides/tools/durable-composite-tools"
 import { foldkitChat } from "../pages/guides/runtime/foldkit-chat"
@@ -39,7 +39,7 @@ import { coreToolsReference } from "../pages/reference/core/tools"
 import { a2aReference } from "../pages/reference/integrations/a2a"
 import { agUiReference } from "../pages/reference/integrations/ag-ui"
 import { foldkitReference } from "../pages/reference/runtime/foldkit"
-import { harnessReference } from "../pages/reference/runtime/harness"
+import { agentGuidanceReference } from "../pages/reference/runtime/agent-guidance"
 import { mcpReference } from "../pages/reference/integrations/mcp"
 import { memoryReference } from "../pages/reference/integrations/memory"
 import { providersReference } from "../pages/reference/integrations/providers"
@@ -88,7 +88,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   mcp,
   multiAgent,
   typescriptCells,
-  continualHarness,
+  agentGuidance,
   durableCompositeTools,
   addressedMessaging,
   serveTransport,
@@ -109,7 +109,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   testReference,
   memoryReference,
   replReference,
-  harnessReference,
+  agentGuidanceReference,
   transportReference,
   foldkitReference,
   versioningReference,

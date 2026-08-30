@@ -48,7 +48,7 @@ export namespace NestedOperation {
   export type ApprovalRequirement = import("../nested-operation.js").ApprovalRequirement
   export type Failure = import("../nested-operation.js").Failure
   export type Identity = import("../nested-operation.js").Identity
-  export type Interface = import("../nested-operation.js").Interface
+  export type Service = import("../nested-operation.js").Service
   export type NestedOperationDenied = import("../nested-operation.js").NestedOperationDenied
   export type NestedOperationDivergence = import("../nested-operation.js").NestedOperationDivergence
   export type NestedOperationSuspended = import("../nested-operation.js").NestedOperationSuspended

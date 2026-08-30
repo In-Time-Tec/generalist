@@ -4,10 +4,10 @@ export const mcpReference = definePage({
   title: "tenetkit/mcp",
   navTitle: "mcp",
   group: "Reference",
-  description: "McpToolSource for discovering and calling MCP tools, plus the TenetKit toolkit and executor adapters.",
+  description: "MCPClient for discovering and calling MCP tools, plus the TenetKit toolkit and executor adapters.",
   content: [
     lead(
-      "tenetkit/mcp connects Model Context Protocol servers to TenetKit: McpToolSource discovers and calls MCP tools, and the tools subpath adapts them into a toolkit and a ToolExecutor.",
+      "tenetkit/mcp connects Model Context Protocol servers to TenetKit: MCPClient discovers and calls MCP tools, and the tools subpath adapts them into a toolkit and a ToolExecutor.",
     ),
     command("Install", "bun add tenetkit tenetkit/mcp"),
     p(
@@ -21,20 +21,20 @@ export const mcpReference = definePage({
     table(
       ["Subpath", "Contents"],
       [
-        [[code(".")], ["Namespace ", code("McpToolSource")]],
+        [[code(".")], ["Namespace ", code("MCPClient")]],
         [[code("./client")], ["Transport-neutral source API over an MCP SDK ", code("Transport")]],
         [[code("./client/http")], ["Worker-safe Streamable HTTP ", code("make"), ", ", code("layer")]],
         [[code("./client/stdio")], ["Node/Bun-only stdio ", code("make"), ", ", code("layer")]],
         [[code("./oauth")], ["Worker-safe OAuth service, errors, and token-store layers"]],
         [
           [code("./tools")],
-          [code("route(options)"), ", ", code("toolkit(source)"), " and ", code("layerToolkit(source)")],
+          [code("connect(options)"), ", ", code("toolkit(client)"), " and ", code("layerToolkit(client)")],
         ],
       ],
     ),
-    h2("mcp-tool-source", "McpToolSource"),
+    h2("mcp-client", "MCPClient"),
     p(
-      "The service interface: ",
+      "The service shape: ",
       code("{ server, tools, callTool(rawName, input), aiTools }"),
       ". Discovered tool names are namespaced as ",
       code("<server>_<rawName>"),
@@ -53,19 +53,19 @@ export const mcpReference = definePage({
         ],
         [
           [code("layer({ name, transport, callTimeout? })")],
-          ["Scoped layer that connects, lists tools once, and fails with ", code("McpConnectionFailed")],
+          ["Scoped layer that connects, lists tools once, and fails with ", code("MCPConnectionFailed")],
         ],
         [
           [code("layerTagged(tag, options)")],
-          "The same interface bound to a custom Context key, for multiple servers side by side",
+          "The same service bound to a custom Context key, for multiple servers side by side",
         ],
         [
           [code("fromTransport(name, transport, options?)")],
-          ["Scoped effect building an interface from a raw ", code("@modelcontextprotocol/sdk"), " transport"],
+          ["Scoped effect building a client from a raw ", code("@modelcontextprotocol/sdk"), " transport"],
         ],
         [[code("CallOptions")], [code("{ callTimeout?: Duration.Input }"), " applied to every tool call"]],
         [
-          [code("McpConnectionFailed"), " / ", code("McpToolCallFailed")],
+          [code("MCPConnectionFailed"), " / ", code("MCPToolCallFailed")],
           [code("{ server, message }"), " and ", code("{ server, tool, message }")],
         ],
       ],
@@ -81,7 +81,7 @@ export const mcpReference = definePage({
       " returns the server's structured content when present, otherwise the joined text content; ",
       code("isError"),
       " results fail with ",
-      code("McpToolCallFailed"),
+      code("MCPToolCallFailed"),
       ".",
     ),
     h2("tools-adapter", "The tools adapter"),
@@ -89,26 +89,26 @@ export const mcpReference = definePage({
       ["Export", "Notes"],
       [
         [
-          [code("route({ name, transport, callTimeout? })")],
+          [code("connect({ name, transport, callTimeout? })")],
           [
             "Scoped acquisition returning ",
-            code("McpTools { toolkit, executorLayer }"),
+            code("MCPTools { toolkit, executorLayer }"),
             ". The executor layer installs both handlers and ",
             code("ToolExecutor"),
           ],
         ],
-        [[code("toolkit(source)")], ["Discovered MCP tools as an ", code("Ai.Toolkit"), " for ", code("Agent.make")]],
+        [[code("toolkit(client)")], ["Discovered MCP tools as an ", code("Ai.Toolkit"), " for ", code("Agent.make")]],
         [
-          [code("layerToolkit(source)")],
+          [code("layerToolkit(client)")],
           [
-            "Lower-level Effect AI handlers for an already acquired source. Structured MCP failures retain their tag, server, tool, and message fields",
+            "Lower-level Effect AI handlers for an already acquired client. Structured MCP failures retain their tag, server, tool, and message fields",
           ],
         ],
       ],
     ),
     p(
-      "Prefer route so the toolkit, handlers, executor, and connection lifetime cannot drift. Use the lower-level exports only when the host already owns the source. See ",
-      link("/docs/guides/mcp", "How to use MCP servers as tool sources"),
+      "Prefer connect so the toolkit, handlers, executor, and connection lifetime cannot drift. Use the lower-level exports only when the host already owns the client. See ",
+      link("/docs/guides/mcp", "How to connect MCP servers"),
       ".",
     ),
   ],

@@ -7,26 +7,21 @@ import {
   ModelMiddleware,
   ModelRegistry,
   Response,
-  SkillSource,
+  SkillCatalog,
   Tool,
   Toolkit,
 } from "tenetkit"
 import { Chat, Connection } from "tenetkit/foldkit"
 import { WorkingMemory } from "tenetkit/memory"
 import { Deterministic } from "tenetkit/ai"
-import { SkillLoader } from "tenetkit/skills"
+import { FileSystemCatalog } from "tenetkit/skills"
 import { ExecutableManifest } from "tenetkit/runtime"
 
-const researchFrontmatter: SkillSource.Frontmatter = {
+const researchSkill: SkillCatalog.Skill = {
   name: "research",
   description: "Gather local project facts before answering implementation questions.",
   allowedTools: ["read", "search"],
-}
-
-const researchSkill: SkillSource.Skill = {
-  frontmatter: researchFrontmatter,
-  listing: SkillSource.makeListing(researchFrontmatter),
-  body: Effect.succeed("Read relevant local files and summarize constraints."),
+  instructions: Effect.succeed("Read relevant local files and summarize constraints."),
   tools: [],
 }
 
@@ -50,7 +45,7 @@ const agent = Agent.make({
 })
 
 const key: Memory.Key = { agent: "capstone-assistant", subject: "local-user" }
-const filesystemSkillLayer = SkillLoader.layer({ cwd: ".", roots: ["fixtures/.agents/skills"] })
+const filesystemSkillLayer = FileSystemCatalog.layer({ cwd: ".", roots: ["fixtures/.agents/skills"] })
 const compactionLayer = Compaction.layer({ contextWindow: 64_000, reserveTokens: 1_024, keepRecentTokens: 8_000 })
 
 const chatAgent = ExecutableManifest.makeTest("capstone-assistant", "1").ref
@@ -107,9 +102,9 @@ const renderedChat = chatFrames.reduce(
 )
 
 const program = Effect.gen(function* () {
-  const source = yield* SkillSource.SkillSource
+  const source = yield* SkillCatalog.SkillCatalog
   const skills = yield* source.all
-  const result = yield* ModelRegistry.operate(
+  const result = yield* ModelRegistry.withModel(
     { provider: "deterministic", model: "capstone" },
     Agent.generate(agent, { prompt: "Use the research skill before answering.", memory: { key } }),
   )
@@ -122,7 +117,7 @@ const runtimeLayer = Layer.mergeAll(
   toolkitLayer,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
-  SkillSource.layerSkills([researchSkill]),
+  SkillCatalog.layerSkills([researchSkill]),
   WorkingMemory.layer({ maxMessages: 4 }),
   Connection.layerTest({ frames: () => Stream.empty, send: () => Effect.void }),
   compactionLayer,

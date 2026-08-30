@@ -22,7 +22,7 @@ import {
 } from "../errors.js"
 import type { MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { Metadata } from "./message.js"
-import type { Interface as RunStoreInterface } from "../run/store.js"
+import type { Service as RunStoreService } from "../run/store.js"
 
 /** @experimental One authorization question about one exact sender and target. */
 export interface PolicyInput {
@@ -39,23 +39,23 @@ export interface PolicyInput {
  * durable identity. Everything else — notably addressing another Session — is a host decision, so
  * cross-product addressing is opt-in rather than a consequence of knowing an id.
  */
-export interface Interface {
+export interface Service {
   readonly allow: (input: PolicyInput) => Effect.Effect<boolean>
   readonly discover: (sender: DirectoryEntry) => Effect.Effect<ReadonlyArray<Address>>
 }
 
 /** @experimental */
-export class MessagingPolicy extends Context.Service<MessagingPolicy, Interface>()(
+export class MessagingPolicy extends Context.Service<MessagingPolicy, Service>()(
   "tenetkit/runtime/messaging/service/MessagingPolicy",
 ) {}
 
-const relationshipsOnly: Interface = {
+const relationshipsOnly: Service = {
   allow: () => Effect.succeed(false),
   discover: () => Effect.succeed([]),
 }
 
 /** @experimental */
-const makePolicy = (policy: Partial<Interface> = {}): Interface => ({
+const makePolicy = (policy: Partial<Service> = {}): Service => ({
   allow: policy.allow ?? relationshipsOnly.allow,
   discover: policy.discover ?? relationshipsOnly.discover,
 })
@@ -64,7 +64,7 @@ const makePolicy = (policy: Partial<Interface> = {}): Interface => ({
 export const Policy = { make: makePolicy }
 
 /** @experimental Host policy over exact sender and target identity. */
-export const layer = (policy: Partial<Interface>): Layer.Layer<MessagingPolicy> =>
+export const layer = (policy: Partial<Service>): Layer.Layer<MessagingPolicy> =>
   Layer.succeed(MessagingPolicy, MessagingPolicy.of(Policy.make(policy)))
 
 /** @experimental Input for one addressed send. Sender identity is a Run id, never caller-supplied text. */
@@ -104,7 +104,7 @@ export type DirectoryError = RunNotFound | RuntimeUnavailable
 export const authorize = (input: {
   readonly sender: DirectoryEntry
   readonly target: DirectoryEntry
-  readonly policy: Interface
+  readonly policy: Service
 }): Effect.Effect<void, MessagingUnauthorized> =>
   Effect.gen(function* () {
     const derived = relationship(input.sender, input.target)
@@ -126,8 +126,8 @@ export const authorize = (input: {
 
 /** @experimental Directory entries one Run may reach under TenetKit relationships plus host policy. */
 export const reachable = (input: {
-  readonly store: RunStoreInterface
-  readonly policy: Interface
+  readonly store: RunStoreService
+  readonly policy: Service
   readonly runId: string
 }): Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError> =>
   Effect.gen(function* () {
@@ -154,7 +154,7 @@ export const reachable = (input: {
   })
 
 /** @experimental Runtime-owned addressed messaging for code running inside an execution. */
-export interface AgentMessagingInterface {
+export interface AgentMessagingService {
   readonly send: (input: {
     readonly to: Address
     readonly idempotencyKey: string
@@ -184,7 +184,7 @@ export interface AgentMessagingInterface {
  * creation would bind one Run into the service and let a caller send under another Run's identity,
  * which is exactly the forgery this contract exists to prevent.
  */
-export class AgentMessaging extends Context.Service<AgentMessaging, AgentMessagingInterface>()(
+export class AgentMessaging extends Context.Service<AgentMessaging, AgentMessagingService>()(
   "tenetkit/runtime/messaging/service/AgentMessaging",
 ) {}
 
@@ -202,10 +202,10 @@ const currentRunId = Effect.flatMap(ToolContext.ToolContext, (context) =>
  * instead of silently duplicating or losing the message.
  */
 export const make = (input: {
-  readonly store: RunStoreInterface
-  readonly policy: Interface
+  readonly store: RunStoreService
+  readonly policy: Service
   readonly sendMessage: (request: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
-}): AgentMessagingInterface => ({
+}): AgentMessagingService => ({
   send: (request) =>
     Effect.gen(function* () {
       const runId = yield* currentRunId

@@ -8,13 +8,13 @@ import {
   catalogVersion,
   compressedSizeLimits,
   forbiddenPackageExports,
-  packageExports,
   packedEffectDependencies,
   packedProviderDependencies,
   packages,
   packageNames,
   sortRecord,
   tarballName,
+  wildcardExportExamples,
   workerSafePackageExports,
 } from "./package-smoke-config.js"
 
@@ -452,6 +452,17 @@ const program = Effect.gen(function* () {
     return { packedManifests, tarballs }
   })
   const { packedManifests, tarballs } = yield* packAndValidatePackages
+  const packageExports = sorted(
+    [
+      ...Object.values(packedManifests).flatMap((manifest) =>
+        Object.keys(manifest.exports)
+          .filter((specifier) => !specifier.includes("*"))
+          .map((specifier) => (specifier === "." ? manifest.name : `${manifest.name}${specifier.slice(1)}`)),
+      ),
+      ...wildcardExportExamples,
+    ],
+    (left, right) => left.localeCompare(right),
+  )
 
   const integrationPeers = Object.fromEntries(
     Object.entries(packedManifests.tenetkit?.peerDependencies ?? {}).filter(
@@ -571,14 +582,13 @@ for (const specifier of forbidden) {
   if (!blocked) throw new Error(\`forbidden package export resolved: \${specifier}\`)
 }
 const { A2A } = await import("tenetkit/a2a")
-const { AgUi } = await import("tenetkit/ag-ui")
+const { AGUI } = await import("tenetkit/ag-ui")
 const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("tenetkit")
 const { VectorStore } = await import("tenetkit/memory")
-const { HarnessState, HarnessStore } = await import("tenetkit/harness")
-const { McpToolSource } = await import("tenetkit/mcp")
+const { State, Store } = await import("tenetkit/agent-guidance")
+const { MCPClient } = await import("tenetkit/mcp")
 const McpHttpClient = await import("tenetkit/mcp/client/http")
-const { Catalog } = await import("tenetkit/ai")
-const OpenAi = await import("tenetkit/ai/openai")
+const { ModelCatalog, OpenAI } = await import("tenetkit/ai")
 const skills = await import("tenetkit/skills")
 const { TestModel } = await import("tenetkit/test")
 const { Runtime, RunEvent } = await import("tenetkit/runtime")
@@ -586,7 +596,16 @@ const { Snapshot, Wire } = await import("tenetkit/transport")
 const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
-for (const value of [A2A.layer, AgUi.layer, Runtime.layerMemory, RunEvent.RunEvent, Snapshot.get, Wire.observerCodec]) {
+for (const value of [
+  A2A.layer,
+  AGUI.layer,
+  State.empty,
+  Store.layerMemory,
+  Runtime.layerMemory,
+  RunEvent.RunEvent,
+  Snapshot.get,
+  Wire.observerCodec,
+]) {
   if (value === undefined) throw new Error("Runtime adapter package export is missing")
 }
 const tool = Tool.make("identity_proof", { parameters: Schema.Struct({ value: Schema.String }) })
@@ -594,15 +613,15 @@ const agent = Agent.make({ name: "identity-proof", toolkit: Toolkit.make(tool) }
 const layers = [
   ModelRegistry.layer(),
   Session.layerMemory,
-  Catalog.layer(),
+  ModelCatalog.layer(),
   TestModel.layer([TestModel.text("identity")]),
-  McpToolSource.layer({
+  MCPClient.layer({
     name: "identity",
     transport: McpHttpClient.make({ url: "https://mcp.example/rpc" }),
   }),
 ]
 if (layers.some((value) => !Layer.isLayer(value))) throw new Error("TenetKit layer does not use the root Effect identity")
-if (!Layer.isLayer(OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
+if (!Layer.isLayer(OpenAI.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
   throw new Error("provider constructor does not use the root Layer identity")
 }
 if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {

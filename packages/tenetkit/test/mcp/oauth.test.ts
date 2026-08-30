@@ -15,7 +15,7 @@ import {
 } from "effect"
 import { beforeEach, vi } from "vitest"
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js"
-import { McpToolSource, OAuth } from "../../src/mcp/index"
+import { MCPClient, OAuth } from "../../src/mcp/index"
 import { layer as layerMcpHttpClient } from "../../src/mcp/client/http.js"
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -653,7 +653,7 @@ describe("OAuth", () => {
         }),
       ).pipe(Effect.flip)
 
-      expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
+      expect(error).toBeInstanceOf(MCPClient.MCPConnectionFailed)
     }).pipe(Effect.scoped),
   )
 
@@ -662,7 +662,7 @@ describe("OAuth", () => {
       Effect.gen(function* () {
         const reads = yield* Ref.make(0)
         const authorization = { url: "https://auth.example/authorize?state=transport", state: "transport" }
-        const oauth: OAuth.Interface = {
+        const oauth: OAuth.Service = {
           provider: {
             redirectUrl: configuration.redirectUrl,
             clientMetadata: configuration.clientMetadata,

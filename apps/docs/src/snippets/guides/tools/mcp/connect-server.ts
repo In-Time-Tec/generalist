@@ -1,12 +1,12 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "tenetkit"
-import { route } from "tenetkit/mcp/tools"
+import { connect } from "tenetkit/mcp/tools"
 import { make as makeStdioTransport } from "tenetkit/mcp/client/stdio"
 import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {
-  const tools = yield* route({
+  const tools = yield* connect({
     name: "files",
     transport: makeStdioTransport({
       command: "bunx",
@@ -33,7 +33,7 @@ const program = Effect.gen(function* () {
         ),
       ),
       (services) =>
-        ModelRegistry.operate(
+        ModelRegistry.withModel(
           { provider: "openrouter", model: "openai/gpt-4o-mini" },
           Agent.generate(agent, { prompt: "List the markdown files in this project." }),
         ).pipe(Effect.provideContext(services)),

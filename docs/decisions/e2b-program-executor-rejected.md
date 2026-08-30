@@ -1,7 +1,7 @@
 # E2B Program executor rejected
 
 TenetKit does not provide `@tenetkit/e2b/program` because E2B cannot currently enforce the strict
-`SandboxExecutor` CPU contract. This decision was checked against `e2b@2.46.1` (npm integrity
+`CodeExecutor` CPU contract. This decision was checked against `e2b@2.46.1` (npm integrity
 `sha512-OqYovS2oFrt4mk737CgfW/RoMadBYK84l5qjKpvbEoOB9KKxaZIXm7YUwOKSRTlijrrwDRX7oZlyPoVXiCpyTw==`).
 
 The pinned SDK exposes template CPU core count, post-hoc sandbox CPU utilization metrics, sandbox wall-clock timeout,
@@ -12,7 +12,7 @@ it would not turn wall time or delayed metrics into exact CPU-time enforcement.
 
 Other required mechanisms exist: a sandbox can start from a specific immutable template build, creation can deny all
 outbound traffic, and the control plane can kill and list running and paused sandboxes. Those mechanisms do not make it
-honest to declare `Identity.limits.cpuMillis` as enforced, so `SandboxExecutor.admit` would have to reject every E2B
+honest to declare `Identity.limits.cpuMillis` as enforced, so `CodeExecutor.admit` would have to reject every E2B
 execution. Shipping an unusable adapter or substituting a wall-clock timer for CPU accounting was rejected.
 
 Reconsider this decision only when a pinned E2B provider or guest mechanism can enforce cumulative CPU milliseconds

@@ -11,8 +11,8 @@ import {
   ToolExecutor,
   Toolkit,
 } from "tenetkit"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
-import { Sse } from "tenetkit/transport"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { SSE } from "tenetkit/transport"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -101,7 +101,7 @@ const program = Effect.gen(function* () {
     prompt: "Deploy api",
   })
   const store = yield* RunStore.RunStore
-  const host = yield* ExecutionHost.ExecutionHost
+  const host = yield* RunExecutor.RunExecutor
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "hitl-example" }))
   const events = yield* runtime.events({ runId: receipt.runId }).pipe(
     Stream.takeUntil(
@@ -114,7 +114,7 @@ const program = Effect.gen(function* () {
     Stream.runCollect,
   )
   yield* Console.log(
-    `${Sse.streamSuccess._tag}: ${Array.from(events)
+    `${SSE.streamSuccess._tag}: ${Array.from(events)
       .map((event) => event._tag)
       .join(" -> ")}`,
   )

@@ -12,9 +12,9 @@ export const agUiReference = definePage({
     p("Published on npm at 0.14.0. Runtime remains the persisted source of truth."),
     h2("service", "Service"),
     p(
-      code("AgUi.layer({ address })"),
+      code("AGUI.layer({ address })"),
       " requires the host's Runtime layer. ",
-      code("AgUi.run(input)"),
+      code("AGUI.run(input)"),
       " returns the AG-UI event stream for the admitted or resumed run.",
     ),
     h2("boundary", "Input boundary"),

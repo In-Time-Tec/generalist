@@ -1,56 +1,56 @@
 import {
-  AppliedRefinementEdit as HarnessEntry_AppliedRefinementEdit,
-  AuthoredCreateEdit as HarnessEntry_AuthoredCreateEdit,
-  AuthoredEdit as HarnessEntry_AuthoredEdit,
-  AuthoredProposal as HarnessEntry_AuthoredProposal,
-  AuthoredUpdateEdit as HarnessEntry_AuthoredUpdateEdit,
-  CreateEdit as HarnessEntry_CreateEdit,
-  DeleteEdit as HarnessEntry_DeleteEdit,
-  HarnessEntry as HarnessEntry_HarnessEntry,
-  HarnessEntryValue as HarnessEntry_HarnessEntryValue,
-  HarnessId as HarnessEntry_HarnessId,
-  HarnessInstant as HarnessEntry_HarnessInstant,
-  HarnessKind as HarnessEntry_HarnessKind,
-  HarnessRevision as HarnessEntry_HarnessRevision,
-  HarnessScope as HarnessEntry_HarnessScope,
-  HarnessSnapshotId as HarnessEntry_HarnessSnapshotId,
-  HarnessVersion as HarnessEntry_HarnessVersion,
-  RefinementEdit as HarnessEntry_RefinementEdit,
-  RefinementEvent as HarnessEntry_RefinementEvent,
-  RefinementProposal as HarnessEntry_RefinementProposal,
-  UpdateEdit as HarnessEntry_UpdateEdit,
-  editKey as HarnessEntry_editKey,
-  kinds as HarnessEntry_kinds,
-  revision as HarnessEntry_revision,
-  value as HarnessEntry_value,
+  AppliedRefinementEdit as Entry_AppliedRefinementEdit,
+  AuthoredCreateEdit as Entry_AuthoredCreateEdit,
+  AuthoredEdit as Entry_AuthoredEdit,
+  AuthoredProposal as Entry_AuthoredProposal,
+  AuthoredUpdateEdit as Entry_AuthoredUpdateEdit,
+  CreateEdit as Entry_CreateEdit,
+  DeleteEdit as Entry_DeleteEdit,
+  GuidanceEntry as Entry_GuidanceEntry,
+  GuidanceEntryValue as Entry_GuidanceEntryValue,
+  GuidanceId as Entry_GuidanceId,
+  GuidanceInstant as Entry_GuidanceInstant,
+  GuidanceKind as Entry_GuidanceKind,
+  GuidanceRevision as Entry_GuidanceRevision,
+  GuidanceScope as Entry_GuidanceScope,
+  GuidanceSnapshotId as Entry_GuidanceSnapshotId,
+  GuidanceVersion as Entry_GuidanceVersion,
+  RefinementEdit as Entry_RefinementEdit,
+  RefinementEvent as Entry_RefinementEvent,
+  RefinementProposal as Entry_RefinementProposal,
+  UpdateEdit as Entry_UpdateEdit,
+  editKey as Entry_editKey,
+  kinds as Entry_kinds,
+  revision as Entry_revision,
+  value as Entry_value,
 } from "./entry.js"
-export const HarnessEntry = {
-  AppliedRefinementEdit: HarnessEntry_AppliedRefinementEdit,
-  AuthoredCreateEdit: HarnessEntry_AuthoredCreateEdit,
-  AuthoredEdit: HarnessEntry_AuthoredEdit,
-  AuthoredProposal: HarnessEntry_AuthoredProposal,
-  AuthoredUpdateEdit: HarnessEntry_AuthoredUpdateEdit,
-  CreateEdit: HarnessEntry_CreateEdit,
-  DeleteEdit: HarnessEntry_DeleteEdit,
-  HarnessEntry: HarnessEntry_HarnessEntry,
-  HarnessEntryValue: HarnessEntry_HarnessEntryValue,
-  HarnessId: HarnessEntry_HarnessId,
-  HarnessInstant: HarnessEntry_HarnessInstant,
-  HarnessKind: HarnessEntry_HarnessKind,
-  HarnessRevision: HarnessEntry_HarnessRevision,
-  HarnessScope: HarnessEntry_HarnessScope,
-  HarnessSnapshotId: HarnessEntry_HarnessSnapshotId,
-  HarnessVersion: HarnessEntry_HarnessVersion,
-  RefinementEdit: HarnessEntry_RefinementEdit,
-  RefinementEvent: HarnessEntry_RefinementEvent,
-  RefinementProposal: HarnessEntry_RefinementProposal,
-  UpdateEdit: HarnessEntry_UpdateEdit,
-  editKey: HarnessEntry_editKey,
-  kinds: HarnessEntry_kinds,
-  revision: HarnessEntry_revision,
-  value: HarnessEntry_value,
+export const Entry = {
+  AppliedRefinementEdit: Entry_AppliedRefinementEdit,
+  AuthoredCreateEdit: Entry_AuthoredCreateEdit,
+  AuthoredEdit: Entry_AuthoredEdit,
+  AuthoredProposal: Entry_AuthoredProposal,
+  AuthoredUpdateEdit: Entry_AuthoredUpdateEdit,
+  CreateEdit: Entry_CreateEdit,
+  DeleteEdit: Entry_DeleteEdit,
+  GuidanceEntry: Entry_GuidanceEntry,
+  GuidanceEntryValue: Entry_GuidanceEntryValue,
+  GuidanceId: Entry_GuidanceId,
+  GuidanceInstant: Entry_GuidanceInstant,
+  GuidanceKind: Entry_GuidanceKind,
+  GuidanceRevision: Entry_GuidanceRevision,
+  GuidanceScope: Entry_GuidanceScope,
+  GuidanceSnapshotId: Entry_GuidanceSnapshotId,
+  GuidanceVersion: Entry_GuidanceVersion,
+  RefinementEdit: Entry_RefinementEdit,
+  RefinementEvent: Entry_RefinementEvent,
+  RefinementProposal: Entry_RefinementProposal,
+  UpdateEdit: Entry_UpdateEdit,
+  editKey: Entry_editKey,
+  kinds: Entry_kinds,
+  revision: Entry_revision,
+  value: Entry_value,
 } satisfies typeof import("./entry.js")
-export namespace HarnessEntry {
+export namespace Entry {
   export type AppliedRefinementEdit = import("./entry.js").AppliedRefinementEdit
   export type AuthoredCreateEdit = import("./entry.js").AuthoredCreateEdit
   export type AuthoredEdit = import("./entry.js").AuthoredEdit
@@ -59,15 +59,15 @@ export namespace HarnessEntry {
   export type AuthoredUpdateEdit = import("./entry.js").AuthoredUpdateEdit
   export type CreateEdit = import("./entry.js").CreateEdit
   export type DeleteEdit = import("./entry.js").DeleteEdit
-  export type HarnessEntry = import("./entry.js").HarnessEntry
-  export type HarnessEntryValue = import("./entry.js").HarnessEntryValue
-  export type HarnessId = import("./entry.js").HarnessId
-  export type HarnessInstant = import("./entry.js").HarnessInstant
-  export type HarnessKind = import("./entry.js").HarnessKind
-  export type HarnessRevision = import("./entry.js").HarnessRevision
-  export type HarnessScope = import("./entry.js").HarnessScope
-  export type HarnessSnapshotId = import("./entry.js").HarnessSnapshotId
-  export type HarnessVersion = import("./entry.js").HarnessVersion
+  export type GuidanceEntry = import("./entry.js").GuidanceEntry
+  export type GuidanceEntryValue = import("./entry.js").GuidanceEntryValue
+  export type GuidanceId = import("./entry.js").GuidanceId
+  export type GuidanceInstant = import("./entry.js").GuidanceInstant
+  export type GuidanceKind = import("./entry.js").GuidanceKind
+  export type GuidanceRevision = import("./entry.js").GuidanceRevision
+  export type GuidanceScope = import("./entry.js").GuidanceScope
+  export type GuidanceSnapshotId = import("./entry.js").GuidanceSnapshotId
+  export type GuidanceVersion = import("./entry.js").GuidanceVersion
   export type RefinementEdit = import("./entry.js").RefinementEdit
   export type RefinementEvent = import("./entry.js").RefinementEvent
   export type RefinementProposal = import("./entry.js").RefinementProposal
@@ -95,28 +95,28 @@ export namespace Authorship {
   export type isAuthored = typeof import("./authorship.js").isAuthored
 }
 import {
-  HarnessEntries as HarnessState_HarnessEntries,
-  HarnessState as HarnessState_HarnessState,
-  allEntries as HarnessState_allEntries,
-  empty as HarnessState_empty,
-  findEntry as HarnessState_findEntry,
-  make as HarnessState_make,
-  snapshotId as HarnessState_snapshotId,
-  withEntries as HarnessState_withEntries,
+  GuidanceEntries as State_GuidanceEntries,
+  GuidanceState as State_GuidanceState,
+  allEntries as State_allEntries,
+  empty as State_empty,
+  findEntry as State_findEntry,
+  make as State_make,
+  snapshotId as State_snapshotId,
+  withEntries as State_withEntries,
 } from "./state.js"
-export const HarnessState = {
-  HarnessEntries: HarnessState_HarnessEntries,
-  HarnessState: HarnessState_HarnessState,
-  allEntries: HarnessState_allEntries,
-  empty: HarnessState_empty,
-  findEntry: HarnessState_findEntry,
-  make: HarnessState_make,
-  snapshotId: HarnessState_snapshotId,
-  withEntries: HarnessState_withEntries,
+export const State = {
+  GuidanceEntries: State_GuidanceEntries,
+  GuidanceState: State_GuidanceState,
+  allEntries: State_allEntries,
+  empty: State_empty,
+  findEntry: State_findEntry,
+  make: State_make,
+  snapshotId: State_snapshotId,
+  withEntries: State_withEntries,
 } satisfies typeof import("./state.js")
-export namespace HarnessState {
-  export type HarnessEntries = import("./state.js").HarnessEntries
-  export type HarnessState = import("./state.js").HarnessState
+export namespace State {
+  export type GuidanceEntries = import("./state.js").GuidanceEntries
+  export type GuidanceState = import("./state.js").GuidanceState
   export type allEntries = typeof import("./state.js").allEntries
   export type empty = typeof import("./state.js").empty
   export type findEntry = typeof import("./state.js").findEntry
@@ -156,48 +156,48 @@ export namespace Refinement {
   export type rollbackProposal = typeof import("./refinement.js").rollbackProposal
   export type rollbackTarget = typeof import("./refinement.js").rollbackTarget
 }
-import { mergeStates as HarnessMerge_mergeStates } from "./merge.js"
-export const HarnessMerge = { mergeStates: HarnessMerge_mergeStates } satisfies typeof import("./merge.js")
-export namespace HarnessMerge {
+import { mergeStates as Merge_mergeStates } from "./merge.js"
+export const Merge = { mergeStates: Merge_mergeStates } satisfies typeof import("./merge.js")
+export namespace Merge {
   export type mergeStates = typeof import("./merge.js").mergeStates
 }
 import {
-  defaultOverviewOptions as HarnessOverview_defaultOverviewOptions,
-  formatOverview as HarnessOverview_formatOverview,
+  defaultOverviewOptions as Overview_defaultOverviewOptions,
+  formatOverview as Overview_formatOverview,
 } from "./overview.js"
-export const HarnessOverview = {
-  defaultOverviewOptions: HarnessOverview_defaultOverviewOptions,
-  formatOverview: HarnessOverview_formatOverview,
+export const Overview = {
+  defaultOverviewOptions: Overview_defaultOverviewOptions,
+  formatOverview: Overview_formatOverview,
 } satisfies typeof import("./overview.js")
-export namespace HarnessOverview {
+export namespace Overview {
   export type OverviewOptions = import("./overview.js").OverviewOptions
   export type defaultOverviewOptions = typeof import("./overview.js").defaultOverviewOptions
   export type formatOverview = typeof import("./overview.js").formatOverview
 }
 import {
-  CODEC as HarnessSnapshot_CODEC,
-  HarnessSnapshot as HarnessSnapshot_HarnessSnapshot,
-  SnapshotInvalid as HarnessSnapshot_SnapshotInvalid,
-  SnapshotMismatch as HarnessSnapshot_SnapshotMismatch,
-  SnapshotPayload as HarnessSnapshot_SnapshotPayload,
-  VERSION as HarnessSnapshot_VERSION,
-  decode as HarnessSnapshot_decode,
-  encode as HarnessSnapshot_encode,
-  snapshot as HarnessSnapshot_snapshot,
+  CODEC as Snapshot_CODEC,
+  GuidanceSnapshot as Snapshot_GuidanceSnapshot,
+  SnapshotInvalid as Snapshot_SnapshotInvalid,
+  SnapshotMismatch as Snapshot_SnapshotMismatch,
+  SnapshotPayload as Snapshot_SnapshotPayload,
+  VERSION as Snapshot_VERSION,
+  decode as Snapshot_decode,
+  encode as Snapshot_encode,
+  snapshot as Snapshot_snapshot,
 } from "./snapshot.js"
-export const HarnessSnapshot = {
-  CODEC: HarnessSnapshot_CODEC,
-  HarnessSnapshot: HarnessSnapshot_HarnessSnapshot,
-  SnapshotInvalid: HarnessSnapshot_SnapshotInvalid,
-  SnapshotMismatch: HarnessSnapshot_SnapshotMismatch,
-  SnapshotPayload: HarnessSnapshot_SnapshotPayload,
-  VERSION: HarnessSnapshot_VERSION,
-  decode: HarnessSnapshot_decode,
-  encode: HarnessSnapshot_encode,
-  snapshot: HarnessSnapshot_snapshot,
+export const Snapshot = {
+  CODEC: Snapshot_CODEC,
+  GuidanceSnapshot: Snapshot_GuidanceSnapshot,
+  SnapshotInvalid: Snapshot_SnapshotInvalid,
+  SnapshotMismatch: Snapshot_SnapshotMismatch,
+  SnapshotPayload: Snapshot_SnapshotPayload,
+  VERSION: Snapshot_VERSION,
+  decode: Snapshot_decode,
+  encode: Snapshot_encode,
+  snapshot: Snapshot_snapshot,
 } satisfies typeof import("./snapshot.js")
-export namespace HarnessSnapshot {
-  export type HarnessSnapshot = import("./snapshot.js").HarnessSnapshot
+export namespace Snapshot {
+  export type GuidanceSnapshot = import("./snapshot.js").GuidanceSnapshot
   export type SnapshotInvalid = import("./snapshot.js").SnapshotInvalid
   export type SnapshotMismatch = import("./snapshot.js").SnapshotMismatch
   export type SnapshotPayload = import("./snapshot.js").SnapshotPayload
@@ -205,42 +205,42 @@ export namespace HarnessSnapshot {
   export type encode = typeof import("./snapshot.js").encode
   export type snapshot = typeof import("./snapshot.js").snapshot
 }
-import { registration as HarnessRegistration_registration } from "./registration.js"
-export const HarnessRegistration = {
-  registration: HarnessRegistration_registration,
+import { registration as Registration_registration } from "./registration.js"
+export const Registration = {
+  registration: Registration_registration,
 } satisfies typeof import("./registration.js")
-export namespace HarnessRegistration {
+export namespace Registration {
   export type PinnedRegistration = import("./registration.js").PinnedRegistration
   export type registration = typeof import("./registration.js").registration
 }
 import {
-  HarnessStore as HarnessStore_HarnessStore,
-  HarnessStoreError as HarnessStore_HarnessStoreError,
-  HarnessStoreRejection as HarnessStore_HarnessStoreRejection,
-  layerMemory as HarnessStore_layerMemory,
-  layerTest as HarnessStore_layerTest,
+  Store as Store_Store,
+  StoreError as Store_StoreError,
+  StoreRejection as Store_StoreRejection,
+  layerMemory as Store_layerMemory,
+  layerTest as Store_layerTest,
 } from "./store.js"
-export const HarnessStore = {
-  HarnessStore: HarnessStore_HarnessStore,
-  HarnessStoreError: HarnessStore_HarnessStoreError,
-  HarnessStoreRejection: HarnessStore_HarnessStoreRejection,
-  layerMemory: HarnessStore_layerMemory,
-  layerTest: HarnessStore_layerTest,
+export const Store = {
+  Store: Store_Store,
+  StoreError: Store_StoreError,
+  StoreRejection: Store_StoreRejection,
+  layerMemory: Store_layerMemory,
+  layerTest: Store_layerTest,
 } satisfies typeof import("./store.js")
-export namespace HarnessStore {
-  export type HarnessStore = import("./store.js").HarnessStore
-  export type HarnessStoreError = import("./store.js").HarnessStoreError
-  export type Interface = import("./store.js").Interface
-  export type HarnessStoreRejection = import("./store.js").HarnessStoreRejection
+export namespace Store {
+  export type Store = import("./store.js").Store
+  export type StoreError = import("./store.js").StoreError
+  export type Service = import("./store.js").Service
+  export type StoreRejection = import("./store.js").StoreRejection
   export type layerMemory = typeof import("./store.js").layerMemory
   export type layerTest = typeof import("./store.js").layerTest
 }
-import { make as FileSystemHarnessStore_make, layer as FileSystemHarnessStore_layer } from "./store-file-system.js"
-export const FileSystemHarnessStore = {
-  make: FileSystemHarnessStore_make,
-  layer: FileSystemHarnessStore_layer,
+import { make as FileSystemStore_make, layer as FileSystemStore_layer } from "./store-file-system.js"
+export const FileSystemStore = {
+  make: FileSystemStore_make,
+  layer: FileSystemStore_layer,
 } satisfies typeof import("./store-file-system.js")
-export namespace FileSystemHarnessStore {
+export namespace FileSystemStore {
   export type Options = import("./store-file-system.js").Options
   export type make = typeof import("./store-file-system.js").make
   export type layer = typeof import("./store-file-system.js").layer

@@ -13,7 +13,7 @@ const modelLayer = layerOrDeterministic({
 
 const selection: ModelRegistry.ModelSelection = { provider: "deterministic", model: "gpt-4o-mini" }
 
-const program = ModelRegistry.operate(selection, Agent.generate(agent, { prompt: "Draft the release note." })).pipe(
+const program = ModelRegistry.withModel(selection, Agent.generate(agent, { prompt: "Draft the release note." })).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
 )
 

@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
 import { ToolContext } from "tenetkit"
-import { HostBindingRegistry } from "../../../src/repl/index.js"
+import { HostModules } from "../../../src/repl/index.js"
 import { liveOptions, platform, runCell, withPool } from "../bun-harness.js"
 
 const Out = Schema.Struct({ session: Schema.String })
@@ -16,7 +16,7 @@ const ambientContext = ToolContext.ToolContext.of({
   toolCallId: "t",
 })
 
-const whoami: HostBindingRegistry.AnyOperation = {
+const whoami: HostModules.AnyOperation = {
   name: "whoami",
   input: Input,
   output: Out,
@@ -30,7 +30,7 @@ const whoami: HostBindingRegistry.AnyOperation = {
 const probeModule = {
   name: "probe",
   operations: [whoami],
-} satisfies HostBindingRegistry.Module
+} satisfies HostModules.Module
 
 layer(platform, liveOptions)("Bun kernel host bindings", (it) => {
   /**

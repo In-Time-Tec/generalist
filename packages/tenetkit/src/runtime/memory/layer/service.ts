@@ -16,7 +16,7 @@ import { make as makeMessage } from "../../messaging/message.js"
 import { RunStore, type AdmitMessageInput, type AdmitSendInput, type AdmitStartInput } from "../../run/store.js"
 import {
   Runtime,
-  type Interface as RuntimeInterface,
+  type Service as RuntimeService,
   type InitialFanOutInput,
   type LayerOptions,
   type SendInput,
@@ -51,7 +51,7 @@ type MutableMessageAdmission = { -readonly [Key in keyof AdmitMessageInput]: Adm
 
 export const serviceEffect = (
   options: LayerOptions,
-): Effect.Effect<RuntimeInterface, never, RunStore | ActiveExecutions> =>
+): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions> =>
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
@@ -115,7 +115,7 @@ export const serviceEffect = (
           idempotencyKey: input.idempotencyKey,
         })
         .pipe(Effect.flatMap((admitted) => (admitted ? Effect.succeed(input.registrations) : attest(input))))
-    const awaitFanOut = (fanOutId: string): ReturnType<RuntimeInterface["awaitFanOut"]> =>
+    const awaitFanOut = (fanOutId: string): ReturnType<RuntimeService["awaitFanOut"]> =>
       Effect.gen(function* () {
         const current = yield* store.inspectFanOut(fanOutId)
         if (current.status !== "running") return current
@@ -131,8 +131,8 @@ export const serviceEffect = (
         return yield* awaitFanOut(fanOutId)
       })
     const childSettlementChanges = (
-      input: Parameters<RuntimeInterface["childSettlementChanges"]>[0],
-    ): ReturnType<RuntimeInterface["childSettlementChanges"]> =>
+      input: Parameters<RuntimeService["childSettlementChanges"]>[0],
+    ): ReturnType<RuntimeService["childSettlementChanges"]> =>
       Stream.unwrap(
         Effect.gen(function* () {
           const parent = yield* store.directory(input.parentRunId)
@@ -153,8 +153,8 @@ export const serviceEffect = (
         }),
       )
     const awaitChildSettlement = (
-      input: Parameters<RuntimeInterface["awaitChildSettlement"]>[0],
-    ): ReturnType<RuntimeInterface["awaitChildSettlement"]> =>
+      input: Parameters<RuntimeService["awaitChildSettlement"]>[0],
+    ): ReturnType<RuntimeService["awaitChildSettlement"]> =>
       childSettlementChanges({ parentRunId: input.parentRunId }).pipe(
         Stream.filter((notification) => notification.childRunId === input.childRunId),
         Stream.runHead,

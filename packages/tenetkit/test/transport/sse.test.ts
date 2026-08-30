@@ -2,7 +2,7 @@ import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Function, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { Sse as SseEncoding } from "effect/unstable/encoding"
 import { Headers, HttpBody, HttpServerRequest } from "effect/unstable/http"
-import { Sse, Wire } from "../../src/transport/index.js"
+import { SSE, Wire } from "../../src/transport/index.js"
 import { event, runtimeLayer } from "./fixtures.js"
 
 const provideScoped = Function.dual<
@@ -49,7 +49,7 @@ const parse = (text: string): ReadonlyArray<SseEncoding.Event> => {
   return events
 }
 
-describe("Sse", () => {
+describe("SSE", () => {
   it.live("replays events strictly after Last-Event-ID", () =>
     Effect.gen(function* () {
       const cursors = yield* Ref.make<Array<number | undefined>>([])
@@ -62,7 +62,7 @@ describe("Sse", () => {
       })
       const response = yield* provideScoped(
         sseLayer,
-        Sse.respond({
+        SSE.respond({
           runId: "run-1",
           request: request("http://test/runs/run-1/events?cursor=0", { "Last-Event-ID": "1" }),
         }),
@@ -78,7 +78,7 @@ describe("Sse", () => {
 
   layer(runtimeLayer())("rejects malformed cursors instead of silently replaying from origin", (suite) => {
     suite.effect("rejects malformed cursors instead of silently replaying from origin", () =>
-      Sse.respond({ runId: "run-1", request: request("http://test/runs/run-1/events?cursor=wat") }).pipe(
+      SSE.respond({ runId: "run-1", request: request("http://test/runs/run-1/events?cursor=wat") }).pipe(
         Effect.flip,
         Effect.map((error) => expect(error._tag).toBe("tenetkit/transport/InvalidCursor")),
       ),

@@ -24,7 +24,7 @@ export const event: {
     }),
 )
 
-export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): Layer.Layer<Runtime.Runtime> =>
+export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Layer.Layer<Runtime.Runtime> =>
   Layer.succeed(
     Runtime.Runtime,
     Runtime.Runtime.of({

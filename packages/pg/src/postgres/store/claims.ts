@@ -14,7 +14,7 @@ import { isTerminal } from "tenetkit/runtime/driver/run"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { claimReadyRuns, refreshLease } from "../runs/claims.js"
-import { RunClaims, type Interface as ClaimsInterface } from "tenetkit/runtime/driver/sql/run/claims"
+import { RunClaims, type Service as ClaimsService } from "tenetkit/runtime/driver/sql/run/claims"
 import { afterTerminal, appendEvent, completeRun, loadEventsAfter, loadRun, settleParent } from "./runtime.js"
 import { lockRunHierarchy } from "../runs/locks.js"
 import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
@@ -97,7 +97,7 @@ export const postgresClaims = (input: {
     runId: string,
     reason: string | undefined,
   ) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable | SqlError, SqlR>
-}): ClaimsInterface => {
+}): ClaimsService => {
   const { hub, run, cancelRun } = input
   return RunClaims.of({
     changes: wakeupChanges(input.pg.config, input.source),

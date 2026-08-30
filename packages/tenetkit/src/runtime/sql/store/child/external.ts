@@ -23,7 +23,7 @@ import { cancel as cancelRun, respond, settleAdmittedCancellation, suspend } fro
 import { appendEvent, loadRun, loadRunWait, nowIso } from "../statements.js"
 import type { EventHub } from "../../subscribers.js"
 import { requireExecutionClaim } from "../execution.js"
-import type { Interface as ExternalChildStoreInterface } from "../../../child/external/store.js"
+import type { Service as ExternalChildStoreService } from "../../../child/external/store.js"
 import { startDigest } from "../../../memory/digest.js"
 import { admitStart } from "../admit.js"
 import { activateRoot } from "../activate.js"
@@ -247,7 +247,7 @@ const settle = (
 
 export const externalChildSettlement = { settle }
 
-type AdmitRootInput = Parameters<ExternalChildStoreInterface["admitRoot"]>[0]
+type AdmitRootInput = Parameters<ExternalChildStoreService["admitRoot"]>[0]
 
 const loadExternalRoot = (placementId: string) =>
   Effect.gen(function* () {

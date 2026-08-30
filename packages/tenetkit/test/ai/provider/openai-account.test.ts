@@ -2,21 +2,21 @@ import { describe, expect, it } from "@effect/vitest"
 import { Config, Deferred, Effect, Fiber, Layer, Redacted, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
-import { OpenAiClient } from "@effect/ai-openai"
+import { OpenAiClient as OpenAIClient } from "@effect/ai-openai"
 import { ModelRegistry } from "../../../src/index.js"
 import {
-  type OpenAiAccountCredential,
-  OpenAiAccountCredentialError,
-  type OpenAiAccountCredentials,
+  type OpenAIAccountCredential,
+  OpenAIAccountCredentialError,
+  type OpenAIAccountCredentials,
   credentialsFromAccountAuth,
   layerAccount,
   layerAccountClient,
 } from "../../../src/ai/provider/openai-account.js"
 import { classifyFailure, layer as openAiLayer } from "../../../src/ai/provider/openai.js"
-import type { ServiceInterface } from "../../../src/ai/provider/openai-account-auth.js"
+import type { AuthService } from "../../../src/ai/provider/openai-account-auth.js"
 
 const endpoint = "https://chatgpt.com/backend-api/codex/responses"
-const credential = (generation: string, suffix = generation): OpenAiAccountCredential => ({
+const credential = (generation: string, suffix = generation): OpenAIAccountCredential => ({
   accessToken: Redacted.make(`token-${suffix}`),
   accountId: `account-${suffix}`,
   generation,
@@ -80,12 +80,12 @@ const streamingOnlyClient = (requests: Array<CapturedRequest>, body: BodyInit = 
   })
 
 const credentials = (
-  acquire: Effect.Effect<OpenAiAccountCredential, OpenAiAccountCredentialError>,
-  refreshRejected: OpenAiAccountCredentials["refreshRejected"] = () => Effect.die("unexpected refresh"),
-): OpenAiAccountCredentials => ({ acquire, refreshRejected })
+  acquire: Effect.Effect<OpenAIAccountCredential, OpenAIAccountCredentialError>,
+  refreshRejected: OpenAIAccountCredentials["refreshRejected"] = () => Effect.die("unexpected refresh"),
+): OpenAIAccountCredentials => ({ acquire, refreshRejected })
 
 const expectAiError = (
-  error: AiError.AiError | OpenAiAccountCredentialError | ModelRegistry.LanguageModelNotRegistered,
+  error: AiError.AiError | OpenAIAccountCredentialError | ModelRegistry.LanguageModelNotRegistered,
 ): AiError.AiError => {
   expect(AiError.isAiError(error)).toBe(true)
   if (AiError.isAiError(error)) return error
@@ -97,7 +97,7 @@ const provideLayer =
   <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
     Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
 
-const provideAccount = (accountCredentials: OpenAiAccountCredentials, client: HttpClient.HttpClient) => {
+const provideAccount = (accountCredentials: OpenAIAccountCredentials, client: HttpClient.HttpClient) => {
   const layer = Layer.provide(
     layerAccount({ model: "gpt-test", credentials: accountCredentials }),
     Layer.succeed(HttpClient.HttpClient, client),
@@ -105,7 +105,7 @@ const provideAccount = (accountCredentials: OpenAiAccountCredentials, client: Ht
   return provideLayer(layer)
 }
 
-const provideAccountStream = (accountCredentials: OpenAiAccountCredentials, client: HttpClient.HttpClient) =>
+const provideAccountStream = (accountCredentials: OpenAIAccountCredentials, client: HttpClient.HttpClient) =>
   Stream.provide(
     Layer.provide(
       layerAccount({ model: "gpt-test", credentials: accountCredentials }),
@@ -113,8 +113,8 @@ const provideAccountStream = (accountCredentials: OpenAiAccountCredentials, clie
     ),
   )
 
-const generate = (accountCredentials: OpenAiAccountCredentials, client: HttpClient.HttpClient) =>
-  ModelRegistry.operate(
+const generate = (accountCredentials: OpenAIAccountCredentials, client: HttpClient.HttpClient) =>
+  ModelRegistry.withModel(
     { provider: "openai", model: "gpt-test" },
     LanguageModel.generateText({ prompt: "hello" }),
   ).pipe(provideAccount(accountCredentials, client))
@@ -228,7 +228,7 @@ describe("OpenAI account Responses registration", () => {
         LanguageModel.streamText({ prompt: "hello" }),
       ).pipe(
         provideAccountStream(credentials(Effect.succeed(credential("current"))), mockClient([200], requests)),
-        Stream.provideService(OpenAiClient.OpenAiSocket, {
+        Stream.provideService(OpenAIClient.OpenAiSocket, {
           createResponseStream: (options) =>
             Effect.sync(() => {
               socketCalls.push(options)
@@ -295,7 +295,7 @@ describe("OpenAI account Responses registration", () => {
       expiresAt: 1,
       refreshedAt: 1,
     })
-    const auth: ServiceInterface = {
+    const auth: AuthService = {
       loginBrowser: () => Effect.succeed(authCredential("profile-a", "old")),
       loginDevice: Effect.succeed(authCredential("profile-a", "old")),
       status: Effect.succeed({ _tag: "Present", fingerprint: "profile-a" }),
@@ -348,7 +348,7 @@ describe("OpenAI account Responses registration", () => {
       )
       const credentialFailure = yield* Effect.flip(
         generate(
-          credentials(Effect.fail(OpenAiAccountCredentialError.make({ operation: "acquire" })), refresh),
+          credentials(Effect.fail(OpenAIAccountCredentialError.make({ operation: "acquire" })), refresh),
           mockClient([], []),
         ),
       )
@@ -399,7 +399,7 @@ describe("OpenAI account Responses registration", () => {
 
     return Effect.gen(function* () {
       yield* Effect.flip(
-        ModelRegistry.operate(
+        ModelRegistry.withModel(
           { provider: "openai", model: "gpt-test" },
           LanguageModel.generateText({ prompt: "hello" }),
         ).pipe(provideLayer(layer)),
@@ -460,7 +460,7 @@ describe("OpenAI account Responses registration", () => {
     const requests: Array<CapturedRequest> = []
 
     return Effect.gen(function* () {
-      const response = yield* ModelRegistry.operate(
+      const response = yield* ModelRegistry.withModel(
         { provider: "openai", model: "gpt-test" },
         LanguageModel.generateText({ prompt: "summarize" }),
       ).pipe(
@@ -507,7 +507,7 @@ describe("OpenAI account Responses registration", () => {
     const accountCredentials = credentials(Effect.succeed(credential("current")))
 
     return Effect.gen(function* () {
-      const folded = yield* ModelRegistry.operate(
+      const folded = yield* ModelRegistry.withModel(
         { provider: "openai", model: "gpt-test" },
         LanguageModel.generateText({ prompt: "summarize" }),
       ).pipe(provideAccount(accountCredentials, streamingOnlyClient([], body)))
@@ -541,7 +541,7 @@ describe("OpenAI account Responses registration", () => {
 
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(
-        ModelRegistry.operate(
+        ModelRegistry.withModel(
           { provider: "openai", model: "gpt-test" },
           LanguageModel.generateText({ prompt: "summarize" }),
         ).pipe(provideAccount(credentials(Effect.succeed(credential("current"))), streamingOnlyClient(requests, body))),
@@ -563,7 +563,7 @@ describe("OpenAI account Responses registration", () => {
 
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(
-        ModelRegistry.operate(
+        ModelRegistry.withModel(
           { provider: "openai", model: "gpt-test" },
           LanguageModel.generateText({ prompt: "summarize" }),
         ).pipe(provideAccount(credentials(Effect.succeed(credential("current"))), streamingOnlyClient(requests, body))),
@@ -580,7 +580,7 @@ describe("OpenAI account Responses registration", () => {
 
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(
-        ModelRegistry.operate(
+        ModelRegistry.withModel(
           { provider: "openai", model: "gpt-test" },
           LanguageModel.generateText({ prompt: "summarize" }),
         ).pipe(provideAccount(credentials(Effect.succeed(credential("current"))), streamingOnlyClient(requests, body))),
@@ -614,7 +614,7 @@ describe("OpenAI account Responses registration", () => {
     })
 
     return Effect.gen(function* () {
-      const response = yield* ModelRegistry.operate(
+      const response = yield* ModelRegistry.withModel(
         { provider: "openai", model: "gpt-test" },
         LanguageModel.generateText({ prompt: "summarize" }),
       ).pipe(provideAccount(accountCredentials, client))
@@ -634,7 +634,7 @@ describe("OpenAI account Responses registration", () => {
     )
 
     return Effect.gen(function* () {
-      const client = yield* OpenAiClient.OpenAiClient
+      const client = yield* OpenAIClient.OpenAiClient
       const failure = yield* Effect.flip(client.createEmbedding({ model: "text-embedding-3-small", input: "hello" }))
 
       expect(requests).toEqual([])

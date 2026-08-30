@@ -15,7 +15,7 @@ import type { Registry } from "../../tools/tool-registry.js"
 import type { Request } from "../../tools/tool-executor.js"
 import type { SuspensionCheckpoint, ToolCheckpoint } from "../suspension.js"
 import type { HandoffRunState } from "../handoff/state.js"
-import type { Entry, Interface as SessionStore } from "../../context/session.js"
+import type { Entry, Service as SessionStore } from "../../context/session.js"
 import type { Steering, Input } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 

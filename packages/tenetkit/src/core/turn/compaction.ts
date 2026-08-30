@@ -112,7 +112,7 @@ export interface StrategyPart {
 }
 
 /** @experimental Compaction service boundary consulted by the loop. */
-export interface Interface {
+export interface Service {
   readonly willCompact?: (input: { readonly usage: Usage; readonly overflow: boolean }) => boolean
   readonly maybeCompact: (
     request: Request,
@@ -126,7 +126,7 @@ export class CompactionError extends Schema.TaggedError<CompactionError>()("tene
 }) {}
 
 /** @experimental */
-export class Compaction extends Context.Service<Compaction, Interface>()("tenetkit/core/turn/compaction") {}
+export class Compaction extends Context.Service<Compaction, Service>()("tenetkit/core/turn/compaction") {}
 
 /** @experimental Options for the default compaction implementation. */
 export interface DefaultOptions {
@@ -372,11 +372,11 @@ export const structuredSummary = (options: StructuredSummaryOptions = {}): Strat
 
 /** @experimental Build a compaction service from a strategy. */
 export const make: {
-  (options?: DefaultOptions): (compactionStrategy: Strategy) => Interface
-  (compactionStrategy: Strategy, options?: DefaultOptions): Interface
+  (options?: DefaultOptions): (compactionStrategy: Strategy) => Service
+  (compactionStrategy: Strategy, options?: DefaultOptions): Service
 } = Function.dual(
   (args) => args.length !== 1 || "shouldCompact" in args[0],
-  (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => {
+  (compactionStrategy: Strategy, options: DefaultOptions = {}): Service => {
     const thresholds = makeThresholdState()
     return {
       willCompact: ({ usage, overflow }) =>
@@ -475,7 +475,7 @@ export const layer: {
 )
 
 /** @experimental Truncate-only compaction over `Tokenizer`. */
-export const truncate = (maxTokens: number): Interface => ({
+export const truncate = (maxTokens: number): Service => ({
   maybeCompact: (input) =>
     Effect.gen(function* () {
       const usage = input.usage
@@ -496,5 +496,5 @@ export const truncate = (maxTokens: number): Interface => ({
 })
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<Compaction> =>
+export const layerTest = (implementation: Service): Layer.Layer<Compaction> =>
   Layer.succeed(Compaction, Compaction.of(implementation))

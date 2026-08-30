@@ -3,7 +3,7 @@ import { Instructions } from "tenetkit"
 import { InstructionFiles } from "tenetkit/skills"
 
 export const repoSources: Effect.Effect<
-  ReadonlyArray<Instructions.ContextSource>,
+  ReadonlyArray<Instructions.Source>,
   PlatformError.PlatformError,
   FileSystem.FileSystem | Path.Path
 > = InstructionFiles.loadInstructionFiles({ cwd: "." }).pipe(

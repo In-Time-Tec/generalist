@@ -1,7 +1,7 @@
 import { Effect, Option, Schema } from "effect"
 import { assemble, type Candidate } from "../../tools/tool-registry.js"
 import { Instructions, openEpoch } from "../../context/instructions.js"
-import { SkillSource, selectListings } from "../../context/skill-source.js"
+import { listing, SkillCatalog, selectListings } from "../../context/skill-catalog.js"
 import { refreshResumeSystem } from "../session/history.js"
 import { activateSkillTool, skillListingBudgetTokens } from "../skill-tool.js"
 import { skillListingsInstructions } from "../message.js"
@@ -15,13 +15,13 @@ const { appendInstructionFragment, errorMessage } = SetupHelpers
 export const setupPromptContext = <T extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(args: {
   readonly agent: Agent<T, R>
   readonly options: RunOptions
-  readonly activeSession: Option.Option<import("../../context/session.js").Interface>
+  readonly activeSession: Option.Option<import("../../context/session.js").Service>
   readonly resumeChat: import("effect/unstable/ai").Chat.Service | undefined
   readonly staticCandidates: ReadonlyArray<Candidate>
 }) =>
   Effect.gen(function* () {
     const instructionsService = yield* Effect.serviceOption(Instructions)
-    const skillSourceService = yield* Effect.serviceOption(SkillSource)
+    const skillSourceService = yield* Effect.serviceOption(SkillCatalog)
     const skillRuntime = Option.isNone(skillSourceService)
       ? undefined
       : {
@@ -32,7 +32,7 @@ export const setupPromptContext = <T extends Record<string, import("effect/unsta
         }
     const selectedSkills =
       skillRuntime === undefined ? [] : selectListings(skillRuntime.skills, skillListingBudgetTokens, [])
-    const skillListings = selectedSkills.map((skill) => skill.listing).join("\n")
+    const skillListings = selectedSkills.map((skill) => listing(skill)).join("\n")
     const hasActivatableSkills = selectedSkills.length > 0
     const initialRegistry = yield* assemble([
       ...args.staticCandidates,

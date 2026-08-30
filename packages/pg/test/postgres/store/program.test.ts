@@ -1,7 +1,7 @@
-import { layerPostgres } from "@tenetkit/pg"
+import { layer as backendLayer } from "@tenetkit/pg"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { ExecutionHost, Runtime, RunStore } from "tenetkit/runtime"
+import { RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { registrationsFor } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
 import { agentMapProgramFixture } from "../../../../tenetkit/test/runtime/program/fixture.js"
@@ -14,7 +14,7 @@ const database = postgresDatabase("program-registration-parity")
 describePostgres("PostgreSQL Program registration parity", () => {
   {
     const fixture = agentMapProgramFixture()
-    const runtimeLayer = layerPostgres({
+    const runtimeLayer = backendLayer({
       url: database.url,
       maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
@@ -34,7 +34,7 @@ describePostgres("PostgreSQL Program registration parity", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claims = yield* RunClaims
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const root = yield* runtime.send({
               to: fixture.address,
               sessionId: "registration-parity",

@@ -10,7 +10,7 @@ export type AuthorshipRejection = typeof AuthorshipRejection.Type
 
 /** @experimental Untrusted proposal input was refused and no state was inspected or changed. */
 export class AuthorshipRejected extends Schema.TaggedError<AuthorshipRejected>()(
-  "tenetkit/harness/AuthorshipRejected",
+  "tenetkit/agent-guidance/AuthorshipRejected",
   { reason: AuthorshipRejection, message: Schema.String },
 ) {}
 

@@ -2,7 +2,7 @@ import { Role, TaskState, type Artifact, type Message, type Part, type Task, typ
 import { ProgramExecutionResult } from "../../runtime/execution/state.js"
 import type { RunInspection } from "../../runtime/run.js"
 import type { RunCompleted, RunEvent } from "../../runtime/run/event.js"
-import type { Interface as RuntimeInterface } from "../../runtime/service.js"
+import type { Service as RuntimeService } from "../../runtime/service.js"
 import { Effect, Function, Schema } from "effect"
 import { TaskProjectionFailed } from "./errors.js"
 
@@ -99,11 +99,11 @@ const artifactFrom = (event: RunCompleted, events: ReadonlyArray<RunEvent>): Art
 
 /** @experimental Project one Runtime snapshot and its canonical history to an A2A Task. */
 export const fromRuntime: {
-  (runtime: RuntimeInterface, taskId: string): Effect.Effect<Task, TaskProjectionFailed>
-  (taskId: string): (runtime: RuntimeInterface) => Effect.Effect<Task, TaskProjectionFailed>
+  (runtime: RuntimeService, taskId: string): Effect.Effect<Task, TaskProjectionFailed>
+  (taskId: string): (runtime: RuntimeService) => Effect.Effect<Task, TaskProjectionFailed>
 } = Function.dual(
   2,
-  (runtime: RuntimeInterface, taskId: string): Effect.Effect<Task, TaskProjectionFailed> =>
+  (runtime: RuntimeService, taskId: string): Effect.Effect<Task, TaskProjectionFailed> =>
     Effect.gen(function* () {
       const snapshot = yield* runtime.snapshot(taskId)
       const events = yield* runtime.history({ runId: taskId, limit: snapshot.cursor + 1 })

@@ -1,11 +1,11 @@
-import { sandboxExecutorConformance } from "tenetkit/test"
+import { codeExecutorConformance } from "tenetkit/test"
 import { Effect } from "effect"
 import { layer } from "@tenetkit/cloudflare/dynamic-workers"
 import { makeVmWorkerLoader } from "./dynamic-workers-vm-loader.js"
 
 const loader = makeVmWorkerLoader()
 
-sandboxExecutorConformance({
+codeExecutorConformance({
   name: "Cloudflare Dynamic Workers protocol fixture",
   layer: layer({
     loader,

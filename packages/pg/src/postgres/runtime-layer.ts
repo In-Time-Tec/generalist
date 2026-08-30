@@ -7,7 +7,7 @@ import { Runtime, type LayerOptions } from "tenetkit/runtime/driver/service"
 import { RunStore } from "tenetkit/runtime/driver/run/store"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { postgresServices } from "./store/index.js"
-import { ExecutionHost, make as makeExecutionHost } from "tenetkit/runtime/driver/execution/host"
+import { RunExecutor, make as makeRunExecutor } from "tenetkit/runtime/driver/execution/run-executor"
 import { layer as activeExecutionsLayer } from "tenetkit/runtime/driver/execution/active-executions"
 import { layer as modelPreviewLayer } from "tenetkit/runtime/driver/execution/model-response/preview"
 import {
@@ -20,25 +20,25 @@ import {
 import { layerClient } from "./client.js"
 
 /** @experimental PostgreSQL Runtime options independent of client acquisition. */
-export interface PostgresOptions extends LayerOptions {
+export interface Options extends LayerOptions {
   readonly source?: string
 }
 
 /** @experimental PostgreSQL Runtime options for the URL-backed convenience Layer. */
-export interface PostgresUrlOptions extends PostgresOptions {
+export interface UrlOptions extends Options {
   readonly url: string
   readonly maxConnections?: number
 }
 
 /** @experimental PostgreSQL Runtime construction failures. */
-export type PostgresStoreError =
+export type StoreError =
   | SchemaDirty
   | SchemaChecksumMismatch
   | SchemaVersionUnsupported
   | SchemaUpgradeRequired
   | SchemaMigrationFailed
 
-type PostgresServices = Runtime | RunStore | RunClaims | ExecutionHost
+type PostgresServices = Runtime | RunStore | RunClaims | RunExecutor
 
 /**
  * @experimental Build the PostgreSQL Runtime from the caller's `PgClient`.
@@ -46,9 +46,7 @@ type PostgresServices = Runtime | RunStore | RunClaims | ExecutionHost
  * Host transactions must use the `SqlClient` exposed by the same client Layer. Runtime operations
  * then nest through that exact transaction service and therefore use PostgreSQL savepoints.
  */
-export const layer = (
-  options: PostgresOptions,
-): Layer.Layer<PostgresServices, PostgresStoreError | SqlError, PgClient.PgClient> => {
+const layerWithClient = (options: Options): Layer.Layer<PostgresServices, StoreError | SqlError, PgClient.PgClient> => {
   const client = Layer.effectContext(
     PgClient.PgClient.pipe(
       Effect.map((pg) => Context.make(PgClient.PgClient, pg).pipe(Context.add(SqlClient.SqlClient, pg))),
@@ -61,17 +59,19 @@ export const layer = (
   ).pipe(Layer.provide(client))
   const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(
-    ExecutionHost,
-    makeExecutionHost({ workerId: "postgres", resolver: options.resolver }),
-  ).pipe(Layer.provide(dependencies))
+  const host = Layer.effect(RunExecutor, makeRunExecutor({ workerId: "postgres", resolver: options.resolver })).pipe(
+    Layer.provide(dependencies),
+  )
   return Layer.mergeAll(runtime, host, services)
 }
 
-/** @experimental Build the PostgreSQL Runtime and its client from a URL. */
-export const layerPostgres = (
-  options: PostgresUrlOptions,
-): Layer.Layer<PostgresServices, PostgresStoreError | SqlError> => {
+/** @experimental Build the PostgreSQL Runtime, optionally acquiring its client from a URL. */
+export function layer(options: UrlOptions): Layer.Layer<PostgresServices, StoreError | SqlError>
+export function layer(options: Options): Layer.Layer<PostgresServices, StoreError | SqlError, PgClient.PgClient>
+export function layer(
+  options: Options | UrlOptions,
+): Layer.Layer<PostgresServices, StoreError | SqlError, PgClient.PgClient> {
+  if (!("url" in options)) return layerWithClient(options)
   const maxConnections = options.maxConnections ?? 10
   const client = Layer.unwrap(
     Effect.gen(function* () {
@@ -84,5 +84,5 @@ export const layerPostgres = (
       return layerClient({ url: options.url, maxConnections })
     }),
   )
-  return layer(options).pipe(Layer.provide(client))
+  return layerWithClient(options).pipe(Layer.provide(client))
 }

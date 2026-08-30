@@ -3,7 +3,7 @@ import { AgentEvent } from "../../core/index.js"
 import { DurableDriver } from "../../core/durable/public/driver.js"
 import { ModelTelemetry } from "../../core/model/public/telemetry.js"
 import type { ExecutionContinuation } from "../run/steering.js"
-import type { ExecutionClaim, Interface as RunStore } from "../run/store.js"
+import type { ExecutionClaim, Service as RunStore } from "../run/store.js"
 
 const maxExecutionAttempts = 3
 

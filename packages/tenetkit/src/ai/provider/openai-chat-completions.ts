@@ -1,14 +1,14 @@
-import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
+import { OpenAiClient as OpenAIClient, OpenAiLanguageModel as OpenAILanguageModel } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "../../core/index.js"
 import { isAvailabilityFailure } from "../model/failure.js"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
+import { AiError, OpenAiStructuredOutput as OpenAIStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import type { RegistrationOptions } from "../model/registration.js"
 
 /** @experimental */
-export interface OpenAiChatCompletionsInput extends RegistrationOptions {
+export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
   readonly config?: Config
@@ -16,7 +16,7 @@ export interface OpenAiChatCompletionsInput extends RegistrationOptions {
 }
 
 /** @experimental */
-export type Config = Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+export type Config = Omit<typeof OpenAILanguageModel.Config.Service, "model">
 
 const ConfigSchema = Schema.Record(Schema.String, Schema.Json).pipe(
   Schema.check(
@@ -33,10 +33,10 @@ export const decodeConfig = (options: ConfigInput): Config => Schema.decodeUnkno
 /** @experimental */
 export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
-    try: () => Tool.getJsonSchema(tool, { transformer: OpenAiStructuredOutput.toCodecOpenAI }),
+    try: () => Tool.getJsonSchema(tool, { transformer: OpenAIStructuredOutput.toCodecOpenAI }),
     catch: (error) =>
       AiError.make({
-        module: "OpenAiLanguageModel",
+        module: "OpenAILanguageModel",
         method: "prepareTools",
         reason: AiError.UnsupportedSchemaError.make({
           description: error instanceof Error ? error.message : String(error),
@@ -45,20 +45,20 @@ export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (too
   })
 
 /** @experimental */
-export interface LayerOptions extends OpenAiChatCompletionsInput {
+export interface ClientOptions extends Options {
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
   readonly baseUrl?: string
-  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey" | "apiUrl">
+  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAIClient.layerConfig>[0]>, "apiKey" | "apiUrl">
 }
 
-const modelLayer = (input: LayerOptions) =>
+const modelLayer = (input: ClientOptions) =>
   layerImageSources(
     input.config === undefined
-      ? OpenAiLanguageModel.layer({ model: input.model })
-      : OpenAiLanguageModel.layer({ model: input.model, config: input.config }),
+      ? OpenAILanguageModel.layer({ model: input.model })
+      : OpenAILanguageModel.layer({ model: input.model, config: input.config }),
   )
 
-const registrationOptions = (input: LayerOptions) => {
+const registrationOptions = (input: ClientOptions) => {
   const required = {
     provider: input.provider ?? "openai-chat-completions",
     model: input.model,
@@ -73,18 +73,18 @@ const registrationOptions = (input: LayerOptions) => {
   return input.metadata === undefined ? registered : { ...registered, metadata: input.metadata }
 }
 
-const clientOptions = (input: LayerOptions) => {
+const clientOptions = (input: ClientOptions) => {
   const configured = input.apiKey === undefined ? input.clientConfig : { ...input.clientConfig, apiKey: input.apiKey }
   return input.baseUrl === undefined ? configured : { ...configured, apiUrl: Config.succeed(input.baseUrl) }
 }
 
 /** @experimental */
 export const layer = (
-  input: LayerOptions,
+  input: ClientOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
-    Layer.provide(OpenAiClient.layerConfig(clientOptions(input))),
+    Layer.provide(OpenAIClient.layerConfig(clientOptions(input))),
   )
 
 /** @experimental */
-export const layerConfig = OpenAiClient.layerConfig
+export const layerConfig = OpenAIClient.layerConfig

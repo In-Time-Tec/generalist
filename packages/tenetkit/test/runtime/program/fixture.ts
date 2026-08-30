@@ -5,11 +5,11 @@ import {
   AgentProgram,
   ExecutableManifest,
   Pins,
-  ProgramBindings,
+  ProgramHandlers,
   ProgramCapabilities,
-  SandboxExecutor,
+  CodeExecutor,
 } from "../../../src/index.js"
-import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
 import { pinnedTestAgent } from "../run/identity.js"
 
 export const program: ReturnType<typeof AgentProgram.make> = AgentProgram.make({
@@ -43,9 +43,9 @@ export const programAddress = Address.make("program:durable")
 export const programFixture = () => {
   let toolCalls = 0
   let logs = 0
-  const bindings = ProgramBindings.make({
+  const handlers = ProgramHandlers.make({
     tools: [
-      ProgramBindings.tool({
+      ProgramHandlers.tool({
         name: "echo",
         pin: program.pinned.manifest.capabilities.tools[0]!.pin,
         input: Schema.String,
@@ -58,7 +58,7 @@ export const programFixture = () => {
     steps: [],
     agents: [],
   })
-  const sandbox = SandboxExecutor.makeTest(() =>
+  const executor = CodeExecutor.makeTest(() =>
     Effect.gen(function* () {
       const host = yield* ProgramCapabilities.ProgramCapabilities
       const first = yield* host.callTool({ operation: "echo", tool: "echo", input: "value" })
@@ -74,18 +74,18 @@ export const programFixture = () => {
     }),
   )
   const resolver = ExecutableResolver.makeStatic([
-    { _tag: "Program", executable: programExecutable, program, sandbox, bindings },
+    { _tag: "Program", executable: programExecutable, program, executor, handlers },
   ])
-  return { resolver, sandbox, bindings, counts: () => ({ toolCalls, logs }) }
+  return { resolver, executor, handlers, counts: () => ({ toolCalls, logs }) }
 }
 
 export const approvalProgramFixture = () => {
   let authorizations = 0
   let executions = 0
   let sandboxes = 0
-  const bindings = ProgramBindings.make({
+  const handlers = ProgramHandlers.make({
     tools: [
-      ProgramBindings.tool({
+      ProgramHandlers.tool({
         name: "echo",
         pin: program.pinned.manifest.capabilities.tools[0]!.pin,
         input: Schema.String,
@@ -107,7 +107,7 @@ export const approvalProgramFixture = () => {
     steps: [],
     agents: [],
   })
-  const sandbox = SandboxExecutor.makeTest(() =>
+  const executor = CodeExecutor.makeTest(() =>
     Effect.sync(() => void ++sandboxes).pipe(
       Effect.andThen(
         Effect.flatMap(ProgramCapabilities.ProgramCapabilities, (host) =>
@@ -118,7 +118,7 @@ export const approvalProgramFixture = () => {
   )
   return {
     resolver: ExecutableResolver.makeStatic([
-      { _tag: "Program", executable: programExecutable, program, sandbox, bindings },
+      { _tag: "Program", executable: programExecutable, program, executor, handlers },
     ]),
     counts: () => ({ authorizations, executions, sandboxes }),
   }
@@ -156,11 +156,11 @@ export const agentMapProgramFixture = () => {
     ],
   })
   let bindingDispatches = 0
-  const bindings = ProgramBindings.make({
+  const handlers = ProgramHandlers.make({
     tools: [],
     steps: [],
     agents: [
-      ProgramBindings.agent({
+      ProgramHandlers.agent({
         selection: "worker",
         agent: pinnedChild.pin,
         inputPin: mapProgram.pinned.manifest.capabilities.agents[0]!.input,
@@ -175,7 +175,7 @@ export const agentMapProgramFixture = () => {
       }),
     ],
   })
-  const sandbox = SandboxExecutor.makeTest(() =>
+  const executor = CodeExecutor.makeTest(() =>
     Effect.gen(function* () {
       const host = yield* ProgramCapabilities.ProgramCapabilities
       const results = yield* host.mapAgents({
@@ -221,7 +221,7 @@ export const agentMapProgramFixture = () => {
     address: Address.make("program:agent-map"),
     executable,
     resolver: ExecutableResolver.makeStatic([
-      { _tag: "Program", executable, program: mapProgram, sandbox, bindings },
+      { _tag: "Program", executable, program: mapProgram, executor, handlers },
       { _tag: "Agent", executable: childExecutable, agent: Agent.close(child, model) },
     ]),
     counts: () => ({ bindingDispatches, childFinalizers }),
@@ -231,7 +231,7 @@ export const agentMapProgramFixture = () => {
 export const executeProgramFixture = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
   const store = yield* RunStore.RunStore
-  const host = yield* ExecutionHost.ExecutionHost
+  const host = yield* RunExecutor.RunExecutor
   const receipt = yield* runtime.send({
     to: programAddress,
     sessionId: "program-session",

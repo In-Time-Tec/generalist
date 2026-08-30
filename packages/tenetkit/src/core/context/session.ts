@@ -176,7 +176,7 @@ export interface CheckpointAppend {
   readonly leafId: EntryId
 }
 /** @experimental Session event-log service boundary. */
-export interface Interface {
+export interface Service {
   readonly reserveEntryId: Effect.Effect<EntryId, SessionStoreError>
   readonly append: (
     entry: AppendInput,
@@ -192,7 +192,7 @@ export interface Interface {
 }
 /** @experimental Keyed Session storage and same-Session Run admission. */
 export interface DirectoryInterface {
-  readonly acquire: (sessionId: string) => Effect.Effect<Interface, SessionStoreError, Scope.Scope>
+  readonly acquire: (sessionId: string) => Effect.Effect<Service, SessionStoreError, Scope.Scope>
 }
 /** @experimental */
 export class SessionDirectory extends Context.Service<SessionDirectory, DirectoryInterface>()(
@@ -200,9 +200,7 @@ export class SessionDirectory extends Context.Service<SessionDirectory, Director
 ) {}
 
 /** @experimental Acquire one exact Session store for the current Scope. */
-export const acquire = (
-  sessionId: string,
-): Effect.Effect<Interface, SessionStoreError, SessionDirectory | Scope.Scope> =>
+export const acquire = (sessionId: string): Effect.Effect<Service, SessionStoreError, SessionDirectory | Scope.Scope> =>
   SessionDirectory.pipe(Effect.flatMap((directory) => directory.acquire(sessionId)))
 
 const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)

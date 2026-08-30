@@ -164,7 +164,7 @@ export interface SessionWriteClaim {
 }
 
 /** @experimental Read-only Session history capability. */
-export type SessionReader = Pick<Session.Interface, "path" | "leaf">
+export type SessionReader = Pick<Session.Service, "path" | "leaf">
 
 export interface ExecutionClaim {
   readonly runId: string

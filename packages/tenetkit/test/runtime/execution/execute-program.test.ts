@@ -3,7 +3,7 @@ import { Clock, Effect, Layer } from "effect"
 import { Pins } from "../../../src/index.js"
 import {
   Approval,
-  ExecutionHost,
+  RunExecutor,
   ExecutableResolver,
   LocalScheduler,
   Runtime,
@@ -69,8 +69,8 @@ describe("durable Agent Programs", () => {
           _tag: "Program",
           executable: programExecutable,
           program: forged,
-          sandbox: fixtureState.sandbox,
-          bindings: fixtureState.bindings,
+          executor: fixtureState.executor,
+          handlers: fixtureState.handlers,
         },
       ]),
     ).toThrow(/does not match/)
@@ -128,7 +128,7 @@ describe("durable Agent Programs", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const receipt = yield* runtime.send({
           to: programAddress,
           sessionId: "approval-session",
@@ -191,7 +191,7 @@ describe("durable Agent Programs", () => {
     const suspend = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const receipt = yield* runtime.send({
         to: programAddress,
         sessionId: "approval-reopen-session",
@@ -212,7 +212,7 @@ describe("durable Agent Programs", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({
           status: "open",
           reason: {
@@ -243,7 +243,7 @@ describe("durable Agent Programs", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const receipt = yield* runtime.send({
           to: programAddress,
           sessionId: `program-${resolution}`,
@@ -355,7 +355,7 @@ describe("durable Agent Programs", () => {
     const verify = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
+      const host = yield* RunExecutor.RunExecutor
       const receipt = yield* runtime.send({
         to: programAddress,
         sessionId: "program-unknown",

@@ -1,8 +1,8 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
 import { Agent, AgentManifest, Pins } from "tenetkit"
-import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
+import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "tenetkit/runtime"
 import { TestModel } from "tenetkit/test"
-import { Sse } from "tenetkit/transport"
+import { SSE } from "tenetkit/transport"
 
 const agent = Agent.make({ name: "transport-agent" })
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
@@ -42,11 +42,11 @@ const program = Effect.gen(function* () {
     prompt: "Say hello",
   })
   const store = yield* RunStore.RunStore
-  const host = yield* ExecutionHost.ExecutionHost
+  const host = yield* RunExecutor.RunExecutor
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "composition-guide" }))
   const first = yield* runtime.events({ runId: receipt.runId }).pipe(Stream.take(1), Stream.runCollect)
   yield* Console.log(
-    `admitted ${receipt.runId}; first event: ${Array.from(first)[0]?._tag}; SSE schema: ${Sse.streamSuccess._tag}`,
+    `admitted ${receipt.runId}; first event: ${Array.from(first)[0]?._tag}; SSE schema: ${SSE.streamSuccess._tag}`,
   )
 })
 

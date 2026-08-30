@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import { VectorStore } from "tenetkit/memory"
 
-interface PgClientInterface {
+interface PgClientService {
   readonly run: (sql: string, params: ReadonlyArray<unknown>) => Effect.Effect<ReadonlyArray<PgRow>, Error>
 }
 
@@ -11,7 +11,7 @@ interface PgRow {
   readonly score?: number
 }
 
-class PgClient extends Context.Service<PgClient, PgClientInterface>()(
+class PgClient extends Context.Service<PgClient, PgClientService>()(
   "@tenetkit/docs/snippets/guides/agent/memory/pgvector-store/PgClient",
 ) {}
 

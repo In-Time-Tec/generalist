@@ -82,7 +82,7 @@ describe("Permissions", () => {
 
   it.effect("uses the base decision as fallback and remembered last-match as overlay", () =>
     Effect.gen(function* () {
-      const base: Permissions.Interface = { evaluate: () => Effect.succeed({ _tag: "Ask", token: "base-token" }) }
+      const base: Permissions.Service = { evaluate: () => Effect.succeed({ _tag: "Ask", token: "base-token" }) }
       const empty = yield* Permissions.evaluateWithRules(
         base,
         { rules: Effect.succeed([]), remember: () => Effect.void },

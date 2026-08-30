@@ -9,7 +9,7 @@ import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "..
 import type { RegistrationOptions } from "../model/registration.js"
 
 /** @experimental */
-export interface AnthropicInput extends RegistrationOptions {
+export interface Options extends RegistrationOptions {
   readonly model: (string & {}) | AnthropicLanguageModel.Model
   readonly config?: Config
 }
@@ -102,7 +102,7 @@ const resolveAnthropicFailure = ({ error, metadata: partMetadata, method }: Fail
 }
 
 /** @experimental Effective Anthropic request config; callers opt into top-level automatic caching. */
-export const resolvedConfig = (input: AnthropicInput): Config => input.config ?? {}
+export const resolvedConfig = (input: Options): Config => input.config ?? {}
 
 const providerConfig = (config: Config): Omit<typeof AnthropicLanguageModel.Config.Service, "model"> => {
   const target: Omit<typeof AnthropicLanguageModel.Config.Service, "model"> = {}
@@ -110,13 +110,13 @@ const providerConfig = (config: Config): Omit<typeof AnthropicLanguageModel.Conf
   return target
 }
 
-const anthropicLanguageModelLayer = (input: AnthropicInput) => {
+const anthropicLanguageModelLayer = (input: Options) => {
   const options =
     input.config === undefined ? { model: input.model } : { model: input.model, config: providerConfig(input.config) }
   return layerModelFailures(layerImageSources(AnthropicLanguageModel.layer(options)), resolveAnthropicFailure)
 }
 
-const registrationOptions = (input: AnthropicInput) => {
+const registrationOptions = (input: Options) => {
   const required = {
     provider: "anthropic",
     model: input.model,
@@ -151,21 +151,21 @@ export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (too
   })
 
 /** @experimental */
-export interface LayerOptions extends AnthropicInput {
+export interface ClientOptions extends Options {
   readonly apiKey: EffectConfig.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof AnthropicClient.layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
 export const layer = (
-  input: LayerOptions,
+  input: ClientOptions,
 ): Layer.Layer<ModelRegistry.ModelRegistry, EffectConfig.ConfigError, HttpClient.HttpClient> =>
   ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
     Layer.provide(AnthropicClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 
 /** @experimental Bare registration effect; the consumer provides the Anthropic client (see layerConfig). */
-export const registration = (input: AnthropicInput): ReturnType<ModelRegistryFacade["registration"]> =>
+export const registration = (input: Options): ReturnType<ModelRegistryFacade["registration"]> =>
   ModelRegistry.registration(registrationOptions(input))
 
 /** @experimental */

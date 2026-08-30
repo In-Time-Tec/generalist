@@ -4,7 +4,7 @@ import {
   AiError,
   AnthropicStructuredOutput,
   LanguageModel,
-  OpenAiStructuredOutput,
+  OpenAiStructuredOutput as OpenAIStructuredOutput,
   Tool,
   Toolkit,
 } from "effect/unstable/ai"
@@ -17,8 +17,8 @@ import {
   toolJsonSchemaCompiler as anthropicToolJsonSchemaCompiler,
 } from "tenetkit/ai/anthropic"
 import {
-  classifyFailure as classifyOpenAiFailure,
-  decodeConfig as decodeOpenAiConfig,
+  classifyFailure as classifyOpenAIFailure,
+  decodeConfig as decodeOpenAIConfig,
   layer as openAiLayer,
   layerOrDeterministic as openAiLayerOrDeterministic,
   toolJsonSchemaCompiler as openAiToolJsonSchemaCompiler,
@@ -36,26 +36,7 @@ import {
   layer as openRouterLayer,
   toolJsonSchemaCompiler as openRouterToolJsonSchemaCompiler,
 } from "tenetkit/ai/openrouter"
-import {
-  layerAzureOpenAi,
-  layerDeepseek,
-  layerGoogleAiStudio,
-  layerGroq,
-  layerMistral,
-  layerOllama,
-  layerXai,
-} from "tenetkit/ai/presets"
-import { Deterministic } from "../../src/ai/index.js"
-
-const Presets = {
-  layerAzureOpenAi,
-  layerDeepseek,
-  layerGoogleAiStudio,
-  layerGroq,
-  layerMistral,
-  layerOllama,
-  layerXai,
-}
+import { Deterministic, OpenAICompatible } from "../../src/ai/index.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const unexpectedTool = Tool.make("unexpected", { parameters: Schema.Unknown, success: Schema.Unknown })
@@ -89,7 +70,7 @@ const tuple = <const Values extends ReadonlyArray<unknown>>(...values: Values): 
 describe("providers", () => {
   it("decodes canonical persisted OpenAI and Anthropic options", () => {
     expect(
-      decodeOpenAiConfig({
+      decodeOpenAIConfig({
         max_output_tokens: 16_384,
         reasoning: { effort: "high", summary: "auto" },
         text: { verbosity: "low" },
@@ -124,8 +105,8 @@ describe("providers", () => {
   })
 
   it("rejects invalid and cross-provider persisted options", () => {
-    expect(() => decodeOpenAiConfig({ max_tokens: 1_000 })).toThrow()
-    expect(() => decodeOpenAiConfig({ max_output_tokens: "1000" })).toThrow()
+    expect(() => decodeOpenAIConfig({ max_tokens: 1_000 })).toThrow()
+    expect(() => decodeOpenAIConfig({ max_output_tokens: "1000" })).toThrow()
     expect(() => decodeAnthropicConfig({ max_output_tokens: 1_000 })).toThrow()
     expect(() => decodeAnthropicConfig({ max_tokens: 0 })).toThrow()
     expect(() => decodeAnthropicConfig({ output_config: { effort: "extreme" } })).toThrow()
@@ -137,19 +118,19 @@ describe("providers", () => {
     const tool = Tool.make("lookup", {
       parameters: Schema.Struct({ required: Schema.String, optional: Schema.optionalKey(Schema.String) }),
     }).annotate(Tool.Strict, true)
-    const expectedOpenAi = Tool.getJsonSchema(tool, { transformer: OpenAiStructuredOutput.toCodecOpenAI })
+    const expectedOpenAI = Tool.getJsonSchema(tool, { transformer: OpenAIStructuredOutput.toCodecOpenAI })
     const expectedAnthropic = Tool.getJsonSchema(tool, {
       transformer: AnthropicStructuredOutput.toCodecAnthropic,
     })
 
     return Effect.gen(function* () {
-      expect(yield* openAiToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
-      expect(yield* chatCompletionsToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
+      expect(yield* openAiToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAI)
+      expect(yield* chatCompletionsToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAI)
       expect(yield* anthropicToolJsonSchemaCompiler(tool)).toEqual(expectedAnthropic)
       expect(yield* openRouterToolJsonSchemaCompiler("anthropic/claude-sonnet-4")(tool)).toEqual(expectedAnthropic)
       expect(yield* openRouterToolJsonSchemaCompiler("claude-local")(tool)).toEqual(expectedAnthropic)
-      expect(yield* openRouterToolJsonSchemaCompiler("openai/gpt-5")(tool)).toEqual(expectedOpenAi)
-      expect(yield* openRouterToolJsonSchemaCompiler("o4-mini")(tool)).toEqual(expectedOpenAi)
+      expect(yield* openRouterToolJsonSchemaCompiler("openai/gpt-5")(tool)).toEqual(expectedOpenAI)
+      expect(yield* openRouterToolJsonSchemaCompiler("o4-mini")(tool)).toEqual(expectedOpenAI)
       expect(yield* openRouterToolJsonSchemaCompiler("google/gemini-2.5-pro")(tool)).toEqual(Tool.getJsonSchema(tool))
     })
   })
@@ -211,7 +192,7 @@ describe("providers", () => {
 
   it("classifies provider context failures from structured metadata and narrow messages", () => {
     const openAiStructured = AiError.make({
-      module: "OpenAiClient",
+      module: "OpenAIClient",
       method: "stream",
       reason: AiError.InvalidRequestError.make({
         description: "unrelated wording",
@@ -221,7 +202,7 @@ describe("providers", () => {
       }),
     })
     const openAiMessage = AiError.make({
-      module: "OpenAiClient",
+      module: "OpenAIClient",
       method: "stream",
       reason: AiError.InvalidRequestError.make({ description: "This model's maximum context length is 128000 tokens" }),
     })
@@ -262,9 +243,9 @@ describe("providers", () => {
       }),
     })
 
-    expect(classifyOpenAiFailure(openAiStructured)).toBe("context-overflow")
-    expect(classifyOpenAiFailure(openAiMessage)).toBe("context-overflow")
-    expect(classifyOpenAiFailure(openAiResponseEvent)).toBe("context-overflow")
+    expect(classifyOpenAIFailure(openAiStructured)).toBe("context-overflow")
+    expect(classifyOpenAIFailure(openAiMessage)).toBe("context-overflow")
+    expect(classifyOpenAIFailure(openAiResponseEvent)).toBe("context-overflow")
     expect(classifyAnthropicFailure(anthropicPrompt)).toBe("context-overflow")
     expect(classifyOpenRouterFailure(openRouterUpstream)).toBe("context-overflow")
     expect(classifyOpenRouterFailure(openRouterAnthropicUpstream)).toBe("context-overflow")
@@ -272,12 +253,12 @@ describe("providers", () => {
 
   it.effect("rejects provider false positives and keeps compatible endpoints conservative by default", () => {
     const maximumOutput = AiError.make({
-      module: "OpenAiClient",
+      module: "OpenAIClient",
       method: "stream",
       reason: AiError.InvalidRequestError.make({ description: "maximum output token length exceeded" }),
     })
     const rateLimit = AiError.make({
-      module: "OpenAiClient",
+      module: "OpenAIClient",
       method: "stream",
       reason: AiError.RateLimitError.make({
         metadata: {
@@ -302,13 +283,13 @@ describe("providers", () => {
       }),
     })
 
-    expect(classifyOpenAiFailure(maximumOutput)).toBe("other")
-    expect(classifyOpenAiFailure(rateLimit)).toBe("other")
+    expect(classifyOpenAIFailure(maximumOutput)).toBe("other")
+    expect(classifyOpenAIFailure(rateLimit)).toBe("other")
     expect(classifyAnthropicFailure(anthropicBytes)).toBe("other")
     expect(classifyOpenRouterFailure(maximumOutput)).toBe("other")
 
     const contextOverflow = AiError.make({
-      module: "OpenAiClient",
+      module: "OpenAIClient",
       method: "stream",
       reason: AiError.InvalidRequestError.make({
         metadata: {
@@ -326,7 +307,7 @@ describe("providers", () => {
           ),
         ).pipe(Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context)))),
       )
-    return Effect.all([registrations(), registrations(classifyOpenAiFailure)]).pipe(
+    return Effect.all([registrations(), registrations(classifyOpenAIFailure)]).pipe(
       Effect.map(([defaultRegistrations, optedInRegistrations]) => {
         const defaultRegistration = defaultRegistrations[0]!
         const optedInRegistration = optedInRegistrations[0]!
@@ -350,7 +331,7 @@ describe("providers", () => {
       Effect.scoped(
         Layer.build(Layer.provide(providerLayer, Layer.succeed(HttpClient.HttpClient, client))).pipe(
           Effect.flatMap((context) =>
-            ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "hello" })).pipe(
+            ModelRegistry.withModel(selection, LanguageModel.generateText({ prompt: "hello" })).pipe(
               Effect.exit,
               Effect.provide(context),
             ),
@@ -386,12 +367,12 @@ describe("providers", () => {
 
   testLayer(
     Layer.provide(
-      Presets.layerGroq({
+      OpenAICompatible.layerGroq({
         model: "llama-test",
         apiKey,
         registrationKey: "primary",
         metadata: { contextWindow: 131_072 },
-        classifyFailure: classifyOpenAiFailure,
+        classifyFailure: classifyOpenAIFailure,
       }),
       FetchHttpClient.layer,
     ),
@@ -404,7 +385,7 @@ describe("providers", () => {
         expect(registered.map((item) => [item.provider, item.model])).toEqual([["groq", "llama-test"]])
         expect(registration.registrationKey).toBe("primary")
         expect(registration.metadata).toEqual({ contextWindow: 131_072 })
-        expect(registration.classifyFailure).toBe(classifyOpenAiFailure)
+        expect(registration.classifyFailure).toBe(classifyOpenAIFailure)
       }),
     )
   })
@@ -421,7 +402,7 @@ describe("providers", () => {
     test.effect("round-trips the deterministic model through Agent.generate", () => {
       const agent = Agent.make({ name: "deterministic-agent", toolkit: unexpectedToolkit })
       return Effect.gen(function* () {
-        const result = yield* ModelRegistry.operate(
+        const result = yield* ModelRegistry.withModel(
           { provider: "deterministic", model: "local" },
           Agent.generate({ prompt: "hello" })(agent),
         )
@@ -560,11 +541,11 @@ describe("providers", () => {
           ["det-b", "model-b"],
         ])
 
-        const first = yield* ModelRegistry.operate(
+        const first = yield* ModelRegistry.withModel(
           { provider: "det-a", model: "model-a" },
           Agent.generate({ prompt: "hello" })(agent),
         )
-        const second = yield* ModelRegistry.operate(
+        const second = yield* ModelRegistry.withModel(
           { provider: "det-b", model: "model-b" },
           Agent.generate({ prompt: "hello" })(agent),
         )
@@ -593,12 +574,12 @@ describe("providers", () => {
           ["openrouter", "openrouter-test"],
           ["openrouter", "openrouter-test"],
         ])
-        const openRouterCompiler = yield* ModelRegistry.operate(
+        const openRouterCompiler = yield* ModelRegistry.withModel(
           { provider: "openrouter", model: "openrouter-test" },
           LanguageModel.LanguageModel.pipe(Effect.map(ModelRegistry.toolJsonSchemaCompiler)),
         )
         expect(openRouterCompiler).toBeTypeOf("function")
-        const keyedCompiler = yield* ModelRegistry.operate(
+        const keyedCompiler = yield* ModelRegistry.withModel(
           { provider: "openrouter", model: "openrouter-test", registrationKey: "secondary" },
           LanguageModel.LanguageModel.pipe(Effect.map(ModelRegistry.toolJsonSchemaCompiler)),
         )
@@ -638,13 +619,13 @@ describe("providers", () => {
       openRouterLayer({ model: "openrouter-test", apiKey }),
       responsesLayer({ model: "responses-compatible-test", apiKey }),
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
-      Presets.layerGroq({ model: "model", apiKey }),
-      Presets.layerMistral({ model: "model", apiKey }),
-      Presets.layerXai({ model: "model", apiKey }),
-      Presets.layerDeepseek({ model: "model", apiKey }),
-      Presets.layerGoogleAiStudio({ model: "model", apiKey }),
-      Presets.layerAzureOpenAi({ model: "model", resource: "resource", apiKey }),
-      Presets.layerOllama({ model: "model", apiKey }),
+      OpenAICompatible.layerGroq({ model: "model", apiKey }),
+      OpenAICompatible.layerMistral({ model: "model", apiKey }),
+      OpenAICompatible.layerXai({ model: "model", apiKey }),
+      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
+      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
+      OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
+      OpenAICompatible.layerOllama({ model: "model", apiKey }),
     )
     const fetchLayers = tuple(...baseLayers.map((providerLayer) => Layer.provide(providerLayer, FetchHttpClient.layer)))
     const deterministicLayer = openAiLayerOrDeterministic({ model: "gpt-test", fallbackModel: "fallback", apiKey })
@@ -666,20 +647,22 @@ describe("providers", () => {
     const deterministicErrors: Assert<Equal<Layer.Error<typeof deterministicLayer>, Config.ConfigError>> = true
     const deterministicFetchErrors: Assert<Equal<Layer.Error<typeof deterministicFetchLayer>, Config.ConfigError>> =
       true
-    const basePresets = tuple(
-      Presets.layerGroq({ model: "model", apiKey }),
-      Presets.layerMistral({ model: "model", apiKey }),
-      Presets.layerXai({ model: "model", apiKey }),
-      Presets.layerDeepseek({ model: "model", apiKey }),
-      Presets.layerGoogleAiStudio({ model: "model", apiKey }),
-      Presets.layerAzureOpenAi({ model: "model", resource: "resource", apiKey }),
-      Presets.layerOllama({ model: "model", apiKey }),
+    const baseOpenAICompatible = tuple(
+      OpenAICompatible.layerGroq({ model: "model", apiKey }),
+      OpenAICompatible.layerMistral({ model: "model", apiKey }),
+      OpenAICompatible.layerXai({ model: "model", apiKey }),
+      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
+      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
+      OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
+      OpenAICompatible.layerOllama({ model: "model", apiKey }),
     )
-    const fetchPresets = tuple(...basePresets.map((presetLayer) => Layer.provide(presetLayer, FetchHttpClient.layer)))
-    const basePresetRequirements: Assert<EveryLayerServices<typeof basePresets, HttpClient.HttpClient>> = true
-    const fetchPresetRequirements: Assert<EveryLayerServices<typeof fetchPresets, never>> = true
-    const presetErrors: Assert<EveryLayerError<typeof basePresets, Config.ConfigError>> = true
-    const fetchPresetErrors: Assert<EveryLayerError<typeof fetchPresets, Config.ConfigError>> = true
+    const fetchOpenAICompatible = tuple(
+      ...baseOpenAICompatible.map((presetLayer) => Layer.provide(presetLayer, FetchHttpClient.layer)),
+    )
+    const basePresetRequirements: Assert<EveryLayerServices<typeof baseOpenAICompatible, HttpClient.HttpClient>> = true
+    const fetchPresetRequirements: Assert<EveryLayerServices<typeof fetchOpenAICompatible, never>> = true
+    const presetErrors: Assert<EveryLayerError<typeof baseOpenAICompatible, Config.ConfigError>> = true
+    const fetchPresetErrors: Assert<EveryLayerError<typeof fetchOpenAICompatible, Config.ConfigError>> = true
 
     expect([
       baseRequirements,
@@ -704,13 +687,13 @@ describe("providers", () => {
       openRouterLayer({ model: "openrouter-test", apiKey }),
       responsesLayer({ model: "responses-compatible-test", apiKey }),
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
-      Presets.layerGroq({ model: "model", apiKey }),
-      Presets.layerMistral({ model: "model", apiKey }),
-      Presets.layerXai({ model: "model", apiKey }),
-      Presets.layerDeepseek({ model: "model", apiKey }),
-      Presets.layerGoogleAiStudio({ model: "model", apiKey }),
-      Presets.layerAzureOpenAi({ model: "model", resource: "resource", apiKey }),
-      Presets.layerOllama({ model: "model", apiKey }),
+      OpenAICompatible.layerGroq({ model: "model", apiKey }),
+      OpenAICompatible.layerMistral({ model: "model", apiKey }),
+      OpenAICompatible.layerXai({ model: "model", apiKey }),
+      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
+      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
+      OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
+      OpenAICompatible.layerOllama({ model: "model", apiKey }),
     ]
     const embeddingLayers = [
       openAiEmbeddingLayer({ model: "text-embedding-3-small", apiKey }),
@@ -786,13 +769,13 @@ describe("providers", () => {
     expect(responsesLayer).toBeInstanceOf(Function)
     expect(chatCompletionsLayer).toBeInstanceOf(Function)
     expect(openAiLayerOrDeterministic).toBeInstanceOf(Function)
-    expect(Presets.layerGroq).toBeInstanceOf(Function)
-    expect(Presets.layerMistral).toBeInstanceOf(Function)
-    expect(Presets.layerXai).toBeInstanceOf(Function)
-    expect(Presets.layerDeepseek).toBeInstanceOf(Function)
-    expect(Presets.layerGoogleAiStudio).toBeInstanceOf(Function)
-    expect(Presets.layerAzureOpenAi).toBeInstanceOf(Function)
-    expect(Presets.layerOllama).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerGroq).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerMistral).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerXai).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerDeepseek).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerGoogleAiStudio).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerAzureOpenAI).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerOllama).toBeInstanceOf(Function)
     expect(FetchHttpClient.layer).toBeDefined()
   })
 })

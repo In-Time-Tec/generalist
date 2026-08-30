@@ -1,6 +1,6 @@
 import { Function } from "effect"
-import { HarnessEntry, kinds } from "./entry.js"
-import { HarnessState, make } from "./state.js"
+import { GuidanceEntry, kinds } from "./entry.js"
+import { GuidanceState, make } from "./state.js"
 
 const compareText = (left: string, right: string): number => {
   if (left < right) return -1
@@ -13,10 +13,10 @@ const compareText = (left: string, right: string): number => {
  * kind and id; every surviving entry keeps the scope that authored it.
  */
 export const mergeStates: {
-  (inner: HarnessState): (outer: HarnessState) => HarnessState
-  (outer: HarnessState, inner: HarnessState): HarnessState
-} = Function.dual(2, (outer: HarnessState, inner: HarnessState): HarnessState => {
-  const entries: Array<HarnessEntry> = []
+  (inner: GuidanceState): (outer: GuidanceState) => GuidanceState
+  (outer: GuidanceState, inner: GuidanceState): GuidanceState
+} = Function.dual(2, (outer: GuidanceState, inner: GuidanceState): GuidanceState => {
+  const entries: Array<GuidanceEntry> = []
   for (const kind of kinds) {
     const overridden = new Set(inner.entries[kind].map((entry) => entry.id))
     for (const entry of outer.entries[kind]) if (!overridden.has(entry.id)) entries.push(entry)

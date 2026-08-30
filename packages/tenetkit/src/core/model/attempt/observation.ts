@@ -1,6 +1,6 @@
 import { Cause, Clock, Duration, Effect, Option, Schedule, Schema } from "effect"
 import { AiError, Response, ResponseIdTracker } from "effect/unstable/ai"
-import type { Classification, Interface as Resilience } from "../resilience.js"
+import type { Classification, Service as Resilience } from "../resilience.js"
 import type { EventPayload, ModelFailureCategory, ModelFirstOutputKind } from "../telemetry/events.js"
 
 export const disabledResponseIdTracker: ResponseIdTracker.Service = {

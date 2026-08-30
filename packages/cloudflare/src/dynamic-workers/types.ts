@@ -1,4 +1,4 @@
-import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
+import { CodeExecutor, ProgramCapabilities } from "tenetkit"
 import { Schema } from "effect"
 
 /** @experimental Minimal Worker Loader code contract used by this adapter. */
@@ -42,7 +42,7 @@ export interface WorkerLoader {
 }
 
 const identity = {
-  protocolVersion: Schema.Literal(SandboxExecutor.protocolVersion),
+  protocolVersion: Schema.Literal(CodeExecutor.protocolVersion),
   requestId: Schema.String,
 }
 const operation = ProgramCapabilities.ProgramOperationName

@@ -15,7 +15,7 @@ Construct MCP Streamable HTTP transports at `tenetkit/mcp/client/http`. `tenetki
 
 ## TypeScript REPL kernels
 
-`tenetkit/repl` defines one persistent, ordered TypeScript namespace per Session. `KernelPool` exposes only `execute`, `inspect`, `interrupt`, `restart`, and `close`. It is intentionally separate from `SandboxExecutor`, whose Agent Program executions are fresh and stateless.
+`tenetkit/repl` defines one persistent, ordered TypeScript namespace per Session. `KernelPool` exposes only `execute`, `inspect`, `interrupt`, `restart`, and `close`. It is intentionally separate from `CodeExecutor`, whose Agent Program executions are fresh and stateless.
 
 `KernelProfile` pins the provider, exact runtime and runtime/image/template identity, physical isolation, checkpoint capabilities, host bindings, workspace, and limits for one epoch. Its content-addressed digest excludes credentials, ownership generations, and mutable provider resource IDs. Recovery reports one exact kind: `live-process`, `filesystem`, `namespace`, or `restart-only`.
 

@@ -1,7 +1,7 @@
 import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Context, type Duration, Effect, Function, Layer, type Scope } from "effect"
-import { fromTransport, type Interface, McpConnectionFailed, McpToolSource } from "../tool-source.js"
+import { fromTransport, type Service, MCPConnectionFailed, MCPClient } from "../client.js"
 import type { OAuthProviderError } from "../oauth.js"
 
 /** @experimental Node/Bun-only stdio transport options. */
@@ -28,10 +28,10 @@ export const make = (options: TransportOptions): Transport => {
 
 const makeInterface = (
   options: Options,
-): Effect.Effect<Interface, McpConnectionFailed | OAuthProviderError, Scope.Scope> =>
+): Effect.Effect<Service, MCPConnectionFailed | OAuthProviderError, Scope.Scope> =>
   Effect.try({
     try: () => make(options.transport),
-    catch: (error) => McpConnectionFailed.make({ server: options.name, message: String(error) }),
+    catch: (error) => MCPConnectionFailed.make({ server: options.name, message: String(error) }),
   }).pipe(
     Effect.flatMap((transport) =>
       options.callTimeout === undefined
@@ -41,20 +41,20 @@ const makeInterface = (
   )
 
 /** @experimental */
-export const layer = (options: Options): Layer.Layer<McpToolSource, McpConnectionFailed | OAuthProviderError> =>
-  Layer.effect(McpToolSource, makeInterface(options))
+export const layer = (options: Options): Layer.Layer<MCPClient, MCPConnectionFailed | OAuthProviderError> =>
+  Layer.effect(MCPClient, makeInterface(options))
 
 /** @experimental */
 export const layerTagged: {
   (
     options: Options,
   ): <Identifier>(
-    tag: Context.Key<Identifier, Interface>,
-  ) => Layer.Layer<Identifier, McpConnectionFailed | OAuthProviderError>
+    tag: Context.Key<Identifier, Service>,
+  ) => Layer.Layer<Identifier, MCPConnectionFailed | OAuthProviderError>
   <Identifier>(
-    tag: Context.Key<Identifier, Interface>,
+    tag: Context.Key<Identifier, Service>,
     options: Options,
-  ): Layer.Layer<Identifier, McpConnectionFailed | OAuthProviderError>
-} = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Interface>, options: Options) =>
+  ): Layer.Layer<Identifier, MCPConnectionFailed | OAuthProviderError>
+} = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Service>, options: Options) =>
   Layer.effect(tag, makeInterface(options)),
 )

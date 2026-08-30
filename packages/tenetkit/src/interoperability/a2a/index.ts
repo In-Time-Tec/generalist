@@ -1,5 +1,5 @@
 import { make as A2A_makeHandler, type Deployment as A2A_Deployment } from "./handler.js"
-import { A2A as A2A_A2A, type Interface as A2A_Interface, layer as A2A_layer } from "./service.js"
+import { A2A as A2A_A2A, type Service as A2A_Service, layer as A2A_layer } from "./service.js"
 export const A2A = {
   A2A: A2A_A2A,
   layer: A2A_layer,
@@ -7,7 +7,7 @@ export const A2A = {
 }
 export namespace A2A {
   export type A2A = A2A_A2A
-  export type Interface = A2A_Interface
+  export type Service = A2A_Service
   export type Deployment = A2A_Deployment
   export type layer = typeof A2A_layer
   export type makeHandler = typeof A2A_makeHandler

@@ -46,9 +46,9 @@ export namespace Permissions {
   export type Ask = import("./permissions.js").Ask
   export type Decision = import("./permissions.js").Decision
   export type Deny = import("./permissions.js").Deny
-  export type Interface = import("./permissions.js").Interface
+  export type Service = import("./permissions.js").Service
   export type Level = import("./permissions.js").Level
   export type Rule = import("./permissions.js").Rule
-  export type RuleStoreInterface = import("./permissions.js").RuleStoreInterface
+  export type RuleStoreService = import("./permissions.js").RuleStoreService
   export type Ruleset = import("./permissions.js").Ruleset
 }

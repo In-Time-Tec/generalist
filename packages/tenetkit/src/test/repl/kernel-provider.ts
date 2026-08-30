@@ -1,9 +1,9 @@
 import { describe, effect as effectTest, expect, live as liveTest } from "@effect/vitest"
 import { Effect, Exit, Schema, Scope, Stream } from "effect"
 import { CellOutcomeUnknown, KernelUnavailable, type CellFailure, validateSequence } from "../../repl/cell.js"
-import type { Execution, Interface as KernelPool, Inspection } from "../../repl/kernel-pool.js"
+import type { Execution, Service as KernelPool, Inspection } from "../../repl/kernel-pool.js"
 import { digest, type KernelProfile } from "../../repl/kernel-profile.js"
-import type { Interface as KernelResourceStore } from "../../repl/kernel-resource-store.js"
+import type { Service as KernelResourceStore } from "../../repl/kernel-resource-store.js"
 
 const noSignal = (): AbortSignal => AbortSignal.any([])
 

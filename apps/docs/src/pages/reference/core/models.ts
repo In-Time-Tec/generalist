@@ -13,7 +13,7 @@ export const coreModelsReference = definePage({
     h2("model-registry", "ModelRegistry"),
     p(
       "A registry of named model registrations. ",
-      code("operate(selection, effect)"),
+      code("withModel(selection, effect)"),
       " looks up the registration matching ",
       code("ModelSelection = { provider, model, registrationKey? }"),
       " and provides its ",
@@ -48,13 +48,10 @@ export const coreModelsReference = definePage({
         ],
         [[code("layerCombined(registries, options?)")], "Merges the registrations of several registry layers into one"],
         [
-          [code("register"), " / ", code("registrations"), " / ", code("operate")],
+          [code("register"), " / ", code("registrations"), " / ", code("withModel")],
           "Module-level call helpers over the service",
         ],
-        [
-          [code("layerMemory"), " / ", code("layerTest")],
-          ["In-memory registry layer; layer from an explicit interface"],
-        ],
+        [[code("layerMemory"), " / ", code("layerTest")], ["In-memory registry layer; layer from an explicit service"]],
       ],
     ),
     callout(
@@ -67,7 +64,7 @@ export const coreModelsReference = definePage({
       " layer, not a ",
       code("LanguageModel"),
       " layer. Wrap the run in ",
-      code("ModelRegistry.operate({ provider, model }, effect)"),
+      code("ModelRegistry.withModel({ provider, model }, effect)"),
       ". Never provide a registry layer where a LanguageModel is required.",
     ),
     h2("model-middleware", "ModelMiddleware"),
@@ -156,7 +153,7 @@ export const coreModelsReference = definePage({
             " part; consumer-visible reasoning, text, or tool-call output is an absolute retry barrier",
           ],
         ],
-        [[code("layerTest(implementation)")], "Layer from an explicit interface"],
+        [[code("layerTest(implementation)")], "Layer from an explicit service"],
       ],
     ),
     h2("guardrail", "Guardrail"),

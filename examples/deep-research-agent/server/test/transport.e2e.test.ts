@@ -5,7 +5,7 @@ import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "tenetkit/runtime"
-import { Client } from "tenetkit/transport"
+import { RunClient } from "tenetkit/transport"
 
 const encodeEvents = (value: ReadonlyArray<{ readonly _tag: string }>): string => JSON.stringify(value)
 
@@ -109,7 +109,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
           yield* waitForServerReady(port, 200)
           const receipt = yield* admitRun(baseUrl, 50)
           const eventsUrl = `${baseUrl}/runs/${receipt.runId}/events`
-          const first = yield* Client.sseEvents({ url: eventsUrl }).pipe(
+          const first = yield* RunClient.sseEvents({ url: eventsUrl }).pipe(
             Stream.takeUntil(
               (event) =>
                 event._tag === "RunWaiting" ||
@@ -129,7 +129,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
             waitId: waiting.wait.waitId,
             resolution: { _tag: "Approved" },
           })
-          const second = yield* Client.sseEvents({ url: eventsUrl, cursor: Cursor.make(waiting.sequence) }).pipe(
+          const second = yield* RunClient.sseEvents({ url: eventsUrl, cursor: Cursor.make(waiting.sequence) }).pipe(
             Stream.takeUntil((event) => event._tag === "RunCompleted"),
             Stream.runCollect,
           )

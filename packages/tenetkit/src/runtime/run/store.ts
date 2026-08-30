@@ -116,12 +116,12 @@ export const PendingRunOutcome = Schema.Union([
 ])
 export type PendingRunOutcome = typeof PendingRunOutcome.Type
 
-export interface Interface {
+export interface Service {
   readonly info: Effect.Effect<StoreInfo>
   /** @experimental Read-only durable conversation history for one Session identity. */
   readonly sessionReader: (sessionId: string) => Effect.Effect<Option.Option<SessionReader>>
   /** @experimental Session writer bound to one storage-issued execution claim. */
-  readonly claimedSessionStore: (claim: ExecutionClaim) => Effect.Effect<Option.Option<Session.Interface>>
+  readonly claimedSessionStore: (claim: ExecutionClaim) => Effect.Effect<Option.Option<Session.Service>>
   readonly hasAdmission: (input: {
     readonly address: Address
     readonly sessionId: string
@@ -458,4 +458,4 @@ export interface Interface {
   ) => Effect.Effect<ProgramOperationRecord, WorkerMutationError | ProgramStoreFailure>
 }
 
-export class RunStore extends Context.Service<RunStore, Interface>()("tenetkit/runtime/run/store/RunStore") {}
+export class RunStore extends Context.Service<RunStore, Service>()("tenetkit/runtime/run/store/RunStore") {}

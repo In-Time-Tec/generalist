@@ -2,7 +2,7 @@ import { describe, expect, layer } from "@effect/vitest"
 import type { RunAgentInput } from "@ag-ui/core"
 import { Effect, Layer, Stream } from "effect"
 import { Address, Approval, ExecutableManifest, Errors as RuntimeErrors, Runtime, TreePolicy } from "tenetkit/runtime"
-import { AgUi } from "../../../src/interoperability/ag-ui/index.js"
+import { AGUI } from "../../../src/interoperability/ag-ui/index.js"
 
 const address = Address.make("agent:assistant")
 const executable = ExecutableManifest.makeTest("assistant", "1")
@@ -36,11 +36,11 @@ const accepted = {
   address,
 }
 
-const runtimeLayer = (runtime: Runtime.Interface) => Layer.succeed(Runtime.Runtime, runtime)
+const runtimeLayer = (runtime: Runtime.Service) => Layer.succeed(Runtime.Runtime, runtime)
 
 const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime method")
 
-const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interface =>
+const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
   Runtime.Runtime.of({
     start: () => unused(),
     admit: () => unused(),
@@ -81,7 +81,7 @@ const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interf
     ...implementation,
   })
 
-describe("AgUi", () => {
+describe("AGUI", () => {
   {
     let sent: Runtime.SendInput | undefined
     const runtime = mockRuntime({
@@ -96,12 +96,12 @@ describe("AgUi", () => {
       },
       events: () => Stream.make(accepted),
     })
-    layer(AgUi.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
       "preserves runId, maps threadId, and admits only the final user message",
       (it) => {
         it.effect("preserves runId, maps threadId, and admits only the final user message", () =>
           Effect.gen(function* () {
-            const service = yield* AgUi.AgUi
+            const service = yield* AGUI.AGUI
             const events = yield* service.run(input()).pipe(Stream.runCollect)
             expect(sent).toMatchObject({
               runId: "client-run-1",
@@ -120,12 +120,12 @@ describe("AgUi", () => {
 
   {
     const runtime = mockRuntime({})
-    layer(AgUi.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
       "rejects malformed input, authority roles, client tools, and non-user final messages",
       (it) => {
         it.effect("rejects malformed input, authority roles, client tools, and non-user final messages", () =>
           Effect.gen(function* () {
-            const service = yield* AgUi.AgUi
+            const service = yield* AGUI.AGUI
             const cases = [
               input({
                 messages: [
@@ -196,12 +196,12 @@ describe("AgUi", () => {
         return Effect.void
       },
     })
-    layer(AgUi.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
       "resumes only the exact active wait",
       (it) => {
         it.effect("resumes only the exact active wait", () =>
           Effect.gen(function* () {
-            const service = yield* AgUi.AgUi
+            const service = yield* AGUI.AGUI
             yield* service
               .run(input({ resume: [{ interruptId: "wait-1", status: "resolved", payload: "approved" }] }))
               .pipe(Stream.runDrain)
@@ -257,12 +257,12 @@ describe("AgUi", () => {
       },
       snapshot: () => Effect.succeed(snapshot),
     })
-    layer(AgUi.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
       "recovers subscriber lag with a state snapshot and the snapshot cursor",
       (it) => {
         it.effect("recovers subscriber lag with a state snapshot and the snapshot cursor", () =>
           Effect.gen(function* () {
-            const service = yield* AgUi.AgUi
+            const service = yield* AGUI.AGUI
             const current = yield* service.snapshot("client-run-1")
             const events = yield* service.run(input()).pipe(Stream.runCollect)
             expect(lagCursors).toEqual([-1, 8])
@@ -308,12 +308,12 @@ describe("AgUi", () => {
       },
       snapshot: () => Effect.succeed(snapshot),
     })
-    layer(AgUi.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
       "recovers an expired cursor from the authoritative snapshot",
       (it) => {
         it.effect("recovers an expired cursor from the authoritative snapshot", () =>
           Effect.gen(function* () {
-            const service = yield* AgUi.AgUi
+            const service = yield* AGUI.AGUI
             const events = yield* service.run(input()).pipe(Stream.runCollect)
             expect(expiredCursors).toEqual([-1, 12])
             expect([...events]).toEqual([{ type: "STATE_SNAPSHOT", snapshot }])

@@ -15,8 +15,8 @@ export {
   isInvocationCoordinationFailed,
   layerInvocationCoordinatorNoop,
   layerNoop,
-  type DeliveryInterface,
-  type InvocationCoordinatorInterface,
+  type DeliveryService,
+  type InvocationCoordinatorService,
 } from "./services.js"
 export {
   CurrentCompactionId,

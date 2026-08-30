@@ -1,6 +1,6 @@
 import { Clock, Effect } from "effect"
 import { SqlClient, SqlError } from "effect/unstable/sql"
-import { ExecutionHost } from "tenetkit/runtime/driver/execution/host"
+import { RunExecutor } from "tenetkit/runtime/driver/execution/run-executor"
 import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { LocalScheduler } from "tenetkit/runtime/driver/execution/local-scheduler"
 import { RunStore } from "tenetkit/runtime/driver/run/store"
@@ -35,12 +35,12 @@ export const drain = (
 ): Effect.Effect<
   DrainResult,
   RuntimeUnavailable | SqlError.SqlError,
-  SqlClient.SqlClient | RunStore | ExecutionHost | LocalScheduler
+  SqlClient.SqlClient | RunStore | RunExecutor | LocalScheduler
 > =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const store = yield* RunStore
-    const host = yield* ExecutionHost
+    const executor = yield* RunExecutor
     const scheduler = yield* LocalScheduler
     const now = yield* Clock.currentTimeMillis
     const fuel = Math.max(0, Math.floor(options.fuel))
@@ -54,7 +54,7 @@ export const drain = (
     for (const candidate of selected) {
       if (candidate.intent === "execute") {
         const outcome = yield* store.claimExecution({ runId: candidate.run_id, ownerId: options.ownerId }).pipe(
-          Effect.flatMap(host.execute),
+          Effect.flatMap(executor.execute),
           Effect.as("executed" as const),
           Effect.catchTags({
             "tenetkit/runtime/StaleClaim": () => Effect.succeed("stale" as const),

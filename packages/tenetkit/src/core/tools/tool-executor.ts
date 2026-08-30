@@ -39,7 +39,7 @@ type AgentToolSchemaServices<Parameters extends Schema.Top, SuccessSchema extend
   | SuccessSchema["EncodingServices"]
 
 /** @experimental */
-export interface Interface<R = ToolContext> {
+export interface Service<R = ToolContext> {
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly cancellable?: ((request: Request) => boolean) | undefined
   readonly execute: (request: Request) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, R>
@@ -49,7 +49,7 @@ export interface Interface<R = ToolContext> {
 }
 
 /** @experimental */
-export class ToolExecutor extends Context.Service<ToolExecutor, Interface<ToolContext>>()(
+export class ToolExecutor extends Context.Service<ToolExecutor, Service<ToolContext>>()(
   "tenetkit/core/tools/tool-executor/ToolExecutor",
 ) {}
 type ResolvedTool<T extends Tool.Any & SchemaTool> = {
@@ -416,5 +416,5 @@ export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<Too
 }
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<ToolExecutor> =>
+export const layerTest = (implementation: Service): Layer.Layer<ToolExecutor> =>
   Layer.succeed(ToolExecutor, ToolExecutor.of(implementation))

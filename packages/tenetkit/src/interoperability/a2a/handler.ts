@@ -24,7 +24,7 @@ import type { Address } from "../../runtime/address.js"
 import { origin, type Cursor } from "../../runtime/cursor.js"
 import type { RunStatus } from "../../runtime/run.js"
 import type { RunEvent } from "../../runtime/run/event.js"
-import type { EventsError, Interface as RuntimeInterface } from "../../runtime/service.js"
+import type { EventsError, Service as RuntimeService } from "../../runtime/service.js"
 import { Errors } from "../../runtime/facade-errors.js"
 import { Effect, Function, Option, Schema, Stream } from "effect"
 import { decode } from "./content.js"
@@ -67,7 +67,7 @@ const withoutArtifacts = (task: Task): Task => ({
   metadata: task.metadata,
 })
 
-const makeTaskStore = (runtime: RuntimeInterface): TaskStore => ({
+const makeTaskStore = (runtime: RuntimeService): TaskStore => ({
   save: () => Promise.resolve(),
   load: (taskId: string, _context: ServerCallContext) =>
     Effect.runPromise(
@@ -156,7 +156,7 @@ const publishEvent = (
 }
 
 const follow = (
-  runtime: RuntimeInterface,
+  runtime: RuntimeService,
   task: Task,
   cursor: Cursor,
   bus: ExecutionEventBus,
@@ -170,7 +170,7 @@ const follow = (
   )
 }
 
-const makeExecutor = (runtime: RuntimeInterface, deployment: Deployment): AgentExecutor => ({
+const makeExecutor = (runtime: RuntimeService, deployment: Deployment): AgentExecutor => ({
   execute: (context: RequestContext, bus: ExecutionEventBus): Promise<void> => {
     const effect = Effect.gen(function* () {
       const prompt = yield* decode(context.userMessage)
@@ -268,7 +268,7 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     card: AgentCard,
     store: TaskStore,
     executor: AgentExecutor,
-    private readonly runtime: RuntimeInterface,
+    private readonly runtime: RuntimeService,
   ) {
     super(card, store, executor)
   }
@@ -383,10 +383,10 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
 
 /** @experimental Construct the SDK handler while keeping Runtime as task authority. */
 export const make: {
-  (runtime: RuntimeInterface, deployment: Deployment): DefaultRequestHandler
-  (deployment: Deployment): (runtime: RuntimeInterface) => DefaultRequestHandler
+  (runtime: RuntimeService, deployment: Deployment): DefaultRequestHandler
+  (deployment: Deployment): (runtime: RuntimeService) => DefaultRequestHandler
 } = Function.dual(
   2,
-  (runtime: RuntimeInterface, deployment: Deployment): DefaultRequestHandler =>
+  (runtime: RuntimeService, deployment: Deployment): DefaultRequestHandler =>
     new RuntimeRequestHandler(deployment.card, makeTaskStore(runtime), makeExecutor(runtime, deployment), runtime),
 )

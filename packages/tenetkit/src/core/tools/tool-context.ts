@@ -8,7 +8,7 @@ export interface Progress {
 }
 
 /** @experimental Ambient context available to a tool handler for the current call. */
-export interface Interface {
+export interface Service {
   readonly signal: AbortSignal
   readonly emit: (progress: Progress) => Effect.Effect<boolean>
   readonly sessionId: string
@@ -23,7 +23,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ToolContext extends Context.Service<ToolContext, Interface>()(
+export class ToolContext extends Context.Service<ToolContext, Service>()(
   "tenetkit/core/tools/tool-context/ToolContext",
 ) {}
 
@@ -37,5 +37,5 @@ export const layerDefault: Layer.Layer<ToolContext> = Layer.sync(ToolContext, ()
 )
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<ToolContext> =>
+export const layerTest = (implementation: Service): Layer.Layer<ToolContext> =>
   Layer.succeed(ToolContext, ToolContext.of(implementation))

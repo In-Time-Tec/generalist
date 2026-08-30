@@ -1,8 +1,8 @@
 import { DateTime, Effect } from "effect"
 import type { AgentEvent } from "../../../core/agent/public/event.js"
-import type { Interface as CodeMode } from "../../code-mode.js"
-import type { Interface as NestedOperations } from "../../operation/nested-operations.js"
-import type { ExecutionClaim, Interface as RunStore } from "../../run/store.js"
+import type { Service as CodeMode } from "../../code-mode.js"
+import type { Service as NestedOperations } from "../../operation/nested-operations.js"
+import type { ExecutionClaim, Service as RunStore } from "../../run/store.js"
 import { approvalReason } from "../../run/wait.js"
 
 /** Persist one aggregate Agent suspension after every admitted authored call reached a safe checkpoint. */

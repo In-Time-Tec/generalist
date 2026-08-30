@@ -60,7 +60,7 @@ expectTypeOf(WorkingMemory.layer(widenedSummaryOptions)).toEqualTypeOf<
   Layer.Layer<Memory.Memory, never, WorkingMemory.SummaryModel>
 >()
 expectTypeOf(WorkingMemory.make(widenedSummaryOptions)).toEqualTypeOf<
-  Effect.Effect<Memory.Interface, never, WorkingMemory.SummaryModel>
+  Effect.Effect<Memory.Service, never, WorkingMemory.SummaryModel>
 >()
 
 layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
@@ -278,7 +278,7 @@ const modelFailure = AiError.make({
   reason: AiError.UnknownError.make({ description: "summary failed" }),
 })
 
-const rememberOverflow = (memory: Memory.Interface, transcript: Prompt.Prompt) =>
+const rememberOverflow = (memory: Memory.Service, transcript: Prompt.Prompt) =>
   memory.remember({ key, turn: 0, terminal: true, transcript })
 
 layer(Layer.empty)((it) => {

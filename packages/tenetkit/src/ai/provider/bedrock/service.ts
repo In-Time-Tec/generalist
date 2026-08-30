@@ -3,7 +3,7 @@ import { ModelRegistry } from "../../../core/model/public/registry.js"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Tool } from "effect/unstable/ai"
 import type { RegistrationOptions } from "../../model/registration.js"
-import { Client, layerClient, type Options } from "./client.js"
+import { Client, layerClient, type ClientOptions } from "./client.js"
 import { conformImageSourceModel } from "../../model/image-source.js"
 import { isAvailabilityFailure } from "../../model/failure.js"
 import { bedrockFailure, clientFailure } from "./error.js"
@@ -14,8 +14,8 @@ export {
   ClientFailure,
   layerClient,
   isRecoverableCredentialFailure,
-  type Interface,
-  type Options,
+  type Service,
+  type ClientOptions,
   type Recovery,
   RecoveryFailure,
 } from "./client.js"
@@ -88,7 +88,7 @@ const decodeConfigInput = Schema.decodeUnknownSync(ConfigSchema, { onExcessPrope
 
 export const decodeConfig = (options: ConfigInput): Config => decodeConfigInput(options ?? {})
 /** @experimental */
-export interface Input extends RegistrationOptions {
+export interface Options extends RegistrationOptions {
   readonly model: string
   readonly config?: Config
 }
@@ -138,7 +138,7 @@ const streamFailure = (cause: unknown) =>
     ? cause
     : parsedStreamFailure(Option.getOrUndefined(Schema.decodeUnknownOption(StreamFailureSchema)(cause)))
 
-const registrationOptions = (input: Input) => {
+const registrationOptions = (input: Options) => {
   const required = {
     provider: "amazon-bedrock",
     model: input.model,
@@ -156,7 +156,7 @@ const registrationOptions = (input: Input) => {
 }
 
 /** @experimental */
-export const make = Effect.fnUntraced(function* (input: Input) {
+export const make = Effect.fnUntraced(function* (input: Options) {
   const client = yield* Client
   const model = yield* LanguageModel.make({
     generateText: (options) =>
@@ -192,7 +192,7 @@ export const make = Effect.fnUntraced(function* (input: Input) {
 })
 
 /** @experimental */
-export const layerLanguageModel = (input: Input) => Layer.effect(LanguageModel.LanguageModel, make(input))
+export const layerLanguageModel = (input: Options) => Layer.effect(LanguageModel.LanguageModel, make(input))
 /** @experimental */
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 /** @experimental */
@@ -210,7 +210,7 @@ export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (too
   })
 /** @experimental */
 export const layer = (
-  input: Input & { readonly client?: Options },
+  input: Options & { readonly client?: ClientOptions },
 ): Layer.Layer<ModelRegistry.ModelRegistry, never, never> =>
   ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
     Layer.provide(layerClient(input.client)),

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Result, Schema } from "effect"
-import { HarnessState, Refinement } from "../../src/harness/index.js"
+import { State, Refinement } from "../../src/harness/index.js"
 import { applied, at, create, entry, proposal, rejected, remove, scope, update } from "./fixtures.js"
 
-const seeded = HarnessState.make({
+const seeded = State.make({
   scope,
   entries: [entry({ id: "keep", kind: "memory" }), entry({ id: "target", kind: "skill", version: 3 })],
 })
@@ -11,10 +11,10 @@ const seeded = HarnessState.make({
 describe("Refinement.applyProposal", () => {
   it("creates one entry at version 1 with the proposal instant", () => {
     const result = applied({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({ edits: [create({ kind: "memory", id: "fresh" })] }),
     })
-    const created = HarnessState.findEntry(result.state, "memory", "fresh")!
+    const created = State.findEntry(result.state, "memory", "fresh")!
     expect(created.version).toBe(1)
     expect(created.createdAt).toBe(at(1))
     expect(created.updatedAt).toBe(at(1))
@@ -28,7 +28,7 @@ describe("Refinement.applyProposal", () => {
       state: seeded,
       proposal: proposal({ at: at(5), edits: [update({ kind: "skill", id: "target", value: { content: "next" } })] }),
     })
-    const updated = HarnessState.findEntry(result.state, "skill", "target")!
+    const updated = State.findEntry(result.state, "skill", "target")!
     expect(updated.version).toBe(4)
     expect(updated.createdAt).toBe(at(0))
     expect(updated.updatedAt).toBe(at(5))
@@ -40,18 +40,18 @@ describe("Refinement.applyProposal", () => {
       state: seeded,
       proposal: proposal({ edits: [update({ kind: "skill", id: "target" }), remove({ kind: "memory", id: "keep" })] }),
     })
-    expect(result.event.applied[0]!.before).toEqual(HarnessState.findEntry(seeded, "skill", "target"))
-    expect(result.event.applied[1]!.before).toEqual(HarnessState.findEntry(seeded, "memory", "keep"))
+    expect(result.event.applied[0]!.before).toEqual(State.findEntry(seeded, "skill", "target"))
+    expect(result.event.applied[1]!.before).toEqual(State.findEntry(seeded, "memory", "keep"))
     expect(result.event.applied[1]!.after).toBeUndefined()
   })
 
   it("increases the version monotonically across repeated updates", () => {
-    let state = HarnessState.empty(scope)
+    let state = State.empty(scope)
     state = applied({
       state,
       proposal: proposal({ id: "p0", edits: [create({ kind: "prompt", id: "note" })] }),
     }).state
-    const versions: Array<number> = [HarnessState.findEntry(state, "prompt", "note")!.version]
+    const versions: Array<number> = [State.findEntry(state, "prompt", "note")!.version]
     for (let step = 1; step <= 5; step += 1) {
       state = applied({
         state,
@@ -60,7 +60,7 @@ describe("Refinement.applyProposal", () => {
           edits: [update({ kind: "prompt", id: "note", value: { content: `v${step}` } })],
         }),
       }).state
-      versions.push(HarnessState.findEntry(state, "prompt", "note")!.version)
+      versions.push(State.findEntry(state, "prompt", "note")!.version)
     }
     expect(versions).toEqual([1, 2, 3, 4, 5, 6])
   })
@@ -81,16 +81,16 @@ describe("Refinement.applyProposal", () => {
   })
 
   it("records the before and after snapshots of one refinement", () => {
-    const before = HarnessState.snapshotId(seeded)
+    const before = State.snapshotId(seeded)
     const result = applied({ state: seeded, proposal: proposal({ edits: [create({ kind: "memory", id: "extra" })] }) })
     expect(result.event.before).toBe(before)
-    expect(result.event.after).toBe(HarnessState.snapshotId({ ...result.state, refinements: [] }))
+    expect(result.event.after).toBe(State.snapshotId({ ...result.state, refinements: [] }))
     expect(result.event.after).not.toBe(before)
   })
 
   it("appends the event to the refinement history", () => {
     const first = applied({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({ id: "p1", edits: [create({ kind: "memory", id: "a" })] }),
     })
     const second = applied({
@@ -102,7 +102,7 @@ describe("Refinement.applyProposal", () => {
 
   it("carries the rationale and source into the event", () => {
     const result = applied({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({ edits: [create({ kind: "memory", id: "a" })], rationale: "why", source: "cell" }),
     })
     expect(result.event.rationale).toBe("why")
@@ -112,7 +112,7 @@ describe("Refinement.applyProposal", () => {
 
   it("omits an absent rationale and source instead of writing undefined", () => {
     const result = applied({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({ edits: [create({ kind: "memory", id: "a" })] }),
     })
     expect("rationale" in result.event).toBe(false)
@@ -120,7 +120,7 @@ describe("Refinement.applyProposal", () => {
   })
 
   it("bounds retained refinement history", () => {
-    let state = HarnessState.empty(scope)
+    let state = State.empty(scope)
     for (let step = 0; step < 5; step += 1) {
       state = applied({
         state,
@@ -135,7 +135,7 @@ describe("Refinement.applyProposal", () => {
 
   it("drops all history at a zero refinement bound", () => {
     const result = applied({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({ edits: [create({ kind: "memory", id: "a" })] }),
       options: {
         maxRefinements: 0,
@@ -150,10 +150,10 @@ describe("Refinement.applyProposal", () => {
       state: seeded,
       proposal: proposal({
         edits: [create({ kind: "memory", id: "extra" })],
-        baseSnapshot: HarnessState.snapshotId(seeded),
+        baseSnapshot: State.snapshotId(seeded),
       }),
     })
-    expect(HarnessState.findEntry(result.state, "memory", "extra")).toBeDefined()
+    expect(State.findEntry(result.state, "memory", "extra")).toBeDefined()
   })
 })
 
@@ -163,12 +163,12 @@ describe("Refinement.applyProposal rejection", () => {
       state: seeded,
       proposal: proposal({
         edits: [create({ kind: "memory", id: "extra" })],
-        baseSnapshot: HarnessState.snapshotId(HarnessState.empty(scope)),
+        baseSnapshot: State.snapshotId(State.empty(scope)),
       }),
     })
     expect(failure.reason).toBe("baseline-drift")
     expect(failure.proposal).toBe("proposal-1")
-    expect(HarnessState.findEntry(seeded, "memory", "extra")).toBeUndefined()
+    expect(State.findEntry(seeded, "memory", "extra")).toBeUndefined()
   })
 
   it("rejects creating an existing entry", () => {
@@ -217,7 +217,7 @@ describe("Refinement.applyProposal rejection", () => {
       state: seeded,
       proposal: proposal({ edits: [update({ kind: "skill", id: "target", baseVersion: 3 })] }),
     })
-    expect(HarnessState.findEntry(result.state, "skill", "target")!.version).toBe(4)
+    expect(State.findEntry(result.state, "skill", "target")!.version).toBe(4)
   })
 
   it("rejects a proposal that edits one target twice", () => {
@@ -236,18 +236,18 @@ describe("Refinement.applyProposal rejection", () => {
 
   it("permits the same id in two kinds", () => {
     const result = applied({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({
         edits: [create({ kind: "memory", id: "shared" }), create({ kind: "skill", id: "shared" })],
       }),
     })
-    expect(HarnessState.findEntry(result.state, "memory", "shared")).toBeDefined()
-    expect(HarnessState.findEntry(result.state, "skill", "shared")).toBeDefined()
+    expect(State.findEntry(result.state, "memory", "shared")).toBeDefined()
+    expect(State.findEntry(result.state, "skill", "shared")).toBeDefined()
   })
 
   it("rejects a proposal that exceeds the per-kind capacity", () => {
     const failure = rejected({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({
         edits: [
           create({ kind: "memory", id: "a" }),
@@ -263,7 +263,7 @@ describe("Refinement.applyProposal rejection", () => {
 
   it("permits a proposal that stays inside the per-kind capacity", () => {
     const result = applied({
-      state: HarnessState.empty(scope),
+      state: State.empty(scope),
       proposal: proposal({ edits: [create({ kind: "memory", id: "a" }), create({ kind: "memory", id: "b" })] }),
       options: { maxEntriesPerKind: 2 },
     })
@@ -271,19 +271,19 @@ describe("Refinement.applyProposal rejection", () => {
   })
 
   it("leaves the input state untouched when a later edit fails", () => {
-    const before = HarnessState.snapshotId(seeded)
+    const before = State.snapshotId(seeded)
     const failure = rejected({
       state: seeded,
       proposal: proposal({ edits: [create({ kind: "memory", id: "ok" }), update({ kind: "memory", id: "absent" })] }),
     })
     expect(failure.reason).toBe("update-missing")
-    expect(HarnessState.snapshotId(seeded)).toBe(before)
-    expect(HarnessState.findEntry(seeded, "memory", "ok")).toBeUndefined()
+    expect(State.snapshotId(seeded)).toBe(before)
+    expect(State.findEntry(seeded, "memory", "ok")).toBeUndefined()
   })
 
   it("encodes one rejection as a tagged boundary error", () => {
     const failure = rejected({ state: seeded, proposal: proposal({ edits: [create({ kind: "memory", id: "keep" })] }) })
-    expect(failure._tag).toBe("tenetkit/harness/RefinementRejected")
+    expect(failure._tag).toBe("tenetkit/agent-guidance/RefinementRejected")
     const encoded = Schema.encodeSync(Refinement.RefinementRejected)(failure)
     expect(encoded).toMatchObject({ reason: "create-existing", proposal: "proposal-1", target: "memory/keep" })
   })

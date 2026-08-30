@@ -1,7 +1,7 @@
 import { Effect, Pull, Stream } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
-import type { Interface as RunStore } from "../run/store.js"
+import type { Service as RunStore } from "../run/store.js"
 
 export const awaitSessionTerminal = (input: {
   readonly store: RunStore

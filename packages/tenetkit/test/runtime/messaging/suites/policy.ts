@@ -5,7 +5,7 @@ import { textPrompt } from "../../execution/fixtures.js"
 import { messagingBackend, type MessagingBackend } from "../scenario.js"
 
 /** A host that opts into one exact cross-session direction, the way a product wires Threads together. */
-const pairPolicy = (allowed: { readonly from: string; readonly to: string }): Messaging.Interface => ({
+const pairPolicy = (allowed: { readonly from: string; readonly to: string }): Messaging.Service => ({
   allow: (input) => Effect.succeed(input.sender.sessionId === allowed.from && input.target.sessionId === allowed.to),
   discover: () => Effect.succeed([]),
 })

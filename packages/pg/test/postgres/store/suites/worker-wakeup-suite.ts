@@ -1,4 +1,4 @@
-import { layerPostgres } from "@tenetkit/pg"
+import { layer as backendLayer } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
@@ -20,7 +20,7 @@ const source = "postgres-worker-wakeup"
 const applicationName = `tenetkit-runtime-worker:${source}`
 
 const layer = database.provision(
-  layerPostgres({
+  backendLayer({
     url: database.url,
     source,
     resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),

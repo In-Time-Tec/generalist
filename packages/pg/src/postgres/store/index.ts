@@ -59,7 +59,7 @@ import {
   requireRun,
   settleParent,
 } from "./runtime.js"
-import type { PostgresOptions } from "../runtime-layer.js"
+import type { Options } from "../runtime-layer.js"
 import { lockMailbox, lockRun, lockRunHierarchy, lockSpawnParent } from "../runs/locks.js"
 import { inspectionStoreMethods } from "./inspection.js"
 import { programStoreMethods } from "./program.js"
@@ -82,7 +82,7 @@ import {
 import { revokeExecutionSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
 import { acknowledge, loadAcknowledged } from "tenetkit/runtime/driver/sql/acknowledgement"
 
-export const postgresServices = (options: PostgresOptions) =>
+export const postgresServices = (options: Options) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* checkSchema(options.source ?? "postgres")

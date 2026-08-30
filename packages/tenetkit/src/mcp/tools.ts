@@ -4,12 +4,12 @@ import { type Duration, Effect, Layer, Schema, type Scope } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import {
   fromTransport,
-  type Interface,
+  type Service,
   type JsonValue,
-  McpConnectionFailed,
-  type McpAiTool,
-  type McpToolFailure,
-} from "./tool-source.js"
+  MCPConnectionFailed,
+  type MCPTool,
+  type MCPToolFailure,
+} from "./client.js"
 import type { OAuthProviderError } from "./oauth.js"
 
 /** @experimental */
@@ -20,8 +20,8 @@ export interface Options {
 }
 
 /** @experimental */
-export interface McpTools {
-  readonly toolkit: Toolkit.Toolkit<Record<string, McpAiTool>>
+export interface MCPTools {
+  readonly toolkit: Toolkit.Toolkit<Record<string, MCPTool>>
   readonly executorLayer: Layer.Layer<ToolExecutor.ToolExecutor | Tool.Handler<string>>
 }
 
@@ -31,11 +31,11 @@ export interface McpTools {
  *
  * @experimental
  */
-export const toolkit = (source: Interface): Effect.Effect<Toolkit.Toolkit<Record<string, McpAiTool>>> =>
-  source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools)))
+export const toolkit = (client: Service): Effect.Effect<Toolkit.Toolkit<Record<string, MCPTool>>> =>
+  client.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools)))
 
-const toolFailure = (server: string, tool: string, message: string): McpToolFailure => ({
-  _tag: "tenetkit/mcp/McpToolCallFailed",
+const toolFailure = (server: string, tool: string, message: string): MCPToolFailure => ({
+  _tag: "tenetkit/mcp/MCPToolCallFailed",
   server,
   tool,
   message,
@@ -46,19 +46,19 @@ const toolFailure = (server: string, tool: string, message: string): McpToolFail
  *
  * @experimental
  */
-export const layerToolkit = (source: Interface): Layer.Layer<Tool.Handler<string>> =>
+export const layerToolkit = (client: Service): Layer.Layer<Tool.Handler<string>> =>
   Layer.unwrap(
     Effect.gen(function* () {
-      const mcpToolkit = yield* toolkit(source)
-      const tools = yield* source.tools
+      const mcpToolkit = yield* toolkit(client)
+      const tools = yield* client.tools
       type HandlerInput = typeof Schema.Unknown.Type
-      const handlers: Record<string, (params: HandlerInput) => Effect.Effect<JsonValue, McpToolFailure>> = {}
+      const handlers: Record<string, (params: HandlerInput) => Effect.Effect<JsonValue, MCPToolFailure>> = {}
       for (const tool of tools) {
         handlers[tool.name] = (params) =>
           Schema.decodeUnknownEffect(Schema.Json)(params).pipe(
-            Effect.mapError((error) => toolFailure(source.server, tool.rawName, error.message)),
+            Effect.mapError((error) => toolFailure(client.server, tool.rawName, error.message)),
             Effect.flatMap((input) =>
-              source
+              client
                 .callTool(tool.rawName, input)
                 .pipe(Effect.mapError((error) => toolFailure(error.server, error.tool, error.message))),
             ),
@@ -68,7 +68,7 @@ export const layerToolkit = (source: Interface): Layer.Layer<Tool.Handler<string
     }),
   )
 
-const acquire = (options: Options): Effect.Effect<Interface, McpConnectionFailed | OAuthProviderError, Scope.Scope> =>
+const acquire = (options: Options): Effect.Effect<Service, MCPConnectionFailed | OAuthProviderError, Scope.Scope> =>
   fromTransport(
     options.name,
     options.transport,
@@ -80,13 +80,13 @@ const acquire = (options: Options): Effect.Effect<Interface, McpConnectionFailed
  *
  * @experimental
  */
-export const route = (
+export const connect = (
   options: Options,
-): Effect.Effect<McpTools, McpConnectionFailed | OAuthProviderError, Scope.Scope> =>
+): Effect.Effect<MCPTools, MCPConnectionFailed | OAuthProviderError, Scope.Scope> =>
   Effect.gen(function* () {
-    const source = yield* acquire(options)
-    const mcpToolkit = yield* toolkit(source)
-    const handlers = layerToolkit(source)
+    const client = yield* acquire(options)
+    const mcpToolkit = yield* toolkit(client)
+    const handlers = layerToolkit(client)
     return {
       toolkit: mcpToolkit,
       executorLayer: ToolExecutor.layerToolkit(mcpToolkit).pipe(Layer.provideMerge(handlers)),

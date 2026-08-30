@@ -82,7 +82,7 @@ const progress = (toolCallId: string, event: CellEvent): Effect.Effect<ToolConte
     Effect.map((data) => ({ toolCallId, message: event._tag, data })),
   )
 
-const cellIdOf = (request: ToolExecutor.Request, context: ToolContext.Interface): string =>
+const cellIdOf = (request: ToolExecutor.Request, context: ToolContext.Service): string =>
   context.operationKey ?? context.toolCallId ?? `${request.sessionId}-${request.turn}-${request.toolCallIndex}`
 
 const success = (result: CellResult): Effect.Effect<ToolExecutor.Outcome, ToolExecutor.FrameworkFailure> =>

@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
-import { Address, ExecutableResolver, ExecutionHost, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { pinnedTestExecutable as testExecutable } from "../../run/identity.js"
 import { registrationsFor } from "../fixtures.js"
 import { tempDbPath } from "../../sql/scenario.js"
@@ -67,7 +67,7 @@ const execute = (input: {
     return yield* scopedWith(layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,
@@ -181,7 +181,7 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
     yield* scopedWith(layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,
@@ -279,7 +279,7 @@ it.effect("retires the published frame when a response commits while keeping the
     yield* scopedWith(layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
+        const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         const receipt = yield* runtime.send({
           to: address,

@@ -12,7 +12,7 @@ const resilienceLayer = ModelResilience.layer({
   streamIdleTimeout: "2 minutes",
 })
 
-const program = ModelRegistry.operate(
+const program = ModelRegistry.withModel(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
   Agent.generate(agent, { prompt: "Summarize today's alerts." }),
 ).pipe(Effect.flatMap((result) => Console.log(result.text)))

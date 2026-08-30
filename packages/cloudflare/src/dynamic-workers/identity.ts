@@ -1,11 +1,11 @@
-import { SandboxExecutor } from "tenetkit"
+import { CodeExecutor } from "tenetkit"
 
-export const identity = (compatibilityDate: string): SandboxExecutor.Identity =>
-  SandboxExecutor.declareIdentity({
+export const identity = (compatibilityDate: string): CodeExecutor.Identity =>
+  CodeExecutor.declareIdentity({
     provider: "cloudflare",
     implementation: { name: "@tenetkit/cloudflare/dynamic-workers", version: "1" },
     runtime: { name: "cloudflare-workers-compatibility-date", version: compatibilityDate },
-    template: { name: "tenetkit-program-runner", version: SandboxExecutor.protocolVersion },
+    template: { name: "tenetkit-program-runner", version: CodeExecutor.protocolVersion },
     physicalIsolation: "worker-isolate",
     persistence: "fresh-per-execution",
     network: {

@@ -1,15 +1,15 @@
-import { AgUi as AgUi_AgUi, layer as AgUi_layer } from "./service.js"
+import { AGUI as AGUI_AGUI, layer as AGUI_layer } from "./service.js"
 
 /** @experimental */
-export const AgUi = {
-  AgUi: AgUi_AgUi,
-  layer: AgUi_layer,
+export const AGUI = {
+  AGUI: AGUI_AGUI,
+  layer: AGUI_layer,
 }
 
 /** @experimental */
-export namespace AgUi {
-  export type AgUi = import("./service.js").AgUi
-  export type Interface = import("./service.js").Interface
+export namespace AGUI {
+  export type AGUI = import("./service.js").AGUI
+  export type Service = import("./service.js").Service
   export type LayerOptions = import("./service.js").LayerOptions
   export type RunError = import("./service.js").RunError
   export type layer = typeof import("./service.js").layer

@@ -17,7 +17,7 @@ export namespace Steering {
   export type layerTest = typeof import("./steering.js").layerTest
   export type DrainMode = import("./steering.js").DrainMode
   export type Input = import("./steering.js").Input
-  export type Interface = import("./steering.js").Interface
+  export type Service = import("./steering.js").Service
   export type MakeOptions = import("./steering.js").MakeOptions
   export type OverflowStrategy = import("./steering.js").OverflowStrategy
   export type QueueName = import("./steering.js").QueueName

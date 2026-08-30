@@ -39,7 +39,7 @@ export namespace Memory {
   export type layerNoop = typeof import("../memory.js").layerNoop
   export type layerTest = typeof import("../memory.js").layerTest
   export type ForgetInput = import("../memory.js").ForgetInput
-  export type Interface = import("../memory.js").Interface
+  export type Service = import("../memory.js").Service
   export type Item = import("../memory.js").Item
   export type ItemPart = import("../memory.js").ItemPart
   export type Key = import("../memory.js").Key

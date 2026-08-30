@@ -37,13 +37,13 @@ export namespace S3Catalog {
   export type layer = typeof import("./s3-catalog.js").layer
   export type Options = import("./s3-catalog.js").Options
 }
-import { make as SkillLoader_make, layer as SkillLoader_layer } from "./loader.js"
-export const SkillLoader = {
-  make: SkillLoader_make,
-  layer: SkillLoader_layer,
+import { make as FileSystemCatalog_make, layer as FileSystemCatalog_layer } from "./file-system-catalog.js"
+export const FileSystemCatalog = {
+  make: FileSystemCatalog_make,
+  layer: FileSystemCatalog_layer,
 }
-export namespace SkillLoader {
-  export type make = typeof import("./loader.js").make
-  export type layer = typeof import("./loader.js").layer
-  export type LoadOptions = import("./loader.js").LoadOptions
+export namespace FileSystemCatalog {
+  export type make = typeof import("./file-system-catalog.js").make
+  export type layer = typeof import("./file-system-catalog.js").layer
+  export type Options = import("./file-system-catalog.js").Options
 }

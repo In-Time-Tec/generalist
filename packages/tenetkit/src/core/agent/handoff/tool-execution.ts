@@ -13,7 +13,7 @@ export const runHandoffTool = (input: {
   readonly turn: number
   readonly call: AnyToolCall
   readonly options: RunOptions
-  readonly activeSession: Option.Option<import("../../context/session.js").Interface>
+  readonly activeSession: Option.Option<import("../../context/session.js").Service>
   readonly handoffState: Ref.Ref<HandoffRunState>
   readonly chat: Chat.Service
   readonly toolState: Ref.Ref<{
@@ -69,7 +69,7 @@ export const handoffDispatch: {
     registry: Registry,
     input: {
       readonly options: RunOptions
-      readonly activeSession: Option.Option<import("../../context/session.js").Interface>
+      readonly activeSession: Option.Option<import("../../context/session.js").Service>
       readonly handoffState: Ref.Ref<HandoffRunState>
       readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
@@ -93,7 +93,7 @@ export const handoffDispatch: {
     registry: Registry,
     input: {
       readonly options: RunOptions
-      readonly activeSession: Option.Option<import("../../context/session.js").Interface>
+      readonly activeSession: Option.Option<import("../../context/session.js").Service>
       readonly handoffState: Ref.Ref<HandoffRunState>
       readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
@@ -116,7 +116,7 @@ export const handoffDispatch: {
     registry: Registry,
     input: {
       readonly options: RunOptions
-      readonly activeSession: Option.Option<import("../../context/session.js").Interface>
+      readonly activeSession: Option.Option<import("../../context/session.js").Service>
       readonly handoffState: Ref.Ref<HandoffRunState>
       readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{

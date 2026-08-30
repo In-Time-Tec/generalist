@@ -1,6 +1,6 @@
 /* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/global-timers-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, effecttsgo/unnecessary-fail-yieldable-error, no-await-in-loop */
 import { Effect, Layer, Option, Result, Schema } from "effect"
-import { ProgramCapabilities, SandboxExecutor } from "tenetkit"
+import { CodeExecutor, ProgramCapabilities } from "tenetkit"
 import { identity } from "./identity.js"
 import { capabilityFailurePrefix, normalize, runner, runnerName } from "./source.js"
 import { type CapabilityRpc, CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
@@ -30,7 +30,7 @@ const safeMessage = (cause: unknown): string => {
 }
 
 const failExecution = (cause: unknown) =>
-  SandboxExecutor.SandboxExecutionFailure.make({ message: `dynamic Worker execution failed: ${safeMessage(cause)}` })
+  CodeExecutor.SandboxExecutionFailure.make({ message: `dynamic Worker execution failed: ${safeMessage(cause)}` })
 
 const encodeJson = <A>(value: A): string | undefined => {
   try {
@@ -94,8 +94,8 @@ const capabilityName = (request: CapabilityRpcRequest): string | undefined => {
 type CapabilityGrant = ReadonlyMap<CapabilityRpcRequest["operation"], ReadonlySet<string>>
 
 interface CapabilityInvocation {
-  readonly capabilities: ProgramCapabilities.Interface
-  readonly request: SandboxExecutor.Request
+  readonly capabilities: ProgramCapabilities.Service
+  readonly request: CodeExecutor.Request
   readonly grants: CapabilityGrant
   readonly signal: AbortSignal
   readonly isActive: () => boolean
@@ -130,7 +130,7 @@ const validateCapabilityRequest = (
 }
 
 const invokeCapability = async (
-  capabilities: ProgramCapabilities.Interface,
+  capabilities: ProgramCapabilities.Service,
   request: CapabilityRpcRequest,
   grant: ReadonlySet<string>,
   signal: AbortSignal,
@@ -201,17 +201,17 @@ const makeCapabilityRpc = (invocation: CapabilityInvocation): CapabilityRpc => (
 
 const loaderFailure = (
   cause: unknown,
-  request: SandboxExecutor.Request,
+  request: CodeExecutor.Request,
   deadlineElapsed: boolean,
-): SandboxExecutor.ExecutionFailure => {
-  if (request.signal.aborted) return SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+): CodeExecutor.ExecutionFailure => {
+  if (request.signal.aborted) return CodeExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
   if (deadlineElapsed || Date.now() >= request.deadlineMillis)
-    return SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+    return CodeExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
   const message = safeMessage(cause)
   if (/cpu/i.test(message))
-    return SandboxExecutor.SandboxResourceExceeded.make({ resource: "cpu", limit: request.limits.cpuMillis })
+    return CodeExecutor.SandboxResourceExceeded.make({ resource: "cpu", limit: request.limits.cpuMillis })
   if (/subrequest/i.test(message))
-    return SandboxExecutor.SandboxResourceExceeded.make({
+    return CodeExecutor.SandboxResourceExceeded.make({
       resource: "subrequests",
       limit: request.limits.subrequests,
     })
@@ -233,14 +233,14 @@ const recoverCapabilityFailure = (
 
 const decodeResponseJson = Schema.decodeOption(Schema.fromJsonString(Schema.Json))
 
-const prepareRequest = (request: SandboxExecutor.Request) =>
+const prepareRequest = (request: CodeExecutor.Request) =>
   Effect.gen(function* () {
     const source = yield* Effect.try({
       try: () => normalize(request),
-      catch: (cause) => SandboxExecutor.SandboxSourceInvalid.make({ message: safeMessage(cause) }),
+      catch: (cause) => CodeExecutor.SandboxSourceInvalid.make({ message: safeMessage(cause) }),
     })
     if (
-      SandboxExecutor.sourceDigest({
+      CodeExecutor.sourceDigest({
         modules: source.modules,
         entrypoint: request.entrypoint,
         inputCodec: request.inputCodec,
@@ -248,29 +248,29 @@ const prepareRequest = (request: SandboxExecutor.Request) =>
         protocolVersion: request.protocolVersion,
       }) !== request.sourceDigest
     )
-      return yield* SandboxExecutor.SandboxSourceInvalid.make({ message: "source digest mismatch" })
+      return yield* CodeExecutor.SandboxSourceInvalid.make({ message: "source digest mismatch" })
     const encodedInput = encodeJson(request.input)
     if (encodedInput === undefined)
-      return yield* SandboxExecutor.SandboxInputInvalid.make({ message: "sandbox input is not JSON serializable" })
+      return yield* CodeExecutor.SandboxInputInvalid.make({ message: "sandbox input is not JSON serializable" })
     return { source, encodedInput }
   })
 
 const decodeWorkerResponse = (
   response: Response,
   text: string | undefined,
-  request: SandboxExecutor.Request,
+  request: CodeExecutor.Request,
   capabilityFailures: Map<string, ProgramCapabilities.CapabilityFailure>,
 ) =>
   Effect.gen(function* () {
     if (text === undefined)
-      return yield* SandboxExecutor.SandboxResourceExceeded.make({
+      return yield* CodeExecutor.SandboxResourceExceeded.make({
         resource: "output",
         limit: request.limits.outputBytes,
       })
     const decodedOption = decodeResponseJson(text)
     if (Option.isNone(decodedOption)) {
       if (!response.ok) return yield* failExecution(`dynamic Worker returned status ${response.status}`)
-      return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON" })
+      return yield* CodeExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON" })
     }
     const decoded = decodedOption.value
     if (!response.ok) {
@@ -278,38 +278,38 @@ const decodeWorkerResponse = (
       if (failure !== undefined) return yield* Effect.fail(failure)
       return yield* failExecution(`dynamic Worker returned status ${response.status}`)
     }
-    const result = yield* SandboxExecutor.validateResult(request, decoded)
+    const result = yield* CodeExecutor.validateResult(request, decoded)
     const resultBytes = bytes(result.output)
     if (resultBytes === undefined)
-      return yield* SandboxExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON serializable" })
+      return yield* CodeExecutor.SandboxOutputInvalid.make({ message: "sandbox output is not JSON serializable" })
     if (resultBytes > request.limits.outputBytes)
-      return yield* SandboxExecutor.SandboxResourceExceeded.make({
+      return yield* CodeExecutor.SandboxResourceExceeded.make({
         resource: "output",
         limit: request.limits.outputBytes,
       })
     return result
   })
 
-const interruptionFailure = (request: SandboxExecutor.Request, deadlineElapsed: boolean) => {
-  if (request.signal.aborted) return SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+const interruptionFailure = (request: CodeExecutor.Request, deadlineElapsed: boolean) => {
+  if (request.signal.aborted) return CodeExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
   if (deadlineElapsed || Date.now() >= request.deadlineMillis)
-    return SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+    return CodeExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
   return undefined
 }
 
-/** @experimental Construct a production SandboxExecutor backed by Cloudflare Worker Loader. */
-export const make = (options: Options): SandboxExecutor.Interface => {
+/** @experimental Construct a production CodeExecutor backed by Cloudflare Worker Loader. */
+export const make = (options: Options): CodeExecutor.Service => {
   const executorIdentity = identity(options.compatibilityDate)
-  return SandboxExecutor.SandboxExecutor.of({
+  return CodeExecutor.CodeExecutor.of({
     identity: executorIdentity,
     execute: (request) =>
       Effect.gen(function* () {
         const now = Date.now()
         if (request.signal.aborted)
-          return yield* SandboxExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
+          return yield* CodeExecutor.SandboxCancelled.make({ message: "sandbox request was cancelled" })
         if (now >= request.deadlineMillis)
-          return yield* SandboxExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
-        yield* SandboxExecutor.admit(executorIdentity, request, now)
+          return yield* CodeExecutor.SandboxDeadlineExceeded.make({ message: "sandbox deadline elapsed" })
+        yield* CodeExecutor.admit(executorIdentity, request, now)
         const { source, encodedInput } = yield* prepareRequest(request)
 
         const capabilities = yield* ProgramCapabilities.ProgramCapabilities
@@ -424,13 +424,13 @@ export const make = (options: Options): SandboxExecutor.Interface => {
 }
 
 /** @experimental Construct an explicitly disabled Worker Loader boundary. */
-export const makeUnavailable = (message = "Worker Loader is unavailable"): SandboxExecutor.Interface =>
-  SandboxExecutor.SandboxExecutor.of({
-    identity: SandboxExecutor.declareIdentity({
+export const makeUnavailable = (message = "Worker Loader is unavailable"): CodeExecutor.Service =>
+  CodeExecutor.CodeExecutor.of({
+    identity: CodeExecutor.declareIdentity({
       provider: "cloudflare",
       implementation: { name: "@tenetkit/cloudflare/dynamic-workers", version: "1" },
       runtime: { name: "cloudflare-workers", version: "not-configured" },
-      template: { name: "tenetkit-program-runner", version: SandboxExecutor.protocolVersion },
+      template: { name: "tenetkit-program-runner", version: CodeExecutor.protocolVersion },
       physicalIsolation: "none",
       persistence: "none",
       network: {
@@ -447,16 +447,16 @@ export const makeUnavailable = (message = "Worker Loader is unavailable"): Sandb
       },
       knownLimitations: [message],
     }),
-    execute: () => SandboxExecutor.SandboxUnavailable.make({ message }),
+    execute: () => CodeExecutor.SandboxUnavailable.make({ message }),
   })
 
-/** @experimental Provide the Worker Loader SandboxExecutor. */
-export const layer = (options: Options): Layer.Layer<SandboxExecutor.Service> =>
-  Layer.succeed(SandboxExecutor.SandboxExecutor, make(options))
+/** @experimental Provide the Worker Loader CodeExecutor. */
+export const layer = (options: Options): Layer.Layer<CodeExecutor.CodeExecutor> =>
+  Layer.succeed(CodeExecutor.CodeExecutor, make(options))
 
 /** @experimental Provide an explicitly disabled Worker Loader boundary. */
-export const layerUnavailable = (message?: string): Layer.Layer<SandboxExecutor.Service> =>
-  Layer.succeed(SandboxExecutor.SandboxExecutor, makeUnavailable(message))
+export const layerUnavailable = (message?: string): Layer.Layer<CodeExecutor.CodeExecutor> =>
+  Layer.succeed(CodeExecutor.CodeExecutor, makeUnavailable(message))
 
 export type {
   CapabilityRpc,

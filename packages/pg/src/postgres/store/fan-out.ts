@@ -1,6 +1,6 @@
 import { Effect, Function } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
-import type { Interface as RunStoreInterface } from "tenetkit/runtime/driver/run/store"
+import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { admitFanOut, inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
@@ -17,7 +17,7 @@ export const fanOutStoreMethods = (input: {
   readonly hub: EventHub
   readonly run: Run
   readonly runNoTxn: Run
-}): Pick<RunStoreInterface, "admitFanOut" | "inspectFanOut"> => ({
+}): Pick<RunStoreService, "admitFanOut" | "inspectFanOut"> => ({
   admitFanOut: (fanOut) =>
     input.run(
       input.sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${fanOut.parentRunId} FOR UPDATE`.pipe(

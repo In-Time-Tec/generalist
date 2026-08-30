@@ -18,7 +18,7 @@ export namespace Instructions {
   export type openEpoch = typeof import("../instructions.js").openEpoch
   export type layer = typeof import("../instructions.js").layer
   export type layerTest = typeof import("../instructions.js").layerTest
-  export type ContextSource = import("../instructions.js").ContextSource
-  export type Interface = import("../instructions.js").Interface
+  export type Source = import("../instructions.js").Source
+  export type Service = import("../instructions.js").Service
   export type RenderContext = import("../instructions.js").RenderContext
 }

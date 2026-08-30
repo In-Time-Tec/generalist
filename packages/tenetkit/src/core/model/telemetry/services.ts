@@ -14,14 +14,14 @@ export class InvocationCoordinationFailed extends Schema.TaggedError<InvocationC
 ) {}
 
 /** @experimental */
-export interface InvocationCoordinatorInterface {
+export interface InvocationCoordinatorService {
   readonly beforeAttempt: (input: ModelInvocationStarted) => Effect.Effect<void, InvocationCoordinationFailed>
   readonly completeAttempt: (input: ModelInvocationCompleted) => Effect.Effect<void, InvocationCoordinationFailed>
   readonly failAttempt: (input: ModelInvocationFailed) => Effect.Effect<void, InvocationCoordinationFailed>
 }
 
 /** @experimental */
-export class InvocationCoordinator extends Context.Service<InvocationCoordinator, InvocationCoordinatorInterface>()(
+export class InvocationCoordinator extends Context.Service<InvocationCoordinator, InvocationCoordinatorService>()(
   "tenetkit/core/model/telemetry/services/InvocationCoordinator",
 ) {}
 
@@ -45,12 +45,12 @@ export class DeliveryFailed extends Schema.TaggedError<DeliveryFailed>()("tenetk
 }) {}
 
 /** @experimental Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`. */
-export interface DeliveryInterface {
+export interface DeliveryService {
   readonly deliver: (batch: DeliveryBatch) => Effect.Effect<void, DeliveryFailed>
 }
 
 /** @experimental */
-export class Delivery extends Context.Service<Delivery, DeliveryInterface>()(
+export class Delivery extends Context.Service<Delivery, DeliveryService>()(
   "tenetkit/core/model/telemetry/services/Delivery",
 ) {}
 

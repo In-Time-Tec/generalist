@@ -57,7 +57,7 @@ import { Permissions } from "./policy/facade-permissions.js"
 import { Session } from "./context/public/session.js"
 import { SessionHistory } from "./context/public/session-history.js"
 import { SessionSync } from "./context/public/session-sync.js"
-import { SkillSource } from "./context/public/skill-source.js"
+import { SkillCatalog } from "./context/public/skill-catalog.js"
 import { Steering } from "./turn/facade-steering.js"
 import { ToolAuthorization } from "./tools/public/tool-authorization.js"
 import { NestedOperation } from "./tools/public/nested-operation.js"
@@ -89,19 +89,19 @@ import {
 } from "./program/capabilities.js"
 import {
   ProgramReplayPolicy,
-  agent as makeProgramAgentBinding,
-  make as makeProgramBindings,
-  step as makeProgramStepBinding,
-  tool as makeProgramToolBinding,
-} from "./program/bindings.js"
+  agent as makeProgramAgentHandler,
+  make as makeProgramHandlers,
+  step as makeProgramStepHandler,
+  tool as makeProgramToolHandler,
+} from "./program/handlers.js"
 import {
   ExecutionFailure as ProgramExecutionFailure,
-  ProgramBindingMismatch,
-  ProgramHost as ProgramHostService,
+  ProgramHandlerMismatch,
+  ProgramRunner as ProgramRunnerService,
   ProgramIdentityMismatch,
-  layerDirect as layerDirectProgramHost,
-  validateBindings as validateProgramBindings,
-} from "./program/host.js"
+  layerDirect as layerDirectProgramRunner,
+  validateHandlers as validateProgramHandlers,
+} from "./program/runner.js"
 import {
   ExecutionFailure as SandboxExecutionFailureSchema,
   Identity as SandboxIdentity,
@@ -116,7 +116,7 @@ import {
   SandboxCancelled,
   SandboxDeadlineExceeded,
   SandboxExecutionFailure,
-  SandboxExecutor as SandboxExecutorService,
+  CodeExecutor as CodeExecutorService,
   SandboxGuaranteeUnavailable,
   SandboxInputInvalid,
   SandboxOutputInvalid,
@@ -124,11 +124,11 @@ import {
   SandboxResourceExceeded,
   SandboxSourceInvalid,
   SandboxUnavailable,
-  layerTest as layerTestSandboxExecutor,
+  layerTest as layerTestCodeExecutor,
   request as makeSandboxRequest,
-  make as makeTestSandboxExecutor,
+  make as makeTestCodeExecutor,
   testIdentity as testSandboxIdentity,
-} from "./program/sandbox-executor.js"
+} from "./program/code-executor.js"
 
 export const Pins = {
   AgentPin,
@@ -197,7 +197,7 @@ export namespace ProgramCapabilities {
   export type CapabilityFailure = import("./program/capabilities.js").CapabilityFailure
   export type ProgramSuspended = import("./program/capabilities.js").ProgramSuspended
   export type ProgramBudgetExhausted = import("./program/capabilities.js").ProgramBudgetExhausted
-  export type Interface = import("./program/capabilities.js").Interface
+  export type Service = import("./program/capabilities.js").Service
   export type ToolCallInput = import("./program/capabilities.js").ToolCallInput
   export type StepCallInput = import("./program/capabilities.js").StepCallInput
   export type AgentRunInput = import("./program/capabilities.js").AgentRunInput
@@ -210,49 +210,49 @@ export namespace ProgramCapabilities {
   export type ToolDescription = import("./program/capabilities.js").ToolDescription
 }
 
-export const ProgramBindings = {
+export const ProgramHandlers = {
   ProgramReplayPolicy,
-  agent: makeProgramAgentBinding,
-  make: makeProgramBindings,
-  step: makeProgramStepBinding,
-  tool: makeProgramToolBinding,
+  agent: makeProgramAgentHandler,
+  make: makeProgramHandlers,
+  step: makeProgramStepHandler,
+  tool: makeProgramToolHandler,
 }
-export namespace ProgramBindings {
-  export type Bindings = import("./program/bindings.js").Bindings
-  export type TypedTool = import("./program/bindings.js").TypedTool
-  export type TypedStep = import("./program/bindings.js").TypedStep
-  export type ToolBinding<I, IE, O, OE, E = never> = import("./program/bindings.js").ToolBinding<I, IE, O, OE, E>
-  export type StepBinding<I, IE, O, OE, E = never> = import("./program/bindings.js").StepBinding<I, IE, O, OE, E>
-  export type AgentBinding<
+export namespace ProgramHandlers {
+  export type Handlers = import("./program/handlers.js").Handlers
+  export type TypedTool = import("./program/handlers.js").TypedTool
+  export type TypedStep = import("./program/handlers.js").TypedStep
+  export type ToolHandler<I, IE, O, OE, E = never> = import("./program/handlers.js").ToolHandler<I, IE, O, OE, E>
+  export type StepHandler<I, IE, O, OE, E = never> = import("./program/handlers.js").StepHandler<I, IE, O, OE, E>
+  export type AgentHandler<
     I extends import("effect/unstable/ai").Prompt.RawInput,
     IE,
     E = never,
-  > = import("./program/bindings.js").AgentBinding<I, IE, E>
-  export type AnyTool = import("./program/bindings.js").AnyTool
-  export type AnyStep = import("./program/bindings.js").AnyStep
-  export type AnyAgent = import("./program/bindings.js").AnyAgent
-  export type Authorize<I> = import("./program/bindings.js").Authorize<I>
-  export type Invocation = import("./program/bindings.js").Invocation
-  export type AgentInvocation = import("./program/bindings.js").AgentInvocation
-  export type ProgramReplayPolicy = import("./program/bindings.js").ProgramReplayPolicy
+  > = import("./program/handlers.js").AgentHandler<I, IE, E>
+  export type AnyTool = import("./program/handlers.js").AnyTool
+  export type AnyStep = import("./program/handlers.js").AnyStep
+  export type AnyAgent = import("./program/handlers.js").AnyAgent
+  export type Authorize<I> = import("./program/handlers.js").Authorize<I>
+  export type Invocation = import("./program/handlers.js").Invocation
+  export type AgentInvocation = import("./program/handlers.js").AgentInvocation
+  export type ProgramReplayPolicy = import("./program/handlers.js").ProgramReplayPolicy
 }
 
-export const ProgramHost = {
+export const ProgramRunner = {
   ExecutionFailure: ProgramExecutionFailure,
-  ProgramBindingMismatch,
-  ProgramHost: ProgramHostService,
+  ProgramHandlerMismatch,
+  ProgramRunner: ProgramRunnerService,
   ProgramIdentityMismatch,
-  layerDirect: layerDirectProgramHost,
-  validateBindings: validateProgramBindings,
+  layerDirect: layerDirectProgramRunner,
+  validateHandlers: validateProgramHandlers,
 }
-export namespace ProgramHost {
-  export type ProgramHost = import("./program/host.js").ProgramHost
-  export type Interface = import("./program/host.js").Interface
-  export type Request = import("./program/host.js").Request
-  export type ExecutionFailure = import("./program/host.js").ExecutionFailure
+export namespace ProgramRunner {
+  export type ProgramRunner = import("./program/runner.js").ProgramRunner
+  export type Service = import("./program/runner.js").Service
+  export type Request = import("./program/runner.js").Request
+  export type ExecutionFailure = import("./program/runner.js").ExecutionFailure
 }
 
-export const SandboxExecutor = {
+export const CodeExecutor = {
   CapabilityGrant: SandboxCapabilityGrant,
   ExecutionFailure: SandboxExecutionFailureSchema,
   Identity: SandboxIdentity,
@@ -263,7 +263,7 @@ export const SandboxExecutor = {
   SandboxCancelled,
   SandboxDeadlineExceeded,
   SandboxExecutionFailure,
-  SandboxExecutor: SandboxExecutorService,
+  CodeExecutor: CodeExecutorService,
   SandboxGuaranteeUnavailable,
   SandboxInputInvalid,
   SandboxOutputInvalid,
@@ -271,24 +271,24 @@ export const SandboxExecutor = {
   SandboxResourceExceeded,
   SandboxSourceInvalid,
   SandboxUnavailable,
-  layerTest: layerTestSandboxExecutor,
+  layerTest: layerTestCodeExecutor,
   makeRequest: makeSandboxRequest,
-  makeTest: makeTestSandboxExecutor,
+  makeTest: makeTestCodeExecutor,
   protocolVersion: sandboxProtocolVersion,
   sourceDigest: sandboxSourceDigest,
   testIdentity: testSandboxIdentity,
   validateResult: validateSandboxResult,
 }
-export namespace SandboxExecutor {
-  export type CapabilityGrant = import("./program/sandbox-executor.js").CapabilityGrant
-  export type ExecutionFailure = import("./program/sandbox-executor.js").ExecutionFailure
-  export type Identity = import("./program/sandbox-executor.js").Identity
-  export type Interface = import("./program/sandbox-executor.js").Interface
-  export type Module = import("./program/sandbox-executor.js").Module
-  export type Request = import("./program/sandbox-executor.js").Request
-  export type Result = import("./program/sandbox-executor.js").Result
-  export type Service = import("./program/sandbox-executor.js").SandboxExecutor
-  export type TestExecute = import("./program/sandbox-executor.js").TestExecute
+export namespace CodeExecutor {
+  export type CodeExecutor = import("./program/code-executor.js").CodeExecutor
+  export type CapabilityGrant = import("./program/code-executor.js").CapabilityGrant
+  export type ExecutionFailure = import("./program/code-executor.js").ExecutionFailure
+  export type Identity = import("./program/code-executor.js").Identity
+  export type Module = import("./program/code-executor.js").Module
+  export type Request = import("./program/code-executor.js").Request
+  export type Result = import("./program/code-executor.js").Result
+  export type Service = import("./program/code-executor.js").Service
+  export type TestExecute = import("./program/code-executor.js").TestExecute
 }
 
 type AgentManifestFacade = typeof import("./durable/manifest/agent-manifest.js")
@@ -373,7 +373,7 @@ export {
   Session,
   SessionHistory,
   SessionSync,
-  SkillSource,
+  SkillCatalog,
   Steering,
   ToolAuthorization,
   ToolContext,
@@ -389,11 +389,11 @@ export type ModelTelemetryFacade = typeof import("./model/telemetry/events.js")
 export type ToolExecutorFacade = typeof import("./tools/tool-executor.js")
 export type TurnPolicyFacade = typeof import("./turn/policy.js")
 export type ModelRegistryFacade = typeof import("./model/registry.js")
-export type SkillSourceFacade = typeof import("./context/skill-source.js")
+export type SkillCatalogFacade = typeof import("./context/skill-catalog.js")
 export type CoreAgent = import("./agent/service.js").Agent
 export type CoreMemory = import("./context/memory.js").Memory
-export type CoreSkillSource = import("./context/skill-source.js").SkillSource
-export type CoreSkillSourceError = import("./context/skill-source.js").SkillSourceError
+export type CoreSkillCatalog = import("./context/skill-catalog.js").SkillCatalog
+export type CoreSkillCatalogError = import("./context/skill-catalog.js").SkillCatalogError
 export type CoreModelRegistry = import("./model/registry.js").ModelRegistry
 export type CoreModelRegistryRegistration = import("./model/registry.js").Registration
 

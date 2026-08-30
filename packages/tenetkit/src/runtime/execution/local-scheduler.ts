@@ -1,8 +1,8 @@
 import { Context, Effect, FiberMap, Layer, Ref, Schedule, Schema, type Scope, Semaphore } from "effect"
 import { ActiveExecutions } from "./active-executions.js"
 import { RuntimeUnavailable } from "../errors.js"
-import { ExecutionHost } from "./host.js"
-import { RunStore, type Interface as RunStoreInterface } from "../run/store.js"
+import { RunExecutor } from "./run-executor.js"
+import { RunStore, type Service as RunStoreService } from "../run/store.js"
 
 export interface Options {
   readonly workerId: string
@@ -12,7 +12,7 @@ export interface Options {
 
 export type CancellationReconciliation = "settled" | "deferred" | "inactive" | "stale"
 
-export interface Interface {
+export interface Service {
   readonly tick: Effect.Effect<void, never, RunStore>
   /** Reconcile one cancellation without scanning the store. */
   readonly reconcileCancellation: (
@@ -22,15 +22,15 @@ export interface Interface {
   readonly idle: Effect.Effect<void>
 }
 
-export class LocalScheduler extends Context.Service<LocalScheduler, Interface>()(
+export class LocalScheduler extends Context.Service<LocalScheduler, Service>()(
   "tenetkit/runtime/execution/local-scheduler/LocalScheduler",
 ) {}
 
 export const make = (
   options: Options,
-): Effect.Effect<Interface, never, RunStore | ExecutionHost | ActiveExecutions | Scope.Scope> =>
+): Effect.Effect<Service, never, RunStore | RunExecutor | ActiveExecutions | Scope.Scope> =>
   Effect.gen(function* () {
-    const host = yield* ExecutionHost
+    const host = yield* RunExecutor
     const active = yield* ActiveExecutions
     const concurrency = options.concurrency
     const tickLock = yield* Semaphore.make(1)
@@ -42,7 +42,7 @@ export const make = (
     const runningCursor = yield* Ref.make<string | undefined>(undefined)
     const queuedCursor = yield* Ref.make<string | undefined>(undefined)
 
-    const reconcileCancellation = (store: RunStoreInterface, runId: string) =>
+    const reconcileCancellation = (store: RunStoreService, runId: string) =>
       Effect.gen(function* () {
         yield* active.interrupt(runId)
         const stillActive = yield* active.active
@@ -65,10 +65,10 @@ export const make = (
         )
       })
 
-    const sweepCancelling = (store: RunStoreInterface) =>
+    const sweepCancelling = (store: RunStoreService) =>
       Effect.gen(function* () {
         const cursor = yield* Ref.get(cancellingCursor)
-        const query: Parameters<RunStoreInterface["list"]>[0] = {
+        const query: Parameters<RunStoreService["list"]>[0] = {
           status: "cancelling",
           order: "oldest",
           limit: reconcileWindow,
@@ -83,10 +83,10 @@ export const make = (
         })
       })
 
-    const selectReadyRuns = (store: RunStoreInterface) =>
+    const selectReadyRuns = (store: RunStoreService) =>
       Effect.gen(function* () {
         const priorRunning = yield* Ref.get(runningCursor)
-        const runningQuery: Parameters<RunStoreInterface["list"]>[0] = {
+        const runningQuery: Parameters<RunStoreService["list"]>[0] = {
           status: "running",
           order: "oldest",
           limit: selectionWindow,
@@ -95,7 +95,7 @@ export const make = (
         const running = yield* store.list(runningQuery)
         const lastRunning = running[running.length - 1]
         const cursor = yield* Ref.get(queuedCursor)
-        const queuedQuery: Parameters<RunStoreInterface["list"]>[0] = {
+        const queuedQuery: Parameters<RunStoreService["list"]>[0] = {
           status: "queued",
           order: "oldest",
           limit: selectionWindow,
@@ -156,7 +156,7 @@ export const make = (
 
 export const layer = (
   options: Options,
-): Layer.Layer<LocalScheduler, never, RunStore | ExecutionHost | ActiveExecutions> =>
+): Layer.Layer<LocalScheduler, never, RunStore | RunExecutor | ActiveExecutions> =>
   Layer.effect(
     LocalScheduler,
     Effect.gen(function* () {

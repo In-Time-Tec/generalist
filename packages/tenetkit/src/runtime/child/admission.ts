@@ -13,7 +13,7 @@ import type {
   RuntimeUnavailable,
 } from "../errors.js"
 import type { RunOutcome, RunStatus } from "../run.js"
-import type { Interface as RunStoreInterface } from "../run/store.js"
+import type { Service as RunStoreService } from "../run/store.js"
 import type { ChildReadiness } from "./readiness.js"
 
 /**
@@ -81,7 +81,7 @@ export type AdmitChildError =
 /** @experimental */
 export type ChildLookupError = ChildParentageInvalid | RunNotFound | RuntimeUnavailable
 
-export interface Interface {
+export interface Service {
   readonly admit: (input: {
     readonly parentRunId: string
     readonly toolCallId: string
@@ -180,7 +180,7 @@ export const originOf = (invocationId: string): ChildOrigin | undefined => admis
  * A host that wants an immediate handle uses `admit`; a host that wants the loop to wait uses the
  * blocking route exactly as before.
  */
-export const make = (store: RunStoreInterface): Interface => {
+export const make = (store: RunStoreService): Service => {
   /** Read a child only after proving the caller is its recorded parent. */
   const owned = (input: { readonly parentRunId: string; readonly childRunId: string }) =>
     Effect.gen(function* () {
@@ -316,7 +316,7 @@ const origin: Effect.Effect<
  * Parentage and invocation identity come from the ambient `ToolContext`, so a caller names only the
  * work: a child cannot be admitted, listed, inspected, joined, or cancelled under another Run.
  */
-export interface AgentChildrenInterface {
+export interface AgentChildrenService {
   readonly admit: (
     input: AdmitParameters,
   ) => Effect.Effect<AdmitReceipt, AdmitChildError | ChildParentageInvalid, ToolContext.ToolContext>
@@ -341,7 +341,7 @@ export interface AgentChildrenInterface {
  * service at Layer creation would let a caller admit and cancel children under another Run, which is
  * exactly the forgery this contract exists to prevent.
  */
-export class AgentChildren extends Context.Service<AgentChildren, AgentChildrenInterface>()(
+export class AgentChildren extends Context.Service<AgentChildren, AgentChildrenService>()(
   "tenetkit/runtime/child/admission/AgentChildren",
 ) {}
 
@@ -360,7 +360,7 @@ export class AgentChildren extends Context.Service<AgentChildren, AgentChildrenI
  * process would reintroduce exactly the duplicate-child failure above, so restart safety is chosen
  * over speed here and the read must not be optimised away.
  */
-export const makeAgentChildren = (store: RunStoreInterface): AgentChildrenInterface => {
+export const makeAgentChildren = (store: RunStoreService): AgentChildrenService => {
   const operations = make(store)
   const admitted = (runId: string, operationKey: string) =>
     Effect.map(operations.listDirect(runId), (children) => {

@@ -93,7 +93,7 @@ describe("OpenRouter request configuration", () => {
     }).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))
 
     return Effect.gen(function* () {
-      const operation = ModelRegistry.operate(
+      const operation = ModelRegistry.withModel(
         { provider: "openrouter", model: "router-test" },
         LanguageModel.generateText({ prompt: "must not be sent" }),
       )

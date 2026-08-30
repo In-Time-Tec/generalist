@@ -8,7 +8,7 @@ import type {
   AdmitProgramChildInput,
   ExecutionClaim,
   ExecutionRecord,
-  Interface as RunStoreInterface,
+  Service as RunStoreService,
 } from "./run/store.js"
 import type { ExecutionCheckpoint } from "./execution/state.js"
 import type { ExecutionContinuation } from "./run/steering.js"
@@ -213,7 +213,7 @@ const closureFor = (
   }
 }
 
-export interface Interface {
+export interface Service {
   readonly parameters: ReturnType<typeof makeParameters>
   readonly tool: ReturnType<typeof makeTool>
   readonly invoke: (request: Parameters & { readonly toolCallId: string }) => Effect.Effect<ToolExecutor.Outcome>
@@ -226,13 +226,13 @@ export interface Interface {
   }) => Effect.Effect<void, ProgramAdmissionFailed>
 }
 
-/** @experimental Construct the Run-attempt scoped implementation; applications still own sandbox and bindings resolution. */
+/** @experimental Construct the Run-attempt scoped implementation; applications still own sandbox and handlers resolution. */
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
   readonly authority: AgentManifest.ProgramAuthority
-  readonly store: RunStoreInterface
-}): Interface => {
+  readonly store: RunStoreService
+}): Service => {
   const parameters = makeParameters(input.authority)
   const declaration = makeDeclaration(parameters)
   const prepare = (request: Parameters & { readonly toolCallId: string }) =>
@@ -353,17 +353,17 @@ export const make = (input: {
 /** @experimental Add the Runtime-owned parallel-safe declaration without changing the resolved Agent identity. */
 export const withTool: {
   (
-    implementation: Interface,
+    implementation: Service,
   ): <Tools extends Record<string, Tool.Any>, R>(agent: Agent.Agent<Tools, R>) => Agent.Agent<Tools, R>
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent.Agent<Tools, R>,
-    implementation: Interface,
+    implementation: Service,
   ): Agent.Agent<Tools, R>
 } = Function.dual(
   2,
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent.Agent<Tools, R>,
-    implementation: Interface,
+    implementation: Service,
   ): Agent.Agent<Tools, R> => {
     const extended = Agent.withTools(agent, [implementation.tool])
     return {
@@ -380,9 +380,9 @@ export const withTool: {
 const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
   readonly agent: Agent.Agent<Tools, R>
   readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
-  readonly implementation: Interface
-  readonly upstream: Option.Option<ToolExecutor.Interface>
-}): ToolExecutor.Interface => {
+  readonly implementation: Service
+  readonly upstream: Option.Option<ToolExecutor.Service>
+}): ToolExecutor.Service => {
   const upstream = Option.getOrUndefined(options.upstream)
   const upstreamCancellation =
     upstream?.cancel !== undefined
@@ -392,11 +392,11 @@ const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
           cancel: (request: ToolExecutor.CancellationRequest) => upstream.cancel!(request),
         }
       : {}
-  const replayPolicy: ToolExecutor.Interface["replayPolicy"] = (request) => {
+  const replayPolicy: ToolExecutor.Service["replayPolicy"] = (request) => {
     if (request.call.name === options.implementation.tool.name) return "never"
     return Option.isSome(options.upstream) ? (options.upstream.value.replayPolicy?.(request) ?? "never") : "never"
   }
-  const execute: ToolExecutor.Interface["execute"] = (request) => {
+  const execute: ToolExecutor.Service["execute"] = (request) => {
     if (request.call.name === options.implementation.tool.name) {
       return Schema.decodeUnknownEffect(options.implementation.parameters, { onExcessProperty: "error" })(
         request.call.params,

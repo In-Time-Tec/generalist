@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Schema } from "effect"
-import { HostBindingRegistry } from "../../../../src/repl/index.js"
+import { HostModules } from "../../../../src/repl/index.js"
 import { collect, platform, runCell, withPool } from "../../bun-harness.js"
 
 class SlowFailure extends Schema.TaggedError<SlowFailure>()("tenetkit/repl/test/SlowFailure", {
@@ -10,7 +10,7 @@ class SlowFailure extends Schema.TaggedError<SlowFailure>()("tenetkit/repl/test/
 const slowModule = (input: {
   readonly arrived: Deferred.Deferred<void>
   readonly gate: Deferred.Deferred<void>
-}): HostBindingRegistry.Module => ({
+}): HostModules.Module => ({
   name: "host",
   operations: [
     {
@@ -27,7 +27,7 @@ const slowModule = (input: {
   ],
 })
 
-const textModule: HostBindingRegistry.Module = {
+const textModule: HostModules.Module = {
   name: "workspace",
   operations: [
     {
@@ -40,7 +40,7 @@ const textModule: HostBindingRegistry.Module = {
   ],
 }
 
-const echoModule: HostBindingRegistry.Module = {
+const echoModule: HostModules.Module = {
   name: "host",
   operations: [
     {

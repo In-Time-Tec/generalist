@@ -3,7 +3,7 @@ import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../../errors.js"
 import { isTerminal } from "../../../run.js"
-import type { Interface as RunStoreInterface } from "../../../run/store.js"
+import type { Service as RunStoreService } from "../../../run/store.js"
 import { encodeReason } from "../../../run/wait.js"
 import { checkpointRef } from "../../../executable/manifest.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../../execution/state.js"
@@ -17,7 +17,7 @@ import { loadTerminalEvent, reconcileChildWaitWith } from "../child/settlement.j
 import { revokeExecutionSessionWriteClaim } from "../../session/claim.js"
 import { appendEvent, loadRun, loadRunWait, nowIso, transitionRunWait } from "../statements.js"
 
-type SuspendInput = Parameters<RunStoreInterface["suspend"]>[0]
+type SuspendInput = Parameters<RunStoreService["suspend"]>[0]
 type SuspendEffect = Effect.Effect<
   undefined,
   RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,

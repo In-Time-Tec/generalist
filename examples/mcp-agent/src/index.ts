@@ -1,10 +1,10 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "tenetkit"
-import { McpToolSource } from "tenetkit/mcp"
+import { MCPClient } from "tenetkit/mcp"
 import { layerToolkit, toolkit } from "tenetkit/mcp/tools"
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
-const source: McpToolSource.Interface = {
+const client: MCPClient.Service = {
   server: "local",
   tools: Effect.succeed([
     {
@@ -52,13 +52,13 @@ const runtimeLayer = Layer.mergeAll(
         )
       : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Found local setup docs." }))
   }),
-  layerToolkit(source),
+  layerToolkit(client),
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )
 
 const program = Effect.gen(function* () {
-  const mcpToolkit = yield* toolkit(source)
+  const mcpToolkit = yield* toolkit(client)
   const agent = Agent.make({ name: "mcp-agent", toolkit: mcpToolkit })
   const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" })
   yield* Console.log(result.text)

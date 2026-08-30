@@ -16,7 +16,7 @@ const searchTool = Tool.make("search_docs", {
 const toolkit = Toolkit.make(searchTool)
 const agent = Agent.make({ name: "assistant", instructions: "Be concise.", toolkit })
 
-const program = ModelRegistry.operate(
+const program = ModelRegistry.withModel(
   { provider: "deterministic", model: "local" },
   Agent.generate(agent, { prompt: "Explain TenetKit in one sentence." }),
 ).pipe(
@@ -43,21 +43,21 @@ GitHub releases and npm contain the same versioned package tarballs with compile
 
 ## Capability matrix
 
-| Capability                                                          | Package              | Status       |
-| ------------------------------------------------------------------- | -------------------- | ------------ |
-| Agent loop, events, typed suspension, turn policy, tools, approvals | `tenetkit`           | experimental |
-| Addressable runs, replay, inspection, waits, and durable stores     | `tenetkit/runtime`   | experimental |
-| Provider registration, deterministic local model, model catalog     | `tenetkit/ai`        | experimental |
-| MCP discovery and TenetKit `ToolExecutor` adapter                   | `tenetkit/mcp`       | experimental |
-| SKILL.md and instruction-file sources                               | `tenetkit/skills`    | experimental |
-| Working memory, vector store, semantic recall                       | `tenetkit/memory`    | experimental |
-| Continual harness entries, refinements, rollback, snapshots         | `tenetkit/harness`   | experimental |
-| Persistent TypeScript cell contracts and the Bun kernel             | `tenetkit/repl`      | experimental |
-| Scripted models and normalized request capture                      | `tenetkit/test`      | experimental |
-| SSE, WebSocket, wire codecs, snapshots, and reconnecting clients    | `tenetkit/transport` | experimental |
-| FoldKit connection, subscription, commands, headless chat model     | `tenetkit/foldkit`   | experimental |
-| A2A v1 server projection over Runtime                               | `tenetkit/a2a`       | experimental |
-| AG-UI event projection over Runtime                                 | `tenetkit/ag-ui`     | experimental |
+| Capability                                                          | Package                   | Status       |
+| ------------------------------------------------------------------- | ------------------------- | ------------ |
+| Agent loop, events, typed suspension, turn policy, tools, approvals | `tenetkit`                | experimental |
+| Addressable runs, replay, inspection, waits, and durable stores     | `tenetkit/runtime`        | experimental |
+| Provider registration, deterministic local model, model catalog     | `tenetkit/ai`             | experimental |
+| MCP discovery and TenetKit `ToolExecutor` adapter                   | `tenetkit/mcp`            | experimental |
+| SKILL.md and instruction-file sources                               | `tenetkit/skills`         | experimental |
+| Working memory, vector store, semantic recall                       | `tenetkit/memory`         | experimental |
+| Agent guidance entries, refinements, rollback, snapshots            | `tenetkit/agent-guidance` | experimental |
+| Persistent TypeScript cell contracts and the Bun kernel             | `tenetkit/repl`           | experimental |
+| Scripted models and normalized request capture                      | `tenetkit/test`           | experimental |
+| SSE, WebSocket, wire codecs, snapshots, and reconnecting clients    | `tenetkit/transport`      | experimental |
+| FoldKit connection, subscription, commands, headless chat model     | `tenetkit/foldkit`        | experimental |
+| A2A v1 server projection over Runtime                               | `tenetkit/a2a`            | experimental |
+| AG-UI event projection over Runtime                                 | `tenetkit/ag-ui`          | experimental |
 
 ## A plugin is a Layer
 

@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { layer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { Clock, Effect, Exit, Layer, Option } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { ExecutionHost } from "tenetkit/runtime/driver/execution/host"
+import { RunExecutor } from "tenetkit/runtime/driver/execution/run-executor"
 import { LocalScheduler } from "tenetkit/runtime/driver/execution/local-scheduler"
 import { RunStore } from "tenetkit/runtime/driver/run/store"
 import type { RunActivation, RunActivationProjection } from "tenetkit/runtime/driver/run/activation"
@@ -257,7 +257,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
         ('future', 'execute', ${future}, 0, 'queued')`
       const claimed: Array<string> = []
       const liveStore = yield* RunStore
-      const liveHost = yield* ExecutionHost
+      const liveExecutor = yield* RunExecutor
       const liveScheduler = yield* LocalScheduler
       const store = RunStore.of({
         ...liveStore,
@@ -296,14 +296,14 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
             }),
           ),
       })
-      const host = ExecutionHost.of({ ...liveHost, execute: () => Effect.void })
+      const executor = RunExecutor.of({ ...liveExecutor, execute: () => Effect.void })
       const scheduler = LocalScheduler.of({
         ...liveScheduler,
         reconcileCancellation: () => Effect.succeed("inactive"),
       })
       const result = yield* drain({ ownerId: "owner", fuel: 1, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, store),
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, executor),
         Effect.provideService(LocalScheduler, scheduler),
       )
       expect(result).toEqual({
@@ -321,7 +321,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
       })
       const stale = yield* drain({ ownerId: "owner", fuel: 5, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, harmless),
-        Effect.provideService(ExecutionHost, host),
+        Effect.provideService(RunExecutor, executor),
         Effect.provideService(LocalScheduler, scheduler),
       )
       expect(stale).toEqual({

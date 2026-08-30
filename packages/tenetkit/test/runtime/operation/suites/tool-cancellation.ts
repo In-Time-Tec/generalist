@@ -2,9 +2,9 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream, Tracer } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
-import { ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
-import { make as makeExecutionHost } from "../../../../src/runtime/execution/host.js"
+import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import {
   assistant,
@@ -21,7 +21,7 @@ export interface ToolCancellationSuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
     options: Runtime.LayerOptions,
-  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExecutionHost.ExecutionHost | Extra, StoreError>
+  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor | Extra, StoreError>
   readonly claim?: (
     runId: string,
     ownerId: string,
@@ -141,7 +141,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.start({
               executable,
               registrations: registrationsFor(executable),
@@ -187,7 +187,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             const replacementClaim = yield* claim(receipt.runId, "tool-cancellation-redelivery")
             yield* Deferred.succeed(allowAcknowledgement, undefined)
             const replacementActive = yield* Layer.build(activeExecutionsLayer)
-            const replacementHost = yield* makeExecutionHost({
+            const replacementHost = yield* makeRunExecutor({
               workerId: "tool-cancellation-redelivery",
               resolver,
             }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(replacementActive))
@@ -271,7 +271,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.start({
               executable,
               registrations: registrationsFor(executable),
@@ -334,7 +334,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const host = yield* ExecutionHost.ExecutionHost
+            const host = yield* RunExecutor.RunExecutor
             const receipt = yield* runtime.start({
               executable: assistantRef,
               registrations: registrationsFor(assistantRef),

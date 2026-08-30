@@ -28,7 +28,7 @@ const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text
 const responseMetadata = (id: string) =>
   Response.makePart("response-metadata", { id, modelId: "m", timestamp: undefined, request: undefined })
 
-const makeResilience = (input?: Partial<ModelResilience.Interface>): ModelResilience.Interface =>
+const makeResilience = (input?: Partial<ModelResilience.Service>): ModelResilience.Service =>
   Effect.runSync(ModelResilience.make(input))
 
 const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service => ({
@@ -77,7 +77,7 @@ describe("ModelResilience", () => {
     }).pipe(Effect.orDie),
   )
 
-  it.effect("defensively rejects a direct Interface before provider invocation", () => {
+  it.effect("defensively rejects a direct Service before provider invocation", () => {
     let calls = 0
     const implementation = {
       ...ModelResilience.none,

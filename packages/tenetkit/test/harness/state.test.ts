@@ -1,19 +1,19 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
-import { HarnessEntry, HarnessState } from "../../src/harness/index.js"
+import { Entry, State } from "../../src/harness/index.js"
 import { at, entry, scope } from "./fixtures.js"
 
-describe("HarnessState", () => {
+describe("State", () => {
   it("starts empty for a scope", () => {
-    const state = HarnessState.empty(scope)
+    const state = State.empty(scope)
     expect(state.schemaVersion).toBe("1")
     expect(state.scope).toBe(scope)
-    expect(HarnessState.allEntries(state)).toEqual([])
+    expect(State.allEntries(state)).toEqual([])
     expect(state.refinements).toEqual([])
   })
 
   it("groups entries by kind and sorts each kind by id", () => {
-    const state = HarnessState.make({
+    const state = State.make({
       scope,
       entries: [
         entry({ id: "zulu", kind: "memory" }),
@@ -28,7 +28,7 @@ describe("HarnessState", () => {
   })
 
   it("lists every entry in kind then id order", () => {
-    const state = HarnessState.make({
+    const state = State.make({
       scope,
       entries: [
         entry({ id: "s2", kind: "subagent" }),
@@ -38,18 +38,18 @@ describe("HarnessState", () => {
         entry({ id: "s1", kind: "subagent" }),
       ],
     })
-    expect(HarnessState.allEntries(state).map((value) => value.id)).toEqual(["p1", "m1", "k1", "s1", "s2"])
+    expect(State.allEntries(state).map((value) => value.id)).toEqual(["p1", "m1", "k1", "s1", "s2"])
   })
 
   it("finds one entry by kind and id", () => {
-    const state = HarnessState.make({ scope, entries: [entry({ id: "one", kind: "memory" })] })
-    expect(HarnessState.findEntry(state, "memory", "one")?.id).toBe("one")
-    expect(HarnessState.findEntry(state, "skill", "one")).toBeUndefined()
-    expect(HarnessState.findEntry(state, "memory", "two")).toBeUndefined()
+    const state = State.make({ scope, entries: [entry({ id: "one", kind: "memory" })] })
+    expect(State.findEntry(state, "memory", "one")?.id).toBe("one")
+    expect(State.findEntry(state, "skill", "one")).toBeUndefined()
+    expect(State.findEntry(state, "memory", "two")).toBeUndefined()
   })
 
   it("keeps replaced entries sorted", () => {
-    const state = HarnessState.withEntries(HarnessState.empty(scope), "skill", [
+    const state = State.withEntries(State.empty(scope), "skill", [
       entry({ id: "zz", kind: "skill" }),
       entry({ id: "aa", kind: "skill" }),
     ])
@@ -57,40 +57,40 @@ describe("HarnessState", () => {
   })
 
   it("digests one state deterministically and independently of input order", () => {
-    const left = HarnessState.make({
+    const left = State.make({
       scope,
       entries: [entry({ id: "b", kind: "memory" }), entry({ id: "a", kind: "memory" })],
     })
-    const right = HarnessState.make({
+    const right = State.make({
       scope,
       entries: [entry({ id: "a", kind: "memory" }), entry({ id: "b", kind: "memory" })],
     })
-    expect(HarnessState.snapshotId(left)).toBe(HarnessState.snapshotId(right))
-    expect(HarnessState.snapshotId(left)).toMatch(/^harness-snapshot:v1:sha256:[0-9a-f]{64}$/)
+    expect(State.snapshotId(left)).toBe(State.snapshotId(right))
+    expect(State.snapshotId(left)).toMatch(/^guidance-snapshot:v1:sha256:[0-9a-f]{64}$/)
   })
 
   it("changes the digest when any entry field changes", () => {
-    const base = HarnessState.make({ scope, entries: [entry({ id: "a", kind: "memory" })] })
-    const changed = HarnessState.make({
+    const base = State.make({ scope, entries: [entry({ id: "a", kind: "memory" })] })
+    const changed = State.make({
       scope,
       entries: [entry({ id: "a", kind: "memory", content: "different" })],
     })
-    const reversioned = HarnessState.make({ scope, entries: [entry({ id: "a", kind: "memory", version: 2 })] })
-    const rekinded = HarnessState.make({ scope, entries: [entry({ id: "a", kind: "skill" })] })
-    const ids = new Set([base, changed, reversioned, rekinded].map(HarnessState.snapshotId))
+    const reversioned = State.make({ scope, entries: [entry({ id: "a", kind: "memory", version: 2 })] })
+    const rekinded = State.make({ scope, entries: [entry({ id: "a", kind: "skill" })] })
+    const ids = new Set([base, changed, reversioned, rekinded].map(State.snapshotId))
     expect(ids.size).toBe(4)
   })
 
   it("changes the digest when the scope changes", () => {
-    const left = HarnessState.make({ scope, entries: [] })
-    const right = HarnessState.make({ scope: "global", entries: [] })
-    expect(HarnessState.snapshotId(left)).not.toBe(HarnessState.snapshotId(right))
+    const left = State.make({ scope, entries: [] })
+    const right = State.make({ scope: "global", entries: [] })
+    expect(State.snapshotId(left)).not.toBe(State.snapshotId(right))
   })
 
   it("ignores refinement history in the digest", () => {
     const entries = [entry({ id: "a", kind: "memory" })]
-    const withoutHistory = HarnessState.make({ scope, entries })
-    const withHistory = HarnessState.make({
+    const withoutHistory = State.make({ scope, entries })
+    const withHistory = State.make({
       scope,
       entries,
       refinements: [
@@ -98,32 +98,32 @@ describe("HarnessState", () => {
           proposal: "p1",
           at: at(1),
           scope,
-          before: HarnessState.snapshotId(withoutHistory),
-          after: HarnessState.snapshotId(withoutHistory),
+          before: State.snapshotId(withoutHistory),
+          after: State.snapshotId(withoutHistory),
           applied: [{ edit: { _tag: "Delete", kind: "memory", id: "gone" } }],
         },
       ],
     })
-    expect(HarnessState.snapshotId(withHistory)).toBe(HarnessState.snapshotId(withoutHistory))
+    expect(State.snapshotId(withHistory)).toBe(State.snapshotId(withoutHistory))
   })
 
   it("round-trips one state through its schema", () => {
-    const state = HarnessState.make({
+    const state = State.make({
       scope,
       entries: [entry({ id: "a", kind: "memory", arguments: { limit: 3 }, metadata: { pinned: true } })],
     })
-    const encoded = Schema.encodeSync(HarnessState.HarnessState)(state)
-    expect(Schema.decodeSync(HarnessState.HarnessState)(encoded)).toEqual(state)
+    const encoded = Schema.encodeSync(State.GuidanceState)(state)
+    expect(Schema.decodeSync(State.GuidanceState)(encoded)).toEqual(state)
   })
 
   it("rejects an out-of-contract entry", () => {
     const invalidKind = { ...entry({ id: "a", kind: "memory" }), kind: "other" }
     expect(() =>
-      Schema.decodeSync(HarnessEntry.HarnessEntry)({ ...entry({ id: "a", kind: "memory" }), version: 0 }),
+      Schema.decodeSync(Entry.GuidanceEntry)({ ...entry({ id: "a", kind: "memory" }), version: 0 }),
     ).toThrow()
-    expect(() => Schema.decodeUnknownSync(HarnessEntry.HarnessEntry)(invalidKind)).toThrow()
+    expect(() => Schema.decodeUnknownSync(Entry.GuidanceEntry)(invalidKind)).toThrow()
     expect(() =>
-      Schema.decodeSync(HarnessEntry.HarnessEntry)({
+      Schema.decodeSync(Entry.GuidanceEntry)({
         ...entry({ id: "a", kind: "memory" }),
         updatedAt: "2024-01-01",
       }),
@@ -132,16 +132,16 @@ describe("HarnessState", () => {
 
   it("projects one entry back to its value and revision", () => {
     const value = entry({ id: "a", kind: "skill", reference: "pkg.run", arguments: { depth: 1 } })
-    expect(HarnessEntry.value(value)).toEqual({
+    expect(Entry.value(value)).toEqual({
       title: value.title,
       content: value.content,
       reference: "pkg.run",
       arguments: { depth: 1 },
     })
-    expect(HarnessEntry.revision(value)).toEqual({ createdAt: at(0), updatedAt: at(0), version: 1 })
+    expect(Entry.revision(value)).toEqual({ createdAt: at(0), updatedAt: at(0), version: 1 })
   })
 
   it("names every kind exactly once in canonical order", () => {
-    expect(HarnessEntry.kinds).toEqual(["prompt", "memory", "skill", "subagent"])
+    expect(Entry.kinds).toEqual(["prompt", "memory", "skill", "subagent"])
   })
 })

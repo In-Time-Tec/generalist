@@ -11,7 +11,7 @@ import {
   RunTree,
   Runtime,
   Steering,
-  ExecutionHost,
+  RunExecutor,
   ExecutionResult,
   RunFailure,
   OperationResolution,
@@ -32,7 +32,7 @@ describe("tenetkit/runtime public surface", () => {
     expect(Steering.SteeringReceipt).toBeDefined()
     expect(Runtime.layerMemory).toBeDefined()
     expect(RunStore.layerMemory).toBeDefined()
-    expect(ExecutionHost.ExecutionHost).toBeDefined()
+    expect(RunExecutor.RunExecutor).toBeDefined()
     expect(RunTree.events).toBeDefined()
     expect(RunTree.watch).toBeDefined()
     expect(ExecutionResult.ExecutionResult).toBeDefined()
