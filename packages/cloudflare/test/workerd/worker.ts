@@ -405,6 +405,7 @@ export class SqlObject {
                 state: { _tag: "Waiting" as const, reason: "tool-wait" as const, waitId: call.id, token: call.id },
               })),
               activeTools: ["workerd-conformance"],
+              authorizationContextDigest: "",
               activatedSkills: [],
               invocationPath: [],
             },

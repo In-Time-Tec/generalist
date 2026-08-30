@@ -46,6 +46,7 @@ export const ToolBatchCheckpoint = Schema.Struct({
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   calls: Schema.Array(ToolCallCheckpoint),
   activeTools: Schema.Array(Schema.String),
+  authorizationContextDigest: Schema.String,
   activatedSkills: Schema.Array(Schema.String),
   invocationPath: Schema.Array(Schema.String),
 })
@@ -92,6 +93,7 @@ export const make = (input: {
   readonly calls: ReadonlyArray<Response.ToolCallPart<string, unknown>>
   readonly operationKeys: ReadonlyArray<string>
   readonly activeTools: ReadonlyArray<string>
+  readonly authorizationContextDigest: string
 }): ToolBatchCheckpoint => ({
   turn: input.turn,
   calls: input.calls.map((call, index) => ({
@@ -100,6 +102,7 @@ export const make = (input: {
     state: { _tag: "Ready", stage: "authorization" },
   })),
   activeTools: [...input.activeTools],
+  authorizationContextDigest: input.authorizationContextDigest,
   activatedSkills: [],
   invocationPath: [],
 })

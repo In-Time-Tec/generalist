@@ -210,6 +210,7 @@ export const suspension = (options: SuspensionOptions): AgentEvent.AgentSuspende
         },
       ],
       activeTools: [call.name],
+      authorizationContextDigest: "",
       activatedSkills: [],
       invocationPath: [],
     },

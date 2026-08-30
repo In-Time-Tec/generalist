@@ -23,6 +23,7 @@ export const toolSuspension = (waitIds: readonly [string, ...Array<string>]): Ag
         state: { _tag: "Waiting", reason: "tool-wait", waitId: call.id, token: call.id },
       })),
       activeTools: [calls[0]!.name],
+      authorizationContextDigest: "",
       activatedSkills: [],
       invocationPath: [],
     },

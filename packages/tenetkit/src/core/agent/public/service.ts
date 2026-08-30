@@ -4,6 +4,7 @@ import {
   make as Agent_make,
   defaultObjectPrompt as Agent_defaultObjectPrompt,
   stream as Agent_stream,
+  streamToolCalls as Agent_streamToolCalls,
   generate as Agent_generate,
   ResumeResolution as Agent_ResumeResolution,
   AgentTypeId as Agent_AgentTypeId,
@@ -14,6 +15,7 @@ export const Agent = {
   make: Agent_make,
   defaultObjectPrompt: Agent_defaultObjectPrompt,
   stream: Agent_stream,
+  streamToolCalls: Agent_streamToolCalls,
   generate: Agent_generate,
   ResumeResolution: Agent_ResumeResolution,
   AgentTypeId: Agent_AgentTypeId,
@@ -24,6 +26,7 @@ export namespace Agent {
   export type make = typeof import("../service.js").make
   export type defaultObjectPrompt = typeof import("../service.js").defaultObjectPrompt
   export type stream = typeof import("../service.js").stream
+  export type streamToolCalls = typeof import("../service.js").streamToolCalls
   export type generate = typeof import("../service.js").generate
   export type close = typeof import("../service.js").close
   export type withTools = typeof import("../service.js").withTools
@@ -66,6 +69,14 @@ export namespace Agent {
   > = import("../service.js").RunRequirements<Tools, R, O>
   export type RunResult<O> = import("../service.js").RunResult<O>
   export type ToolDeclaration = import("../service.js").ToolDeclaration
+  export type ToolCallBatch = import("../service.js").ToolCallBatch
+  export type ToolCallBatchOptions = import("../service.js").ToolCallBatchOptions
+  export type ToolCallBatchRequirements<
+    Tools extends Record<string, import("effect/unstable/ai").Tool.Any>,
+    R,
+  > = import("../service.js").ToolCallBatchRequirements<Tools, R>
+  export type ToolCallBatchResume = import("../service.js").ToolCallBatchResume
+  export type ToolCallBatchStart = import("../service.js").ToolCallBatchStart
   export type ToolSchedulingPolicy = import("../service.js").ToolSchedulingPolicy
   export type WithModelDefault = import("../service.js").WithModelDefault
 }

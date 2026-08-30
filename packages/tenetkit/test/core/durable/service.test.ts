@@ -702,7 +702,13 @@ const batchToolFixture = (logicalOperationId: string, ids: ReadonlyArray<string>
       budget: RunBudget.allocate({ toolCalls: ids.length }),
     })
     const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(initial.state)
-    const ready = makeToolBatch({ turn: 0, calls, operationKeys, activeTools: ["echo"] })
+    const ready = makeToolBatch({
+      turn: 0,
+      calls,
+      operationKeys,
+      activeTools: ["echo"],
+      authorizationContextDigest: "",
+    })
     const toolBatch = calls.reduce(
       (checkpoint, _call, callIndex) =>
         updateCall(checkpoint, { callIndex, state: { _tag: "Ready", stage: "execution" } }),

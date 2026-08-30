@@ -412,6 +412,7 @@ const suspendedCall = (
         },
       ],
       activeTools: [call.name],
+      authorizationContextDigest: "",
       activatedSkills: [],
       invocationPath: [],
     },

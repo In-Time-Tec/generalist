@@ -164,7 +164,7 @@ export const decodeToolCall: {
     const tool = findTool(toolkit, part.name)
     if (tool === undefined) return Effect.fail(invalid(part.name))
     const schema = Schema.toType(tool.parametersSchema)
-    return Schema.decodeUnknownEffect(schema)(part.params).pipe(
+    return Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(part.params).pipe(
       Effect.map((params) => ({ ...part, params })),
       Effect.mapError(() => invalid(part.name)),
     )
@@ -189,7 +189,7 @@ export const validateDecodedToolCall: {
     const tool = findTool(toolkit, part.name)
     if (tool === undefined) return Effect.fail(invalid(part.name))
     const schema = Schema.toType(tool.parametersSchema)
-    return Schema.decodeUnknownEffect(schema)(part.params).pipe(
+    return Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(part.params).pipe(
       Effect.map((params) => ({ ...part, params })),
       Effect.mapError(() => invalid(part.name)),
     )

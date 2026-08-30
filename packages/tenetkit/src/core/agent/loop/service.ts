@@ -1,5 +1,5 @@
 import { Cause, Effect, Option, Ref, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
+import { AiError, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event, type StructuredOutput, DuplicateToolCallId } from "../event.js"
 import {
   CurrentCompactionId,
@@ -10,35 +10,26 @@ import {
 } from "../../model/telemetry/events.js"
 import { TurnPolicyError, type Decision, type TurnOverrides, type TurnPolicy } from "../../turn/policy.js"
 import type { LanguageModelNotRegistered } from "../../model/registry.js"
-import type { AnyToolCall, PendingToolResult } from "../tools/result.js"
-import { resolvedToolResult, type ToolCheckpoint } from "../suspension.js"
-import {
-  completed as checkpointCompleted,
-  pendingResult,
-  projectableResults,
-  resolutionFor,
-  updateCall,
-  waits as batchWaits,
-} from "../tools/checkpoint.js"
+import type { PendingToolResult } from "../tools/result.js"
+import type { ToolCheckpoint } from "../suspension.js"
+import { pendingResult, projectableResults } from "../tools/checkpoint.js"
 import type { RunError } from "../service.js"
 import type { Input } from "../../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "../message.js"
 import type { LoopServices, ObjectSchema, RunLoopContext, StructuredRunConfig, TurnServices } from "./context.js"
-import type { Request } from "../../tools/tool-executor.js"
 import { select } from "../../tools/tool-registry.js"
 import {
   checkpoint as driverCheckpoint,
   intercept,
   logicalOperationId,
   setToolBatch,
-  updateToolBatch,
 } from "../../durable/driver/run.js"
 import { operationKey } from "../../durable/driver/interpreter.js"
 import { LoopDriverState, modelCallOrdinal } from "../../durable/loop-driver-state.js"
 import { HandoffRequirementsMissing, type HandoffRunState } from "../handoff/state.js"
 import { DriverStateInvalid } from "../../durable/service.js"
 import { terminalCompletedEvent, turnCompletedEvent } from "../model-turn/finish.js"
-import { schedule as scheduleTools } from "../tools/scheduler.js"
+import { resumeBatch } from "../tools/resume-batch.js"
 import { isClosed } from "../lifecycle/closure-identity.js"
 import { afterTurnFor } from "./after-turn.js"
 
@@ -255,95 +246,33 @@ export const make = <
           Effect.all({ tools: Ref.get(toolState), activeAgent: activeAgent() }).pipe(
             Effect.map(({ tools, activeAgent: resumedAgent }) => {
               const registry = select(tools.registry, checkpoint.checkpoint.activeTools)
-              const calls = checkpoint.toolCallBatch.map((call) =>
-                Response.makePart("tool-call", {
-                  id: call.id,
-                  name: call.name,
-                  params: call.params,
-                  providerExecuted: call.providerExecuted,
-                  metadata: call.metadata,
-                }),
-              )
-              const toolCallBatch: Request["toolCallBatch"] = { calls }
-              const executions = checkpoint.checkpoint.calls.flatMap((entry, toolCallIndex) => {
-                const call = calls[toolCallIndex]
-                return call === undefined ? [] : [{ call, entry, toolCallIndex }]
-              })
-              const execute = ({
-                call,
-                entry,
-                toolCallIndex,
-              }: {
-                readonly call: AnyToolCall
-                readonly entry: ToolCheckpoint["checkpoint"]["calls"][number]
-                readonly toolCallIndex: number
-              }): ReturnType<typeof toolCallEvents> => {
-                if (entry.state._tag === "Completed") {
-                  return Stream.empty
-                }
-                if (entry.state._tag === "Unknown" || entry.state._tag === "Cancelled") {
-                  return Stream.fail(
-                    AgentError.make({ message: `Tool call ${call.id} is ${entry.state._tag.toLowerCase()}`, turn }),
-                  )
-                }
-                if (entry.state._tag === "Waiting") {
-                  const resolution = resolutionFor(options.resume?.resolutions ?? [], entry.state.waitId)
-                  if (resolution === undefined) return Stream.empty
-                  if (resolution._tag === "Approved") {
-                    return Stream.unwrap(
-                      updateToolBatch((current) =>
-                        updateCall(current, {
-                          callIndex: toolCallIndex,
-                          state: { _tag: "Ready", stage: "execution" },
-                        }),
-                      ).pipe(Effect.map(() => resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry))),
-                    )
-                  }
-                  return Stream.fromEffect(
-                    Effect.gen(function* () {
-                      const result = resolvedToolResult(call, resolution)
-                      yield* updateToolBatch((current) => checkpointCompleted(current, toolCallIndex, result))
-                      return { _tag: "ToolExecutionCompleted" as const, turn, call, result }
-                    }),
-                  )
-                }
-                if (entry.state._tag === "Scheduled") {
-                  return resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
-                }
-                return entry.state.stage === "execution"
-                  ? resumeApproved(turn, toolCallBatch, toolCallIndex, call, registry)
-                  : toolCallEvents(turn, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
-              }
-              return scheduleTools(executions, resumedAgent.toolScheduling, {
-                execute,
-                afterStage: () =>
-                  Effect.gen(function* () {
-                    const current = yield* driverCheckpoint
-                    const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
-                      Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
-                    )
-                    if (driverState.toolBatch === undefined) return
+              return resumeBatch({
+                checkpoint: checkpoint.checkpoint,
+                messages: checkpoint.messages,
+                resolutions: options.resume?.resolutions ?? [],
+                registry,
+                toolScheduling: resumedAgent.toolScheduling,
+                toolCallEvents,
+                resumeApproved,
+                onCheckpoint: (current) =>
+                  Effect.sync(() => {
                     for (const [index, result] of projectableResults(
-                      driverState.toolBatch,
+                      current,
                       checkpoint.projectedResults,
                       new Set(state.pending.keys()),
                     )) {
                       state.pending.set(index, result)
                     }
-                    const waits = batchWaits(driverState.toolBatch)
-                    if (waits.length > 0) {
-                      return yield* AgentSuspended.make({ checkpoint: driverState.toolBatch, waits })
-                    }
                     if (
                       state.pending.size === 0 &&
-                      driverState.toolBatch.calls.length > 0 &&
-                      driverState.toolBatch.calls.every(
+                      current.calls.length > 0 &&
+                      current.calls.every(
                         (entry) =>
                           entry.state._tag === "Completed" &&
                           checkpoint.projectedResults.has(`${entry.call.id}\0${entry.call.name}`),
                       )
                     ) {
-                      alreadyProjectedPending = driverState.toolBatch.calls.flatMap((entry) =>
+                      alreadyProjectedPending = current.calls.flatMap((entry) =>
                         entry.state._tag === "Completed" ? [pendingResult(entry.state.result)] : [],
                       )
                     }

@@ -30,12 +30,36 @@ import { setupChat, setupSession } from "./session.js"
 import { setupPromptContext } from "./resume.js"
 const { errorMessage } = SetupHelpers
 
+/** @internal Resolve the same configured or default authorization policy for every Agent tool execution surface. */
+export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(agent: Agent<T, R, P, A>) =>
+  Effect.gen(function* () {
+    if (agent.authorization !== undefined) return agent.authorization
+    const configured = yield* Effect.serviceOption(ToolAuthorizerService)
+    if (Option.isSome(configured)) return configured.value
+    const permissions = yield* Effect.serviceOption(Permissions)
+    const approvals = yield* Effect.serviceOption(Approvals)
+    const ruleStore = yield* Effect.serviceOption(RuleStore)
+    const defaultRules = yield* Ref.make<ReadonlyArray<import("../../policy/permissions.js").Rule>>([])
+    return makeToolAuthorizer({
+      permissions: Option.getOrElse(permissions, () =>
+        Permissions.of({ evaluate: () => Effect.succeed({ _tag: "Allow" }) }),
+      ),
+      approvals: Option.getOrElse(approvals, () => Approvals.of({ resolve: (pending) => Effect.succeed(pending) })),
+      ruleStore: Option.getOrElse(ruleStore, () =>
+        RuleStore.of({
+          rules: Ref.get(defaultRules),
+          remember: (rule) =>
+            Ref.update(defaultRules, (rules) => [...rules.filter((current) => current.pattern !== rule.pattern), rule]),
+        }),
+      ),
+    })
+  })
+
 const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
   Effect.gen(function* () {
     const { resume, compactionService, activeSession, resumeChat, validatedResume } = yield* setupSession(options)
     const { staticCandidates, staticRegistry, staticToolkit } = yield* setupStaticTools(agent)
     const executor = yield* Effect.serviceOption(ToolExecutor)
-    const approvals = yield* Effect.serviceOption(Approvals)
     const chain = yield* Effect.serviceOption(ModelMiddleware).pipe(
       Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
     )
@@ -150,33 +174,10 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       return instrument(model, instrumentation)
     }
     const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
-    const permissionsService = yield* Effect.serviceOption(Permissions)
-    const ruleStoreService = yield* Effect.serviceOption(RuleStore)
-    const authorizationService = yield* Effect.serviceOption(ToolAuthorizerService)
     const steeringService = yield* Effect.serviceOption(Steering)
     const memoryService = yield* Effect.serviceOption(Memory)
     const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
-    const defaultRules = yield* Ref.make<ReadonlyArray<import("../../policy/permissions.js").Rule>>([])
-    const authorizer =
-      agent.authorization ??
-      Option.getOrElse(authorizationService, () =>
-        makeToolAuthorizer({
-          permissions: Option.getOrElse(permissionsService, () =>
-            Permissions.of({ evaluate: () => Effect.succeed({ _tag: "Allow" }) }),
-          ),
-          approvals: Option.getOrElse(approvals, () => Approvals.of({ resolve: (pending) => Effect.succeed(pending) })),
-          ruleStore: Option.getOrElse(ruleStoreService, () =>
-            RuleStore.of({
-              rules: Ref.get(defaultRules),
-              remember: (rule) =>
-                Ref.update(defaultRules, (rules) => [
-                  ...rules.filter((current) => current.pattern !== rule.pattern),
-                  rule,
-                ]),
-            }),
-          ),
-        }),
-      )
+    const authorizer = yield* setupToolAuthorizer(agent)
     const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
     const agentModel = agent.model
     const agentModelRegistry =
@@ -230,7 +231,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       staticRegistry,
       staticToolkit,
       executor,
-      approvals,
       chain,
       activeModelResponse,
       progressPolicy,
@@ -264,13 +264,9 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       modelCallUsage,
       instrumentModel,
       modelRegistryService,
-      permissionsService,
-      ruleStoreService,
-      authorizationService,
       steeringService,
       memoryService,
       tokenizerService,
-      defaultRules,
       authorizer,
       memoryOptions,
       agentModel,

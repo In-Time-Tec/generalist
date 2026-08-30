@@ -11,21 +11,21 @@ const AgentInput = Schema.Struct({ toolkit: Schema.Unknown })
 
 /** @experimental Construct the inline driver Layer for one Agent run. */
 export const layerForRun: {
-  <Tools extends Record<string, Tool.Any>, R>(
+  <Tools extends Record<string, Tool.Any>, R, P, A>(
     options: RunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,
-  ): (agent: Agent<Tools, R>) => Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
+  ): (agent: Agent<Tools, R, P, A>) => Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
+  <Tools extends Record<string, Tool.Any>, R, P, A>(
+    agent: Agent<Tools, R, P, A>,
     options: RunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,
   ): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
 } = Function.dual(
   (args) => args.length >= 1 && Schema.is(AgentInput)(args[0]),
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
+  <Tools extends Record<string, Tool.Any>, R, P, A>(
+    agent: Agent<Tools, R, P, A>,
     options: RunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,

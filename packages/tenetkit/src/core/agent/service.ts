@@ -40,6 +40,8 @@ import type { ToolBatchResolution } from "./tools/checkpoint.js"
 
 export { close, withTools } from "./lifecycle/definition.js"
 export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
+export { streamToolCalls } from "./tool-calls.js"
+export type * from "./tool-calls.js"
 export const AgentTypeId = "tenetkit/core/Agent"
 /** @experimental Agent-owned metadata values. */
 export type AgentMetadata = Readonly<Record<string, Schema.Json>>
@@ -182,11 +184,18 @@ export function make<
   const O extends MakeToolsOptions<StaticTools, unknown, unknown> = MakeToolsOptions<StaticTools>,
 >(
   options: MakeToolsOptions<StaticTools, unknown, unknown> & O,
-): Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
+): Agent<
+  Toolkit.ToolsByName<StaticTools>,
+  OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>,
+  PolicyRequirement<O>,
+  AuthorizationRequirement<O>
+>
 export function make<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   const O extends MakeOptions<Tools, unknown, unknown> = MakeOptions<Tools>,
->(options: MakeOptions<Tools, unknown, unknown> & O): Agent<Tools, OptionRequirements<Tools, O>>
+>(
+  options: MakeOptions<Tools, unknown, unknown> & O,
+): Agent<Tools, OptionRequirements<Tools, O>, PolicyRequirement<O>, AuthorizationRequirement<O>>
 export function make<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   PolicyServices = never,

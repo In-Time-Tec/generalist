@@ -31,17 +31,17 @@ type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
 
-interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
+interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly options: RunOptions
   readonly state: AgentRunState
   readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
-  readonly agent: Agent<T, R>
+  readonly agent: Agent<T, AgentR, PolicyR, AuthorizationR>
   readonly staticToolkit: Toolkit.Toolkit<T>
   readonly chat: Chat.Service
   readonly activeSession: Option.Option<import("../../context/session.js").Service>
   readonly sessionId: string
   readonly executor: Option.Option<typeof ToolExecutor.Service>
-  readonly authorizer: ToolAuthorizer<R>
+  readonly authorizer: ToolAuthorizer<AuthorizationR>
   readonly skillRuntime:
     | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined
@@ -51,7 +51,9 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
   readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
 }
 
-export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext: ToolExecutionContext<T, R>) => {
+export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR = AgentR, AuthorizationR = AgentR>(
+  inputContext: ToolExecutionContext<T, AgentR, PolicyR, AuthorizationR>,
+) => {
   const {
     options,
     isSkillActivationCall,
@@ -372,7 +374,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | R | import("../../durable/driver/interpreter.js").DriverInterpreter
+    StaticToolServices<T> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
   > =>
     Stream.unwrap(
       activeAgentName().pipe(
@@ -392,7 +394,7 @@ export const make = <T extends Record<string, Tool.Any>, R = never>(inputContext
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | R | import("../../durable/driver/interpreter.js").DriverInterpreter
+    StaticToolServices<T> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
   > => {
     const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: "", sessionId }
     const candidate = get(registry, call.name)

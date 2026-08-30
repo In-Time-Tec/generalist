@@ -470,6 +470,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
               executions,
               toolScheduling,
               activeTools: activeRegistry.entries.map((entry) => String(entry.tool.name)),
+              authorizationMessages: executions[0]?.messages ?? [],
               pending: context.state.pending,
               execute: ({ call, messages, toolCallIndex }) =>
                 toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
