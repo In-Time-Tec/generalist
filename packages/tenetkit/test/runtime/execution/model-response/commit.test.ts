@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite"
 import { expect, it, layer } from "@effect/vitest"
-import { Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Effect, Fiber, Layer, Metric, Option, Ref, Schema, Stream, Tracer } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Pins, Session } from "../../../../src/index.js"
 import { Runtime, RunStore } from "../../../../src/runtime/index.js"
@@ -170,6 +170,146 @@ const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
   <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
+
+type MetricSnapshots = Effect.Success<typeof Metric.snapshot>
+
+const observedMetric = (snapshots: MetricSnapshots, id: string, transition?: string) =>
+  snapshots.find(
+    (snapshot) =>
+      snapshot.id === id &&
+      snapshot.attributes?.backend === "sqlite" &&
+      (transition === undefined || snapshot.attributes.transition === transition),
+  )
+
+const observedLockMetric = (snapshots: MetricSnapshots, lock: string, transition: string) =>
+  snapshots.find(
+    (snapshot) =>
+      snapshot.id === "tenetkit_runtime_sql_lock_wait_duration" &&
+      snapshot.attributes?.backend === "sqlite" &&
+      snapshot.attributes.lock === lock &&
+      snapshot.attributes.transition === transition,
+  )
+
+const expectMetricCount = (snapshots: MetricSnapshots, id: string, count: number, transition?: string) => {
+  const snapshot = observedMetric(snapshots, id, transition)
+  expect(snapshot?.type).toBe("Histogram")
+  expect(snapshot?.type === "Histogram" ? snapshot.state.count : undefined).toBe(count)
+}
+
+const expectTransitionOutcomes = (snapshots: MetricSnapshots) => {
+  const snapshot = observedMetric(snapshots, "tenetkit_runtime_sql_transition_outcomes", "commitModelResponse")
+  expect(snapshot?.type).toBe("Frequency")
+  const occurrences = snapshot?.type === "Frequency" ? snapshot.state.occurrences : new Map<string, number>()
+  expect(occurrences.get("committed")).toBe(1)
+  expect(occurrences.get("exact-retry")).toBe(1)
+  expect(occurrences.get("divergent-retry")).toBe(1)
+  expect(occurrences.get("stale-claim")).toBe(1)
+}
+
+it.live("observes SQLite model commits, exact retries, divergence, and stale claims", () => {
+  const spans: Array<Tracer.NativeSpan> = []
+  const tracer = Tracer.make({
+    span: (options) => {
+      const span = new Tracer.NativeSpan(options)
+      spans.push(span)
+      return span
+    },
+  })
+  const metrics = new Map()
+  return scopedWith(sqliteLayer(tempDbPath("model-response-observability")))(
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:model-response-observability",
+        idempotencyKey: "model-response-observability",
+        prompt: textPrompt("answer"),
+      })
+      const { store, claim, operation, operationKey, sessionParentId } = yield* schedule(receipt.runId)
+      const exact = completion(operationKey, sessionParentId)
+      yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
+      yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
+      yield* store
+        .commitModelResponse({
+          ...claim,
+          operationId: operation.operationId,
+          ...completion(operationKey, sessionParentId, "divergent"),
+        })
+        .pipe(Effect.exit)
+      yield* store
+        .commitModelResponse({
+          ...claim,
+          ownerId: "stale-model-response-owner",
+          operationId: operation.operationId,
+          ...exact,
+        })
+        .pipe(Effect.exit)
+
+      const transitions = spans.filter(
+        (span) =>
+          span.name === "TenetKit.Runtime.sqlTransition" &&
+          span.attributes.get("tenetkit.runtime.sql.transition") === "commitModelResponse",
+      )
+      expect(transitions.map((span) => span.attributes.get("tenetkit.runtime.sql.outcome"))).toEqual([
+        "committed",
+        "exact-retry",
+        "divergent-retry",
+        "stale-claim",
+      ])
+      expect(transitions[1]?.attributes.get("tenetkit.runtime.sql.retry.classification")).toBe("exact-retry")
+      expect(transitions[2]?.attributes.get("tenetkit.runtime.sql.retry.classification")).toBe("divergent-retry")
+      expect(
+        transitions.every(
+          (span) =>
+            span.attributes.get("tenetkit.runtime.sql.backend") === "sqlite" &&
+            span.attributes.get("tenetkit.runtime.run_id") === receipt.runId &&
+            span.attributes.get("tenetkit.runtime.operation_id") === operation.operationId &&
+            span.attributes.get("tenetkit.runtime.operation_kind") === "model",
+        ),
+      ).toBe(true)
+      const first = transitions[0]!
+      const transaction = spans.find(
+        (span) => span.name === "sql.transaction" && Option.getOrUndefined(span.parent)?.spanId === first.spanId,
+      )
+      expect(transaction).toBeDefined()
+      expect(
+        spans.some(
+          (span) => span.name === "sql.execute" && Option.getOrUndefined(span.parent)?.spanId === transaction?.spanId,
+        ),
+      ).toBe(true)
+      expect(
+        spans.some(
+          (span) =>
+            span.name === "TenetKit.Runtime.sqlLock" &&
+            span.attributes.get("tenetkit.runtime.sql.backend") === "sqlite" &&
+            span.attributes.get("tenetkit.runtime.sql.lock") === "fence" &&
+            span.attributes.get("tenetkit.runtime.sql.transition") === "commitModelResponse",
+        ),
+      ).toBe(true)
+      const migration = spans.find(
+        (span) =>
+          span.name === "TenetKit.Runtime.sqlTransition" &&
+          span.attributes.get("tenetkit.runtime.sql.transition") === "migrate",
+      )
+      expect(migration?.attributes.get("tenetkit.runtime.sql.schema.version")).toBe(4)
+      expect(migration?.attributes.get("tenetkit.runtime.sql.schema.status")).toBe("current")
+      expect(migration?.attributes.get("tenetkit.runtime.sql.schema.checksum")).toMatch(/^[a-f\d]{64}$/)
+
+      const snapshots = yield* Metric.snapshot
+      expectTransitionOutcomes(snapshots)
+      expectMetricCount(snapshots, "tenetkit_runtime_sql_transition_duration", 4, "commitModelResponse")
+      const lockDuration = observedLockMetric(snapshots, "fence", "commitModelResponse")
+      expect(lockDuration?.type).toBe("Histogram")
+      expect(lockDuration?.type === "Histogram" ? lockDuration.state.count : undefined).toBe(4)
+      const schemaStatus = snapshots.find(
+        (snapshot) =>
+          snapshot.id === "tenetkit_runtime_sql_schema_statuses" && snapshot.attributes?.backend === "sqlite",
+      )
+      expect(schemaStatus?.type).toBe("Frequency")
+      expect(schemaStatus?.type === "Frequency" ? schemaStatus.state.occurrences.get("current") : undefined).toBe(1)
+    }),
+  ).pipe(Effect.provideService(Tracer.Tracer, tracer), Effect.provideService(Metric.MetricRegistry, metrics))
+})
 
 it.live("rolls back every SQLite model transition statement boundary", () => {
   const filename = tempDbPath("model-response-boundaries")

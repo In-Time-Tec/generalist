@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Metric } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
 import { withConsistentSnapshot, withSql, type SqlStoreRun, type SqlStoreRunner } from "tenetkit/runtime/sql-driver"
@@ -8,28 +8,51 @@ const isDeadlock = (error: SqlError): boolean => {
   return text.includes("deadlock") || text.includes("1213") || text.includes("40001")
 }
 
+const deadlockRetries = Metric.counter("tenetkit_runtime_sql_deadlock_retries", {
+  description: "MySQL whole-transaction deadlock retries",
+  incremental: true,
+  attributes: { backend: "mysql" },
+})
+
+const deadlockExhaustions = Metric.counter("tenetkit_runtime_sql_deadlock_exhaustions", {
+  description: "MySQL whole-transaction deadlock retry exhaustion",
+  incremental: true,
+  attributes: { backend: "mysql" },
+})
+
 /** Execute one whole MySQL transaction with the exact initial attempt plus four deadlock retries. */
 export const transactionWithDeadlockRetry = <A, E, R>(input: {
   readonly effect: Effect.Effect<A, E, R>
   readonly transact: SqlClient.SqlClient["withTransaction"]
   readonly retries?: number
 }): Effect.Effect<A, E | SqlError, R> => {
+  const configuredRetries = input.retries ?? 4
   const transaction = (retries: number): Effect.Effect<A, E | SqlError, R> =>
     Effect.suspend(() =>
-      input
-        .transact(input.effect)
-        .pipe(
-          Effect.catchIf(isSqlError, (error) =>
-            retries > 0 && isDeadlock(error)
-              ? Effect.sleep("10 millis").pipe(Effect.andThen(transaction(retries - 1)))
-              : Effect.fail(error),
-          ),
-        ),
+      input.transact(input.effect).pipe(
+        Effect.catchIf(isSqlError, (error) => {
+          if (!isDeadlock(error)) return Effect.fail(error)
+          if (retries > 0) {
+            return Effect.annotateCurrentSpan({
+              "tenetkit.runtime.sql.retry.attempt": configuredRetries - retries + 1,
+              "tenetkit.runtime.sql.retry.classification": "deadlock",
+            }).pipe(
+              Effect.andThen(Metric.update(deadlockRetries, 1)),
+              Effect.andThen(Effect.sleep("10 millis")),
+              Effect.andThen(transaction(retries - 1)),
+            )
+          }
+          return Effect.annotateCurrentSpan({
+            "tenetkit.runtime.sql.retry.attempt": configuredRetries,
+            "tenetkit.runtime.sql.retry.classification": "deadlock-exhausted",
+          }).pipe(Effect.andThen(Metric.update(deadlockExhaustions, 1)), Effect.andThen(Effect.fail(error)))
+        }),
+      ),
     )
-  return transaction(input.retries ?? 4)
+  return transaction(configuredRetries)
 }
 
-/** @experimental MySQL-specific transaction runner bound to one SqlClient. */
+/** MySQL-specific transaction runner bound to one SqlClient. */
 export const sqlRunner = (
   sql: SqlClient.SqlClient,
 ): Pick<SqlStoreRunner, "run" | "runInspection" | "transaction"> & { readonly runNoTxn: SqlStoreRun } => {

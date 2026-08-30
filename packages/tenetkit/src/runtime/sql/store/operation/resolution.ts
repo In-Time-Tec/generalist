@@ -11,6 +11,7 @@ import { decodeJson, encodeJsonValue } from "../../codec/codecs.js"
 import type { OperationRow } from "../../codec/rows.js"
 import { loadRun, nowIso } from "../statements.js"
 import { revokeRunSessionWriteClaim } from "../../session/claim.js"
+import { markSqlTransitionExactRetry } from "../kernel/observability.js"
 
 type ResolveOperationEffect = Effect.Effect<
   undefined,
@@ -73,8 +74,10 @@ const resolveOperationEffect = (
         row.resolution_idempotency_key === input.idempotencyKey &&
         priorResolution !== undefined &&
         resolutionDigest(priorResolution) === resolutionDigest(input.resolution)
-      )
+      ) {
+        yield* markSqlTransitionExactRetry
         return
+      }
       return yield* conflict()
     }
     if (run.status !== "needs-resolution" || row.status !== "unknown") return yield* conflict()

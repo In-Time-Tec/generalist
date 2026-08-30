@@ -11,10 +11,13 @@ import { cancel, complete, fail } from "../control.js"
 import { releaseExecution, requireExecutionClaim } from "../execution.js"
 import { appendEvent, loadRun } from "../statements.js"
 import type { SqlClaimMechanics, SqlStoreLocks, SqlStoreRun } from "../driver/protocol.js"
+import { SqlObservability } from "./observability.js"
 import type { EventHub } from "../../subscribers.js"
+import type { StoreBackend } from "../../../run/store.js"
 
 /** Adapt dialect claim mechanics to Runtime's lifecycle-aware claim service. */
 export const sqlClaims = (input: {
+  readonly backend: Exclude<StoreBackend, "memory">
   readonly mechanics: SqlClaimMechanics
   readonly run: SqlStoreRun
   readonly transactionHub: EventHub
@@ -26,13 +29,29 @@ export const sqlClaims = (input: {
     attemptFence: number,
     session: import("../../../run/store.js").SessionWriteClaim,
   ) => ({ runId, ownerId: workerId, attemptFence, session })
+  const observed = <A, E>(
+    transition: string,
+    effect: Effect.Effect<A, E | import("effect/unstable/sql/SqlError").SqlError, SqlClient.SqlClient>,
+    runId?: string,
+  ) =>
+    SqlObservability.observeTransition(
+      input.backend,
+      transition,
+      runId === undefined ? {} : { runId },
+      input.run(effect),
+    )
 
   return RunClaims.of({
     changes: input.mechanics.changes,
     claimReadyRuns: (options) =>
-      input.run(
+      observed(
+        "claimReadyRuns",
         Effect.gen(function* () {
-          const claimed = yield* input.mechanics.claimReadyRuns(options)
+          const claimed = yield* SqlObservability.observeLock(
+            input.backend,
+            "ready-claim",
+            input.mechanics.claimReadyRuns(options),
+          )
           const result: Array<ClaimedRun> = []
           for (const item of claimed) {
             let run = item.run
@@ -47,11 +66,17 @@ export const sqlClaims = (input: {
             }
             result.push({ ...item, run })
           }
+          yield* SqlObservability.recordReadyClaimBatch(
+            input.backend,
+            result.length,
+            claimed.filter((item) => !item.startedAttempt).length,
+          )
           return result
         }),
       ),
     refreshLease: (options) =>
-      input.run(
+      observed(
+        "refreshLease",
         input.locks.run(options.runId).pipe(
           Effect.andThen(
             requireExecutionClaim(claim(options.runId, options.workerId, options.attemptFence, options.session)),
@@ -62,9 +87,11 @@ export const sqlClaims = (input: {
             () => Effect.succeed(false),
           ),
         ),
+        options.runId,
       ),
     releaseClaim: (options) =>
-      input.run(
+      observed(
+        "releaseClaim",
         input.locks
           .run(options.runId)
           .pipe(
@@ -73,9 +100,11 @@ export const sqlClaims = (input: {
             ),
             Effect.andThen(input.transactionHub.touchRun(options.runId)),
           ),
+        options.runId,
       ),
     commitWithClaim: (options) =>
-      input.run(
+      observed(
+        "commitWithClaim",
         Effect.gen(function* () {
           yield* input.locks.hierarchy(options.runId)
           const executionClaim = claim(options.runId, options.workerId, options.attemptFence, options.session)
@@ -131,6 +160,7 @@ export const sqlClaims = (input: {
             }),
           })
         }),
+        options.runId,
       ),
   })
 }

@@ -24,14 +24,13 @@ export const eventStream = (input: {
     Effect.gen(function* () {
       const cursor = yield* SynchronizedRef.make<Cursor.Cursor>(input.cursor)
       const catchUp = SynchronizedRef.modifyEffect(cursor, (current) =>
-        input.loadAfter(current).pipe(
-          Effect.flatMap((events) =>
-            Effect.forEach(events, (event) => input.hub.publish(input.runId, event)).pipe(
-              Effect.as(events.at(-1)?.sequence ?? current),
-            ),
-          ),
-          Effect.map((last) => [last, last] as const),
-        ),
+        input.hub
+          .catchUp({
+            runId: input.runId,
+            cursor: current,
+            loadAfter: input.loadAfter(current),
+          })
+          .pipe(Effect.map((last) => [last, last] as const)),
       ).pipe(Effect.ignore)
       return input.hub.subscribe({
         runId: input.runId,

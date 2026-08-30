@@ -1,4 +1,4 @@
-import { Effect, Function, Stream } from "effect"
+import { Effect, Function, Metric, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { AgentExecutionFailure } from "../../errors.js"
 import type { ExclusiveExecutionRecovery } from "../../execution/recovery/exclusive.js"
@@ -24,11 +24,23 @@ interface ClaimedRow {
 const eventHub: EventHub = {
   touchRun: () => Effect.void,
   publish: () => Effect.void,
+  catchUp: (input) => Effect.succeed(input.cursor),
   wakeTree: () => Effect.void,
   subscribe: () => Stream.empty,
   subscribeTree: () => Stream.empty,
   shutdown: Effect.void,
 }
+
+const recoveryDuration = Metric.timer("tenetkit_runtime_sql_do_incarnation_recovery_duration", {
+  description: "Cloudflare Durable Object exclusive-incarnation recovery duration",
+  attributes: { backend: "cloudflare-do" },
+})
+
+const recoveredClaims = Metric.counter("tenetkit_runtime_sql_do_incarnation_recovered_claims", {
+  description: "Cloudflare Durable Object claims recovered after incarnation replacement",
+  attributes: { backend: "cloudflare-do" },
+  incremental: true,
+})
 
 const claimFromRow = (row: ClaimedRow): ExecutionClaim | undefined => {
   if (
@@ -134,6 +146,22 @@ export const makeExclusiveExecutionRecovery: {
             return { recovered: selected.length }
           }),
         )
-        .pipe(Effect.provideService(SqlClient.SqlClient, sqlClient), Effect.orDie),
+        .pipe(
+          Effect.provideService(SqlClient.SqlClient, sqlClient),
+          Effect.orDie,
+          Effect.tap((result) =>
+            Metric.update(recoveredClaims, result.recovered).pipe(
+              Effect.andThen(
+                Effect.annotateCurrentSpan({
+                  "tenetkit.runtime.sql.backend": "cloudflare-do",
+                  "tenetkit.runtime.sql.recovered_claims": result.recovered,
+                  "tenetkit.runtime.sql.recovery_has_more": result.continuation !== undefined,
+                }),
+              ),
+            ),
+          ),
+          Effect.trackDuration(recoveryDuration),
+          Effect.withSpan("TenetKit.Runtime.sqlExclusiveRecovery"),
+        ),
   }),
 )

@@ -14,6 +14,7 @@ import type { OperationRow } from "../codec/rows.js"
 import { appendEvent, loadEventsAfter, loadRun, nowIso, toOperationRecord } from "../store/statements.js"
 import type { EventHub } from "../subscribers.js"
 import { encodeJsonValue } from "../codec/codecs.js"
+import { markSqlTransitionDivergentRetry, markSqlTransitionExactRetry } from "../store/kernel/observability.js"
 
 type CompleteEffect = Effect.Effect<OperationRecord, RunNotFound | RuntimeUnavailable | SqlError, SqlClient.SqlClient>
 
@@ -35,6 +36,7 @@ export const commitInterruptedModelResponse: {
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     const current = toOperationRecord(row)
+    if (current.status === "failed") yield* markSqlTransitionDivergentRetry
     const validated = validateInterruptedModelResponse({
       runId: input.runId,
       sessionId: run.message.sessionId,
@@ -65,6 +67,7 @@ export const commitInterruptedModelResponse: {
       yield* verifyInterruptedSessionEntry(sessionEntry).pipe(
         Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
       )
+      yield* markSqlTransitionExactRetry
       return current
     }
     if (current.status !== "running") {

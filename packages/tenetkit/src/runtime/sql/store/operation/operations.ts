@@ -32,6 +32,7 @@ import {
 } from "../../../session/handoff.js"
 import type { CancellationOutcome } from "../../../../core/tools/tool-executor.js"
 import { decodeCancellableOperation } from "../../../../core/tools/tool-executor-cancellation.js"
+import { markSqlTransitionDivergentRetry, markSqlTransitionExactRetry } from "../kernel/observability.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
 const isCompletedStatus = (status: OperationRow["status"]): boolean =>
@@ -317,6 +318,7 @@ export const commitModelResponse: {
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     const current = toOperationRecord(row)
+    if (current.status === "succeeded") yield* markSqlTransitionDivergentRetry
     const validated = validateModelResponseCommit({ record: current, input, sessionId: run.message.sessionId })
     if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
     const sessionEntry = validated.entry
@@ -344,6 +346,7 @@ export const commitModelResponse: {
       yield* verifyCompletedSessionEntry(sessionEntry).pipe(
         Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
       )
+      yield* markSqlTransitionExactRetry
       return current
     }
     if (current.status === "failed" || current.status === "unknown")

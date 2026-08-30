@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { layer } from "@effect/sql-sqlite-bun/SqliteClient"
-import { Clock, Effect, Exit, Layer, Option } from "effect"
+import { Clock, Effect, Exit, Layer, Metric, Option } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   Errors,
@@ -422,6 +422,18 @@ it.live("recovers stale running and cancelling claims by status, raises fences, 
         ownerId: replacement.ownerId,
         attemptFence: replacement.attemptFence,
       })
+
+      const snapshots = yield* Metric.snapshot
+      const recoveredClaims = snapshots.find(
+        (snapshot) => snapshot.id === "tenetkit_runtime_sql_do_incarnation_recovered_claims",
+      )
+      expect(recoveredClaims?.type).toBe("Counter")
+      if (recoveredClaims?.type === "Counter") expect(recoveredClaims.state.count).toBe(2)
+      const recoveryDuration = snapshots.find(
+        (snapshot) => snapshot.id === "tenetkit_runtime_sql_do_incarnation_recovery_duration",
+      )
+      expect(recoveryDuration?.type).toBe("Histogram")
+      if (recoveryDuration?.type === "Histogram") expect(recoveryDuration.state.count).toBe(1)
     }),
-  ),
+  ).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
 )

@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Metric, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import {
@@ -33,6 +33,11 @@ const migrationFailure = (source: string, fallback: string) => (error: SqlError)
 
 const AcquiredRows = Schema.Array(Schema.Tuple([Schema.NullOr(Schema.Finite)]))
 const PresentRows = Schema.Array(Schema.Tuple([Schema.Finite]))
+
+const migrationLockWait = Metric.timer("tenetkit_runtime_sql_migration_lock_wait_duration", {
+  description: "Runtime SQL migration lock acquisition duration",
+  attributes: { backend: "mysql" },
+})
 
 const readMeta = (source: string) =>
   Effect.gen(function* () {
@@ -84,6 +89,10 @@ export const apply = (source: string) =>
 
       const acquired = yield* query("SELECT GET_LOCK(?, 30) AS acquired", [MIGRATION_LOCK]).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(AcquiredRows)),
+        Effect.trackDuration(migrationLockWait),
+        Effect.withSpan("TenetKit.Runtime.sqlMigrationLock", {
+          attributes: { "tenetkit.runtime.sql.backend": "mysql" },
+        }),
       )
       if (acquired[0]?.[0] !== 1) {
         return yield* SchemaMigrationFailed.make({ source, message: "timed out acquiring MySQL migration lock" })

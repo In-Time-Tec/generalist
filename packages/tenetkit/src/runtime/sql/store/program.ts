@@ -37,6 +37,7 @@ import {
 } from "../../operation/resolution.js"
 import type { WorkerMutationError } from "../../run/store.js"
 import { revokeRunSessionWriteClaim } from "../session/claim.js"
+import { markSqlTransitionExactRetry } from "./kernel/observability.js"
 
 interface StateRow {
   readonly run_id: string
@@ -287,7 +288,7 @@ export const settleProgramOperation: {
       return yield* RuntimeUnavailable.make({ message: `Program operation ${input.operation} is missing` })
     const prior = yield* decodeOperation(row)
     if (["succeeded", "failed", "unknown"].includes(prior.status)) {
-      if (idempotentReplay(prior, input.outcome)) return prior
+      if (idempotentReplay(prior, input.outcome)) return yield* markSqlTransitionExactRetry.pipe(Effect.as(prior))
       return yield* StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence })
     }
     const state = yield* loadProgramState(input.runId)
@@ -324,7 +325,6 @@ export const settleProgramOperation: {
     return record
   }),
 )
-
 const resolveProgramOperationEffect = (
   input: ResolveOperationInput,
   claimableStatus: ClaimableStatus,
@@ -348,7 +348,7 @@ const resolveProgramOperationEffect = (
         prior !== undefined &&
         resolutionDigest(prior) === resolutionDigest(input.resolution)
       )
-        return
+        return yield* markSqlTransitionExactRetry.pipe(Effect.as(undefined))
       return yield* conflict()
     }
     if (run.status !== "needs-resolution" || row.status !== "unknown") return yield* conflict()
@@ -444,7 +444,7 @@ export const suspendProgramOperation: {
 } = Function.dual(3, (hub: EventHub, input: SuspendProgramOperationInput, suspendParent: SuspendParent) =>
   Effect.gen(function* () {
     const reserved = yield* reserveProgramOperation(input)
-    if (reserved.status === "waiting") return reserved
+    if (reserved.status === "waiting") return yield* markSqlTransitionExactRetry.pipe(Effect.as(reserved))
     const sql = yield* SqlClient.SqlClient
     yield* sql`
       UPDATE tenetkit_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId}
@@ -461,7 +461,7 @@ export const admitProgramAgents: {
 } = Function.dual(3, (hub: EventHub, input: AdmitProgramAgentsInput, suspendParent: SuspendParent) =>
   Effect.gen(function* () {
     const reserved = yield* reserveProgramOperation(input)
-    if (reserved.childRunIds.length > 0) return reserved
+    if (reserved.childRunIds.length > 0) return yield* markSqlTransitionExactRetry.pipe(Effect.as(reserved))
     const receipt = yield* admitFanOut(hub, input.fanOut)
     const sql = yield* SqlClient.SqlClient
     yield* sql`
@@ -480,7 +480,7 @@ export const commitProgramLog: {
 } = Function.dual(2, (hub: EventHub, input: CommitProgramLogInput) =>
   Effect.gen(function* () {
     const prior = yield* reserveProgramOperation(input)
-    if (prior.status === "succeeded") return prior
+    if (prior.status === "succeeded") return yield* markSqlTransitionExactRetry.pipe(Effect.as(prior))
     const run = yield* loadRun(input.runId)
     if (run === undefined) return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} is missing` })
     const event = {

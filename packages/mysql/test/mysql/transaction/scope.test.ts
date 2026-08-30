@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Metric, Tracer } from "effect"
 import { DeadlockError, SqlError, UnknownError } from "effect/unstable/sql/SqlError"
 import { transactionWithDeadlockRetry } from "../../../src/mysql/transaction/scope.js"
 
@@ -18,13 +18,31 @@ const failingTransaction =
 it.live("retries the whole transaction after a deadlock", () => {
   const attempts = { value: 0 }
   const failure = sqlError(DeadlockError.make({ cause: "forced", message: "Deadlock found; code 1213" }))
+  const spans: Array<Tracer.NativeSpan> = []
+  const tracer = Tracer.make({
+    span: (options) => {
+      const span = new Tracer.NativeSpan(options)
+      spans.push(span)
+      return span
+    },
+  })
   return Effect.gen(function* () {
     yield* transactionWithDeadlockRetry({
       effect: Effect.succeed("committed"),
       transact: failingTransaction(failure, 2, attempts),
     })
     expect(attempts.value).toBe(3)
-  })
+    const snapshots = yield* Metric.snapshot
+    const retries = snapshots.find((snapshot) => snapshot.id === "tenetkit_runtime_sql_deadlock_retries")
+    expect(retries?.type).toBe("Counter")
+    if (retries?.type === "Counter") expect(retries.state.count).toBe(2)
+    expect(spans[0]?.attributes.get("tenetkit.runtime.sql.retry.classification")).toBe("deadlock")
+    expect(spans[0]?.attributes.get("tenetkit.runtime.sql.retry.attempt")).toBe(2)
+  }).pipe(
+    Effect.withSpan("mysql-transaction-test"),
+    Effect.provideService(Tracer.Tracer, tracer),
+    Effect.provideService(Metric.MetricRegistry, new Map()),
+  )
 })
 
 it.live("exhausts the initial attempt plus four exact deadlock retries", () => {

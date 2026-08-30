@@ -1,4 +1,4 @@
-import { Clock, Effect } from "effect"
+import { Clock, Effect, Metric } from "effect"
 import { SqlClient, SqlError } from "effect/unstable/sql"
 import { Errors, LocalScheduler, RunExecutor, RunStore } from "tenetkit/runtime"
 import type { Rearm } from "./activations.js"
@@ -25,6 +25,29 @@ interface Candidate {
   readonly intent: "execute" | "cancel"
   readonly due_at_millis: number
 }
+
+const drainDuration = Metric.timer("tenetkit_runtime_sql_do_alarm_drain_duration", {
+  description: "Cloudflare Durable Object Runtime alarm drain duration",
+  attributes: { backend: "cloudflare-do" },
+})
+
+const drainSize = Metric.histogram("tenetkit_runtime_sql_do_alarm_drain_size", {
+  description: "Cloudflare Durable Object Runtime activations processed per alarm drain",
+  attributes: { backend: "cloudflare-do" },
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 16 }),
+})
+
+const drainOutcomes = Metric.frequency("tenetkit_runtime_sql_do_alarm_drain_outcomes", {
+  description: "Cloudflare Durable Object Runtime alarm drain outcomes",
+  attributes: { backend: "cloudflare-do" },
+  preregisteredWords: ["executed", "cancelled", "deferred", "inactive", "stale"],
+})
+
+const alarmRearms = Metric.counter("tenetkit_runtime_sql_do_alarm_rearms", {
+  description: "Cloudflare Durable Object Runtime alarm rearms",
+  attributes: { backend: "cloudflare-do" },
+  incremental: true,
+})
 
 /** @experimental Drain a deterministic bounded batch; claiming and execution occur outside candidate reads. */
 export const drain = (
@@ -79,7 +102,10 @@ export const drain = (
         }
       }
     }
+    yield* Metric.update(drainSize, selected.length)
+    yield* Effect.forEach(outcomes, ({ outcome }) => Metric.update(drainOutcomes, outcome), { discard: true })
     yield* options.rearm
+    yield* Metric.update(alarmRearms, 1)
     const due = yield* sql<{
       due_at_millis: number | null
     }>`SELECT MIN(due_at_millis) AS due_at_millis FROM tenetkit_activations`
@@ -90,4 +116,4 @@ export const drain = (
     }
     if (due[0]?.due_at_millis != null) return { ...result, nextDueAt: due[0].due_at_millis }
     return result
-  })
+  }).pipe(Effect.trackDuration(drainDuration))

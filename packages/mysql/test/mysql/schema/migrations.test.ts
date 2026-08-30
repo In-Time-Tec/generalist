@@ -1,6 +1,6 @@
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Metric } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   SchemaChecksumMismatch,
@@ -108,7 +108,13 @@ describeMysql("mysql schema baseline", () => {
         yield* RunSchema.apply("mysql-migration-test")
         yield* RunSchema.apply("mysql-migration-test")
         yield* inspectSchema
-      }),
+        const snapshot = (yield* Metric.snapshot).find(
+          (item) =>
+            item.id === "tenetkit_runtime_sql_migration_lock_wait_duration" && item.attributes?.backend === "mysql",
+        )
+        expect(snapshot?.type).toBe("Histogram")
+        if (snapshot?.type === "Histogram") expect(snapshot.state.count).toBe(1)
+      }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
     )
   })
 

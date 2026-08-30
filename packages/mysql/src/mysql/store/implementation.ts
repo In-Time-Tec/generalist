@@ -100,15 +100,14 @@ export const mysqlDriver = (options: Options): SqlRuntimeDriver<StoreError> => (
         const pollCursor = yield* Ref.make(input.cursor)
         const deliveredCursor = yield* Ref.make(input.cursor)
         const poll = Ref.get(pollCursor).pipe(
-          Effect.flatMap(context.loadAfter),
-          Effect.flatMap((events) =>
-            Effect.forEach(
-              events,
-              (event) =>
-                context.hub.publish(input.runId, event).pipe(Effect.andThen(Ref.set(pollCursor, event.sequence))),
-              { discard: true },
-            ),
+          Effect.flatMap((cursor) =>
+            context.hub.catchUp({
+              runId: input.runId,
+              cursor,
+              loadAfter: context.loadAfter(cursor),
+            }),
           ),
+          Effect.flatMap((cursor) => Ref.set(pollCursor, cursor)),
           Effect.ignore,
           Effect.repeat(Schedule.spaced(options.pollInterval ?? "50 millis")),
           Effect.asVoid,

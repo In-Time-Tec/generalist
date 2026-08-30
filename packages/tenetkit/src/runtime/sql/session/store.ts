@@ -16,6 +16,7 @@ import type { ExecutionClaim, SessionReader } from "../../run/store.js"
 import { StaleSessionClaim } from "../errors.js"
 import { requireSessionWriteClaim } from "./claim.js"
 import { type EntryRow, type SessionRow, SessionStorage } from "./storage.js"
+import { markSqlTransitionExactRetry } from "../store/kernel/observability.js"
 const { appendMatches, entryPayloadEquivalence, storeError, encodePayload, fromEntry, toEntry, pathFromRows } =
   SessionStorage
 
@@ -155,10 +156,15 @@ export const claimedStore = (options: {
   readonly transaction?: <A, E, R>(
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | import("effect/unstable/sql/SqlError").SqlError, R>
+  readonly observe?: <A, E, R>(transition: string, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
 }): Effect.Effect<Service, never, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const transaction: NonNullable<typeof options.transaction> = options.transaction ?? sql.withTransaction
+    const observedTransaction = <A, E, R>(transition: string, effect: Effect.Effect<A, E, R>) => {
+      const transactional = transaction(effect)
+      return options.observe === undefined ? transactional : options.observe(transition, transactional)
+    }
     const sessionId = options.claim.session.sessionId
     const requireWriteClaim = requireSessionWriteClaim(options.claim.session).pipe(
       Effect.provideService(SqlClient.SqlClient, sql),
@@ -269,11 +275,13 @@ export const claimedStore = (options: {
             message: `Session entry id ${appendOptions.id} is not on the active path from ${String(session.leaf_id)}`,
           })
         }
+        yield* markSqlTransitionExactRetry
         return persisted
       })
 
     const append = (entry: AppendInput, appendOptions: AppendOptions = {}) =>
-      transaction(
+      observedTransaction(
+        "appendSessionEntry",
         Effect.gen(function* () {
           yield* requireWriteClaim
           const session = yield* requireSession
@@ -306,7 +314,8 @@ export const claimedStore = (options: {
       )
 
     const appendCheckpoint = (prepared: PreparedCheckpoint) =>
-      transaction(
+      observedTransaction(
+        "appendSessionCheckpoint",
         Effect.gen(function* () {
           yield* requireWriteClaim
           const session = yield* requireSession
@@ -323,6 +332,7 @@ export const claimedStore = (options: {
                 message: `Session checkpoint id ${prepared.id} was reused with different content`,
               })
             }
+            yield* markSqlTransitionExactRetry
             return {
               _tag: "AlreadyPresent" as const,
               checkpoint: entry,
@@ -368,16 +378,19 @@ export const claimedStore = (options: {
       )
 
     return {
-      reserveEntryId: Effect.gen(function* () {
-        yield* requireWriteClaim
-        const session = yield* requireSession
-        const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
-        let sequence = session.next_seq
-        while (ids.has(String(sequence))) sequence += 1
-        const created = yield* now
-        yield* advance(session.leaf_id, sequence + 1, created)
-        return String(sequence)
-      }).pipe(transaction, asReserveError),
+      reserveEntryId: observedTransaction(
+        "reserveSessionEntryId",
+        Effect.gen(function* () {
+          yield* requireWriteClaim
+          const session = yield* requireSession
+          const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
+          let sequence = session.next_seq
+          while (ids.has(String(sequence))) sequence += 1
+          const created = yield* now
+          yield* advance(session.leaf_id, sequence + 1, created)
+          return String(sequence)
+        }),
+      ).pipe(asReserveError),
       append: (entry, appendOptions) => asStoreError(append(entry, appendOptions)),
       appendCheckpoint: (prepared) => asStoreError(appendCheckpoint(prepared)),
       path: (leaf) =>
@@ -388,7 +401,8 @@ export const claimedStore = (options: {
           return yield* pathTo(leaf ?? session.leaf_id)
         }).pipe(asReadError),
       setLeaf: (id) =>
-        transaction(
+        observedTransaction(
+          "setSessionLeaf",
           Effect.gen(function* () {
             yield* requireWriteClaim
             yield* requireSession
