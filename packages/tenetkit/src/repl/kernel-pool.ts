@@ -1,4 +1,4 @@
-import { Context, Effect, Stream } from "effect"
+import { Context, Effect, Scope, Stream } from "effect"
 import type { CellEvent, CellFailure, CellId, CellResult, Epoch, RestartReason, SessionId } from "./cell.js"
 import type { CheckpointKind, KernelProfile } from "./kernel-profile.js"
 
@@ -62,7 +62,7 @@ export interface Restart {
  * Session and authored-order; the pool owns process lifetime, generation, and lease.
  */
 export interface Service {
-  readonly execute: (request: ExecuteRequest) => Effect.Effect<Execution, CellFailure>
+  readonly execute: (request: ExecuteRequest) => Effect.Effect<Execution, CellFailure, Scope.Scope>
   readonly inspect: (request: InspectRequest) => Effect.Effect<Inspection, CellFailure>
   readonly interrupt: (sessionId: SessionId, cellId: CellId) => Effect.Effect<Interruption, CellFailure>
   readonly restart: (sessionId: SessionId, reason: RestartReason) => Effect.Effect<Restart, CellFailure>

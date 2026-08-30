@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber } from "effect"
+import { Deferred, Effect, Exit, Fiber, Scope } from "effect"
 import type { CellFailure, CellResult } from "../../../../src/repl/cell.js"
 import { liveOptions, platform, runCell, withPool } from "../../bun-harness.js"
 
@@ -110,6 +110,32 @@ layer(platform, liveOptions)("Bun kernel kill restart", (it) => {
           const outcome = yield* Fiber.join(running)
           expect(outcome._tag).toBe("Failure")
           expect(process.pid).toBe(hostPid)
+        }),
+    }),
+  )
+
+  it.effect("kills an abandoned cell when its execution scope closes", () =>
+    withPool({
+      overrides: { cellDeadlineMillis: 30_000, interruptGraceMillis: 100 },
+      use: ({ pool }) =>
+        Effect.gen(function* () {
+          const executionScope = yield* Scope.make()
+          const execution = yield* pool
+            .execute({
+              sessionId: "s",
+              cellId: "abandoned",
+              code: "while (true) {}",
+              signal: AbortSignal.any([]),
+            })
+            .pipe(Scope.provide(executionScope))
+          yield* Effect.sleep(200)
+          yield* Scope.close(executionScope, Exit.void)
+
+          const outcome = yield* Effect.timeout(Effect.exit(execution.result), 8_000)
+          expect(Exit.isFailure(outcome)).toBe(true)
+          const replacement = yield* runCell({ pool, sessionId: "s", cellId: "replacement", code: "1 + 1" })
+          expect(replacement.value).toBe("2")
+          expect(replacement.epoch).toBe(1)
         }),
     }),
   )

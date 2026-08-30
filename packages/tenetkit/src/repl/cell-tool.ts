@@ -107,26 +107,28 @@ const domainFailure = (failure: CellFailure): Effect.Effect<Outcome, FrameworkFa
   )
 
 const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, ToolContext | KernelPool> =>
-  Effect.gen(function* () {
-    const context = yield* ToolContext
-    const pool = yield* KernelPool
-    const params = yield* Schema.decodeUnknownEffect(Parameters)(request.call.params).pipe(
-      Effect.mapError((error) => frameworkFailure("decode-input", schemaMessage(error))),
-    )
-    const toolCallId = context.toolCallId ?? request.call.id
-    const cellId = cellIdOf(request, context)
-    return yield* pool
-      .execute({ sessionId: request.sessionId, cellId, code: params.code, signal: context.signal })
-      .pipe(
-        Effect.flatMap((execution) =>
-          execution.events.pipe(
-            Stream.runForEach((event) => progress(toolCallId, event).pipe(Effect.flatMap(context.emit))),
-            Effect.andThen(execution.result),
-          ),
-        ),
-        Effect.matchEffect({ onSuccess: success, onFailure: domainFailure }),
+  Effect.scoped(
+    Effect.gen(function* () {
+      const context = yield* ToolContext
+      const pool = yield* KernelPool
+      const params = yield* Schema.decodeUnknownEffect(Parameters)(request.call.params).pipe(
+        Effect.mapError((error) => frameworkFailure("decode-input", schemaMessage(error))),
       )
-  })
+      const toolCallId = context.toolCallId ?? request.call.id
+      const cellId = cellIdOf(request, context)
+      return yield* pool
+        .execute({ sessionId: request.sessionId, cellId, code: params.code, signal: context.signal })
+        .pipe(
+          Effect.flatMap((execution) =>
+            execution.events.pipe(
+              Stream.runForEach((event) => progress(toolCallId, event).pipe(Effect.flatMap(context.emit))),
+              Effect.andThen(execution.result),
+            ),
+          ),
+          Effect.matchEffect({ onSuccess: success, onFailure: domainFailure }),
+        )
+    }),
+  )
 
 /** @experimental The cell route: one tool, ToolContext progress and interruption, typed cell outcomes. */
 export const route: Route<ToolContext | KernelPool> = toolExecutorRoute<ToolContext | KernelPool>({

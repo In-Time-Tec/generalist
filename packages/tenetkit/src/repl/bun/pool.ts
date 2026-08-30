@@ -195,7 +195,8 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
               message: `the cell source is ${sourceBytes} bytes, over the profile bound of ${options.profile.limits.sourceBytes}`,
             })
           }
-          const cellScope = yield* Scope.make()
+          const callerScope = yield* Scope.Scope
+          const cellScope = yield* Scope.fork(callerScope)
           return yield* Effect.gen(function* () {
             const lease = yield* RcMap.get(kernels, request.sessionId)
             const prelude: ReadonlyArray<CellEvent> = [
@@ -215,6 +216,7 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
               sequenceStart: prelude.length,
             })
             const strongInterruption = yield* Ref.make(false)
+            const resultHandled = yield* Ref.make(false)
             const invalidated = yield* Deferred.make<void>()
             const stopStrongly = Ref.set(strongInterruption, true).pipe(
               Effect.andThen(lease.kernel.interrupt(request.cellId, options.interruptGraceMillis)),
@@ -223,6 +225,10 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
               ),
               Effect.ignore,
               Effect.ensuring(Deferred.succeed(invalidated, undefined)),
+            )
+            yield* Scope.addFinalizer(
+              cellScope,
+              Ref.get(resultHandled).pipe(Effect.flatMap((handled) => (handled ? Effect.void : stopStrongly))),
             )
             yield* watchAbort(request.signal).pipe(Effect.andThen(stopStrongly), Effect.forkIn(cellScope))
             yield* Effect.sleep(options.profile.limits.cellDeadlineMillis + options.interruptGraceMillis).pipe(
@@ -252,7 +258,10 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
                     : Ref.get(strongInterruption).pipe(
                         Effect.flatMap((strong) => (strong ? Deferred.await(invalidated) : Effect.void)),
                       )
-                  ).pipe(Effect.andThen(Scope.close(cellScope, Exit.succeed(undefined)))),
+                  ).pipe(
+                    Effect.andThen(Ref.set(resultHandled, true)),
+                    Effect.andThen(Scope.close(cellScope, Exit.succeed(undefined))),
+                  ),
                 ),
               ),
             }

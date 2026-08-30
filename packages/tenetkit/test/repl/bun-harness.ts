@@ -159,7 +159,7 @@ export interface CellRequest {
   readonly signal?: AbortSignal
 }
 
-const submit = (request: CellRequest): Effect.Effect<Execution, CellFailure> =>
+const submit = (request: CellRequest): Effect.Effect<Execution, CellFailure, Scope.Scope> =>
   request.pool.execute({
     sessionId: request.sessionId,
     cellId: request.cellId,
@@ -168,7 +168,7 @@ const submit = (request: CellRequest): Effect.Effect<Execution, CellFailure> =>
   })
 
 /** One cell awaited to its terminal outcome. */
-export const runCell = (request: CellRequest): Effect.Effect<CellResult, CellFailure> =>
+export const runCell = (request: CellRequest): Effect.Effect<CellResult, CellFailure, Scope.Scope> =>
   submit(request).pipe(Effect.flatMap((execution) => execution.result))
 
 /** One cell's streamed events, plus its still-awaitable terminal outcome. */
@@ -178,7 +178,7 @@ export interface Observed {
 }
 
 /** One cell's events drained to completion, with its outcome left for the caller to observe. */
-export const collect = (request: CellRequest): Effect.Effect<Observed, CellFailure> =>
+export const collect = (request: CellRequest): Effect.Effect<Observed, CellFailure, Scope.Scope> =>
   submit(request).pipe(
     Effect.flatMap((execution) =>
       Stream.runCollect(execution.events).pipe(
@@ -193,7 +193,7 @@ export const collect = (request: CellRequest): Effect.Effect<Observed, CellFailu
  * result first and read the events afterwards, and it must still see every event including the
  * `Result`.
  */
-export const collectAfterResult = (request: CellRequest): Effect.Effect<Observed, CellFailure> =>
+export const collectAfterResult = (request: CellRequest): Effect.Effect<Observed, CellFailure, Scope.Scope> =>
   submit(request).pipe(
     Effect.flatMap((execution) =>
       Effect.exit(execution.result).pipe(

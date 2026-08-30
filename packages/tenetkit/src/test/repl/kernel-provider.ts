@@ -12,7 +12,7 @@ const request = (
   sessionId: string,
   cellId: string,
   code: string,
-): Effect.Effect<Execution, CellFailure> => pool.execute({ sessionId, cellId, code, signal: noSignal() })
+): Effect.Effect<Execution, CellFailure, Scope.Scope> => pool.execute({ sessionId, cellId, code, signal: noSignal() })
 
 const run = (pool: KernelPool, sessionId: string, cellId: string, code: string) =>
   request(pool, sessionId, cellId, code).pipe(Effect.flatMap((execution) => execution.result))
@@ -72,12 +72,12 @@ type Tester = typeof effectTest
 
 const withHarness = <A, E, MakeError>(
   make: Effect.Effect<Harness, MakeError, Scope.Scope>,
-  use: (harness: Harness) => Effect.Effect<A, E>,
+  use: (harness: Harness) => Effect.Effect<A, E, Scope.Scope>,
 ): Effect.Effect<A, E | MakeError> => Effect.scoped(Effect.flatMap(make, use))
 
 const withRemote = <A, E, MakeError>(
   make: Effect.Effect<RemoteHarness, MakeError, Scope.Scope>,
-  use: (harness: RemoteHarness) => Effect.Effect<A, E>,
+  use: (harness: RemoteHarness) => Effect.Effect<A, E, Scope.Scope>,
 ): Effect.Effect<A, E | MakeError> => Effect.scoped(Effect.flatMap(make, use))
 
 const registerCommon = <CommonError, RemoteError>(options: Options<CommonError, RemoteError>, test: Tester): void => {

@@ -284,13 +284,12 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     const stream = () => super.sendMessageStream(params, context)
     return toAsyncGenerator(
       Stream.toAsyncIterable(
-        Stream.fromEffect(Effect.promise(() => validateRequest(params))).pipe(
-          Stream.flatMap(() =>
-            Stream.fromAsyncIterable(stream(), (error): never => {
-              throw error
-            }),
-          ),
-        ),
+        Stream.fromEffect(
+          Effect.tryPromise({
+            try: () => validateRequest(params),
+            catch: (error) => error,
+          }),
+        ).pipe(Stream.flatMap(() => Stream.fromAsyncIterable(stream(), (error) => error))),
       ),
     )
   }
