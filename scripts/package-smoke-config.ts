@@ -1,15 +1,17 @@
-export const packages = ["tenetkit", "pg", "mysql", "cloudflare"] as const
+export const packages = ["tenetkit", "pg", "mysql", "cloudflare", "rivet"] as const
 export const packageNames = {
   tenetkit: "tenetkit",
   pg: "@tenetkit/pg",
   mysql: "@tenetkit/mysql",
   cloudflare: "@tenetkit/cloudflare",
+  rivet: "@tenetkit/rivet",
 } satisfies Record<(typeof packages)[number], string>
 export const compressedSizeLimits = {
   tenetkit: 700_000,
   pg: 180_000,
   mysql: 120_000,
   cloudflare: 120_000,
+  rivet: 80_000,
 } satisfies Record<(typeof packages)[number], number>
 export const packedEffectDependencies = {
   tenetkit: [
@@ -22,6 +24,7 @@ export const packedEffectDependencies = {
   pg: ["@effect/sql-pg"],
   mysql: ["@effect/sql-mysql2"],
   cloudflare: ["@effect/sql-sqlite-do"],
+  rivet: [],
 } satisfies Record<(typeof packages)[number], ReadonlyArray<string>>
 export const packedProviderDependencies = {
   "@aws-sdk/client-bedrock-runtime": "3.859.0",
@@ -181,6 +184,12 @@ export const minimumConsumerProfiles = [
       { specifier: "@tenetkit/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
     ],
   },
+  {
+    name: "rivet",
+    packages: ["tenetkit", "rivet"],
+    peers: [],
+    imports: [{ specifier: "@tenetkit/rivet/actors", runtimes: nodeAndBun, exports: ["makeRuntimeActor"] }],
+  },
 ] as const satisfies ReadonlyArray<MinimumConsumerProfile>
 
 export const workerSafePackageExports = [
@@ -257,6 +266,7 @@ export const exactPackageExports = {
   pg: ["."],
   mysql: ["."],
   cloudflare: ["./durable-objects", "./dynamic-workers", "./workers"],
+  rivet: ["./actors"],
 } as const satisfies Record<(typeof packages)[number], ReadonlyArray<string>>
 const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
   Array.from(values).reduce<Array<A>>((result, value) => {

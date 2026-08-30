@@ -1,6 +1,6 @@
 # TenetKit
 
-TenetKit is an Effect-native agent framework over `effect/unstable/ai`. The `tenetkit` package provides the process-local agent loop and optional durable Runtime; `@tenetkit/pg`, `@tenetkit/mysql`, and `@tenetkit/cloudflare` provide host-specific storage and runtime adapters. Core stays usable without Relay or another durable runtime.
+TenetKit is an Effect-native agent framework over `effect/unstable/ai`. The `tenetkit` package provides the process-local agent loop and optional durable Runtime; `@tenetkit/pg`, `@tenetkit/mysql`, `@tenetkit/cloudflare`, and `@tenetkit/rivet` provide host-specific storage and runtime adapters. Core stays usable without Relay or another durable runtime.
 
 ## Commands
 
@@ -37,7 +37,7 @@ For changes to public exports, package manifests, dependencies, or release outpu
 PACKAGE_ARTIFACT_DIR=release bun run package
 ```
 
-This is the downstream compatibility check. It packs the four public packages, validates every exact manifest export plus concrete wildcard examples, installs the tarballs in fresh Bun-isolated, core-only, and npm consumers, typechecks and bundles a consumer, imports public entrypoints under Node and Bun, and verifies one Effect installation. It writes four tarballs, `release-evidence.json`, and `SHA256SUMS`.
+This is the downstream compatibility check. It packs the five public packages, validates every exact manifest export plus concrete wildcard examples, installs the tarballs in fresh Bun-isolated, core-only, and npm consumers, typechecks and bundles a consumer, imports public entrypoints under Node and Bun, and verifies one Effect installation. It writes five tarballs, `release-evidence.json`, and `SHA256SUMS`.
 
 ## Boundaries
 
@@ -83,12 +83,12 @@ bun --bun vitest run \
 
 ## Release
 
-The lockstep public train is `tenetkit`, `@tenetkit/pg`, `@tenetkit/mysql`, and `@tenetkit/cloudflare`. Root and package manifest versions match exactly. Do not publish from a workstation.
+The lockstep public train is `tenetkit`, `@tenetkit/pg`, `@tenetkit/mysql`, `@tenetkit/cloudflare`, and `@tenetkit/rivet`. Root and package manifest versions match exactly. Do not publish from a workstation.
 
 A release change must:
 
 1. Add the user-visible change to `CHANGELOG.md`.
-2. Set one lockstep semantic version in the root manifest and `packages/{tenetkit,pg,mysql,cloudflare}/package.json`.
+2. Set one lockstep semantic version in the root manifest and `packages/{tenetkit,pg,mysql,cloudflare,rivet}/package.json`.
 3. Pass `bun run check`, `bun run test` with PostgreSQL and MySQL available, and `bun run package`.
 4. Use the `tenetkit-release` skill to produce and verify artifacts from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
 5. Land the exact release commit on both `main` and `release`, then create the immutable `v<version>` tag at that commit.

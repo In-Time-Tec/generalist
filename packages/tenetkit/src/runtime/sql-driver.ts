@@ -13,6 +13,11 @@ export {
   type SqlStoreRun,
   type SqlStoreRunner,
 } from "./sql/store.js"
+export {
+  layerSqliteRuntime,
+  type SqliteRuntimeOptions,
+  type SqliteRuntimeServices,
+} from "./sql/run/exclusive-runtime.js"
 export type { EventHub } from "./sql/subscribers.js"
 export { RunClaims, type ClaimedRun, type Service as RunClaimsService } from "./sql/run/claims.js"
 export * as RuntimeWorker from "./sql/worker.js"
@@ -29,6 +34,7 @@ export {
   SchemaVersionUnsupported,
 } from "./sql/errors.js"
 export { makeExclusiveExecutionRecovery } from "./sql/run/exclusive-recovery.js"
+export * as SqliteRunActivation from "./sql/run/exclusive-activation.js"
 export {
   SQL_LOGICAL_SCHEMA,
   SQL_SCHEMA_NAME,

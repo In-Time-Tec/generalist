@@ -31,14 +31,14 @@ const eventHub: EventHub = {
   shutdown: Effect.void,
 }
 
-const recoveryDuration = Metric.timer("tenetkit_runtime_sql_do_incarnation_recovery_duration", {
-  description: "Cloudflare Durable Object exclusive-incarnation recovery duration",
-  attributes: { backend: "cloudflare-do" },
+const recoveryDuration = Metric.timer("tenetkit_runtime_sqlite_exclusive_recovery_duration", {
+  description: "Exclusive SQLite Runtime incarnation recovery duration",
+  attributes: { backend: "sqlite-exclusive-host" },
 })
 
-const recoveredClaims = Metric.counter("tenetkit_runtime_sql_do_incarnation_recovered_claims", {
-  description: "Cloudflare Durable Object claims recovered after incarnation replacement",
-  attributes: { backend: "cloudflare-do" },
+const recoveredClaims = Metric.counter("tenetkit_runtime_sqlite_exclusive_recovered_claims", {
+  description: "Exclusive SQLite Runtime claims recovered after incarnation replacement",
+  attributes: { backend: "sqlite-exclusive-host" },
   incremental: true,
 })
 
@@ -153,7 +153,7 @@ export const makeExclusiveExecutionRecovery: {
             Metric.update(recoveredClaims, result.recovered).pipe(
               Effect.andThen(
                 Effect.annotateCurrentSpan({
-                  "tenetkit.runtime.sql.backend": "cloudflare-do",
+                  "tenetkit.runtime.sql.backend": "sqlite-exclusive-host",
                   "tenetkit.runtime.sql.recovered_claims": result.recovered,
                   "tenetkit.runtime.sql.recovery_has_more": result.continuation !== undefined,
                 }),
