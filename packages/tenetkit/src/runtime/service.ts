@@ -343,7 +343,12 @@ export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTer
 export type RespondApprovalError = RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
 export type CancelError = RunNotFound | RuntimeUnavailable
-export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable
+export type SteerError =
+  | RunNotFound
+  | RunTerminal
+  | SteeringConflict
+  | import("../core/index.js").Steering.InboxFull
+  | RuntimeUnavailable
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
 export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable

@@ -36,12 +36,14 @@ import { intercept, setHandoffState, setToolBatch } from "../durable/driver/run.
 import { type HandoffRunState, make as makeHandoffStateRef, takePendingContinuation } from "./handoff/state-ref.js"
 import type { ObjectSchema, StructuredRunConfig } from "./loop/context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
+import type { RunInbox } from "../turn/steering.js"
 const errorMessage = String
 const { insertRecalledItems, steeringDrainedEvent } = RunSupport
 const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools, R>,
   options: RunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
+  inbox: RunInbox,
 ): RunStream<Tools, StructuredOutputSchema, R> =>
   Stream.unwrap(
     Effect.gen(function* () {
@@ -72,11 +74,9 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         telemetryIdentity,
         modelCallUsage,
         instrumentModel,
-        steeringService,
         tokenizerService,
         authorizer,
-        agentModel,
-        agentModelRegistry,
+        modelSource,
         memoryRuntime,
         seedSystem,
         chat,
@@ -331,8 +331,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       const { resumeApproved, toolCallEvents } = toolRuntime
       const modelContext = {
         agent,
-        agentModel,
-        agentModelRegistry,
+        modelSource,
         resilienceService,
         activeModelResponse,
         telemetryIdentity,
@@ -391,7 +390,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               chain,
               activeSession,
               memoryRuntime,
-              steeringService,
+              inbox,
               structured,
               validatedResume,
               recoveredToolCheckpoint,
@@ -425,15 +424,21 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         ),
       ).pipe(Stream.provideContext(interpreterServices))
     }),
-  ).pipe(Stream.withSpan("TenetKit.Agent.run", { attributes: { "tenetkit.agent.name": agent.name } }))
+  ).pipe(
+    Stream.withSpan("TenetKit.Agent.run", {
+      attributes: { "tenetkit.agent.name": agent.name, "tenetkit.agent.run_id": inbox.runId },
+    }),
+  )
 export const streamInternal: {
   <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
     options: RunOptions,
     structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
+    inbox: RunInbox,
   ): (agent: Agent<Tools, R>) => RunStream<Tools, StructuredOutputSchema, R>
   <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
     agent: Agent<Tools, R>,
     options: RunOptions,
     structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
+    inbox: RunInbox,
   ): RunStream<Tools, StructuredOutputSchema, R>
-} = Function.dual(3, streamInternalImpl)
+} = Function.dual(4, streamInternalImpl)

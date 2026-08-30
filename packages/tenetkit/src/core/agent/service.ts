@@ -32,8 +32,10 @@ import { HandoffLimitExceeded, HandoffRequirementsMissing, HandoffTargetMissing 
 import { HandoffProjectionInvalid } from "../policy/handoff-projection.js"
 import { HandoffRejected } from "../policy/handoff-runtime.js"
 import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "../turn/policy.js"
+import type { RunId as RunIdType } from "../durable/run-id.js"
+import type { PolicyInvalid } from "../turn/steering.js"
 
-import { streamInternal } from "./run.js"
+import { allocateRun, defaultObjectPrompt, type RunHandle } from "./lifecycle/run-handle.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
 import type { ObjectSchema } from "./loop/context.js"
 import type { ToolBatchResolution } from "./tools/checkpoint.js"
@@ -41,6 +43,9 @@ import type { ToolBatchResolution } from "./tools/checkpoint.js"
 export { close, withTools } from "./lifecycle/definition.js"
 export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
 export { streamToolCalls } from "./tool-calls.js"
+export { defaultObjectPrompt, type RunHandle }
+/** @experimental Allocate one scoped Run and its producer handle before consuming its event stream. */
+export const makeRun = allocateRun
 export type * from "./tool-calls.js"
 export const AgentTypeId = "tenetkit/core/Agent"
 /** @experimental Agent-owned metadata values. */
@@ -290,8 +295,8 @@ export interface RunOptions {
   readonly logicalOperationId?: string
   /** @experimental Authoritative invocation facts supplied by a durable host. */
   readonly invocation?: {
-    readonly runId: string
-    readonly rootRunId: string
+    readonly runId: RunIdType
+    readonly rootRunId: RunIdType
     readonly attempt: number
     readonly admittedAt?: string
   }
@@ -308,6 +313,8 @@ export interface RunOptions {
   readonly toolOutputMaxBytes?: number
   /** @experimental Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64. */
   readonly toolProgress?: ProgressOverflowPolicy
+  /** @experimental Finite process-local input policy for this Run. */
+  readonly steering?: import("../turn/steering.js").Options
   /** @experimental Context-window hint for optional compaction. */
   readonly compaction?: {
     readonly contextWindow?: number
@@ -330,9 +337,6 @@ export interface RunOptions {
 }
 
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
-type NoOutputSchema = ObjectSchema
-/** @experimental Default prompt for the terminal structured-output turn. */
-export const defaultObjectPrompt = "Return the final structured output for the task above."
 /** @experimental The error channel of `stream` and `generate`. */
 export type RunError =
   | DeliveryFailed
@@ -363,6 +367,7 @@ export type RunError =
   | HandoffRequirementsMissing
   | HandoffProjectionInvalid
   | HandoffRejected
+  | PolicyInvalid
 
 /** @experimental Result of a non-streaming run. */
 export interface Result {
@@ -408,21 +413,11 @@ export const stream: {
     options: O,
   ): Stream.Stream<Event, RunError, RunRequirements<Tools, R, O>>
 } = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  streamInternal(
-    agent,
-    options,
-    options.output === undefined
-      ? undefined
-      : {
-          schema: options.output.schema,
-          objectName: options.output.name ?? "output",
-          objectPrompt: options.output.prompt ?? defaultObjectPrompt,
-        },
-  ),
+  Stream.scoped(Stream.unwrap(makeRun(agent, options).pipe(Effect.map((run) => run.events)))),
 )
 
-const generateText = <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  Stream.runLast(streamInternal<Tools, R, NoOutputSchema>(agent, options, undefined)).pipe(
+const generateText = <R>(events: Stream.Stream<Event, RunError, R>) =>
+  Stream.runLast(events).pipe(
     Effect.flatMap(
       Option.match({
         onNone: () => Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
@@ -434,17 +429,9 @@ const generateText = <Tools extends Record<string, Tool.Any>, R>(agent: Agent<To
     ),
   )
 
-const generateObjectResult = <Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema>(
-  agent: Agent<Tools, R>,
-  options: RunOptions,
-  structured: {
-    readonly schema: S
-    readonly objectName: string
-    readonly objectPrompt: Prompt.RawInput
-  },
-) =>
+const generateObjectResult = <R>(events: Stream.Stream<Event, RunError, R>) =>
   Stream.runFold(
-    streamInternal(agent, options, structured),
+    events,
     () => ({ value: Option.none<unknown>(), completed: Option.none<Completed>() }),
     (acc, event) => {
       if (event._tag === "StructuredOutput") return { ...acc, value: Option.some(event.value) }
@@ -486,11 +473,11 @@ export const generate: {
     options: O,
   ): Effect.Effect<RunResult<O>, RunError, RunRequirements<Tools, R, O>>
 } = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  options.output === undefined
-    ? generateText(agent, options)
-    : generateObjectResult(agent, options, {
-        schema: options.output.schema,
-        objectName: options.output.name ?? "output",
-        objectPrompt: options.output.prompt ?? defaultObjectPrompt,
-      }),
+  Effect.scoped(
+    makeRun(agent, options).pipe(
+      Effect.flatMap((run) =>
+        options.output === undefined ? generateText(run.events) : generateObjectResult(run.events),
+      ),
+    ),
+  ),
 )

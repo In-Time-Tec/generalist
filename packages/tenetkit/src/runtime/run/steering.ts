@@ -1,4 +1,5 @@
 import { Pins } from "../../core/index.js"
+export { InboxFull, defaultCapacity, defaultMaxPendingBytes, promptBytes } from "../../core/turn/steering.js"
 import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 

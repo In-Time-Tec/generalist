@@ -1,17 +1,17 @@
-import { type Clock, Function, Schema, type Stream } from "effect"
+import { Function, Schema, type Stream } from "effect"
 import { AgentSuspended, type Event, type SteeringDrained, ToolNameCollision } from "../event.js"
 import { type Item, type Key, messageFromRecall } from "../../context/memory.js"
 import { inputDigest } from "../../durable/driver/contract.js"
 import type { Input } from "../../turn/steering.js"
 import { StopReason } from "../../turn/policy.js"
-import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
+import { Prompt, Tool } from "effect/unstable/ai"
 import type { RunError } from "../service.js"
 import type { ObjectSchema, SchemaServicesD, StaticToolServices } from "./context.js"
 
 export type RunStream<Tools extends Record<string, Tool.Any>, S extends ObjectSchema, R> = Stream.Stream<
   Event,
   RunError,
-  R | Clock.Clock | LanguageModel.LanguageModel | StaticToolServices<Tools> | SchemaServicesD<S>
+  R | StaticToolServices<Tools> | SchemaServicesD<S>
 >
 
 export const suspensionApplicationIdentity = (suspension: AgentSuspended): string =>

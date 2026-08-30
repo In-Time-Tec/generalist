@@ -11,8 +11,10 @@ import {
   close as Agent_close,
   withTools as Agent_withTools,
 } from "../service.js"
+import { allocateRun as Agent_allocateRun } from "../lifecycle/run-handle.js"
 export const Agent = {
   make: Agent_make,
+  makeRun: Agent_allocateRun,
   defaultObjectPrompt: Agent_defaultObjectPrompt,
   stream: Agent_stream,
   streamToolCalls: Agent_streamToolCalls,
@@ -24,6 +26,7 @@ export const Agent = {
 } satisfies AgentFacade
 export namespace Agent {
   export type make = typeof import("../service.js").make
+  export type makeRun = typeof import("../service.js").makeRun
   export type defaultObjectPrompt = typeof import("../service.js").defaultObjectPrompt
   export type stream = typeof import("../service.js").stream
   export type streamToolCalls = typeof import("../service.js").streamToolCalls
@@ -61,6 +64,11 @@ export namespace Agent {
   export type Resume = import("../service.js").Resume
   export type ResumeResolution = import("../service.js").ResumeResolution
   export type RunError = import("../service.js").RunError
+  export type RunHandle<
+    Tools extends Record<string, import("effect/unstable/ai").Tool.Any>,
+    R,
+    O extends import("../service.js").RunOptions,
+  > = import("../service.js").RunHandle<Tools, R, O>
   export type RunOptions = import("../service.js").RunOptions
   export type RunRequirements<
     Tools extends Record<string, import("effect/unstable/ai").Tool.Any>,

@@ -4603,6 +4603,114 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "keeps same-Session concurrent Run inboxes isolated", () => {
+    const prompts = { first: new Array<string>(), second: new Array<string>() }
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          const prompt = Json.stringify(options.prompt.content)
+          const run = prompt.includes("initial first") ? "first" : "second"
+          prompts[run].push(prompt)
+          return Stream.make(textDelta(`completed ${run}`))
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.scoped(
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "same-session-steering-agent" })
+          const first = yield* Agent.makeRun(agent, {
+            prompt: "initial first",
+            sessionId: "shared-conversation",
+          })
+          const second = yield* Agent.makeRun(agent, {
+            prompt: "initial second",
+            sessionId: "shared-conversation",
+          })
+          yield* first.steer({ prompt: "correction first only" })
+          yield* second.steer({ prompt: "correction second only" })
+
+          const [firstEvents, secondEvents] = yield* Effect.all(
+            [Stream.runCollect(first.events), Stream.runCollect(second.events)],
+            { concurrency: "unbounded" },
+          )
+
+          expect(first.runId).not.toBe(second.runId)
+          expect(prompts.first).toHaveLength(2)
+          expect(prompts.second).toHaveLength(2)
+          expect(prompts.first[1]).toContain("correction first only")
+          expect(prompts.first[1]).not.toContain("correction second only")
+          expect(prompts.second[1]).toContain("correction second only")
+          expect(prompts.second[1]).not.toContain("correction first only")
+          expect(firstEvents.filter((event) => event._tag === "Completed")).toHaveLength(1)
+          expect(secondEvents.filter((event) => event._tag === "Completed")).toHaveLength(1)
+          expect(yield* first.steer({ prompt: "late first" }).pipe(Effect.flip)).toBeInstanceOf(Steering.RunClosed)
+          expect(yield* second.steer({ prompt: "late second" }).pipe(Effect.flip)).toBeInstanceOf(Steering.RunClosed)
+        }),
+      ),
+    ] as const
+  })
+
+  ItLayer.make(it, "admits a backpressured input after an exact FIFO drain", () => {
+    let started: Deferred.Deferred<void> | undefined
+    let release: Deferred.Deferred<void> | undefined
+    let calls = 0
+    const prompts: Array<string> = []
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          calls += 1
+          prompts.push(Json.stringify(options.prompt.content))
+          if (calls === 1) {
+            if (started === undefined || release === undefined) return Stream.die("missing steering latch")
+            return Stream.fromEffect(Deferred.succeed(started, undefined)).pipe(
+              Stream.drain,
+              Stream.concat(Stream.fromEffect(Deferred.await(release)).pipe(Stream.drain)),
+              Stream.concat(Stream.make(toolCallPart("tool-call-backpressure", "echo", { text: "from model" }))),
+            )
+          }
+          return Stream.make(textDelta(`turn ${calls}`))
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.scoped(
+        Effect.gen(function* () {
+          started = yield* Deferred.make<void>()
+          release = yield* Deferred.make<void>()
+          const agent = Agent.make({ name: "backpressured-steering-agent", toolkit: Toolkit.make(echoTool) })
+          const run = yield* Agent.makeRun(agent, {
+            prompt: "start",
+            steering: { steering: { mode: "one-at-a-time", capacity: 1, onFull: "backpressure" } },
+          })
+          yield* run.steer({ prompt: "first correction" })
+          const events = yield* Stream.runCollect(run.events).pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(started)
+          const duplicateExit = yield* Stream.runDrain(run.events).pipe(Effect.exit)
+          expect(Exit.isFailure(duplicateExit)).toBe(true)
+          const blocked = yield* run
+            .steer({ prompt: "second correction" })
+            .pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Effect.yieldNow
+          expect(blocked.pollUnsafe()).toBeUndefined()
+
+          yield* Deferred.succeed(release, undefined)
+          const receipt = yield* Fiber.join(blocked)
+          const completed = yield* Fiber.join(events)
+
+          expect(receipt).toMatchObject({ runId: run.runId, queue: "steering", sequence: 1 })
+          expect(calls).toBe(3)
+          expect(prompts[1]).toContain("first correction")
+          expect(prompts[1]).not.toContain("second correction")
+          expect(prompts[2]).toContain("second correction")
+          expect(completed.filter((event) => event._tag === "Completed")).toHaveLength(1)
+        }),
+      ),
+    ] as const
+  })
+
   ItLayer.make(it, "drains steering after checkpointed tool results", () => {
     let calls = 0
     let secondMessages: ReadonlyArray<Prompt.Message> = []
@@ -4618,16 +4726,15 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.layerAutoApprove,
-        Steering.layer({ steering: { mode: "all" } }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const steering = yield* Steering.Steering
-        yield* steering.steer({ prompt: "steer one" })
-        yield* steering.steer({ prompt: "steer two" })
         const agent = Agent.make({ name: "steering-agent", toolkit: Toolkit.make(echoTool) })
+        const run = yield* Agent.makeRun(agent, { prompt: "use tool" })
+        yield* run.steer({ prompt: "steer one" })
+        yield* run.steer({ prompt: "steer two" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool" }))
+        const events = yield* Stream.runCollect(run.events)
 
         expect(calls).toBe(2)
         const secondPrompt = Json.stringify(secondMessages)
@@ -4649,13 +4756,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const drained = events.find((event) => event._tag === "SteeringDrained")
         expect(drained).toMatchObject({ _tag: "SteeringDrained", turn: 0, queue: "steering", count: 2 })
         expect(events.at(-1)?._tag).toBe("Completed")
-      }),
+      }).pipe(Effect.scoped),
     ] as const
   })
 
   ItLayer.make(it, "steering one-at-a-time leaves later steering queued", () => {
     let calls = 0
-    let secondPrompt = ""
+    const prompts: Array<string> = []
     return [
       Layer.mergeAll(
         modelLayer((options) => {
@@ -4663,27 +4770,29 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           if (calls === 1) {
             return Stream.make(toolCallPart("tool-call-steering-one", "echo", { text: "from model" }))
           }
-          secondPrompt = Json.stringify(options.prompt.content)
+          prompts.push(Json.stringify(options.prompt.content))
           return Stream.make(textDelta("after first steering"))
         }),
         echoExecutor,
         Approvals.layerAutoApprove,
-        Steering.layer({ steering: { mode: "one-at-a-time" } }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const steering = yield* Steering.Steering
-        yield* steering.steer({ prompt: "first steer" })
-        yield* steering.steer({ prompt: "second steer" })
         const agent = Agent.make({ name: "steering-one-agent", toolkit: Toolkit.make(echoTool) })
+        const run = yield* Agent.makeRun(agent, {
+          prompt: "use tool",
+          steering: { steering: { mode: "one-at-a-time" } },
+        })
+        yield* run.steer({ prompt: "first steer" })
+        yield* run.steer({ prompt: "second steer" })
 
-        yield* Stream.runDrain(Agent.stream(agent, { prompt: "use tool" }))
-        const remaining = yield* steering.takeSteering
+        yield* Stream.runDrain(run.events)
 
-        expect(secondPrompt).toContain("first steer")
-        expect(secondPrompt).not.toContain("second steer")
-        expect(remaining.map((input) => input.prompt)).toEqual(["second steer"])
-      }),
+        expect(calls).toBe(3)
+        expect(prompts[0]).toContain("first steer")
+        expect(prompts[0]).not.toContain("second steer")
+        expect(prompts[1]).toContain("second steer")
+      }).pipe(Effect.scoped),
     ] as const
   })
 
@@ -4699,16 +4808,15 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,
-        Steering.layer(),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const steering = yield* Steering.Steering
-        yield* steering.followUp({ prompt: "follow one" })
-        yield* steering.followUp({ prompt: "follow two" })
         const agent = Agent.make({ name: "follow-up-agent" })
+        const run = yield* Agent.makeRun(agent, { prompt: "start" })
+        yield* run.followUp({ prompt: "follow one" })
+        yield* run.followUp({ prompt: "follow two" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start" }))
+        const events = yield* Stream.runCollect(run.events)
 
         expect(calls).toBe(3)
         expect(prompts[1]).toContain("follow one")
@@ -4717,7 +4825,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(events.filter((event) => event._tag === "SteeringDrained" && event.queue === "followUp")).toHaveLength(2)
         const completed = events.at(-1)
         if (completed?._tag === "Completed") expect(completed.turns).toBe(3)
-      }),
+      }).pipe(Effect.scoped),
     ] as const
   })
 
@@ -4733,23 +4841,25 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,
-        Steering.layer({ followUp: { mode: "all" } }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const steering = yield* Steering.Steering
-        yield* steering.followUp({ prompt: "follow one" })
-        yield* steering.followUp({ prompt: "follow two" })
         const agent = Agent.make({ name: "follow-up-all-agent" })
+        const run = yield* Agent.makeRun(agent, {
+          prompt: "start",
+          steering: { followUp: { mode: "all" } },
+        })
+        yield* run.followUp({ prompt: "follow one" })
+        yield* run.followUp({ prompt: "follow two" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start" }))
+        const events = yield* Stream.runCollect(run.events)
 
         expect(calls).toBe(2)
         expect(secondPrompt).toContain("follow one")
         expect(secondPrompt).toContain("follow two")
         const completed = events.at(-1)
         if (completed?._tag === "Completed") expect(completed.turns).toBe(2)
-      }),
+      }).pipe(Effect.scoped),
     ] as const
   })
 
@@ -4766,17 +4876,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.layerAutoApprove,
-        Steering.layer(),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const steering = yield* Steering.Steering
-        yield* steering.followUp({ prompt: "follow before object" })
         const agent = Agent.make({ name: "follow-up-structured-agent" })
+        const run = yield* Agent.makeRun(agent, { prompt: "start", output: { schema: objectSchema } })
+        yield* run.followUp({ prompt: "follow before object" })
 
-        const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "start", output: { schema: objectSchema } }),
-        )
+        const events = yield* Stream.runCollect(run.events)
 
         expect(calls).toBe(2)
         expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(2)
@@ -4784,7 +4891,64 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         if (structured?._tag === "StructuredOutput") expect(structured.turn).toBe(2)
         const completed = events.at(-1)
         if (completed?._tag === "Completed") expect(completed.turns).toBe(3)
-      }),
+      }).pipe(Effect.scoped),
+    ] as const
+  })
+
+  ItLayer.make(it, "rechecks completion after structured output without exposing a nonterminal value", () => {
+    let structuredStarted: Deferred.Deferred<void> | undefined
+    let releaseStructured: Deferred.Deferred<void> | undefined
+    let streamCalls = 0
+    let structuredCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => {
+            streamCalls += 1
+            return Stream.make(textDelta(`turn ${streamCalls}`))
+          },
+          () =>
+            Effect.gen(function* () {
+              structuredCalls += 1
+              if (structuredCalls === 1) {
+                if (structuredStarted === undefined || releaseStructured === undefined) {
+                  return yield* Effect.die("missing structured steering latch")
+                }
+                yield* Deferred.succeed(structuredStarted, undefined)
+                yield* Deferred.await(releaseStructured)
+              }
+              return [{ type: "text" as const, text: '{"ok":true}' }]
+            }),
+        ),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.scoped(
+        Effect.gen(function* () {
+          structuredStarted = yield* Deferred.make<void>()
+          releaseStructured = yield* Deferred.make<void>()
+          const agent = Agent.make({ name: "structured-completion-steering-agent" })
+          const run = yield* Agent.makeRun(agent, { prompt: "start", output: { schema: objectSchema } })
+          const fiber = yield* Stream.runCollect(run.events).pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(structuredStarted)
+          yield* run.followUp({ prompt: "late follow-up" })
+          yield* Deferred.succeed(releaseStructured, undefined)
+
+          const events = yield* Fiber.join(fiber)
+
+          expect(streamCalls).toBe(2)
+          expect(structuredCalls).toBe(2)
+          expect(events.filter((event) => event._tag === "StructuredOutput")).toHaveLength(1)
+          expect(events.filter((event) => event._tag === "Completed")).toHaveLength(1)
+          expect(events.filter((event) => event._tag === "SteeringDrained" && event.queue === "followUp")).toHaveLength(
+            1,
+          )
+          expect(yield* run.followUp({ prompt: "after completion" }).pipe(Effect.flip)).toBeInstanceOf(
+            Steering.RunClosed,
+          )
+        }),
+      ),
     ] as const
   })
 
@@ -4799,25 +4963,24 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.layerAutoApprove,
-        Steering.layer(),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const currentStarted = yield* Deferred.make<void>()
         started = currentStarted
-        const steering = yield* Steering.Steering
-        yield* steering.steer({ prompt: "queued steering" })
-        yield* steering.followUp({ prompt: "queued follow-up" })
         const agent = Agent.make({ name: "interrupt-steering-agent" })
-        const run = Stream.runDrain(Agent.stream(agent, { prompt: "never finish" }))
-        const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
+        const run = yield* Agent.makeRun(agent, { prompt: "never finish" })
+        yield* run.steer({ prompt: "queued steering" })
+        yield* run.followUp({ prompt: "queued follow-up" })
+        const fiber = yield* Stream.runDrain(run.events).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(currentStarted)
         yield* Fiber.interrupt(fiber)
 
-        expect((yield* steering.takeSteering).map((input) => input.prompt)).toEqual(["queued steering"])
-        expect((yield* steering.takeFollowUp).map((input) => input.prompt)).toEqual(["queued follow-up"])
-      }),
+        const closed = yield* Effect.flip(run.steer({ prompt: "too late" }))
+        expect(closed).toBeInstanceOf(Steering.RunClosed)
+        expect(closed.runId).toBe(run.runId)
+      }).pipe(Effect.scoped),
     ] as const
   })
 

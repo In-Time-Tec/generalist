@@ -1,4 +1,4 @@
-import type { Clock, Effect, Option, Stream } from "effect"
+import type { Effect, Option, Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import type { AgentRunState } from "../run-state.js"
 import type { AgentError, Event } from "../event.js"
@@ -7,25 +7,27 @@ import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
 import type { HandoffRunState } from "../handoff/state.js"
 import type { RunError, ToolSchedulingPolicy } from "../service.js"
 import type { Middleware } from "../../model/middleware.js"
-import type { ModelSelection, ModelRegistry } from "../../model/registry.js"
 import type { ModelResilience } from "../../model/resilience.js"
 import type { EventPayload as DeliveryEventPayload } from "../../model/telemetry/events.js"
 import type { ModelProviderUsage } from "../../model/attempt/observation.js"
 import type { Request } from "../../tools/tool-executor.js"
 import type { Registry } from "../../tools/tool-registry.js"
 import type { ToolContext } from "../../tools/tool-context.js"
+import type { ModelSource } from "./model-source.js"
 
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
 
-/** @experimental Every service one model turn requires, including the send-time clock. */
-export type ModelTurnServices<T extends Record<string, Tool.Any>, R> =
+/** @internal Services required inside an already-selected active model scope. */
+export type ActiveModelServices<T extends Record<string, Tool.Any>, R> =
   | LanguageModel.LanguageModel
-  | Clock.Clock
   | R
   | StaticToolServices<T>
   | DriverInterpreter
+
+/** @experimental Services remaining after an ambient or registered active model is scoped. */
+export type ModelTurnServices<T extends Record<string, Tool.Any>, R> = R | StaticToolServices<T> | DriverInterpreter
 
 export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly agent: {
@@ -34,8 +36,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
     readonly model?: import("../../model/registry.js").ModelSelection
   }
   readonly handoffStateRef?: import("effect").Ref.Ref<HandoffRunState>
-  readonly agentModelRegistry: typeof ModelRegistry.Service | undefined
-  readonly agentModel: ModelSelection | undefined
+  readonly modelSource: ModelSource
   readonly resilienceService: Option.Option<typeof ModelResilience.Service>
   readonly activeModelResponse: Option.Option<
     typeof import("../../model/result/active-model-response.js").ActiveModelResponse.Service

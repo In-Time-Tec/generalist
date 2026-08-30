@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, ToolExecutor } from "tenetkit"
+import { Agent, Steering, ToolExecutor } from "tenetkit"
 import { Address, Cursor, Errors, RunExecutor, ExecutableResolver, Runtime, RunStore, RunTree } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
 import { transitionRunWait } from "tenetkit/runtime/driver/sql/store/statements"
@@ -610,6 +610,67 @@ describePostgres("PostgreSQL run store", () => {
           expect.objectContaining({ _tag: "SteeringAccepted", entryId: remaining.entryId, steeringSequence: 2 }),
           expect.objectContaining({ _tag: "SteeringDiscarded", entryIds: [remaining.entryId], reason: "failed" }),
         ])
+      }).pipe(scopedWith(postgresLayer(url))),
+    ),
+  )
+
+  it.live("bounds direct steering and preserves idempotent retries at capacity", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("steering-bound"),
+          idempotencyKey: "run",
+          prompt: "start",
+        })
+        const accepted = yield* Effect.forEach(
+          Array.from({ length: Steering.defaultCapacity }, (_, index) => index),
+          (index) =>
+            runtime.steer({ runId: receipt.runId, idempotencyKey: `entry:${index}`, prompt: `prompt ${index}` }),
+          { concurrency: "unbounded" },
+        )
+        expect(
+          yield* runtime.steer({
+            runId: receipt.runId,
+            idempotencyKey: `entry:${Steering.defaultCapacity - 1}`,
+            prompt: `prompt ${Steering.defaultCapacity - 1}`,
+          }),
+        ).toEqual(accepted.at(-1))
+        const full = yield* runtime
+          .steer({ runId: receipt.runId, idempotencyKey: "entry:full", prompt: "not admitted" })
+          .pipe(Effect.flip)
+        expect(full).toBeInstanceOf(Steering.InboxFull)
+        expect(full).toMatchObject({
+          runId: receipt.runId,
+          dimension: "entries",
+          limit: Steering.defaultCapacity,
+        })
+        expect(
+          (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
+            (event) => event._tag === "SteeringAccepted",
+          ),
+        ).toHaveLength(Steering.defaultCapacity)
+
+        const byteRun = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("steering-byte-bound"),
+          idempotencyKey: "run",
+          prompt: "start",
+        })
+        const byteFull = yield* runtime
+          .steer({
+            runId: byteRun.runId,
+            idempotencyKey: "too-large",
+            prompt: "x".repeat(Steering.defaultMaxPendingBytes),
+          })
+          .pipe(Effect.flip)
+        expect(byteFull).toBeInstanceOf(Steering.InboxFull)
+        expect(byteFull).toMatchObject({
+          runId: byteRun.runId,
+          dimension: "bytes",
+          limit: Steering.defaultMaxPendingBytes,
+        })
       }).pipe(scopedWith(postgresLayer(url))),
     ),
   )

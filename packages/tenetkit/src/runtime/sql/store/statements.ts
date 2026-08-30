@@ -41,6 +41,16 @@ const sqlBool = (sql: SqlClient.SqlClient, value: boolean): boolean | 0 | 1 =>
     orElse: () => (value ? 1 : 0),
   })
 
+export const lockRun = (runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql.onDialectOrElse({
+      pg: () => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`,
+      mysql: () => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`,
+      orElse: () => Effect.void,
+    })
+  })
+
 export const loadRun = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient

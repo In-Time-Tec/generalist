@@ -74,6 +74,7 @@ describe("tenetkit public surface", () => {
         "Prompt",
         "Response",
         "RunBudget",
+        "RunId",
         "Session",
         "SessionHistory",
         "SessionSync",

@@ -1,4 +1,4 @@
-import type { Clock, Effect, Option, Ref, Schema, Stream } from "effect"
+import type { Effect, Option, Ref, Schema, Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import type { AgentSuspended, Event, SteeringDrained } from "../event.js"
 import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
@@ -16,7 +16,7 @@ import type { Request } from "../../tools/tool-executor.js"
 import type { SuspensionCheckpoint, ToolCheckpoint } from "../suspension.js"
 import type { HandoffRunState } from "../handoff/state.js"
 import type { Entry, Service as SessionStore } from "../../context/session.js"
-import type { Steering, Input } from "../../turn/steering.js"
+import type { Input, RunInbox } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 
 export type ObjectSchema = Schema.Codec<Record<string, Schema.Top["Type"]>, object, never, never>
@@ -36,18 +36,12 @@ export type StaticToolServices<T extends Record<string, Tool.Any>> =
 /** @experimental Every service one run loop turn requires. */
 export type LoopServices<Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema> =
   | R
-  | Clock.Clock
-  | LanguageModel.LanguageModel
   | StaticToolServices<Tools>
   | SchemaServicesD<S>
   | DriverInterpreter
 
 /** @experimental Every service one model turn requires. */
-export type TurnServices<S extends ObjectSchema> =
-  | LanguageModel.LanguageModel
-  | Clock.Clock
-  | SchemaServicesD<S>
-  | DriverInterpreter
+export type TurnServices<R, S extends ObjectSchema> = R | SchemaServicesD<S> | DriverInterpreter
 
 export type ToolState = {
   readonly registry: Registry
@@ -61,7 +55,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly chain: ReadonlyArray<Middleware>
   readonly activeSession: Option.Option<SessionStore>
   readonly memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined
-  readonly steeringService: Option.Option<typeof Steering.Service>
+  readonly inbox: RunInbox
   readonly structured: StructuredRunConfig<S> | undefined
   readonly validatedResume: SuspensionCheckpoint | undefined
   readonly recoveredToolCheckpoint: ToolCheckpoint | undefined
@@ -84,8 +78,8 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     purpose: ModelCallPurpose,
   ) => (effect: Effect.Effect<A, E, R2>) => Effect.Effect<A, E, R2 | LanguageModel.LanguageModel>
   readonly withAgentModel: <A, E, R2>(
-    effect: Effect.Effect<A, E, R2>,
-  ) => Effect.Effect<A, E | LanguageModelNotRegistered, R2>
+    effect: Effect.Effect<A, E, R2 | LanguageModel.LanguageModel>,
+  ) => Effect.Effect<A, E | LanguageModelNotRegistered, R2 | R>
   readonly syncSession: (
     turn: number,
     transcript: Prompt.Prompt,

@@ -6,9 +6,13 @@ Core distinguishes **inline delegation** from **same-run handoff**.
 
 `AgentTool.asTool` and `Handoff.delegateTool` expose a child agent as a tool with its own child invocation identity. The parent run schedules a nested `generate`/`Registration.run` through `reserveChildBudget` / `refundChildBudget`. Effect services such as `SessionDirectory` remain inherited, but an exact active Session does not: omitted child `sessionId` means no Session, and explicitly requesting the active parent's ID fails before the child model call instead of waiting on the parent's lane. Child failures and suspension collapse to the tool's declared domain failure unless the host configures otherwise. This path does not switch the active agent for subsequent turns in the parent stream.
 
+Every inline child and fan-out member allocates a fresh process-local Run ID and inbox. Inherited Effect services never imply inbox identity, so parent, child, and sibling control inputs cannot be consumed across Run boundaries.
+
 ## Same-run handoff (`Handoff.supervisor`, `Handoff.sameRunHandoffTool`)
 
 Same-run handoff switches the **active agent** for subsequent turns inside one `Agent.stream` invocation. The run keeps one session identity, one `DriverInterpreter`, one tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event ordering.
+
+It also keeps the original Run ID and inbox. A producer holding the original `RunHandle` continues to steer the same Run after the active agent changes.
 
 `Handoff.supervisor` builds a supervisor agent plus:
 

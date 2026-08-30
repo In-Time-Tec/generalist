@@ -1,127 +1,120 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
-import { Steering } from "../../../src/core/index"
-import { ItLayer } from "../it-layer.js"
+import { Effect, Exit, Fiber, Scope } from "effect"
+import { Prompt } from "effect/unstable/ai"
+import { Agent, Steering } from "../../../src/core/index"
 
-const input = (prompt: string): Steering.Input => ({ prompt })
-const prompts = (inputs: ReadonlyArray<Steering.Input>) => inputs.map((item) => item.prompt)
+const agent = Agent.make({ name: "steering-test-agent" })
 
 describe("Steering", () => {
-  ItLayer.make(
-    it,
-    "defaults to all steering and one follow-up at a time",
-    () =>
-      [
-        Steering.layer(),
-        Effect.gen(function* () {
-          const steering = yield* Steering.Steering
-
-          yield* steering.steer(input("steer one"))
-          yield* steering.steer(input("steer two"))
-          yield* steering.followUp(input("follow one"))
-          yield* steering.followUp(input("follow two"))
-
-          expect(prompts(yield* steering.takeSteering)).toEqual(["steer one", "steer two"])
-          expect(yield* steering.takeSteering).toEqual([])
-          expect(prompts(yield* steering.takeFollowUp)).toEqual(["follow one"])
-          expect(prompts(yield* steering.takeFollowUp)).toEqual(["follow two"])
-          expect(yield* steering.takeFollowUp).toEqual([])
-        }),
-      ] as const,
-  )
-
-  ItLayer.make(
-    it,
-    "honors explicit queue modes",
-    () =>
-      [
-        Steering.layer({ steering: { mode: "one-at-a-time" }, followUp: { mode: "all" } }),
-        Effect.gen(function* () {
-          const steering = yield* Steering.Steering
-
-          yield* steering.steer(input("steer one"))
-          yield* steering.steer(input("steer two"))
-          yield* steering.followUp(input("follow one"))
-          yield* steering.followUp(input("follow two"))
-
-          expect(prompts(yield* steering.takeSteering)).toEqual(["steer one"])
-          expect(prompts(yield* steering.takeSteering)).toEqual(["steer two"])
-          expect(prompts(yield* steering.takeFollowUp)).toEqual(["follow one", "follow two"])
-          expect(yield* steering.takeFollowUp).toEqual([])
-        }),
-      ] as const,
-  )
-
-  ItLayer.make(
-    it,
-    "fails bounded queues with a typed overflow error",
-    () =>
-      [
-        Steering.layer({ steering: { capacity: 1, onFull: "fail" } }),
-        Effect.gen(function* () {
-          const steering = yield* Steering.Steering
-
-          yield* steering.steer(input("kept"))
-          const error = yield* Effect.flip(steering.steer(input("rejected")))
-
-          expect(error).toBeInstanceOf(Steering.SteeringQueueFull)
-          expect(error.queue).toBe("steering")
-          expect(prompts(yield* steering.takeSteering)).toEqual(["kept"])
-        }),
-      ] as const,
-  )
-
-  ItLayer.make(
-    it,
-    "supports explicit bounded dropping policies",
-    () =>
-      [
-        Steering.layer({
-          steering: { mode: "all", capacity: 2, onFull: "drop-newest" },
-          followUp: { mode: "all", capacity: 2, onFull: "drop-oldest" },
-        }),
-        Effect.gen(function* () {
-          const steering = yield* Steering.Steering
-
-          yield* steering.steer(input("oldest"))
-          yield* steering.steer(input("kept"))
-          yield* steering.steer(input("dropped newest"))
-          yield* steering.followUp(input("dropped oldest"))
-          yield* steering.followUp(input("kept one"))
-          yield* steering.followUp(input("kept two"))
-
-          expect(prompts(yield* steering.takeSteering)).toEqual(["oldest", "kept"])
-          expect(prompts(yield* steering.takeFollowUp)).toEqual(["kept one", "kept two"])
-        }),
-      ] as const,
-  )
-
-  ItLayer.make(it, "layerTest provides an exact implementation", () => {
-    const recorded: Array<string> = []
-    return [
-      Steering.layerTest({
-        steer: (item) =>
-          Schema.decodeUnknownEffect(Schema.String)(item.prompt).pipe(
-            Effect.tap((prompt) => Effect.sync(() => recorded.push(prompt))),
-            Effect.orDie,
-          ),
-        followUp: (item) =>
-          Schema.decodeUnknownEffect(Schema.String)(item.prompt).pipe(
-            Effect.tap((prompt) => Effect.sync(() => recorded.push(prompt))),
-            Effect.orDie,
-          ),
-        takeSteering: Effect.succeed([input("test steer")]),
-        takeFollowUp: Effect.succeed([]),
-      }),
+  it.effect("binds finite producer-only inboxes to distinct Runs", () =>
+    Effect.scoped(
       Effect.gen(function* () {
-        const steering = yield* Steering.Steering
+        const first = yield* Agent.makeRun(agent, { prompt: "first", sessionId: "shared-session" })
+        const second = yield* Agent.makeRun(agent, { prompt: "second", sessionId: "shared-session" })
 
-        yield* steering.steer(input("steer"))
-        yield* steering.followUp(input("follow"))
-        expect(recorded).toEqual(["steer", "follow"])
-        expect(prompts(yield* steering.takeSteering)).toEqual(["test steer"])
-        expect(yield* steering.takeFollowUp).toEqual([])
+        expect(first.runId).not.toBe(second.runId)
+        const firstReceipt = yield* first.steer({ prompt: "first correction" })
+        const secondReceipt = yield* second.steer({ prompt: "second correction" })
+        expect(firstReceipt).toMatchObject({ runId: first.runId, queue: "steering", sequence: 0 })
+        expect(secondReceipt).toMatchObject({ runId: second.runId, queue: "steering", sequence: 0 })
       }),
-    ] as const
-  })
+    ),
+  )
+
+  it.effect("fails fast at the finite entry bound without partial admission", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const run = yield* Agent.makeRun(agent, {
+          prompt: "start",
+          steering: { steering: { capacity: 1 } },
+        })
+        yield* run.steer({ prompt: "kept" })
+        const full = yield* Effect.flip(run.steer({ prompt: "rejected" }))
+
+        expect(full).toBeInstanceOf(Steering.InboxFull)
+        expect(full).toMatchObject({
+          runId: run.runId,
+          queue: "steering",
+          dimension: "entries",
+          limit: 1,
+        })
+      }),
+    ),
+  )
+
+  it.effect("enforces one aggregate encoded-prompt byte bound", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bytes = Steering.promptBytes(Prompt.make("kept"))
+        const run = yield* Agent.makeRun(agent, {
+          prompt: "start",
+          steering: { maxPendingBytes: bytes },
+        })
+        yield* run.steer({ prompt: "kept" })
+        const full = yield* Effect.flip(run.followUp({ prompt: "rejected" }))
+
+        expect(full).toBeInstanceOf(Steering.InboxFull)
+        expect(full).toMatchObject({
+          runId: run.runId,
+          queue: "followUp",
+          dimension: "bytes",
+          limit: bytes,
+        })
+      }),
+    ),
+  )
+
+  it.effect("releases a backpressured producer with RunClosed when the Run scope closes", () =>
+    Effect.gen(function* () {
+      const scope = yield* Scope.make()
+      const run = yield* Agent.makeRun(agent, {
+        prompt: "start",
+        steering: { steering: { capacity: 1, onFull: "backpressure" } },
+      }).pipe(Scope.provide(scope))
+      yield* run.steer({ prompt: "kept" })
+      const blocked = yield* run.steer({ prompt: "blocked" }).pipe(Effect.forkChild({ startImmediately: true }))
+      yield* Effect.yieldNow
+      expect(blocked.pollUnsafe()).toBeUndefined()
+
+      yield* Scope.close(scope, Exit.void)
+      const closed = yield* Fiber.join(blocked).pipe(Effect.flip)
+      expect(closed).toBeInstanceOf(Steering.RunClosed)
+      expect(closed.runId).toBe(run.runId)
+    }),
+  )
+
+  it.effect("closes admission when an allocated Run scope exits before execution", () =>
+    Effect.gen(function* () {
+      const scope = yield* Scope.make()
+      const run = yield* Agent.makeRun(agent, { prompt: "never started" }).pipe(Scope.provide(scope))
+      yield* run.followUp({ prompt: "queued" })
+      yield* Scope.close(scope, Exit.void)
+
+      const closed = yield* Effect.flip(run.followUp({ prompt: "too late" }))
+      expect(closed).toBeInstanceOf(Steering.RunClosed)
+      expect(closed.runId).toBe(run.runId)
+    }),
+  )
+
+  it.effect("rejects non-positive and non-integer policies before execution", () =>
+    Effect.gen(function* () {
+      const invalidCapacity = yield* Effect.scoped(
+        Agent.makeRun(agent, {
+          prompt: "never starts",
+          steering: { steering: { capacity: 0 } },
+        }).pipe(Effect.flip),
+      )
+      expect(invalidCapacity).toBeInstanceOf(Steering.PolicyInvalid)
+      expect(invalidCapacity).toMatchObject({ field: "steering.capacity", value: "0" })
+
+      const invalidBytes = yield* Effect.scoped(
+        Agent.makeRun(agent, {
+          prompt: "never starts",
+          steering: { maxPendingBytes: 1.5 },
+        }).pipe(Effect.flip),
+      )
+      expect(invalidBytes).toBeInstanceOf(Steering.PolicyInvalid)
+      expect(invalidBytes).toMatchObject({ field: "maxPendingBytes", value: "1.5" })
+    }),
+  )
 })

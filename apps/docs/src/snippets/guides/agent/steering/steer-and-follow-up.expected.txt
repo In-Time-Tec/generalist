@@ -1,2 +1,2 @@
 turns: 3
-The api deploy is healthy, in one sentence as steered. Follow-up: the worker deploy is healthy too.
+Follow-up: the worker deploy is healthy too.

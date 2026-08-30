@@ -1,5 +1,5 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Steering, Tool, Toolkit } from "tenetkit"
+import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "tenetkit"
 
 const statusTool = Tool.make("check_status", {
   description: "Check the deploy status of a service",
@@ -17,6 +17,11 @@ const agent = Agent.make({
 
 let calls = 0
 
+const usage = Response.Usage.make({
+  inputTokens: { total: 1, uncached: 1 },
+  outputTokens: { total: 1, text: 1 },
+})
+
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
@@ -31,13 +36,17 @@ const modelLayer = Layer.effect(
             params: { service: "api" },
             providerExecuted: false,
           }),
+          Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
         )
       }
       const promptText = JSON.stringify(options.prompt.content)
       const delta = promptText.includes("worker service")
         ? "Follow-up: the worker deploy is healthy too."
         : "The api deploy is healthy, in one sentence as steered. "
-      return Stream.make(Response.makePart("text-delta", { id: "assistant", delta }))
+      return Stream.make(
+        Response.makePart("text-delta", { id: "assistant", delta }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+      )
     },
   }),
 )
@@ -47,17 +56,21 @@ const layers = Layer.mergeAll(
   toolkit.toLayer({ check_status: ({ service }) => Effect.succeed(`${service} is healthy`) }),
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
-  Steering.layer(),
 )
 
-const program = Effect.gen(function* () {
-  const steering = yield* Steering.Steering
-  yield* steering.steer({ prompt: "Keep the answer to one sentence." })
-  yield* steering.followUp({ prompt: "Also check the worker service." })
-  const result = yield* Agent.generate(agent, { prompt: "Is the api deploy healthy?" })
-  yield* Console.log(`turns: ${result.turns}`)
-  yield* Console.log(result.text)
-})
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const run = yield* Agent.makeRun(agent, { prompt: "Is the api deploy healthy?" })
+    yield* run.steer({ prompt: "Keep the answer to one sentence." })
+    yield* run.followUp({ prompt: "Also check the worker service." })
+    const last = yield* Stream.runLast(run.events)
+    if (Option.isNone(last) || last.value._tag !== "Completed") {
+      return yield* Effect.die("expected the Run to complete")
+    }
+    yield* Console.log(`turns: ${last.value.turns}`)
+    yield* Console.log(last.value.text)
+  }),
+)
 
 const runtime = ManagedRuntime.make(layers)
 await runtime.runPromise(program)

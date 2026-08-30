@@ -1,6 +1,7 @@
 import { Effect, Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { SqlClient } from "effect/unstable/sql"
+import { Steering } from "../../../../core/index.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../../../errors.js"
 import { isTerminal, type RunStatus } from "../../../run.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../../../run/store.js"
@@ -12,7 +13,7 @@ import {
 } from "../../../run/steering.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { ExecutionResult } from "../../../execution/state.js"
-import { appendEvent, loadRun } from "../statements.js"
+import { appendEvent, loadRun, lockRun } from "../statements.js"
 import { decodeJson, encodeJson } from "../../codec/codecs.js"
 import type { EventHub } from "../../subscribers.js"
 
@@ -36,7 +37,7 @@ const decode = (row: SteeringRow): SteeringEntry => ({
 
 type AdmitSteeringEffect = Effect.Effect<
   SteeringReceipt,
-  RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | SqlError,
+  RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | Steering.InboxFull | SqlError,
   SqlClient.SqlClient
 >
 
@@ -46,6 +47,7 @@ export const admitSteering: {
 } = Function.dual(2, (hub: EventHub, input: AdmitSteeringInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    yield* lockRun(input.runId)
     const run = yield* loadRun(input.runId)
     if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
     const existing = yield* sql<SteeringRow>`
@@ -65,6 +67,20 @@ export const admitSteering: {
       else if (run.pendingOutcome?._tag === "Completed") status = "succeeded"
       return yield* RunTerminal.make({ runId: run.runId, status })
     }
+    const pending = yield* sql<Pick<SteeringRow, "prompt_json">>`
+      SELECT prompt_json FROM tenetkit_run_steering
+      WHERE run_id = ${input.runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
+    `
+    if (pending.length >= Steering.defaultCapacity) {
+      return yield* Steering.InboxFull.make({
+        runId: run.runId,
+        queue: "steering",
+        dimension: "entries",
+        limit: Steering.defaultCapacity,
+      })
+    }
+    const encoder = new TextEncoder()
+    const pendingBytes = pending.reduce((total, row) => total + encoder.encode(row.prompt_json).byteLength, 0)
     const rows = yield* sql<{ next_sequence: number | string }>`
       SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence
       FROM tenetkit_run_steering WHERE run_id = ${input.runId}
@@ -72,6 +88,14 @@ export const admitSteering: {
     const sequence = Number(rows[0]?.next_sequence ?? 0)
     const entryId = `${input.runId}:steering:${sequence}`
     const encoded = encodeJson(Prompt.Prompt, input.prompt)
+    if (pendingBytes + encoder.encode(encoded).byteLength > Steering.defaultMaxPendingBytes) {
+      return yield* Steering.InboxFull.make({
+        runId: run.runId,
+        queue: "steering",
+        dimension: "bytes",
+        limit: Steering.defaultMaxPendingBytes,
+      })
+    }
     yield* sql`
       INSERT INTO tenetkit_run_steering (
         entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id, discarded_reason

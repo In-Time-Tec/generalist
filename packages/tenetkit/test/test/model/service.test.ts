@@ -11,7 +11,6 @@ import {
   Prompt,
   Response,
   Session,
-  Steering,
   Tool,
   Toolkit,
 } from "tenetkit"
@@ -479,17 +478,16 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
           fixture.layer,
           fixture.registryLayer,
           echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }),
-          Steering.layer(),
         ),
       )
       const events = yield* Effect.gen(function* () {
-        const steering = yield* Steering.Steering
-        yield* steering.steer({ prompt: "steer one" })
-        yield* steering.steer({ prompt: "steer two" })
-        return yield* Agent.stream(Agent.make({ name: "steered", toolkit: echoToolkit }), {
+        const run = yield* Agent.makeRun(Agent.make({ name: "steered", toolkit: echoToolkit }), {
           prompt: "start",
-        }).pipe(Stream.runCollect)
-      }).pipe(Effect.provide(services))
+        })
+        yield* run.steer({ prompt: "steer one" })
+        yield* run.steer({ prompt: "steer two" })
+        return yield* Stream.runCollect(run.events)
+      }).pipe(Effect.provide(services), Effect.scoped)
       const requests = yield* fixture.requests
 
       expect(events).toContainEqual(expect.objectContaining({ _tag: "SteeringDrained", queue: "steering", count: 2 }))

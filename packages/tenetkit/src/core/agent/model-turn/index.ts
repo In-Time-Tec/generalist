@@ -10,7 +10,7 @@ import { classifyFailure as classifyModelFailure } from "../../model/registry.js
 import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../../model/telemetry/events.js"
 import { withWireCache } from "../../model/prompt-cache.js"
 import type { AnyToolCall, ToolCallIdState } from "../tools/result.js"
-import type { ModelTurnServices, RuntimeContext } from "./context.js"
+import type { ActiveModelServices, ModelTurnServices, RuntimeContext } from "./context.js"
 import {
   InvalidToolCallParameters,
   isInvalidToolCallParameters,
@@ -30,13 +30,13 @@ import { make as makeActiveTurn } from "./active.js"
 import { make as makeRetryableOverflow } from "./retryable-overflow.js"
 import { validateContext } from "../../context/session.js"
 import { scheduleBatch, type ToolExecution } from "./tool-batch.js"
+import { ModelSource } from "./model-source.js"
 
 export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
     handoffStateRef,
-    agentModel,
-    agentModelRegistry,
+    modelSource,
     resilienceService,
     activeModelResponse,
     telemetryIdentity,
@@ -53,6 +53,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     errorMessage,
     toolCallEvents,
   } = context
+  const agentModel = modelSource._tag === "Registry" ? modelSource.selection : undefined
   const activeTurnInput: Parameters<typeof makeActiveTurn>[0] = {
     agent,
     agentModel,
@@ -68,10 +69,10 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
           Effect.provideService(CurrentPurpose, purpose),
         ),
       )
-  const withAgentModel = <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
-    agentModelRegistry === undefined || agentModel === undefined
-      ? effect
-      : agentModelRegistry.withModel(agentModel, effect)
+  const withAgentModel = <A, E, R2>(effect: Effect.Effect<A, E, R2 | LanguageModel.LanguageModel>) =>
+    modelSource._tag === "Ambient"
+      ? effect.pipe(Effect.provideService(LanguageModel.LanguageModel, modelSource.model))
+      : modelSource.registry.withModel(modelSource.selection, effect)
   const partEvents = (
     turn: number,
     part: Response.StreamPart<Record<string, Tool.Any>>,
@@ -168,7 +169,13 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
       ),
     )
   }
-  const modelTurn = (turn: number, prompt: Prompt.RawInput, registry: Registry, overrides?: TurnOverrides) =>
+
+  const modelTurn = (
+    turn: number,
+    prompt: Prompt.RawInput,
+    registry: Registry,
+    overrides?: TurnOverrides,
+  ): Stream.Stream<Event, RunError, ModelTurnServices<T, R>> =>
     Stream.unwrap(
       Effect.gen(function* () {
         const agentName = yield* activeAgentName()
@@ -176,15 +183,9 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
         const toolScheduling = yield* activeToolScheduling()
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
         const parts = modelTurnBody(turn, prompt, activeRegistry, overrides, agentName, toolScheduling)
-        if (overrides?.model !== undefined) return parts.pipe(Stream.provide(overrides.model))
-        if (selection === undefined || agentModelRegistry === undefined) return parts
-        return agentModelRegistry
-          .stream(selection, parts)
-          .pipe(
-            Stream.catchTag("tenetkit/core/LanguageModelNotRegistered", (error) =>
-              Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
-            ),
-          )
+        return ModelSource.scope(modelSource, parts, selection, overrides?.model, (error) =>
+          AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error }),
+        )
       }),
     )
   const modelTurnBody = (
@@ -194,13 +195,13 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     overrides: TurnOverrides | undefined,
     agentName: string,
     toolScheduling: ToolSchedulingPolicy,
-  ): Stream.Stream<Event, RunError, ModelTurnServices<T, R>> => {
+  ): Stream.Stream<Event, RunError, ActiveModelServices<T, R>> => {
     const instrumentTurnStream = <A, E>(
-      stream: Stream.Stream<A, E, ModelTurnServices<Record<string, Tool.Any>, never>>,
+      stream: Stream.Stream<A, E, ActiveModelServices<Record<string, Tool.Any>, never>>,
     ): Stream.Stream<
       A,
       E | InvalidToolCallParameters | ToolJsonSchemaCompilerMissing | AiError.AiError,
-      ModelTurnServices<Record<string, Tool.Any>, never>
+      ActiveModelServices<Record<string, Tool.Any>, never>
     > =>
       Stream.unwrap(
         LanguageModel.LanguageModel.pipe(
@@ -232,7 +233,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
       compactOverflow = false,
       overflowCause?: Cause.Cause<RunError>,
       operationKey?: string,
-    ): Stream.Stream<AttemptEvent, RunError, ModelTurnServices<Record<string, Tool.Any>, never>> => {
+    ): Stream.Stream<AttemptEvent, RunError, ActiveModelServices<Record<string, Tool.Any>, never>> => {
       let emitted = false
       let classifyFailure = classifyOtherFailure
       const responseInput: Parameters<typeof attemptResponse>[0] = {
@@ -418,7 +419,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     })
     const parts = Stream.unwrap(
       applyPromptChain(chain, Prompt.make(prompt), { agentName, turn }).pipe(
-        Effect.map((transformedPrompt): Stream.Stream<Event, RunError, ModelTurnServices<T, R>> => {
+        Effect.map((transformedPrompt): Stream.Stream<Event, RunError, ActiveModelServices<T, R>> => {
           let nextToolCallIndex = 0
           const calls = new Array<AnyToolCall>()
           const executions = new Array<ToolExecution>()
@@ -426,7 +427,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
           const accepted: Stream.Stream<
             Event,
             RunError,
-            ModelTurnServices<Record<string, Tool.Any>, never>
+            ActiveModelServices<Record<string, Tool.Any>, never>
           > = instrumentTurnStream(driverAttempt(transformedPrompt, true)).pipe(
             Stream.filter((event): event is Extract<AttemptEvent, { readonly _tag: "Part" }> => event._tag === "Part"),
             Stream.map(({ part, messages, modelCallId, modelAttemptId, attempt }) => {
@@ -460,7 +461,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
               })
             }),
           )
-          const tools: Stream.Stream<Event, RunError, R | ModelTurnServices<T, never>> = Stream.suspend(() => {
+          const tools: Stream.Stream<Event, RunError, R | ActiveModelServices<T, never>> = Stream.suspend(() => {
             Object.freeze(calls)
             Object.freeze(toolCallBatch)
             if (calls.length === 0) return Stream.empty
@@ -476,7 +477,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                 toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
             })
           })
-          return Stream.fromIterable<Stream.Stream<Event, RunError, ModelTurnServices<T, R>>>([
+          return Stream.fromIterable<Stream.Stream<Event, RunError, ActiveModelServices<T, R>>>([
             accepted,
             committed,
             tools,

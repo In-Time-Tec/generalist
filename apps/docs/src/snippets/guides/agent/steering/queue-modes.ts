@@ -1,14 +1,20 @@
-import { Console, Effect, ManagedRuntime } from "effect"
-import { Steering } from "tenetkit"
+import { Console, Effect, Schema } from "effect"
+import { Agent, Steering } from "tenetkit"
 
-const program = Effect.gen(function* () {
-  const steering = yield* Steering.Steering
-  yield* steering.steer({ prompt: "First correction." })
-  yield* steering.steer({ prompt: "Second correction." })
-  const firstDrain = yield* steering.takeSteering
-  const secondDrain = yield* steering.takeSteering
-  yield* Console.log(`first drain: ${firstDrain.length}, second drain: ${secondDrain.length}`)
-})
+const agent = Agent.make({ name: "bounded-inbox" })
 
-const runtime = ManagedRuntime.make(Steering.layer({ steering: { mode: "one-at-a-time" }, followUp: { mode: "all" } }))
-await runtime.runPromise(program)
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const run = yield* Agent.makeRun(agent, {
+      prompt: "start",
+      steering: { steering: { capacity: 1 } },
+    })
+    const first = yield* run.steer({ prompt: "First correction." })
+    const rejected = yield* run.steer({ prompt: "Second correction." }).pipe(Effect.flip)
+    const outcome = Schema.is(Steering.InboxFull)(rejected) ? `${rejected.dimension} full` : "closed"
+
+    yield* Console.log(`first sequence: ${first.sequence}, second: ${outcome}`)
+  }),
+)
+
+await Effect.runPromise(program)

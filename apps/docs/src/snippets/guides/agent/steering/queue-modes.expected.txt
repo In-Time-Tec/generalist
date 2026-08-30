@@ -1,1 +1,1 @@
-first drain: 1, second drain: 1
+first sequence: 0, second: entries full

@@ -4,7 +4,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../errors.js"
-import { appendEvent, loadRun, loadRunWaits, nowIso } from "./statements.js"
+import { appendEvent, loadRun, loadRunWaits, lockRun, nowIso } from "./statements.js"
 import type { DecodedRun } from "../codec/rows.js"
 import { checkpointRef } from "../../executable/manifest.js"
 import { encodeExecutableRef, encodeJson } from "../codec/codecs.js"
@@ -16,17 +16,6 @@ import { acquireSessionWriteClaim, requireSessionWriteClaim, revokeSessionWriteC
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
-
-/** Lock ordering authority: every combined transaction acquires Run before Session. */
-const lockRun = (runId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    yield* sql.onDialectOrElse({
-      pg: () => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`,
-      mysql: () => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`,
-      orElse: () => Effect.void,
-    })
-  })
 
 export const requireExecutionClaim = (input: ExecutionClaim) =>
   Effect.gen(function* () {

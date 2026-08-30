@@ -12,7 +12,7 @@ import {
   type AttemptEvent,
 } from "../../model/operation.js"
 import type { RunError } from "../service.js"
-import type { ModelTurnServices } from "./context.js"
+import type { ActiveModelServices } from "./context.js"
 import { promptDigest } from "../prompt-identity.js"
 
 export type AttemptBody = (
@@ -21,7 +21,7 @@ export type AttemptBody = (
   compactOverflow?: boolean,
   overflowCause?: Cause.Cause<RunError>,
   operationKey?: string,
-) => Stream.Stream<AttemptEvent, RunError, ModelTurnServices<Record<string, Tool.Any>, never>>
+) => Stream.Stream<AttemptEvent, RunError, ActiveModelServices<Record<string, Tool.Any>, never>>
 
 type OperationDigestInput = typeof Schema.Unknown.Type
 

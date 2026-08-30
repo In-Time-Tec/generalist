@@ -1,9 +1,9 @@
 import { Effect, Schema, Stream } from "effect"
-import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
+import { Prompt, Tool } from "effect/unstable/ai"
 import type { AgentError, Event } from "../event.js"
 import type { PendingToolResult } from "../tools/result.js"
 import { TurnPolicyError, type Decision, type TurnOverrides } from "../../turn/policy.js"
-import type { Input } from "../../turn/steering.js"
+import type { Completion, Input } from "../../turn/steering.js"
 import type { ObjectSchema, RunLoopContext, SchemaServicesD } from "./context.js"
 import { checkpoint, setHandoffState, setToolBatch } from "../../durable/driver/run.js"
 import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
@@ -14,9 +14,23 @@ import { HandoffRequirementsMissing, takePendingContinuation } from "../handoff/
 import type { RunError } from "../service.js"
 
 interface AfterTurnResult<StructuredOutputSchema extends ObjectSchema> {
-  readonly events: Stream.Stream<Event, RunError, LanguageModel.LanguageModel | SchemaServicesD<StructuredOutputSchema>>
+  readonly events: Stream.Stream<Event, RunError, SchemaServicesD<StructuredOutputSchema>>
   readonly next?: { readonly prompt: Prompt.RawInput; readonly overrides?: TurnOverrides }
   readonly structuredTurn?: number
+}
+
+const takeTerminalCompletion = (
+  structured: boolean,
+  takeCompletion: () => Effect.Effect<Completion>,
+  takeFollowUp: () => Effect.Effect<ReadonlyArray<Input>>,
+): Effect.Effect<Completion> => {
+  if (!structured) return takeCompletion()
+  return takeFollowUp().pipe(
+    Effect.map(
+      (inputs): Completion =>
+        inputs.length === 0 ? { _tag: "Closed" } : { _tag: "Pending", queue: "followUp", inputs },
+    ),
+  )
 }
 
 const withoutPending = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(input: {
@@ -24,16 +38,16 @@ const withoutPending = <Tools extends Record<string, Tool.Any>, R, StructuredOut
   readonly turn: number
   readonly transcript: Prompt.Prompt
   readonly completed: Event
-  readonly followUp: ReadonlyArray<Input>
+  readonly completion?: Completion
   readonly promptFromSteeringInputs: (inputs: ReadonlyArray<Input>) => Prompt.Prompt
 }): AfterTurnResult<StructuredOutputSchema> => {
-  if (input.followUp.length > 0) {
+  if (input.completion?._tag === "Pending") {
     return {
       events: Stream.fromIterable<Event>([
         input.completed,
-        input.context.steeringDrainedEvent(input.turn, "followUp", input.followUp),
+        input.context.steeringDrainedEvent(input.turn, input.completion.queue, input.completion.inputs),
       ]),
-      next: { prompt: input.promptFromSteeringInputs(input.followUp) },
+      next: { prompt: input.promptFromSteeringInputs(input.completion.inputs) },
     }
   }
   if (input.context.structured !== undefined) {
@@ -69,6 +83,7 @@ export const afterTurnFor = <
   }) => Effect.Effect<Decision, TurnPolicyError | HandoffRequirementsMissing, R>
   readonly takeFollowUp: () => Effect.Effect<ReadonlyArray<Input>>
   readonly takeSteering: () => Effect.Effect<ReadonlyArray<Input>>
+  readonly takeCompletion: () => Effect.Effect<Completion>
   readonly promptFromSteeringInputs: (inputs: ReadonlyArray<Input>) => Prompt.Prompt
 }) => {
   const {
@@ -102,13 +117,17 @@ export const afterTurnFor = <
       if (driverState.toolBatch !== undefined) yield* setToolBatch(undefined)
       const completed: Event = turnCompletedEvent(state, turn, transcript)
       if (pending.length === 0) {
-        const followUp = yield* input.takeFollowUp()
+        const completion = yield* takeTerminalCompletion(
+          input.context.structured !== undefined,
+          input.takeCompletion,
+          input.takeFollowUp,
+        )
         return withoutPending({
           context: input.context,
           turn,
           transcript,
           completed,
-          followUp,
+          completion,
           promptFromSteeringInputs: input.promptFromSteeringInputs,
         })
       }

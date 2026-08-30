@@ -34,6 +34,7 @@ import {
   make as makeProgramManifest,
 } from "./durable/manifest/program-manifest.js"
 import { digest } from "./durable/canonical-json.js"
+import { RunId } from "./durable/run-id.js"
 import { DurableDriver } from "./durable/public/driver.js"
 import { RunBudget } from "./durable/public/run-budget.js"
 import { Agent } from "./agent/public/service.js"
@@ -129,6 +130,9 @@ import {
   make as makeTestCodeExecutor,
   testIdentity as testSandboxIdentity,
 } from "./program/code-executor.js"
+
+/** @experimental Stable identity of one Agent execution. */
+export { RunId }
 
 export const Pins = {
   AgentPin,

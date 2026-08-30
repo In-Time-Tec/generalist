@@ -1,4 +1,4 @@
-import { Clock, Effect, Function, Option, Ref, Schema } from "effect"
+import { Effect, Function, Option, Ref, Schema } from "effect"
 import { LanguageModel, Tokenizer, Tool } from "effect/unstable/ai"
 import { AgentError, type Event as AgentEvent } from "../event.js"
 import { Approvals } from "../../policy/approvals.js"
@@ -18,7 +18,6 @@ import {
 } from "../../model/telemetry/events.js"
 import { Permissions, RuleStore } from "../../policy/permissions.js"
 import { restoreCheckpointTelemetry } from "../session/history.js"
-import { Steering } from "../../turn/steering.js"
 import { ToolAuthorizerService, make as makeToolAuthorizer } from "../../tools/tool-authorization.js"
 import { ToolExecutor } from "../../tools/tool-executor.js"
 import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../../durable/loop-driver-state.js"
@@ -28,6 +27,7 @@ import { recoverToolCheckpoint } from "../tools/checkpoint-recovery.js"
 import { SetupOptions } from "./options.js"
 import { setupChat, setupSession } from "./session.js"
 import { setupPromptContext } from "./resume.js"
+import type { ModelSource } from "../model-turn/model-source.js"
 const { errorMessage } = SetupHelpers
 
 /** @internal Resolve the same configured or default authorization policy for every Agent tool execution surface. */
@@ -142,7 +142,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
           )
     let modelCallOrdinal = restoredModelCallOrdinal ?? options.modelCallOrdinalStart ?? 0
     const modelCallUsage = new Map<string, ModelProviderUsage | undefined>()
-    const clock = yield* Clock.Clock
+    const clock = yield* Effect.clockWith((currentClock) => Effect.succeed(currentClock))
     const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service => {
       const baseInstrumentation = {
         clock,
@@ -174,25 +174,37 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       return instrument(model, instrumentation)
     }
     const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
-    const steeringService = yield* Effect.serviceOption(Steering)
     const memoryService = yield* Effect.serviceOption(Memory)
     const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
     const authorizer = yield* setupToolAuthorizer(agent)
     const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
-    const agentModel = agent.model
-    const agentModelRegistry =
-      agentModel === undefined
-        ? undefined
-        : yield* Option.match(modelRegistryService, {
-            onNone: () =>
-              Effect.fail(
-                AgentError.make({
-                  message: "Agent.model requires ModelRegistry in context",
-                  turn: 0,
+    const modelSource: ModelSource =
+      agent.model === undefined
+        ? {
+            _tag: "Ambient",
+            model: yield* Effect.serviceOption(LanguageModel.LanguageModel).pipe(
+              Effect.flatMap(
+                Option.match({
+                  onNone: () => AgentError.make({ message: "Agent requires LanguageModel in context", turn: 0 }),
+                  onSome: Effect.succeed,
                 }),
               ),
-            onSome: Effect.succeed,
-          })
+            ),
+          }
+        : {
+            _tag: "Registry",
+            selection: agent.model,
+            registry: yield* Option.match(modelRegistryService, {
+              onNone: () =>
+                Effect.fail(
+                  AgentError.make({
+                    message: "Agent.model requires ModelRegistry in context",
+                    turn: 0,
+                  }),
+                ),
+              onSome: Effect.succeed,
+            }),
+          }
     const memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined =
       memoryOptions === undefined
         ? undefined
@@ -264,13 +276,11 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       modelCallUsage,
       instrumentModel,
       modelRegistryService,
-      steeringService,
       memoryService,
       tokenizerService,
       authorizer,
       memoryOptions,
-      agentModel,
-      agentModelRegistry,
+      modelSource,
       memoryRuntime,
       seedSystem,
       freshChat,

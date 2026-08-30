@@ -1,4 +1,4 @@
-import { Cause, Effect, Option, Ref, Schema, Stream } from "effect"
+import { Cause, Effect, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event, type StructuredOutput, DuplicateToolCallId } from "../event.js"
 import {
@@ -51,7 +51,7 @@ export const make = <
     state,
     chat,
     chain,
-    steeringService,
+    inbox,
     structured,
     validatedResume,
     recoveredToolCheckpoint,
@@ -75,7 +75,8 @@ export const make = <
   const structuredFinalEvents = (
     structuredTurn: number,
     config: StructuredRunConfig<StructuredOutputSchema>,
-  ): Stream.Stream<Event, RunError, TurnServices<StructuredOutputSchema>> =>
+    onPending: (input: { readonly prompt: Prompt.RawInput }) => void,
+  ): Stream.Stream<Event, RunError, TurnServices<R, StructuredOutputSchema>> =>
     Stream.fromEffect(
       Effect.gen(function* () {
         const transformedPrompt = yield* applyPromptChain(chain, Prompt.make(config.objectPrompt), {
@@ -143,21 +144,21 @@ export const make = <
           value: response.value,
           content: response.content,
         }
-        return [structuredOutput, terminalCompletedEvent(state, structuredTurn, transcript)]
+        const completion = yield* inbox.complete
+        if (completion._tag === "Closed") {
+          return [structuredOutput, terminalCompletedEvent(state, structuredTurn, transcript)]
+        }
+        onPending({ prompt: promptFromSteeringInputs(completion.inputs) })
+        return [
+          turnCompletedEvent(state, structuredTurn, transcript),
+          context.steeringDrainedEvent(structuredTurn, completion.queue, completion.inputs),
+        ]
       }),
     ).pipe(Stream.flatMap((events) => Stream.fromIterable<Event>(events)))
   const promptFromSteeringInputs = (inputs: ReadonlyArray<Input>): Prompt.Prompt =>
     inputs.reduce<Prompt.Prompt>((prompt, input) => Prompt.concat(prompt, input.prompt), Prompt.empty)
-  const takeSteering = (): Effect.Effect<ReadonlyArray<Input>> =>
-    Option.match(steeringService, {
-      onNone: () => Effect.succeed([]),
-      onSome: (service) => service.takeSteering,
-    })
-  const takeFollowUp = (): Effect.Effect<ReadonlyArray<Input>> =>
-    Option.match(steeringService, {
-      onNone: () => Effect.succeed([]),
-      onSome: (service) => service.takeFollowUp,
-    })
+  const takeSteering = (): Effect.Effect<ReadonlyArray<Input>> => inbox.takeSteering
+  const takeFollowUp = (): Effect.Effect<ReadonlyArray<Input>> => inbox.takeFollowUp
   const activeAgent = () =>
     handoffStateRef === undefined
       ? Effect.succeed(agent)
@@ -180,7 +181,14 @@ export const make = <
       }),
     )
   }
-  const afterTurn = afterTurnFor({ context, decidePolicy, takeFollowUp, takeSteering, promptFromSteeringInputs })
+  const afterTurn = afterTurnFor({
+    context,
+    decidePolicy,
+    takeFollowUp,
+    takeSteering,
+    takeCompletion: () => inbox.complete,
+    promptFromSteeringInputs,
+  })
   const resetTurnState = (turn: number) =>
     Stream.sync(() => {
       state.turn = turn
@@ -224,8 +232,14 @@ export const make = <
       currentTurn,
       Stream.suspend(() => {
         if (structuredTurn !== undefined && structured !== undefined) {
-          return structuredFinalEvents(structuredTurn, structured).pipe(
-            Stream.withSpan("TenetKit.Agent.turn", { attributes: { "tenetkit.turn": structuredTurn } }),
+          const finalTurn = structuredTurn
+          return Stream.concat(
+            structuredFinalEvents(finalTurn, structured, (pending) => {
+              next = pending
+            }).pipe(Stream.withSpan("TenetKit.Agent.turn", { attributes: { "tenetkit.turn": finalTurn } })),
+            Stream.suspend(() =>
+              next === undefined ? Stream.empty : runTurn(finalTurn + 1, next.prompt, next.overrides),
+            ),
           )
         }
         return next === undefined ? Stream.empty : runTurn(turn + 1, next.prompt, next.overrides)

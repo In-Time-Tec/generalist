@@ -1,5 +1,5 @@
 import { Context, Effect, Schema, Stream, Option } from "effect"
-import type { ProgramCapabilities } from "../../core/index.js"
+import type { ProgramCapabilities, Steering } from "../../core/index.js"
 import { Session } from "../../core/context/public/session.js"
 import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
 import type { Address } from "../address.js"
@@ -220,7 +220,10 @@ export interface Service {
   }) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable>
   readonly admitSteering: (
     input: AdmitSteeringInput,
-  ) => Effect.Effect<SteeringReceipt, RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable>
+  ) => Effect.Effect<
+    SteeringReceipt,
+    RunNotFound | RunTerminal | SteeringConflict | Steering.InboxFull | RuntimeUnavailable
+  >
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
   /**
    * @experimental The authoritative directory record for one Run.

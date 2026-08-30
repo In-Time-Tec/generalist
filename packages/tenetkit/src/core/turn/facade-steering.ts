@@ -1,25 +1,31 @@
 import {
-  Steering as Steering_Steering,
-  SteeringQueueFull as Steering_SteeringQueueFull,
-  layer as Steering_layer,
-  layerTest as Steering_layerTest,
+  InboxFull as Steering_InboxFull,
+  PolicyInvalid as Steering_PolicyInvalid,
+  Receipt as Steering_Receipt,
+  RunClosed as Steering_RunClosed,
+  defaultCapacity as Steering_defaultCapacity,
+  defaultMaxPendingBytes as Steering_defaultMaxPendingBytes,
+  promptBytes as Steering_promptBytes,
 } from "./steering.js"
 export const Steering = {
-  Steering: Steering_Steering,
-  SteeringQueueFull: Steering_SteeringQueueFull,
-  layer: Steering_layer,
-  layerTest: Steering_layerTest,
+  InboxFull: Steering_InboxFull,
+  PolicyInvalid: Steering_PolicyInvalid,
+  Receipt: Steering_Receipt,
+  RunClosed: Steering_RunClosed,
+  defaultCapacity: Steering_defaultCapacity,
+  defaultMaxPendingBytes: Steering_defaultMaxPendingBytes,
+  promptBytes: Steering_promptBytes,
 }
 export namespace Steering {
-  export type Steering = import("./steering.js").Steering
-  export type SteeringQueueFull = import("./steering.js").SteeringQueueFull
-  export type layer = typeof import("./steering.js").layer
-  export type layerTest = typeof import("./steering.js").layerTest
   export type DrainMode = import("./steering.js").DrainMode
+  export type InboxFull = import("./steering.js").InboxFull
   export type Input = import("./steering.js").Input
-  export type Service = import("./steering.js").Service
-  export type MakeOptions = import("./steering.js").MakeOptions
+  export type Options = import("./steering.js").Options
   export type OverflowStrategy = import("./steering.js").OverflowStrategy
+  export type PolicyInvalid = import("./steering.js").PolicyInvalid
+  export type Producer = import("./steering.js").Producer
   export type QueueName = import("./steering.js").QueueName
   export type QueuePolicy = import("./steering.js").QueuePolicy
+  export type Receipt = import("./steering.js").Receipt
+  export type RunClosed = import("./steering.js").RunClosed
 }

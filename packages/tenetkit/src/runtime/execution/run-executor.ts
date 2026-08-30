@@ -2,8 +2,9 @@ import { Cause, Context, Effect, Layer, Option, Ref, type Scope, Stream } from "
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { Agent } from "../../core/index.js"
 import { AgentEvent } from "../../core/agent/public/event.js"
+import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
 import { DurableDriver } from "../../core/durable/public/driver.js"
-import { Steering } from "../../core/turn/facade-steering.js"
+import { externalRunInbox } from "../../core/turn/steering.js"
 import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../errors.js"
@@ -167,10 +168,8 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
                         )
                         return entries.map((entry) => ({ prompt: entry.prompt }))
                       }).pipe(Effect.orDie)
-                      const steering = Steering.Steering.of({
-                        steer: () => Effect.die(new Error("Runtime steering must be admitted through Runtime.steer")),
-                        followUp: () =>
-                          Effect.die(new Error("Runtime steering must be admitted through Runtime.steer")),
+                      const inbox = externalRunInbox({
+                        runId,
                         takeSteering: take,
                         takeFollowUp: take,
                       })
@@ -311,10 +310,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
                       }
                       const context = Context.merge(
                         baseContext,
-                        Context.merge(
-                          Context.make(DurableDriver.DriverJournalService, journal),
-                          Context.make(Steering.Steering, steering),
-                        ),
+                        Context.make(DurableDriver.DriverJournalService, journal),
                       )
                       if (
                         !matchesActiveRunOptions(claimed.executableRef, claimed.executableManifest, resolved.runOptions)
@@ -379,7 +375,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
                           }
                           yield* store.emitAgentEvent({ ...claim, event: persistedEvent })
                         })
-                      const exit = yield* Agent.stream(hostedAgent, runOptions).pipe(
+                      const exit = yield* HostedRun.stream(hostedAgent, runOptions, inbox).pipe(
                         Stream.runForEach(persistEvent),
                         Effect.provideContext(context),
                         Effect.exit,

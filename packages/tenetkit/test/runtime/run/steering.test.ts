@@ -2,7 +2,7 @@ import { expect, it, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, DurableDriver, ToolExecutor } from "../../../src/index.js"
+import { Agent, DurableDriver, Steering, ToolExecutor } from "../../../src/index.js"
 import { Database } from "bun:sqlite"
 import { closedTestAgent, testExecutable } from "./identity.js"
 import { Address, RunExecutor, Errors, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
@@ -221,6 +221,67 @@ for (const backend of ["memory", "sqlite"] as const) {
           )
           expect(tags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
           expect(tags).not.toContain("RunCompleted")
+        }),
+      )
+
+      test.effect(`${backend} bounds direct steering without charging idempotent retries twice`, () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: `steering-bounds:${backend}`,
+            idempotencyKey: "run",
+            prompt: "start",
+          })
+          const accepted = yield* Effect.forEach(
+            Array.from({ length: Steering.defaultCapacity }, (_, index) => index),
+            (index) =>
+              runtime.steer({ runId: receipt.runId, idempotencyKey: `entry:${index}`, prompt: `prompt ${index}` }),
+            { concurrency: "unbounded" },
+          )
+          expect(
+            yield* runtime.steer({
+              runId: receipt.runId,
+              idempotencyKey: `entry:${Steering.defaultCapacity - 1}`,
+              prompt: `prompt ${Steering.defaultCapacity - 1}`,
+            }),
+          ).toEqual(accepted.at(-1))
+          const full = yield* runtime
+            .steer({ runId: receipt.runId, idempotencyKey: "entry:full", prompt: "not admitted" })
+            .pipe(Effect.flip)
+          expect(full).toBeInstanceOf(Steering.InboxFull)
+          expect(full).toMatchObject({
+            runId: receipt.runId,
+            queue: "steering",
+            dimension: "entries",
+            limit: Steering.defaultCapacity,
+          })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: `bounds:${backend}` })
+          expect(yield* store.readSteering(claim)).toHaveLength(Steering.defaultCapacity)
+
+          const byteRun = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: `steering-byte-bound:${backend}`,
+            idempotencyKey: "run",
+            prompt: "start",
+          })
+          const byteFull = yield* runtime
+            .steer({
+              runId: byteRun.runId,
+              idempotencyKey: "too-large",
+              prompt: "x".repeat(Steering.defaultMaxPendingBytes),
+            })
+            .pipe(Effect.flip)
+          expect(byteFull).toBeInstanceOf(Steering.InboxFull)
+          expect(byteFull).toMatchObject({
+            runId: byteRun.runId,
+            queue: "steering",
+            dimension: "bytes",
+            limit: Steering.defaultMaxPendingBytes,
+          })
+          const byteClaim = yield* store.claimExecution({ runId: byteRun.runId, ownerId: `byte-bounds:${backend}` })
+          expect(yield* store.readSteering(byteClaim)).toEqual([])
         }),
       )
     },

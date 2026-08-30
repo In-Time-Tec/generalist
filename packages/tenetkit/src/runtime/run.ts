@@ -1,5 +1,5 @@
 import { Effect, Function, Predicate, Schema } from "effect"
-import { ModelTelemetry, ProgramRunner } from "../core/index.js"
+import { ModelTelemetry, ProgramRunner, RunId as CoreRunId, type RunId as CoreRunIdType } from "../core/index.js"
 import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable/manifest.js"
 import { RunWait } from "./run/wait.js"
 import { Cursor } from "./cursor.js"
@@ -33,8 +33,9 @@ export const RunStatus = Schema.Literals([
 ])
 export type RunStatus = typeof RunStatus.Type
 
-export const RunId = Schema.String.check(Schema.isNonEmpty())
-export type RunId = typeof RunId.Type
+/** @experimental Runtime uses Core's canonical Agent execution identity. */
+export const RunId = CoreRunId
+export type RunId = CoreRunIdType
 
 export interface RunReceipt {
   readonly runId: RunId

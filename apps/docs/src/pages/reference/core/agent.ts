@@ -4,10 +4,11 @@ export const coreAgentReference = definePage({
   title: "Agent and run functions",
   navTitle: "Agent",
   group: "Reference",
-  description: "Agent.make, stream and generate run functions, truthful requirements, RunError, Resume, and Result.",
+  description:
+    "Agent.make, makeRun, stream and generate functions, truthful requirements, RunError, Resume, and Result.",
   content: [
     lead(
-      "The Agent namespace of tenetkit defines an opaque agent value, the stream and generate run functions, and every option and service a run consumes.",
+      "The Agent namespace of tenetkit defines an opaque agent value, scoped Run handles, stream and generate projections, and every option and service a Run consumes.",
     ),
     command("Install", "bun add tenetkit"),
     h2("agent-make", "Agent.make"),
@@ -71,6 +72,15 @@ export const coreAgentReference = definePage({
       ["Function", "Signature", "Notes"],
       [
         [
+          [code("Agent.makeRun")],
+          [
+            code(
+              "(agent: Agent<Tools, R>, options: O) => Effect<RunHandle<Tools, R, O>, Steering.PolicyInvalid, Scope>",
+            ),
+          ],
+          "Allocates one Run ID, event stream, and producer-only steer/followUp capability before lazy execution",
+        ],
+        [
           [code("Agent.stream")],
           [code("(agent: Agent<Tools, R>, options: O) => Stream<AgentEvent.Event, RunError, RunRequirements<R, O>>")],
           "Streams text or schema-validated output; output is selected by options",
@@ -109,7 +119,12 @@ export const coreAgentReference = definePage({
         [
           [code("sessionId")],
           [code("string"), " (optional)"],
-          "Sole host-assigned Session identity; omission means no persistent Session",
+          "Sole host-assigned Session identity; it never selects the process-local Run inbox",
+        ],
+        [
+          [code("steering")],
+          [code("Steering.Options"), " (optional)"],
+          "Finite per-Run lane capacities, drain modes, overload behavior, and aggregate pending-byte bound",
         ],
         [
           [code("toolOutputMaxBytes")],
@@ -150,7 +165,7 @@ export const coreAgentReference = definePage({
       code("ToolExecutor"),
       " override can handle calls at runtime but does not discharge those configured requirements. Configured or run-specific memory adds ",
       code("Memory"),
-      ". Ambient enhancements such as approvals, compaction, instructions, middleware, resilience, permissions, sessions, skills, steering, tokenization, tool execution overrides, and output spill remain optional.",
+      ". Ambient enhancements such as approvals, compaction, instructions, middleware, resilience, permissions, sessions, skills, tokenization, tool execution overrides, and output spill remain optional. Steering is owned directly by each RunHandle, not discovered as an ambient service.",
     ),
     table(
       ["Service", "When it is needed"],
