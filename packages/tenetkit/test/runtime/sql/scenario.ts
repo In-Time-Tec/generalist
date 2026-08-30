@@ -34,8 +34,11 @@ const options = {
   subscriberQueueCapacity: 8,
 } satisfies Omit<SqliteRuntime.Options, "filename">
 
-export const sqliteLayer = (filename: string, overrides: Partial<Omit<SqliteRuntime.Options, "filename">> = {}) =>
-  SqliteRuntime.layerSqlite({ filename, ...options, ...overrides })
+export const sqliteLayer = (filename: string) => SqliteRuntime.layerSqlite({ filename, ...options })
+
+/** A SQLite Runtime whose scheduler stays asleep while a test owns execution claims directly. */
+export const sqliteManualClaimLayer = (filename: string) =>
+  SqliteRuntime.layerSqlite({ filename, ...options, scheduler: { pollInterval: "1 hour" } })
 
 /**
  * A SQLite Runtime whose mailbox bounds and messaging policy the test chooses.

@@ -7,13 +7,13 @@ import {
 } from "tenetkit/test/runtime-driver"
 import { Effect } from "effect"
 import { assistantAddress, memoryLayer } from "../../runtime/execution/fixtures.js"
-import { sqliteLayer, tempDbPath } from "../../runtime/sql/scenario.js"
+import { sqliteManualClaimLayer, tempDbPath } from "../../runtime/sql/scenario.js"
 
 const claim: ClaimExecution = ({ store }, { runId, workerId }) =>
   store.claimExecution({ runId, ownerId: workerId }).pipe(Effect.orDie)
 
 const sqlitePath = tempDbPath("runtime-driver-conformance")
-const sqliteTestLayer = sqliteLayer(sqlitePath, { scheduler: { pollInterval: "1 hour" } })
+const sqliteTestLayer = sqliteManualClaimLayer(sqlitePath)
 const triggerName = (boundary: ModelResponseFaultBoundary) => `tenetkit_fault_${boundary.replaceAll("-", "_")}`
 const quote = (value: string): string => value.replaceAll("'", "''")
 
