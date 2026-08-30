@@ -588,7 +588,8 @@ const { VectorStore } = await import("tenetkit/memory")
 const { State, Store } = await import("tenetkit/agent-guidance")
 const { MCPClient } = await import("tenetkit/mcp")
 const McpHttpClient = await import("tenetkit/mcp/client/http")
-const { ModelCatalog, OpenAI } = await import("tenetkit/ai")
+const { ModelCatalog } = await import("tenetkit/ai")
+const OpenAI = await import("tenetkit/ai/openai")
 const skills = await import("tenetkit/skills")
 const { TestModel } = await import("tenetkit/test")
 const { Runtime, RunEvent } = await import("tenetkit/runtime")
@@ -689,17 +690,17 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
     path.join(coreConsumerDirectory, "runtime.mjs"),
     `import { Agent, Session } from "tenetkit"
 import { Runtime } from "tenetkit/runtime"
-import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
+import { ModelCatalog, Deterministic, ModelRoute } from "tenetkit/ai"
 if (Agent === undefined || Session === undefined) throw new Error("core export is missing")
 if (Runtime.layerMemory === undefined) throw new Error("generic Runtime export is missing")
-if (Catalog === undefined || Deterministic === undefined || ModelRoute === undefined) throw new Error("neutral AI export is missing")
+if (ModelCatalog === undefined || Deterministic === undefined || ModelRoute === undefined) throw new Error("neutral AI export is missing")
 `,
   )
   yield* fileSystem.writeFileString(
     path.join(coreConsumerDirectory, "typecheck.ts"),
-    `import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
+    `import { ModelCatalog, Deterministic, ModelRoute } from "tenetkit/ai"
 import { make } from "tenetkit/ai/model-route"
-void [Catalog, Deterministic, ModelRoute, make]
+void [ModelCatalog, Deterministic, ModelRoute, make]
 `,
   )
   yield* fileSystem.writeFileString(

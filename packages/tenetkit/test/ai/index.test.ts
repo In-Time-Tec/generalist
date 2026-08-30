@@ -36,7 +36,16 @@ import {
   layer as openRouterLayer,
   toolJsonSchemaCompiler as openRouterToolJsonSchemaCompiler,
 } from "tenetkit/ai/openrouter"
-import { Deterministic, OpenAICompatible } from "../../src/ai/index.js"
+import {
+  layerAzureOpenAI,
+  layerDeepseek,
+  layerGoogleAiStudio,
+  layerGroq,
+  layerMistral,
+  layerOllama,
+  layerXai,
+} from "tenetkit/ai/openai-compatible"
+import { Deterministic } from "../../src/ai/index.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const unexpectedTool = Tool.make("unexpected", { parameters: Schema.Unknown, success: Schema.Unknown })
@@ -367,7 +376,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.provide(
-      OpenAICompatible.layerGroq({
+      layerGroq({
         model: "llama-test",
         apiKey,
         registrationKey: "primary",
@@ -619,13 +628,13 @@ describe("providers", () => {
       openRouterLayer({ model: "openrouter-test", apiKey }),
       responsesLayer({ model: "responses-compatible-test", apiKey }),
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
-      OpenAICompatible.layerGroq({ model: "model", apiKey }),
-      OpenAICompatible.layerMistral({ model: "model", apiKey }),
-      OpenAICompatible.layerXai({ model: "model", apiKey }),
-      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
-      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
-      OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
-      OpenAICompatible.layerOllama({ model: "model", apiKey }),
+      layerGroq({ model: "model", apiKey }),
+      layerMistral({ model: "model", apiKey }),
+      layerXai({ model: "model", apiKey }),
+      layerDeepseek({ model: "model", apiKey }),
+      layerGoogleAiStudio({ model: "model", apiKey }),
+      layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
+      layerOllama({ model: "model", apiKey }),
     )
     const fetchLayers = tuple(...baseLayers.map((providerLayer) => Layer.provide(providerLayer, FetchHttpClient.layer)))
     const deterministicLayer = openAiLayerOrDeterministic({ model: "gpt-test", fallbackModel: "fallback", apiKey })
@@ -648,13 +657,13 @@ describe("providers", () => {
     const deterministicFetchErrors: Assert<Equal<Layer.Error<typeof deterministicFetchLayer>, Config.ConfigError>> =
       true
     const baseOpenAICompatible = tuple(
-      OpenAICompatible.layerGroq({ model: "model", apiKey }),
-      OpenAICompatible.layerMistral({ model: "model", apiKey }),
-      OpenAICompatible.layerXai({ model: "model", apiKey }),
-      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
-      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
-      OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
-      OpenAICompatible.layerOllama({ model: "model", apiKey }),
+      layerGroq({ model: "model", apiKey }),
+      layerMistral({ model: "model", apiKey }),
+      layerXai({ model: "model", apiKey }),
+      layerDeepseek({ model: "model", apiKey }),
+      layerGoogleAiStudio({ model: "model", apiKey }),
+      layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
+      layerOllama({ model: "model", apiKey }),
     )
     const fetchOpenAICompatible = tuple(
       ...baseOpenAICompatible.map((presetLayer) => Layer.provide(presetLayer, FetchHttpClient.layer)),
@@ -687,13 +696,13 @@ describe("providers", () => {
       openRouterLayer({ model: "openrouter-test", apiKey }),
       responsesLayer({ model: "responses-compatible-test", apiKey }),
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
-      OpenAICompatible.layerGroq({ model: "model", apiKey }),
-      OpenAICompatible.layerMistral({ model: "model", apiKey }),
-      OpenAICompatible.layerXai({ model: "model", apiKey }),
-      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
-      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
-      OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
-      OpenAICompatible.layerOllama({ model: "model", apiKey }),
+      layerGroq({ model: "model", apiKey }),
+      layerMistral({ model: "model", apiKey }),
+      layerXai({ model: "model", apiKey }),
+      layerDeepseek({ model: "model", apiKey }),
+      layerGoogleAiStudio({ model: "model", apiKey }),
+      layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
+      layerOllama({ model: "model", apiKey }),
     ]
     const embeddingLayers = [
       openAiEmbeddingLayer({ model: "text-embedding-3-small", apiKey }),
@@ -769,13 +778,13 @@ describe("providers", () => {
     expect(responsesLayer).toBeInstanceOf(Function)
     expect(chatCompletionsLayer).toBeInstanceOf(Function)
     expect(openAiLayerOrDeterministic).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerGroq).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerMistral).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerXai).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerDeepseek).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerGoogleAiStudio).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerAzureOpenAI).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerOllama).toBeInstanceOf(Function)
+    expect(layerGroq).toBeInstanceOf(Function)
+    expect(layerMistral).toBeInstanceOf(Function)
+    expect(layerXai).toBeInstanceOf(Function)
+    expect(layerDeepseek).toBeInstanceOf(Function)
+    expect(layerGoogleAiStudio).toBeInstanceOf(Function)
+    expect(layerAzureOpenAI).toBeInstanceOf(Function)
+    expect(layerOllama).toBeInstanceOf(Function)
     expect(FetchHttpClient.layer).toBeDefined()
   })
 })

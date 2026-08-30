@@ -1,6 +1,6 @@
-import { OpenRouter } from "tenetkit/ai"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
+import { layer, type ClientOptions } from "tenetkit/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 type StreamText = Parameters<typeof LanguageModel.make>[0]["streamText"]
@@ -98,7 +98,7 @@ const scriptedDeterministicModel: Layer.Layer<LanguageModel.LanguageModel> = Lay
 )
 
 /** @experimental */
-export type LayerOrDeterministicOptions = OpenRouter.ClientOptions
+export type LayerOrDeterministicOptions = ClientOptions
 
 /**
  * @experimental Copies the shape of OpenAI's `layerOrDeterministic`, swapping OpenAI for
@@ -112,7 +112,7 @@ export const layerOrDeterministic = (options: LayerOrDeterministicOptions): Laye
   Layer.unwrap(
     Effect.gen(function* () {
       const openRouterRegistration = yield* Effect.scoped(
-        Layer.build(Layer.provide(OpenRouter.layer(options), FetchHttpClient.layer)).pipe(
+        Layer.build(Layer.provide(layer(options), FetchHttpClient.layer)).pipe(
           Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context))),
           Effect.map((registrations) => registrations[0]),
         ),

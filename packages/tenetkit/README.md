@@ -1,6 +1,6 @@
 # TenetKit
 
-Effect-native agent framework. Import core from `tenetkit`, or use the explicit Worker-safe alias `tenetkit/core`. The `tenetkit/ai` entry contains only provider-neutral `Catalog`, `Deterministic`, and `ModelRoute`; install a selected optional provider peer and import its exact `tenetkit/ai/*` subpath.
+Effect-native agent framework. Import core from `tenetkit`, or use the explicit Worker-safe alias `tenetkit/core`. The `tenetkit/ai` entry contains only provider-neutral `ModelCatalog`, `Deterministic`, and `ModelRoute`; install a selected optional provider peer and import its exact `tenetkit/ai/*` subpath.
 
 ## Worker-safe entrypoints
 
