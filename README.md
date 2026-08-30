@@ -5,7 +5,7 @@ TenetKit is the **Effect-native agent framework**: a standalone model-turn loop 
 ```ts
 import { Effect, Layer, Schema } from "effect"
 import { Agent, ModelRegistry, Tool, Toolkit } from "tenetkit"
-import { Deterministic } from "tenetkit/ai"
+import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
 
 const searchTool = Tool.make("search_docs", {
   description: "Search local docs",
@@ -22,7 +22,7 @@ const program = ModelRegistry.withModel(
 ).pipe(
   Effect.provide(
     Layer.mergeAll(
-      Deterministic.layer({ model: "local" }),
+      deterministicLayer({ model: "local" }),
       toolkit.toLayer({ search_docs: () => Effect.succeed(["Getting started"]) }),
     ),
   ),
@@ -47,7 +47,7 @@ GitHub releases and npm contain the same versioned package tarballs with compile
 | ------------------------------------------------------------------- | ------------------------- | ------------ |
 | Agent loop, events, typed suspension, turn policy, tools, approvals | `tenetkit`                | experimental |
 | Addressable runs, replay, inspection, waits, and durable stores     | `tenetkit/runtime`        | experimental |
-| Provider registration, deterministic local model, model catalog     | `tenetkit/ai`             | experimental |
+| Provider registration, deterministic local model, model catalog     | `tenetkit/ai/*`           | experimental |
 | MCP discovery and TenetKit `ToolExecutor` adapter                   | `tenetkit/mcp`            | experimental |
 | SKILL.md and instruction-file sources                               | `tenetkit/skills`         | experimental |
 | Working memory, vector store, semantic recall                       | `tenetkit/memory`         | experimental |
@@ -125,25 +125,17 @@ External contributors can request repository access through the path in [CONTRIB
 
 ## Repository layout
 
-| Path                 | Purpose                                                                      |
-| -------------------- | ---------------------------------------------------------------------------- |
-| `packages/core`      | `tenetkit` — the Effect-native agent loop.                                   |
-| `packages/runtime`   | `tenetkit/runtime` — addressable Run lifecycle, stores, and workers.         |
-| `packages/providers` | `tenetkit/ai` — provider helpers and deterministic local models.             |
-| `packages/mcp`       | `tenetkit/mcp` — MCP client bridge and TenetKit adapter.                     |
-| `packages/skills`    | `tenetkit/skills` — SKILL.md and instruction-file sources.                   |
-| `packages/memory`    | `tenetkit/memory` — non-durable memory implementations.                      |
-| `packages/repl`      | `tenetkit/repl` — persistent TypeScript cell contracts and the Bun kernel.   |
-| `packages/test`      | `tenetkit/test` — scripted model fixtures and normalized request capture.    |
-| `packages/transport` | `tenetkit/transport` — Runtime wire codecs, SSE, WS, snapshots, and clients. |
-| `packages/foldkit`   | `tenetkit/foldkit` — FoldKit adapter and headless chat model.                |
-| `packages/a2a`       | `tenetkit/a2a` — A2A v1 server projection over Runtime.                      |
-| `packages/ag-ui`     | `tenetkit/ag-ui` — AG-UI projection over Runtime.                            |
-| `docs/features`      | Current behavior and rules relied on by the code.                            |
-| `docs/decisions`     | Important choices and why they were made.                                    |
-| `docs/tradeoffs`     | Useful notes about meaningful gains and costs.                               |
-| `docs/site`          | Consumer-facing guides, recipes, API stability, and positioning.             |
-| `examples`           | Private Bun workspaces typechecked in CI.                                    |
+| Path                  | Purpose                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `packages/tenetkit`   | Core agent loop, Runtime, feature entries, and exact `tenetkit/ai/*` provider leaves. |
+| `packages/pg`         | `@tenetkit/pg` PostgreSQL durable Runtime adapter.                                    |
+| `packages/mysql`      | `@tenetkit/mysql` MySQL durable Runtime adapter.                                      |
+| `packages/cloudflare` | `@tenetkit/cloudflare` Durable Object and dynamic Worker adapters.                    |
+| `docs/features`       | Current behavior and rules relied on by the code.                                     |
+| `docs/decisions`      | Important choices and why they were made.                                             |
+| `docs/tradeoffs`      | Useful notes about meaningful gains and costs.                                        |
+| `apps/docs`           | Consumer-facing guides, recipes, API stability, and positioning.                      |
+| `examples`            | Private Bun workspaces typechecked in CI.                                             |
 
 ## Verification
 

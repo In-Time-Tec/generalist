@@ -1,6 +1,15 @@
 import { Effect, Function, Predicate, Schema } from "effect"
-import { ModelTelemetry, ProgramRunner, RunId as CoreRunId, type RunId as CoreRunIdType } from "../core/index.js"
-import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable/manifest.js"
+import { RunId as CoreRunId, type RunId as CoreRunIdType } from "../core/durable/run-id.js"
+import {
+  CompactionCommit,
+  CompactionTrigger,
+  ModelAttemptCompleted,
+  ModelFailureCategory,
+  ModelProviderUsage,
+} from "../core/model/telemetry/events.js"
+import { ExecutionFailure } from "../core/program/runner.js"
+import { decodePinned } from "./executable/manifest-internal.js"
+import { ExecutableManifest, ExecutableRef } from "./executable/manifest.js"
 import { RunWait } from "./run/wait.js"
 import { Cursor } from "./cursor.js"
 import type { ParseOptions } from "effect/SchemaAST"
@@ -45,7 +54,7 @@ export interface RunReceipt {
 }
 
 /** @experimental Encoded durable Run receipt. */
-export interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
+interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
   readonly runId: typeof RunId.Encoded
 }
 
@@ -71,8 +80,7 @@ export interface RunInspection {
 }
 
 /** @experimental Encoded durable Run inspection. */
-export interface RunInspectionEncoded
-  extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "waits"> {
+interface RunInspectionEncoded extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "waits"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
   readonly executableManifest: typeof ExecutableManifest.Encoded
@@ -116,7 +124,7 @@ export type RunFailure =
   | ExecutableIdentityMismatch
   | ExecutableRegistrationInvalid
   | ExecutableRegistrationMissing
-  | ProgramRunner.ExecutionFailure
+  | ExecutionFailure
 
 export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
   AgentExecutionFailure,
@@ -124,7 +132,7 @@ export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
   ExecutableIdentityMismatch,
   ExecutableRegistrationInvalid,
   ExecutableRegistrationMissing,
-  ProgramRunner.ExecutionFailure,
+  ExecutionFailure,
 ])
 
 export type RunOutcome =
@@ -185,16 +193,16 @@ export type RawUsageFact =
   | (RawUsageCommon & {
       readonly _tag: "Completed"
       readonly usageAt: number
-      readonly usage: ModelTelemetry.ModelAttemptCompleted["usage"]
+      readonly usage: ModelAttemptCompleted["usage"]
       readonly requestId?: string
       readonly responseModel?: string
       readonly serviceTier?: string
     })
   | (RawUsageCommon & {
       readonly _tag: "Failed"
-      readonly category: ModelTelemetry.ModelFailureCategory
+      readonly category: ModelFailureCategory
       readonly usageAt: number
-      readonly providerUsage: ModelTelemetry.ModelProviderUsage
+      readonly providerUsage: ModelProviderUsage
     })
 
 type RawUsageFactEncoded = RawUsageFact
@@ -208,7 +216,7 @@ export const RawUsageFact: Schema.Codec<RawUsageFact, RawUsageFactEncoded> = Sch
     modelAttemptId: Schema.String,
     attempt: Schema.Int,
     usageAt: Schema.Finite,
-    usage: ModelTelemetry.ModelAttemptCompleted.fields.usage,
+    usage: ModelAttemptCompleted.fields.usage,
     provider: Schema.optionalKey(Schema.String),
     model: Schema.optionalKey(Schema.String),
     requestId: Schema.optionalKey(Schema.String),
@@ -222,9 +230,9 @@ export const RawUsageFact: Schema.Codec<RawUsageFact, RawUsageFactEncoded> = Sch
     modelCallId: Schema.String,
     modelAttemptId: Schema.String,
     attempt: Schema.Int,
-    category: ModelTelemetry.ModelFailureCategory,
+    category: ModelFailureCategory,
     usageAt: Schema.Finite,
-    providerUsage: ModelTelemetry.ModelProviderUsage,
+    providerUsage: ModelProviderUsage,
     provider: Schema.optionalKey(Schema.String),
     model: Schema.optionalKey(Schema.String),
   }),
@@ -235,7 +243,7 @@ const CompactionBase = {
   turn: Schema.Finite,
   compactionId: Schema.String,
   startedAt: Schema.Finite,
-  trigger: ModelTelemetry.CompactionTrigger,
+  trigger: CompactionTrigger,
   contextTokensBefore: Schema.optionalKey(Schema.Finite),
   entriesBefore: Schema.optionalKey(Schema.Finite),
 }
@@ -244,7 +252,7 @@ interface CompactionInspectionBase {
   readonly turn: number
   readonly compactionId: string
   readonly startedAt: number
-  readonly trigger: ModelTelemetry.CompactionTrigger
+  readonly trigger: CompactionTrigger
   readonly contextTokensBefore?: number
   readonly entriesBefore?: number
 }
@@ -256,7 +264,7 @@ export type CompactionInspection =
       readonly checkpointId: string
       readonly appliedAt: number
       readonly kind: "microcompact" | "summarize"
-      readonly commit: ModelTelemetry.CompactionCommit
+      readonly commit: CompactionCommit
     })
   | (CompactionInspectionBase & { readonly _tag: "Failed"; readonly failedAt: number })
 
@@ -269,7 +277,7 @@ export const CompactionInspection: Schema.Codec<CompactionInspection, Compaction
     checkpointId: Schema.String,
     appliedAt: Schema.Finite,
     kind: Schema.Literals(["microcompact", "summarize"]),
-    commit: ModelTelemetry.CompactionCommit,
+    commit: CompactionCommit,
   }),
   Schema.TaggedStruct("Failed", { ...CompactionBase, failedAt: Schema.Finite }),
 ])
@@ -283,7 +291,7 @@ export interface RunSnapshot {
 }
 
 /** @experimental Encoded durable Run snapshot. */
-export interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions"> {
+interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions"> {
   readonly run: RunInspectionEncoded
   readonly cursor: typeof Cursor.Encoded
   readonly outcome?: RunOutcomeEncoded
@@ -316,8 +324,7 @@ export interface Run {
 }
 
 /** @experimental Encoded durable Run state. */
-export interface RunEncoded
-  extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "waits"> {
+interface RunEncoded extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "waits"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
   readonly executableManifest: typeof ExecutableManifest.Encoded

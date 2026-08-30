@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { NamedCapability } from "../capability.js"
-import { AgentPin, CapabilityPin, Pin, ProgramPin } from "../pin.js"
+import { AgentPin, CapabilityPin, ProgramPin, makeProgram } from "../pin.js"
 
 const compareText = (left: string, right: string): number => {
   if (left < right) return -1
@@ -113,5 +113,5 @@ export const make = (input: Omit<ProgramManifest, "version"> & { readonly versio
       ),
     },
   })
-  return { manifest, pin: Pin.makeProgram(manifest) }
+  return { manifest, pin: makeProgram(manifest) }
 }

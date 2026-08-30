@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { SkillCatalog } from "../core/index.js"
+import { SkillCatalogError, layer as SkillCatalogLayer } from "../core/context/skill-catalog.js"
 import { type Limits, make as makeHostedCatalog, resolveRelative, validateSkillPath } from "./hosted-catalog.js"
 
 /** @experimental Manifest-backed S3 catalog options. */
@@ -25,7 +25,7 @@ export const make = (options: Options) => {
     !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/.test(options.region)
   ) {
     return Effect.fail(
-      SkillCatalog.SkillCatalogError.make({
+      SkillCatalogError.make({
         source: validationSource,
         message: "Invalid S3 bucket or region for hosted skill catalog",
       }),
@@ -48,4 +48,4 @@ export const make = (options: Options) => {
 }
 
 /** @experimental Build a manifest-backed S3 catalog layer. */
-export const layer = (options: Options): ReturnType<typeof SkillCatalog.layer> => SkillCatalog.layer([make(options)])
+export const layer = (options: Options): ReturnType<typeof SkillCatalogLayer> => SkillCatalogLayer([make(options)])

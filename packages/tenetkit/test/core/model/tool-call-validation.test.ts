@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { ModelRegistry, ModelToolCallValidation } from "../../../src/core/index.js"
+import { ModelRegistry, ModelToolCallValidation } from "../../../src/index.js"
 
 const compiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) => Effect.succeed(Tool.getJsonSchema(tool))
 

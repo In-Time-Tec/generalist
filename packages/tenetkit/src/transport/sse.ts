@@ -5,17 +5,17 @@ import { HttpApiSchema } from "effect/unstable/httpapi"
 import type { Cursor } from "../runtime/cursor.js"
 import type { RunEvent } from "../runtime/run/event.js"
 import { Runtime, type EventsError } from "../runtime/service.js"
-import { Errors } from "../runtime/facade-errors.js"
+import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from "../runtime/errors.js"
 import { InvalidCursor, WireEncodeFailed } from "./errors.js"
 import { CursorFromString, ObserverRunEvent, observerCodec } from "./wire.js"
 
 /** @experimental Typed errors that can terminate an SSE RunEvent stream. */
 export type StreamError = EventsError | WireEncodeFailed
 export const StreamError: Schema.Schema<StreamError> = Schema.Union([
-  Errors.RunNotFound,
-  Errors.CursorExpired,
-  Errors.SubscriberLagged,
-  Errors.RuntimeUnavailable,
+  RunNotFound,
+  CursorExpired,
+  SubscriberLagged,
+  RuntimeUnavailable,
   WireEncodeFailed,
 ])
 

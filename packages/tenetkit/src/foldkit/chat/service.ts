@@ -2,14 +2,8 @@ import { Cause, Effect, Result, Schema } from "effect"
 import { define, type Command } from "foldkit/command"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import {
-  AgentCommandError,
-  AgentConnection,
-  type ClientApproval,
-  CommandOperation,
-  Incoming,
-  SendFailed,
-} from "./connection.js"
+import { AgentCommandError, AgentConnection, CommandOperation, Incoming, SendFailed } from "./connection.js"
+import type { ClientApproval } from "./connection-command.js"
 
 type EmptyFields = Record<never, never>
 

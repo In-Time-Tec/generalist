@@ -12,7 +12,7 @@ import {
   RunBudget,
   Session,
   ToolExecutor,
-} from "../../../src/core/index"
+} from "../../../src/index"
 import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache"
 
 import { Json } from "../json.js"
@@ -21,7 +21,7 @@ import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { sha256Text } from "../../../src/core/durable/canonical-json.js"
 import { edgeCount, incrementEdge } from "../../../src/core/agent/handoff/state.js"
 import { applyHandoffCommit } from "../../../src/core/durable/loop-driver.js"
-import { Pin } from "../../../src/core/durable/pin.js"
+import { makeAgent, makeExecutable } from "../../../src/core/durable/pin-internal.js"
 import { withDerivedSystem } from "../../../src/core/agent/session/history.js"
 import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
 import { make as makeToolBatch, updateCall } from "../../../src/core/agent/tools/checkpoint.js"
@@ -47,9 +47,9 @@ describe("executable identity", () => {
   })
 
   it.effect("applies an exact handoff commit to control state and active pin together", () => {
-    const root = Pin.makeAgent({ name: "a" })
-    const child = Pin.makeAgent({ name: "b" })
-    const executable = Pin.makeExecutable({ root, child })
+    const root = makeAgent({ name: "a" })
+    const child = makeAgent({ name: "b" })
+    const executable = makeExecutable({ root, child })
     const projectedHistory = Prompt.make("committed projection")
     const commit = {
       _tag: "HandoffCommit" as const,

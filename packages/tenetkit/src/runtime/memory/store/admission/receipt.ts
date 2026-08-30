@@ -1,6 +1,7 @@
 import type { RunReceipt } from "../../../run.js"
 import type { StartReceipt } from "../../../service.js"
-import { childRunIdFor, fanOutIdFor, type AdmitFanOutInput, type FanOutReceipt } from "../../../child/fan-out.js"
+import type { FanOutReceipt } from "../../../child/fan-out.js"
+import { childRunIdFor, fanOutIdFor, type AdmitFanOutInput } from "../../../child/fan-out-internal.js"
 import { fanOutMemberSessionId } from "../../../child/session.js"
 import type { AdmitStartInput } from "../../../run/store.js"
 import type { MemoryState } from "../../state.js"

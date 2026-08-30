@@ -300,7 +300,7 @@ export const sourceDigest = (input: {
   })
 
 /** @experimental Synthesize the canonical single-module request used by current Program manifests. */
-export const request = (input: {
+export const makeRequest = (input: {
   readonly requestId: string
   readonly source: string
   readonly inputCodec: string
@@ -373,7 +373,7 @@ export type TestExecute = (
 ) => Effect.Effect<unknown, ExecutionFailure, ProgramCapabilities | Scope.Scope>
 
 /** @experimental Trusted fixture executor for tests only. */
-export const make = (execute: TestExecute): Service =>
+export const makeTest = (execute: TestExecute): Service =>
   CodeExecutor.of({
     identity: testIdentity,
     execute: (sandboxRequest) =>
@@ -394,4 +394,5 @@ export const make = (execute: TestExecute): Service =>
   })
 
 /** @experimental Trusted fixture Layer for tests only. It provides no source isolation. */
-export const layerTest = (execute: TestExecute): Layer.Layer<CodeExecutor> => Layer.succeed(CodeExecutor, make(execute))
+export const layerTest = (execute: TestExecute): Layer.Layer<CodeExecutor> =>
+  Layer.succeed(CodeExecutor, makeTest(execute))

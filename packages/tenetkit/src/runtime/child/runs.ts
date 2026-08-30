@@ -1,13 +1,23 @@
 import { Context, Effect, Layer, Option, Schema, SchemaIssue } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { Agent } from "../../core/index.js"
-import { ToolContext } from "../../core/tools/public/tool-context.js"
-import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
+import type { Agent, ClosedServices } from "../../core/agent/service.js"
+import { ToolContext } from "../../core/tools/tool-context.js"
+import {
+  type CancellationRequest,
+  FrameworkFailure,
+  type Outcome,
+  type Request,
+  type Service as ToolExecutorService,
+  ToolExecutor,
+  executeToolkit,
+  route as toolExecutorRoute,
+} from "../../core/tools/tool-executor.js"
+import type { Route } from "../../core/tools/tool-placement.js"
 import type { Service as RunStoreService } from "../run/store.js"
 import { make as makeAddress } from "../address.js"
 import { make as makeMessage } from "../messaging/message.js"
 import { normalizePrompt } from "../memory/prompt.js"
-import { childRunIdFor, fanOutIdFor } from "./fan-out.js"
+import { childRunIdFor, fanOutIdFor } from "./fan-out-internal.js"
 import { fanOutMemberSessionId } from "./session.js"
 import {
   AwaitGroupParameters,
@@ -51,20 +61,20 @@ type MutableGroupInput = { -readonly [Key in keyof StartGroupInput]: StartGroupI
 
 /** @experimental Runtime-owned child execution operations used by the model-facing routes. */
 export interface Service {
-  readonly invoke: (input: Input) => Effect.Effect<ToolExecutor.Outcome>
-  readonly runGroup: (input: StartGroupInput) => Effect.Effect<ToolExecutor.Outcome>
-  readonly startGroup: (input: StartGroupInput) => Effect.Effect<ToolExecutor.Outcome>
-  readonly awaitGroup: (input: AwaitGroupInput) => Effect.Effect<ToolExecutor.Outcome>
+  readonly invoke: (input: Input) => Effect.Effect<Outcome>
+  readonly runGroup: (input: StartGroupInput) => Effect.Effect<Outcome>
+  readonly startGroup: (input: StartGroupInput) => Effect.Effect<Outcome>
+  readonly awaitGroup: (input: AwaitGroupInput) => Effect.Effect<Outcome>
 }
 
 /** @experimental Runtime-owned child execution service. */
 export class ChildRuns extends Context.Service<ChildRuns, Service>()("tenetkit/runtime/child/runs/ChildRuns") {}
 
-const success = <Result>(result: Result): ToolExecutor.Outcome => ({ _tag: "Success", result, encodedResult: result })
+const success = <Result>(result: Result): Outcome => ({ _tag: "Success", result, encodedResult: result })
 
 const ErrorMessage = Schema.Struct({ message: Schema.String })
 
-const domainFailure = <Error>(error: Error): ToolExecutor.Outcome => {
+const domainFailure = <Error>(error: Error): Outcome => {
   const decoded = Schema.decodeUnknownOption(ErrorMessage)(error)
   const failure =
     Schema.is(ChildDepthExceeded)(error) || Schema.is(ChildLimitExceeded)(error)
@@ -279,21 +289,20 @@ export const make = (store: RunStoreService): Service => {
 
 /** @experimental Route Runtime-owned child tools and preserve every resolved upstream handler. */
 const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
-  readonly agent: Agent.Agent<Tools, R>
-  readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
+  readonly agent: Agent<Tools, R>
+  readonly environment: Layer.Layer<ClosedServices<Tools, R>>
   readonly implementation: Service
-  readonly upstream: Option.Option<ToolExecutor.Service>
-}): ToolExecutor.Service => {
+  readonly upstream: Option.Option<ToolExecutorService>
+}): ToolExecutorService => {
   const upstream = Option.getOrUndefined(options.upstream)
   const upstreamCancellation =
     upstream?.cancel !== undefined
       ? {
-          cancellable: (request: ToolExecutor.Request) =>
-            !route.matches(request) && supportsCancellation(upstream, request),
-          cancel: (request: ToolExecutor.CancellationRequest) => upstream.cancel!(request),
+          cancellable: (request: Request) => !route.matches(request) && supportsCancellation(upstream, request),
+          cancel: (request: CancellationRequest) => upstream.cancel!(request),
         }
       : {}
-  return ToolExecutor.ToolExecutor.of({
+  return ToolExecutor.of({
     replayPolicy: (request) => {
       if (route.matches(request)) return "never"
       return Option.isSome(options.upstream) ? (options.upstream.value.replayPolicy?.(request) ?? "never") : "never"
@@ -303,10 +312,10 @@ const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
         return route.execute(request).pipe(Effect.provideService(ChildRuns, options.implementation))
       }
       if (Option.isSome(options.upstream)) return options.upstream.value.execute(request)
-      return Effect.flatMap(Effect.context<ToolContext.ToolContext>(), (context) =>
+      return Effect.flatMap(Effect.context<ToolContext>(), (context) =>
         Effect.scoped(
           Effect.flatMap(Layer.build(options.environment), (environment) =>
-            ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
+            executeToolkit(options.agent.toolkit, request).pipe(
               Effect.provideContext(context),
               Effect.provideContext(environment),
             ),
@@ -322,10 +331,10 @@ const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
 export const Executor = { make: makeExecutor }
 
 const runtimeContext = Effect.gen(function* () {
-  const context = yield* ToolContext.ToolContext
+  const context = yield* ToolContext
   const children = yield* ChildRuns
   if (context.runId === undefined || context.toolCallId === undefined) {
-    return yield* ToolExecutor.FrameworkFailure.make({
+    return yield* FrameworkFailure.make({
       stage: "handler",
       tool: "child-runs",
       message: "child tools require a Runtime-owned ToolContext",
@@ -335,7 +344,7 @@ const runtimeContext = Effect.gen(function* () {
 })
 
 /** @experimental Route for the blocking and grouped child tools. */
-export const route: ToolExecutor.Route<ChildRuns | ToolContext.ToolContext> = ToolExecutor.route({
+export const route: Route<ChildRuns | ToolContext> = toolExecutorRoute({
   tools: [toolName, runGroupToolName, startGroupToolName, awaitGroupToolName],
   execute: (request) =>
     Effect.gen(function* () {
@@ -343,7 +352,7 @@ export const route: ToolExecutor.Route<ChildRuns | ToolContext.ToolContext> = To
       if (request.call.name === toolName) {
         const input = yield* Schema.decodeUnknownEffect(Parameters)(request.call.params).pipe(
           Effect.mapError(() =>
-            ToolExecutor.FrameworkFailure.make({
+            FrameworkFailure.make({
               stage: "decode-input",
               tool: toolName,
               message: "run_child requires one declared selection and a non-empty prompt",
@@ -361,7 +370,7 @@ export const route: ToolExecutor.Route<ChildRuns | ToolContext.ToolContext> = To
       if (request.call.name === runGroupToolName || request.call.name === startGroupToolName) {
         const input = yield* Schema.decodeUnknownEffect(StartGroupParameters)(request.call.params).pipe(
           Effect.mapError((error) =>
-            ToolExecutor.FrameworkFailure.make({
+            FrameworkFailure.make({
               stage: "decode-input",
               tool: request.call.name,
               message: schemaIssueMessage(error),
@@ -380,7 +389,7 @@ export const route: ToolExecutor.Route<ChildRuns | ToolContext.ToolContext> = To
       }
       const input = yield* Schema.decodeUnknownEffect(AwaitGroupParameters)(request.call.params).pipe(
         Effect.mapError(() =>
-          ToolExecutor.FrameworkFailure.make({
+          FrameworkFailure.make({
             stage: "decode-input",
             tool: awaitGroupToolName,
             message: "await_child_group requires a durable groupId",

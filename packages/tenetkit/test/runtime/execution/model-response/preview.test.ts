@@ -6,10 +6,10 @@ import {
   MaxCadenceMillis,
   MaxPayloadCharacters,
   SubscriberCapacity,
-  make,
-  type ModelPreviewEvent,
-  type ModelPreviewFrame,
+  type Event as ModelPreviewEvent,
+  type Frame as ModelPreviewFrame,
 } from "../../../../src/runtime/execution/model-response/preview.js"
+import { make } from "../../../../src/runtime/execution/model-response/preview-internal.js"
 import type { AgentLoopEvent } from "../../../../src/runtime/execution/agent/event.js"
 
 type ModelPart = Extract<AgentLoopEvent, { readonly _tag: "ModelPart" }>

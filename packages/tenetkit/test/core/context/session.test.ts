@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Memory, ModelTelemetry, Session } from "../../../src/core/index"
+import { Memory, ModelTelemetry, Session } from "../../../src/index"
 import { ItLayer } from "../it-layer.js"
 
 const user = (text: string): Prompt.Message =>

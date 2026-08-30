@@ -1,22 +1,32 @@
 import { Effect, Function, Schema, SchemaParser } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { ExecutableRef } from "../executable/manifest.js"
-import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
+import type { AgentLoopEvent, DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionResult } from "../execution/state.js"
 import { ExecutionResult as ExecutionResultSchema, RunFailure as RunFailureSchema, RunId } from "../run.js"
 import { RunWait, WaitResolution } from "./wait.js"
 import { Address } from "../address.js"
-import { AgentEvent } from "../../core/index.js"
-import { ModelTelemetry } from "../../core/model/public/telemetry.js"
+import { ApprovalRequest } from "../../core/agent/event.js"
 import {
-  FanOutJoin,
-  FanOutMemberOrigin,
-  FanOutRemainder,
-  type FanOutMemberOrigin as FanOutOrigin,
-} from "../child/fan-out.js"
+  CompactionApplied,
+  CompactionFailed,
+  CompactionSkipped,
+  CompactionStarted,
+  ModelAttemptCompleted,
+  ModelAttemptFailed,
+  ModelAttemptFirstOutput,
+  ModelAttemptStarted,
+  ModelCallCompleted,
+  ModelCallFailed,
+  ModelCallStarted,
+  ModelFallbackScheduled,
+  ModelRetryScheduled,
+} from "../../core/model/telemetry/events.js"
+import { FanOutJoin, FanOutRemainder } from "../child/fan-out.js"
+import { FanOutMemberOrigin, type FanOutMemberOrigin as FanOutOrigin } from "../child/fan-out-internal.js"
 import { ChildReadiness } from "../child/readiness.js"
 
-export type { DurableAgentLoopEvent, ExecutionResult }
+export type { AgentLoopEvent, ExecutionResult }
 
 export const SpecVersion = Schema.Literals(["1"])
 export type SpecVersion = typeof SpecVersion.Type
@@ -153,7 +163,7 @@ export type RunCancelled = RunEventBase & {
   readonly _tag: "RunCancelled"
   readonly reason?: string
 }
-export type ProgramLog = RunEventBase & {
+type ProgramLog = RunEventBase & {
   readonly _tag: "ProgramLog"
   readonly operation: string
   readonly level: "debug" | "info" | "warn" | "error"
@@ -261,22 +271,22 @@ const Part = Schema.Union([
 ])
 const optionalMetadata = { metadata: Schema.optionalKey(Metadata) }
 const ModelTelemetryEventSchema = Schema.Union([
-  ModelTelemetry.ModelCallStarted,
-  ModelTelemetry.ModelAttemptStarted,
-  ModelTelemetry.ModelAttemptFirstOutput,
-  Schema.Struct({ ...ModelTelemetry.ModelAttemptCompleted.fields, usage: Usage }),
-  ModelTelemetry.ModelAttemptFailed,
-  ModelTelemetry.ModelRetryScheduled,
-  ModelTelemetry.ModelFallbackScheduled,
+  ModelCallStarted,
+  ModelAttemptStarted,
+  ModelAttemptFirstOutput,
+  Schema.Struct({ ...ModelAttemptCompleted.fields, usage: Usage }),
+  ModelAttemptFailed,
+  ModelRetryScheduled,
+  ModelFallbackScheduled,
   Schema.Struct({
-    ...ModelTelemetry.ModelCallCompleted.fields,
+    ...ModelCallCompleted.fields,
     usage: Schema.optionalKey(Usage),
   }),
-  ModelTelemetry.ModelCallFailed,
-  ModelTelemetry.CompactionStarted,
-  ModelTelemetry.CompactionSkipped,
-  ModelTelemetry.CompactionApplied,
-  ModelTelemetry.CompactionFailed,
+  ModelCallFailed,
+  CompactionStarted,
+  CompactionSkipped,
+  CompactionApplied,
+  CompactionFailed,
 ])
 export const CompletedModelResponse = Schema.Struct({
   content: Schema.Array(Part),
@@ -364,7 +374,7 @@ const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("ApprovalRequested", {
     turn: Schema.Finite,
     call: ToolCall,
-    request: AgentEvent.ApprovalRequest,
+    request: ApprovalRequest,
     ...optionalMetadata,
   }),
   Schema.TaggedStruct("SteeringDrained", {

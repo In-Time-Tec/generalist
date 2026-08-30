@@ -3,7 +3,8 @@ import type { Tool } from "effect/unstable/ai"
 import type { Agent, ToolSchedulingPolicy } from "../../agent/service.js"
 import { validationFailure as toolSchedulingFailure } from "../../agent/tools/scheduler.js"
 import { BudgetLimits } from "../run-budget.js"
-import { AgentPin, CapabilityPin, ModelPin, Pin } from "../pin.js"
+import { makeAgent } from "../pin-internal.js"
+import { AgentPin, CapabilityPin, ModelPin } from "../pin.js"
 import { digest } from "../canonical-json.js"
 import { NamedCapability, PinnedContent, namedCapabilityWith, type NamedCapabilityEncoded } from "../capability.js"
 import { ProgramBudget, type ProgramAgentCapability } from "./program-manifest.js"
@@ -14,7 +15,7 @@ const compareText = (left: string, right: string): number => {
   return 0
 }
 
-export { NamedCapability, PinnedContent, type NamedCapabilityEncoded }
+export { NamedCapability, PinnedContent }
 
 /** @experimental One child profile name this Agent may select from its executable registry. */
 export interface ChildSelection {
@@ -75,16 +76,16 @@ export interface AgentManifest {
   readonly children: ReadonlyArray<ChildSelection>
 }
 
-export type PolicyIdentityEncoded =
+type PolicyIdentityEncoded =
   | { readonly _tag: "Portable"; readonly policy: PortablePolicy }
   | { readonly _tag: "Pinned"; readonly pin: string }
 
-export interface CompactionIdentityEncoded extends Omit<CompactionIdentity, "service" | "summaryModel"> {
+interface CompactionIdentityEncoded extends Omit<CompactionIdentity, "service" | "summaryModel"> {
   readonly service: string
   readonly summaryModel: string
 }
 
-export interface AgentManifestEncoded
+interface AgentManifestEncoded
   extends Omit<
     AgentManifest,
     "model" | "tools" | "skills" | "services" | "policy" | "compaction" | "programAuthority" | "children"
@@ -256,7 +257,7 @@ export const make = (input: Omit<AgentManifest, "version"> & { readonly version?
           },
         }
   const manifest = Schema.decodeSync(AgentManifest, { onExcessProperty: "error" })(manifestInput)
-  return { manifest, pin: Pin.makeAgent(manifest) }
+  return { manifest, pin: makeAgent(manifest) }
 }
 
 /** @experimental Build an exact manifest for a live Agent using explicitly supplied opaque dependencies. */

@@ -1,6 +1,7 @@
 import { Schema } from "effect"
-import { AgentEvent, ProgramCapabilities } from "../../core/index.js"
-import { DurableDriver } from "../../core/durable/public/driver.js"
+import { AgentSuspended } from "../../core/agent/event.js"
+import { ProgramSuspended } from "../../core/program/capabilities.js"
+import { DriverCheckpoint } from "../../core/durable/driver.js"
 
 export const SessionCursor = Schema.Struct({
   sessionId: Schema.String,
@@ -37,15 +38,15 @@ export const ProgramCheckpoint = Schema.TaggedStruct("Program", {
 export type ProgramCheckpoint = typeof ProgramCheckpoint.Type
 
 /** @experimental Executable-neutral persisted continuation state. */
-export const ExecutionCheckpoint = Schema.Union([DurableDriver.DriverCheckpoint, ProgramCheckpoint])
+export const ExecutionCheckpoint = Schema.Union([DriverCheckpoint, ProgramCheckpoint])
 /** @experimental */
 export type ExecutionCheckpoint = typeof ExecutionCheckpoint.Type
 
 /** @experimental Executable-neutral persisted suspension state. */
 /** @experimental */
-export type ExecutionSuspension = AgentEvent.AgentSuspended | ProgramCapabilities.ProgramSuspended
+export type ExecutionSuspension = AgentSuspended | ProgramSuspended
 /** @experimental */
 export const ExecutionSuspension: Schema.Codec<ExecutionSuspension, unknown> = Schema.Union([
-  AgentEvent.AgentSuspended,
-  ProgramCapabilities.ProgramSuspended,
+  AgentSuspended,
+  ProgramSuspended,
 ])

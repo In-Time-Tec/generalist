@@ -13,7 +13,7 @@ export const providers = definePage({
   navTitle: "Register model providers",
   group: "Guides",
   description:
-    "Bind provider and model pairs to language-model layers with tenetkit/ai, combine registries, and keep a deterministic fallback for keyless environments.",
+    "Bind provider and model pairs from exact tenetkit/ai/* leaves, combine registries, and keep a deterministic fallback for keyless environments.",
   content: [
     p(
       code("tenetkit"),
@@ -26,12 +26,12 @@ export const providers = definePage({
       " layer and fails with a typed ",
       code("LanguageModelNotRegistered"),
       " when the selection is missing. ",
-      code("tenetkit/ai"),
-      " adds registration helpers over the upstream ",
+      code("tenetkit/ai/*"),
+      " leaves add registration helpers over the upstream ",
       code("@effect/ai-*"),
       " packages.",
     ),
-    command("Terminal", "bun add tenetkit tenetkit/ai"),
+    command("Terminal", "bun add effect tenetkit"),
     h2("register-one-provider", "1. Register a provider"),
     p(
       "Each provider module ships one ",
@@ -169,7 +169,7 @@ export const providers = definePage({
       "For context windows and pricing of models reached through presets, pass overrides to the offline ",
       code("ModelCatalog.layer"),
       ". The full export map is in ",
-      link("/docs/reference/providers", "the tenetkit/ai reference"),
+      link("/docs/reference/providers", "the provider-leaf reference"),
       ". To pin loop behavior without any provider at all, see ",
       link("/docs/guides/testing-evals", "How to test agents and run evals in CI"),
       ".",

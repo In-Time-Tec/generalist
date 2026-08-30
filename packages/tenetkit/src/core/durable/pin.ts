@@ -1,8 +1,6 @@
 import { Function, Schema } from "effect"
+export { digest } from "./canonical-json.js"
 import { digest } from "./canonical-json.js"
-
-/** @experimental Closed JSON identity accepted by durable pin constructors. */
-export type PinIdentity = Schema.Json
 
 const decodeIdentity = Schema.decodeUnknownSync(Schema.Json)
 
@@ -39,21 +37,17 @@ export const ExecutablePin = pinSchema("executable-pin")
 /** @experimental */
 export type ExecutablePin = typeof ExecutablePin.Type
 
-/** @experimental Constructors for every durable pin identity. */
-export const Pin = {
-  makeModel: Function.flow(decodeIdentity, (identity) =>
-    Schema.decodeSync(ModelPin)(`model-pin:v1:sha256:${digest(identity)}`),
-  ),
-  makeCapability: Function.flow(decodeIdentity, (identity) =>
-    Schema.decodeSync(CapabilityPin)(`capability-pin:v1:sha256:${digest(identity)}`),
-  ),
-  makeAgent: Function.flow(decodeIdentity, (identity) =>
-    Schema.decodeSync(AgentPin)(`agent-pin:v1:sha256:${digest(identity)}`),
-  ),
-  makeProgram: Function.flow(decodeIdentity, (identity) =>
-    Schema.decodeSync(ProgramPin)(`program-pin:v1:sha256:${digest(identity)}`),
-  ),
-  makeExecutable: Function.flow(decodeIdentity, (identity) =>
-    Schema.decodeSync(ExecutablePin)(`executable-pin:v1:sha256:${digest(identity)}`),
-  ),
-}
+/** @experimental Construct the exact identity of a model implementation and configuration. */
+export const makeModel = Function.flow(decodeIdentity, (identity) =>
+  Schema.decodeSync(ModelPin)(`model-pin:v1:sha256:${digest(identity)}`),
+)
+
+/** @experimental Construct the exact identity of a tool, skill, service, or policy capability. */
+export const makeCapability = Function.flow(decodeIdentity, (identity) =>
+  Schema.decodeSync(CapabilityPin)(`capability-pin:v1:sha256:${digest(identity)}`),
+)
+
+/** @experimental Construct the exact identity of one closed Agent Program manifest. */
+export const makeProgram = Function.flow(decodeIdentity, (identity) =>
+  Schema.decodeSync(ProgramPin)(`program-pin:v1:sha256:${digest(identity)}`),
+)

@@ -2,7 +2,8 @@ import { Effect, Function, Schema } from "effect"
 import type { ParseOptions } from "effect/SchemaAST"
 import { AgentManifest, make as makeManifest, type PinnedAgent } from "./agent-manifest.js"
 import { ProgramManifest, make as makeProgramManifest, type PinnedProgram } from "./program-manifest.js"
-import { AgentPin, ExecutablePin, Pin, ProgramPin } from "../pin.js"
+import { makeExecutable } from "../pin-internal.js"
+import { AgentPin, ExecutablePin, ProgramPin, makeCapability, makeModel } from "../pin.js"
 
 const compareText = (left: string, right: string): number => {
   if (left < right) return -1
@@ -57,29 +58,29 @@ export interface PinnedExecutable {
   readonly manifest: ExecutableManifest
 }
 
-export interface AgentEntryEncoded extends Omit<AgentEntry, "pin" | "manifest"> {
+interface AgentEntryEncoded extends Omit<AgentEntry, "pin" | "manifest"> {
   readonly pin: string
   readonly manifest: typeof AgentManifest.Encoded
 }
 
-export interface ProgramEntryEncoded extends Omit<ProgramEntry, "pin" | "manifest"> {
+interface ProgramEntryEncoded extends Omit<ProgramEntry, "pin" | "manifest"> {
   readonly pin: string
   readonly manifest: typeof ProgramManifest.Encoded
 }
 
-export type ExecutableEntryEncoded = AgentEntryEncoded | ProgramEntryEncoded
+type ExecutableEntryEncoded = AgentEntryEncoded | ProgramEntryEncoded
 
-export interface ProfileBindingEncoded extends Omit<ProfileBinding, "agent"> {
+interface ProfileBindingEncoded extends Omit<ProfileBinding, "agent"> {
   readonly agent: string
 }
 
-export interface ExecutableManifestEncoded extends Omit<ExecutableManifest, "root" | "profiles" | "entries"> {
+interface ExecutableManifestEncoded extends Omit<ExecutableManifest, "root" | "profiles" | "entries"> {
   readonly root: string
   readonly profiles: ReadonlyArray<ProfileBindingEncoded>
   readonly entries: ReadonlyArray<ExecutableEntryEncoded>
 }
 
-export interface PinnedExecutableEncoded extends Omit<PinnedExecutable, "ref" | "manifest"> {
+interface PinnedExecutableEncoded extends Omit<PinnedExecutable, "ref" | "manifest"> {
   readonly ref: typeof ExecutableRef.Encoded
   readonly manifest: ExecutableManifestEncoded
 }
@@ -176,7 +177,7 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
     const pin = entry._tag === "Agent" ? makeManifest(entry.manifest).pin : makeProgramManifest(entry.manifest).pin
     if (pin !== entry.pin) throw new TypeError(`${entry._tag} manifest digest mismatch: ${entry.pin}`)
   }
-  if (ref.executable !== Pin.makeExecutable(manifest)) throw new TypeError("Executable manifest digest mismatch")
+  if (ref.executable !== makeExecutable(manifest)) throw new TypeError("Executable manifest digest mismatch")
   return pinned
 }
 
@@ -203,21 +204,21 @@ export const make = (input: {
     profiles,
     entries,
   })
-  return validate({ manifest, ref: { executable: Pin.makeExecutable(manifest), active } })
+  return validate({ manifest, ref: { executable: makeExecutable(manifest), active } })
 }
 
 /** @experimental Canonical executable fixture for tests and non-running documentation examples. */
-export const test: {
+export const makeTest: {
   (revision?: string): (name: string) => PinnedExecutable
   (name: string, revision?: string): PinnedExecutable
 } = Function.dual(2, (name: string, revision: string = "1"): PinnedExecutable => {
   const agent = makeManifest({
     name,
-    model: Pin.makeModel({ fixture: name, revision }),
+    model: makeModel({ fixture: name, revision }),
     tools: [],
     skills: [],
     services: [],
-    policy: { _tag: "Pinned", pin: Pin.makeCapability({ fixture: name, policy: revision }) },
+    policy: { _tag: "Pinned", pin: makeCapability({ fixture: name, policy: revision }) },
     toolScheduling: { maxConcurrency: 1, parallelSafe: [] },
     budget: {},
     children: [],

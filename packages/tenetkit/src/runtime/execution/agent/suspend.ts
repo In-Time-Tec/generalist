@@ -1,5 +1,5 @@
 import { DateTime, Effect } from "effect"
-import type { AgentEvent } from "../../../core/agent/public/event.js"
+import type { AgentSuspended } from "../../../core/agent/event.js"
 import type { Service as CodeMode } from "../../code-mode.js"
 import type { Service as NestedOperations } from "../../operation/nested-operations.js"
 import type { ExecutionClaim, Service as RunStore } from "../../run/store.js"
@@ -12,7 +12,7 @@ export const suspend = (input: {
   readonly store: RunStore
   readonly nested: NestedOperations
   readonly codeMode?: CodeMode
-  readonly suspension: AgentEvent.AgentSuspended
+  readonly suspension: AgentSuspended
 }) =>
   Effect.gen(function* () {
     const openedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))

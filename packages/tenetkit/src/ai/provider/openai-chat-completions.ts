@@ -1,5 +1,11 @@
 import { OpenAiClient as OpenAIClient, OpenAiLanguageModel as OpenAILanguageModel } from "@effect/ai-openai-compat"
-import { ModelRegistry } from "../../core/index.js"
+import {
+  type FailureClassifier,
+  type ModelRegistry,
+  type ToolJsonSchemaCompiler,
+  layer as modelRegistryLayer,
+  registration,
+} from "../../core/model/registry.js"
 import { isAvailabilityFailure } from "../model/failure.js"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
@@ -12,7 +18,7 @@ export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
   readonly config?: Config
-  readonly classifyFailure?: ModelRegistry.FailureClassifier
+  readonly classifyFailure?: FailureClassifier
 }
 
 /** @experimental */
@@ -31,7 +37,7 @@ type ConfigInput = typeof Schema.Unknown.Type
 export const decodeConfig = (options: ConfigInput): Config => Schema.decodeUnknownSync(ConfigSchema)(options ?? {})
 
 /** @experimental */
-export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool, { transformer: OpenAIStructuredOutput.toCodecOpenAI }),
     catch: (error) =>
@@ -79,10 +85,8 @@ const clientOptions = (input: ClientOptions) => {
 }
 
 /** @experimental */
-export const layer = (
-  input: ClientOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
+  modelRegistryLayer([registration(registrationOptions(input))]).pipe(
     Layer.provide(OpenAIClient.layerConfig(clientOptions(input))),
   )
 

@@ -1,7 +1,7 @@
 import "./suites/nested-operation-render-suite.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Ref } from "effect"
-import { NestedOperation, ToolContext } from "../../../src/core/index"
+import { NestedOperation, ToolContext } from "../../../src/index"
 import type { Request } from "../../../src/core/tools/nested-operation.js"
 
 /** Build one context+operations environment in the test's own scope, never at a nested boundary. */

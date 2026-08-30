@@ -4,7 +4,7 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
 import { RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
-import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor.js"
+import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor-internal.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import {
   assistant,

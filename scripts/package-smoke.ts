@@ -7,6 +7,7 @@ import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
   catalogVersion,
   compressedSizeLimits,
+  exactPackageExports,
   forbiddenPackageExports,
   packedEffectDependencies,
   packedProviderDependencies,
@@ -101,6 +102,120 @@ const run = Effect.fn("PackageSmoke.run")(function* (
     return yield* smokeError(`${command} ${args.join(" ")} failed\n${stdout}\n${stderr}`)
   }
   return stdout
+})
+
+const installedPackages = Effect.fn("PackageSmoke.installedPackages")(function* (
+  directory: string,
+  dependencies: ReadonlyArray<string>,
+) {
+  const found: Array<string> = []
+  for (const dependency of dependencies) {
+    const installed = (yield* run(
+      "find",
+      ["node_modules", "-path", `*/${dependency}/package.json`, "-print"],
+      directory,
+    )).trim()
+    if (installed.length > 0) found.push(installed)
+  }
+  return found
+})
+
+const emittedFiles = Effect.fn("PackageSmoke.emittedFiles")(function* (directory: string, extension: ".js" | ".d.ts") {
+  const listing = yield* run("find", [directory, "-type", "f", "-name", `*${extension}`, "-print"], directory)
+  return sorted(
+    listing.split("\n").filter((file) => file.length > 0),
+    (left, right) => left.localeCompare(right),
+  )
+})
+
+const verifyLocalRuntimeGraph = Effect.fn("PackageSmoke.verifyLocalRuntimeGraph")(function* (directory: string) {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const files = yield* emittedFiles(directory, ".js")
+  const nodes = new Set(files.map((file) => path.resolve(file)))
+  const graph = new Map<string, Array<string>>(Array.from(nodes, (file) => [file, []]))
+  const transpiler = new Bun.Transpiler({ loader: "js" })
+  let edges = 0
+  for (const file of nodes) {
+    const imports = transpiler.scanImports(yield* fileSystem.readFileString(file))
+    for (const item of imports) {
+      if (item.kind !== "import-statement" || !item.path.startsWith(".")) continue
+      const target = path.resolve(path.dirname(file), item.path)
+      if (!nodes.has(target)) continue
+      graph.get(file)!.push(target)
+      edges += 1
+    }
+  }
+
+  let nextIndex = 0
+  const indices = new Map<string, number>()
+  const lowLinks = new Map<string, number>()
+  const stack: Array<string> = []
+  const onStack = new Set<string>()
+  const cycles: Array<Array<string>> = []
+  const visit = (node: string): void => {
+    indices.set(node, nextIndex)
+    lowLinks.set(node, nextIndex)
+    nextIndex += 1
+    stack.push(node)
+    onStack.add(node)
+    for (const target of graph.get(node)!) {
+      if (!indices.has(target)) {
+        visit(target)
+        lowLinks.set(node, Math.min(lowLinks.get(node)!, lowLinks.get(target)!))
+      } else if (onStack.has(target)) {
+        lowLinks.set(node, Math.min(lowLinks.get(node)!, indices.get(target)!))
+      }
+    }
+    if (lowLinks.get(node) !== indices.get(node)) return
+    const component: Array<string> = []
+    while (true) {
+      const member = stack.pop()!
+      onStack.delete(member)
+      component.push(member)
+      if (member === node) break
+    }
+    if (component.length > 1 || graph.get(node)!.includes(node)) cycles.push(component)
+  }
+  for (const node of nodes) if (!indices.has(node)) visit(node)
+  if (cycles.length > 0) {
+    const members = sorted(
+      cycles.flatMap((cycle) => cycle.map((file) => path.relative(directory, file))),
+      (left, right) => left.localeCompare(right),
+    )
+    return yield* smokeError(`TenetKit emitted runtime graph contains local cycles:\n${members.join("\n")}`)
+  }
+  yield* Console.log(`${nodes.size} TenetKit runtime modules, ${edges} local static edges, 0 cycles`)
+})
+
+const verifyDeclarationSpecifiers = Effect.fn("PackageSmoke.verifyDeclarationSpecifiers")(function* (root: string) {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const allowed = new Set(
+    packages.flatMap((packageName) =>
+      exactPackageExports[packageName].map((specifier) =>
+        specifier === "." ? packageNames[packageName] : `${packageNames[packageName]}${specifier.slice(1)}`,
+      ),
+    ),
+  )
+  const blocked: Array<string> = []
+  const transpiler = new Bun.Transpiler({ loader: "ts" })
+  for (const packageName of packages) {
+    const directory = path.join(root, "packages", packageName, "dist")
+    for (const file of yield* emittedFiles(directory, ".d.ts")) {
+      for (const item of transpiler.scanImports(yield* fileSystem.readFileString(file))) {
+        if (item.path !== "tenetkit" && !item.path.startsWith("tenetkit/") && !item.path.startsWith("@tenetkit/")) {
+          continue
+        }
+        if (!allowed.has(item.path)) blocked.push(`${path.relative(root, file)} -> ${item.path}`)
+      }
+    }
+  }
+  if (blocked.length > 0) {
+    return yield* smokeError(
+      `public declarations reference blocked package paths:\n${sorted(blocked, (left, right) => left.localeCompare(right)).join("\n")}`,
+    )
+  }
 })
 
 const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints")(function* (input: {
@@ -284,6 +399,8 @@ const program = Effect.gen(function* () {
   yield* fileSystem.makeDirectory(consumerDirectory, { recursive: true })
 
   yield* run("bun", ["run", "build"], root)
+  yield* verifyLocalRuntimeGraph(path.join(root, "packages", "tenetkit", "dist"))
+  yield* verifyDeclarationSpecifiers(root)
 
   const packAndValidatePackages = Effect.gen(function* () {
     const tarballs: Record<string, string> = {}
@@ -369,6 +486,10 @@ const program = Effect.gen(function* () {
           }
           if (!Equal.equals(manifest.exports, sourceManifest.exports)) {
             return yield* smokeError(`@tenetkit/${packageName} changed its public exports`)
+          }
+          const actualExports = sorted(Object.keys(manifest.exports), (left, right) => left.localeCompare(right))
+          if (!Equal.equals(actualExports, exactPackageExports[packageName])) {
+            return yield* smokeError(`@tenetkit/${packageName} exact exports changed: ${actualExports.join(", ")}`)
           }
           for (const [specifier, target] of Object.entries(manifest.exports)) {
             if (!Equal.equals(Object.keys(target), ["types", "import"])) {
@@ -602,7 +723,7 @@ const { VectorStore } = await import("tenetkit/memory")
 const { State, Store } = await import("tenetkit/agent-guidance")
 const { MCPClient } = await import("tenetkit/mcp")
 const McpHttpClient = await import("tenetkit/mcp/client/http")
-const { ModelCatalog } = await import("tenetkit/ai")
+const ModelCatalog = await import("tenetkit/ai/model-catalog")
 const OpenAI = await import("tenetkit/ai/openai")
 const skills = await import("tenetkit/skills")
 const { TestModel } = await import("tenetkit/test")
@@ -704,17 +825,20 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
     path.join(coreConsumerDirectory, "runtime.mjs"),
     `import { Agent, Session } from "tenetkit"
 import { Runtime } from "tenetkit/runtime"
-import { ModelCatalog, Deterministic, ModelRoute } from "tenetkit/ai"
+import { layer as modelCatalogLayer } from "tenetkit/ai/model-catalog"
+import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
+import { make as makeModelRoute } from "tenetkit/ai/model-route"
 if (Agent === undefined || Session === undefined) throw new Error("core export is missing")
 if (Runtime.layerMemory === undefined) throw new Error("generic Runtime export is missing")
-if (ModelCatalog === undefined || Deterministic === undefined || ModelRoute === undefined) throw new Error("neutral AI export is missing")
+if (modelCatalogLayer === undefined || deterministicLayer === undefined || makeModelRoute === undefined) throw new Error("provider-neutral AI leaf is missing")
 `,
   )
   yield* fileSystem.writeFileString(
     path.join(coreConsumerDirectory, "typecheck.ts"),
-    `import { ModelCatalog, Deterministic, ModelRoute } from "tenetkit/ai"
-import { make } from "tenetkit/ai/model-route"
-void [ModelCatalog, Deterministic, ModelRoute, make]
+    `import { layer as modelCatalogLayer } from "tenetkit/ai/model-catalog"
+import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
+import { make as makeModelRoute } from "tenetkit/ai/model-route"
+void [modelCatalogLayer, deterministicLayer, makeModelRoute]
 `,
   )
   yield* fileSystem.writeFileString(
@@ -748,13 +872,18 @@ console.log(Runtime.layerMemory)
   yield* run("bun", ["install", "--linker=isolated"], coreConsumerDirectory, {
     BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache"),
   })
-  const unexpectedIntegrations = (yield* run(
-    "find",
-    ["node_modules", "-path", "*/@effect/ai-anthropic/package.json", "-print"],
-    coreConsumerDirectory,
-  )).trim()
+  const unexpectedIntegrations = yield* installedPackages(coreConsumerDirectory, [
+    "@effect/ai-anthropic",
+    "@effect/ai-openai",
+    "@effect/ai-openai-compat",
+    "@effect/ai-openrouter",
+    "@aws-sdk/client-bedrock-runtime",
+    "@aws-sdk/credential-provider-node",
+  ])
   if (unexpectedIntegrations.length > 0) {
-    return yield* smokeError(`core-only consumer installed optional provider SDKs:\n${unexpectedIntegrations}`)
+    return yield* smokeError(
+      `provider-free consumer installed optional provider SDKs:\n${unexpectedIntegrations.join("\n")}`,
+    )
   }
   const unexpectedSqlite = (yield* run(
     "find",
@@ -825,6 +954,18 @@ void [layer, options]
     BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache"),
   })
   yield* run("bun", ["tsc", "--noEmit"], openRouterConsumerDirectory)
+  const unexpectedOpenRouterPeers = yield* installedPackages(openRouterConsumerDirectory, [
+    "@effect/ai-anthropic",
+    "@effect/ai-openai",
+    "@effect/ai-openai-compat",
+    "@aws-sdk/client-bedrock-runtime",
+    "@aws-sdk/credential-provider-node",
+  ])
+  if (unexpectedOpenRouterPeers.length > 0) {
+    return yield* smokeError(
+      `OpenRouter-only Bun consumer installed unrelated provider SDKs:\n${unexpectedOpenRouterPeers.join("\n")}`,
+    )
+  }
   yield* run(
     "env",
     [
@@ -838,6 +979,48 @@ void [layer, options]
       'await import("tenetkit/ai/openrouter")',
     ],
     openRouterConsumerDirectory,
+  )
+  yield* run(
+    "env",
+    ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "bun", "-e", 'await import("tenetkit/ai/openrouter")'],
+    openRouterConsumerDirectory,
+  )
+
+  const npmOpenRouterConsumerDirectory = path.join(directory, "npm-openrouter-consumer")
+  yield* fileSystem.makeDirectory(npmOpenRouterConsumerDirectory)
+  for (const filename of ["package.json", "tsconfig.json", "proof.ts"]) {
+    yield* fileSystem.copyFile(
+      path.join(openRouterConsumerDirectory, filename),
+      path.join(npmOpenRouterConsumerDirectory, filename),
+    )
+  }
+  yield* run("npm", ["install", "--ignore-scripts", "--legacy-peer-deps"], npmOpenRouterConsumerDirectory)
+  yield* run("npx", ["tsc", "--noEmit"], npmOpenRouterConsumerDirectory)
+  const unexpectedNpmOpenRouterPeers = yield* installedPackages(npmOpenRouterConsumerDirectory, [
+    "@effect/ai-anthropic",
+    "@effect/ai-openai",
+    "@effect/ai-openai-compat",
+    "@aws-sdk/client-bedrock-runtime",
+    "@aws-sdk/credential-provider-node",
+  ])
+  if (unexpectedNpmOpenRouterPeers.length > 0) {
+    return yield* smokeError(
+      `OpenRouter-only npm consumer installed unrelated provider SDKs:\n${unexpectedNpmOpenRouterPeers.join("\n")}`,
+    )
+  }
+  yield* run(
+    "env",
+    [
+      "-u",
+      "NODE_PATH",
+      "-u",
+      "NODE_OPTIONS",
+      "node",
+      "--input-type=module",
+      "-e",
+      'await import("tenetkit/ai/openrouter")',
+    ],
+    npmOpenRouterConsumerDirectory,
   )
 
   const npmConsumerDirectory = path.join(directory, "npm-consumer")

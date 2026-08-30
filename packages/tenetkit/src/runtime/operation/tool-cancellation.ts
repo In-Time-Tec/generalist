@@ -1,18 +1,18 @@
 import { Clock, Effect, Layer, Option, Schema } from "effect"
-import { ToolContext } from "../../core/index.js"
-import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
+import { ToolContext } from "../../core/tools/tool-context.js"
+import { CancellationFailure, type CancellationRequest, ToolExecutor } from "../../core/tools/tool-executor.js"
 import { decodeCancellableOperation, supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { AgentExecutionFailure } from "../errors.js"
 import type { Service as ExecutableResolver } from "../executable/resolver.js"
 import { selectToolExecutor } from "../execution/context.js"
-import { ExecutionResolution } from "../execution/resolution.js"
+import { ExecutionResolution } from "../execution/resolution/resolve.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
 
 export const make = (options: { readonly store: RunStore; readonly resolver: ExecutableResolver }) =>
   Effect.gen(function* () {
-    const ambient = yield* Effect.serviceOption(ToolExecutor.ToolExecutor)
+    const ambient = yield* Effect.serviceOption(ToolExecutor)
     return (claim: ExecutionClaim, claimed: ExecutionRecord) =>
       Effect.scoped(
         Effect.gen(function* () {
@@ -31,7 +31,7 @@ export const make = (options: { readonly store: RunStore; readonly resolver: Exe
                 const services = yield* Layer.build(environment)
                 const selected = selectToolExecutor(services, ambient)
                 if (Option.isNone(selected)) {
-                  return yield* ToolExecutor.CancellationFailure.make({
+                  return yield* CancellationFailure.make({
                     tool: "unknown",
                     message: `Run ${claim.runId} has no ToolExecutor for durable cancellation`,
                   })
@@ -43,18 +43,18 @@ export const make = (options: { readonly store: RunStore; readonly resolver: Exe
                     ? decodeCancellableOperation(envelope.value.cancellation)
                     : undefined
                   if (execution === undefined) {
-                    return yield* ToolExecutor.CancellationFailure.make({
+                    return yield* CancellationFailure.make({
                       tool: "unknown",
                       message: `Operation ${operation.operationId} has invalid cancellation identity`,
                     })
                   }
                   if (!supportsCancellation(executor, execution)) {
-                    return yield* ToolExecutor.CancellationFailure.make({
+                    return yield* CancellationFailure.make({
                       tool: execution.call.name,
                       message: `ToolExecutor route for ${execution.call.name} no longer supports cancellation`,
                     })
                   }
-                  const request: ToolExecutor.CancellationRequest = {
+                  const request: CancellationRequest = {
                     operationKey: operation.operationKey,
                     attempt: operation.attempt,
                     sessionId: claimed.message.sessionId,
@@ -72,8 +72,8 @@ export const make = (options: { readonly store: RunStore; readonly resolver: Exe
                     const signal = yield* Effect.abortSignal
                     const acknowledged = yield* executor.cancel!(request).pipe(
                       Effect.provideService(
-                        ToolContext.ToolContext,
-                        ToolContext.ToolContext.of({
+                        ToolContext,
+                        ToolContext.of({
                           signal,
                           emit: () => Effect.succeed(true),
                           sessionId: request.sessionId,

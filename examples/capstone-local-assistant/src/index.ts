@@ -13,7 +13,7 @@ import {
 } from "tenetkit"
 import { Chat, Connection } from "tenetkit/foldkit"
 import { WorkingMemory } from "tenetkit/memory"
-import { Deterministic } from "tenetkit/ai"
+import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
 import { FileSystemCatalog } from "tenetkit/skills"
 import { ExecutableManifest } from "tenetkit/runtime"
 
@@ -113,7 +113,7 @@ const program = Effect.gen(function* () {
 })
 
 const runtimeLayer = Layer.mergeAll(
-  Deterministic.layer({ model: "capstone" }),
+  deterministicLayer({ model: "capstone" }),
   toolkitLayer,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,

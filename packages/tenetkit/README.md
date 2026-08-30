@@ -1,12 +1,12 @@
 # TenetKit
 
-Effect-native agent framework. Import core from `tenetkit`, or use the explicit Worker-safe alias `tenetkit/core`. The `tenetkit/ai` entry contains only provider-neutral `ModelCatalog`, `Deterministic`, and `ModelRoute`; install a selected optional provider peer and import its exact `tenetkit/ai/*` subpath.
+Effect-native agent framework. Import the Worker-safe agent API from `tenetkit`. Provider-neutral catalog, deterministic model, and route owners live at `tenetkit/ai/model-catalog`, `tenetkit/ai/deterministic`, and `tenetkit/ai/model-route`; optional providers remain exact `tenetkit/ai/*` leaves.
 
 ## Worker-safe entrypoints
 
 The packed-artifact smoke suite bundles and executes these public entrypoints under workerd without `nodejs_compat`:
 
-- `tenetkit/core`
+- `tenetkit`
 - `tenetkit/mcp`, `tenetkit/mcp/client`, `tenetkit/mcp/client/http`, `tenetkit/mcp/oauth`, and `tenetkit/mcp/tools`
 - `tenetkit/ai/openrouter`
 - `tenetkit/runtime`

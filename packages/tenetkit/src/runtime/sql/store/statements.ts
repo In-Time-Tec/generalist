@@ -2,7 +2,8 @@ import { DateTime, Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { eventIdFor, type RunEvent } from "../../run/event.js"
-import { decodePinned, type ExecutableManifest, type ExecutableRef } from "../../executable/manifest.js"
+import { decodePinned } from "../../executable/manifest-internal.js"
+import type { ExecutableManifest, ExecutableRef } from "../../executable/manifest.js"
 import type { Message } from "../../messaging/message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
 import {
@@ -17,7 +18,8 @@ import {
 } from "../codec/codecs.js"
 import type { EventHub } from "../subscribers.js"
 import type { DecodedRun, EventRow, RunRow, WaitRow } from "../codec/rows.js"
-import { decodeReason, WaitResolution, type RunWait } from "../../run/wait.js"
+import { WaitResolution, type RunWait } from "../../run/wait.js"
+import { decodeReason } from "../../run/wait-internal.js"
 import {
   hasPendingOperationCancellation,
   hasUnknownOperation,

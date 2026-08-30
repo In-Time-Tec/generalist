@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { Response, Tool } from "effect/unstable/ai"
-import { Approvals, Permissions, ToolAuthorization } from "../../../src/core/index"
+import { Approvals, Permissions, ToolAuthorization } from "../../../src/index"
 
 const call = Schema.decodeSync(Response.ToolCallPart("echo", Schema.Struct({ text: Schema.String })))({
   type: "tool-call",

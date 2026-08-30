@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect"
-import type { Session } from "../../core/index.js"
+import type { Entry } from "../../core/context/session.js"
 import { RuntimeUnavailable, SessionEntryCorrupt, SessionEntryNotFound } from "../errors.js"
 import type { Service as RunStoreService } from "../run/store.js"
 import type { ModelResponseEvent, SessionEntryInput } from "../service.js"
@@ -13,9 +13,7 @@ import { interruptedSessionEntryId, resolveInterruptedModelResponse } from "../e
 
 export const readEntry =
   (store: RunStoreService) =>
-  (
-    input: SessionEntryInput,
-  ): Effect.Effect<Session.Entry, SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable> =>
+  (input: SessionEntryInput): Effect.Effect<Entry, SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable> =>
     Effect.gen(function* () {
       const session = yield* store.sessionReader(input.sessionId)
       if (Option.isNone(session)) {

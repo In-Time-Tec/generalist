@@ -1,8 +1,8 @@
 import { DateTime, Equal, Function, Schema } from "effect"
-import { Session } from "../../../core/index.js"
+import { EntryPayload } from "../../../core/context/session.js"
 
-const decodeEntry = Schema.decodeUnknownSync(Session.EntryPayload)
-const encodeEntry = Schema.encodeSync(Session.EntryPayload)
+const decodeEntry = Schema.decodeUnknownSync(EntryPayload)
+const encodeEntry = Schema.encodeSync(EntryPayload)
 const CODEC_MARKER = "tenetkit/runtime/session-codec"
 const UNDEFINED_MARKER = { [CODEC_MARKER]: "undefined" }
 const EncodedRecordSchema = Schema.Record(Schema.String, Schema.Unknown)
@@ -116,23 +116,23 @@ const payloadIdentity = (value: EncodedValue, seen: Set<EncodedValue>): PayloadI
   return ["Object", entries]
 }
 
-const payloadOnly = (value: Session.EntryPayload): EncodedRecord =>
+const payloadOnly = (value: EntryPayload): EncodedRecord =>
   Object.fromEntries(
     Object.entries(decodeEncodedRecord(encodeEntry(value))).filter(([key]) => key !== "id" && key !== "parentId"),
   )
 
-const sessionPayloadEquivalenceImpl = (self: Session.EntryPayload, that: Session.EntryPayload): boolean =>
+const sessionPayloadEquivalenceImpl = (self: EntryPayload, that: EntryPayload): boolean =>
   Equal.equals(payloadIdentity(payloadOnly(self), new Set()), payloadIdentity(payloadOnly(that), new Set()))
 
 export const sessionPayloadEquivalence: {
-  (that: Session.EntryPayload): (self: Session.EntryPayload) => boolean
-  (self: Session.EntryPayload, that: Session.EntryPayload): boolean
+  (that: EntryPayload): (self: EntryPayload) => boolean
+  (self: EntryPayload, that: EntryPayload): boolean
 } = Function.dual(2, sessionPayloadEquivalenceImpl)
 
-export const decodeSessionPayload = (text: string): Session.EntryPayload =>
+export const decodeSessionPayload = (text: string): EntryPayload =>
   decodeEntry(
     restoreRedactedHeaders(withoutUndefinedMarkers(Schema.decodeUnknownSync(Schema.Unknown)(JSON.parse(text)))),
   )
 
-export const encodeSessionPayload = (payload: Session.EntryPayload): string =>
+export const encodeSessionPayload = (payload: EntryPayload): string =>
   JSON.stringify(withUndefinedMarkers(encodeEntry(payload))) ?? "null"

@@ -21,11 +21,6 @@ const Metadata = Schema.Record(Schema.String, Schema.Unknown)
 /** @experimental */
 export type Metadata = typeof Metadata.Type
 
-const ModelFailure = Schema.Unknown
-
-/** @experimental Failure value received from a model boundary. */
-export type ModelFailure = typeof ModelFailure.Type
-
 /** @experimental */
 export interface GovernanceOptions {
   readonly maxConcurrentModelCalls?: number
@@ -64,10 +59,10 @@ export type CandidateRoute = (instrumentation: CandidateRouteInstrumentation) =>
 export type FailureClassification = "context-overflow" | "other"
 
 /** @experimental Provider-owned semantic model-failure classifier. */
-export type FailureClassifier = (error: ModelFailure) => FailureClassification
+export type FailureClassifier = (cause: unknown) => FailureClassification
 
 /** @experimental Provider-owned decision that a failed invocation may advance an ordered candidate route. */
-export type AvailabilityFailureClassifier = (error: ModelFailure) => boolean
+export type AvailabilityFailureClassifier = (cause: unknown) => boolean
 
 const failureClassifiers = new WeakMap<LanguageModel.Service, FailureClassifier>()
 const toolJsonSchemaCompilers = new WeakMap<LanguageModel.Service, ToolJsonSchemaCompiler>()
@@ -90,11 +85,11 @@ export type ToolJsonSchemaCompiler = (tool: Tool.Any) => Effect.Effect<JsonSchem
 
 /** @experimental Classify a failure using semantics attached to the active registered model, falling back to provider-agnostic context-overflow evidence. */
 export const classifyFailure: {
-  (error: ModelFailure): (model: LanguageModel.Service) => FailureClassification
-  (model: LanguageModel.Service, error: ModelFailure): FailureClassification
-} = Function.dual(2, (model: LanguageModel.Service, error: ModelFailure): FailureClassification => {
-  const classified = failureClassifiers.get(model)?.(error)
-  return classified !== undefined && classified !== "other" ? classified : classifyContextOverflow(error)
+  (cause: unknown): (model: LanguageModel.Service) => FailureClassification
+  (model: LanguageModel.Service, cause: unknown): FailureClassification
+} = Function.dual(2, (model: LanguageModel.Service, cause: unknown): FailureClassification => {
+  const classified = failureClassifiers.get(model)?.(cause)
+  return classified !== undefined && classified !== "other" ? classified : classifyContextOverflow(cause)
 })
 
 /** @experimental Read the compiler attached to the active registered or explicitly wrapped model. */

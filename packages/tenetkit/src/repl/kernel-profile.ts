@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { Pins } from "../core/index.js"
+import { digest as pinDigest } from "../core/durable/pin.js"
 
 /** @experimental Wire version of the cell protocol. A kernel and a host must agree exactly. */
 export const protocolVersion = 1
@@ -118,7 +118,7 @@ export const make = (options: MakeOptions): KernelProfile =>
  * @experimental Content-addressed identity of one profile. Two profiles with the same digest
  * reconstruct the same kernel epoch; a different digest requires a new epoch.
  */
-export const digest = (profile: KernelProfile): string => Pins.digest(Schema.encodeSync(KernelProfile)(profile))
+export const digest = (profile: KernelProfile): string => pinDigest(Schema.encodeSync(KernelProfile)(profile))
 
 /** @experimental Digest of the ordered set of host binding module names mounted into a kernel. */
-export const bindingsDigest = (names: ReadonlyArray<string>): string => Pins.digest(names.toSorted())
+export const bindingsDigest = (names: ReadonlyArray<string>): string => pinDigest(names.toSorted())

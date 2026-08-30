@@ -16,7 +16,8 @@ import type { CancelInput, RespondInput, SignalInput } from "../../service.js"
 import type { RespondInput as RespondApprovalInput } from "../../operation/approval.js"
 import { isTerminal } from "../../run.js"
 import type { RunFailure } from "../../run/event.js"
-import { classifyResponse, WaitResolution } from "../../run/wait.js"
+import { WaitResolution } from "../../run/wait.js"
+import { classifyResponse } from "../../run/wait-internal.js"
 import { encodeJson } from "../codec/codecs.js"
 import {
   afterTerminal,

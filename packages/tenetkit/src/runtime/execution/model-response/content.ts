@@ -1,11 +1,11 @@
-import { Session } from "../../../core/context/public/session.js"
+import { ModelResponseContent, type ModelResponseEntry } from "../../../core/context/session.js"
 import { Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 
 export const decodeAuthoredModelResponseContent = (
-  input: typeof Session.ModelResponseContent.Encoded,
-): Session.ModelResponseEntry["content"] => {
-  const content = Schema.decodeSync(Session.ModelResponseContent)(input).map((part) => {
+  input: typeof ModelResponseContent.Encoded,
+): ModelResponseEntry["content"] => {
+  const content = Schema.decodeSync(ModelResponseContent)(input).map((part) => {
     if (part.type === "tool-call") {
       return Response.makePart("tool-call", {
         id: part.id,

@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import { Url } from "effect/unstable/http"
-import { SkillCatalog } from "../core/index.js"
+import { SkillCatalogError, layer as SkillCatalogLayer } from "../core/context/skill-catalog.js"
 import { type Limits, make as makeHostedCatalog, validateSkillPath } from "./hosted-catalog.js"
 
 /** @experimental Manifest-backed GitHub catalog options. */
@@ -25,7 +25,7 @@ export const make = (options: Options) => {
   const validationSource = "github-skill-catalog"
   if (!/^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$/.test(options.ref)) {
     return Effect.fail(
-      SkillCatalog.SkillCatalogError.make({
+      SkillCatalogError.make({
         source: validationSource,
         message: "GitHub skill catalog ref must be a commit id",
       }),
@@ -36,7 +36,7 @@ export const make = (options: Options) => {
     !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/.test(options.repo)
   ) {
     return Effect.fail(
-      SkillCatalog.SkillCatalogError.make({ source: validationSource, message: "Invalid GitHub owner or repository" }),
+      SkillCatalogError.make({ source: validationSource, message: "Invalid GitHub owner or repository" }),
     )
   }
   const source = `github:${options.owner}/${options.repo}@${options.ref}`
@@ -44,7 +44,7 @@ export const make = (options: Options) => {
     if ((options.root?.length ?? 0) > 0) yield* validateSkillPath(source, options.root ?? "")
     yield* validateSkillPath(source, options.manifestName ?? "skills.json")
     const apiBase = yield* Effect.fromResult(Url.fromString(options.apiBaseUrl ?? "https://api.github.com")).pipe(
-      Effect.mapError(() => SkillCatalog.SkillCatalogError.make({ source, message: "Invalid GitHub API base URL" })),
+      Effect.mapError(() => SkillCatalogError.make({ source, message: "Invalid GitHub API base URL" })),
     )
     if (
       apiBase.protocol !== "https:" ||
@@ -53,7 +53,7 @@ export const make = (options: Options) => {
       apiBase.search.length > 0 ||
       apiBase.hash.length > 0
     ) {
-      return yield* SkillCatalog.SkillCatalogError.make({ source, message: "Invalid GitHub API base URL" })
+      return yield* SkillCatalogError.make({ source, message: "Invalid GitHub API base URL" })
     }
     const base = apiBase.toString().replace(/\/$/, "")
     const root = encodedPath(options.root ?? "")
@@ -80,4 +80,4 @@ export const make = (options: Options) => {
 }
 
 /** @experimental Build a manifest-backed immutable GitHub catalog layer. */
-export const layer = (options: Options): ReturnType<typeof SkillCatalog.layer> => SkillCatalog.layer([make(options)])
+export const layer = (options: Options): ReturnType<typeof SkillCatalogLayer> => SkillCatalogLayer([make(options)])

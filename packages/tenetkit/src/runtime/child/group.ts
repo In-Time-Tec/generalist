@@ -1,6 +1,7 @@
 import { Function, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { FanOutMemberStatus, FanOutStatus, MAX_FAN_OUT_MEMBERS, type FanOutInspection } from "./fan-out.js"
+import { FanOutMemberStatus, FanOutStatus, type FanOutInspection } from "./fan-out.js"
+import { MAX_FAN_OUT_MEMBERS } from "./fan-out-internal.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
 import type { RunEvent } from "../run/event.js"
 import { ChildReadiness } from "./readiness.js"

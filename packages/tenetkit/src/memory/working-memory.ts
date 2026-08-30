@@ -1,6 +1,6 @@
 import { Context, Effect, HashMap, Layer, SynchronizedRef } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
-import { Memory } from "../core/index.js"
+import { type Item, type Key, Memory, MemoryError, type Service as MemoryService } from "../core/context/memory.js"
 
 /** @experimental */
 export interface SummarizeOptions {
@@ -53,9 +53,9 @@ const emptyState: KeyState = {
 
 const defaultSummaryPrompt = "Summarize the conversation memory while preserving stable user preferences and facts."
 
-const memoryError = (message: string): Memory.MemoryError => Memory.MemoryError.make({ message })
+const memoryError = (message: string): MemoryError => MemoryError.make({ message })
 
-const keyId = (key: Memory.Key): string => JSON.stringify([key.agent, key.subject])
+const keyId = (key: Key): string => JSON.stringify([key.agent, key.subject])
 
 const textPart = (text: string) => Prompt.makePart("text", { text })
 
@@ -123,7 +123,7 @@ const summarizeOverflow = (
   prompt: string | undefined,
   summary: string | undefined,
   overflow: ReadonlyArray<StoredItem>,
-): Effect.Effect<string | undefined, Memory.MemoryError> =>
+): Effect.Effect<string | undefined, MemoryError> =>
   model
     .generateText({
       prompt: renderSummaryPrompt(prompt ?? defaultSummaryPrompt, summary, overflow),
@@ -143,7 +143,7 @@ const resolveSummaryModel = (options: Options): Effect.Effect<LanguageModel.Serv
 
 type WithoutSummaryOptions = Options & { readonly summarize?: undefined }
 
-const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
+const recallItems = (state: KeyState): ReadonlyArray<Item> => [
   ...(state.summary === undefined
     ? []
     : [
@@ -158,12 +158,12 @@ const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
 /** @experimental */
 export function make(
   options: Options & { readonly summarize: SummarizeOptions },
-): Effect.Effect<Memory.Service, never, SummaryModel>
+): Effect.Effect<MemoryService, never, SummaryModel>
 /** @experimental */
-export function make(options?: WithoutSummaryOptions): Effect.Effect<Memory.Service>
+export function make(options?: WithoutSummaryOptions): Effect.Effect<MemoryService>
 /** @experimental */
-export function make(options: Options): Effect.Effect<Memory.Service, never, SummaryModel>
-export function make(options: Options = {}): Effect.Effect<Memory.Service, never, SummaryModel> {
+export function make(options: Options): Effect.Effect<MemoryService, never, SummaryModel>
+export function make(options: Options = {}): Effect.Effect<MemoryService, never, SummaryModel> {
   return Effect.gen(function* () {
     const summaryModel = yield* resolveSummaryModel(options)
     const states = yield* SynchronizedRef.make(HashMap.empty<string, KeyState>())
@@ -230,11 +230,11 @@ export function make(options: Options = {}): Effect.Effect<Memory.Service, never
 /** @experimental */
 export function layer(
   options: Options & { readonly summarize: SummarizeOptions },
-): Layer.Layer<Memory.Memory, never, SummaryModel>
+): Layer.Layer<Memory, never, SummaryModel>
 /** @experimental */
-export function layer(options?: WithoutSummaryOptions): Layer.Layer<Memory.Memory>
+export function layer(options?: WithoutSummaryOptions): Layer.Layer<Memory>
 /** @experimental */
-export function layer(options: Options): Layer.Layer<Memory.Memory, never, SummaryModel>
-export function layer(options: Options = {}): Layer.Layer<Memory.Memory, never, SummaryModel> {
-  return Layer.effect(Memory.Memory, make(options).pipe(Effect.map(Memory.Memory.of)))
+export function layer(options: Options): Layer.Layer<Memory, never, SummaryModel>
+export function layer(options: Options = {}): Layer.Layer<Memory, never, SummaryModel> {
+  return Layer.effect(Memory, make(options).pipe(Effect.map(Memory.of)))
 }

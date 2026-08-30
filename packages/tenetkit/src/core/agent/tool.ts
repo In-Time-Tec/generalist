@@ -1,14 +1,6 @@
 import { Cause, Effect, Function, Layer, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import {
-  type Agent,
-  type Result,
-  type RunError,
-  type RunOptions,
-  type RunResult,
-  type RunRequirements,
-  generate,
-} from "./service.js"
+import { type Agent, type Result, type RunError, type RunRequirements, generate } from "./service.js"
 import {
   AgentError,
   AgentSuspended,
@@ -24,24 +16,9 @@ import { TurnPolicyError } from "../turn/policy.js"
 
 import { DriverInterpreter } from "../durable/driver/interpreter.js"
 import { RunBudgetExhausted, RunBudgetGrantWidened, type RunBudget } from "../durable/run-budget.js"
+import { RegistrationError, type Registration } from "./tool/registration.js"
 
-export class RegistrationError extends Schema.TaggedError<RegistrationError>()("tenetkit/core/RegistrationError", {
-  agent: Schema.String,
-  message: Schema.String,
-  cause: Schema.Unknown,
-}) {}
-
-export interface Registration<Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never> {
-  readonly name: string
-  readonly run: <O extends RunOptions>(
-    options: O,
-  ) => Effect.Effect<
-    RunResult<O>,
-    RunError | RegistrationError,
-    Exclude<Exclude<RunRequirements<Tools, R, O>, R>, import("effect/Scope").Scope>
-  >
-  readonly requirements: (value: R) => R
-}
+export { RegistrationError }
 
 export const register: {
   <R, E>(
@@ -104,7 +81,7 @@ export interface AsToolOptions<
 }
 
 /** @experimental A schema-backed tool with a stable name and closed invocation. */
-export type AgentToolTool<Parameters extends Schema.Top, Success extends Schema.Top> = Tool.Tool<
+type AgentToolTool<Parameters extends Schema.Top, Success extends Schema.Top> = Tool.Tool<
   string,
   {
     readonly parameters: Parameters | DefaultParameters

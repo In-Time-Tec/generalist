@@ -1,15 +1,20 @@
 import { Context, Effect, Function, Layer, Schema, Scope } from "effect"
+import type { Program } from "../../core/program/agent-program.js"
+import { type AgentManifest, fromLiveAgent } from "../../core/durable/manifest/agent-manifest.js"
+import type { Service as CodeExecutorService } from "../../core/program/code-executor.js"
+import type { AgentPin, CapabilityPin } from "../../core/durable/pin.js"
 import {
-  AgentManifest,
-  ProgramHandlers,
-  ProgramRunner,
-  ProgramManifest,
-  type AgentProgram,
-  type Pins,
-  type CodeExecutor,
-} from "../../core/index.js"
-import type { Agent } from "../../core/agent/public/service.js"
-import { decodePinned, ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
+  type AnyAgent,
+  type AnyStep,
+  type AnyTool,
+  type Handlers,
+  make as makeHandlers,
+} from "../../core/program/handlers.js"
+import { type PinnedProgram, make as makeProgramManifest } from "../../core/durable/manifest/program-manifest.js"
+import { validateHandlers } from "../../core/program/runner.js"
+import type { Closed } from "../../core/agent/service.js"
+import { decodePinned } from "./manifest-internal.js"
+import { ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
 import { ExecutablePinMissing, ExecutableRegistrationInvalid, ExecutableRegistrationMissing } from "../errors.js"
 import { RunId } from "../run.js"
 import {
@@ -61,7 +66,7 @@ export const verifyAttestation = (attestation: Attestation): Attestation => deco
 /** @experimental Live executable resources owned by the caller's scope. */
 export interface AgentResolution {
   readonly _tag: "Agent"
-  readonly agent: Agent.Closed
+  readonly agent: Closed
   readonly runOptions?: StaticRunOptions
   readonly attestation: Attestation
 }
@@ -74,7 +79,7 @@ export interface StaticRunOptions {
   }
 }
 
-const matchesRunOptions = (manifest: AgentManifest.AgentManifest, options: StaticRunOptions | undefined): boolean => {
+const matchesRunOptions = (manifest: AgentManifest, options: StaticRunOptions | undefined): boolean => {
   const expected = manifest.compaction
   const actual = options?.compaction
   return (
@@ -101,9 +106,9 @@ export const matchesActiveRunOptions: {
 /** @experimental Live Agent Program resources owned by the caller's scope. */
 export interface ProgramResolution {
   readonly _tag: "Program"
-  readonly program: AgentProgram.Program<unknown, unknown, unknown, unknown>
-  readonly executor: CodeExecutor.Service
-  readonly handlers: ProgramHandlers.Handlers
+  readonly program: Program<unknown, unknown, unknown, unknown>
+  readonly executor: CodeExecutorService
+  readonly handlers: Handlers
   readonly services?: Layer.Layer<never>
   readonly attestation: Attestation
 }
@@ -131,7 +136,7 @@ export class ExecutableResolver extends Context.Service<ExecutableResolver, Serv
 export interface StaticAgentExecutable {
   readonly _tag?: "Agent"
   readonly executable: PinnedExecutable
-  readonly agent: Agent.Closed
+  readonly agent: Closed
   readonly runOptions?: StaticRunOptions
 }
 
@@ -139,9 +144,9 @@ export interface StaticAgentExecutable {
 export interface StaticProgramExecutable {
   readonly _tag: "Program"
   readonly executable: PinnedExecutable
-  readonly program: AgentProgram.Program<unknown, unknown, unknown, unknown>
-  readonly executor: CodeExecutor.Service
-  readonly handlers: ProgramHandlers.Handlers
+  readonly program: Program<unknown, unknown, unknown, unknown>
+  readonly executor: CodeExecutorService
+  readonly handlers: Handlers
   readonly services?: Layer.Layer<never>
 }
 
@@ -157,17 +162,17 @@ const registerStatic = (executables: ReadonlyArray<StaticExecutable>): ReadonlyM
     const active = executable.manifest.entries.find((candidate) => candidate.pin === executable.ref.active)
     if (active === undefined) throw new TypeError(`Active executable is missing: ${executable.ref.active}`)
     if (entry._tag === "Program") {
-      const attested = ProgramManifest.make(entry.program.pinned.manifest)
+      const attested = makeProgramManifest(entry.program.pinned.manifest)
       if (active._tag !== "Program" || entry.program.pinned.pin !== attested.pin || attested.pin !== active.pin) {
         throw new TypeError(`Live Program does not match static executable reference: ${executable.ref.active}`)
       }
-      Effect.runSync(ProgramRunner.validateHandlers(entry.program.pinned, entry.handlers))
+      Effect.runSync(validateHandlers(entry.program.pinned, entry.handlers))
     } else {
       if (active._tag !== "Agent") {
         throw new TypeError(`Static Agent does not match active executable kind: ${executable.ref.active}`)
       }
       const attested = entry.agent.open((agent) =>
-        AgentManifest.fromLiveAgent(agent, {
+        fromLiveAgent(agent, {
           model: active.manifest.model,
           tools: active.manifest.tools,
           skills: active.manifest.skills,
@@ -255,8 +260,8 @@ export interface CapabilityRequest {
   readonly runId: string
   readonly ref: ExecutableRef
   readonly manifest: ExecutableManifest
-  readonly program: ProgramManifest.PinnedProgram
-  readonly pin: Pins.CapabilityPin
+  readonly program: PinnedProgram
+  readonly pin: CapabilityPin
   readonly registration: ExecutableRegistration
 }
 
@@ -273,8 +278,8 @@ export interface NamedCapabilityRequest extends CapabilityRequest {
 /** @experimental Exact persisted authority for one reconstructed Program Agent handler. */
 export interface AgentCapabilityRequest extends CapabilityRequest {
   readonly selection: string
-  readonly agent: Pins.AgentPin
-  readonly agentManifest: AgentManifest.AgentManifest
+  readonly agent: AgentPin
+  readonly agentManifest: AgentManifest
 }
 
 /** @experimental Exact persisted authority for the Run-scoped services of one reconstructed Program. */
@@ -282,7 +287,7 @@ export interface ServicesRequest {
   readonly runId: string
   readonly ref: ExecutableRef
   readonly manifest: ExecutableManifest
-  readonly program: ProgramManifest.PinnedProgram
+  readonly program: PinnedProgram
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
@@ -294,19 +299,13 @@ export interface ServicesRequest {
 export interface ProgramReconstruction {
   readonly executor: (
     request: CapabilityRequest,
-  ) => Effect.Effect<CodeExecutor.Service, ReconstructionError, Scope.Scope>
+  ) => Effect.Effect<CodeExecutorService, ReconstructionError, Scope.Scope>
   readonly codec: (
     request: CodecRequest,
   ) => Effect.Effect<Schema.Codec<unknown, unknown>, ReconstructionError, Scope.Scope>
-  readonly tool: (
-    request: NamedCapabilityRequest,
-  ) => Effect.Effect<ProgramHandlers.AnyTool, ReconstructionError, Scope.Scope>
-  readonly step: (
-    request: NamedCapabilityRequest,
-  ) => Effect.Effect<ProgramHandlers.AnyStep, ReconstructionError, Scope.Scope>
-  readonly agent: (
-    request: AgentCapabilityRequest,
-  ) => Effect.Effect<ProgramHandlers.AnyAgent, ReconstructionError, Scope.Scope>
+  readonly tool: (request: NamedCapabilityRequest) => Effect.Effect<AnyTool, ReconstructionError, Scope.Scope>
+  readonly step: (request: NamedCapabilityRequest) => Effect.Effect<AnyStep, ReconstructionError, Scope.Scope>
+  readonly agent: (request: AgentCapabilityRequest) => Effect.Effect<AnyAgent, ReconstructionError, Scope.Scope>
   readonly services?: (request: ServicesRequest) => Effect.Effect<Layer.Layer<never>, ReconstructionError, Scope.Scope>
 }
 
@@ -323,9 +322,9 @@ const resolveProgram = (
       requiredPinsForActiveExecutable(pinned),
     )
     const byPin = new Map(registrations.map((registration) => [registration.pin, registration] as const))
-    const program: ProgramManifest.PinnedProgram = { pin: entry.pin, manifest: entry.manifest }
+    const program: PinnedProgram = { pin: entry.pin, manifest: entry.manifest }
     const authority = { runId: input.runId, ref: pinned.ref, manifest: pinned.manifest, program }
-    const required = (pin: Pins.CapabilityPin): Effect.Effect<CapabilityRequest, ExecutableRegistrationMissing> => {
+    const required = (pin: CapabilityPin): Effect.Effect<CapabilityRequest, ExecutableRegistrationMissing> => {
       const registration = byPin.get(pin)
       return registration === undefined
         ? Effect.fail(ExecutableRegistrationMissing.make({ pin }))
@@ -364,14 +363,14 @@ const resolveProgram = (
     )
     const handlers = yield* Effect.try({
       try: () =>
-        ProgramHandlers.make({
+        makeHandlers({
           tools,
           steps,
           agents,
         }),
       catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
     })
-    yield* ProgramRunner.validateHandlers(program, handlers).pipe(
+    yield* validateHandlers(program, handlers).pipe(
       Effect.mapError((mismatch) =>
         ExecutableRegistrationInvalid.make({
           message: `reconstructed ${mismatch.kind} handler ${mismatch.name} ${mismatch.reason}: ${entry.pin}`,

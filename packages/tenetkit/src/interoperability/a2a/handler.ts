@@ -25,11 +25,11 @@ import { origin, type Cursor } from "../../runtime/cursor.js"
 import type { RunStatus } from "../../runtime/run.js"
 import type { RunEvent } from "../../runtime/run/event.js"
 import type { EventsError, Service as RuntimeService } from "../../runtime/service.js"
-import { Errors } from "../../runtime/facade-errors.js"
+import { RunNotFound } from "../../runtime/errors.js"
 import { Effect, Function, Option, Schema, Stream } from "effect"
 import { decode } from "./content.js"
 import { artifactFromEvent, fromRuntime, stateFromRun, statusFromEvent } from "./projection.js"
-import { TaskNotWaiting } from "./errors.js"
+import { TaskNotWaiting } from "./handler-error.js"
 
 /** @experimental One explicit A2A endpoint deployment. */
 export interface Deployment {
@@ -74,7 +74,7 @@ const makeTaskStore = (runtime: RuntimeService): TaskStore => ({
       fromRuntime(runtime, taskId).pipe(
         Effect.map(Option.some),
         Effect.catchTag("tenetkit/a2a/TaskProjectionFailed", (failure) =>
-          Schema.is(Errors.RunNotFound)(failure.cause) ? Effect.succeed(Option.none<Task>()) : Effect.fail(failure),
+          Schema.is(RunNotFound)(failure.cause) ? Effect.succeed(Option.none<Task>()) : Effect.fail(failure),
         ),
         Effect.map(Option.getOrUndefined),
       ),

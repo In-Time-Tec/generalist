@@ -12,7 +12,7 @@ import {
   CodeExecutor,
 } from "../../src/index.js"
 import { CodeMode, ExecutableResolver, LocalScheduler, RunStore, Runtime } from "../../src/runtime/index.js"
-import { make as makeRunExecutor } from "../../src/runtime/execution/run-executor.js"
+import { make as makeRunExecutor } from "../../src/runtime/execution/run-executor-internal.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
 import { tempDbPath } from "./sql/scenario.js"
 

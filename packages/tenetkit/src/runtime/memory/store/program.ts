@@ -1,5 +1,9 @@
 import { Effect, Function, Schema } from "effect"
-import { ProgramCapabilities } from "../../../core/index.js"
+import {
+  ProgramBudgetExhausted,
+  ProgramOperationUnknown,
+  ProgramReplayDivergence,
+} from "../../../core/program/capabilities.js"
 import {
   FanOutConflict,
   FanOutInvalid,
@@ -100,14 +104,13 @@ export const reserveProgramOperation: {
     const existing = state.programOperations.get(key(input.runId, input.operation))
     if (existing !== undefined) {
       if (incompatibleReservation(existing, input)) {
-        return yield* ProgramCapabilities.ProgramReplayDivergence.make({
+        return yield* ProgramReplayDivergence.make({
           operation: input.operation,
           expected: existing.inputDigest,
           actual: input.inputDigest,
         })
       }
-      if (existing.status === "unknown")
-        return yield* ProgramCapabilities.ProgramOperationUnknown.make({ operation: input.operation })
+      if (existing.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: input.operation })
       return [existing, state] as const
     }
     const current = state.programStates.get(input.runId) ?? {
@@ -122,20 +125,20 @@ export const reserveProgramOperation: {
       activeSlots: 0,
     }
     if (current.programPin !== input.programPin)
-      return yield* ProgramCapabilities.ProgramReplayDivergence.make({
+      return yield* ProgramReplayDivergence.make({
         operation: input.operation,
         expected: current.programPin,
         actual: input.programPin,
       })
     if (input.nowMillis > current.deadlineMillis)
-      return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
+      return yield* ProgramBudgetExhausted.make({
         dimension: "wallClockMillis",
         limit: input.budget.wallClockMillis,
       })
     const exhausted = exhaustedDimension(current, input)
     if (exhausted !== undefined) {
       const [field, , limit] = exhausted
-      return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
+      return yield* ProgramBudgetExhausted.make({
         dimension: field === "activeSlots" ? "concurrency" : field,
         limit,
       })
@@ -244,7 +247,7 @@ export const settleProgramOperation: {
     const tokens = input.outcome._tag === "Succeeded" ? (input.outcome.tokens ?? 0) : 0
     const tokenFailure =
       current.tokens + tokens > current.budget.tokens
-        ? ProgramCapabilities.ProgramBudgetExhausted.make({ dimension: "tokens", limit: current.budget.tokens })
+        ? ProgramBudgetExhausted.make({ dimension: "tokens", limit: current.budget.tokens })
         : undefined
     const outcome = tokenFailure === undefined ? input.outcome : { _tag: "Failed" as const, error: tokenFailure }
     let record: ProgramOperationRecord = {
@@ -436,19 +439,19 @@ export const completeProgram: {
     state: MemoryState,
   ) => Effect.Effect<
     readonly [CompletionOutcome, MemoryState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramCapabilities.ProgramBudgetExhausted>
+    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramBudgetExhausted>
   >
   (
     state: MemoryState,
     input: CompleteProgramInput,
   ): Effect.Effect<
     readonly [CompletionOutcome, MemoryState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramCapabilities.ProgramBudgetExhausted>
+    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramBudgetExhausted>
   >
 } = Function.dual(2, (state: MemoryState, input: CompleteProgramInput) =>
   Effect.gen(function* () {
     if (input.outputBytes > input.outputLimit)
-      return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
+      return yield* ProgramBudgetExhausted.make({
         dimension: "outputBytes",
         limit: input.outputLimit,
       })

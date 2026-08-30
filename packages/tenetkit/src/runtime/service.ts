@@ -1,5 +1,5 @@
 import { Context, Effect, Stream, type Duration } from "effect"
-import type { Session } from "../core/index.js"
+import type { Entry as SessionEntry } from "../core/context/session.js"
 import { Prompt } from "effect/unstable/ai"
 import type { TreePolicy } from "./tree/policy.js"
 import type { Address } from "./address.js"
@@ -57,23 +57,18 @@ import type { Service as MessagingPolicyService } from "./messaging/service.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { CompletedModelResponse, RunEvent } from "./run/event.js"
 import type { WaitResolution } from "./run/wait.js"
-import type {
-  FanOutInput,
-  FanOutInspection,
-  FanOutMemberOrigin,
-  FanOutReceipt,
-  InitialFanOutInput,
-} from "./child/fan-out.js"
+import type { FanOutInspection, FanOutReceipt } from "./child/fan-out.js"
+import type { FanOutInput, FanOutMemberOrigin, InitialFanOutInput } from "./child/fan-out-internal.js"
 import type { ResolveOperationInput } from "./operation/resolution.js"
 import type { SteeringReceipt } from "./run/steering.js"
 import type { RespondInput as RespondApprovalInput } from "./operation/approval.js"
 import type { ExecutableRegistration } from "./executable/registration.js"
 import type { Notification as ChildSettlementNotification } from "./child/settlement.js"
-import type { ModelPreviewEvent } from "./execution/model-response/preview.js"
+import type { Event as ModelPreviewEvent } from "./execution/model-response/preview.js"
 import type { RunActivationProjection } from "./run/activation.js"
 import type { Point as AcknowledgementPoint } from "./acknowledgement.js"
 
-export type { InitialFanOutInput } from "./child/fan-out.js"
+export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
 export interface AddressBinding {
   readonly address: Address
@@ -347,7 +342,7 @@ export type SteerError =
   | RunNotFound
   | RunTerminal
   | SteeringConflict
-  | import("../core/index.js").Steering.InboxFull
+  | import("../core/turn/steering.js").InboxFull
   | RuntimeUnavailable
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
@@ -389,7 +384,7 @@ export interface Service {
   readonly acknowledge: (input: { readonly runId: string; readonly sequence: number }) => Effect.Effect<void, AckError>
   /** @experimental Read the durable host processed-through point; -1 means no cycle is acknowledged. */
   readonly acknowledged: (runId: string) => Effect.Effect<AcknowledgementPoint, InspectError>
-  readonly sessionEntry: (input: SessionEntryInput) => Effect.Effect<Session.Entry, SessionEntryError>
+  readonly sessionEntry: (input: SessionEntryInput) => Effect.Effect<SessionEntry, SessionEntryError>
   readonly resolveModelResponse: (
     event: ModelResponseEvent,
   ) => Effect.Effect<CompletedModelResponse, ResolveModelResponseError>

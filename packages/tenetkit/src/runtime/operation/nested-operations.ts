@@ -1,10 +1,21 @@
 import { Cause, Effect, Option, Ref, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
-import { Approvals } from "../../core/index.js"
-import { NestedOperation } from "../../core/tools/public/nested-operation.js"
-import type { Request } from "../../core/tools/nested-operation.js"
-import { ToolContext } from "../../core/tools/public/tool-context.js"
-import type { AgentEvent } from "../../core/agent/public/event.js"
+import { Approvals, type Service as ApprovalsService } from "../../core/policy/approvals.js"
+import {
+  type Failure,
+  NestedOperationDenied,
+  NestedOperationDivergence,
+  NestedOperationSuspended,
+  NestedOperationUnknown,
+  type ProgressStatus,
+  type Render,
+  type Request,
+  type Service as NestedOperationService,
+  payloadDigest as nestedOperationPayloadDigest,
+  progressData,
+} from "../../core/tools/nested-operation.js"
+import { ToolContext } from "../../core/tools/tool-context.js"
+import type { AgentSuspended } from "../../core/agent/event.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStoreService } from "../run/store.js"
 import { approvalReason, type WaitReason } from "../run/wait.js"
 
@@ -19,9 +30,9 @@ interface PendingApproval {
 }
 
 /** @experimental Runtime-owned nested durable operations plus the waits they open. */
-export interface Service extends NestedOperation.Service {
+export interface Service extends NestedOperationService {
   readonly waitFor: (
-    wait: AgentEvent.AgentSuspended["waits"][number],
+    wait: AgentSuspended["waits"][number],
   ) => Effect.Effect<{ readonly waitId: string; readonly reason: WaitReason } | undefined>
 }
 
@@ -73,19 +84,19 @@ export const make = (input: {
     function run<A, E, R>(
       request: Request<A, E>,
       effect: Effect.Effect<A, E, R>,
-    ): Effect.Effect<A, E | NestedOperation.Failure, R | ToolContext.ToolContext> {
+    ): Effect.Effect<A, E | Failure, R | ToolContext> {
       return Effect.gen(function* () {
-        const context = yield* ToolContext.ToolContext
+        const context = yield* ToolContext
         const operationKey = context.operationKey ?? context.toolCallId ?? input.claim.runId
         const ordinal = yield* nextOrdinal(operationKey)
         const nestedKey = nestedOperationKey({ operationKey, ordinal })
-        const payloadDigest = NestedOperation.payloadDigest(request.kind, request.payload)
+        const payloadDigest = nestedOperationPayloadDigest(request.kind, request.payload)
         const toolCallId = context.toolCallId
         const projected = (value: A) => (request.render === undefined ? undefined : request.render(value))
-        const emit = (status: NestedOperation.ProgressStatus, render?: NestedOperation.Render) =>
+        const emit = (status: ProgressStatus, render?: Render) =>
           toolCallId === undefined
             ? Effect.void
-            : NestedOperation.progressData({ kind: request.kind, ordinal, status, render }).pipe(
+            : progressData({ kind: request.kind, ordinal, status, render }).pipe(
                 Effect.flatMap((data) => context.emit({ toolCallId, message: `${request.kind} ${status}`, data })),
               )
 
@@ -100,8 +111,7 @@ export const make = (input: {
             attempt: input.claimed.attempt,
           })
           .pipe(Effect.orDie)
-        const unknown = () =>
-          NestedOperation.NestedOperationUnknown.make({ operationKey, ordinal, operationId: record.operationId })
+        const unknown = () => NestedOperationUnknown.make({ operationKey, ordinal, operationId: record.operationId })
         const replayFailure = (recorded: { readonly error?: unknown }) => {
           if (request.failure === undefined) return Effect.fail(unknown())
           return Schema.decodeUnknownEffect(request.failure)(recorded.error).pipe(
@@ -110,7 +120,7 @@ export const make = (input: {
         }
         const persisted = Option.getOrUndefined(recordedInput(record.input))
         if (record.inputDigest !== payloadDigest || persisted?.kind !== request.kind) {
-          return yield* NestedOperation.NestedOperationDivergence.make({
+          return yield* NestedOperationDivergence.make({
             operationKey,
             ordinal,
             recordedKind: persisted?.kind ?? record.kind,
@@ -182,7 +192,7 @@ export const make = (input: {
             const prior = resolvedApproval(approvalId)
             const denied = (reason: string) =>
               Effect.gen(function* () {
-                const failure = NestedOperation.NestedOperationDenied.make({
+                const failure = NestedOperationDenied.make({
                   operationKey,
                   ordinal,
                   capability,
@@ -192,7 +202,7 @@ export const make = (input: {
                 return yield* failure
               })
             if (prior === undefined) {
-              const approvals = yield* Effect.serviceOption(Approvals.Approvals)
+              const approvals = yield* Effect.serviceOption(Approvals)
               const resolution = yield* Option.getOrElse(approvals, () => autoApprove).resolve({
                 _tag: "Pending",
                 token: approvalId,
@@ -218,7 +228,7 @@ export const make = (input: {
                   })
                   return next
                 })
-                return yield* NestedOperation.NestedOperationSuspended.make({
+                return yield* NestedOperationSuspended.make({
                   token: approvalId,
                   operationKey,
                   ordinal,
@@ -283,4 +293,4 @@ export const make = (input: {
     return { run, waitFor }
   })
 
-const autoApprove: Approvals.Service = { resolve: () => Effect.succeed({ _tag: "Approved" as const }) }
+const autoApprove: ApprovalsService = { resolve: () => Effect.succeed({ _tag: "Approved" as const }) }

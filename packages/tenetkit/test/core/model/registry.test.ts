@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { ModelRegistry } from "../../../src/core/index"
+import { ModelRegistry } from "../../../src/index"
 import { ItLayer } from "../it-layer.js"
 
 type Equal<Left, Right> =

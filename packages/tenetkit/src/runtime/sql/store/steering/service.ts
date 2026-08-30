@@ -1,7 +1,7 @@
 import { Effect, Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { SqlClient } from "effect/unstable/sql"
-import { Steering } from "../../../../core/index.js"
+import { InboxFull, defaultCapacity, defaultMaxPendingBytes } from "../../../../core/turn/steering.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../../../errors.js"
 import { isTerminal, type RunStatus } from "../../../run.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../../../run/store.js"
@@ -37,7 +37,7 @@ const decode = (row: SteeringRow): SteeringEntry => ({
 
 type AdmitSteeringEffect = Effect.Effect<
   SteeringReceipt,
-  RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | Steering.InboxFull | SqlError,
+  RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | InboxFull | SqlError,
   SqlClient.SqlClient
 >
 
@@ -71,12 +71,12 @@ export const admitSteering: {
       SELECT prompt_json FROM tenetkit_run_steering
       WHERE run_id = ${input.runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
     `
-    if (pending.length >= Steering.defaultCapacity) {
-      return yield* Steering.InboxFull.make({
+    if (pending.length >= defaultCapacity) {
+      return yield* InboxFull.make({
         runId: run.runId,
         queue: "steering",
         dimension: "entries",
-        limit: Steering.defaultCapacity,
+        limit: defaultCapacity,
       })
     }
     const encoder = new TextEncoder()
@@ -88,12 +88,12 @@ export const admitSteering: {
     const sequence = Number(rows[0]?.next_sequence ?? 0)
     const entryId = `${input.runId}:steering:${sequence}`
     const encoded = encodeJson(Prompt.Prompt, input.prompt)
-    if (pendingBytes + encoder.encode(encoded).byteLength > Steering.defaultMaxPendingBytes) {
-      return yield* Steering.InboxFull.make({
+    if (pendingBytes + encoder.encode(encoded).byteLength > defaultMaxPendingBytes) {
+      return yield* InboxFull.make({
         runId: run.runId,
         queue: "steering",
         dimension: "bytes",
-        limit: Steering.defaultMaxPendingBytes,
+        limit: defaultMaxPendingBytes,
       })
     }
     yield* sql`

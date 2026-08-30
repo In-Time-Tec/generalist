@@ -1,6 +1,6 @@
-import { AgentEvent } from "../../../core/agent/public/event.js"
-import { Pins } from "../../../core/index.js"
-import { Session } from "../../../core/context/public/session.js"
+import type { Event } from "../../../core/agent/event.js"
+import { digest as pinDigest } from "../../../core/durable/pin.js"
+import { ModelResponseContent, type ModelResponseEntry } from "../../../core/context/session.js"
 import { CompletedModelOperation } from "../../../core/model/operation.js"
 import { Effect, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
@@ -12,7 +12,7 @@ import { CompletedModelResponse } from "../../run/event.js"
 import { decodeAuthoredModelResponseContent } from "./content.js"
 import type { OperationRecord } from "../../sql/operations.js"
 
-export type LiveModelResponseCommitted = Extract<AgentEvent.Event, { readonly _tag: "ModelResponseCommitted" }>
+export type LiveModelResponseCommitted = Extract<Event, { readonly _tag: "ModelResponseCommitted" }>
 
 export interface CommitModelResponseInput extends ExecutionClaim {
   readonly runId: string
@@ -47,7 +47,7 @@ export interface CompletedSessionEntry {
   readonly sessionId: string
   readonly entryId: string
   readonly parentId: string | null
-  readonly content: Session.ModelResponseEntry["content"]
+  readonly content: ModelResponseEntry["content"]
   readonly digest: string
 }
 
@@ -64,7 +64,7 @@ const UnknownFromString = Schema.fromJsonString(Schema.Unknown)
 const jsonValue = (value: JsonInput): Schema.Json =>
   Schema.decodeSync(JsonFromString)(Schema.encodeSync(UnknownFromString)(value))
 const sameJson = <Left, Right>(left: Left, right: Right): boolean =>
-  Pins.digest(jsonValue(left)) === Pins.digest(jsonValue(right))
+  pinDigest(jsonValue(left)) === pinDigest(jsonValue(right))
 const continuationIdentity = (continuation: CommitModelResponseInput["continuation"]): Schema.Json => {
   if (continuation === undefined) return { disposition: "unchanged" }
   if (continuation === null) return { disposition: "cleared" }
@@ -72,7 +72,7 @@ const continuationIdentity = (continuation: CommitModelResponseInput["continuati
 }
 const transitionDigest = (input: CommitModelResponseInput): string =>
   input.transitionDigest ??
-  Pins.digest(
+  pinDigest(
     jsonValue({
       checkpoint: input.checkpoint ?? null,
       continuation: continuationIdentity(input.continuation),
@@ -162,7 +162,7 @@ const operationFromReference = (input: {
   readonly content: CompletedOperation["content"]
 }): CompletedOperation | RuntimeUnavailable => {
   const unsigned = unsignedOperation(input)
-  if (Pins.digest(jsonValue(unsigned)) !== input.reference.digest) {
+  if (pinDigest(jsonValue(unsigned)) !== input.reference.digest) {
     return fail(`model operation ${input.reference.operationId} result digest is corrupt`)
   }
   return { ...unsigned, digest: input.reference.digest }
@@ -174,7 +174,7 @@ export const liveModelResponseEvent = (
   const operation = operationValue(value)
   if (operation === undefined) return fail("model operation has an invalid completed result")
   const { digest, ...unsigned } = operation
-  if (Pins.digest(jsonValue(unsigned)) !== digest) return fail("model operation result digest is corrupt")
+  if (pinDigest(jsonValue(unsigned)) !== digest) return fail("model operation result digest is corrupt")
   try {
     return {
       _tag: "ModelResponseCommitted",
@@ -312,7 +312,7 @@ export const validateModelResponseCommit = (request: {
   const operation = rich ?? operationFromReference({ reference, content: contentFromResponse(input.event.response) })
   if (Schema.is(RuntimeUnavailable)(operation)) return operation
   const { digest, ...unsigned } = operation
-  if (Pins.digest(jsonValue(unsigned)) !== digest)
+  if (pinDigest(jsonValue(unsigned)) !== digest)
     return fail(`model operation ${input.operationId} result digest is corrupt`)
   const identityFailure = validateOperationIdentity({ operation, record, request: input })
   if (identityFailure !== undefined) return identityFailure
@@ -424,7 +424,7 @@ export const hydrateCompletedOperation = (input: {
         message: "Session model response reference does not match its entry",
       })
     }
-    const content = yield* Schema.encodeEffect(Session.ModelResponseContent)(entry.content).pipe(
+    const content = yield* Schema.encodeEffect(ModelResponseContent)(entry.content).pipe(
       Effect.mapError((error) =>
         SessionEntryCorrupt.make({
           sessionId: input.reference.sessionId,

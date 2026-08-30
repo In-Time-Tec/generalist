@@ -9,7 +9,8 @@ import {
   RuntimeUnavailable,
 } from "../../../errors.js"
 import { fanOutMember } from "../../../child/session.js"
-import { childRunIdFor, fanOutIdFor, type AdmitFanOutInput, type FanOutReceipt } from "../../../child/fan-out.js"
+import type { FanOutReceipt } from "../../../child/fan-out.js"
+import { childRunIdFor, fanOutIdFor, type AdmitFanOutInput } from "../../../child/fan-out-internal.js"
 import type { AdmitStartInput } from "../../../run/store.js"
 import type { SqlClient } from "effect/unstable/sql"
 import { admitFanOut } from "./service.js"

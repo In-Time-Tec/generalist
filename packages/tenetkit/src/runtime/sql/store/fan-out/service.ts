@@ -10,16 +10,15 @@ import {
   RunTerminal,
   RuntimeUnavailable,
 } from "../../../errors.js"
+import { FanOutJoin, type FanOutReceipt } from "../../../child/fan-out.js"
 import {
   digestFanOut,
-  FanOutJoin,
   FanOutMemberOrigin,
   validateAdmission,
   type AdmitFanOutInput,
-  type FanOutReceipt,
   type StoredFanOutMember,
-} from "../../../child/fan-out.js"
-import { resolveChild } from "../../../executable/manifest.js"
+} from "../../../child/fan-out-internal.js"
+import { resolveChild } from "../../../executable/manifest-internal.js"
 import { make as makeMessage } from "../../../messaging/message.js"
 import { isTerminal } from "../../../run.js"
 import type { RunEvent } from "../../../run/event.js"

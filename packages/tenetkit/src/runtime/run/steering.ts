@@ -1,4 +1,4 @@
-import { Pins } from "../../core/index.js"
+import { digest as pinDigest } from "../../core/durable/pin.js"
 export { InboxFull, defaultCapacity, defaultMaxPendingBytes, promptBytes } from "../../core/turn/steering.js"
 import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
@@ -40,4 +40,4 @@ export const decodeContinuation = (encoded: string): ExecutionContinuation =>
   Schema.decodeUnknownSync(ExecutionContinuation)(JSON.parse(encoded))
 
 /** @experimental Stable digest used for steering idempotency. */
-export const digest = (prompt: Prompt.Prompt): string => Pins.digest(Schema.encodeSync(Prompt.Prompt)(prompt))
+export const digest = (prompt: Prompt.Prompt): string => prompt.pipe(Schema.encodeSync(Prompt.Prompt), pinDigest)

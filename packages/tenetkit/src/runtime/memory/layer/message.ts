@@ -1,5 +1,5 @@
 import type { Prompt } from "effect/unstable/ai"
-import { childRunIdFor } from "../../child/fan-out.js"
+import { childRunIdFor } from "../../child/fan-out-internal.js"
 import { fanOutMemberSessionId } from "../../child/session.js"
 import type { Address } from "../../address.js"
 import type { Metadata } from "../../messaging/message.js"

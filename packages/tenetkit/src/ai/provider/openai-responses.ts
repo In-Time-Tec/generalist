@@ -1,5 +1,10 @@
 import { OpenAiClient as OpenAIClient } from "@effect/ai-openai"
-import { ModelRegistry } from "../../core/index.js"
+import {
+  type FailureClassifier,
+  type ModelRegistry,
+  layer as modelRegistryLayer,
+  registration,
+} from "../../core/model/registry.js"
 import { Config, Layer, Redacted } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { isAvailabilityFailure } from "../model/failure.js"
@@ -17,7 +22,7 @@ export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
   readonly config?: OpenAIConfig
-  readonly classifyFailure?: ModelRegistry.FailureClassifier
+  readonly classifyFailure?: FailureClassifier
 }
 
 /** @experimental */
@@ -48,10 +53,8 @@ const clientOptions = (input: ClientOptions) => {
 }
 
 /** @experimental */
-export const layer = (
-  input: ClientOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
+  modelRegistryLayer([registration(registrationOptions(input))]).pipe(
     Layer.provide(openAiLayerConfig(clientOptions(input))),
   )
 

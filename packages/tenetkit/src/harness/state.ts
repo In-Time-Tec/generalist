@@ -1,4 +1,4 @@
-import { Pins } from "../core/index.js"
+import { digest } from "../core/durable/pin.js"
 import { Function, Schema } from "effect"
 import { GuidanceEntry, GuidanceScope, GuidanceSnapshotId, RefinementEvent, kinds, type GuidanceKind } from "./entry.js"
 
@@ -100,7 +100,7 @@ const encodeEntries = Schema.encodeSync(GuidanceEntries)
 
 /** @experimental Content-addressed identity of one exact state, independent of refinement history. */
 export const snapshotId = (state: GuidanceState): GuidanceSnapshotId =>
-  `guidance-snapshot:v1:sha256:${Pins.digest({
+  `guidance-snapshot:v1:sha256:${digest({
     schemaVersion: state.schemaVersion,
     scope: state.scope,
     entries: encodeEntries(state.entries),

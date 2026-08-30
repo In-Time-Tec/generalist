@@ -16,7 +16,8 @@ import type { Request } from "../../tools/tool-executor.js"
 import type { SuspensionCheckpoint, ToolCheckpoint } from "../suspension.js"
 import type { HandoffRunState } from "../handoff/state.js"
 import type { Entry, Service as SessionStore } from "../../context/session.js"
-import type { Input, RunInbox } from "../../turn/steering.js"
+import type { RunInbox } from "../../turn/steering-inbox.js"
+import type { Input } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 
 export type ObjectSchema = Schema.Codec<Record<string, Schema.Top["Type"]>, object, never, never>

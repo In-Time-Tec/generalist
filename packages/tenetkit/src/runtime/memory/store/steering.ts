@@ -1,5 +1,5 @@
 import { Effect, Function, Option } from "effect"
-import { Steering } from "../../../core/index.js"
+import { InboxFull, defaultCapacity, defaultMaxPendingBytes, promptBytes } from "../../../core/turn/steering.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../../errors.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../../run/store.js"
 import type { SteeringReceipt } from "../../run/steering.js"
@@ -19,7 +19,7 @@ export const admitSteering: {
     state: MemoryState,
   ) => Effect.Effect<
     readonly [SteeringReceipt, MemoryState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | Steering.InboxFull,
+    RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | InboxFull,
     never
   >
   (
@@ -27,7 +27,7 @@ export const admitSteering: {
     input: AdmitSteeringInput,
   ): Effect.Effect<
     readonly [SteeringReceipt, MemoryState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | Steering.InboxFull,
+    RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | InboxFull,
     never
   >
 } = Function.dual(2, (state: MemoryState, input: AdmitSteeringInput) =>
@@ -48,21 +48,21 @@ export const admitSteering: {
     const pending = run.steering.filter(
       (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
     )
-    if (pending.length >= Steering.defaultCapacity) {
-      return yield* Steering.InboxFull.make({
+    if (pending.length >= defaultCapacity) {
+      return yield* InboxFull.make({
         runId: run.runId,
         queue: "steering",
         dimension: "entries",
-        limit: Steering.defaultCapacity,
+        limit: defaultCapacity,
       })
     }
-    const pendingBytes = pending.reduce((total, entry) => total + Steering.promptBytes(entry.prompt), 0)
-    if (pendingBytes + Steering.promptBytes(input.prompt) > Steering.defaultMaxPendingBytes) {
-      return yield* Steering.InboxFull.make({
+    const pendingBytes = pending.reduce((total, entry) => total + promptBytes(entry.prompt), 0)
+    if (pendingBytes + promptBytes(input.prompt) > defaultMaxPendingBytes) {
+      return yield* InboxFull.make({
         runId: run.runId,
         queue: "steering",
         dimension: "bytes",
-        limit: Steering.defaultMaxPendingBytes,
+        limit: defaultMaxPendingBytes,
       })
     }
     const entry = {

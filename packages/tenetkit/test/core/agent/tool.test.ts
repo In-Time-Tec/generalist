@@ -13,7 +13,7 @@ import {
   ToolContext,
   ToolExecutor,
   ToolPlacement,
-} from "../../../src/core/index"
+} from "../../../src/index"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { withProviderFinish } from "../provider-finish"

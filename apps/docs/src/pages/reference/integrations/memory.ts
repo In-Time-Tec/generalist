@@ -119,7 +119,7 @@ export const memoryReference = definePage({
     ),
     p(
       "Embedding layers live in ",
-      link("/docs/reference/providers", "tenetkit/ai"),
+      link("/docs/reference/providers", "the tenetkit/ai/* provider leaves"),
       ". See ",
       link("/docs/guides/memory", "How to add memory"),
       ".",

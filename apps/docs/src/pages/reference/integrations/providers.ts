@@ -1,24 +1,20 @@
 import { callout, code, command, definePage, h2, lead, link, p, table } from "../../../prose"
 export const providersReference = definePage({
   path: "/docs/reference/providers",
-  title: "tenetkit/ai",
+  title: "tenetkit/ai/*",
   navTitle: "providers",
   group: "Reference",
   description: "Provider-neutral model utilities and exact provider, preset, catalog, and embedding subpaths.",
   content: [
     lead(
-      "tenetkit/ai is the provider-neutral model catalog, deterministic test model, and model-route entry. Exact tenetkit/ai/* subpaths bind OpenAI, Anthropic, OpenRouter, Amazon Bedrock, OpenAI-compatible endpoints, and embeddings without loading unselected providers.",
+      "Exact tenetkit/ai/* leaves own the model catalog, deterministic test model, model routes, provider adapters, presets, and embeddings. There is no aggregate entry that loads every optional provider.",
     ),
-    command("Install", "bun add tenetkit tenetkit/ai"),
+    command("Install", "bun add effect tenetkit"),
     p("Published on npm. Requires ", code("tenetkit"), " and the pinned effect version."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
       [
-        [
-          [code(".")],
-          ["Provider-neutral namespaces ", code("ModelCatalog"), ", ", code("Deterministic"), ", ", code("ModelRoute")],
-        ],
         [
           [code("./openai")],
           [

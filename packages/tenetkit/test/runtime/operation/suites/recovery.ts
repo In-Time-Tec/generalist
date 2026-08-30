@@ -6,7 +6,7 @@ import { Agent, Session, ToolContext, ToolExecutor } from "../../../../src/index
 import { layer } from "../../../../src/ai/provider/openrouter.js"
 import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
-import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor.js"
+import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor-internal.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { assistant, assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
 import { closedTestAgent, testExecutable } from "../../run/identity.js"

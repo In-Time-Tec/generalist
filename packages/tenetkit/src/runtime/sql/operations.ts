@@ -1,4 +1,4 @@
-import { DurableDriver } from "../../core/durable/public/driver.js"
+import { ReplayPolicy as DriverReplayPolicy } from "../../core/durable/driver.js"
 import { Schema } from "effect"
 import { OperationResolution } from "../operation/resolution.js"
 import { decodeJson, decodeJsonValue } from "./codec/codecs.js"
@@ -29,8 +29,8 @@ export const OperationStatus = Schema.Literals([
 ])
 export type OperationStatus = typeof OperationStatus.Type
 
-export const ReplayPolicy = DurableDriver.ReplayPolicy
-export type ReplayPolicy = DurableDriver.ReplayPolicy
+export const ReplayPolicy = DriverReplayPolicy
+export type ReplayPolicy = DriverReplayPolicy
 
 export interface OperationRecord {
   readonly runId: string

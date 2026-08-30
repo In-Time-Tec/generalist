@@ -49,7 +49,7 @@ export const makeRun = allocateRun
 export type * from "./tool-calls.js"
 export const AgentTypeId = "tenetkit/core/Agent"
 /** @experimental Agent-owned metadata values. */
-export type AgentMetadata = Readonly<Record<string, Schema.Json>>
+type AgentMetadata = Readonly<Record<string, Schema.Json>>
 /** @experimental An agent definition: a plain value, not a service. */
 export interface HandoffAgent<R> {
   readonly name: string

@@ -11,7 +11,7 @@ import {
   ModelMiddleware,
   Pins,
   ToolExecutor,
-} from "../../../src/core/index"
+} from "../../../src/index"
 import { ItLayer } from "../it-layer"
 import { close } from "../../../src/core/agent/closure.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"

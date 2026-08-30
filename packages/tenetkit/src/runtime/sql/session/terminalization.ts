@@ -1,4 +1,4 @@
-import { Session } from "../../../core/context/public/session.js"
+import { type AppendInput, SessionStoreError } from "../../../core/context/session.js"
 import { DateTime, Effect, Option, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
@@ -100,7 +100,7 @@ export const appendTerminalToolResults = (input: {
     const existing = entries.find((entry) => entry.entry_id === id)
     const parentId = existing === undefined ? session.leaf_id : existing.parent_id
     const path = pathFromRows(entries, parentId)
-    if (Schema.is(Session.SessionStoreError)(path)) return yield* unavailable(path.message)
+    if (Schema.is(SessionStoreError)(path)) return yield* unavailable(path.message)
     const eventRows = yield* sql<EventRow>`
       SELECT * FROM tenetkit_run_events WHERE run_id = ${input.run.runId} ORDER BY sequence
     `
@@ -132,7 +132,7 @@ export const appendTerminalToolResults = (input: {
     if (authority === undefined) {
       return yield* unavailable(`Run ${input.run.runId} does not own its terminal Session projection`)
     }
-    const payload: Session.AppendInput = {
+    const payload: AppendInput = {
       _tag: "Message",
       message,
       metadata: { terminalRunId: input.run.runId, terminalTag: input.terminal._tag },

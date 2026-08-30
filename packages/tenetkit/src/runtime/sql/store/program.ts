@@ -1,7 +1,12 @@
 import { Effect, Function, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { ProgramCapabilities } from "../../../core/index.js"
+import {
+  ProgramBudgetExhausted,
+  ProgramCancelled,
+  ProgramOperationUnknown,
+  ProgramReplayDivergence,
+} from "../../../core/program/capabilities.js"
 import {
   ChildSelectionMissing,
   FanOutConflict,
@@ -145,13 +150,12 @@ const replayedOperation = (input: ReserveProgramOperationInput, prior: ProgramOp
     prior.inputDigest !== input.inputDigest ||
     prior.replay !== input.replay
   )
-    return ProgramCapabilities.ProgramReplayDivergence.make({
+    return ProgramReplayDivergence.make({
       operation: input.operation,
       expected: prior.inputDigest,
       actual: input.inputDigest,
     })
-  if (prior.status === "unknown")
-    return ProgramCapabilities.ProgramOperationUnknown.make({ operation: input.operation })
+  if (prior.status === "unknown") return ProgramOperationUnknown.make({ operation: input.operation })
   return Effect.succeed(prior)
 }
 
@@ -210,18 +214,18 @@ export const reserveProgramOperation = (
     let state = yield* loadProgramState(input.runId)
     if (state === undefined) state = yield* initializeProgramState(input)
     if (state.programPin !== input.programPin)
-      return yield* ProgramCapabilities.ProgramReplayDivergence.make({
+      return yield* ProgramReplayDivergence.make({
         operation: input.operation,
         expected: state.programPin,
         actual: input.programPin,
       })
     if (input.nowMillis > state.deadlineMillis)
-      return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
+      return yield* ProgramBudgetExhausted.make({
         dimension: "wallClockMillis",
         limit: state.budget.wallClockMillis,
       })
     const exhausted = exhaustedReservation(input, state)
-    if (exhausted !== undefined) return yield* ProgramCapabilities.ProgramBudgetExhausted.make(exhausted)
+    if (exhausted !== undefined) return yield* ProgramBudgetExhausted.make(exhausted)
     yield* sql`
       UPDATE tenetkit_program_runs SET
         tool_calls = tool_calls + ${input.reservation.toolCalls ?? 0},
@@ -293,7 +297,7 @@ export const settleProgramOperation: {
       state.tokens + tokens > state.budget.tokens
         ? {
             _tag: "Failed",
-            error: ProgramCapabilities.ProgramBudgetExhausted.make({ dimension: "tokens", limit: state.budget.tokens }),
+            error: ProgramBudgetExhausted.make({ dimension: "tokens", limit: state.budget.tokens }),
           }
         : input.outcome
     let status: "succeeded" | "failed" | "unknown" = "unknown"
@@ -411,7 +415,7 @@ export const startProgramOperation = (input: { readonly runId: string; readonly 
 const reconcileProgramCancellationEffect = (runId: string, reason?: string): CancelProgramEffect =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
+    const failure = ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
     yield* sql`
       UPDATE tenetkit_program_operations SET status = 'failed', error_json = ${encodeJsonValue(failure)}
       WHERE run_id = ${runId} AND status IN ('reserved', 'running', 'waiting')

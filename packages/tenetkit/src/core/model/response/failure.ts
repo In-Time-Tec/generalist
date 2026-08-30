@@ -1,6 +1,5 @@
 import { Effect, Function, Schema, Stream } from "effect"
 import { AiError, Response } from "effect/unstable/ai"
-import type { ModelFailure } from "../registry.js"
 
 /** @experimental */
 export type Method = "generateText" | "generateObject" | "streamText"
@@ -30,10 +29,10 @@ const FailureEvidence = Schema.Union([
   }),
 ])
 
-const failureDescription = (error: ModelFailure): string => {
-  const text = Schema.decodeUnknownOption(Schema.String)(error)
+const failureDescription = (cause: unknown): string => {
+  const text = Schema.decodeUnknownOption(Schema.String)(cause)
   if (text._tag === "Some") return bounded(text.value)
-  const record = Schema.decodeUnknownOption(FailureEvidence.members[1])(error)
+  const record = Schema.decodeUnknownOption(FailureEvidence.members[1])(cause)
   if (record._tag === "None") return "Language model returned an unknown error part"
   const evidence = [record.value.message, record.value.description, record.value.code, record.value.type].filter(
     (value): value is string => value !== undefined && value.length > 0,

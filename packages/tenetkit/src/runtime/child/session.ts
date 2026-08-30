@@ -1,4 +1,4 @@
-import { Pins } from "../../core/index.js"
+import { digest } from "../../core/durable/pin.js"
 import { Schema } from "effect"
 
 /**
@@ -16,11 +16,11 @@ import { Schema } from "effect"
  * delegation, and a Session identity is a bounded key that a host may also use to name a file.
  */
 export const childSessionId = (input: { readonly parentRunId: string; readonly invocationId: string }): string =>
-  `child:${encodeURIComponent(input.parentRunId)}:${Pins.digest(input.invocationId)}`
+  `child:${encodeURIComponent(input.parentRunId)}:${digest(input.invocationId)}`
 
 /** @experimental Session identity for one member of a fan-out. */
 export const fanOutMemberSessionId = (input: { readonly fanOutId: string; readonly key: string }): string =>
-  `fanout:${encodeURIComponent(input.fanOutId)}:${Pins.digest(input.key)}`
+  `fanout:${encodeURIComponent(input.fanOutId)}:${digest(input.key)}`
 
 /** @experimental Shape one fan-out member into its admitted child form. */
 export const fanOutMember = <
@@ -31,7 +31,7 @@ export const fanOutMember = <
     readonly prompt: P
     readonly sessionId?: string
     readonly metadata?: Readonly<Record<string, typeof Schema.Unknown.Type>>
-    readonly origin?: import("./fan-out.js").FanOutMemberOrigin
+    readonly origin?: import("./fan-out-internal.js").FanOutMemberOrigin
   },
   P,
 >(input: {

@@ -1,4 +1,8 @@
-import { ActiveModelResponse } from "../../core/model/public/active-model-response.js"
+import {
+  ActiveModelResponse,
+  type Service as ActiveModelResponseService,
+  make as makeActiveModelResponse,
+} from "../../core/model/result/active-model-response.js"
 import { Context, Effect, Option, Ref, Schema } from "effect"
 import { AgentExecutionFailure, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"
@@ -12,7 +16,7 @@ const settleRunningModels = (input: {
   readonly claim: ExecutionClaim
   readonly runId: string
   readonly activeOperationIds: Ref.Ref<ReadonlySet<string>>
-  readonly activeModelResponse: ActiveModelResponse.Service
+  readonly activeModelResponse: ActiveModelResponseService
   readonly reason: "cancel" | "failure"
   readonly error: RunFailure
 }) =>
@@ -60,7 +64,7 @@ export const settleInterruptedExecution = (input: {
   readonly runId: string
   readonly activeOperationIds: Ref.Ref<ReadonlySet<string>>
   readonly completingRetrySafeOperationIds: Ref.Ref<ReadonlySet<string>>
-  readonly activeModelResponse: ActiveModelResponse.Service
+  readonly activeModelResponse: ActiveModelResponseService
   readonly reason: "cancel" | "failure"
   readonly error?: RunFailure
   readonly settleRun?: boolean
@@ -89,7 +93,7 @@ export const settleInterruptedExecution = (input: {
   }).pipe(Effect.orDie)
 
 export interface ExecutionInterruption {
-  readonly context: Context.Context<typeof ActiveModelResponse.ActiveModelResponse>
+  readonly context: Context.Context<typeof ActiveModelResponse>
   readonly settle: (input: {
     readonly reason: "cancel" | "failure"
     readonly error?: RunFailure
@@ -109,7 +113,7 @@ export const make = (input: {
   readonly activeOperationIds: Ref.Ref<ReadonlySet<string>>
   readonly completingRetrySafeOperationIds: Ref.Ref<ReadonlySet<string>>
 }): ExecutionInterruption => {
-  const activeModelResponse = ActiveModelResponse.make()
+  const activeModelResponse = makeActiveModelResponse()
   const settle = (terminal: { readonly reason: "cancel" | "failure"; readonly error?: RunFailure }) =>
     settleInterruptedExecution({ ...input, activeModelResponse, ...terminal })
   const hasRunningModelOperation = Effect.gen(function* () {
@@ -127,7 +131,7 @@ export const make = (input: {
     settleRun: false,
   })
   return {
-    context: Context.make(ActiveModelResponse.ActiveModelResponse, activeModelResponse),
+    context: Context.make(ActiveModelResponse, activeModelResponse),
     settle,
     retry: <A, E, R>(blocked: boolean, effect: Effect.Effect<A, E, R>) => {
       const skipped: Effect.Effect<A | undefined> = Effect.as(Effect.void, undefined)

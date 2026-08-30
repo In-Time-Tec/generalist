@@ -1,9 +1,26 @@
 import { Effect, Function, Layer, Option, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { Agent, ExecutableManifest, Pins, ProgramManifest, type AgentManifest } from "../core/index.js"
-import { AgentEvent } from "../core/agent/public/event.js"
-import { ToolContext } from "../core/tools/public/tool-context.js"
-import { ToolExecutor } from "../core/tools/public/tool-executor.js"
+import { type Agent, type ClosedServices, withTools } from "../core/agent/service.js"
+import type { ProgramAuthority } from "../core/durable/manifest/agent-manifest.js"
+import {
+  type ExecutableEntry,
+  type ExecutableManifest,
+  type ProfileBinding,
+  make as makeExecutableManifest,
+} from "../core/durable/manifest/executable-manifest.js"
+import { digest } from "../core/durable/pin.js"
+import { type ProgramBudget, make as makeProgramManifest } from "../core/durable/manifest/program-manifest.js"
+import type { AgentSuspended } from "../core/agent/event.js"
+import type { ToolContext } from "../core/tools/tool-context.js"
+import {
+  type CancellationRequest,
+  FrameworkFailure,
+  type Outcome,
+  type Request,
+  type Service as ToolExecutorService,
+  ToolExecutor,
+  executeToolkit,
+} from "../core/tools/tool-executor.js"
 import type {
   AdmitProgramChildInput,
   ExecutionClaim,
@@ -40,7 +57,7 @@ export interface AuthorityCatalog {
 }
 
 /** @experimental Construct the exact canonical selection catalog for one ProgramAuthority. */
-export const makeCatalog = (authority: AgentManifest.ProgramAuthority): AuthorityCatalog => ({
+export const makeCatalog = (authority: ProgramAuthority): AuthorityCatalog => ({
   tools: authority.tools.map(({ name }) => name),
   agents: authority.agents.map(({ selection }) => selection),
   steps: authority.steps.map(({ name }) => name),
@@ -56,7 +73,7 @@ export interface Parameters {
   readonly tools: ReadonlyArray<string>
   readonly agents: ReadonlyArray<string>
   readonly steps: ReadonlyArray<string>
-  readonly budget: ProgramManifest.ProgramBudget
+  readonly budget: ProgramBudget
 }
 
 /**
@@ -70,7 +87,7 @@ const selectionArray = (catalog: ReadonlyArray<string>): Schema.Codec<ReadonlyAr
     : Schema.Array(Schema.Literals(catalog)).pipe(Schema.check(Schema.isMaxLength(64)))
 
 /** @experimental Construct the model-visible request schema for one exact ProgramAuthority. */
-export const makeParameters = (authority: AgentManifest.ProgramAuthority) => {
+export const makeParameters = (authority: ProgramAuthority) => {
   const catalog = makeCatalog(authority)
   return Schema.Struct({
     source: Schema.String.pipe(Schema.check(Schema.isMaxLength(authority.maxSourceBytes))),
@@ -122,7 +139,7 @@ const makeDeclaration = (parameters: ReturnType<typeof makeParameters>) =>
   })
 
 /** @experimental Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority. */
-export const makeTool = (authority: AgentManifest.ProgramAuthority) => makeDeclaration(makeParameters(authority))
+export const makeTool = (authority: ProgramAuthority) => makeDeclaration(makeParameters(authority))
 
 const selected = <A>(
   requested: ReadonlyArray<string>,
@@ -162,8 +179,8 @@ const selected = <A>(
   })
 
 const narrowBudget = (
-  requested: ProgramManifest.ProgramBudget,
-  maximum: ProgramManifest.ProgramBudget,
+  requested: ProgramBudget,
+  maximum: ProgramBudget,
 ): Effect.Effect<void, ProgramAuthorityExceeded> =>
   Effect.gen(function* () {
     for (const key of BudgetDimensions) {
@@ -178,20 +195,15 @@ const narrowBudget = (
   })
 
 interface ExecutableClosure {
-  readonly entries: ReadonlyArray<Extract<ExecutableManifest.ExecutableEntry, { readonly _tag: "Agent" }>>
-  readonly profiles: ReadonlyArray<ExecutableManifest.ProfileBinding>
+  readonly entries: ReadonlyArray<Extract<ExecutableEntry, { readonly _tag: "Agent" }>>
+  readonly profiles: ReadonlyArray<ProfileBinding>
 }
 
-const closureFor = (
-  manifest: ExecutableManifest.ExecutableManifest,
-  roots: ReadonlyArray<string>,
-): ExecutableClosure => {
-  const byPin = new Map<string, ExecutableManifest.ExecutableEntry>(
-    manifest.entries.map((entry) => [entry.pin, entry] as const),
-  )
+const closureFor = (manifest: ExecutableManifest, roots: ReadonlyArray<string>): ExecutableClosure => {
+  const byPin = new Map<string, ExecutableEntry>(manifest.entries.map((entry) => [entry.pin, entry] as const))
   const bySelection = new Map(manifest.profiles.map((profile) => [profile.selection, profile] as const))
-  const entries = new Map<string, Extract<ExecutableManifest.ExecutableEntry, { readonly _tag: "Agent" }>>()
-  const profiles = new Map<string, ExecutableManifest.ProfileBinding>()
+  const entries = new Map<string, Extract<ExecutableEntry, { readonly _tag: "Agent" }>>()
+  const profiles = new Map<string, ProfileBinding>()
   const visit = (pin: string): void => {
     if (entries.has(pin)) return
     const entry = byPin.get(pin)
@@ -216,9 +228,9 @@ const closureFor = (
 export interface Service {
   readonly parameters: ReturnType<typeof makeParameters>
   readonly tool: ReturnType<typeof makeTool>
-  readonly invoke: (request: Parameters & { readonly toolCallId: string }) => Effect.Effect<ToolExecutor.Outcome>
+  readonly invoke: (request: Parameters & { readonly toolCallId: string }) => Effect.Effect<Outcome>
   readonly admitSuspension: (input: {
-    readonly suspension: AgentEvent.AgentSuspended
+    readonly suspension: AgentSuspended
     readonly openedAt: string
     readonly waits: ReadonlyArray<RunWait>
     readonly checkpoint?: ExecutionCheckpoint
@@ -230,7 +242,7 @@ export interface Service {
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
-  readonly authority: AgentManifest.ProgramAuthority
+  readonly authority: ProgramAuthority
   readonly store: RunStoreService
 }): Service => {
   const parameters = makeParameters(input.authority)
@@ -249,7 +261,7 @@ export const make = (input: {
       const tools = yield* selected(request.tools, input.authority.tools, (value) => value.name, "tools")
       const agents = yield* selected(request.agents, input.authority.agents, (value) => value.selection, "agents")
       const steps = yield* selected(request.steps, input.authority.steps, (value) => value.name, "steps")
-      const program = ProgramManifest.make({
+      const program = makeProgramManifest({
         name: `code_mode:${request.toolCallId}`,
         source: { language: "javascript", text: request.source },
         sandbox: input.authority.sandbox,
@@ -262,7 +274,7 @@ export const make = (input: {
         input.claimed.executableManifest,
         agents.map((agent) => agent.agent),
       )
-      const executable = ExecutableManifest.make({
+      const executable = makeExecutableManifest({
         root: program.pin,
         profiles: closure.profiles,
         entries: [
@@ -275,7 +287,7 @@ export const make = (input: {
         ],
       })
       const registrations = yield* narrowRegistrations(executable, input.claimed.registrations)
-      const childRunId = `run_code_${Pins.digest({ parentRunId: input.claim.runId, toolCallId: request.toolCallId }).slice(0, 32)}`
+      const childRunId = `run_code_${digest({ parentRunId: input.claim.runId, toolCallId: request.toolCallId }).slice(0, 32)}`
       const idempotencyKey = `code-mode:${input.claim.runId}:${request.toolCallId}`
       const message = makeMessage({
         id: `code-mode:${request.toolCallId}`,
@@ -352,20 +364,12 @@ export const make = (input: {
 
 /** @experimental Add the Runtime-owned parallel-safe declaration without changing the resolved Agent identity. */
 export const withTool: {
-  (
-    implementation: Service,
-  ): <Tools extends Record<string, Tool.Any>, R>(agent: Agent.Agent<Tools, R>) => Agent.Agent<Tools, R>
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent.Agent<Tools, R>,
-    implementation: Service,
-  ): Agent.Agent<Tools, R>
+  (implementation: Service): <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>) => Agent<Tools, R>
+  <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, implementation: Service): Agent<Tools, R>
 } = Function.dual(
   2,
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent.Agent<Tools, R>,
-    implementation: Service,
-  ): Agent.Agent<Tools, R> => {
-    const extended = Agent.withTools(agent, [implementation.tool])
+  <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, implementation: Service): Agent<Tools, R> => {
+    const extended = withTools(agent, [implementation.tool])
     return {
       ...extended,
       toolScheduling: {
@@ -378,32 +382,32 @@ export const withTool: {
 
 /** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
 const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
-  readonly agent: Agent.Agent<Tools, R>
-  readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
+  readonly agent: Agent<Tools, R>
+  readonly environment: Layer.Layer<ClosedServices<Tools, R>>
   readonly implementation: Service
-  readonly upstream: Option.Option<ToolExecutor.Service>
-}): ToolExecutor.Service => {
+  readonly upstream: Option.Option<ToolExecutorService>
+}): ToolExecutorService => {
   const upstream = Option.getOrUndefined(options.upstream)
   const upstreamCancellation =
     upstream?.cancel !== undefined
       ? {
-          cancellable: (request: ToolExecutor.Request) =>
+          cancellable: (request: Request) =>
             request.call.name !== options.implementation.tool.name && supportsCancellation(upstream, request),
-          cancel: (request: ToolExecutor.CancellationRequest) => upstream.cancel!(request),
+          cancel: (request: CancellationRequest) => upstream.cancel!(request),
         }
       : {}
-  const replayPolicy: ToolExecutor.Service["replayPolicy"] = (request) => {
+  const replayPolicy: ToolExecutorService["replayPolicy"] = (request) => {
     if (request.call.name === options.implementation.tool.name) return "never"
     return Option.isSome(options.upstream) ? (options.upstream.value.replayPolicy?.(request) ?? "never") : "never"
   }
-  const execute: ToolExecutor.Service["execute"] = (request) => {
+  const execute: ToolExecutorService["execute"] = (request) => {
     if (request.call.name === options.implementation.tool.name) {
       return Schema.decodeUnknownEffect(options.implementation.parameters, { onExcessProperty: "error" })(
         request.call.params,
       ).pipe(
         Effect.flatMap((parameters) => options.implementation.invoke({ ...parameters, toolCallId: request.call.id })),
         Effect.mapError(() =>
-          ToolExecutor.FrameworkFailure.make({
+          FrameworkFailure.make({
             stage: "decode-input",
             tool: options.implementation.tool.name,
             message: "code_mode input does not match its schema",
@@ -412,10 +416,10 @@ const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
       )
     }
     if (Option.isSome(options.upstream)) return options.upstream.value.execute(request)
-    return Effect.flatMap(Effect.context<ToolContext.ToolContext>(), (context) =>
+    return Effect.flatMap(Effect.context<ToolContext>(), (context) =>
       Effect.scoped(
         Effect.flatMap(Layer.build(options.environment), (environment) =>
-          ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
+          executeToolkit(options.agent.toolkit, request).pipe(
             Effect.provideContext(context),
             Effect.provideContext(environment),
           ),
@@ -423,7 +427,7 @@ const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
       ),
     )
   }
-  return ToolExecutor.ToolExecutor.of({
+  return ToolExecutor.of({
     replayPolicy,
     execute,
     ...upstreamCancellation,

@@ -1,3 +1,3 @@
 mkdir tenetkit-quickstart && cd tenetkit-quickstart
 bun init -y
-bun add tenetkit tenetkit/ai
+bun add effect tenetkit

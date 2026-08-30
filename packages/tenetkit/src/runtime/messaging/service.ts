@@ -1,7 +1,14 @@
 import { Context, Effect, Layer } from "effect"
-import { DurableDriver } from "../../core/index.js"
-import { RunBudget } from "../../core/durable/public/run-budget.js"
-import { ToolContext } from "../../core/tools/public/tool-context.js"
+import {
+  type DriverError,
+  type DriverInterpreter,
+  type DriverStateInvalid,
+  type DriverUnknownReplay,
+  intercept,
+  operationKey,
+} from "../../core/durable/driver.js"
+import type { RunBudgetExhausted } from "../../core/durable/run-budget.js"
+import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import {
@@ -163,17 +170,13 @@ export interface AgentMessagingService {
     readonly metadata?: Metadata
   }) => Effect.Effect<
     MessageReceipt,
-    | SendMessageError
-    | DurableDriver.DriverError
-    | DurableDriver.DriverStateInvalid
-    | DurableDriver.DriverUnknownReplay
-    | RunBudget.RunBudgetExhausted,
-    DurableDriver.DriverInterpreter | ToolContext.ToolContext
+    SendMessageError | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    DriverInterpreter | ToolContext
   >
   readonly inbox: (input: {
     readonly limit: number
-  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError, ToolContext.ToolContext>
-  readonly directory: Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError, ToolContext.ToolContext>
+  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError, ToolContext>
+  readonly directory: Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError, ToolContext>
 }
 
 /**
@@ -188,7 +191,7 @@ export class AgentMessaging extends Context.Service<AgentMessaging, AgentMessagi
   "tenetkit/runtime/messaging/service/AgentMessaging",
 ) {}
 
-const currentRunId = Effect.flatMap(ToolContext.ToolContext, (context) =>
+const currentRunId = Effect.flatMap(ToolContext, (context) =>
   context.runId === undefined
     ? RuntimeUnavailable.make({ message: "addressed messaging requires a Runtime-owned ToolContext" })
     : Effect.succeed(context.runId),
@@ -209,10 +212,10 @@ export const make = (input: {
   send: (request) =>
     Effect.gen(function* () {
       const runId = yield* currentRunId
-      return yield* DurableDriver.intercept(
+      return yield* intercept(
         {
           kind: "send",
-          key: DurableDriver.operationKey([runId, "send", request.idempotencyKey]),
+          key: operationKey([runId, "send", request.idempotencyKey]),
           input: { to: request.to, idempotencyKey: request.idempotencyKey },
           replayPolicy: "never",
         },

@@ -36,7 +36,7 @@ import { intercept, setHandoffState, setToolBatch } from "../durable/driver/run.
 import { type HandoffRunState, make as makeHandoffStateRef, takePendingContinuation } from "./handoff/state-ref.js"
 import type { ObjectSchema, StructuredRunConfig } from "./loop/context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
-import type { RunInbox } from "../turn/steering.js"
+import type { RunInbox } from "../turn/steering-inbox.js"
 const errorMessage = String
 const { insertRecalledItems, steeringDrainedEvent } = RunSupport
 const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(

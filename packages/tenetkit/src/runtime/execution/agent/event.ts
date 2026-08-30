@@ -1,11 +1,11 @@
-import type { AgentEvent } from "../../../core/agent/public/event.js"
-import type { Session } from "../../../core/context/public/session.js"
+import type { Completed, Event, Metadata as CoreMetadata } from "../../../core/agent/event.js"
+import type { ModelResponseEntry } from "../../../core/context/session.js"
 import type { Response } from "effect/unstable/ai"
 import type { CompletedModelResponse } from "../../run/event.js"
 
-export type Metadata = AgentEvent.Metadata
+export type Metadata = CoreMetadata
 
-export type AgentLoopEvent = Exclude<AgentEvent.Event, AgentEvent.Completed>
+export type AgentLoopEvent = Exclude<Event, Completed>
 
 type CoreTurnCompleted = Extract<AgentLoopEvent, { readonly _tag: "TurnCompleted" }>
 
@@ -77,6 +77,6 @@ export interface InterruptedSessionEntry {
   readonly sessionId: string
   readonly entryId: string
   readonly parentId: string | null
-  readonly content: Session.ModelResponseEntry["content"]
+  readonly content: ModelResponseEntry["content"]
   readonly digest: string
 }

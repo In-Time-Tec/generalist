@@ -1,6 +1,6 @@
 import { Option, Schema } from "effect"
 import { AiError } from "effect/unstable/ai"
-import type { FailureClassification, ModelFailure } from "../registry.js"
+import type { FailureClassification } from "../registry.js"
 
 const overflowEvidence =
   /context_length_exceeded|context_window_exceeded|context_window_overflow|input_too_long|maximum context length|context (?:window|length) (?:was |has been )?exceeded|exceeds? (?:the )?(?:context window|maximum number of tokens|model'?s? maximum context)|input (?:is )?too (?:long|large)|prompt is too long|too many (?:input )?tokens/i
@@ -12,14 +12,14 @@ const nestedFields = ["error", "reason", "cause"] as const
 
 const EvidenceRecord = Schema.Record(Schema.String, Schema.Unknown)
 
-const evidence = (value: ModelFailure, depth: number): string => {
-  if (depth > 4 || value === null || value === undefined) return ""
-  if (AiError.isAiError(value)) {
-    return overflowEligibleReasons.has(value.reason._tag) ? `${value.message} ${evidence(value.reason, depth + 1)}` : ""
+const evidence = (cause: unknown, depth: number): string => {
+  if (depth > 4 || cause === null || cause === undefined) return ""
+  if (AiError.isAiError(cause)) {
+    return overflowEligibleReasons.has(cause.reason._tag) ? `${cause.message} ${evidence(cause.reason, depth + 1)}` : ""
   }
-  const decodedString = Schema.decodeUnknownOption(Schema.String)(value)
+  const decodedString = Schema.decodeUnknownOption(Schema.String)(cause)
   if (Option.isSome(decodedString)) return decodedString.value
-  const decodedRecord = Schema.decodeUnknownOption(EvidenceRecord)(value)
+  const decodedRecord = Schema.decodeUnknownOption(EvidenceRecord)(cause)
   if (Option.isNone(decodedRecord)) return ""
   const record = decodedRecord.value
   const parts: Array<string> = []
@@ -38,5 +38,5 @@ const evidence = (value: ModelFailure, depth: number): string => {
 }
 
 /** @experimental Classify every model failure as a context-window overflow by its semantic evidence, independent of provider, error shape, or decode success. */
-export const classify = (error: ModelFailure): FailureClassification =>
-  overflowEvidence.test(evidence(error, 0)) ? "context-overflow" : "other"
+export const classify = (cause: unknown): FailureClassification =>
+  overflowEvidence.test(evidence(cause, 0)) ? "context-overflow" : "other"

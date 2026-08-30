@@ -1,7 +1,8 @@
 import { Context, Effect, Schema, Stream, Option } from "effect"
-import type { ProgramCapabilities, Steering } from "../../core/index.js"
-import { Session } from "../../core/context/public/session.js"
-import { ToolExecutor } from "../../core/tools/public/tool-executor.js"
+import type { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
+import type { InboxFull } from "../../core/turn/steering.js"
+import type { Service as SessionService } from "../../core/context/session.js"
+import type { CancellationOutcome } from "../../core/tools/tool-executor.js"
 import type { Address } from "../address.js"
 import type { Cursor } from "../cursor.js"
 import type {
@@ -51,7 +52,8 @@ import type { ResolveOperationInput } from "../operation/resolution.js"
 import type { RespondInput as RespondApprovalInput } from "../operation/approval.js"
 import type { OperationRecord, OperationStatus } from "../sql/operations.js"
 import type { ExecutionContinuation, SteeringEntry, SteeringReceipt } from "./steering.js"
-import type { AdmitFanOutInput, FanOutInspection, FanOutReceipt } from "../child/fan-out.js"
+import type { FanOutInspection, FanOutReceipt } from "../child/fan-out.js"
+import type { AdmitFanOutInput } from "../child/fan-out-internal.js"
 import type { Notification as ChildSettlementNotification } from "../child/settlement.js"
 import type {
   CompleteProgramInput,
@@ -121,7 +123,7 @@ export interface Service {
   /** @experimental Read-only durable conversation history for one Session identity. */
   readonly sessionReader: (sessionId: string) => Effect.Effect<Option.Option<SessionReader>>
   /** @experimental Session writer bound to one storage-issued execution claim. */
-  readonly claimedSessionStore: (claim: ExecutionClaim) => Effect.Effect<Option.Option<Session.Service>>
+  readonly claimedSessionStore: (claim: ExecutionClaim) => Effect.Effect<Option.Option<SessionService>>
   readonly hasAdmission: (input: {
     readonly address: Address
     readonly sessionId: string
@@ -220,10 +222,7 @@ export interface Service {
   }) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable>
   readonly admitSteering: (
     input: AdmitSteeringInput,
-  ) => Effect.Effect<
-    SteeringReceipt,
-    RunNotFound | RunTerminal | SteeringConflict | Steering.InboxFull | RuntimeUnavailable
-  >
+  ) => Effect.Effect<SteeringReceipt, RunNotFound | RunTerminal | SteeringConflict | InboxFull | RuntimeUnavailable>
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
   /**
    * @experimental The authoritative directory record for one Run.
@@ -380,7 +379,7 @@ export interface Service {
   readonly acknowledgeOperationCancellation: (
     input: ExecutionClaim & {
       readonly operationId: string
-      readonly outcome: ToolExecutor.CancellationOutcome
+      readonly outcome: CancellationOutcome
     },
   ) => Effect.Effect<OperationRecord, WorkerMutationError>
   readonly resolveOperation: (
@@ -455,7 +454,7 @@ export interface Service {
   }) => Effect.Effect<ProgramOperationRecord | undefined, RunNotFound | RuntimeUnavailable>
   readonly completeProgram: (
     input: CompleteProgramInput,
-  ) => Effect.Effect<CompletionOutcome, WorkerMutationError | ProgramCapabilities.ProgramBudgetExhausted>
+  ) => Effect.Effect<CompletionOutcome, WorkerMutationError | ProgramBudgetExhausted>
   readonly commitProgramLog: (
     input: CommitProgramLogInput,
   ) => Effect.Effect<ProgramOperationRecord, WorkerMutationError | ProgramStoreFailure>

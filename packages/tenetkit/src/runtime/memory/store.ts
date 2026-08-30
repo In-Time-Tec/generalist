@@ -59,7 +59,7 @@ import { admitFanOut } from "./store/fan-out/service.js"
 import { inspectFanOut } from "./store/fan-out/inspection.js"
 import { make as makeTreeCursor } from "../tree/cursor.js"
 import { projectRunSnapshot, projectTreeCheckpoint, type InspectionRun } from "../execution/inspection.js"
-import { decodePinned, equals } from "../executable/manifest.js"
+import { decodePinned, equals } from "../executable/manifest-internal.js"
 import {
   admitProgramAgents,
   completeProgram,

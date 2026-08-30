@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
-import { Instructions } from "../../../src/core/index"
+import { Instructions } from "../../../src/index"
 
 const context: Instructions.RenderContext = { agentName: "agent", turn: 0 }
 

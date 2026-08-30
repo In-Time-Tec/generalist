@@ -1,12 +1,12 @@
 import { Option, Schema } from "effect"
-import { Agent } from "../../../core/index.js"
-import { AgentEvent } from "../../../core/agent/public/event.js"
-import { DurableDriver } from "../../../core/durable/public/driver.js"
+import type { RunOptions } from "../../../core/agent/service.js"
+import { AgentSuspended } from "../../../core/agent/event.js"
+import type { DriverCheckpoint } from "../../../core/durable/driver.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { ExecutionClaim, ExecutionRecord } from "../../run/store.js"
 import type { ExecutionContinuation } from "../../run/steering.js"
 
-type HostedRunOptions = Omit<Agent.RunOptions, "memory" | "output" | "steering">
+type HostedRunOptions = Omit<RunOptions, "memory" | "output" | "steering">
 
 export const make = (input: {
   readonly claim: ExecutionClaim
@@ -14,17 +14,17 @@ export const make = (input: {
   readonly attempt: number
   readonly prompt: Prompt.RawInput
   readonly history?: Prompt.Prompt
-  readonly checkpoint?: DurableDriver.DriverCheckpoint
+  readonly checkpoint?: DriverCheckpoint
   readonly continuation?: ExecutionContinuation
   readonly turnStart?: number
   readonly resume: boolean
-  readonly budget: NonNullable<Agent.RunOptions["budget"]>
-  readonly compaction?: Agent.RunOptions["compaction"]
+  readonly budget: NonNullable<RunOptions["budget"]>
+  readonly compaction?: RunOptions["compaction"]
 }): HostedRunOptions | undefined => {
   const suspension =
     !input.resume || input.execution.suspension === undefined
-      ? Option.none<AgentEvent.AgentSuspended>()
-      : Schema.decodeUnknownOption(AgentEvent.AgentSuspended)(input.execution.suspension)
+      ? Option.none<AgentSuspended>()
+      : Schema.decodeUnknownOption(AgentSuspended)(input.execution.suspension)
   if (input.resume && input.execution.suspension !== undefined && Option.isNone(suspension)) return undefined
   const options: HostedRunOptions = {
     prompt: input.prompt,

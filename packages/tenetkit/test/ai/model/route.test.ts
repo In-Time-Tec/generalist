@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Schedule, Schema, Scope, Stream } from "effect"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ModelResilience, ToolExecutor } from "tenetkit"
-import { ModelRoute } from "../../../src/ai/index.js"
+import { make, type Route } from "../../../src/ai/model/route.js"
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: undefined, total: 3, cacheRead: undefined, cacheWrite: undefined },
@@ -70,7 +70,7 @@ const provideScoped = <A, E, R, A2, E2, R2>(
 ): Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>> =>
   Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
-const run = (route: ModelRoute.Route, resilience: ModelResilience.Service = ModelResilience.none) =>
+const run = (route: Route, resilience: ModelResilience.Service = ModelResilience.none) =>
   Stream.runCollect(Agent.stream(Agent.make({ name: "route", model: route.selection }), { prompt: "go" })).pipe(
     (effect) =>
       provideScoped(
@@ -101,7 +101,7 @@ describe("ordered model route", () => {
         () => Stream.make(Response.makePart("text-delta", { id: "text", delta: "ok" }), finish),
         calls,
       )
-      const route = yield* ModelRoute.make({ candidates: [primary, fallback] })
+      const route = yield* make({ candidates: [primary, fallback] })
       const resilience = yield* ModelResilience.make({
         retrySchedule: Schedule.recurs(1),
         classify: (error) => (isUnavailableWithUsage(error) ? "transient" : "terminal"),
@@ -142,7 +142,7 @@ describe("ordered model route", () => {
           calls,
         )
         const fallback = yield* registration("fallback", () => Stream.make(finish), calls)
-        const route = yield* ModelRoute.make({ candidates: [primary, fallback] })
+        const route = yield* make({ candidates: [primary, fallback] })
         yield* run(route).pipe(Effect.exit)
         expect(calls).toEqual(["primary"])
       }
@@ -150,7 +150,7 @@ describe("ordered model route", () => {
       const calls: Array<string> = []
       const primary = yield* registration("primary", () => Stream.fail(terminal), calls)
       const fallback = yield* registration("fallback", () => Stream.make(finish), calls)
-      const route = yield* ModelRoute.make({ candidates: [primary, fallback] })
+      const route = yield* make({ candidates: [primary, fallback] })
       yield* run(route).pipe(Effect.exit)
       expect(calls).toEqual(["primary"])
     }),
@@ -166,7 +166,7 @@ describe("ordered model route", () => {
         calls,
       )
       const fallback = yield* registration("fallback", () => Stream.make(finish), calls)
-      const route = yield* ModelRoute.make({ candidates: [primary, fallback] })
+      const route = yield* make({ candidates: [primary, fallback] })
       const fiber = yield* run(route).pipe(Effect.forkChild)
       yield* Deferred.await(entered)
       yield* Fiber.interrupt(fiber)
@@ -179,9 +179,9 @@ describe("ordered model route", () => {
       const calls: Array<string> = []
       const first = yield* registration("first", () => Stream.make(finish), calls)
       const second = yield* registration("second", () => Stream.make(finish), calls)
-      const left = yield* ModelRoute.make({ candidates: [first, second] })
-      const same = yield* ModelRoute.make({ candidates: [first, second] })
-      const reversed = yield* ModelRoute.make({ candidates: [second, first] })
+      const left = yield* make({ candidates: [first, second] })
+      const same = yield* make({ candidates: [first, second] })
+      const reversed = yield* make({ candidates: [second, first] })
       expect(left.selection).toEqual(same.selection)
       expect(left.selection).not.toEqual(reversed.selection)
     }),

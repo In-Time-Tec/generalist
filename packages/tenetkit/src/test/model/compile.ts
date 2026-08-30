@@ -1,6 +1,5 @@
 import { Duration, Effect, Stream } from "effect"
-import { AiError } from "../../core/index.js"
-import { Response } from "effect/unstable/ai"
+import { AiError, Response } from "effect/unstable/ai"
 import type { Operation, Part, ToolCallPart, TruncatedStep, TruncationPoint, TurnStep } from "./service.js"
 
 /** @experimental */

@@ -27,12 +27,13 @@ import { normalizePrompt } from "../prompt.js"
 import { normalizeInitialChild, normalizeInitialFanOut } from "../start.js"
 import { ActiveExecutions } from "../../execution/active-executions.js"
 import { digest as steeringDigest } from "../../run/steering.js"
-import { fanOutIdFor, MAX_FAN_OUT_MEMBERS } from "../../child/fan-out.js"
+import { fanOutIdFor, MAX_FAN_OUT_MEMBERS } from "../../child/fan-out-internal.js"
 import { parseCursor } from "../../tree/cursor.js"
-import { decodePinned, equals, resolveChild, type PinnedExecutable } from "../../executable/manifest.js"
+import { decodePinned, equals, resolveChild } from "../../executable/manifest-internal.js"
+import type { PinnedExecutable } from "../../executable/manifest.js"
 import type { Input as ResolverInput } from "../../executable/resolver.js"
 import { validate as validateRegistrations, type ExecutableRegistration } from "../../executable/registration.js"
-import { ModelPreviewLane, previews as modelPreviews } from "../../execution/model-response/preview.js"
+import { ModelPreviewLane, previews as modelPreviews } from "../../execution/model-response/preview-internal.js"
 import { readEntry, resolveModelResponse } from "../../session/service.js"
 type Registrations = ReadonlyArray<ExecutableRegistration>
 import { childSessionId } from "../../child/session.js"
@@ -496,5 +497,4 @@ export const serviceEffect = (
       awaitFanOut,
     })
   })
-export const layer = (options: LayerOptions): Layer.Layer<Runtime, never, RunStore | ActiveExecutions> =>
-  Layer.effect(Runtime, serviceEffect(options))
+export const layer = (options: LayerOptions) => Layer.effect(Runtime, serviceEffect(options))

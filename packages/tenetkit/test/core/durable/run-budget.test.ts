@@ -15,7 +15,7 @@ import {
   RunBudget,
   Session,
   ToolExecutor,
-} from "../../../src/core/index"
+} from "../../../src/index"
 import { withProviderFinish } from "../provider-finish.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { suspension } from "../../runtime/execution/fixtures.js"

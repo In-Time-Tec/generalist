@@ -14,7 +14,7 @@ import {
   StartInvalid,
   TreePolicyInvalid,
 } from "../../errors.js"
-import { decodePinned, equals, resolveChild } from "../../executable/manifest.js"
+import { decodePinned, equals, resolveChild } from "../../executable/manifest-internal.js"
 import { childDigest, startDigest } from "../../memory/digest.js"
 import type { AdmitProgramChildInput, AdmitStartInput } from "../../run/store.js"
 import type { SpawnInput } from "../../service.js"

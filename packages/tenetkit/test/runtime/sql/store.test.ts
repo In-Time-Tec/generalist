@@ -22,7 +22,7 @@ import {
   RunTree,
 } from "../../../src/runtime/index.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
-import { make as makeRunExecutor } from "../../../src/runtime/execution/run-executor.js"
+import { make as makeRunExecutor } from "../../../src/runtime/execution/run-executor-internal.js"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/runtime/sql/codec/schema.js"
 import { markDirty } from "../../../src/runtime/sql/migrate.js"
 import {

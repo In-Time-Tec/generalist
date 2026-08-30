@@ -1,8 +1,17 @@
 import { Effect, type Layer, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import { Agent } from "../core/index.js"
-import { ToolContext } from "../core/tools/public/tool-context.js"
-import { ToolExecutor } from "../core/tools/public/tool-executor.js"
+import type { ToolSchedulingPolicy } from "../core/agent/service.js"
+import { type Progress, type Service, ToolContext } from "../core/tools/tool-context.js"
+import {
+  FrameworkFailure,
+  type FrameworkStage,
+  type Outcome,
+  type Request,
+  type ToolExecutor,
+  layerRouter,
+  route as toolExecutorRoute,
+} from "../core/tools/tool-executor.js"
+import type { Route } from "../core/tools/tool-placement.js"
 import { CellEvent, CellFailure, CellResult } from "./cell.js"
 import { KernelPool } from "./kernel-pool.js"
 
@@ -41,13 +50,13 @@ export const toolkit = Toolkit.make(tool)
  * @experimental One shared namespace means one cell at a time: the cell tool is never parallel-safe
  * and every call is an authored-order exclusive barrier.
  */
-export const scheduling: Agent.ToolSchedulingPolicy = {
+export const scheduling: ToolSchedulingPolicy = {
   maxConcurrency: 1,
   parallelSafe: [],
 }
 
-const frameworkFailure = (stage: ToolExecutor.FrameworkStage, message: string): ToolExecutor.FrameworkFailure =>
-  ToolExecutor.FrameworkFailure.make({ stage, tool: name, message })
+const frameworkFailure = (stage: FrameworkStage, message: string): FrameworkFailure =>
+  FrameworkFailure.make({ stage, tool: name, message })
 
 const schemaMessage = (error: { readonly message: string }): string => error.message
 
@@ -70,7 +79,7 @@ const encodedSize = (encoded: typeof CellEvent.Encoded): number =>
  * render streamed cell output. An event that cannot be encoded, or that exceeds the bound, still
  * emits its identity, so the cell-local sequence a consumer verifies stays contiguous.
  */
-const progress = (toolCallId: string, event: CellEvent): Effect.Effect<ToolContext.Progress> =>
+const progress = (toolCallId: string, event: CellEvent): Effect.Effect<Progress> =>
   encodeEvent(event).pipe(
     Effect.match({
       onFailure: () => identity(event),
@@ -82,26 +91,24 @@ const progress = (toolCallId: string, event: CellEvent): Effect.Effect<ToolConte
     Effect.map((data) => ({ toolCallId, message: event._tag, data })),
   )
 
-const cellIdOf = (request: ToolExecutor.Request, context: ToolContext.Service): string =>
+const cellIdOf = (request: Request, context: Service): string =>
   context.operationKey ?? context.toolCallId ?? `${request.sessionId}-${request.turn}-${request.toolCallIndex}`
 
-const success = (result: CellResult): Effect.Effect<ToolExecutor.Outcome, ToolExecutor.FrameworkFailure> =>
+const success = (result: CellResult): Effect.Effect<Outcome, FrameworkFailure> =>
   Schema.encodeUnknownEffect(CellResult)(result).pipe(
     Effect.mapError((error) => frameworkFailure("encode-success", schemaMessage(error))),
-    Effect.map((encodedResult): ToolExecutor.Outcome => ({ _tag: "Success", result, encodedResult })),
+    Effect.map((encodedResult): Outcome => ({ _tag: "Success", result, encodedResult })),
   )
 
-const domainFailure = (failure: CellFailure): Effect.Effect<ToolExecutor.Outcome, ToolExecutor.FrameworkFailure> =>
+const domainFailure = (failure: CellFailure): Effect.Effect<Outcome, FrameworkFailure> =>
   Schema.encodeUnknownEffect(CellFailure)(failure).pipe(
     Effect.mapError((error) => frameworkFailure("encode-domain-failure", schemaMessage(error))),
-    Effect.map((encodedFailure): ToolExecutor.Outcome => ({ _tag: "DomainFailure", failure, encodedFailure })),
+    Effect.map((encodedFailure): Outcome => ({ _tag: "DomainFailure", failure, encodedFailure })),
   )
 
-const execute = (
-  request: ToolExecutor.Request,
-): Effect.Effect<ToolExecutor.Outcome, ToolExecutor.FrameworkFailure, ToolContext.ToolContext | KernelPool> =>
+const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, ToolContext | KernelPool> =>
   Effect.gen(function* () {
-    const context = yield* ToolContext.ToolContext
+    const context = yield* ToolContext
     const pool = yield* KernelPool
     const params = yield* Schema.decodeUnknownEffect(Parameters)(request.call.params).pipe(
       Effect.mapError((error) => frameworkFailure("decode-input", schemaMessage(error))),
@@ -122,13 +129,10 @@ const execute = (
   })
 
 /** @experimental The cell route: one tool, ToolContext progress and interruption, typed cell outcomes. */
-export const route: ToolExecutor.Route<ToolContext.ToolContext | KernelPool> = ToolExecutor.route<
-  ToolContext.ToolContext | KernelPool
->({
+export const route: Route<ToolContext | KernelPool> = toolExecutorRoute<ToolContext | KernelPool>({
   tools: [name],
   execute,
 })
 
 /** @experimental */
-export const layer: Layer.Layer<ToolExecutor.ToolExecutor, never, ToolContext.ToolContext | KernelPool> =
-  ToolExecutor.layerRouter([route])
+export const layer: Layer.Layer<ToolExecutor, never, ToolContext | KernelPool> = layerRouter([route])

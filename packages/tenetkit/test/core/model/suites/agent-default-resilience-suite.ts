@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
-import { Agent } from "../../../../src/core/index"
+import { Agent } from "../../../../src/index"
 
 const failure = (reason: Parameters<typeof AiError.make>[0]["reason"]) =>
   AiError.make({ module: "DefaultResilienceTestModel", method: "streamText", reason })

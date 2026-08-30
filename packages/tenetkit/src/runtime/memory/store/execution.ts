@@ -5,7 +5,7 @@ import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../r
 import { StaleClaim, StaleSessionClaim } from "../../sql/errors.js"
 import { activeChildCount } from "./child/capacity.js"
 import { runWaits, type MemoryState } from "../state.js"
-import { checkpointRef } from "../../executable/manifest.js"
+import { checkpointRef } from "../../executable/manifest-internal.js"
 import { appendLifecycle, attemptStartedEvent } from "../append.js"
 
 const requireRun = (state: MemoryState, runId: string) => {

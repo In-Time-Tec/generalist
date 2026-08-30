@@ -1,12 +1,21 @@
 import { Schema } from "effect"
-import { AgentEvent } from "../core/index.js"
-import { RunBudget } from "../core/durable/public/run-budget.js"
+import { ResumeMismatch } from "../core/agent/event.js"
+import { RunBudgetExhausted } from "../core/durable/run-budget.js"
 import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
 import { ExecutableRef } from "./executable/manifest.js"
 import { TreeCursor, TreeCursorInvalid, TreeCursorRootMismatch } from "./tree/cursor.js"
 
 export { TreeCursorInvalid, TreeCursorRootMismatch }
+export {
+  MultiWorkerUnsupported,
+  SchemaChecksumMismatch,
+  SchemaDirty,
+  SchemaMigrationFailed,
+  SchemaUpgradeRequired,
+  SchemaVersionUnsupported,
+  StaleClaim,
+} from "./sql/errors.js"
 
 export class AddressNotFound extends Schema.TaggedError<AddressNotFound>()("tenetkit/runtime/AddressNotFound", {
   address: Address,
@@ -42,12 +51,12 @@ export class ExecutableIdentityMismatch extends Schema.TaggedError<ExecutableIde
 ) {}
 
 /** @experimental The structured Agent failures a durable terminal event preserves verbatim. */
-export type StructuredAgentFailure = RunBudget.RunBudgetExhausted | AgentEvent.ResumeMismatch
+export type StructuredAgentFailure = RunBudgetExhausted | ResumeMismatch
 
 export const StructuredAgentFailure: Schema.Codec<
   StructuredAgentFailure,
-  typeof RunBudget.RunBudgetExhausted.Encoded | typeof AgentEvent.ResumeMismatch.Encoded
-> = Schema.Union([RunBudget.RunBudgetExhausted, AgentEvent.ResumeMismatch])
+  typeof RunBudgetExhausted.Encoded | typeof ResumeMismatch.Encoded
+> = Schema.Union([RunBudgetExhausted, ResumeMismatch])
 
 export class AgentExecutionFailure extends Schema.TaggedError<AgentExecutionFailure>()(
   "tenetkit/runtime/AgentExecutionFailure",
@@ -57,21 +66,6 @@ export class AgentExecutionFailure extends Schema.TaggedError<AgentExecutionFail
     cause: Schema.optionalKey(Schema.Defect()),
   },
 ) {}
-
-/** @experimental Guarantee an actionable non-empty terminal message. */
-export const failureMessage = (message: string): string => {
-  const trimmed = message.trim()
-  return trimmed.length === 0 ? "Agent execution failed" : trimmed
-}
-
-/** @experimental Internal canonical failure for resolver-owned compaction option drift. */
-export const compactionOptionsMismatch = AgentExecutionFailure.make({
-  message: "Resolved compaction options do not match Agent manifest",
-})
-
-export const undecodableSuspension = AgentExecutionFailure.make({
-  message: "Persisted suspension could not be decoded",
-})
 
 export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>()(
   "tenetkit/runtime/IdempotencyConflict",

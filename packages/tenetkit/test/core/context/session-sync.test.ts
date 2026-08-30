@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Ref, Schema } from "effect"
 import { Chat, Prompt } from "effect/unstable/ai"
-import { SessionSync } from "../../../src/core/index"
+import { SessionSync } from "../../../src/index"
 import { Json } from "../json.js"
 
 const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })

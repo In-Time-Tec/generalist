@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { AgentManifest, ExecutableManifest, Pins } from "../packages/tenetkit/src/core/index.js"
+import { AgentManifest, ExecutableManifest, Pins } from "../packages/tenetkit/src/index.js"
 import { Entry, Registration, Snapshot, State } from "../packages/tenetkit/src/harness/index.js"
 import { ExecutableRegistration } from "../packages/tenetkit/src/runtime/index.js"
 import { Effect } from "effect"

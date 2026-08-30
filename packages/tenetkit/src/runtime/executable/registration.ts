@@ -1,4 +1,5 @@
-import { AgentManifest, Pins } from "../../core/index.js"
+import type { NamedCapability, PinnedContent } from "../../core/durable/manifest/agent-manifest.js"
+import { digest as pinDigest } from "../../core/durable/pin.js"
 import { Effect, Function, Schema } from "effect"
 import { PinnedExecutable } from "./manifest.js"
 import { ExecutableRegistrationInvalid, ExecutableRegistrationMissing } from "../errors.js"
@@ -129,8 +130,8 @@ export const requiredPinsForActiveExecutable = (executable: PinnedExecutable): R
   return pins
 }
 
-const namedCapabilities = (executable: PinnedExecutable): ReadonlyArray<AgentManifest.NamedCapability> => {
-  const capabilities: Array<AgentManifest.NamedCapability> = []
+const namedCapabilities = (executable: PinnedExecutable): ReadonlyArray<NamedCapability> => {
+  const capabilities: Array<NamedCapability> = []
   for (const entry of executable.manifest.entries) {
     if (entry._tag === "Agent") {
       capabilities.push(...entry.manifest.tools, ...entry.manifest.skills, ...entry.manifest.services)
@@ -144,12 +145,12 @@ const namedCapabilities = (executable: PinnedExecutable): ReadonlyArray<AgentMan
   return capabilities
 }
 
-const pinnedContents = (executable: PinnedExecutable): ReadonlyMap<string, AgentManifest.PinnedContent> => {
-  const contents = new Map<string, AgentManifest.PinnedContent>()
+const pinnedContents = (executable: PinnedExecutable): ReadonlyMap<string, PinnedContent> => {
+  const contents = new Map<string, PinnedContent>()
   for (const capability of namedCapabilities(executable)) {
     if (capability.content === undefined) continue
     const current = contents.get(capability.pin)
-    if (current !== undefined && Pins.digest(current) !== Pins.digest(capability.content)) {
+    if (current !== undefined && pinDigest(current) !== pinDigest(capability.content)) {
       throw new TypeError(`capability pin has conflicting pinned content: ${capability.pin}`)
     }
     contents.set(capability.pin, capability.content)
@@ -164,7 +165,7 @@ const compactionPolicies = (executable: PinnedExecutable): ReadonlyMap<string, C
     const { service, keepRecentTokens, strategyIdentity, summaryPromptIdentity } = entry.manifest.compaction
     const policy = { keepRecentTokens, strategyIdentity, summaryPromptIdentity }
     const current = policies.get(service)
-    if (current !== undefined && Pins.digest(current) !== Pins.digest(policy)) {
+    if (current !== undefined && pinDigest(current) !== pinDigest(policy)) {
       throw new TypeError(`compaction service has conflicting identities: ${service}`)
     }
     policies.set(service, policy)
@@ -233,7 +234,7 @@ export const validate: {
             })
           }
           const payloadDigest = yield* Effect.try({
-            try: () => Pins.digest(registration.payload),
+            try: () => pinDigest(registration.payload),
             catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
           })
           if (payloadDigest !== expectedContent.digest) {
@@ -247,7 +248,7 @@ export const validate: {
           const policy = yield* Schema.decodeUnknownEffect(CompactionPolicy, { onExcessProperty: "error" })(
             registration.payload,
           ).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: String(error) })))
-          if (Pins.digest(policy) !== Pins.digest(expectedPolicy)) {
+          if (pinDigest(policy) !== pinDigest(expectedPolicy)) {
             return yield* ExecutableRegistrationInvalid.make({
               message: `compaction registration does not match executable identity: ${registration.pin}`,
             })
@@ -273,7 +274,7 @@ export const validate: {
           })
         }
         yield* Effect.try({
-          try: () => Pins.digest(registration.payload),
+          try: () => pinDigest(registration.payload),
           catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
         })
         byPin.set(registration.pin, registration)
@@ -290,7 +291,7 @@ export const validate: {
 )
 
 /** @experimental Stable persisted identity of one registration. */
-export const digest = (registration: ExecutableRegistration): string => Pins.digest(registration)
+export const digest = (registration: ExecutableRegistration): string => pinDigest(registration)
 
 export const encodeJson = encoded
 

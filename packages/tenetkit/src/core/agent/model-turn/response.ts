@@ -1,6 +1,7 @@
 import { Effect, Option, Ref } from "effect"
 import { Chat, Prompt, Response, Tool } from "effect/unstable/ai"
-import { controller, type Controller, type Service } from "../../model/result/active-model-response.js"
+import type { Service } from "../../model/result/active-model-response.js"
+import { controller, type Controller } from "../../model/result/active-model-response-controller.js"
 import { make as makeModelResponse, type CompletedModelResponse } from "../../model/response/builder.js"
 import type { AttemptCompleted } from "../../model/operation.js"
 import { coalesceAdjacentText } from "../../context/session-sync.js"

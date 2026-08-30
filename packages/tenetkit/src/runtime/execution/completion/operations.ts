@@ -1,7 +1,7 @@
 import { Cause, Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { AgentEvent } from "../../../core/agent/public/event.js"
-import { DurableDriver } from "../../../core/durable/public/driver.js"
+import { AgentSuspended } from "../../../core/agent/event.js"
+import { DriverCheckpoint } from "../../../core/durable/driver.js"
 import { RunTerminal } from "../../errors.js"
 import type { ExecutionContinuation } from "../../run/steering.js"
 import type { make as makeAgentRunOptions } from "../agent/run-options.js"
@@ -38,10 +38,10 @@ export const continuationForOperation = (input: {
 export const runTerminalReason = (reason: Cause.Reason<unknown> | undefined): boolean =>
   reason !== undefined && Cause.isFailReason(reason) && Schema.is(RunTerminal)(reason.error)
 
-export const suspendedReason = (reason: Cause.Reason<unknown> | undefined): AgentEvent.AgentSuspended | undefined => {
+export const suspendedReason = (reason: Cause.Reason<unknown> | undefined): AgentSuspended | undefined => {
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
-  return Schema.decodeUnknownOption(AgentEvent.AgentSuspended)(reason.error).pipe(Option.getOrUndefined)
+  return Schema.decodeUnknownOption(AgentSuspended)(reason.error).pipe(Option.getOrUndefined)
 }
 
-export const driverCheckpoint = (value: ExecutionCheckpoint | undefined): DurableDriver.DriverCheckpoint | undefined =>
-  Schema.decodeUnknownOption(DurableDriver.DriverCheckpoint)(value).pipe(Option.getOrUndefined)
+export const driverCheckpoint = (value: ExecutionCheckpoint | undefined): DriverCheckpoint | undefined =>
+  Schema.decodeUnknownOption(DriverCheckpoint)(value).pipe(Option.getOrUndefined)

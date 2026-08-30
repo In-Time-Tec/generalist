@@ -1,6 +1,12 @@
 import { AnthropicClient, AnthropicLanguageModel, Generated } from "@effect/ai-anthropic"
-import { ContextOverflow, type ModelRegistryFacade } from "../../core/index.js"
-import { ModelRegistry } from "../../core/model/public/registry.js"
+import { classify } from "../../core/model/result/context-overflow.js"
+import {
+  type FailureClassifier,
+  type ModelRegistry,
+  type ToolJsonSchemaCompiler,
+  layer as modelRegistryLayer,
+  registration as modelRegistration,
+} from "../../core/model/registry.js"
 import { Config as EffectConfig, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { AiError, AnthropicStructuredOutput, Tool } from "effect/unstable/ai"
@@ -134,10 +140,10 @@ const registrationOptions = (input: Options) => {
 }
 
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
+export const classifyFailure: FailureClassifier = classify
 
 /** @experimental */
-export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool, { transformer: AnthropicStructuredOutput.toCodecAnthropic }),
     catch: (error) =>
@@ -159,14 +165,14 @@ export interface ClientOptions extends Options {
 /** @experimental */
 export const layer = (
   input: ClientOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, EffectConfig.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+): Layer.Layer<ModelRegistry, EffectConfig.ConfigError, HttpClient.HttpClient> =>
+  modelRegistryLayer([modelRegistration(registrationOptions(input))]).pipe(
     Layer.provide(AnthropicClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 
 /** @experimental Bare registration effect; the consumer provides the Anthropic client (see layerConfig). */
-export const registration = (input: Options): ReturnType<ModelRegistryFacade["registration"]> =>
-  ModelRegistry.registration(registrationOptions(input))
+export const registration = (input: Options): ReturnType<typeof modelRegistration> =>
+  modelRegistration(registrationOptions(input))
 
 /** @experimental */
 export const layerConfig = AnthropicClient.layerConfig

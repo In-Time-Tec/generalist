@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Session, SessionHistory } from "../../../src/core/index"
+import { Session, SessionHistory } from "../../../src/index"
 
 /** One isolated in-memory Session per test, built and released in the test's own scope. */
 const withSession = <A, E>(effect: Effect.Effect<A, E, Session.SessionDirectory>): Effect.Effect<A, E> =>

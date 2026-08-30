@@ -1,4 +1,4 @@
-import { Pins } from "../../core/index.js"
+import { digest as pinDigest } from "../../core/durable/pin.js"
 import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Address } from "../address.js"
@@ -111,7 +111,7 @@ export const digest = (input: {
   readonly inReplyTo?: string
   readonly metadata: Metadata
 }): string =>
-  Pins.digest({
+  pinDigest({
     to: input.to,
     from: input.from,
     prompt: Schema.encodeSync(Prompt.Prompt)(input.prompt),

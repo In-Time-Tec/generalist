@@ -33,9 +33,7 @@ export const quickstart = definePage({
     p(
       "The install summary lists ",
       code("tenetkit@0.14.0"),
-      " and ",
-      code("tenetkit/ai@0.14.0"),
-      ". npm and pnpm work the same way; ",
+      ". Provider leaves are subpaths of that package, not separate installs. npm and pnpm work the same way; ",
       link("/docs/start/installation", "Installation"),
       " has the variants.",
     ),

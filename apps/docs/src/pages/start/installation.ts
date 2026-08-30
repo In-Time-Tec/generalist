@@ -37,9 +37,9 @@ export const installation = definePage({
           "The agent loop: events, typed suspension, turn policy, tools, approvals, permissions, steering, and compaction",
         ],
         [
-          [code("tenetkit/ai")],
+          [code("tenetkit/ai/*")],
           "0.38.3",
-          "Optional model registration for OpenAI, Anthropic, OpenRouter, Amazon Bedrock, and OpenAI-compatible APIs",
+          "Exact subpath leaves in tenetkit for catalogs, routes, deterministic models, and optional providers",
         ],
         [[code("tenetkit/runtime")], "0.38.3", "Addressable Runs, replay, inspection, waits, and stores"],
         [[code("tenetkit/mcp")], "0.38.3", "MCP discovery and the TenetKit ToolExecutor adapter"],

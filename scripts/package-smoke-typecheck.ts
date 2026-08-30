@@ -20,7 +20,8 @@ import { MCPClient, OAuth } from "tenetkit/mcp"
 import { make as makeMcpHttpTransport } from "tenetkit/mcp/client/http"
 import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "tenetkit/mcp/tools"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
-import { Deterministic, ModelRoute } from "tenetkit/ai"
+import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
+import { make as makeModelRoute } from "tenetkit/ai/model-route"
 import { TestModel } from "tenetkit/test"
 import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
@@ -73,7 +74,6 @@ type MemoryRunRequirements = Assert<
   Equal<StreamServices<typeof memoryRun>, LanguageModel.LanguageModel | Memory.Memory>
 >
 void Handoff
-type ProviderRoot = typeof import("tenetkit/ai")
 type TransportRoot = typeof import("tenetkit/transport")
 type RuntimeRoot = typeof import("tenetkit/runtime")
 type A2ARoot = typeof import("tenetkit/a2a")
@@ -92,17 +92,8 @@ type SqliteRuntimeOptions = import("tenetkit/runtime/sqlite-bun").Runtime.Option
 type SqliteRunStoreOptions = import("tenetkit/runtime/sqlite-bun").RunStore.Options
 void SqliteRuntime.layerSqlite
 void SqliteRunStore.layerSqlite
-type ProviderCatalogSubpath = Assert<
-  MemberEqual<ProviderRoot["ModelCatalog"], typeof import("tenetkit/ai/model-catalog"), "layer">
->
-type ProviderDeterministicSubpath = Assert<
-  MemberEqual<ProviderRoot["Deterministic"], typeof import("tenetkit/ai/deterministic"), "layer">
->
-type ProviderModelRouteSubpath = Assert<
-  MemberEqual<ProviderRoot["ModelRoute"], typeof import("tenetkit/ai/model-route"), "make">
->
-void Deterministic
-void ModelRoute
+void deterministicLayer
+void makeModelRoute
 type TransportClientSubpath = Assert<
   MemberEqual<TransportRoot["RunClient"], typeof import("tenetkit/transport/run-client"), "layerWebSocket">
 >

@@ -6,7 +6,8 @@ import type { CancelInput } from "../../service.js"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
 import type { ExecutionResult } from "../../execution/state.js"
 import type { RunFailure } from "../../run/event.js"
-import { classifyResponse, type WaitResolution } from "../../run/wait.js"
+import type { WaitResolution } from "../../run/wait.js"
+import { classifyResponse } from "../../run/wait-internal.js"
 import {
   appendAgentEvent,
   appendLifecycle,
@@ -20,7 +21,7 @@ import {
 import { afterTerminal } from "../lanes.js"
 import { openRunWaits, waitMapKey, type MemoryState, type StoredRun } from "../state.js"
 import { reconcileFanOut } from "./fan-out/service.js"
-import { ProgramCapabilities } from "../../../core/index.js"
+import { ProgramCancelled } from "../../../core/program/capabilities.js"
 import { hasUnsettledChild, settleParentChild } from "./child/settlement.js"
 import { hasPendingOperationCancellation, markOperationCancellations } from "./operation/cancellation.js"
 import { closeWait } from "./control/wait.js"
@@ -53,7 +54,7 @@ const reconcileProgramCancellation = (
 ): Effect.Effect<MemoryState, RuntimeUnavailable> =>
   Effect.gen(function* () {
     const programOperations = new Map(state.programOperations)
-    const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
+    const failure = ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
     for (const [key, operation] of programOperations) {
       if (operation.runId === runId && ["reserved", "running", "waiting"].includes(operation.status)) {
         programOperations.set(key, { ...operation, status: "failed", error: failure })

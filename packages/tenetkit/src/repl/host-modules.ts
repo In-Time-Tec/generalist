@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
-import { ToolContext } from "../core/index.js"
+import { ToolContext, type Service as ToolContextService } from "../core/tools/tool-context.js"
 
 /** @experimental Every host operation failure is tagged, so a cell can discriminate it as data. */
 export interface Tagged {
@@ -112,13 +112,13 @@ const index = <R>(modules: ReadonlyArray<Module<R>>): Map<string, Map<string, An
 
 const callContext = <R>(request: Request, base: Context.Context<R>): Context.Context<R> => {
   if (request.sessionId === undefined) return base
-  const ambient = Option.getOrUndefined(Context.getOption(base, ToolContext.ToolContext))
+  const ambient = Option.getOrUndefined(Context.getOption(base, ToolContext))
   if (ambient === undefined) return base
-  const toolContext: ToolContext.Service =
+  const toolContext: ToolContextService =
     request.cellId === undefined
       ? { ...ambient, sessionId: request.sessionId }
       : { ...ambient, sessionId: request.sessionId, toolCallId: request.cellId }
-  return Context.add(base, ToolContext.ToolContext, ToolContext.ToolContext.of(toolContext))
+  return Context.add(base, ToolContext, ToolContext.of(toolContext))
 }
 
 /** @experimental Mount modules and reject duplicate module or operation names. */

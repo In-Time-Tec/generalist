@@ -12,7 +12,7 @@ import {
   type SendError,
   type SessionEntryError,
 } from "../../runtime/service.js"
-import { Errors } from "../../runtime/facade-errors.js"
+import { CursorExpired, SubscriberLagged } from "../../runtime/errors.js"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
 import { project, projectModelResponse, stateSnapshot } from "./projection.js"
 
@@ -89,8 +89,8 @@ const recover = (
     ),
     Stream.flattenIterable,
     Stream.catchIf(
-      (error): error is Errors.SubscriberLagged | Errors.CursorExpired =>
-        Schema.is(Errors.SubscriberLagged)(error) || Schema.is(Errors.CursorExpired)(error),
+      (error): error is SubscriberLagged | CursorExpired =>
+        Schema.is(SubscriberLagged)(error) || Schema.is(CursorExpired)(error),
       () =>
         Stream.unwrap(
           runtime.snapshot(runId).pipe(

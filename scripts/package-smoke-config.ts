@@ -30,7 +30,7 @@ export const packedProviderDependencies = {
 } as const
 
 export const workerSafePackageExports = [
-  "tenetkit/core",
+  "tenetkit",
   "tenetkit/mcp",
   "tenetkit/mcp/client",
   "tenetkit/mcp/client/http",
@@ -42,7 +42,68 @@ export const workerSafePackageExports = [
 ] as const
 
 export const wildcardExportExamples = [] as const
-export const forbiddenPackageExports = ["@tenetkit/cloudflare"] as const
+export const forbiddenPackageExports = [
+  "@tenetkit/cloudflare",
+  "tenetkit/ai",
+  "tenetkit/core",
+  "tenetkit/ai/index",
+  "tenetkit/ai/provider/openrouter",
+  "tenetkit/core/agent/service",
+  "tenetkit/runtime/service",
+  "tenetkit/runtime/execution/run-executor-internal",
+] as const
+
+export const exactPackageExports = {
+  tenetkit: [
+    ".",
+    "./a2a",
+    "./ag-ui",
+    "./agent-guidance",
+    "./ai/amazon-bedrock",
+    "./ai/anthropic",
+    "./ai/deterministic",
+    "./ai/model-catalog",
+    "./ai/model-route",
+    "./ai/openai",
+    "./ai/openai-account-auth",
+    "./ai/openai-account-auth-http",
+    "./ai/openai-chat-completions",
+    "./ai/openai-compatible",
+    "./ai/openai-compatible-embedding",
+    "./ai/openai-embedding",
+    "./ai/openai-responses",
+    "./ai/openrouter",
+    "./foldkit",
+    "./mcp",
+    "./mcp/client",
+    "./mcp/client/http",
+    "./mcp/client/stdio",
+    "./mcp/oauth",
+    "./mcp/tools",
+    "./memory",
+    "./repl",
+    "./repl/bun",
+    "./runtime",
+    "./runtime/external-child-placement",
+    "./runtime/external-child-store",
+    "./runtime/sql-driver",
+    "./runtime/sqlite-bun",
+    "./skills",
+    "./test",
+    "./test/runtime-driver",
+    "./transport",
+    "./transport/errors",
+    "./transport/replay",
+    "./transport/run-client",
+    "./transport/snapshot",
+    "./transport/sse",
+    "./transport/websocket",
+    "./transport/wire",
+  ],
+  pg: ["."],
+  mysql: ["."],
+  cloudflare: ["./durable-objects", "./dynamic-workers", "./workers"],
+} as const satisfies Record<(typeof packages)[number], ReadonlyArray<string>>
 const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
   Array.from(values).reduce<Array<A>>((result, value) => {
     const index = result.findIndex((item) => compare(value, item) < 0)

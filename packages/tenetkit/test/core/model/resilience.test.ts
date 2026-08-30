@@ -2,7 +2,7 @@ import "./suites/agent-default-resilience-suite.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Function, Layer, Schedule, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool } from "effect/unstable/ai"
-import { ModelResilience, ModelStreamTermination } from "../../../src/core/index"
+import { ModelResilience, ModelStreamTermination } from "../../../src/index"
 
 const transientError = AiError.make({
   module: "TestLanguageModel",

@@ -9,7 +9,7 @@ import {
   ProgramCapabilities,
   ProgramRunner,
   CodeExecutor,
-} from "../../../src/core/index.js"
+} from "../../../src/index.js"
 import { Deferred, Effect, Fiber, Function, Layer, Schema, Scope } from "effect"
 import { expect } from "vitest"
 

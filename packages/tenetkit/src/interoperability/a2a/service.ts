@@ -3,6 +3,8 @@ import { Runtime } from "../../runtime/service.js"
 import { Context, Effect, Layer } from "effect"
 import { make as makeHandler, type Deployment } from "./handler.js"
 
+export { make as makeHandler, type Deployment } from "./handler.js"
+
 /** @experimental A configured A2A v1 request handler. */
 export interface Service {
   readonly deployment: Deployment

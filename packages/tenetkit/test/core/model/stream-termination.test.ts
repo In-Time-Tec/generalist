@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Function, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
-import { ModelStreamTermination } from "../../../src/core/index"
+import { ModelStreamTermination } from "../../../src/index"
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: undefined, total: 4, cacheRead: undefined, cacheWrite: undefined },

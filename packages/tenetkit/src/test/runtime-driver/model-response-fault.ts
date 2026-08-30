@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { Pins } from "../../core/index.js"
+import { digest as pinDigest } from "../../core/durable/pin.js"
 import type { Address } from "../../runtime/address.js"
 import { RunStore, type ExecutionClaim } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
@@ -57,7 +57,7 @@ const completion = (operationKey: string, sessionParentId: string | null) => {
     finishReason: "stop" as const,
     budgetCharge: 0,
   }
-  const digest = Pins.digest(jsonValue(unsigned))
+  const digest = pinDigest(jsonValue(unsigned))
   return {
     outcome: { _tag: "Succeeded" as const, value: { ...unsigned, digest } },
     event: {
@@ -107,7 +107,7 @@ export const modelResponseFaultConformance = <LayerError>(options: ModelResponse
                 ...claim,
                 operationKey,
                 kind: "model",
-                inputDigest: Pins.digest({ turn: 0 }),
+                inputDigest: pinDigest({ turn: 0 }),
                 input: { turn: 0 },
                 replayPolicy: "never",
                 attempt: 0,

@@ -1,7 +1,14 @@
 import { Duration, Effect, Function, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
-import { AiError } from "../../core/index.js"
-import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
-import { ModelRegistry } from "../../core/model/public/registry.js"
+import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
+import {
+  type GovernanceOptions,
+  type Metadata,
+  type ModelRegistry,
+  type ModelSelection,
+  type Registration,
+  layer as modelRegistryLayer,
+  registration as modelRegistration,
+} from "../../core/model/registry.js"
 import { compile, type CompiledStream } from "./compile.js"
 
 /** @experimental */
@@ -85,7 +92,7 @@ export interface MakeOptions {
   readonly provider?: string
   readonly model?: string
   readonly registrationKey?: string
-  readonly metadata?: ModelRegistry.Metadata
+  readonly metadata?: Metadata
 }
 
 /** @experimental */
@@ -106,9 +113,9 @@ export interface Request {
 /** @experimental */
 export interface Fixture {
   readonly layer: Layer.Layer<LanguageModel.LanguageModel>
-  readonly selection: ModelRegistry.ModelSelection
-  readonly registration: ModelRegistry.Registration
-  readonly registryLayer: Layer.Layer<ModelRegistry.ModelRegistry>
+  readonly selection: ModelSelection
+  readonly registration: Registration
+  readonly registryLayer: Layer.Layer<ModelRegistry>
   readonly requests: Effect.Effect<ReadonlyArray<Request>>
   readonly prompts: Effect.Effect<ReadonlyArray<Prompt.Prompt>>
   readonly remaining: Effect.Effect<number>
@@ -366,7 +373,7 @@ export const make: {
           ),
       })
       const modelLayer = Layer.succeed(LanguageModel.LanguageModel, service)
-      const selection: ModelRegistry.ModelSelection =
+      const selection: ModelSelection =
         options.registrationKey === undefined
           ? { provider: options.provider ?? "test", model: options.model ?? "scripted" }
           : {
@@ -374,7 +381,7 @@ export const make: {
               model: options.model ?? "scripted",
               registrationKey: options.registrationKey,
             }
-      const registration = yield* ModelRegistry.registration(
+      const registration = yield* modelRegistration(
         options.metadata === undefined
           ? { ...selection, layer: modelLayer }
           : { ...selection, layer: modelLayer, metadata: options.metadata },
@@ -384,7 +391,7 @@ export const make: {
         layer: modelLayer,
         selection,
         registration,
-        registryLayer: ModelRegistry.layer([Effect.succeed(registration)]),
+        registryLayer: modelRegistryLayer([Effect.succeed(registration)]),
         requests,
         prompts: requests.pipe(Effect.map((items) => items.map((request) => request.prompt))),
         remaining: SubscriptionRef.get(state).pipe(
@@ -416,17 +423,12 @@ export const layer: {
 
 /** @experimental */
 export const layerRegistry: {
-  (
-    governance?: ModelRegistry.GovernanceOptions,
-  ): (fixtures: ReadonlyArray<Fixture>) => Layer.Layer<ModelRegistry.ModelRegistry>
-  (
-    fixtures: ReadonlyArray<Fixture>,
-    governance?: ModelRegistry.GovernanceOptions,
-  ): Layer.Layer<ModelRegistry.ModelRegistry>
+  (governance?: GovernanceOptions): (fixtures: ReadonlyArray<Fixture>) => Layer.Layer<ModelRegistry>
+  (fixtures: ReadonlyArray<Fixture>, governance?: GovernanceOptions): Layer.Layer<ModelRegistry>
 } = Function.dual(
   (args) => Array.isArray(args[0]),
-  (fixtures: ReadonlyArray<Fixture>, governance?: ModelRegistry.GovernanceOptions) =>
-    ModelRegistry.layer(
+  (fixtures: ReadonlyArray<Fixture>, governance?: GovernanceOptions) =>
+    modelRegistryLayer(
       fixtures.map((fixture) => Effect.succeed(fixture.registration)),
       governance,
     ),

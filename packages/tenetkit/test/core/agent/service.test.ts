@@ -39,7 +39,7 @@ import {
   ToolExecutor,
   ToolOutput,
   TurnPolicy,
-} from "../../../src/core/index"
+} from "../../../src/index"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { estimatePromptTokens } from "../../../src/core/turn/prompt-token-estimate"

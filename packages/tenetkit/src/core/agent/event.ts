@@ -31,7 +31,7 @@ export interface ModelPart {
 }
 
 /** @experimental One normalized model response after its durable operation commit. */
-export interface ModelResponseCommitted {
+interface ModelResponseCommitted {
   readonly _tag: "ModelResponseCommitted"
   readonly turn: number
   readonly operationKey: string
@@ -63,7 +63,7 @@ export interface ToolProgress {
 }
 
 /** @experimental A same-run handoff was requested. */
-export interface HandoffRequested {
+interface HandoffRequested {
   readonly _tag: "HandoffRequested"
   readonly turn: number
   readonly handoffId: string
@@ -74,7 +74,7 @@ export interface HandoffRequested {
 }
 
 /** @experimental A same-run handoff completed and switched the active agent. */
-export interface HandoffCompleted {
+interface HandoffCompleted {
   readonly _tag: "HandoffCompleted"
   readonly turn: number
   readonly handoffId: string
@@ -84,7 +84,7 @@ export interface HandoffCompleted {
 }
 
 /** @experimental A same-run handoff was rejected before switching agents. */
-export interface HandoffRejectedEvent {
+interface HandoffRejectedEvent {
   readonly _tag: "HandoffRejected"
   readonly turn: number
   readonly handoffId: string
@@ -106,7 +106,7 @@ export interface ToolExecutionCompleted {
 }
 
 /** @experimental A tool reached a durable wait without disturbing admitted siblings. */
-export interface ToolExecutionWaiting {
+interface ToolExecutionWaiting {
   readonly _tag: "ToolExecutionWaiting"
   readonly turn: number
   readonly call: Response.ToolCallPart<string, unknown>

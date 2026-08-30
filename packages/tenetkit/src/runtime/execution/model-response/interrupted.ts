@@ -1,5 +1,5 @@
-import { Pins } from "../../../core/index.js"
-import { Session } from "../../../core/context/public/session.js"
+import { digest as pinDigest } from "../../../core/durable/pin.js"
+import { type Entry, ModelResponseContent } from "../../../core/context/session.js"
 import { Schema } from "effect"
 import type { InterruptedSessionEntry, ModelResponseInterrupted } from "../agent/event.js"
 import { RuntimeUnavailable, SessionEntryCorrupt } from "../../errors.js"
@@ -36,7 +36,7 @@ export interface ValidatedInterruptedModelResponse {
 const jsonValue = <Value>(value: Value): Schema.Json =>
   Schema.decodeSync(Schema.fromJsonString(Schema.Json))(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
 const sameJson = <Left, Right>(left: Left, right: Right): boolean =>
-  Pins.digest(jsonValue(left)) === Pins.digest(jsonValue(right))
+  pinDigest(jsonValue(left)) === pinDigest(jsonValue(right))
 const fail = (message: string) => RuntimeUnavailable.make({ message })
 const interruptedTag: ModelResponseInterrupted["_tag"] = "ModelResponseInterrupted"
 
@@ -62,7 +62,7 @@ export const make = (input: {
   readonly reason: "cancel" | "failure"
 }): PendingModelResponseInterrupted => {
   const event = { _tag: "ModelResponseInterrupted" as const, ...input }
-  return { ...event, digest: Pins.digest(jsonValue(unsigned(event))) }
+  return { ...event, digest: pinDigest(jsonValue(unsigned(event))) }
 }
 
 export const interruptedSessionEntryId = (input: { readonly runId: string; readonly operationKey: string }): string =>
@@ -128,7 +128,7 @@ export const validateInterruptedModelResponse = (input: {
   } catch (error) {
     return fail(`interrupted model operation ${event.operationKey} outcome or response is invalid: ${String(error)}`)
   }
-  if (Pins.digest(jsonValue(unsigned(event))) !== event.digest) {
+  if (pinDigest(jsonValue(unsigned(event))) !== event.digest) {
     return fail(`interrupted model operation ${event.operationKey} digest is corrupt`)
   }
   const entry = interruptedSessionEntry({ runId: input.runId, sessionId: input.sessionId, event })
@@ -169,7 +169,7 @@ export const sameInterruptedModelResponse = (input: {
 
 export const resolveInterruptedModelResponse = (input: {
   readonly event: ModelResponseInterrupted
-  readonly entry: Session.Entry
+  readonly entry: Entry
 }): CompletedModelResponse | SessionEntryCorrupt => {
   const { entry, event } = input
   if (
@@ -182,14 +182,14 @@ export const resolveInterruptedModelResponse = (input: {
   try {
     const encoded = Object.assign(
       {
-        content: Schema.encodeSync(Session.ModelResponseContent)(entry.content),
+        content: Schema.encodeSync(ModelResponseContent)(entry.content),
       },
       event.usage === undefined ? undefined : { usage: event.usage },
       event.finishReason === undefined ? undefined : { finishReason: event.finishReason },
     )
     const response = Schema.decodeSync(CompletedModelResponse)(encoded)
     const pending: PendingModelResponseInterrupted = { ...event, response }
-    if (Pins.digest(jsonValue(unsigned(pending))) !== event.digest) return corruptReference(event)
+    if (pinDigest(jsonValue(unsigned(pending))) !== event.digest) return corruptReference(event)
     return response
   } catch {
     return corruptReference(event)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, pipe } from "effect"
-import { SkillCatalog } from "../../../src/core/index"
+import { SkillCatalog } from "../../../src/index"
 import { ItLayer } from "../it-layer.js"
 
 const skill = (name: string, description: string, options: Partial<SkillCatalog.Skill> = {}): SkillCatalog.Skill => ({

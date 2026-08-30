@@ -4,7 +4,7 @@ import type { OperationCompletionOutcome, RecordOperationInput } from "../../../
 import type { OperationRecord, OperationStatus } from "../../../sql/operations.js"
 import { appendAgentEvent, appendLifecycle, rejectIfTerminal } from "../../append.js"
 import { operationKeyMapKey, operationMapKey, type MemoryState } from "../../state.js"
-import { checkpointRef } from "../../../executable/manifest.js"
+import { checkpointRef } from "../../../executable/manifest-internal.js"
 import {
   sameModelResponseEvent,
   validateModelResponseCommit,

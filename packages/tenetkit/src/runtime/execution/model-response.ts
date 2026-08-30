@@ -1,4 +1,9 @@
-import { DurableDriver } from "../../core/durable/public/driver.js"
+import {
+  type DriverCheckpoint,
+  DriverError,
+  type DriverOperation,
+  type OperationOutcome,
+} from "../../core/durable/driver.js"
 import { Effect, Function, Option, Ref, Schema } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"
@@ -21,10 +26,10 @@ interface PreparedCompletion {
 export const commitDriverOperation = (input: {
   readonly store: RunStoreService
   readonly claim: ExecutionClaim
-  readonly operation: DurableDriver.DriverOperation
+  readonly operation: DriverOperation
   readonly operationId: string
-  readonly outcome: DurableDriver.OperationOutcome
-  readonly checkpoint: DurableDriver.DriverCheckpoint
+  readonly outcome: OperationOutcome
+  readonly checkpoint: DriverCheckpoint
   readonly prepared: PreparedCompletion
 }): Effect.Effect<OperationRecord, WorkerMutationError> => {
   const { store, claim, operation, operationId, outcome, checkpoint, prepared } = input
@@ -57,17 +62,17 @@ export const commitDriverOperationWithReconciliation = (
 }
 
 export const journalFailure: {
-  (operationKey: string, cause: unknown): (phase: string) => DurableDriver.DriverError
-  (phase: string, operationKey: string, cause: unknown): DurableDriver.DriverError
+  (operationKey: string, cause: unknown): (phase: string) => DriverError
+  (phase: string, operationKey: string, cause: unknown): DriverError
 } = Function.dual(3, (phase: string, operationKey: string, cause: unknown) =>
-  DurableDriver.DriverError.make({ message: `Driver journal ${phase} failed for ${operationKey}`, cause }),
+  DriverError.make({ message: `Driver journal ${phase} failed for ${operationKey}`, cause }),
 )
 
 export const saveJournalCheckpoint = (input: {
   readonly store: RunStoreService
   readonly claim: ExecutionClaim
-  readonly checkpoint: DurableDriver.DriverCheckpoint
-}): Effect.Effect<void, DurableDriver.DriverError> =>
+  readonly checkpoint: DriverCheckpoint
+}): Effect.Effect<void, DriverError> =>
   input.store
     .saveExecution({ ...input.claim, checkpoint: input.checkpoint })
     .pipe(Effect.mapError((error) => journalFailure("checkpoint", input.claim.runId, error)))

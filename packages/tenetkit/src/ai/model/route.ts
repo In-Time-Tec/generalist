@@ -1,17 +1,25 @@
 import { Cause, Context, Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { adapt, invokeGenerateObject, invokeGenerateText, invokeStreamText } from "../../core/model/service.js"
-import { ModelRegistry } from "../../core/model/public/registry.js"
+import {
+  type AvailabilityFailureClassifier,
+  type CandidateIdentity,
+  type CandidateRouteInstrumentation,
+  type ModelSelection,
+  type Registration,
+  registration as modelRegistration,
+  withCandidateRoute,
+} from "../../core/model/registry.js"
 
 /** @experimental */
 export interface Input {
-  readonly candidates: readonly [ModelRegistry.Registration, ...ReadonlyArray<ModelRegistry.Registration>]
+  readonly candidates: readonly [Registration, ...ReadonlyArray<Registration>]
 }
 
 /** @experimental */
 export interface Route {
-  readonly selection: ModelRegistry.ModelSelection
-  readonly registration: ModelRegistry.Registration
+  readonly selection: ModelSelection
+  readonly registration: Registration
 }
 
 /** @experimental An ordered candidate route contains a candidate without provider-approved availability semantics. */
@@ -21,9 +29,9 @@ export class AvailabilitySemanticsMissing extends Schema.TaggedError<Availabilit
 ) {}
 
 interface Candidate {
-  readonly identity: ModelRegistry.CandidateIdentity
+  readonly identity: CandidateIdentity
   readonly model: LanguageModel.Service
-  readonly isAvailabilityFailure: ModelRegistry.AvailabilityFailureClassifier
+  readonly isAvailabilityFailure: AvailabilityFailureClassifier
 }
 
 const singleFailure = <E>(cause: Cause.Cause<E>): E | undefined => {
@@ -33,7 +41,7 @@ const singleFailure = <E>(cause: Cause.Cause<E>): E | undefined => {
 
 const routeModel = (
   candidates: ReadonlyArray<Candidate>,
-  instrumentation: ModelRegistry.CandidateRouteInstrumentation,
+  instrumentation: CandidateRouteInstrumentation,
 ): LanguageModel.Service => {
   const models = candidates.map((candidate) => instrumentation.instrument(candidate.model, candidate.identity))
   const effect = <A, E, R>(
@@ -97,7 +105,7 @@ const routeModel = (
   })
 }
 
-const routeIdentity = (registrations: ReadonlyArray<ModelRegistry.Registration>): string =>
+const routeIdentity = (registrations: ReadonlyArray<Registration>): string =>
   JSON.stringify(
     registrations.map(({ provider, model, registrationKey }) => [provider, model, registrationKey ?? null]),
   )
@@ -143,11 +151,9 @@ export const make = (input: Input): Effect.Effect<Route, AvailabilitySemanticsMi
             }),
           ),
         )
-        return ModelRegistry.withCandidateRoute(candidates[0].model, (instrumentation) =>
-          routeModel(candidates, instrumentation),
-        )
+        return withCandidateRoute(candidates[0].model, (instrumentation) => routeModel(candidates, instrumentation))
       }),
     )
-    const registration = yield* ModelRegistry.registration({ ...selection, layer: routeLayer })
+    const registration = yield* modelRegistration({ ...selection, layer: routeLayer })
     return { selection, registration }
   })

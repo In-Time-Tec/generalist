@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
-import { AgentManifest, ExecutableManifest, Pins } from "../../../src/core/index"
+import { AgentManifest, ExecutableManifest, Pins } from "../../../src/index"
 
 const payload = { schemaVersion: "1", entries: [{ id: "a" }] }
 const content = { codec: "tenetkit/agent-guidance/snapshot", version: "1", digest: Pins.digest(payload) }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent } from "../../../src/core/index"
+import { Agent } from "../../../src/index"
 import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache"
 import { withProviderFinish } from "../provider-finish.js"
 

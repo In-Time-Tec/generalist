@@ -1,6 +1,5 @@
 import { Duration, Effect, Function, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
-import type { ModelFailure } from "./registry.js"
 
 /**
  * @experimental What already escaped downstream when a model part stream ended
@@ -53,11 +52,11 @@ const isTruncated = Schema.is(ModelStreamTruncated)
 const isTimeout = Schema.is(ModelStreamTimeout)
 
 /** @experimental Whether a failure means the stream did not reach its terminal event. */
-export const isTerminationFailure = (error: ModelFailure): error is TerminationFailure =>
-  isTruncated(error) || isTimeout(error)
+export const isTerminationFailure = (cause: unknown): cause is TerminationFailure =>
+  isTruncated(cause) || isTimeout(cause)
 
 /** @experimental Whether a model stream exceeded its configured idle deadline. */
-export const isModelStreamTimeout = (error: ModelFailure): error is ModelStreamTimeout => isTimeout(error)
+export const isModelStreamTimeout = (cause: unknown): cause is ModelStreamTimeout => isTimeout(cause)
 
 interface Observation {
   lastPart: string | undefined

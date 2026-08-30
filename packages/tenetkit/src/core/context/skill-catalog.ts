@@ -1,25 +1,9 @@
 import { Context, Effect, Function, Layer, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
+import { listing } from "./skill-catalog-internal.js"
 
 /** @experimental Per-entry description character cap. */
-export const DESCRIPTION_CAP = 1_024
-
-/** @experimental Parsed SKILL.md frontmatter. */
-export const Frontmatter = Schema.Struct({
-  name: Schema.String,
-  description: Schema.String.pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(DESCRIPTION_CAP))),
-  whenToUse: Schema.optionalKey(Schema.String),
-  allowedTools: Schema.optionalKey(Schema.Array(Schema.String)),
-  disableModelInvocation: Schema.optionalKey(Schema.Boolean),
-  userInvocable: Schema.optionalKey(Schema.Boolean),
-  contextFork: Schema.optionalKey(Schema.Boolean),
-  agent: Schema.optionalKey(Schema.String),
-  model: Schema.optionalKey(Schema.String),
-  paths: Schema.optionalKey(Schema.Array(Schema.String)),
-})
-
-/** @experimental Parsed SKILL.md frontmatter. */
-export type Frontmatter = typeof Frontmatter.Type
+export { DESCRIPTION_CAP } from "./skill-catalog-internal.js"
 
 /** @experimental Skill catalog operation failed. */
 export class SkillCatalogError extends Schema.TaggedError<SkillCatalogError>()("tenetkit/core/SkillCatalogError", {
@@ -60,8 +44,6 @@ export interface Service {
 export class SkillCatalog extends Context.Service<SkillCatalog, Service>()(
   "tenetkit/core/context/skill-catalog/SkillCatalog",
 ) {}
-
-export const listing = (skill: Skill): string => `- ${skill.name}: ${skill.description}`
 
 /** @experimental A catalog built from in-memory skills. */
 export const layerSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillCatalog> => {

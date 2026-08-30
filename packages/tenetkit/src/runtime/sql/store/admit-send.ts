@@ -10,7 +10,8 @@ import {
   RuntimeUnavailable,
   TreePolicyInvalid,
 } from "../../errors.js"
-import { decodePinned, equals, type PinnedExecutable } from "../../executable/manifest.js"
+import { decodePinned, equals } from "../../executable/manifest-internal.js"
+import type { PinnedExecutable } from "../../executable/manifest.js"
 import { rootDigest } from "../../memory/digest.js"
 import type { AdmitSendInput } from "../../run/store.js"
 import { decodePinnedExecutable, decodeQueue, encodeQueue } from "../codec/codecs.js"

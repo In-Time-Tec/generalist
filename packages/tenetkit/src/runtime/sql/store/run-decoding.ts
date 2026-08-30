@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { checkpointRef } from "../../executable/manifest.js"
+import { checkpointRef } from "../../executable/manifest-internal.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution/state.js"
 import { RuntimeUnavailable } from "../../errors.js"
 import { PendingRunOutcome } from "../../run/store.js"

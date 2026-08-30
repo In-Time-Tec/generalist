@@ -1,5 +1,16 @@
 import { Effect, Schema, SynchronizedRef } from "effect"
-import { Session } from "../../core/index.js"
+import {
+  type AppendInput,
+  type AppendOptions,
+  type CheckpointAppend,
+  type CompactionEntry,
+  type Entry,
+  EntryPayload,
+  type Service,
+  SessionConflict,
+  SessionStoreError,
+  checkpointMatches,
+} from "../../core/context/session.js"
 import type { InterruptedSessionEntry } from "../execution/agent/event.js"
 import { RuntimeUnavailable } from "../errors.js"
 import type { CompletedSessionEntry } from "../execution/model-response/commit.js"
@@ -9,8 +20,6 @@ import type { MemorySession, MemoryState } from "./state.js"
 import type { ExecutionClaim, SessionReader } from "../run/store.js"
 import { StaleSessionClaim } from "../sql/errors.js"
 
-type Entry = Session.Entry
-
 const emptySession = (): MemorySession => ({
   entries: new Map(),
   order: [],
@@ -18,18 +27,17 @@ const emptySession = (): MemorySession => ({
   counter: 0,
   writerEpoch: 0n,
 })
-const payloadEquivalence = Schema.toEquivalence(Session.EntryPayload)
-const storeError = (message: string) => Session.SessionStoreError.make({ message })
-const conflict = (reason: Session.SessionConflict["reason"], message: string) =>
-  Session.SessionConflict.make({ reason, message })
+const payloadEquivalence = Schema.toEquivalence(EntryPayload)
+const storeError = (message: string) => SessionStoreError.make({ message })
+const conflict = (reason: SessionConflict["reason"], message: string) => SessionConflict.make({ reason, message })
 
-const entryFromInput = (input: Session.AppendInput, id: string, parentId: string | null): Entry => ({
+const entryFromInput = (input: AppendInput, id: string, parentId: string | null): Entry => ({
   ...input,
   id,
   parentId,
 })
 
-const pathTo = (session: MemorySession, leaf: string | null): ReadonlyArray<Entry> | Session.SessionStoreError => {
+const pathTo = (session: MemorySession, leaf: string | null): ReadonlyArray<Entry> | SessionStoreError => {
   if (leaf === null) return []
   const entries: Array<Entry> = []
   let cursor: string | null = leaf
@@ -45,20 +53,20 @@ const pathTo = (session: MemorySession, leaf: string | null): ReadonlyArray<Entr
 
 const onActivePath = (session: MemorySession, id: string): boolean => {
   const path = pathTo(session, session.leaf)
-  return !Schema.is(Session.SessionStoreError)(path) && path.some((entry) => entry.id === id)
+  return !Schema.is(SessionStoreError)(path) && path.some((entry) => entry.id === id)
 }
 
-const samePayload = (entry: Entry, input: Session.AppendInput): boolean => payloadEquivalence(entry, input)
+const samePayload = (entry: Entry, input: AppendInput): boolean => payloadEquivalence(entry, input)
 
 const isAppendSuccess = (
-  value: readonly [Entry, MemorySession] | Session.SessionConflict,
+  value: readonly [Entry, MemorySession] | SessionConflict,
 ): value is readonly [Entry, MemorySession] => Array.isArray(value)
 
 const existingAppend = (
   session: MemorySession,
-  input: Session.AppendInput,
-  options: Session.AppendOptions,
-): readonly [Entry, MemorySession] | Session.SessionConflict | undefined => {
+  input: AppendInput,
+  options: AppendOptions,
+): readonly [Entry, MemorySession] | SessionConflict | undefined => {
   if (options.id === undefined) return undefined
   const existing = session.entries.get(options.id)
   if (existing === undefined) return undefined
@@ -73,9 +81,9 @@ const existingAppend = (
 
 const append = (
   session: MemorySession,
-  input: Session.AppendInput,
-  options?: Session.AppendOptions,
-): readonly [Entry, MemorySession] | Session.SessionConflict => {
+  input: AppendInput,
+  options?: AppendOptions,
+): readonly [Entry, MemorySession] | SessionConflict => {
   const existing = options === undefined ? undefined : existingAppend(session, input, options)
   if (existing !== undefined) return existing
   if (options?.expectedLeafId !== undefined && options.expectedLeafId !== session.leaf) {
@@ -101,7 +109,7 @@ const append = (
   ]
 }
 
-const completedPayload = (input: CompletedSessionEntry): Session.AppendInput => ({
+const completedPayload = (input: CompletedSessionEntry): AppendInput => ({
   _tag: "ModelResponse",
   content: input.content,
   metadata: { modelResponseDigest: input.digest },
@@ -110,7 +118,7 @@ const completedPayload = (input: CompletedSessionEntry): Session.AppendInput => 
 export const verifyCompletedSessionEntry = (input: {
   readonly state: MemoryState
   readonly entry: CompletedSessionEntry
-}): Effect.Effect<void, Session.SessionConflict> => {
+}): Effect.Effect<void, SessionConflict> => {
   const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
   const existing = session.entries.get(input.entry.entryId)
   if (
@@ -132,7 +140,7 @@ export const verifyCompletedSessionEntry = (input: {
 export const appendCompletedSessionEntry = (input: {
   readonly state: MemoryState
   readonly entry: CompletedSessionEntry
-}): Effect.Effect<MemoryState, Session.SessionConflict | Session.SessionStoreError> =>
+}): Effect.Effect<MemoryState, SessionConflict | SessionStoreError> =>
   Effect.gen(function* () {
     const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
     const payload = completedPayload(input.entry)
@@ -158,7 +166,7 @@ export const appendCompletedSessionEntry = (input: {
 export const verifyHandoffSessionEntry = (input: {
   readonly state: MemoryState
   readonly entry: HandoffSessionEntry
-}): Effect.Effect<void, Session.SessionConflict> => {
+}): Effect.Effect<void, SessionConflict> => {
   const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
   const existing = session.entries.get(input.entry.entryId)
   if (
@@ -179,7 +187,7 @@ export const verifyHandoffSessionEntry = (input: {
 export const appendHandoffSessionEntry = (input: {
   readonly state: MemoryState
   readonly entry: HandoffSessionEntry
-}): Effect.Effect<MemoryState, Session.SessionConflict | Session.SessionStoreError> =>
+}): Effect.Effect<MemoryState, SessionConflict | SessionStoreError> =>
   Effect.gen(function* () {
     const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
     const existing = session.entries.get(input.entry.entryId)
@@ -201,7 +209,7 @@ export const appendHandoffSessionEntry = (input: {
     }
   })
 
-const interruptedPayload = (input: InterruptedSessionEntry): Session.AppendInput => ({
+const interruptedPayload = (input: InterruptedSessionEntry): AppendInput => ({
   _tag: "ModelResponse",
   content: input.content,
   metadata: { interruptionDigest: input.digest },
@@ -210,7 +218,7 @@ const interruptedPayload = (input: InterruptedSessionEntry): Session.AppendInput
 export const verifyInterruptedSessionEntry = (input: {
   readonly state: MemoryState
   readonly entry: InterruptedSessionEntry
-}): Effect.Effect<void, Session.SessionConflict> => {
+}): Effect.Effect<void, SessionConflict> => {
   const { state, entry: interrupted } = input
   const session = state.sessions.get(interrupted.sessionId) ?? emptySession()
   const existing = session.entries.get(interrupted.entryId)
@@ -232,7 +240,7 @@ export const verifyInterruptedSessionEntry = (input: {
 export const appendInterruptedSessionEntry = (input: {
   readonly state: MemoryState
   readonly entry: InterruptedSessionEntry
-}): Effect.Effect<MemoryState, Session.SessionConflict | Session.SessionStoreError> =>
+}): Effect.Effect<MemoryState, SessionConflict | SessionStoreError> =>
   Effect.gen(function* () {
     const { state, entry: interrupted } = input
     const session = state.sessions.get(interrupted.sessionId) ?? emptySession()
@@ -306,7 +314,7 @@ export const appendTerminalToolResults = (input: {
     const existing = session.entries.get(id)
     const parentId = existing === undefined ? session.leaf : existing.parentId
     const path = parentId === null ? [] : pathTo(session, parentId)
-    if (Schema.is(Session.SessionStoreError)(path)) {
+    if (Schema.is(SessionStoreError)(path)) {
       return yield* RuntimeUnavailable.make({ message: path.message })
     }
     const operations = new Map(
@@ -392,7 +400,7 @@ export const reader = (config: {
       Effect.flatMap((state) => {
         const session = state.sessions.get(config.sessionId) ?? emptySession()
         const path = pathTo(session, leaf ?? session.leaf)
-        return Schema.is(Session.SessionStoreError)(path) ? Effect.fail(path) : Effect.succeed(path)
+        return Schema.is(SessionStoreError)(path) ? Effect.fail(path) : Effect.succeed(path)
       }),
     ),
   leaf: SynchronizedRef.get(config.stateRef).pipe(
@@ -403,7 +411,7 @@ export const reader = (config: {
 export const claimedStore = (config: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
   readonly claim: ExecutionClaim
-}): Session.Service => {
+}): Service => {
   const { stateRef, claim } = config
   const sessionId = claim.session.sessionId
   return {
@@ -413,19 +421,19 @@ export const claimedStore = (config: {
       return Effect.succeed([String(counter), { ...session, counter: counter + 1 }] as const)
     }),
     append: (input, options) =>
-      claimedUpdate<Session.Entry, Session.SessionConflict>(stateRef, claim, (session) => {
+      claimedUpdate<Entry, SessionConflict>(stateRef, claim, (session) => {
         const result = append(session, input, options)
         return isAppendSuccess(result) ? Effect.succeed(result) : Effect.fail(result)
       }),
     appendCheckpoint: (prepared) =>
-      claimedUpdate<Session.CheckpointAppend, Session.SessionConflict>(stateRef, claim, (session) =>
+      claimedUpdate<CheckpointAppend, SessionConflict>(stateRef, claim, (session) =>
         Effect.gen(function* () {
           if (prepared.compactionCommit !== undefined && prepared.compactionCommit.checkpointId !== prepared.id) {
             return yield* conflict("checkpoint-id-reused", "Compaction commit checkpoint identity diverges")
           }
           const existing = session.entries.get(prepared.id)
           if (existing !== undefined) {
-            if (existing._tag !== "Compaction" || !Session.checkpointMatches(existing, prepared)) {
+            if (existing._tag !== "Compaction" || !checkpointMatches(existing, prepared)) {
               return yield* conflict(
                 "checkpoint-id-reused",
                 `Session checkpoint id ${prepared.id} was reused with different content`,
@@ -439,7 +447,7 @@ export const claimedStore = (config: {
                 _tag: "AlreadyPresent" as const,
                 checkpoint: existing,
                 leafId: session.leaf ?? existing.id,
-              } satisfies Session.CheckpointAppend,
+              } satisfies CheckpointAppend,
               session,
             ] as const
           }
@@ -449,7 +457,7 @@ export const claimedStore = (config: {
               `Expected Session leaf ${String(prepared.parentId)} but found ${String(session.leaf)}`,
             )
           }
-          const checkpoint: Session.CompactionEntry = {
+          const checkpoint: CompactionEntry = {
             _tag: "Compaction",
             id: prepared.id,
             parentId: prepared.parentId,
@@ -466,7 +474,7 @@ export const claimedStore = (config: {
             leaf: checkpoint.id,
           }
           return [
-            { _tag: "Appended" as const, checkpoint, leafId: checkpoint.id } satisfies Session.CheckpointAppend,
+            { _tag: "Appended" as const, checkpoint, leafId: checkpoint.id } satisfies CheckpointAppend,
             next,
           ] as const
         }),

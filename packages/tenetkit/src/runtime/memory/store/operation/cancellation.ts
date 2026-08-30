@@ -1,5 +1,5 @@
 import { Effect, Function, Option, Schema } from "effect"
-import type { ToolExecutor } from "../../../../core/index.js"
+import type { CancellationOutcome } from "../../../../core/tools/tool-executor.js"
 import { decodeCancellableOperation } from "../../../../core/tools/tool-executor-cancellation.js"
 import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import type { OperationRecord } from "../../../sql/operations.js"
@@ -14,7 +14,7 @@ const getRun = (state: MemoryState, runId: string) => {
 type CancellationInput = { readonly runId: string }
 type AcknowledgeInput = CancellationInput & {
   readonly operationId: string
-  readonly outcome: ToolExecutor.CancellationOutcome
+  readonly outcome: CancellationOutcome
 }
 type CancellationRecords = Effect.Effect<ReadonlyArray<OperationRecord>, RunNotFound | RuntimeUnavailable>
 type Acknowledgement = Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RuntimeUnavailable>

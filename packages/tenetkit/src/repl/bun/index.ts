@@ -1,14 +1,7 @@
 import { fileURLToPath } from "node:url"
-import {
-  type Options as BunKernelPool_Options,
-  layer as BunKernelPool_layer,
-  make as BunKernelPool_make,
-} from "./pool.js"
-import {
-  type Options as BunKernelStateStore_Options,
-  layer as BunKernelStateStore_layer,
-  make as BunKernelStateStore_make,
-} from "./state-store.js"
+
+export * as BunKernelPool from "./pool.js"
+export * as BunKernelStateStore from "./state-store.js"
 
 const extension = import.meta.url.endsWith(".ts") ? "ts" : "js"
 
@@ -26,23 +19,3 @@ export const workerSupportModules: ReadonlyArray<string> = [
   fileURLToPath(new URL(`./text-result.${extension}`, import.meta.url)),
   fileURLToPath(new URL(`./value.${extension}`, import.meta.url)),
 ]
-
-/** @experimental The Server-scoped pool of live Bun kernels, one per TenetKit Session. */
-export const BunKernelPool = {
-  layer: BunKernelPool_layer,
-  make: BunKernelPool_make,
-}
-/** @experimental */
-export namespace BunKernelPool {
-  export type Options = BunKernelPool_Options
-}
-
-/** @experimental Best-effort namespace persistence for Bun kernels on the Effect filesystem. */
-export const BunKernelStateStore = {
-  layer: BunKernelStateStore_layer,
-  make: BunKernelStateStore_make,
-}
-/** @experimental */
-export namespace BunKernelStateStore {
-  export type Options = BunKernelStateStore_Options
-}

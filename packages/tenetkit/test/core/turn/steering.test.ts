@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Scope } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Agent, Steering } from "../../../src/core/index"
+import { Agent, Steering } from "../../../src/index"
 
 const agent = Agent.make({ name: "steering-test-agent" })
 

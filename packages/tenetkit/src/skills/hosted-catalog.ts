@@ -1,7 +1,7 @@
 import { Crypto, Effect, Encoding, Function, Schema, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse, Url } from "effect/unstable/http"
-import { SkillCatalog } from "../core/index.js"
-import { Frontmatter } from "../core/context/skill-catalog.js"
+import { type Skill, SkillCatalogError } from "../core/context/skill-catalog.js"
+import { Frontmatter } from "../core/context/skill-catalog-internal.js"
 import { parseDocument, validateName } from "./document.js"
 
 const ManifestSkill = Schema.Struct({
@@ -22,14 +22,14 @@ export interface Limits {
   readonly manifestMaxBytes?: number
   readonly bodyMaxBytes?: number
   readonly maxSkills?: number
-  readonly toolsBySkill?: Readonly<Record<string, ReadonlyArray<SkillCatalog.Skill["tools"][number]>>>
+  readonly toolsBySkill?: Readonly<Record<string, ReadonlyArray<Skill["tools"][number]>>>
 }
 
 interface MakeOptions {
   readonly limits: Limits
   readonly source: string
   readonly manifestUrl: string
-  readonly resolveSkillUrl: (skillPath: string) => Effect.Effect<string, SkillCatalog.SkillCatalogError>
+  readonly resolveSkillUrl: (skillPath: string) => Effect.Effect<string, SkillCatalogError>
   readonly manifestHeaders?: Readonly<Record<string, string>>
   readonly bodyHeaders?: Readonly<Record<string, string>>
 }
@@ -42,10 +42,10 @@ interface SkillCatalogErrorInput {
   cause?: unknown
 }
 
-const sourceError = (source: string, message: string, cause?: unknown): SkillCatalog.SkillCatalogError => {
+const sourceError = (source: string, message: string, cause?: unknown): SkillCatalogError => {
   const input: SkillCatalogErrorInput = { source, message }
   if (cause !== undefined) input.cause = cause
-  return SkillCatalog.SkillCatalogError.make(input)
+  return SkillCatalogError.make(input)
 }
 
 const safeInteger = (
@@ -53,7 +53,7 @@ const safeInteger = (
   name: string,
   value: number,
   minimum: number,
-): Effect.Effect<number, SkillCatalog.SkillCatalogError> =>
+): Effect.Effect<number, SkillCatalogError> =>
   Number.isSafeInteger(value) && value >= minimum
     ? Effect.succeed(value)
     : Effect.fail(sourceError(source, `${name} must be a safe integer >= ${minimum}`))
@@ -70,7 +70,7 @@ const fetchBytes = (
   url: string,
   headers: Readonly<Record<string, string>> | undefined,
   maxBytes: number,
-): Effect.Effect<Uint8Array, SkillCatalog.SkillCatalogError> =>
+): Effect.Effect<Uint8Array, SkillCatalogError> =>
   client.execute(request(url, headers)).pipe(
     Effect.flatMap(HttpClientResponse.filterStatusOk),
     Effect.mapError(() => sourceError(source, "Hosted skill request failed")),
@@ -101,7 +101,7 @@ const fetchBytes = (
     ),
   )
 
-const decodeText = (source: string, bytes: Uint8Array): Effect.Effect<string, SkillCatalog.SkillCatalogError> =>
+const decodeText = (source: string, bytes: Uint8Array): Effect.Effect<string, SkillCatalogError> =>
   Effect.try({
     try: () => decoder.decode(bytes),
     catch: (cause) => sourceError(source, "Hosted skill response is not valid UTF-8", cause),
@@ -112,8 +112,8 @@ const sameFrontmatter = (left: Frontmatter, right: Frontmatter): boolean =>
 
 /** @experimental Validate one safe relative SKILL.md path. */
 export const validateSkillPath: {
-  (skillPath: string): (source: string) => Effect.Effect<string, SkillCatalog.SkillCatalogError>
-  (source: string, skillPath: string): Effect.Effect<string, SkillCatalog.SkillCatalogError>
+  (skillPath: string): (source: string) => Effect.Effect<string, SkillCatalogError>
+  (source: string, skillPath: string): Effect.Effect<string, SkillCatalogError>
 } = Function.dual(2, (source: string, skillPath: string) => {
   const segments = skillPath.split("/")
   return skillPath.length > 0 &&
@@ -129,8 +129,8 @@ export const validateSkillPath: {
 
 /** @experimental Resolve a same-origin path beneath a manifest directory. */
 export const resolveRelative: {
-  (manifestUrl: string, skillPath: string): (source: string) => Effect.Effect<string, SkillCatalog.SkillCatalogError>
-  (source: string, manifestUrl: string, skillPath: string): Effect.Effect<string, SkillCatalog.SkillCatalogError>
+  (manifestUrl: string, skillPath: string): (source: string) => Effect.Effect<string, SkillCatalogError>
+  (source: string, manifestUrl: string, skillPath: string): Effect.Effect<string, SkillCatalogError>
 } = Function.dual(3, (source: string, manifestUrl: string, skillPath: string) =>
   Effect.gen(function* () {
     yield* validateSkillPath(source, skillPath)
@@ -182,7 +182,7 @@ export const make = (options: MakeOptions) =>
     if (manifest.skills.length > maxSkills) {
       return yield* sourceError(options.source, `Hosted skill manifest exceeds ${maxSkills} skills`)
     }
-    const byName = new Map<string, SkillCatalog.Skill>()
+    const byName = new Map<string, Skill>()
     for (const entry of manifest.skills) {
       yield* validateName(options.source, entry.name)
       if (!/^[0-9a-f]{64}$/.test(entry.sha256)) {

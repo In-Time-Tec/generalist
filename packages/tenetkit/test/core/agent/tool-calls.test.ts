@@ -10,7 +10,7 @@ import {
   Permissions,
   ToolContext,
   ToolExecutor,
-} from "../../../src/core/index.js"
+} from "../../../src/index.js"
 
 const messages = Prompt.make("authorize the completed external calls").content
 const executableRef = Schema.decodeSync(ExecutableManifest.ExecutableRef)({

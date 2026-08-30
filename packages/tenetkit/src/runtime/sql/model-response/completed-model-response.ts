@@ -1,5 +1,11 @@
 import { DateTime, Effect } from "effect"
-import { Session } from "../../../core/index.js"
+import {
+  type AppendInput,
+  type Entry,
+  type HandoffEntry,
+  SessionConflict,
+  type SessionStoreError,
+} from "../../../core/context/session.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { CompletedSessionEntry } from "../../execution/model-response/commit.js"
 import { handoffPayload, type HandoffSessionEntry } from "../../session/handoff.js"
@@ -7,7 +13,7 @@ import { type EntryRow, type SessionRow, SessionStorage } from "../session/stora
 
 const { encodePayload, entryPayloadEquivalence, storeError, toEntry } = SessionStorage
 
-const completedPayload = (input: CompletedSessionEntry): Session.AppendInput => ({
+const completedPayload = (input: CompletedSessionEntry): AppendInput => ({
   _tag: "ModelResponse",
   content: input.content,
   metadata: { modelResponseDigest: input.digest },
@@ -17,7 +23,7 @@ export const verifyCompletedSessionEntry = (
   input: CompletedSessionEntry,
 ): Effect.Effect<
   void,
-  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  SessionConflict | SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
@@ -39,7 +45,7 @@ export const verifyCompletedSessionEntry = (
       entry?._tag !== "ModelResponse" ||
       entry.metadata?.modelResponseDigest !== input.digest
     ) {
-      return yield* Session.SessionConflict.make({
+      return yield* SessionConflict.make({
         reason: "entry-id-reused",
         message: `Session entry id ${input.entryId} does not match the completed response`,
       })
@@ -54,7 +60,7 @@ export const verifyCompletedSessionEntry = (
       if (cursor === input.entryId) return
       cursor = byId.get(cursor)?.parent_id ?? null
     }
-    return yield* Session.SessionConflict.make({
+    return yield* SessionConflict.make({
       reason: "stale-leaf",
       message: `Session entry id ${input.entryId} is not on the active path`,
     })
@@ -64,8 +70,8 @@ export const verifyCompletedSessionEntry = (
 export const appendCompletedSessionEntry = (
   input: CompletedSessionEntry,
 ): Effect.Effect<
-  Session.Entry,
-  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  Entry,
+  SessionConflict | SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
@@ -87,7 +93,7 @@ export const appendCompletedSessionEntry = (
       return toEntry(existing)
     }
     if (session.leaf_id !== input.parentId) {
-      return yield* Session.SessionConflict.make({
+      return yield* SessionConflict.make({
         reason: "stale-leaf",
         message: `Expected Session leaf ${String(input.parentId)} but found ${String(session.leaf_id)}`,
       })
@@ -109,7 +115,7 @@ export const verifyHandoffSessionEntry = (
   input: HandoffSessionEntry,
 ): Effect.Effect<
   void,
-  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  SessionConflict | SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
@@ -129,7 +135,7 @@ export const verifyHandoffSessionEntry = (
       existing.parent_id !== input.parentId ||
       !entryPayloadEquivalence(toEntry(existing), handoffPayload(input))
     ) {
-      return yield* Session.SessionConflict.make({
+      return yield* SessionConflict.make({
         reason: "entry-id-reused",
         message: `Session entry id ${input.entryId} does not match the handoff projection`,
       })
@@ -144,7 +150,7 @@ export const verifyHandoffSessionEntry = (
       if (cursor === input.entryId) return
       cursor = byId.get(cursor)?.parent_id ?? null
     }
-    return yield* Session.SessionConflict.make({
+    return yield* SessionConflict.make({
       reason: "stale-leaf",
       message: `Session entry id ${input.entryId} is not on the active path`,
     })
@@ -154,8 +160,8 @@ export const verifyHandoffSessionEntry = (
 export const appendHandoffSessionEntry = (
   input: HandoffSessionEntry,
 ): Effect.Effect<
-  Session.HandoffEntry,
-  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  HandoffEntry,
+  SessionConflict | SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
@@ -176,7 +182,7 @@ export const appendHandoffSessionEntry = (
       yield* verifyHandoffSessionEntry(input)
       const entry = toEntry(existing)
       if (entry._tag !== "Handoff") {
-        return yield* Session.SessionConflict.make({
+        return yield* SessionConflict.make({
           reason: "entry-id-reused",
           message: `Session entry id ${input.entryId} is not a handoff projection`,
         })
@@ -184,7 +190,7 @@ export const appendHandoffSessionEntry = (
       return entry
     }
     if (session.leaf_id !== input.parentId) {
-      return yield* Session.SessionConflict.make({
+      return yield* SessionConflict.make({
         reason: "stale-leaf",
         message: `Expected Session leaf ${String(input.parentId)} but found ${String(session.leaf_id)}`,
       })

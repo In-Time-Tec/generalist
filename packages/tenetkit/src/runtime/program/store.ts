@@ -1,7 +1,14 @@
 import { Schema } from "effect"
-import { ProgramHandlers, ProgramCapabilities, ProgramManifest } from "../../core/index.js"
+import {
+  type ProgramBudgetExhausted,
+  type ProgramOperationUnknown,
+  ProgramOperationName,
+  type ProgramReplayDivergence,
+} from "../../core/program/capabilities.js"
+import { ProgramReplayPolicy } from "../../core/program/handlers.js"
+import { ProgramBudget } from "../../core/durable/manifest/program-manifest.js"
 import type { ExecutionClaim } from "../run/store.js"
-import type { AdmitFanOutInput } from "../child/fan-out.js"
+import type { AdmitFanOutInput } from "../child/fan-out-internal.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/state.js"
 import type { RunWait } from "../run/wait.js"
 import { OperationResolution } from "../operation/resolution.js"
@@ -27,7 +34,7 @@ export type ProgramOperationStatus = typeof ProgramOperationStatus.Type
 export const ProgramRunState = Schema.Struct({
   runId: Schema.String,
   programPin: Schema.String,
-  budget: ProgramManifest.ProgramBudget,
+  budget: ProgramBudget,
   deadlineMillis: Schema.Finite,
   toolCalls: Schema.Int,
   agentRuns: Schema.Int,
@@ -41,12 +48,12 @@ export type ProgramRunState = typeof ProgramRunState.Type
 /** @experimental Exact durable record for one Core Program operation. */
 export const ProgramOperationRecord = Schema.Struct({
   runId: Schema.String,
-  operation: ProgramCapabilities.ProgramOperationName,
+  operation: ProgramOperationName,
   kind: ProgramOperationKind,
   capability: Schema.String,
   inputDigest: Schema.String,
   input: Schema.Unknown,
-  replay: ProgramHandlers.ProgramReplayPolicy,
+  replay: ProgramReplayPolicy,
   status: ProgramOperationStatus,
   result: Schema.optionalKey(Schema.Unknown),
   error: Schema.optionalKey(Schema.Unknown),
@@ -70,14 +77,14 @@ export interface ProgramReservation {
 /** @experimental */
 export interface ReserveProgramOperationInput extends ExecutionClaim {
   readonly programPin: string
-  readonly budget: ProgramManifest.ProgramBudget
+  readonly budget: ProgramBudget
   readonly nowMillis: number
-  readonly operation: typeof ProgramCapabilities.ProgramOperationName.Type
+  readonly operation: ProgramOperationName
   readonly kind: ProgramOperationKind
   readonly capability: string
   readonly inputDigest: string
   readonly input: unknown
-  readonly replay: ProgramHandlers.ProgramReplayPolicy
+  readonly replay: ProgramReplayPolicy
   readonly reservation: ProgramReservation
 }
 
@@ -89,7 +96,7 @@ export type ProgramOperationOutcome =
 
 /** @experimental */
 export interface SettleProgramOperationInput extends ExecutionClaim {
-  readonly operation: typeof ProgramCapabilities.ProgramOperationName.Type
+  readonly operation: ProgramOperationName
   readonly outcome: ProgramOperationOutcome
   readonly releaseSlots: number
 }
@@ -124,6 +131,6 @@ export interface CompleteProgramInput extends ExecutionClaim {
 
 /** @experimental Expected Program store decisions remain typed. */
 export type ProgramStoreFailure =
-  | InstanceType<typeof ProgramCapabilities.ProgramBudgetExhausted>
-  | InstanceType<typeof ProgramCapabilities.ProgramReplayDivergence>
-  | InstanceType<typeof ProgramCapabilities.ProgramOperationUnknown>
+  | InstanceType<typeof ProgramBudgetExhausted>
+  | InstanceType<typeof ProgramReplayDivergence>
+  | InstanceType<typeof ProgramOperationUnknown>

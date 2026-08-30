@@ -22,7 +22,7 @@ const h = ih
 
 const quickstartPath = "/docs/start/quickstart"
 const agentLoopPath = "/docs/learn/agent-loop"
-const installCommand = "bun add tenetkit tenetkit/ai"
+const installCommand = "bun add effect tenetkit"
 
 const glyph = (symbol: string, offsetY?: string): Html =>
   h.div(

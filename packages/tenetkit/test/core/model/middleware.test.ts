@@ -11,7 +11,7 @@ import {
   ModelMiddleware,
   Session,
   ToolExecutor,
-} from "../../../src/core/index"
+} from "../../../src/index"
 import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { ItLayer } from "../it-layer.js"
 import { withProviderFinish } from "../provider-finish.js"

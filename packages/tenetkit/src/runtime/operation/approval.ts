@@ -1,13 +1,13 @@
-import { AgentEvent } from "../../core/agent/public/event.js"
+import { ApprovalId as CoreApprovalId, ApprovalRequest } from "../../core/agent/event.js"
 import { Effect, Schema } from "effect"
 import { Runtime } from "../service.js"
 
 /** @experimental Stable identity for one approval request. */
-export const ApprovalId = AgentEvent.ApprovalId
+export const ApprovalId = CoreApprovalId
 export type ApprovalId = typeof ApprovalId.Type
 
 /** @experimental The exact operation and capability awaiting authorization. */
-export const Request = AgentEvent.ApprovalRequest
+export const Request = ApprovalRequest
 export type Request = typeof Request.Type
 
 /** @experimental One terminal response to an approval request. */

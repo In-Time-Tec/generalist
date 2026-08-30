@@ -1,0 +1,12 @@
+id: no-production-assembly-imports
+language: TypeScript
+severity: error
+message: Production modules must import domain owners directly, not package or feature assembly indexes.
+rule:
+  all:
+    - kind: import_statement
+    - has:
+        field: source
+        regex: '^[''"](?:tenetkit(?:/(?:core|runtime|ai))?|(?:\.\.?/)+(?:index|(?:core|runtime|harness|skills|transport|mcp|repl(?:/bun)?|memory|foldkit|test|interoperability/(?:a2a|ag-ui))/index)\.js)[''"]$'
+files:
+  - "packages/tenetkit/src/**/*.ts"

@@ -1,12 +1,12 @@
 import { Context, Effect, HashMap, Layer, Ref, Schema } from "effect"
-import { Memory } from "../core/index.js"
+import type { Key, Metadata } from "../core/context/memory.js"
 
 /** @experimental */
 export interface Document {
   readonly id: string
-  readonly key: Memory.Key
+  readonly key: Key
   readonly text: string
-  readonly metadata?: Memory.Metadata
+  readonly metadata?: Metadata
 }
 
 /** @experimental */
@@ -22,7 +22,7 @@ export interface Match {
 
 /** @experimental */
 export interface Query {
-  readonly key: Memory.Key
+  readonly key: Key
   readonly embedding: ReadonlyArray<number>
   readonly limit: number
   readonly minScore?: number
@@ -30,7 +30,7 @@ export interface Query {
 
 /** @experimental */
 export interface DeleteInput {
-  readonly key: Memory.Key
+  readonly key: Key
   readonly id?: string | undefined
 }
 
@@ -49,10 +49,9 @@ export interface Service {
 /** @experimental */
 export class VectorStore extends Context.Service<VectorStore, Service>()("tenetkit/memory/vector-store/VectorStore") {}
 
-const storageKey = (key: Memory.Key, id: string): string => JSON.stringify([key.agent, key.subject, id])
+const storageKey = (key: Key, id: string): string => JSON.stringify([key.agent, key.subject, id])
 
-const sameKey = (left: Memory.Key, right: Memory.Key): boolean =>
-  left.agent === right.agent && left.subject === right.subject
+const sameKey = (left: Key, right: Key): boolean => left.agent === right.agent && left.subject === right.subject
 
 const validateVector = (label: string, vector: ReadonlyArray<number>): Effect.Effect<void, VectorStoreError> => {
   const invalid = vector.find((value) => !Number.isFinite(value))

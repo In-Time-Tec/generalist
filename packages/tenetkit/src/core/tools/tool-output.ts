@@ -8,7 +8,7 @@ export interface ToolOutput {
 }
 
 /** @experimental Content persisted by a tool-output store. */
-export type ToolOutputContent = Success["encodedResult"]
+type ToolOutputContent = Success["encodedResult"]
 
 /** @experimental A successful tool result after applying the output bound. */
 export interface BoundedSuccess extends Success {

@@ -15,7 +15,7 @@ import {
   ChildLimitExceeded,
   TreePolicyInvalid,
 } from "../../errors.js"
-import { decodePinned, equals, resolveChild } from "../../executable/manifest.js"
+import { decodePinned, equals, resolveChild } from "../../executable/manifest-internal.js"
 import type { RunReceipt } from "../../run.js"
 import type { AdmitSendInput, AdmitStartInput } from "../../run/store.js"
 import { digest as registrationDigest, narrow } from "../../executable/registration.js"
@@ -26,7 +26,8 @@ import { childDigest, rootDigest, startDigest } from "../digest.js"
 import { enqueueLane, promoteHead } from "../lanes.js"
 import { idempotencyKey, laneKey, type MemoryState, type StoredRun } from "../state.js"
 import { make as makeAddress } from "../../address.js"
-import type { FanOutMemberOrigin, FanOutReceipt } from "../../child/fan-out.js"
+import type { FanOutReceipt } from "../../child/fan-out.js"
+import type { FanOutMemberOrigin } from "../../child/fan-out-internal.js"
 import { admitFanOut } from "./fan-out/service.js"
 import { normalize as normalizeTreePolicy } from "../../tree/policy.js"
 import { readinessForAdmission } from "./child/capacity.js"

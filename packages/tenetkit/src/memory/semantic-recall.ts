@@ -1,6 +1,6 @@
 import { Effect, Layer, Ref } from "effect"
 import { EmbeddingModel, Prompt } from "effect/unstable/ai"
-import { Memory } from "../core/index.js"
+import { type Item, Memory, MemoryError, type Service } from "../core/context/memory.js"
 import { VectorStore, type Match, type Query } from "./vector-store.js"
 /** @experimental */
 export interface Options {
@@ -8,7 +8,7 @@ export interface Options {
   readonly minScore?: number
 }
 
-const memoryError = (message: string): Memory.MemoryError => Memory.MemoryError.make({ message })
+const memoryError = (message: string): MemoryError => MemoryError.make({ message })
 
 const textPart = (text: string) => Prompt.makePart("text", { text })
 
@@ -48,7 +48,7 @@ const finalExchangeText = (prompt: Prompt.Prompt): string | undefined => {
   return undefined
 }
 
-const itemFromMatch = (match: Match): Memory.Item => ({
+const itemFromMatch = (match: Match): Item => ({
   id: match.document.id,
   content: [textPart(match.document.text)],
   metadata: { ...match.document.metadata, score: match.score },
@@ -57,7 +57,7 @@ const itemFromMatch = (match: Match): Memory.Item => ({
 /** @experimental */
 export const make = (
   options: Options = {},
-): Effect.Effect<Memory.Service, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
+): Effect.Effect<Service, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
   Effect.gen(function* () {
     const store = yield* VectorStore
     const embeddingModel = yield* EmbeddingModel.EmbeddingModel
@@ -115,7 +115,5 @@ export const make = (
   })
 
 /** @experimental */
-export const layer = (
-  options: Options = {},
-): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
-  Layer.effect(Memory.Memory, make(options).pipe(Effect.map(Memory.Memory.of)))
+export const layer = (options: Options = {}): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
+  Layer.effect(Memory, make(options).pipe(Effect.map(Memory.of)))

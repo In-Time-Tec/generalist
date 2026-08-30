@@ -1,8 +1,11 @@
 import { DateTime, Effect, Layer, Schema, Scope } from "effect"
-import { AgentProgram, ProgramCapabilities, ProgramRunner } from "../../core/index.js"
+import { run } from "../../core/program/agent-program.js"
+import { ProgramSuspended } from "../../core/program/capabilities.js"
+import { ExecutionFailure, ProgramRunner } from "../../core/program/runner.js"
 import type { ProgramResolution } from "../executable/resolver.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
-import { AgentExecutionFailure, RunTerminal, failureMessage } from "../errors.js"
+import { failureMessage } from "../errors-internal.js"
+import { AgentExecutionFailure, RunTerminal } from "../errors.js"
 import { make as makeProgramRunner } from "../program/runner.js"
 import { programWait } from "../program/approval.js"
 
@@ -20,8 +23,8 @@ export const executeProgram = (input: {
     executor: resolution.executor,
     handlers: resolution.handlers,
   })
-  const execution = AgentProgram.run(resolution.program, claimed.message.prompt).pipe(
-    Effect.provideService(ProgramRunner.ProgramRunner, programRunner),
+  const execution = run(resolution.program, claimed.message.prompt).pipe(
+    Effect.provideService(ProgramRunner, programRunner),
   )
   const services = resolution.services
   const scopedExecution = Effect.scoped(
@@ -55,10 +58,10 @@ export const executeProgram = (input: {
       store.inspect(claim.runId).pipe(
         Effect.flatMap((inspection) => {
           if (inspection.status === "needs-resolution") return Effect.void
-          if (!Schema.is(ProgramCapabilities.ProgramSuspended)(error)) {
+          if (!Schema.is(ProgramSuspended)(error)) {
             return store.fail({
               ...claim,
-              error: Schema.is(ProgramRunner.ExecutionFailure)(error)
+              error: Schema.is(ExecutionFailure)(error)
                 ? error
                 : AgentExecutionFailure.make({ message: failureMessage(String(error)) }),
             })

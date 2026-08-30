@@ -3,8 +3,15 @@ import {
   OpenAiLanguageModel as OpenAILanguageModel,
   OpenAiSchema as OpenAISchema,
 } from "@effect/ai-openai"
-import { ContextOverflow } from "../../core/index.js"
-import { ModelRegistry } from "../../core/model/public/registry.js"
+import { classify } from "../../core/model/result/context-overflow.js"
+import {
+  type FailureClassifier,
+  type ModelRegistry,
+  type Registration,
+  type ToolJsonSchemaCompiler,
+  layer as modelRegistryLayer,
+  registration as modelRegistration,
+} from "../../core/model/registry.js"
 import { Config, Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError, OpenAiStructuredOutput as OpenAIStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
@@ -189,10 +196,10 @@ export const openAiLanguageModelLayer = (input: Options) =>
   )
 
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
+export const classifyFailure: FailureClassifier = classify
 
 /** @experimental */
-export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool, { transformer: OpenAIStructuredOutput.toCodecOpenAI }),
     catch: (error) =>
@@ -212,18 +219,14 @@ export interface ClientOptions extends Options {
 }
 
 /** @experimental */
-export const layer = (
-  input: ClientOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
+  modelRegistryLayer([modelRegistration(registrationOptions(input))]).pipe(
     Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 
 /** @experimental Bare registration effect; the consumer provides the OpenAI client (see layerConfig). */
-export const registration = (
-  input: Options,
-): Effect.Effect<ModelRegistry.Registration, never, OpenAIClient.OpenAiClient> =>
-  ModelRegistry.registration(registrationOptions(input))
+export const registration = (input: Options): Effect.Effect<Registration, never, OpenAIClient.OpenAiClient> =>
+  modelRegistration(registrationOptions(input))
 
 const registrationOptions = (input: Options) => {
   const required = {
@@ -392,7 +395,7 @@ export const layerOrDeterministic = (options: DeterministicFallbackOptions) =>
             Effect.asSome,
           ),
       })
-      return ModelRegistry.layer([
+      return modelRegistryLayer([
         Effect.succeed(deterministic),
         ...(Option.isSome(openAiRegistration) ? [Effect.succeed(openAiRegistration.value)] : []),
       ])

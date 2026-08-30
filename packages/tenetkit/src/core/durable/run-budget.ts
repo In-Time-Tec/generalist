@@ -234,7 +234,7 @@ export const charge: {
 )
 
 /** @experimental Result of settling a paid model response against its token allocation. */
-export interface ModelTokenSettlement {
+interface ModelTokenSettlement {
   readonly budget: RunBudget
   readonly exhausted: RunBudgetExhausted | undefined
 }

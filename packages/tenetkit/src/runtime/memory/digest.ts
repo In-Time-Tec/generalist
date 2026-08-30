@@ -1,10 +1,10 @@
-import { Pins } from "../../core/index.js"
+import { digest } from "../../core/durable/pin.js"
 import { Function, Predicate } from "effect"
 import type { Message } from "../messaging/message.js"
 import type { ExecutableRef } from "../executable/manifest.js"
 import type { AdmitStartInput } from "../run/store.js"
 import { defaultTreePolicy, type TreePolicy } from "../tree/policy.js"
-import type { FanOutMemberOrigin } from "../child/fan-out.js"
+import type { FanOutMemberOrigin } from "../child/fan-out-internal.js"
 import { promptDigestValue } from "../run/prompt-digest.js"
 
 interface ChildDigestDetails {
@@ -15,7 +15,7 @@ interface ChildDigestDetails {
 }
 
 export const messageDigest = (message: Message): string =>
-  Pins.digest({
+  digest({
     to: message.to,
     from: message.from ?? null,
     sessionId: message.sessionId,
@@ -29,9 +29,7 @@ export const messageDigest = (message: Message): string =>
 export const rootDigest: {
   (treePolicy: TreePolicy): (message: Message) => string
   (message: Message, treePolicy: TreePolicy): string
-} = Function.dual(2, (message: Message, treePolicy: TreePolicy): string =>
-  Pins.digest([messageDigest(message), treePolicy]),
-)
+} = Function.dual(2, (message: Message, treePolicy: TreePolicy): string => digest([messageDigest(message), treePolicy]))
 
 export const childDigest: {
   (executableRef: ExecutableRef, details?: ChildDigestDetails): (message: Message) => string
@@ -39,11 +37,11 @@ export const childDigest: {
 } = Function.dual(
   (args) => args.length >= 2 && Predicate.hasProperty(args[0], "id"),
   (message: Message, executableRef: ExecutableRef, details?: ChildDigestDetails): string =>
-    Pins.digest([messageDigest(message), executableRef, details ?? null]),
+    digest([messageDigest(message), executableRef, details ?? null]),
 )
 
 export const startDigest = (input: AdmitStartInput): string =>
-  Pins.digest([
+  digest([
     messageDigest(input.message),
     input.treePolicy ?? defaultTreePolicy,
     input.initialChildren.map((child) => ({

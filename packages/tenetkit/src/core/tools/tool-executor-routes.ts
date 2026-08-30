@@ -7,13 +7,13 @@ import {
   type PlacementRequest,
   type PlacementResponse,
   type PlacementRouteOptions,
-  type PlacementSchemaServices,
   placementOutcome,
   type RemoteRouteIdempotentOptions,
   type RemoteRouteOptions,
   type Route,
   type RouteOptions,
 } from "./tool-placement.js"
+import type { PlacementSchemaServices } from "./tool-placement-internal.js"
 import type { ToolContext } from "./tool-context.js"
 
 /** @experimental */

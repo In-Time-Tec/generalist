@@ -9,7 +9,7 @@ import {
   ModelRegistry,
   ModelResilience,
   ModelToolCallValidation,
-} from "../../../../src/core/index"
+} from "../../../../src/index"
 import { withProviderFinish } from "../../provider-finish"
 
 const rateLimit = AiError.make({

@@ -1,6 +1,6 @@
 import { Effect, Function, Schema } from "effect"
-import { SkillCatalog } from "../core/index.js"
-import { Frontmatter } from "../core/context/skill-catalog.js"
+import { DESCRIPTION_CAP, SkillCatalogError } from "../core/context/skill-catalog.js"
+import { Frontmatter } from "../core/context/skill-catalog-internal.js"
 
 export interface ParsedDocument {
   readonly frontmatter: Frontmatter
@@ -26,10 +26,10 @@ interface SourceErrorFields {
   cause?: unknown
 }
 
-const sourceError = (source: string, message: string, cause?: unknown): SkillCatalog.SkillCatalogError => {
+const sourceError = (source: string, message: string, cause?: unknown): SkillCatalogError => {
   const fields: SourceErrorFields = { source, message }
   if (cause !== undefined) fields.cause = cause
-  return SkillCatalog.SkillCatalogError.make(fields)
+  return SkillCatalogError.make(fields)
 }
 
 const normalizeKey = (key: string): string => key.replace(/[-_]/g, "").toLowerCase()
@@ -103,7 +103,7 @@ const setArrayValue = (target: Partial<ParsedHeader>, key: string, value: Readon
   }
 }
 
-const parseHeader = (source: string, block: string): Effect.Effect<ParsedHeader, SkillCatalog.SkillCatalogError> =>
+const parseHeader = (source: string, block: string): Effect.Effect<ParsedHeader, SkillCatalogError> =>
   Effect.sync(() => {
     const parsed: Partial<ParsedHeader> = {}
     const lines = block.split("\n")
@@ -133,8 +133,8 @@ const parseHeader = (source: string, block: string): Effect.Effect<ParsedHeader,
   }).pipe(Effect.catchCause((cause) => Effect.fail(sourceError(source, "Invalid SKILL.md frontmatter", cause))))
 
 export const splitDocument: {
-  (content: string): (source: string) => Effect.Effect<readonly [string, string], SkillCatalog.SkillCatalogError>
-  (source: string, content: string): Effect.Effect<readonly [string, string], SkillCatalog.SkillCatalogError>
+  (content: string): (source: string) => Effect.Effect<readonly [string, string], SkillCatalogError>
+  (source: string, content: string): Effect.Effect<readonly [string, string], SkillCatalogError>
 } = Function.dual(2, (source: string, content: string) =>
   Effect.gen(function* () {
     const normalized = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")
@@ -151,8 +151,8 @@ export const splitDocument: {
 )
 
 export const validateName: {
-  (name: string): (source: string) => Effect.Effect<string, SkillCatalog.SkillCatalogError>
-  (source: string, name: string): Effect.Effect<string, SkillCatalog.SkillCatalogError>
+  (name: string): (source: string) => Effect.Effect<string, SkillCatalogError>
+  (source: string, name: string): Effect.Effect<string, SkillCatalogError>
 } = Function.dual(2, (source: string, name: string) =>
   /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(name) && !name.includes("--")
     ? Effect.succeed(name)
@@ -162,8 +162,8 @@ export const validateName: {
 )
 
 export const parseFrontmatter: {
-  (block: string, directoryName: string): (source: string) => Effect.Effect<Frontmatter, SkillCatalog.SkillCatalogError>
-  (source: string, block: string, directoryName: string): Effect.Effect<Frontmatter, SkillCatalog.SkillCatalogError>
+  (block: string, directoryName: string): (source: string) => Effect.Effect<Frontmatter, SkillCatalogError>
+  (source: string, block: string, directoryName: string): Effect.Effect<Frontmatter, SkillCatalogError>
 } = Function.dual(3, (source: string, block: string, directoryName: string) =>
   Effect.gen(function* () {
     const parsed = yield* parseHeader(source, block)
@@ -176,22 +176,15 @@ export const parseFrontmatter: {
     }
     return yield* Schema.decodeUnknownEffect(Frontmatter)(parsed).pipe(
       Effect.mapError((cause) =>
-        sourceError(source, `SKILL.md description must contain 1-${SkillCatalog.DESCRIPTION_CAP} characters`, cause),
+        sourceError(source, `SKILL.md description must contain 1-${DESCRIPTION_CAP} characters`, cause),
       ),
     )
   }),
 )
 
 export const parseDocument: {
-  (
-    content: string,
-    directoryName: string,
-  ): (source: string) => Effect.Effect<ParsedDocument, SkillCatalog.SkillCatalogError>
-  (
-    source: string,
-    content: string,
-    directoryName: string,
-  ): Effect.Effect<ParsedDocument, SkillCatalog.SkillCatalogError>
+  (content: string, directoryName: string): (source: string) => Effect.Effect<ParsedDocument, SkillCatalogError>
+  (source: string, content: string, directoryName: string): Effect.Effect<ParsedDocument, SkillCatalogError>
 } = Function.dual(3, (source: string, content: string, directoryName: string) =>
   Effect.gen(function* () {
     const [header, body] = yield* splitDocument(source, content)

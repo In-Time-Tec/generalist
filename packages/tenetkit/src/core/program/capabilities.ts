@@ -145,7 +145,7 @@ export interface AgentRunInput {
 }
 
 /** @experimental Token accounting reported by the host-owned Agent executor. */
-export interface AgentTokenUsage {
+interface AgentTokenUsage {
   readonly input: number
   readonly output: number
 }
@@ -158,7 +158,7 @@ export interface AgentRunResult {
 }
 
 /** @experimental */
-export interface AgentMapMember {
+interface AgentMapMember {
   readonly member: ProgramMemberKey
   readonly input: unknown
 }
@@ -171,7 +171,7 @@ export interface AgentMapInput {
 }
 
 /** @experimental */
-export interface AgentFanOutMember extends AgentMapMember {
+interface AgentFanOutMember extends AgentMapMember {
   readonly selection: string
 }
 

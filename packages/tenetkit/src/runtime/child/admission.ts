@@ -1,5 +1,5 @@
 import { Context, Effect, Schema } from "effect"
-import { ToolContext } from "../../core/index.js"
+import { ToolContext } from "../../core/tools/tool-context.js"
 import { make as makeAddress } from "../address.js"
 import { childSessionId } from "./session.js"
 import { make as makeMessage } from "../messaging/message.js"
@@ -284,8 +284,8 @@ export const make = (store: RunStoreService): Service => {
  * A route reads parentage here rather than from tool parameters, which is what makes admission,
  * inspection, and cancellation unforgeable from model code.
  */
-export const parentRunId: Effect.Effect<string, ChildParentageInvalid, ToolContext.ToolContext> = Effect.flatMap(
-  ToolContext.ToolContext,
+export const parentRunId: Effect.Effect<string, ChildParentageInvalid, ToolContext> = Effect.flatMap(
+  ToolContext,
   (context) =>
     context.runId === undefined
       ? ChildParentageInvalid.make({ parentRunId: "", childRunId: "" })
@@ -295,10 +295,10 @@ export const parentRunId: Effect.Effect<string, ChildParentageInvalid, ToolConte
 const origin: Effect.Effect<
   { readonly parentRunId: string; readonly toolCallId: string; readonly operationKey?: string },
   ChildParentageInvalid,
-  ToolContext.ToolContext
+  ToolContext
 > = Effect.gen(function* () {
   const derived = yield* parentRunId
-  const context = yield* ToolContext.ToolContext
+  const context = yield* ToolContext
   return context.toolCallId === undefined
     ? yield* ChildParentageInvalid.make({ parentRunId: derived, childRunId: "" })
     : Object.assign(
@@ -319,18 +319,18 @@ const origin: Effect.Effect<
 export interface AgentChildrenService {
   readonly admit: (
     input: AdmitParameters,
-  ) => Effect.Effect<AdmitReceipt, AdmitChildError | ChildParentageInvalid, ToolContext.ToolContext>
-  readonly listDirect: Effect.Effect<ReadonlyArray<ChildInspection>, ChildLookupError, ToolContext.ToolContext>
+  ) => Effect.Effect<AdmitReceipt, AdmitChildError | ChildParentageInvalid, ToolContext>
+  readonly listDirect: Effect.Effect<ReadonlyArray<ChildInspection>, ChildLookupError, ToolContext>
   readonly inspect: (input: {
     readonly childRunId: string
-  }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext.ToolContext>
+  }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext>
   readonly join: (input: {
     readonly childRunId: string
-  }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext.ToolContext>
+  }) => Effect.Effect<ChildInspection, ChildLookupError, ToolContext>
   readonly cancel: (input: {
     readonly childRunId: string
     readonly reason?: string
-  }) => Effect.Effect<void, ChildLookupError, ToolContext.ToolContext>
+  }) => Effect.Effect<void, ChildLookupError, ToolContext>
 }
 
 /**

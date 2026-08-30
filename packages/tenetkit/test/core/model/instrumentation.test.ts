@@ -2,12 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Clock, Deferred, Effect, Exit, Fiber, Function, Option, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Model, Prompt, Response, ResponseIdTracker } from "effect/unstable/ai"
-import {
-  ModelResilience,
-  ModelStreamTermination,
-  ModelTelemetry,
-  ModelToolCallValidation,
-} from "../../../src/core/index"
+import { ModelResilience, ModelStreamTermination, ModelTelemetry, ModelToolCallValidation } from "../../../src/index"
 import {
   instrument as instrumentModel,
   type InstrumentOptions,

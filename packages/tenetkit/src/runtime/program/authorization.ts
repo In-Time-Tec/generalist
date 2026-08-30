@@ -1,17 +1,18 @@
 import { Effect } from "effect"
-import { ProgramCapabilities, type ProgramHandlers } from "../../core/index.js"
+import { type CapabilityFailure, ProgramCapabilityDenied } from "../../core/program/capabilities.js"
+import type { Invocation } from "../../core/program/handlers.js"
 import type { ExecutionRecord } from "../run/store.js"
 import { approvedFor, deniedFor } from "./approval.js"
 
 const authorize = (
   claimed: ExecutionRecord,
-  invocation: Pick<ProgramHandlers.Invocation, "authorize">,
+  invocation: Pick<Invocation, "authorize">,
   operation: string,
   capability: string,
-): Effect.Effect<void, ProgramCapabilities.CapabilityFailure> => {
+): Effect.Effect<void, CapabilityFailure> => {
   const denied = deniedFor(claimed, operation)
   if (denied !== undefined) {
-    return Effect.fail(ProgramCapabilities.ProgramCapabilityDenied.make({ capability, operation, reason: denied }))
+    return Effect.fail(ProgramCapabilityDenied.make({ capability, operation, reason: denied }))
   }
   if (approvedFor(claimed, operation)) return Effect.void
   return invocation.authorize(operation).pipe(
@@ -19,7 +20,7 @@ const authorize = (
       allowed
         ? Effect.void
         : Effect.fail(
-            ProgramCapabilities.ProgramCapabilityDenied.make({
+            ProgramCapabilityDenied.make({
               capability,
               operation,
               reason: "host authorization denied the operation",

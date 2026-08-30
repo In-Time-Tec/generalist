@@ -1,6 +1,6 @@
 import { Console, Effect, ManagedRuntime } from "effect"
 import { Agent, ModelRegistry } from "tenetkit"
-import { Deterministic } from "tenetkit/ai"
+import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
 
 const agent = Agent.make({ name: "eval-agent" })
 
@@ -15,5 +15,5 @@ const program = Effect.gen(function* () {
   yield* Console.log("eval passed")
 })
 
-const runtime = ManagedRuntime.make(Deterministic.layer({ model: "local" }))
+const runtime = ManagedRuntime.make(deterministicLayer({ model: "local" }))
 await runtime.runPromise(program)

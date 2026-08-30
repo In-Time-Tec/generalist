@@ -21,9 +21,9 @@ export const versioningReference = definePage({
         [[code("tenetkit/mcp")], [code(version)], [code("."), ", ", code("./tools")]],
         [[code("tenetkit/memory")], [code(version)], [code(".")]],
         [
-          [code("tenetkit/ai")],
+          [code("tenetkit/ai/*")],
           [code(version)],
-          [code("."), ", ", code("./catalog"), ", provider, authentication, preset, and embedding subpaths"],
+          ["Exact catalog, route, deterministic, provider, authentication, preset, and embedding leaves"],
         ],
         [[code("tenetkit/runtime")], [code(version)], [code(".")]],
         [[code("tenetkit/skills")], [code(version)], [code(".")]],

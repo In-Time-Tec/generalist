@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { NestedOperation, ToolContext, ToolExecutor } from "tenetkit"
+import { NestedOperation, ToolContext, ToolExecutor, ToolPlacement } from "tenetkit"
 
 interface Written {
   readonly path: string
@@ -48,7 +48,7 @@ const returned = (tag: string, detail: string): Effect.Effect<ToolExecutor.Outco
  * `catchSuspension` converts exactly that error into the executor's Suspend outcome; every other
  * failure is mapped first, so the suspension is still on the error channel when it reaches it.
  */
-export const route: ToolExecutor.Route<InExecution> = ToolExecutor.route<InExecution>({
+export const route: ToolPlacement.Route<InExecution> = ToolExecutor.route<InExecution>({
   tools: ["edit_file"],
   execute: (request) =>
     NestedOperation.catchSuspension(

@@ -1,7 +1,8 @@
 import { DateTime, Effect, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../../errors.js"
 import type { RespondInput, SignalInput } from "../../../service.js"
-import { classifyResponse, type RunWait, type WaitResolution } from "../../../run/wait.js"
+import type { RunWait, WaitResolution } from "../../../run/wait.js"
+import { classifyResponse } from "../../../run/wait-internal.js"
 import { appendLifecycle, rejectIfTerminal, resumedEvent } from "../../append.js"
 import { waitMapKey, type MemoryState, type StoredRun } from "../../state.js"
 

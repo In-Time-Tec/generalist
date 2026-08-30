@@ -12,8 +12,6 @@ import {
   Runtime,
   Steering,
   RunExecutor,
-  ExecutionResult,
-  RunFailure,
   OperationResolution,
 } from "../../src/runtime/index.js"
 
@@ -35,10 +33,8 @@ describe("tenetkit/runtime public surface", () => {
     expect(RunExecutor.RunExecutor).toBeDefined()
     expect(RunTree.events).toBeDefined()
     expect(RunTree.watch).toBeDefined()
-    expect(ExecutionResult.ExecutionResult).toBeDefined()
-    expect(RunFailure.RunFailure).toBeDefined()
-    expect(Run.ExecutionResult).toBe(ExecutionResult.ExecutionResult)
-    expect(Run.RunFailure).toBe(RunFailure.RunFailure)
+    expect(Run.ExecutionResult).toBeDefined()
+    expect(Run.RunFailure).toBeDefined()
     expect(Errors.AddressNotFound).toBeDefined()
     expect(Errors.IdempotencyConflict).toBeDefined()
     expect(Errors.SteeringConflict).toBeDefined()

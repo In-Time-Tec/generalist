@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { Deterministic } from "tenetkit/ai"
+import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
 
 const agent = Agent.make({ name: "eval-agent" })
 
@@ -16,7 +16,7 @@ const program = Effect.gen(function* () {
 })
 
 const runtimeLayer = Layer.mergeAll(
-  Deterministic.layer({ model: "local" }),
+  deterministicLayer({ model: "local" }),
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,

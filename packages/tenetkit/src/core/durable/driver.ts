@@ -1,0 +1,68 @@
+export {
+  DriverCheckpoint,
+  DriverDecision,
+  DriverOperation,
+  DriverOperationKind,
+  DriverResult,
+  DriverVersion,
+  OperationOutcome,
+  ReplayPolicy,
+  WaitDefinition,
+  currentDriverVersion,
+  decodeCheckpoint,
+  decodeDecision,
+  decodeOutcome,
+  encodeCheckpoint,
+  encodeDecision,
+  encodeOutcome,
+  inputDigest,
+  isFailedOutcome,
+  isSucceededOutcome,
+  isUnknownOutcome,
+  make as makeOperation,
+  operationKey,
+} from "./driver/contract.js"
+export {
+  DriverError,
+  DriverStateInvalid,
+  DriverVersionMismatch,
+  requireDriverVersion,
+  type DriverInput,
+  type DurableAgentDriver,
+} from "./service.js"
+export {
+  TracerState,
+  applyOperation,
+  completeFromCheckpoint,
+  make as makeTracer,
+  type TracerModelStep,
+} from "./driver/tracer.js"
+export {
+  DriverInterpreter,
+  DriverJournalService,
+  DriverUnknownReplay,
+  guardUnknownNeverReplay,
+  layerInline,
+  layerTest,
+  make as makeInline,
+  type DriverJournal,
+  type OperationSpec,
+  type RecordedOperation,
+  type StreamSuccessCodec,
+} from "./driver/interpreter.js"
+export { layerForRun } from "./driver/layer-for-run.js"
+export { make as makeLoopDriver } from "./loop-driver.js"
+export {
+  abortPending,
+  chargeUsage,
+  checkpoint,
+  intercept,
+  interceptStream,
+  logicalOperationId,
+  recorded,
+  refundChildBudget,
+  reserveChildBudget,
+  setBudget,
+  setToolBatch,
+  updateToolBatch,
+} from "./driver/run.js"

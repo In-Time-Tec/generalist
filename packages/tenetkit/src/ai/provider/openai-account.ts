@@ -1,5 +1,10 @@
 import { OpenAiClient as OpenAIClient, type OpenAiSchema as OpenAISchema } from "@effect/ai-openai"
-import { ModelRegistry } from "../../core/index.js"
+import {
+  type ModelRegistry,
+  type Registration,
+  layer as modelRegistryLayer,
+  registration as modelRegistration,
+} from "../../core/model/registry.js"
 import { Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
 import type { Credential, AuthService } from "./openai-account-auth.js"
@@ -243,10 +248,8 @@ export const layerAccountClient = (credentials: OpenAIAccountCredentials) =>
   )
 
 /** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
-export const registrationAccount = (
-  input: AccountOptions,
-): Effect.Effect<ModelRegistry.Registration, never, HttpClient.HttpClient> =>
-  ModelRegistry.registration(registrationOptions(input))
+export const registrationAccount = (input: AccountOptions): Effect.Effect<Registration, never, HttpClient.HttpClient> =>
+  modelRegistration(registrationOptions(input))
 
 const registrationOptions = (input: AccountOptions) => {
   const required = {
@@ -263,7 +266,5 @@ const registrationOptions = (input: AccountOptions) => {
 }
 
 /** @experimental */
-export const layerAccount = (
-  input: AccountOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, never, HttpClient.HttpClient> =>
-  ModelRegistry.layer([registrationAccount(input)])
+export const layerAccount = (input: AccountOptions): Layer.Layer<ModelRegistry, never, HttpClient.HttpClient> =>
+  modelRegistryLayer([registrationAccount(input)])

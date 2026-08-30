@@ -3,7 +3,7 @@ import { Effect } from "effect"
 import { AgentSuspended } from "../../core/agent/event.js"
 import type { Address } from "../../runtime/address.js"
 import { ResponseConflict, RuntimeUnavailable } from "../../runtime/errors.js"
-import type { RuntimeCapability, Services } from "./index.js"
+import type { RuntimeCapability, Services } from "./contract.js"
 
 export const toolSuspension = (waitIds: readonly [string, ...Array<string>]): AgentSuspended => {
   const calls = waitIds.map((waitId) => ({

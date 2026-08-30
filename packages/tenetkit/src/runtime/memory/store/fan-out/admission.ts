@@ -10,20 +10,19 @@ import {
   ChildDepthExceeded,
   ChildLimitExceeded,
 } from "../../../errors.js"
+import type { FanOutMemberResult, FanOutReceipt } from "../../../child/fan-out.js"
 import {
   digestFanOut,
   validateAdmission,
   type AdmitFanOutInput,
-  type FanOutMemberResult,
-  type FanOutReceipt,
   type StoredFanOutMember,
-} from "../../../child/fan-out.js"
+} from "../../../child/fan-out-internal.js"
 import { make as makeMessage } from "../../../messaging/message.js"
 import { isTerminal } from "../../../run.js"
 import type { MemoryState, StoredFanOut, StoredRun } from "../../state.js"
 
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
-import { resolveChild } from "../../../executable/manifest.js"
+import { resolveChild } from "../../../executable/manifest-internal.js"
 import { narrow } from "../../../executable/registration.js"
 import { activeChildCount } from "../child/capacity.js"
 const fanOutAdmittedEvent = (input: {

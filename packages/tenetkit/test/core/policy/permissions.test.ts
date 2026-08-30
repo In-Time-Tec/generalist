@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { Response } from "effect/unstable/ai"
-import { Permissions } from "../../../src/core/index"
+import { Permissions } from "../../../src/index"
 import { ItLayer } from "../it-layer.js"
 
 const request = {

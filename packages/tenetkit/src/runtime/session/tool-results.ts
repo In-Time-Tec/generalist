@@ -1,6 +1,6 @@
-import { DurableDriver } from "../../core/durable/public/driver.js"
-import { Pins } from "../../core/index.js"
-import { Session } from "../../core/context/public/session.js"
+import { operationKey } from "../../core/durable/driver.js"
+import { digest as pinDigest } from "../../core/durable/pin.js"
+import { buildContext, type Entry, unresolvedToolCalls } from "../../core/context/session.js"
 import { Effect, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { RuntimeUnavailable } from "../errors.js"
@@ -105,7 +105,7 @@ const outcomePart = (
 const callIdentity = (call: { readonly id: string; readonly name: string }) => `${call.id}\u0000${call.name}`
 
 const entryDigest = (
-  entry: Session.Entry,
+  entry: Entry,
 ): { readonly tag: ModelResponseEvent["_tag"]; readonly value: string } | undefined => {
   if (entry._tag !== "ModelResponse") return undefined
   const completed = Schema.decodeUnknownOption(Schema.String)(entry.metadata?.modelResponseDigest)
@@ -115,7 +115,7 @@ const entryDigest = (
   return undefined
 }
 
-const assistantMessage = (entry: Session.Entry): Prompt.Message | undefined => {
+const assistantMessage = (entry: Entry): Prompt.Message | undefined => {
   if (entry._tag === "ModelResponse") {
     return Prompt.fromResponseParts(entry.content).content.find((candidate) => candidate.role === "assistant")
   }
@@ -136,7 +136,7 @@ const resolveOwnedCall = (
 
 const ownedCalls = (input: {
   readonly runId: string
-  readonly path: ReadonlyArray<Session.Entry>
+  readonly path: ReadonlyArray<Entry>
   readonly events: ReadonlyArray<RunEvent>
   readonly operations: ReadonlyArray<ToolOperation>
 }): Effect.Effect<ReadonlyArray<OwnedCall>, RuntimeUnavailable> =>
@@ -178,14 +178,14 @@ const ownedCalls = (input: {
         if (!committed) {
           return yield* unavailable(`Session entry ${entry.id} diverges from model response ${response.eventId}`)
         }
-        const operationKey = DurableDriver.operationKey([input.runId, "tool", response.turn, call.id, call.name])
-        const operation = operations.get(operationKey)
+        const key = operationKey([input.runId, "tool", response.turn, call.id, call.name])
+        const operation = operations.get(key)
         const owned: OwnedCall = operation === undefined ? { call, response } : { call, response, operation }
         const identity = callIdentity(call)
         calls.set(identity, [...(calls.get(identity) ?? []), owned])
       }
     }
-    const unresolved = Session.unresolvedToolCalls(Session.buildContext(input.path))
+    const unresolved = unresolvedToolCalls(buildContext(input.path))
     return yield* Effect.forEach(unresolved, (call) => resolveOwnedCall(calls, call))
   })
 
@@ -203,7 +203,7 @@ const completedToolResult = (
   )
   const outcomes = new Set(
     matching.map((event) =>
-      Pins.digest({
+      pinDigest({
         id: event.result.id,
         name: event.result.name,
         isFailure: event.result.isFailure,
@@ -218,7 +218,7 @@ const completedToolResult = (
 
 export const terminalToolMessage = (input: {
   readonly runId: string
-  readonly path: ReadonlyArray<Session.Entry>
+  readonly path: ReadonlyArray<Entry>
   readonly events: ReadonlyArray<RunEvent>
   readonly operations: ReadonlyArray<ToolOperation>
   readonly terminal: RunTerminalOutcome

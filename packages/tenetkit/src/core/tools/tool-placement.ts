@@ -6,12 +6,12 @@ import {
   type Outcome,
   type ReplayPolicy,
   type Request,
-  type ToolSchemaServices,
   type ToolkitInput,
   toolResultCodec,
 } from "./tool-result-codec.js"
 import type { CancellationFailure, CancellationOutcome, CancellationRequest } from "./tool-executor-cancellation.js"
 import type { ToolContext } from "./tool-context.js"
+import type { ConcreteSchemaTool, PlacementSchemaServices } from "./tool-placement-internal.js"
 
 /** @experimental */
 export interface Route<R = ToolContext> {
@@ -57,20 +57,6 @@ export type PlacementResponse =
   | { readonly _tag: "Success"; readonly result: unknown }
   | { readonly _tag: "DomainFailure"; readonly failure: unknown }
   | { readonly _tag: "Suspend"; readonly token: string }
-
-type ConcreteSchemaTool<T extends Tool.Any> =
-  T extends Tool.Tool<string, infer Config, infer _Requirements>
-    ? {
-        readonly name: string
-        readonly parametersSchema: Config["parameters"]
-        readonly successSchema: Config["success"]
-        readonly failureSchema: Config["failure"]
-      }
-    : never
-
-export type PlacementSchemaServices<Tools extends Record<string, Tool.Any>> = ToolSchemaServices<
-  ConcreteSchemaTool<Tools[keyof Tools]>
->
 
 type PlacementTool<Tools extends Record<string, Tool.Any>> = Tools[keyof Tools] & {
   readonly parametersSchema: Tool.ParametersSchema<Tools[keyof Tools]>

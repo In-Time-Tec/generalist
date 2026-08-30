@@ -1,7 +1,7 @@
 import { DateTime, Effect, Equal, Function, Option } from "effect"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../../errors.js"
 import type { RunWait } from "../../../run/wait.js"
-import { checkpointRef } from "../../../executable/manifest.js"
+import { checkpointRef } from "../../../executable/manifest-internal.js"
 import { appendLifecycle, rejectIfTerminal, resumedEvent, waitingEvent } from "../../append.js"
 import { waitMapKey, type MemoryState, type StoredRun } from "../../state.js"
 import { groupWaitsFromSuspension, resultFromInspection } from "../../../child/group.js"

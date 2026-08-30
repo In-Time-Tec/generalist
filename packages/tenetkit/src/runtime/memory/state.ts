@@ -17,7 +17,7 @@ import type { PendingRunOutcome } from "../run/store.js"
 import type { TreePolicy } from "../tree/policy.js"
 import type { ChildReadiness } from "../child/readiness.js"
 import type { MailboxEntry } from "../messaging/mailbox.js"
-import type { Session } from "../../core/index.js"
+import type { Entry as SessionEntry } from "../../core/context/session.js"
 import type { ExternalRoot, Placement as ExternalChildPlacement } from "../child/external/placement.js"
 import type { Point as AcknowledgementPoint } from "../acknowledgement.js"
 
@@ -80,7 +80,7 @@ export interface Lane {
 }
 
 export interface MemorySession {
-  readonly entries: ReadonlyMap<string, Session.Entry>
+  readonly entries: ReadonlyMap<string, SessionEntry>
   readonly order: ReadonlyArray<string>
   readonly leaf: string | null
   readonly counter: number

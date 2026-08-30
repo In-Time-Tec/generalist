@@ -1,5 +1,5 @@
 import { expect, it } from "vitest"
-import { decodeReason, encodeReason } from "../../../src/runtime/run/wait.js"
+import { decodeReason, encodeReason } from "../../../src/runtime/run/wait-internal.js"
 import { openWait, suspension } from "../execution/fixtures.js"
 
 it("builds a wait for every reason", () => {

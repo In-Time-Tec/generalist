@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { TurnPolicy } from "../../../src/core/index"
+import { TurnPolicy } from "../../../src/index"
 
 type EffectServices<T> = T extends Effect.Effect<unknown, unknown, infer R> ? R : never
 

@@ -1,15 +1,21 @@
 import { DateTime, Effect, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { Session } from "../../../core/index.js"
+import {
+  type AppendInput,
+  type AppendOptions,
+  type CompactionEntry,
+  type Entry,
+  type EntryId,
+  type PreparedCheckpoint,
+  type Service,
+  SessionConflict,
+  SessionStoreError,
+  checkpointMatches,
+} from "../../../core/context/session.js"
 import type { ExecutionClaim, SessionReader } from "../../run/store.js"
 import { StaleSessionClaim } from "../errors.js"
 import { requireSessionWriteClaim } from "./claim.js"
 import { type EntryRow, type SessionRow, SessionStorage } from "./storage.js"
-type Entry = Session.Entry
-type EntryId = Session.EntryId
-type AppendInput = Session.AppendInput
-type AppendOptions = Session.AppendOptions
-type CompactionEntry = Session.CompactionEntry
 const { appendMatches, entryPayloadEquivalence, storeError, encodePayload, fromEntry, toEntry, pathFromRows } =
   SessionStorage
 
@@ -17,8 +23,8 @@ const { appendMatches, entryPayloadEquivalence, storeError, encodePayload, fromE
 export const appendInterruptedSessionEntry = (
   input: import("../../execution/agent/event.js").InterruptedSessionEntry,
 ): Effect.Effect<
-  Session.Entry,
-  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  Entry,
+  SessionConflict | SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
@@ -30,7 +36,7 @@ export const appendInterruptedSessionEntry = (
     `
     const session = sessionRows[0]
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
-    const payload: Session.AppendInput = {
+    const payload: AppendInput = {
       _tag: "ModelResponse",
       content: input.content,
       metadata: { interruptionDigest: input.digest },
@@ -43,7 +49,7 @@ export const appendInterruptedSessionEntry = (
     if (existing !== undefined) {
       const entry = toEntry(existing)
       if (existing.parent_id !== input.parentId || !entryPayloadEquivalence(entry, payload)) {
-        return yield* Session.SessionConflict.make({
+        return yield* SessionConflict.make({
           reason: "entry-id-reused",
           message: `Session entry id ${input.entryId} was reused with different interrupted response content`,
         })
@@ -60,7 +66,7 @@ export const appendInterruptedSessionEntry = (
         cursor = byId.get(cursor)?.parent_id ?? null
       }
       if (!active) {
-        return yield* Session.SessionConflict.make({
+        return yield* SessionConflict.make({
           reason: "stale-leaf",
           message: `Session entry id ${input.entryId} is not on the active path`,
         })
@@ -68,7 +74,7 @@ export const appendInterruptedSessionEntry = (
       return entry
     }
     if (session.leaf_id !== input.parentId) {
-      return yield* Session.SessionConflict.make({
+      return yield* SessionConflict.make({
         reason: "stale-leaf",
         message: `Expected Session leaf ${String(input.parentId)} but found ${String(session.leaf_id)}`,
       })
@@ -89,7 +95,7 @@ export const verifyInterruptedSessionEntry = (
   input: import("../../execution/agent/event.js").InterruptedSessionEntry,
 ): Effect.Effect<
   void,
-  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  SessionConflict | SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
@@ -104,7 +110,7 @@ export const verifyInterruptedSessionEntry = (
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
     `
     const existing = existingRows[0]
-    const payload: Session.AppendInput = {
+    const payload: AppendInput = {
       _tag: "ModelResponse",
       content: input.content,
       metadata: { interruptionDigest: input.digest },
@@ -115,7 +121,7 @@ export const verifyInterruptedSessionEntry = (
       existing.parent_id !== input.parentId ||
       !entryPayloadEquivalence(toEntry(existing), payload)
     ) {
-      return yield* Session.SessionConflict.make({
+      return yield* SessionConflict.make({
         reason: "entry-id-reused",
         message: `Session entry id ${input.entryId} does not match the interrupted response`,
       })
@@ -130,7 +136,7 @@ export const verifyInterruptedSessionEntry = (
       if (cursor === input.entryId) return
       cursor = byId.get(cursor)?.parent_id ?? null
     }
-    return yield* Session.SessionConflict.make({
+    return yield* SessionConflict.make({
       reason: "stale-leaf",
       message: `Session entry id ${input.entryId} is not on the active path`,
     })
@@ -149,7 +155,7 @@ export const claimedStore = (options: {
   readonly transaction?: <A, E, R>(
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | import("effect/unstable/sql/SqlError").SqlError, R>
-}): Effect.Effect<Session.Service, never, SqlClient.SqlClient> =>
+}): Effect.Effect<Service, never, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const transaction: NonNullable<typeof options.transaction> = options.transaction ?? sql.withTransaction
@@ -223,24 +229,22 @@ export const claimedStore = (options: {
 
     const asStoreError = <A, E, R>(
       effect: Effect.Effect<A, E, R>,
-    ): Effect.Effect<A, Session.SessionConflict | Session.SessionStoreError, R> =>
+    ): Effect.Effect<A, SessionConflict | SessionStoreError, R> =>
       Effect.mapError(effect, (error) => {
         if (Schema.is(StaleSessionClaim)(error)) return storeError("Session write claim is stale")
-        if (Schema.is(Session.SessionConflict)(error) || Schema.is(Session.SessionStoreError)(error)) return error
+        if (Schema.is(SessionConflict)(error) || Schema.is(SessionStoreError)(error)) return error
         return storeError(String(error))
       })
 
-    const asReserveError = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, Session.SessionStoreError, R> =>
+    const asReserveError = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, SessionStoreError, R> =>
       Effect.mapError(effect, (error) => {
         if (Schema.is(StaleSessionClaim)(error)) return storeError("Session write claim is stale")
-        if (Schema.is(Session.SessionStoreError)(error)) return error
+        if (Schema.is(SessionStoreError)(error)) return error
         return storeError(String(error))
       })
 
-    const asReadError = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, Session.SessionStoreError, R> =>
-      Effect.mapError(effect, (error) =>
-        Schema.is(Session.SessionStoreError)(error) ? error : storeError(String(error)),
-      )
+    const asReadError = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, SessionStoreError, R> =>
+      Effect.mapError(effect, (error) => (Schema.is(SessionStoreError)(error) ? error : storeError(String(error))))
 
     const findExistingAppend = (entry: AppendInput, appendOptions: AppendOptions, session: SessionRow) =>
       Effect.gen(function* () {
@@ -253,14 +257,14 @@ export const claimedStore = (options: {
         if (existing === undefined) return undefined
         const persisted = toEntry(existing)
         if (!appendMatches(persisted, entry, appendOptions.expectedLeafId)) {
-          return yield* Session.SessionConflict.make({
+          return yield* SessionConflict.make({
             reason: "entry-id-reused",
             message: `Session entry id ${appendOptions.id} was reused with different parent or content`,
           })
         }
         const activePath = yield* pathTo(session.leaf_id)
         if (!activePath.some((active) => active.id === persisted.id)) {
-          return yield* Session.SessionConflict.make({
+          return yield* SessionConflict.make({
             reason: "stale-leaf",
             message: `Session entry id ${appendOptions.id} is not on the active path from ${String(session.leaf_id)}`,
           })
@@ -276,7 +280,7 @@ export const claimedStore = (options: {
           const existing = yield* findExistingAppend(entry, appendOptions, session)
           if (existing !== undefined) return existing
           if (appendOptions.expectedLeafId !== undefined && appendOptions.expectedLeafId !== session.leaf_id) {
-            return yield* Session.SessionConflict.make({
+            return yield* SessionConflict.make({
               reason: "stale-leaf",
               message: `Expected Session leaf ${String(appendOptions.expectedLeafId)} but found ${String(session.leaf_id)}`,
             })
@@ -301,7 +305,7 @@ export const claimedStore = (options: {
         }),
       )
 
-    const appendCheckpoint = (prepared: Session.PreparedCheckpoint) =>
+    const appendCheckpoint = (prepared: PreparedCheckpoint) =>
       transaction(
         Effect.gen(function* () {
           yield* requireWriteClaim
@@ -313,8 +317,8 @@ export const claimedStore = (options: {
           const existing = rows[0]
           if (existing !== undefined) {
             const entry = toEntry(existing)
-            if (entry._tag !== "Compaction" || !Session.checkpointMatches(entry, prepared)) {
-              return yield* Session.SessionConflict.make({
+            if (entry._tag !== "Compaction" || !checkpointMatches(entry, prepared)) {
+              return yield* SessionConflict.make({
                 reason: "checkpoint-id-reused",
                 message: `Session checkpoint id ${prepared.id} was reused with different content`,
               })
@@ -326,7 +330,7 @@ export const claimedStore = (options: {
             }
           }
           if (prepared.parentId !== session.leaf_id) {
-            return yield* Session.SessionConflict.make({
+            return yield* SessionConflict.make({
               reason: "stale-leaf",
               message: `Expected Session leaf ${String(prepared.parentId)} but found ${String(session.leaf_id)}`,
             })
@@ -431,11 +435,11 @@ export const reader = (sessionId: string): Effect.Effect<SessionReader, never, S
             `.pipe(
               Effect.flatMap((rows) => {
                 const path = pathFromRows(rows, leaf ?? session.leaf_id)
-                return Schema.is(Session.SessionStoreError)(path) ? path : Effect.succeed(path)
+                return Schema.is(SessionStoreError)(path) ? path : Effect.succeed(path)
               }),
             )
           }),
-          Effect.mapError((error) => (Schema.is(Session.SessionStoreError)(error) ? error : storeError(String(error)))),
+          Effect.mapError((error) => (Schema.is(SessionStoreError)(error) ? error : storeError(String(error)))),
         ),
       leaf: sessionRow.pipe(
         Effect.map((session) => session?.leaf_id ?? null),

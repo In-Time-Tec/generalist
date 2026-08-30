@@ -1,14 +1,8 @@
 import { Effect, Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Address } from "../../address.js"
-import {
-  decodePinned,
-  ExecutableManifest,
-  type ExecutableManifestEncoded,
-  ExecutableRef,
-  PinnedExecutable,
-  type PinnedExecutableEncoded,
-} from "../../executable/manifest.js"
+import { decodePinned } from "../../executable/manifest-internal.js"
+import { ExecutableManifest, ExecutableRef, PinnedExecutable } from "../../executable/manifest.js"
 import { Message, Metadata } from "../../messaging/message.js"
 import { type RunEvent, RunEvent as RunEventSchema } from "../../run/event.js"
 import { RuntimeUnavailable } from "../../errors.js"
@@ -70,7 +64,8 @@ export const decodeJsonEffect: {
 
 export const MessageCodec = Message
 export const ExecutableRefCodec = ExecutableRef
-export const ExecutableManifestCodec: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> = ExecutableManifest
+export const ExecutableManifestCodec: Schema.Codec<ExecutableManifest, typeof ExecutableManifest.Encoded> =
+  ExecutableManifest
 export const MetadataCodec = Metadata
 export const PromptCodec = Prompt.Prompt
 export const StringArray = Schema.Array(Schema.String)
@@ -101,7 +96,7 @@ export const decodePinnedExecutable: {
     }),
 )
 
-export const decodePinnedEffect = (input: PinnedExecutableEncoded) =>
+export const decodePinnedEffect = (input: typeof PinnedExecutable.Encoded) =>
   Effect.try({
     try: () => decodePinned(input),
     catch: (error) => RuntimeUnavailable.make({ message: String(error) }),

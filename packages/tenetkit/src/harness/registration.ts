@@ -1,4 +1,5 @@
-import { Pins, type AgentManifest } from "../core/index.js"
+import type { NamedCapability } from "../core/durable/manifest/agent-manifest.js"
+import { digest as pinDigest, makeCapability } from "../core/durable/pin.js"
 import { Function } from "effect"
 import type { GuidanceSnapshotId } from "./entry.js"
 import type { GuidanceState } from "./state.js"
@@ -7,7 +8,7 @@ import { CODEC, VERSION, encode, snapshot } from "./snapshot.js"
 /** @experimental One named capability and the exact secret-free payload that reconstructs its pinned snapshot. */
 export interface PinnedRegistration {
   readonly id: GuidanceSnapshotId
-  readonly capability: AgentManifest.NamedCapability
+  readonly capability: NamedCapability
   readonly payload: typeof import("./snapshot.js").SnapshotPayload.Encoded
 }
 
@@ -24,8 +25,8 @@ export const registration: {
     id: snapshot(state).id,
     capability: {
       name,
-      pin: Pins.makeCapability({ codec: CODEC, version: VERSION, payload }),
-      content: { codec: CODEC, version: VERSION, digest: Pins.digest(payload) },
+      pin: makeCapability({ codec: CODEC, version: VERSION, payload }),
+      content: { codec: CODEC, version: VERSION, digest: pinDigest(payload) },
     },
     payload,
   }

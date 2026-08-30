@@ -1,4 +1,9 @@
-import { ModelRegistry } from "../../core/model/public/registry.js"
+import {
+  type ModelRegistry,
+  type Registration,
+  layer as modelRegistryLayer,
+  registration as modelRegistration,
+} from "../../core/model/registry.js"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import type { RegistrationOptions } from "../model/registration.js"
@@ -49,9 +54,8 @@ const deterministicRegistrationOptions = (input: Options) => {
 }
 
 /** @experimental */
-export const registration = (input: Options = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
-  ModelRegistry.registration(deterministicRegistrationOptions(input))
+export const registration = (input: Options = {}): Effect.Effect<Registration, never, never> =>
+  modelRegistration(deterministicRegistrationOptions(input))
 
 /** @experimental */
-export const layer = (input: Options = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
-  ModelRegistry.layer([registration(input)])
+export const layer = (input: Options = {}): Layer.Layer<ModelRegistry> => modelRegistryLayer([registration(input)])

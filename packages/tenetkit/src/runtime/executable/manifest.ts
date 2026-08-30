@@ -1,27 +1,34 @@
-import { ExecutableManifest as CoreExecutableManifest } from "../../core/index.js"
+import {
+  ExecutableManifest as CoreExecutableManifest,
+  ExecutableRef as CoreExecutableRef,
+  type PinnedExecutable as CorePinnedExecutable,
+  type ProfileBinding as CoreProfileBinding,
+  decode as decodeCore,
+  encode as encodeCore,
+  make as makeCore,
+  makeTest as makeTestCore,
+} from "../../core/durable/manifest/executable-manifest.js"
 import { Function, Schema } from "effect"
-import type { ExecutionCheckpoint } from "../execution/state.js"
 
 /** @experimental Complete closed executable profile registry and entry closure. */
-export type ExecutableManifest = CoreExecutableManifest.ExecutableManifest
+export type ExecutableManifest = CoreExecutableManifest
 /** @experimental One globally pinned child profile available by selection name. */
-export type ProfileBinding = CoreExecutableManifest.ProfileBinding
+export type ProfileBinding = CoreProfileBinding
 /** @experimental Encoded complete closed executable Agent graph. */
-export type ExecutableManifestEncoded = typeof CoreExecutableManifest.ExecutableManifest.Encoded
+type ExecutableManifestEncoded = typeof CoreExecutableManifest.Encoded
 
 /** @experimental Complete closed executable Agent graph. */
-export const ExecutableManifest: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> =
-  CoreExecutableManifest.ExecutableManifest
+export const ExecutableManifest: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> = CoreExecutableManifest
 
 /** @experimental Durable reference to one exact executable closure and active Agent. */
-export const ExecutableRef: typeof CoreExecutableManifest.ExecutableRef = CoreExecutableManifest.ExecutableRef
+export const ExecutableRef: typeof CoreExecutableRef = CoreExecutableRef
 /** @experimental */
-export type ExecutableRef = CoreExecutableManifest.ExecutableRef
+export type ExecutableRef = CoreExecutableRef
 
 /** @experimental Executable closure paired with its constructor-owned reference. */
-export type PinnedExecutable = CoreExecutableManifest.PinnedExecutable
+export type PinnedExecutable = CorePinnedExecutable
 /** @experimental Encoded executable closure paired with its reference. */
-export interface PinnedExecutableEncoded {
+interface PinnedExecutableEncoded {
   readonly ref: typeof ExecutableRef.Encoded
   readonly manifest: ExecutableManifestEncoded
 }
@@ -33,79 +40,13 @@ export const PinnedExecutable: Schema.Codec<PinnedExecutable, PinnedExecutableEn
 })
 
 /** @experimental Construct, validate, canonicalize, and pin a complete executable closure. */
-export const make: typeof CoreExecutableManifest.make = CoreExecutableManifest.make
+export const make: typeof makeCore = makeCore
 /** @experimental Construct an exact static executable fixture. */
-export const test: {
-  (revision?: string): (name: string) => CoreExecutableManifest.PinnedExecutable
-  (name: string, revision?: string): CoreExecutableManifest.PinnedExecutable
-} = Function.dual(2, (name: string, revision?: string) => CoreExecutableManifest.makeTest(name, revision))
-/** @experimental Verify that a durable reference is exactly owned by a closure. */
-export const validateRef: {
-  (manifest: ExecutableManifest): (ref: ExecutableRef) => void
-  (ref: ExecutableRef, manifest: ExecutableManifest): void
-} = Function.dual(2, (ref: ExecutableRef, manifest: ExecutableManifest): void =>
-  CoreExecutableManifest.validateRef(ref, manifest),
-)
+export const makeTest: {
+  (revision?: string): (name: string) => CorePinnedExecutable
+  (name: string, revision?: string): CorePinnedExecutable
+} = Function.dual(2, (name: string, revision?: string) => makeTestCore(name, revision))
 /** @experimental */
-export const encode: typeof CoreExecutableManifest.encode = CoreExecutableManifest.encode
+export const encode: typeof encodeCore = encodeCore
 /** @experimental */
-export const decode: typeof CoreExecutableManifest.decode = CoreExecutableManifest.decode
-
-/** @experimental Decode and synchronously verify one complete executable authority. */
-export const decodePinned = (input: PinnedExecutable | PinnedExecutableEncoded): PinnedExecutable => {
-  const pinned = Schema.decodeSync(PinnedExecutable, { onExcessProperty: "error" })({
-    ref: input.ref,
-    manifest: input.manifest,
-  })
-  validateRef(pinned.ref, pinned.manifest)
-  return pinned
-}
-
-/** @experimental Compare two verified executable authorities exactly. */
-export const equals: {
-  (right: PinnedExecutable): (left: PinnedExecutable) => boolean
-  (left: PinnedExecutable, right: PinnedExecutable): boolean
-} = Function.dual(2, (left: PinnedExecutable, right: PinnedExecutable): boolean => {
-  const verifiedLeft = decodePinned(left)
-  const verifiedRight = decodePinned(right)
-  return (
-    JSON.stringify(Schema.encodeSync(PinnedExecutable)(verifiedLeft)) ===
-    JSON.stringify(Schema.encodeSync(PinnedExecutable)(verifiedRight))
-  )
-})
-
-/** @experimental Validate a checkpoint pin and derive the Run's active executable reference. */
-export const checkpointRef: {
-  (manifest: ExecutableManifest, checkpoint: ExecutionCheckpoint | undefined): (current: ExecutableRef) => ExecutableRef
-  (current: ExecutableRef, manifest: ExecutableManifest, checkpoint: ExecutionCheckpoint | undefined): ExecutableRef
-} = Function.dual(
-  3,
-  (
-    current: ExecutableRef,
-    manifest: ExecutableManifest,
-    checkpoint: ExecutionCheckpoint | undefined,
-  ): ExecutableRef => {
-    decodePinned({ ref: current, manifest })
-    const next = checkpoint === undefined || !("driverVersion" in checkpoint) ? undefined : checkpoint.executable
-    if (next === undefined) return current
-    if (next.executable !== current.executable) throw new TypeError("Checkpoint executable closure does not match Run")
-    return decodePinned({ ref: { executable: next.executable, active: next.active }, manifest }).ref
-  },
-)
-export const resolveChild: {
-  (manifest: ExecutableManifest, selection: string): (ref: ExecutableRef) => ExecutableRef | undefined
-  (ref: ExecutableRef, manifest: ExecutableManifest, selection: string): ExecutableRef | undefined
-} = Function.dual(
-  3,
-  (ref: ExecutableRef, manifest: ExecutableManifest, selection: string): ExecutableRef | undefined => {
-    const active = manifest.entries.find((entry) => entry.pin === ref.active)
-    let child: string | undefined
-    if (active?._tag === "Agent" && active.manifest.children.some((binding) => binding.selection === selection)) {
-      child = manifest.profiles.find((profile) => profile.selection === selection)?.agent
-    } else if (active?._tag === "Program") {
-      child = active.manifest.capabilities.agents.find((binding) => binding.selection === selection)?.agent
-    }
-    const childEntry = manifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === child)
-    return childEntry === undefined ? undefined : { executable: ref.executable, active: childEntry.pin }
-  },
-)
+export const decode: typeof decodeCore = decodeCore

@@ -1,7 +1,7 @@
 import { Effect, Ref } from "effect"
-import { AgentEvent } from "../../core/index.js"
-import { DurableDriver } from "../../core/durable/public/driver.js"
-import { ModelTelemetry } from "../../core/model/public/telemetry.js"
+import type { Event } from "../../core/agent/event.js"
+import type { DriverCheckpoint } from "../../core/durable/driver.js"
+import type { ModelAttemptFailed } from "../../core/model/telemetry/events.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import type { ExecutionClaim, Service as RunStore } from "../run/store.js"
 
@@ -14,12 +14,12 @@ type EscapedFailure = {
 
 export type Retry = {
   readonly attempt: number
-  readonly checkpoint: DurableDriver.DriverCheckpoint
+  readonly checkpoint: DriverCheckpoint
   readonly continuation?: ExecutionContinuation
   readonly turn: number
 }
 
-const isRecoverable = (event: ModelTelemetry.ModelAttemptFailed): boolean =>
+const isRecoverable = (event: ModelAttemptFailed): boolean =>
   event.classification === "transient" ||
   event.category === "rate-limit" ||
   event.category === "transport" ||
@@ -30,7 +30,7 @@ export const make = (initialAttempt: number) =>
   Effect.gen(function* () {
     const attempt = yield* Ref.make(initialAttempt)
     const escaped = yield* Ref.make<EscapedFailure | undefined>(undefined)
-    const observe = (event: AgentEvent.Event): Effect.Effect<void> => {
+    const observe = (event: Event): Effect.Effect<void> => {
       if (event._tag === "ModelAttemptFailed") {
         return Ref.set(escaped, isRecoverable(event) ? { modelCallId: event.modelCallId, turn: event.turn } : undefined)
       }

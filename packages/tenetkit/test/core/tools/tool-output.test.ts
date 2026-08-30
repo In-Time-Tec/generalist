@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Json } from "../json.js"
 import { Cause, Effect, Option, Schema } from "effect"
-import { ToolOutput, ToolExecutor } from "../../../src/core/index"
+import { ToolOutput, ToolExecutor } from "../../../src/index"
 import { ItLayer } from "../it-layer.js"
 
 const success = (encodedResult: ToolExecutor.Success["result"]): ToolExecutor.Success => ({

@@ -1,6 +1,6 @@
 import { Effect, Function, Layer, Stream } from "effect"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
-import { ModelMiddleware } from "../../core/index.js"
+import { adapt } from "../../core/model/middleware.js"
 
 /** @experimental */
 export type Method = "generateText" | "generateObject" | "streamText"
@@ -38,7 +38,7 @@ const normalizeResponse = <A extends ModelResponse>(
 }
 
 const conformFailureModel = (model: LanguageModel.Service, resolve: Resolver): LanguageModel.Service =>
-  ModelMiddleware.adapt<AiError.AiError, AiError.AiError, AiError.AiError>(model, {
+  adapt<AiError.AiError, AiError.AiError, AiError.AiError>(model, {
     generateText: (_options, invoke) =>
       invoke().pipe(Effect.flatMap((response) => normalizeResponse(response, "generateText", resolve))),
     generateObject: (_options, invoke) =>

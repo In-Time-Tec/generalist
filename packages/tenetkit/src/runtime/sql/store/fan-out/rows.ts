@@ -1,12 +1,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { decodeJson } from "../../codec/codecs.js"
-import {
-  FanOutJoin,
-  FanOutMemberOrigin,
-  type FanOutInspection,
-  type FanOutMemberResult,
-} from "../../../child/fan-out.js"
+import { FanOutJoin, type FanOutInspection, type FanOutMemberResult } from "../../../child/fan-out.js"
+import { FanOutMemberOrigin } from "../../../child/fan-out-internal.js"
 import type { RunEvent } from "../../../run/event.js"
 import { Prompt } from "effect/unstable/ai"
 import { FanOutNotFound } from "../../../errors.js"

@@ -8,7 +8,6 @@ import {
   promoteStreamFailures,
 } from "./response/failure.js"
 import { isTerminationFailure } from "./stream-termination.js"
-import type { ModelFailure } from "./registry.js"
 
 /** @experimental */
 export { defaultResolveFailure }
@@ -21,7 +20,7 @@ export type Classification = "transient" | "terminal"
 
 /** @experimental Retry and correction policy for one logical model call. */
 export interface Service {
-  readonly classify: (error: ModelFailure) => Classification
+  readonly classify: (cause: unknown) => Classification
   readonly resolve: FailureResolver
   readonly retrySchedule: Schedule.Schedule<unknown>
   readonly invalidToolCallCorrectionLimit: number
@@ -55,16 +54,16 @@ export class ModelResilienceMisconfigured extends Schema.TaggedError<ModelResili
  * only while nothing a consumer would replay escaped downstream; retrying after
  * that would duplicate the consumer's transcript.
  */
-export const defaultClassify = (error: ModelFailure): Classification => {
-  if (isTerminationFailure(error)) return error.emitted._tag === "Nothing" ? "transient" : "terminal"
-  return AiError.isAiError(error) && error.isRetryable ? "transient" : "terminal"
+export const defaultClassify = (cause: unknown): Classification => {
+  if (isTerminationFailure(cause)) return cause.emitted._tag === "Nothing" ? "transient" : "terminal"
+  return AiError.isAiError(cause) && cause.isRetryable ? "transient" : "terminal"
 }
 
-const defaultProviderClassify = (error: ModelFailure): Classification =>
-  AiError.isAiError(error) &&
-  (error.reason._tag === "RateLimitError" ||
-    error.reason._tag === "InternalProviderError" ||
-    (error.reason._tag === "NetworkError" && error.reason.reason === "TransportError"))
+const defaultProviderClassify = (cause: unknown): Classification =>
+  AiError.isAiError(cause) &&
+  (cause.reason._tag === "RateLimitError" ||
+    cause.reason._tag === "InternalProviderError" ||
+    (cause.reason._tag === "NetworkError" && cause.reason.reason === "TransportError"))
     ? "transient"
     : "terminal"
 

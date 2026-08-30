@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
-import { NestedOperation } from "../../../../src/core/index.js"
+import { NestedOperation } from "../../../../src/index.js"
 
 /**
  * A projection decorates a nested operation that has already committed. A render the schema refuses

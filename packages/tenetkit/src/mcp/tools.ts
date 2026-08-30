@@ -1,5 +1,5 @@
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
-import { ToolExecutor } from "../core/index.js"
+import { type ToolExecutor, layerToolkit as toolExecutorLayerToolkit } from "../core/tools/tool-executor.js"
 import { type Duration, Effect, Layer, Schema, type Scope } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import {
@@ -22,7 +22,7 @@ export interface Options {
 /** @experimental */
 export interface MCPTools {
   readonly toolkit: Toolkit.Toolkit<Record<string, MCPTool>>
-  readonly executorLayer: Layer.Layer<ToolExecutor.ToolExecutor | Tool.Handler<string>>
+  readonly executorLayer: Layer.Layer<ToolExecutor | Tool.Handler<string>>
 }
 
 /**
@@ -89,6 +89,6 @@ export const connect = (
     const handlers = layerToolkit(client)
     return {
       toolkit: mcpToolkit,
-      executorLayer: ToolExecutor.layerToolkit(mcpToolkit).pipe(Layer.provideMerge(handlers)),
+      executorLayer: toolExecutorLayerToolkit(mcpToolkit).pipe(Layer.provideMerge(handlers)),
     }
   })

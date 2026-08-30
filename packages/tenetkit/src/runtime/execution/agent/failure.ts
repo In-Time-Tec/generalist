@@ -1,6 +1,15 @@
 import { Cause, Schema } from "effect"
-import { AgentEvent } from "../../../core/index.js"
-import { RunBudget } from "../../../core/durable/public/run-budget.js"
+import {
+  DuplicateToolCallId,
+  MiddlewareViolation,
+  ProgressOverflow,
+  ResumeMismatch,
+  RunEndedWithoutOutput,
+  ToolNameCollision,
+  TurnLimitExceeded,
+  TurnPolicyStopped,
+} from "../../../core/agent/event.js"
+import { RunBudgetExhausted } from "../../../core/durable/run-budget.js"
 import { AgentExecutionFailure } from "../../errors.js"
 
 const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; readonly tool_call_id: string }>): string =>
@@ -14,46 +23,46 @@ const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; reado
  * phrase. Every variant is named here so a terminal failure always states what actually happened.
  */
 const SummaryFailure = Schema.Union([
-  RunBudget.RunBudgetExhausted,
-  AgentEvent.ResumeMismatch,
-  AgentEvent.TurnLimitExceeded,
-  AgentEvent.TurnPolicyStopped,
-  AgentEvent.RunEndedWithoutOutput,
-  AgentEvent.MiddlewareViolation,
-  AgentEvent.DuplicateToolCallId,
-  AgentEvent.ProgressOverflow,
-  AgentEvent.ToolNameCollision,
+  RunBudgetExhausted,
+  ResumeMismatch,
+  TurnLimitExceeded,
+  TurnPolicyStopped,
+  RunEndedWithoutOutput,
+  MiddlewareViolation,
+  DuplicateToolCallId,
+  ProgressOverflow,
+  ToolNameCollision,
 ])
 type SummaryFailure = typeof SummaryFailure.Type
 
 const summary = (failure: SummaryFailure): string | undefined => {
-  if (Schema.is(RunBudget.RunBudgetExhausted)(failure)) {
+  if (Schema.is(RunBudgetExhausted)(failure)) {
     const remaining = failure.remaining === undefined ? "unavailable" : failure.remaining
     return `Run budget exhausted for ${failure.dimension}: requested ${failure.requested}, remaining ${remaining}`
   }
-  if (Schema.is(AgentEvent.ResumeMismatch)(failure)) {
+  if (Schema.is(ResumeMismatch)(failure)) {
     return `Agent resume ${failure.reason} for waits ${failure.received.waits.map((wait) => wait.waitId).join(", ")}`
   }
-  if (Schema.is(AgentEvent.TurnLimitExceeded)(failure)) {
+  if (Schema.is(TurnLimitExceeded)(failure)) {
     return `Turn limit of ${failure.limit} reached at turn ${failure.turn} with ${pendingCalls(failure.pending)}`
   }
-  if (Schema.is(AgentEvent.TurnPolicyStopped)(failure)) {
+  if (Schema.is(TurnPolicyStopped)(failure)) {
     return `Turn policy stopped the run at turn ${failure.turn} (${failure.reason._tag}) with ${pendingCalls(failure.pending)}`
   }
-  if (Schema.is(AgentEvent.RunEndedWithoutOutput)(failure)) {
+  if (Schema.is(RunEndedWithoutOutput)(failure)) {
     const reason = failure.finishReason ?? "no terminal event"
     return `Turn ${failure.turn} ended with no assistant text (finish reason ${reason}, ${failure.providerTextCharacters} text and ${failure.reasoningCharacters} reasoning characters streamed)`
   }
-  if (Schema.is(AgentEvent.MiddlewareViolation)(failure)) {
+  if (Schema.is(MiddlewareViolation)(failure)) {
     return `Model middleware violated the loop contract at turn ${failure.turn}: ${failure.detail}`
   }
-  if (Schema.is(AgentEvent.DuplicateToolCallId)(failure)) {
+  if (Schema.is(DuplicateToolCallId)(failure)) {
     return `Model reused tool call id ${failure.id} at index ${failure.duplicateIndex} after index ${failure.firstIndex}`
   }
-  if (Schema.is(AgentEvent.ProgressOverflow)(failure)) {
+  if (Schema.is(ProgressOverflow)(failure)) {
     return `Tool progress queue for call ${failure.toolCallId} overflowed its capacity of ${failure.capacity} at turn ${failure.turn}`
   }
-  if (Schema.is(AgentEvent.ToolNameCollision)(failure)) {
+  if (Schema.is(ToolNameCollision)(failure)) {
     return `Tool name ${failure.name} is declared by ${failure.origins.map((origin) => origin._tag).join(", ")}`
   }
   return undefined
@@ -62,9 +71,9 @@ const summary = (failure: SummaryFailure): string | undefined => {
 const typedFailure = (cause: Cause.Cause<unknown>) => {
   const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
-  return Schema.decodeUnknownOption(Schema.Union([RunBudget.RunBudgetExhausted, AgentEvent.ResumeMismatch]))(
-    reason.error,
-  ).pipe((decoded) => (decoded._tag === "Some" ? decoded.value : undefined))
+  return Schema.decodeUnknownOption(Schema.Union([RunBudgetExhausted, ResumeMismatch]))(reason.error).pipe((decoded) =>
+    decoded._tag === "Some" ? decoded.value : undefined,
+  )
 }
 
 /**

@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, Session, ToolExecutor } from "../../../src/core/index"
+import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, Session, ToolExecutor } from "../../../src/index"
 import { ItLayer } from "../it-layer"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"

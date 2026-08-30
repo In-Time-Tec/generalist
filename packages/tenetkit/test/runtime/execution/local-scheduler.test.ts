@@ -18,7 +18,7 @@ import { Agent } from "../../../src/index.js"
 import { closedTestAgent } from "../run/identity.js"
 import { makeStatic } from "../../../src/runtime/executable/resolver.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
-import { make as makeLocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
+import { make as makeLocalScheduler } from "../../../src/runtime/execution/local-scheduler-internal.js"
 import { tempDbPath } from "../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"

@@ -45,10 +45,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./core": {
-      "types": "./dist/core/index.d.ts",
-      "import": "./dist/core/index.js"
-    },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
@@ -60,10 +56,6 @@
     "./runtime/sql-driver": {
       "types": "./dist/runtime/sql-driver.d.ts",
       "import": "./dist/runtime/sql-driver.js"
-    },
-    "./ai": {
-      "types": "./dist/ai/index.d.ts",
-      "import": "./dist/ai/index.js"
     },
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",

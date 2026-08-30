@@ -1,5 +1,11 @@
-import { ContextOverflow } from "../../../core/index.js"
-import { ModelRegistry } from "../../../core/model/public/registry.js"
+import { classify } from "../../../core/model/result/context-overflow.js"
+import {
+  type FailureClassifier,
+  type ModelRegistry,
+  type ToolJsonSchemaCompiler,
+  layer as modelRegistryLayer,
+  registration,
+} from "../../../core/model/registry.js"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Tool } from "effect/unstable/ai"
 import type { RegistrationOptions } from "../../model/registration.js"
@@ -194,9 +200,9 @@ export const make = Effect.fnUntraced(function* (input: Options) {
 /** @experimental */
 export const layerLanguageModel = (input: Options) => Layer.effect(LanguageModel.LanguageModel, make(input))
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
+export const classifyFailure: FailureClassifier = classify
 /** @experimental */
-export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool),
     catch: (error) =>
@@ -209,9 +215,5 @@ export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (too
       }),
   })
 /** @experimental */
-export const layer = (
-  input: Options & { readonly client?: ClientOptions },
-): Layer.Layer<ModelRegistry.ModelRegistry, never, never> =>
-  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
-    Layer.provide(layerClient(input.client)),
-  )
+export const layer = (input: Options & { readonly client?: ClientOptions }): Layer.Layer<ModelRegistry, never, never> =>
+  modelRegistryLayer([registration(registrationOptions(input))]).pipe(Layer.provide(layerClient(input.client)))

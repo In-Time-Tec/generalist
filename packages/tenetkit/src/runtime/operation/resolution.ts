@@ -1,4 +1,4 @@
-import { Pins } from "../../core/index.js"
+import { digest as pinDigest } from "../../core/durable/pin.js"
 import { Schema } from "effect"
 
 export const OperationResolution = Schema.Union([
@@ -9,7 +9,7 @@ export const OperationResolution = Schema.Union([
 export type OperationResolution = typeof OperationResolution.Type
 
 /** @experimental Stable digest used for operation-resolution idempotency. */
-export const digest = (resolution: OperationResolution): string => Pins.digest(resolution)
+export const digest = (resolution: OperationResolution): string => pinDigest(resolution)
 
 export const ResolveOperationInput = Schema.Struct({
   runId: Schema.String,

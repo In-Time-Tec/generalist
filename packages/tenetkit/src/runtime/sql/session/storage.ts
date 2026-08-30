@@ -1,10 +1,13 @@
 import { Predicate, Schema } from "effect"
-import { Session } from "../../../core/index.js"
+import {
+  type AppendInput,
+  type Entry,
+  type EntryId,
+  EntryPayload,
+  SessionConflict,
+  SessionStoreError,
+} from "../../../core/context/session.js"
 import { decodeSessionPayload, encodeSessionPayload, sessionPayloadEquivalence } from "./payload-codec.js"
-
-type Entry = Session.Entry
-type EntryId = Session.EntryId
-type AppendInput = Session.AppendInput
 
 export interface EntryRow {
   readonly entry_id: string
@@ -23,7 +26,7 @@ export interface SessionRow {
   readonly writer_attempt_fence: number | null
 }
 
-const storeError = (message: string) => Session.SessionStoreError.make({ message })
+const storeError = (message: string) => SessionStoreError.make({ message })
 const encodePayload = encodeSessionPayload
 const parseEntry = Schema.decodeUnknownSync(
   Schema.declare<Entry>(
@@ -31,7 +34,7 @@ const parseEntry = Schema.decodeUnknownSync(
       Predicate.isObject(input) &&
       Predicate.isString(input.id) &&
       (Predicate.isString(input.parentId) || input.parentId === null) &&
-      Schema.is(Session.EntryPayload)(input),
+      Schema.is(EntryPayload)(input),
   ),
 )
 
@@ -41,13 +44,10 @@ const toEntry = (row: EntryRow): Entry => {
   return parseEntry({ ...payload, id: row.entry_id, parentId: row.parent_id })
 }
 
-const pathFromRows = (
-  rows: ReadonlyArray<EntryRow>,
-  leaf: string | null,
-): ReadonlyArray<Session.Entry> | Session.SessionStoreError => {
+const pathFromRows = (rows: ReadonlyArray<EntryRow>, leaf: string | null): ReadonlyArray<Entry> | SessionStoreError => {
   if (leaf === null) return []
   const byId = new Map(rows.map((row) => [row.entry_id, row] as const))
-  const walked: Array<Session.Entry> = []
+  const walked: Array<Entry> = []
   let cursor: string | null = leaf
   while (cursor !== null) {
     if (walked.length > rows.length) return storeError(`Session path for leaf ${leaf} contains a cycle`)
@@ -64,14 +64,14 @@ const requireActive = (
   leaf: string | null,
   entryId: string,
   reason: "stale-leaf" | "checkpoint-not-on-active-path" = "stale-leaf",
-): Session.SessionConflict | undefined => {
+): SessionConflict | undefined => {
   const path = pathFromRows(rows, leaf)
-  if (Schema.is(Session.SessionStoreError)(path)) {
-    return Session.SessionConflict.make({ reason, message: path.message })
+  if (Schema.is(SessionStoreError)(path)) {
+    return SessionConflict.make({ reason, message: path.message })
   }
   return path.some((entry) => entry.id === entryId)
     ? undefined
-    : Session.SessionConflict.make({
+    : SessionConflict.make({
         reason,
         message: `Session entry id ${entryId} is not on the active path from ${String(leaf)}`,
       })

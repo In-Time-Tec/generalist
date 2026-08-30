@@ -10,4 +10,4 @@ The command emits four versioned tarballs, `release-evidence.json`, and `SHA256S
 
 Effect is one exact peer across TenetKit packages. Consumer verification proves one physical Effect installation for the workspace-pinned release candidate.
 
-Every public AI specifier has an exact dependency closure. The neutral `tenetkit/ai`, catalog, deterministic, and model-route entries install and typecheck with zero provider peers; each provider or embedding entry requires only its named optional peer. Packed smoke verifies full declarations for the zero-provider neutral entry and verifies runtime plus consumer types for an OpenRouter-only install.
+Every public AI leaf has an exact dependency closure. The catalog, deterministic, and model-route leaves install and typecheck with zero provider peers; each provider or embedding leaf requires only its named optional peer. Packed smoke verifies full declarations for the zero-provider leaves and runs an OpenRouter-only packed install under fresh Bun and npm/Node consumers while rejecting unrelated provider SDKs.

@@ -49,8 +49,8 @@ import {
 } from "./capabilities.js"
 import {
   ExecutionFailure as SandboxFailure,
+  makeRequest as makeSandboxRequest,
   type Service as CodeExecutor,
-  request as makeSandboxRequest,
 } from "./code-executor.js"
 
 const ToolCall = Schema.Struct({ operation: ProgramOperationName, tool: Schema.String, input: Schema.Unknown })

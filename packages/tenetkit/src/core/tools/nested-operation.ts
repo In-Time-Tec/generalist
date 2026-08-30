@@ -85,7 +85,7 @@ export const Progress = Schema.Struct({
 export type Progress = typeof Progress.Type
 type ProgressEncoded = typeof Progress.Encoded
 
-export interface ProgressData {
+interface ProgressData {
   readonly [progressKey]: ProgressEncoded
   readonly [key: string]: ProgressEncoded
 }

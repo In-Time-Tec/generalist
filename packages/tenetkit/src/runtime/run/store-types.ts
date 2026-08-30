@@ -11,7 +11,8 @@ import type {
 import type { Message, Metadata } from "../messaging/message.js"
 import type { AddressInvalid } from "../execution/agent/directory.js"
 import type { MailboxBounds } from "../messaging/mailbox.js"
-import type { RunWait, WaitResponse } from "./wait.js"
+import type { RunWait } from "./wait.js"
+import type { WaitResponse } from "./wait-internal.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/state.js"
 import type { ExecutableManifest, ExecutableRef } from "../executable/manifest.js"
@@ -20,8 +21,8 @@ import type { OperationKind, ReplayPolicy } from "../sql/operations.js"
 import type { ExecutionContinuation } from "./steering.js"
 import type { ExecutableRegistration } from "../executable/registration.js"
 import type { Prompt } from "effect/unstable/ai"
-import type { InitialFanOutInput } from "../child/fan-out.js"
-import type { Session } from "../../core/index.js"
+import type { InitialFanOutInput } from "../child/fan-out-internal.js"
+import type { Service as SessionService } from "../../core/context/session.js"
 
 export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
@@ -164,7 +165,7 @@ export interface SessionWriteClaim {
 }
 
 /** @experimental Read-only Session history capability. */
-export type SessionReader = Pick<Session.Service, "path" | "leaf">
+export type SessionReader = Pick<SessionService, "path" | "leaf">
 
 export interface ExecutionClaim {
   readonly runId: string

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, Session, ToolContext } from "../../../src/core/index.js"
+import { Agent, Session, ToolContext } from "../../../src/index.js"
 import { Json } from "../json.js"
 import { withProviderFinish } from "../provider-finish.js"
 

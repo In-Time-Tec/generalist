@@ -4,7 +4,7 @@ import { AckBeyondCommitted, AckInvalid, RunNotFound } from "../../runtime/error
 import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
 import { RunClaims } from "../../runtime/sql/run/claims.js"
-import type { Options, RuntimeCapability, Services } from "./index.js"
+import type { Options, RuntimeCapability, Services } from "./contract.js"
 
 const servicesFrom = (context: Context.Context<Runtime | RunStore>): Services => {
   const claims = Context.getOption(context, RunClaims)

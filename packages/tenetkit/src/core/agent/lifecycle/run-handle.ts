@@ -3,14 +3,8 @@ import { dual } from "effect/Function"
 import type { Tool } from "effect/unstable/ai"
 import { generateId } from "../../model/telemetry/events.js"
 import type { RunId } from "../../durable/run-id.js"
-import {
-  allocateRunInbox,
-  type InboxFull,
-  type Input as SteeringInput,
-  type PolicyInvalid,
-  type RunInbox,
-  type RunClosed,
-} from "../../turn/steering.js"
+import { allocateRunInbox, type RunInbox } from "../../turn/steering-inbox.js"
+import type { InboxFull, Input as SteeringInput, PolicyInvalid, RunClosed } from "../../turn/steering.js"
 import { streamInternal } from "../run.js"
 import type { Agent, RunError, RunOptions, RunRequirements } from "../service.js"
 import { AgentError, type Event } from "../event.js"

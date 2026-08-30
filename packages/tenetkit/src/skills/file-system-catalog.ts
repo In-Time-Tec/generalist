@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Layer, Path, PlatformError, Stream } from "effect"
-import { SkillCatalog } from "../core/index.js"
+import { type Skill, SkillCatalog, SkillCatalogError } from "../core/context/skill-catalog.js"
 import { parseDocument, parseFrontmatter, splitDocument } from "./document.js"
 
 /** @experimental Filesystem skill catalog options. */
@@ -19,20 +19,20 @@ interface SkillCatalogErrorInput {
   cause?: unknown
 }
 
-const sourceError = (source: string, message: string, cause?: unknown): SkillCatalog.SkillCatalogError => {
+const sourceError = (source: string, message: string, cause?: unknown): SkillCatalogError => {
   const input: SkillCatalogErrorInput = { source, message }
   if (cause !== undefined) input.cause = cause
-  return SkillCatalog.SkillCatalogError.make(input)
+  return SkillCatalogError.make(input)
 }
 
-const mapPlatformError = (source: string, error: PlatformError.PlatformError): SkillCatalog.SkillCatalogError =>
+const mapPlatformError = (source: string, error: PlatformError.PlatformError): SkillCatalogError =>
   sourceError(source, error.message, error)
 
 const readHeader = (
   fs: FileSystem.FileSystem,
   source: string,
   bytes: number,
-): Effect.Effect<string, SkillCatalog.SkillCatalogError> =>
+): Effect.Effect<string, SkillCatalogError> =>
   fs.stream(source, { bytesToRead: bytes, chunkSize: bytes }).pipe(
     Stream.runFold(
       () => "",
@@ -47,7 +47,7 @@ const loadSkill = (
   file: string,
   relativeFile: string,
   frontmatterMaxBytes: number,
-): Effect.Effect<SkillCatalog.Skill, SkillCatalog.SkillCatalogError> =>
+): Effect.Effect<Skill, SkillCatalogError> =>
   Effect.gen(function* () {
     const header = yield* readHeader(fs, file, frontmatterMaxBytes)
     const [headerBlock] = yield* splitDocument(file, header)
@@ -72,7 +72,7 @@ const discoverRoot = (
   cwd: string,
   root: string,
   frontmatterMaxBytes: number,
-): Effect.Effect<ReadonlyArray<SkillCatalog.Skill>, SkillCatalog.SkillCatalogError> =>
+): Effect.Effect<ReadonlyArray<Skill>, SkillCatalogError> =>
   Effect.gen(function* () {
     const rootPath = path.isAbsolute(root) ? path.normalize(root) : path.join(cwd, root)
     const exists = yield* fs.exists(rootPath).pipe(Effect.mapError((error) => mapPlatformError(rootPath, error)))
@@ -80,7 +80,7 @@ const discoverRoot = (
     const entries = yield* fs
       .readDirectory(rootPath, { recursive: true })
       .pipe(Effect.mapError((error) => mapPlatformError(rootPath, error)))
-    const skills: Array<SkillCatalog.Skill> = []
+    const skills: Array<Skill> = []
     for (const skillFile of entries.filter((entry) => path.basename(entry) === "SKILL.md").toSorted()) {
       skills.push(yield* loadSkill(fs, path, path.join(rootPath, skillFile), skillFile, frontmatterMaxBytes))
     }
@@ -95,7 +95,7 @@ export const make = (options: Options) =>
     const cwd = path.resolve(options.cwd)
     const roots = options.roots ?? DEFAULT_ROOTS
     const frontmatterMaxBytes = options.frontmatterMaxBytes ?? 64 * 1024
-    const byName = new Map<string, SkillCatalog.Skill>()
+    const byName = new Map<string, Skill>()
     for (const root of roots) {
       for (const skill of yield* discoverRoot(fs, path, cwd, root, frontmatterMaxBytes)) {
         byName.set(skill.name, skill)
@@ -111,5 +111,5 @@ export const make = (options: Options) =>
 /** @experimental Build a SkillCatalog layer from filesystem roots. */
 export const layer = (
   options: Options,
-): Layer.Layer<SkillCatalog.SkillCatalog, SkillCatalog.SkillCatalogError, FileSystem.FileSystem | Path.Path> =>
-  Layer.effect(SkillCatalog.SkillCatalog, make(options).pipe(Effect.map(SkillCatalog.SkillCatalog.of)))
+): Layer.Layer<SkillCatalog, SkillCatalogError, FileSystem.FileSystem | Path.Path> =>
+  Layer.effect(SkillCatalog, make(options).pipe(Effect.map(SkillCatalog.of)))

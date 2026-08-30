@@ -1,14 +1,30 @@
 import { Clock, DateTime, Effect, Schema, SchemaRepresentation } from "effect"
+import { type Service as CodeExecutorService, makeRequest } from "../../core/program/code-executor.js"
 import {
+  type CapabilityFailure,
+  ProgramAgentFailure,
+  ProgramBudgetExhausted,
+  ProgramCancelled,
   ProgramCapabilities,
+  ProgramCapabilityMissing,
+  ProgramInvocationFailure,
+  ProgramOperationUnknown,
+  type ProgramSchemaFailure,
+  ProgramStepFailure,
+  ProgramSuspended,
+  ProgramToolFailure,
+} from "../../core/program/capabilities.js"
+import type { Handlers, ProgramReplayPolicy } from "../../core/program/handlers.js"
+import { type PinnedProgram, make as makeProgramManifest } from "../../core/durable/manifest/program-manifest.js"
+import {
+  ProgramIdentityMismatch,
   ProgramRunner,
-  ProgramManifest,
-  CodeExecutor,
-  type ProgramHandlers,
-} from "../../core/index.js"
+  type Service as ProgramRunnerService,
+  validateHandlers,
+} from "../../core/program/runner.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 import type { CommitProgramLogInput, ProgramOperationKind, ProgramReservation } from "./store.js"
-import { childRunIdFor, fanOutIdFor } from "../child/fan-out.js"
+import { childRunIdFor, fanOutIdFor } from "../child/fan-out-internal.js"
 import { fanOutMemberSessionId } from "../child/session.js"
 import {
   AgentFanOut,
@@ -35,9 +51,9 @@ export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
   readonly store: RunStore
-  readonly executor: CodeExecutor.Service
-  readonly handlers: ProgramHandlers.Handlers
-}): ProgramRunner.Service => {
+  readonly executor: CodeExecutorService
+  readonly handlers: Handlers
+}): ProgramRunnerService => {
   const tools = new Map(input.handlers.tools.map((handler) => [handler.name, handler] as const))
   const steps = new Map(input.handlers.steps.map((handler) => [handler.name, handler] as const))
   const agents = new Map(input.handlers.agents.map((handler) => [handler.selection, handler] as const))
@@ -50,22 +66,20 @@ export const make = (input: {
       .settleProgramOperation({ ...input.claim, operation, outcome, releaseSlots })
       .pipe(Effect.mapError(storeFailure))
   const executeOperation = <A>(
-    program: ProgramManifest.PinnedProgram,
+    program: PinnedProgram,
     options: {
       readonly operation: string
       readonly kind: Exclude<ProgramOperationKind, "log">
       readonly capability: string
       readonly request: unknown
-      readonly replay: ProgramHandlers.ProgramReplayPolicy
+      readonly replay: ProgramReplayPolicy
       readonly reservation?: ProgramReservation
-      readonly prepare: Effect.Effect<void, ProgramCapabilities.CapabilityFailure>
-      readonly dispatch: Effect.Effect<A, ProgramCapabilities.CapabilityFailure>
-      readonly validateResult: (
-        value: SerializedValue,
-      ) => Effect.Effect<A, InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>>
+      readonly prepare: Effect.Effect<void, CapabilityFailure>
+      readonly dispatch: Effect.Effect<A, CapabilityFailure>
+      readonly validateResult: (value: SerializedValue) => Effect.Effect<A, InstanceType<typeof ProgramSchemaFailure>>
       readonly tokens?: (value: A) => number
     },
-  ): Effect.Effect<A, ProgramCapabilities.CapabilityFailure> =>
+  ): Effect.Effect<A, CapabilityFailure> =>
     Effect.gen(function* () {
       const nowMillis = yield* Clock.currentTimeMillis
       const inputDigest = yield* digest(
@@ -89,14 +103,13 @@ export const make = (input: {
       const record = yield* input.store.reserveProgramOperation(reservation).pipe(Effect.mapError(storeFailure))
       if (record.status === "succeeded") return yield* options.validateResult(record.result)
       if (record.status === "failed") return yield* storeFailure(record.error)
-      if (record.status === "unknown")
-        return yield* ProgramCapabilities.ProgramOperationUnknown.make({ operation: options.operation })
+      if (record.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: options.operation })
       if (record.status === "waiting") return yield* storeFailure(input.claimed.suspension)
       const prepareReserved = Effect.gen(function* () {
         const prepared = yield* Effect.exit(options.prepare)
         if (prepared._tag === "Failure") {
           const failure = failureFromExit(prepared.cause)
-          if (Schema.is(ProgramCapabilities.ProgramSuspended)(failure)) {
+          if (Schema.is(ProgramSuspended)(failure)) {
             const openedAt = DateTime.formatIso(DateTime.makeUnsafe(nowMillis))
             const waitInput = {
               runId: input.claim.runId,
@@ -132,7 +145,7 @@ export const make = (input: {
       }
       if (record.status === "running" && options.replay !== "idempotent") {
         yield* settleOperation(options.operation, { _tag: "Unknown" }, options.reservation?.activeSlots ?? 0)
-        return yield* ProgramCapabilities.ProgramOperationUnknown.make({ operation: options.operation })
+        return yield* ProgramOperationUnknown.make({ operation: options.operation })
       }
       const dispatch = Effect.gen(function* () {
         const exit = yield* Effect.exit(options.dispatch)
@@ -144,8 +157,8 @@ export const make = (input: {
           return value
         }
         const failure = failureFromExit(exit.cause)
-        if (Schema.is(ProgramCapabilities.ProgramSuspended)(failure)) return yield* failure
-        if (Schema.is(ProgramCapabilities.ProgramCancelled)(failure)) return yield* failure
+        if (Schema.is(ProgramSuspended)(failure)) return yield* failure
+        if (Schema.is(ProgramCancelled)(failure)) return yield* failure
         yield* settleOperation(
           options.operation,
           { _tag: "Failed", error: failure },
@@ -161,7 +174,7 @@ export const make = (input: {
         const outcome = snapshot.outcome
         if (outcome?._tag !== "Succeeded" || "_tag" in outcome.result) {
           return Effect.fail(
-            ProgramCapabilities.ProgramAgentFailure.make({
+            ProgramAgentFailure.make({
               selection,
               operation,
               cause: outcome ?? `child Run ${runId} is not terminal`,
@@ -182,13 +195,11 @@ export const make = (input: {
         })
       }),
       Effect.mapError((cause) =>
-        Schema.is(ProgramCapabilities.ProgramAgentFailure)(cause)
-          ? cause
-          : ProgramCapabilities.ProgramAgentFailure.make({ selection, operation, cause }),
+        Schema.is(ProgramAgentFailure)(cause) ? cause : ProgramAgentFailure.make({ selection, operation, cause }),
       ),
     )
   const runAgentMembers = (
-    program: ProgramManifest.PinnedProgram,
+    program: PinnedProgram,
     request: {
       readonly operation: string
       readonly kind: "agent" | "agent-map" | "agent-fan-out"
@@ -198,7 +209,7 @@ export const make = (input: {
     Effect.gen(function* () {
       if (request.members.length === 0) return []
       if (new Set(request.members.map((member) => member.member)).size !== request.members.length) {
-        return yield* ProgramCapabilities.ProgramAgentFailure.make({
+        return yield* ProgramAgentFailure.make({
           selection: request.kind,
           operation: request.operation,
           cause: "Agent member keys must be unique",
@@ -212,7 +223,7 @@ export const make = (input: {
       for (const member of request.members) {
         const binding = agents.get(member.selection)
         if (binding === undefined) {
-          return yield* ProgramCapabilities.ProgramCapabilityMissing.make({ capability: member.selection })
+          return yield* ProgramCapabilityMissing.make({ capability: member.selection })
         }
         const invocation = yield* binding
           .decode(member.input)
@@ -227,7 +238,7 @@ export const make = (input: {
       const fanOutId = fanOutIdFor(input.claim.runId, `program:${request.operation}`)
       const concurrency = Math.min(program.manifest.budget.concurrency, decoded.length)
       const nowMillis = yield* Clock.currentTimeMillis
-      const suspension = ProgramCapabilities.ProgramSuspended.make({
+      const suspension = ProgramSuspended.make({
         operation: request.operation,
         reason: "agent",
         token: `program-children:${request.operation}`,
@@ -304,13 +315,13 @@ export const make = (input: {
       return results
     })
 
-  const callBinding = (program: ProgramManifest.PinnedProgram, raw: SerializedValue, kind: "tool" | "step") =>
+  const callBinding = (program: PinnedProgram, raw: SerializedValue, kind: "tool" | "step") =>
     Effect.gen(function* () {
       const boundary = kind === "tool" ? "tool-input" : "step-input"
       const request = yield* strictDecode(kind === "tool" ? ToolCall : StepCall, boundary)(raw)
       const capability = "tool" in request ? request.tool : request.step
       const binding = (kind === "tool" ? tools : steps).get(capability)
-      if (binding === undefined) return yield* ProgramCapabilities.ProgramCapabilityMissing.make({ capability })
+      if (binding === undefined) return yield* ProgramCapabilityMissing.make({ capability })
       const invocation = yield* binding.decode(request.input).pipe(Effect.mapError(schemaFailure(boundary, capability)))
       const outputBoundary = kind === "tool" ? "tool-output" : "step-output"
       const validateResult = (result: SerializedValue) =>
@@ -332,15 +343,15 @@ export const make = (input: {
         dispatch: invocation.execute.pipe(
           Effect.mapError((cause) =>
             kind === "tool"
-              ? ProgramCapabilities.ProgramToolFailure.make({
+              ? ProgramToolFailure.make({
                   tool: capability,
                   operation,
-                  cause: Schema.is(ProgramCapabilities.ProgramInvocationFailure)(cause) ? cause.cause : cause,
+                  cause: Schema.is(ProgramInvocationFailure)(cause) ? cause.cause : cause,
                 })
-              : ProgramCapabilities.ProgramStepFailure.make({
+              : ProgramStepFailure.make({
                   step: capability,
                   operation,
-                  cause: Schema.is(ProgramCapabilities.ProgramInvocationFailure)(cause) ? cause.cause : cause,
+                  cause: Schema.is(ProgramInvocationFailure)(cause) ? cause.cause : cause,
                 }),
           ),
           Effect.flatMap((output) =>
@@ -352,13 +363,12 @@ export const make = (input: {
       })
     })
 
-  const makeCapabilities = (program: ProgramManifest.PinnedProgram) =>
-    ProgramCapabilities.ProgramCapabilities.of({
+  const makeCapabilities = (program: PinnedProgram) =>
+    ProgramCapabilities.of({
       discoverTools: Effect.succeed(input.handlers.tools.map(({ name }) => ({ name }))),
       describeTool: (name) => {
         const binding = tools.get(name)
-        if (binding === undefined)
-          return Effect.fail(ProgramCapabilities.ProgramCapabilityMissing.make({ capability: name }))
+        if (binding === undefined) return Effect.fail(ProgramCapabilityMissing.make({ capability: name }))
         const describe = (schema: Schema.Top) =>
           SchemaRepresentation.toJson(SchemaRepresentation.toRepresentation(schema.ast))
         return Effect.succeed({ name, inputSchema: describe(binding.input), outputSchema: describe(binding.output) })
@@ -435,23 +445,23 @@ export const make = (input: {
         }),
     })
 
-  return ProgramRunner.ProgramRunner.of({
+  return ProgramRunner.of({
     execute: (request) =>
       Effect.gen(function* () {
-        const actual = ProgramManifest.make(request.program.manifest)
+        const actual = makeProgramManifest(request.program.manifest)
         if (actual.pin !== request.program.pin)
-          return yield* ProgramRunner.ProgramIdentityMismatch.make({
+          return yield* ProgramIdentityMismatch.make({
             expected: request.program.pin,
             actual: actual.pin,
           })
-        yield* ProgramRunner.validateHandlers(request.program, input.handlers)
+        yield* validateHandlers(request.program, input.handlers)
         const capabilities = makeCapabilities(request.program)
         const signal = yield* Effect.abortSignal
         const now = yield* Clock.currentTimeMillis
         const budget = request.program.manifest.budget
         const execution = input.executor
           .execute(
-            CodeExecutor.makeRequest({
+            makeRequest({
               requestId: `${input.claim.runId}:${input.claim.attemptFence}`,
               source: request.program.manifest.source.text,
               inputCodec: request.program.manifest.input,
@@ -468,27 +478,23 @@ export const make = (input: {
               agents: request.program.manifest.capabilities.agents.map((entry) => entry.selection),
             }),
           )
-          .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities))
+          .pipe(Effect.provideService(ProgramCapabilities, capabilities))
         const output = yield* execution.pipe(
           Effect.timeoutOrElse({
             duration: request.program.manifest.budget.wallClockMillis,
             orElse: () =>
               Effect.fail(
-                ProgramCapabilities.ProgramBudgetExhausted.make({
+                ProgramBudgetExhausted.make({
                   dimension: "wallClockMillis",
                   limit: request.program.manifest.budget.wallClockMillis,
                 }),
               ),
           }),
         )
-        const value = output.output
-        const outputBytes = yield* encodedBytes(value)
+        const outputBytes = yield* encodedBytes(output.output)
         if (outputBytes > request.program.manifest.budget.outputBytes)
-          return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
-            dimension: "outputBytes",
-            limit: request.program.manifest.budget.outputBytes,
-          })
-        return value
+          return yield* ProgramBudgetExhausted.make({ dimension: "outputBytes", limit: budget.outputBytes })
+        return output.output
       }),
   })
 }

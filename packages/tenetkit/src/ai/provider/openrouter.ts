@@ -1,6 +1,12 @@
 import { Generated, OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
-import { ContextOverflow } from "../../core/index.js"
-import { ModelRegistry } from "../../core/model/public/registry.js"
+import { classify } from "../../core/model/result/context-overflow.js"
+import {
+  type FailureClassifier,
+  type ModelRegistry,
+  type ToolJsonSchemaCompiler,
+  layer as modelRegistryLayer,
+  registration,
+} from "../../core/model/registry.js"
 import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError, AnthropicStructuredOutput, LanguageModel, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import { Sse } from "effect/unstable/encoding"
@@ -190,7 +196,7 @@ const openRouterLanguageModelLayer = (input: Options) =>
   )
 
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
+export const classifyFailure: FailureClassifier = classify
 
 const codecTransformer = (model: string): LanguageModel.CodecTransformer => {
   if (model.startsWith("anthropic/") || model.startsWith("claude-")) {
@@ -210,7 +216,7 @@ const codecTransformer = (model: string): LanguageModel.CodecTransformer => {
 
 /** @experimental */
 export const toolJsonSchemaCompiler =
-  (model: string): ModelRegistry.ToolJsonSchemaCompiler =>
+  (model: string): ToolJsonSchemaCompiler =>
   (tool) =>
     Effect.try({
       try: () => Tool.getJsonSchema(tool, { transformer: codecTransformer(model) }),
@@ -238,10 +244,8 @@ export interface ClientOptions extends Options {
 }
 
 /** @experimental */
-export const layer = (
-  input: ClientOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([ModelRegistry.registration(registrationOptions(input))]).pipe(
+export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
+  modelRegistryLayer([registration(registrationOptions(input))]).pipe(
     Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 

@@ -10,7 +10,7 @@ import type { OperationRow } from "../../codec/rows.js"
 import { appendEvent, loadEventsAfter, loadRun, nowIso, toOperationRecord } from "../statements.js"
 import type { EventHub } from "../../subscribers.js"
 import { encodeContinuation } from "../../../run/steering.js"
-import { checkpointRef } from "../../../executable/manifest.js"
+import { checkpointRef } from "../../../executable/manifest-internal.js"
 
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import {
@@ -30,7 +30,7 @@ import {
   sameHandoffCheckpoint,
   sameHandoffCommit,
 } from "../../../session/handoff.js"
-import type { ToolExecutor } from "../../../../core/index.js"
+import type { CancellationOutcome } from "../../../../core/tools/tool-executor.js"
 import { decodeCancellableOperation } from "../../../../core/tools/tool-executor-cancellation.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
@@ -455,7 +455,7 @@ export const markOperationCancellations = (runId: string) =>
 export const acknowledgeOperationCancellation = (input: {
   readonly runId: string
   readonly operationId: string
-  readonly outcome: ToolExecutor.CancellationOutcome
+  readonly outcome: CancellationOutcome
 }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient

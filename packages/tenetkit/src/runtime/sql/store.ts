@@ -69,7 +69,7 @@ import {
   settleProgramOperation,
   startProgramOperation,
 } from "./store/program.js"
-import { ProgramCapabilities } from "../../core/index.js"
+import { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
 import { settlementNotifications } from "./settlement-notifications.js"
 import { reconcileCancellationRequested, sessionRoots, sessionRuns } from "./session/lifecycle.js"
 import { loadChildReadiness } from "./store/child/capacity.js"
@@ -87,8 +87,9 @@ import { ExternalChildStore } from "../child/external/store.js"
 import { acknowledge, loadAcknowledged } from "./acknowledgement.js"
 import { RunClaims } from "./run/claims.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
-import { layer as modelPreviewLayer } from "../execution/model-response/preview.js"
-import { RunExecutor, make as makeRunExecutor } from "../execution/run-executor.js"
+import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
+import { RunExecutor } from "../execution/run-executor.js"
+import { make as makeRunExecutor } from "../execution/run-executor-internal.js"
 import { serviceEffect as makeRuntime } from "../memory/layer/service.js"
 import { Runtime } from "../service.js"
 import { sqlClaims } from "./store/kernel/claims.js"
@@ -396,7 +397,7 @@ const makeSqlStoreServices = <DriverError>(
           input,
           Effect.gen(function* () {
             if (input.outputBytes > input.outputLimit)
-              return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
+              return yield* ProgramBudgetExhausted.make({
                 dimension: "outputBytes",
                 limit: input.outputLimit,
               })

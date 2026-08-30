@@ -8,7 +8,7 @@ import {
   RunTerminal,
   RuntimeUnavailable,
 } from "../../../errors.js"
-import { decodePinned, equals } from "../../../executable/manifest.js"
+import { decodePinned, equals } from "../../../executable/manifest-internal.js"
 import { narrow } from "../../../executable/registration.js"
 import type { RunReceipt } from "../../../run.js"
 import type { AdmitProgramChildInput, Service as RunStoreService } from "../../../run/store.js"
