@@ -20,7 +20,7 @@ import { MCPClient, OAuth } from "tenetkit/mcp"
 import { make as makeMcpHttpTransport } from "tenetkit/mcp/client/http"
 import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "tenetkit/mcp/tools"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
-import { Catalog, Deterministic, ModelRoute } from "tenetkit/ai"
+import { Deterministic, ModelRoute } from "tenetkit/ai"
 import { TestModel } from "tenetkit/test"
 import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
@@ -167,5 +167,5 @@ const connectOptions: MCPConnectOptions = {
 }
 const routed: Effect.Effect<MCPTools, MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError, Scope.Scope> =
   mcpConnect(connectOptions)
-void connected
+void routed
 `
