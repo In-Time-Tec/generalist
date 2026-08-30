@@ -66,8 +66,8 @@
       "import": "./dist/mcp/index.js"
     },
     "./mcp/client": {
-      "types": "./dist/mcp/tool-source.d.ts",
-      "import": "./dist/mcp/tool-source.js"
+      "types": "./dist/mcp/client.d.ts",
+      "import": "./dist/mcp/client.js"
     },
     "./mcp/client/http": {
       "types": "./dist/mcp/client/http.d.ts",
