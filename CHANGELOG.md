@@ -1,9 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.44.0
 
 - Rename public APIs around established agent-framework vocabulary: `SkillCatalog`, `MCPClient`, `ProgramHandlers`, `ProgramRunner`, `CodeExecutor`, `RunExecutor`, `HostModules`, `ModelCatalog`, `OpenAICompatible`, `RunClient`, `SSE`, `WebSocket`, `AGUI`, and Agent Guidance. Public Effect service implementation shapes now use `Service` instead of `Interface`, provider and database adapter options are package-qualified, and Skill values expose flattened metadata with lazy `instructions`.
 - Simplify namespace-qualified APIs to `InstructionFiles.load`, the `tenetkit/memory` root `layer`, `RuntimeWorker.layer`, `Authorship.author`, `Refinement.apply`, `Refinement.applyTrusted`, `Refinement.makeRollback`, `State.merge`, `Overview.format`, `Snapshot.make`, and `Registration.make`; consistently capitalize `OpenAI.normalizeResponsesSSE` and remove leaked root `Core*` and `*Facade` implementation types.
+- Make domain owners the public namespaces and delete mechanical facade and assembly modules. The broad `tenetkit/core` and `tenetkit/ai` exports, runtime driver barrels, and recursive driver wildcards are removed; use the exact feature, provider, transport, and `tenetkit/runtime/sql-driver` entrypoints instead.
+- Key agent state by Session identity and fence every mutable Session projection with a monotonically increasing ownership epoch. Model responses now commit their operation, checkpoint, Session history, event, and budget charge atomically, while durable host acknowledgements identify the exact completed model cycle.
+- Persist plural authored-order tool waits by `(runId, waitId)`, resume exact siblings independently, project settled results once in authored order, and defer the next model call until the whole batch settles. Steering is now a bounded, idempotent Run-scoped inbox rather than ambient host state.
+- Converge cancellation and uncertain-operation handling across memory, SQLite, PostgreSQL, and MySQL. An interrupted non-cancellable operation remains `unknown` and leaves its Run `needs-resolution`; cancellation cannot turn uncertainty into a false terminal result, and stale Session writers lose authority when execution ownership ends.
+- Centralize SQL Runtime lifecycle policy behind `tenetkit/runtime/sql-driver`, shared by Bun SQLite, Cloudflare Durable Object SQLite, PostgreSQL, and MySQL. This release establishes clean schema baseline version 4 and refuses older or future layouts; existing SQL Runtime databases must be recreated because there is no migration or backfill shim.
+- Add bounded SQL lifecycle spans and metrics for transitions, claims, locks, replay, schema identity, subscriber lag, MySQL deadlock retries, and Cloudflare drain/recovery without recording Session content, tool payloads, checkpoints, or SQL parameters.
+- Add fail-closed permission rules, bound tool outcomes before durable interception, and define conformance contracts for sandbox executors and remotely owned REPL kernels, including exact resource, fencing, recovery, and lifecycle requirements.
+- Upgrade the Effect package cohort to `4.0.0-rc.112`, pin FoldKit to the tested `0.148.2`, isolate optional provider SDKs, and verify exact package exports through clean minimum-dependency Bun, npm/Node, and workerd consumers.
 
 ## 0.42.0
 
