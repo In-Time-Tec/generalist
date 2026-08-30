@@ -8,7 +8,7 @@ export const agUiReference = definePage({
   description: "AG-UI 0.0.57 event projection over authoritative Runtime runs.",
   content: [
     lead("tenetkit/ag-ui projects canonical Runtime runs into AG-UI events."),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @ag-ui/core@0.0.57"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @ag-ui/core@0.0.57"),
     p(code("tenetkit/ag-ui"), " is an import subpath. Runtime remains the persisted source of truth."),
     h2("service", "Service"),
     p(

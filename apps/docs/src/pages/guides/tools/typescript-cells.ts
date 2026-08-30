@@ -5,11 +5,11 @@ import testKernelExpected from "virtual:source/src/snippets/guides/tools/typescr
 import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../../prose"
 
 const composeBunPool = `import { Duration, Effect } from "effect"
-import { KernelStateStore } from "tenetkit/repl"
-import { BunKernelPool, BunKernelStateStore, workerModule } from "tenetkit/repl/bun"
+import { KernelSnapshotStore } from "tenetkit/repl"
+import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "tenetkit/repl/bun"
 
 const pool = Effect.gen(function* () {
-  const store = yield* BunKernelStateStore.make({ dataRoot })
+  const store = yield* BunKernelSnapshotStore.make({ dataRoot })
   return yield* BunKernelPool.make({
     profile,
     runtimeCommand: "bun",
@@ -19,7 +19,7 @@ const pool = Effect.gen(function* () {
     maxConcurrentBoots: 4,
     idleTimeToLive: Duration.minutes(5),
     environment: {},
-  }).pipe(Effect.provideService(KernelStateStore.KernelStateStore, store))
+  }).pipe(Effect.provideService(KernelSnapshotStore.KernelSnapshotStore, store))
 })`
 
 export const typescriptCells = definePage({
@@ -83,7 +83,7 @@ export const typescriptCells = definePage({
     ),
     h2("mount-host-modules", "3. Mount host modules into the namespace"),
     p(
-      code("HostModules.make(modules)"),
+      code("HostBindings.make(modules)"),
       " mounts named Schema-typed modules as kernel bindings, so a cell calls ",
       code("await workspace.read({ path })"),
       " directly. Duplicate module or operation names are rejected at mount. A declared operation failure is encoded and thrown inside the cell, so the model discriminates it as data; a request for something unmounted, or one that does not satisfy the declared schema, fails typed at the boundary with its stage.",
@@ -113,9 +113,7 @@ export const typescriptCells = definePage({
     p(
       "A cell that outruns ",
       code("limits.cellDeadlineMillis"),
-      " is stopped by an escalation ladder: the call's ",
-      code("AbortSignal"),
-      " first, then the worker's ",
+      " is stopped by an escalation ladder: caller interruption first, then the worker's ",
       code("vm"),
       " watchdog, which terminates a synchronous loop in place and leaves the namespace intact, and only then a child ",
       code("SIGKILL"),

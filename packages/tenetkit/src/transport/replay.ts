@@ -35,7 +35,7 @@ const resolve = (
 /** @experimental Load and observer-encode one bounded page strictly after an exclusive cursor. */
 export const page = (
   input: PageInput,
-): Effect.Effect<Page, EventsError | ResolveModelResponseError | import("./errors.js").WireEncodeFailed, Runtime> =>
+): Effect.Effect<Page, EventsError | ResolveModelResponseError | import("./errors.js").WireCodecFailed, Runtime> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime
     const cursor = input.cursor ?? origin

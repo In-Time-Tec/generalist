@@ -1,11 +1,11 @@
-import { layer, RunSchema } from "@tenetkit/mysql"
+import { layer, RuntimeSchema } from "@tenetkit/mysql"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { provideScoped } from "../../../../tenetkit/test/runtime/execution/scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { ExecutableResolver } from "tenetkit/runtime"
-import type { StoreError } from "../../../src/mysql/store/implementation.js"
+import type { RuntimeError } from "../../../src/mysql/store/implementation.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
   analyst,
@@ -102,11 +102,11 @@ type MysqlClientError = SqlError | Config.ConfigError
 export interface MysqlDatabase {
   readonly url: string
   readonly empty: Effect.Effect<void, MysqlClientError>
-  readonly ready: Effect.Effect<void, MysqlClientError | StoreError>
-  readonly truncated: Effect.Effect<void, MysqlClientError | StoreError>
+  readonly ready: Effect.Effect<void, MysqlClientError | RuntimeError>
+  readonly truncated: Effect.Effect<void, MysqlClientError | RuntimeError>
   readonly provisioned: () => Promise<void>
   readonly client: Layer.Layer<SqlClient.SqlClient, MysqlClientError>
-  readonly provision: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | MysqlClientError | StoreError, R>
+  readonly provision: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | MysqlClientError | RuntimeError, R>
   readonly provisionEmpty: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | MysqlClientError, R>
 }
 
@@ -138,7 +138,7 @@ export const mysqlDatabase = (label: string): MysqlDatabase => {
         yield* sql.unsafe(`CREATE DATABASE IF NOT EXISTS \`${name}\``)
       }),
     ),
-    withDatabase(RunSchema.apply("mysql-test")),
+    withDatabase(RuntimeSchema.apply("mysql-test")),
   ).pipe(Effect.asVoid)
   const readyOnce = Effect.runSync(Effect.cached(ready))
   const provisioned = () => (mysqlAvailable ? Effect.runPromise(readyOnce) : Promise.resolve())

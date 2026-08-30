@@ -90,7 +90,9 @@ export interface Service {
 }
 
 /** @experimental */
-export class HostModules extends Context.Service<HostModules, Service>()("tenetkit/repl/host-modules/HostModules") {}
+export class HostBindings extends Context.Service<HostBindings, Service>()(
+  "tenetkit/repl/host-bindings/HostBindings",
+) {}
 
 const schemaMessage = (error: { readonly message: string }): string => error.message
 
@@ -211,9 +213,9 @@ export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Servic
   )
 
 /** @experimental */
-export const layer = <R>(modules: ReadonlyArray<Module<R>>): Layer.Layer<HostModules, HostModuleConflict, R> =>
-  Layer.effect(HostModules, make(modules))
+export const layer = <R>(modules: ReadonlyArray<Module<R>>): Layer.Layer<HostBindings, HostModuleConflict, R> =>
+  Layer.effect(HostBindings, make(modules))
 
 /** @experimental */
-export const layerTest = (implementation: Service): Layer.Layer<HostModules> =>
-  Layer.succeed(HostModules, HostModules.of(implementation))
+export const layerTest = (implementation: Service): Layer.Layer<HostBindings> =>
+  Layer.succeed(HostBindings, HostBindings.of(implementation))

@@ -152,7 +152,7 @@ it.effect("rejects an unsupported admission limit before source normalization or
       })
       .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
     expect(failure).toMatchObject({
-      _tag: "@tenetkit/core/SandboxGuaranteeUnavailable",
+      _tag: "tenetkit/core/SandboxGuaranteeUnavailable",
       guarantee: "deadlineMillis",
     })
     expect(loads).toBe(0)
@@ -179,7 +179,7 @@ it.effect("maps provider CPU and subrequest enforcement failures to exact reques
           .execute(request())
           .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip),
       ).toMatchObject({
-        _tag: "@tenetkit/core/SandboxResourceExceeded",
+        _tag: "tenetkit/core/SandboxResourceExceeded",
         resource,
         limit,
       })
@@ -606,7 +606,7 @@ it.effect("streams output through the byte bound before decoding", () =>
     const failure = yield* executor
       .execute({ ...request(), limits: { cpuMillis: 50, subrequests: 3, outputBytes: 128 } })
       .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
-    expect(failure).toMatchObject({ _tag: "@tenetkit/core/SandboxResourceExceeded", resource: "output", limit: 128 })
+    expect(failure).toMatchObject({ _tag: "tenetkit/core/SandboxResourceExceeded", resource: "output", limit: 128 })
     expect(cancelled).toBe(true)
     expect(pulls).toBeLessThanOrEqual(4)
   }),
@@ -880,7 +880,7 @@ it.effect("provides an explicit typed unavailable executor", () =>
         .execute(request())
         .pipe(Effect.flip, Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities)),
     ).toMatchObject({
-      _tag: "@tenetkit/core/SandboxUnavailable",
+      _tag: "tenetkit/core/SandboxUnavailable",
       message: "feature disabled",
     })
   }),

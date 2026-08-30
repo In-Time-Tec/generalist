@@ -6,14 +6,12 @@ const delayThenWrite = (marker: string): string =>
   `await new Promise((resolve) => setTimeout(resolve, 2000)); await Bun.write(\`${marker}\`, "landed"); "done"`
 
 layer(platform, liveOptions)("Bun kernel cancellation", (it) => {
-  it.effect("replaces the kernel after an external abort and restores only the completed snapshot", () =>
+  it.effect("replaces the kernel after scope interruption and restores only the completed snapshot", () =>
     withPool({
       use: ({ pool, dataRoot }) =>
         Effect.gen(function* () {
           const fileSystem = yield* FileSystem.FileSystem
           const started = `${dataRoot}/abort-started`
-          // oxlint-disable-next-line effecttsgo/abort-controller-in-effect -- This test exercises caller-owned AbortSignal cancellation.
-          const controller = new AbortController()
           const first = yield* runCell({
             pool,
             sessionId: "s",
@@ -26,14 +24,12 @@ layer(platform, liveOptions)("Bun kernel cancellation", (it) => {
                 pool,
                 sessionId: "s",
                 cellId: "c2",
-                signal: controller.signal,
                 code: `const activeOnly = 2; await Bun.write(\`${started}\`, "started"); await new Promise(() => {})`,
               }),
             ),
           )
           while (!(yield* fileSystem.exists(started))) yield* Effect.sleep(10)
-          controller.abort()
-          yield* Fiber.join(running)
+          yield* Fiber.interrupt(running)
 
           expect((yield* pool.interrupt("s", "c2"))._tag).toBe("NotRunning")
           const restored = yield* runCell({
@@ -66,15 +62,11 @@ layer(platform, liveOptions)("Bun kernel cancellation", (it) => {
           const started = `${dataRoot}/cancellation-started`
           const first = yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "process.pid" })
           const running = yield* Effect.forkChild(
-            Effect.gen(function* () {
-              const signal = yield* Effect.abortSignal
-              return yield* runCell({
-                pool,
-                sessionId: "s",
-                cellId: "c2",
-                signal,
-                code: `await Bun.write(\`${started}\`, "started"); ${delayThenWrite(marker)}`,
-              })
+            runCell({
+              pool,
+              sessionId: "s",
+              cellId: "c2",
+              code: `await Bun.write(\`${started}\`, "started"); ${delayThenWrite(marker)}`,
             }).pipe(Effect.exit),
           )
           while (!(yield* fileSystem.exists(started))) yield* Effect.sleep(10)

@@ -1,7 +1,7 @@
 import { Effect, Equivalence, Option, Schema, Stream } from "effect"
 import { dual } from "effect/Function"
 import { make } from "foldkit/subscription"
-import { Connection } from "./connection.js"
+import { Connection, ConnectionFailed, ConnectionLost, ConnectionOpened } from "./connection.js"
 import {
   Action,
   type ChatCommand,
@@ -11,7 +11,7 @@ import {
   CancelRun,
   Failed,
   Idle,
-  ReceivedAgent,
+  ReceivedConnection,
   ResolveApproval,
   RunFailed,
   SendUserMessage,
@@ -19,7 +19,7 @@ import {
 } from "./service.js"
 import { chatUpdateRuntime } from "./update.js"
 
-const { applyRunEvent, isRunEvent } = chatUpdateRuntime
+const { applyRunEvent, applyUnknownObserverEvent, isObserverEvent, isResolvedRunEvent } = chatUpdateRuntime
 
 type UpdateResult = readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<Output>]
 
@@ -33,27 +33,31 @@ const changeModel = (model: Model, changes: Partial<Model>): Model =>
     draft: changes.draft ?? model.draft,
   })
 
-const updateReceived = (model: Model, action: typeof ReceivedAgent.Type): UpdateResult => {
-  if (isRunEvent(action.incoming)) {
-    const [next, output] = applyRunEvent(model, action.incoming)
+const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): UpdateResult => {
+  if (isObserverEvent(action.event)) {
+    const [next, output] = isResolvedRunEvent(action.event)
+      ? applyRunEvent(model, action.event)
+      : applyUnknownObserverEvent(model, action.event)
     return [next, [], output]
   }
-  switch (action.incoming._tag) {
-    case "ConnectionOpened":
-      return [changeModel(model, { connection: "open" }), [], Option.none()]
-    case "ConnectionLost":
-      return [
-        changeModel(model, { connection: model.sessionId === null ? "disconnected" : "reconnecting" }),
-        [],
-        Option.none(),
-      ]
-    case "ConnectionFailed":
-      return [
-        changeModel(model, { connection: "disconnected", run: Failed({ message: action.incoming.reason }) }),
-        [],
-        Option.some(RunFailed({ message: action.incoming.reason })),
-      ]
+  if (Schema.is(ConnectionOpened)(action.event)) {
+    return [changeModel(model, { connection: "open" }), [], Option.none()]
   }
+  if (Schema.is(ConnectionLost)(action.event)) {
+    return [
+      changeModel(model, { connection: model.sessionId === null ? "disconnected" : "reconnecting" }),
+      [],
+      Option.none(),
+    ]
+  }
+  if (Schema.is(ConnectionFailed)(action.event)) {
+    return [
+      changeModel(model, { connection: "disconnected", run: Failed({ message: action.event.reason }) }),
+      [],
+      Option.some(RunFailed({ message: action.event.reason })),
+    ]
+  }
+  return [model, [], Option.none()]
 }
 
 const submitMessage = (model: Model): UpdateResult => {
@@ -86,7 +90,7 @@ export const update: {
   (model: Model, action: Action): readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<Output>]
 } = dual(2, (model: Model, action: Action) => {
   switch (action._tag) {
-    case "ReceivedAgent":
+    case "ReceivedConnection":
       return updateReceived(model, action)
     case "OpenedSession":
       return [
@@ -135,7 +139,7 @@ export const subscriptions = make<Model, Action, Connection>()((entry) => ({
               .session(afterSeq < 0 ? { sessionId } : { sessionId, afterSeq })
               .pipe(
                 Effect.map((sessionConnection) =>
-                  sessionConnection.frames.pipe(Stream.map((incoming) => ReceivedAgent({ incoming }))),
+                  sessionConnection.frames.pipe(Stream.map((event) => ReceivedConnection({ event }))),
                 ),
               )
           }),

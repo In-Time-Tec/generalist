@@ -31,6 +31,18 @@ export interface Suspend {
   readonly token: string
 }
 
+/** @experimental Durable tool execution outcome. */
+export const Outcome = Schema.Union([
+  Schema.Struct({
+    _tag: Schema.tag("Success"),
+    result: Schema.Unknown,
+    encodedResult: Schema.Unknown,
+    outputPaths: Schema.optionalKey(Schema.Array(Schema.String)),
+  }),
+  Schema.Struct({ _tag: Schema.tag("DomainFailure"), failure: Schema.Unknown, encodedFailure: Schema.Unknown }),
+  Schema.Struct({ _tag: Schema.tag("Suspend"), token: Schema.String }),
+])
+
 export type Outcome = Success | DomainFailure | Suspend
 
 export type ReplayPolicy = "never" | "provider-idempotent"

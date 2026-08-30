@@ -14,7 +14,7 @@ import { appendInstructionFragment, errorMessage } from "./construction.js"
 export const setupPromptContext = <T extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(args: {
   readonly agent: Agent<T, R>
   readonly options: RunOptions
-  readonly activeSession: Option.Option<import("../../context/session.js").Service>
+  readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
   readonly resumeChat: import("effect/unstable/ai").Chat.Service | undefined
   readonly staticCandidates: ReadonlyArray<Candidate>
 }) =>

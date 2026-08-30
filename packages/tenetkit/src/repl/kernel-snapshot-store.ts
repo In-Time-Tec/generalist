@@ -64,6 +64,6 @@ export interface Service {
 }
 
 /** @experimental */
-export class KernelStateStore extends Context.Service<KernelStateStore, Service>()(
-  "tenetkit/repl/kernel-state-store/KernelStateStore",
+export class KernelSnapshotStore extends Context.Service<KernelSnapshotStore, Service>()(
+  "tenetkit/repl/kernel-snapshot-store/KernelSnapshotStore",
 ) {}

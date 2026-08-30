@@ -125,7 +125,6 @@ layer(platform, liveOptions)("Bun kernel kill restart", (it) => {
               sessionId: "s",
               cellId: "abandoned",
               code: "while (true) {}",
-              signal: AbortSignal.any([]),
             })
             .pipe(Scope.provide(executionScope))
           yield* Effect.sleep(200)
@@ -151,7 +150,6 @@ layer(platform, liveOptions)("Bun kernel kill restart", (it) => {
               sessionId: "s",
               cellId: "c1",
               code: "while (true) {}",
-              signal: AbortSignal.any([]),
             })
             yield* Effect.forkDetach(
               Effect.exit(execution.result).pipe(Effect.flatMap((exit) => Deferred.succeed(settled, exit))),

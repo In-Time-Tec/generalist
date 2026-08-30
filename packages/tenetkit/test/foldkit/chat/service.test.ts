@@ -6,7 +6,7 @@ import { Wire } from "tenetkit/transport"
 import { Chat, Connection } from "../../../src/foldkit/index.js"
 
 const agent = ExecutableManifest.makeTest("assistant", "1").ref
-const runEvent = <Fields extends object>(sequence: number, fields: Fields): Wire.ResolvedRunEvent =>
+const observerEvent = <Fields extends object>(sequence: number, fields: Fields): Wire.ObserverRunEvent =>
   Schema.decodeUnknownSync(Wire.ObserverRunEvent)({
     specVersion: "1",
     eventId: `run-1:${sequence}`,
@@ -18,6 +18,12 @@ const runEvent = <Fields extends object>(sequence: number, fields: Fields): Wire
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,
   })
+
+const runEvent = <Fields extends object>(sequence: number, fields: Fields): Wire.ResolvedRunEvent => {
+  const event = observerEvent(sequence, fields)
+  if (!Wire.isResolvedRunEvent(event)) throw new Error("Expected a known RunEvent")
+  return event
+}
 
 const modelResponse = (
   sequence: number,
@@ -33,13 +39,14 @@ const modelResponse = (
     attempt: 0,
     response: { content },
     sessionId: "session-1",
+    sessionParentId: "entry-input",
     sessionEntryId: `entry-${sequence}`,
-    ...(tag === "ModelResponseCommitted" ? { sessionParentId: "entry-input" } : { reason: "failure" }),
+    ...(tag === "ModelResponseCommitted" ? { budgetCharge: 1 } : { reason: "failure" }),
     digest: `${tag}-digest`,
   })
 
-const updateWith = (model: Chat.Model, incoming: Connection.Incoming) =>
-  Chat.update(model, Chat.ReceivedAgent({ incoming }))
+const updateWith = (model: Chat.Model, event: Connection.Incoming) =>
+  Chat.update(model, Chat.ReceivedConnection({ event }))
 
 const searchCall = Response.makePart("tool-call", {
   id: "tool-1",
@@ -157,7 +164,7 @@ describe("Chat RunEvent projection", () => {
   })
 
   it("does not project removed ModelPart transport fragments", () => {
-    const fragment = runEvent(0, {
+    const fragment = observerEvent(0, {
       _tag: "ModelPart",
       turn: 0,
       modelCallId: "model-call-0",
@@ -168,7 +175,9 @@ describe("Chat RunEvent projection", () => {
     const model = Chat.initialModel("run-1")
 
     expect(Schema.is(RunEvent.RunEvent)(fragment)).toBe(false)
-    expect(updateWith(model, fragment)[0].entries).toEqual([])
+    const [updated] = updateWith(model, fragment)
+    expect(updated.entries).toEqual([])
+    expect(updated.lastSeq).toBe(0)
   })
 
   it("projects waits and failures without synthetic status or ended frames", () => {
@@ -191,7 +200,10 @@ describe("Chat RunEvent projection", () => {
     )
     expect(model.run._tag).toBe("AwaitingApproval")
     expect(Option.getOrUndefined(output)?._tag).toBe("ApprovalRequired")
-    ;[model, , output] = updateWith(model, runEvent(5, { _tag: "RunFailed", error: { message: "failed" } }))
+    ;[model, , output] = updateWith(
+      model,
+      runEvent(5, { _tag: "RunFailed", error: Errors.AgentExecutionFailure.make({ message: "failed" }) }),
+    )
     expect(model.run).toEqual({ _tag: "Failed", message: "failed" })
     expect(Option.getOrUndefined(output)).toEqual({ _tag: "RunFailed", message: "failed" })
 

@@ -8,7 +8,7 @@ import {
   type Entry,
   type EntryId,
   EntryPayload,
-  type Service,
+  type SessionStore,
   type PreparedCheckpoint,
   SessionConflict,
   SessionDirectory,
@@ -241,7 +241,7 @@ const setLeafState = (state: State, id: EntryId | null): readonly [Result<void>,
   return [success(undefined), { ...state, leaf: id }]
 }
 
-const makeStore: Effect.Effect<Service> = Ref.make(initialState).pipe(
+const makeStore: Effect.Effect<SessionStore> = Ref.make(initialState).pipe(
   Effect.map((state) => ({
     reserveEntryId: Ref.modify(state, (current) => {
       let counter = current.counter
@@ -270,7 +270,7 @@ const makeStore: Effect.Effect<Service> = Ref.make(initialState).pipe(
 )
 
 interface Cell {
-  readonly store: Service
+  readonly store: SessionStore
   readonly semaphore: Semaphore.Semaphore
 }
 

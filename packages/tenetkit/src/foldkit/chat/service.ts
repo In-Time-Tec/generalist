@@ -37,7 +37,7 @@ const AwaitingApprovalFields = {
   params: Schema.Unknown,
 }
 const ClickedDenyFields = { reason: Schema.NullOr(Schema.String) }
-const ReceivedAgentFields = { incoming: Incoming }
+const ReceivedConnectionFields = { event: Incoming }
 const ModelConnection = Schema.Literals(["disconnected", "connecting", "open", "reconnecting"])
 
 /** @experimental */
@@ -108,9 +108,9 @@ export const Model: Schema.Schema<Model> = Schema.Struct({
 })
 
 /** @experimental */
-export const ReceivedAgent: CallableTaggedStruct<"ReceivedAgent", typeof ReceivedAgentFields> = m(
-  "ReceivedAgent",
-  ReceivedAgentFields,
+export const ReceivedConnection: CallableTaggedStruct<"ReceivedConnection", typeof ReceivedConnectionFields> = m(
+  "ReceivedConnection",
+  ReceivedConnectionFields,
 )
 
 /** @experimental */
@@ -165,7 +165,7 @@ export const FailedAgentCommand: CallableTaggedStruct<
 
 /** @experimental */
 export type Action =
-  | typeof ReceivedAgent.Type
+  | typeof ReceivedConnection.Type
   | typeof OpenedSession.Type
   | typeof ChangedDraft.Type
   | typeof SubmittedMessage.Type
@@ -179,7 +179,7 @@ export type Action =
 
 /** @experimental */
 export const Action: Schema.Schema<Action> = Schema.Union([
-  ReceivedAgent,
+  ReceivedConnection,
   OpenedSession,
   ChangedDraft,
   SubmittedMessage,

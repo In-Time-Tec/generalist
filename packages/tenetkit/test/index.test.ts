@@ -80,8 +80,9 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   [
     "skills",
     () => import("../src/skills/index.js"),
-    ["FileSystemCatalog", "GitHubCatalog", "HttpCatalog", "InstructionFiles", "S3Catalog"],
+    ["FileSystemCatalog", "GitHubCatalog", "HttpCatalog", "S3Catalog"],
   ],
+  ["instructions", () => import("../src/instructions.js"), ["load"]],
   [
     "transport",
     () => import("../src/transport/index.js"),
@@ -95,11 +96,11 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
     [
       "Cell",
       "CellTool",
-      "HostModules",
+      "HostBindings",
       "KernelPool",
       "KernelProfile",
-      "KernelResourceStore",
-      "KernelStateStore",
+      "KernelResourceAuthority",
+      "KernelSnapshotStore",
       "RemoteKernelProtocol",
       "TestKernel",
     ],
@@ -107,7 +108,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   [
     "repl/bun",
     () => import("../src/repl/bun/index.js"),
-    ["BunKernelPool", "BunKernelStateStore", "workerModule", "workerSupportModules"],
+    ["BunKernelPool", "BunKernelSnapshotStore", "workerModule", "workerSupportModules"],
   ],
   ["ag-ui", () => import("../src/interoperability/ag-ui/index.js"), ["AGUI", "Errors"]],
   ["a2a", () => import("../src/interoperability/a2a/index.js"), ["A2A", "Content", "Errors", "Projection"]],

@@ -25,7 +25,7 @@ export interface UrlOptions extends Options {
 }
 
 /** @experimental PostgreSQL Runtime construction failures. */
-export type StoreError = SqlDriverStoreError
+export type RuntimeError = SqlDriverStoreError
 
 /**
  * @experimental Build the PostgreSQL Runtime from the caller's `PgClient`.
@@ -35,7 +35,11 @@ export type StoreError = SqlDriverStoreError
  */
 const layerWithClient = (
   options: Options,
-): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver> =>
+): Layer.Layer<
+  SqlRuntimeServices,
+  RuntimeError | SqlError,
+  PgClient.PgClient | ExecutableResolver.ExecutableResolver
+> =>
   Layer.unwrap(
     PgClient.PgClient.pipe(
       Effect.map((pg) =>
@@ -49,13 +53,13 @@ const layerWithClient = (
 /** @experimental Build the PostgreSQL Runtime, optionally acquiring its client from a URL. */
 export function layer(
   options: UrlOptions,
-): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, ExecutableResolver.ExecutableResolver>
+): Layer.Layer<SqlRuntimeServices, RuntimeError | SqlError, ExecutableResolver.ExecutableResolver>
 export function layer(
   options: Options,
-): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver>
+): Layer.Layer<SqlRuntimeServices, RuntimeError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver>
 export function layer(
   options: Options | UrlOptions,
-): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver> {
+): Layer.Layer<SqlRuntimeServices, RuntimeError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver> {
   if (!("url" in options)) return layerWithClient(options)
   const maxConnections = options.maxConnections ?? 10
   const client = Layer.unwrap(

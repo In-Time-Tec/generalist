@@ -9,7 +9,7 @@ export const providersReference = definePage({
     lead(
       "Exact tenetkit/ai/* leaves own the model catalog, deterministic test model, model routes, provider adapters, presets, and embeddings. There is no aggregate entry that loads every optional provider.",
     ),
-    command("Install core", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    command("Install core", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
     p(
       "Provider-neutral deterministic, catalog, and route leaves need no optional provider peer. For a provider leaf, add exactly the dependency shown below.",
     ),

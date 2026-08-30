@@ -16,16 +16,21 @@ interface OperationInput {
 }
 
 /** @experimental Operation scheduled at one agent-loop effect boundary. */
-export interface OperationSpec extends OperationInput {
+export interface OperationSpec<
+  Success,
+  Failure,
+  SuccessDecodingServices = never,
+  SuccessEncodingServices = never,
+  FailureDecodingServices = never,
+  FailureEncodingServices = never,
+> extends OperationInput {
   readonly turn?: number
+  readonly success: Schema.Codec<Success, unknown, SuccessDecodingServices, SuccessEncodingServices>
+  readonly failure: Schema.Codec<Failure, unknown, FailureDecodingServices, FailureEncodingServices>
   readonly applyCheckpoint?: (checkpoint: DriverCheckpoint, outcome: OperationOutcome) => DriverCheckpoint
 }
 
 const ModelOperationInput = Schema.Struct({ modelCallOrdinal: Schema.Finite })
-type PersistedReplayValue = Extract<OperationOutcome, { readonly _tag: "Succeeded" }>["value"]
-const replaySchema = <A>() => Schema.declare((_value): _value is A => true)
-
-export const decodeReplay = <A>(value: PersistedReplayValue): A => Schema.decodeUnknownSync(replaySchema<A>())(value)
 
 export const fromInput = (input: OperationInput): DriverOperation => ({
   key: input.key,

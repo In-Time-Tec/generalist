@@ -12,7 +12,7 @@ import {
   TurnLimitExceeded,
   PolicyStopped,
 } from "./event.js"
-import { Error as TurnPolicyError } from "../turn/policy.js"
+import { PolicyError as TurnPolicyError } from "../turn/policy.js"
 
 import { DriverInterpreter } from "../durable/driver/interpreter.js"
 import { Exhausted, GrantWidened, type RunBudget } from "../durable/run-budget.js"

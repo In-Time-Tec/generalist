@@ -10,7 +10,7 @@ export const transportReference = definePage({
     lead(
       "tenetkit/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

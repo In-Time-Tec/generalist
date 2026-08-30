@@ -2,13 +2,14 @@ import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } f
 import { Chat, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./result.js"
-import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "../service.js"
+import type { Agent, ClosedServices, ProgressOverflowPolicy, RunOptions } from "../service.js"
+import { RunError } from "../run/error.js"
 import type { AgentRunState } from "../run-state.js"
 import type { HandoffRunState } from "../handoff/state.js"
 import type { AuthorizationError, Authorizer } from "../../tools/tool-authorization.js"
 import {
   FrameworkFailure,
-  type Outcome,
+  Outcome,
   type Request,
   RemoteRetryMisconfigured,
   ToolExecutor,
@@ -27,10 +28,6 @@ import { handoffDispatch } from "../handoff/tool-execution.js"
 import { updateCall } from "./checkpoint.js"
 import { applyToolOutcome } from "./checkpoint-operation.js"
 
-type StaticToolServices<T extends Record<string, Tool.Any>> =
-  | Tool.HandlersFor<T>
-  | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
-
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly options: RunOptions
   readonly state: AgentRunState
@@ -38,7 +35,7 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, Polic
   readonly agent: Agent<T, AgentR, PolicyR, AuthorizationR>
   readonly staticToolkit: Toolkit.Toolkit<T>
   readonly chat: Chat.Service
-  readonly activeSession: Option.Option<import("../../context/session.js").Service>
+  readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
   readonly sessionId: string
   readonly executor: Option.Option<typeof ToolExecutor.Service>
   readonly authorizer: Authorizer<AuthorizationR>
@@ -216,7 +213,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
   ): Effect.Effect<
     Outcome,
     RunError,
-    StaticToolServices<T> | ToolContext | import("../../durable/driver/interpreter.js").DriverInterpreter
+    ClosedServices<T, never> | ToolContext | import("../../durable/driver/interpreter.js").DriverInterpreter
   > => {
     if (skillActivation) return activateSkillOutcome(turn, call)
     if (handoffExecution !== undefined) return handoffExecution
@@ -252,7 +249,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | import("../../durable/driver/interpreter.js").DriverInterpreter
+    ClosedServices<T, never> | import("../../durable/driver/interpreter.js").DriverInterpreter
   > =>
     Stream.concat(
       Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
@@ -308,6 +305,8 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
               turn,
               input: { turn, callId: call.id, name: call.name, ...cancellation },
               replayPolicy,
+              success: Outcome,
+              failure: RunError,
               applyCheckpoint: applyToolOutcome({
                 callIndex: request.toolCallIndex,
                 call,
@@ -374,7 +373,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
+    ClosedServices<T, never> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
   > =>
     Stream.unwrap(
       activeAgentName().pipe(
@@ -394,7 +393,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
+    ClosedServices<T, never> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
   > => {
     const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: "", sessionId }
     const candidate = get(registry, call.name)

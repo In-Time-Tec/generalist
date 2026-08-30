@@ -18,7 +18,7 @@ import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { make as makeCursor, type Cursor } from "../runtime/cursor.js"
 import { ReconnectExhausted, TransportError } from "./errors.js"
-import { encodeCommand, ObserverRunEvent, observerCodec, type ClientCommand, type ResolvedRunEvent } from "./wire.js"
+import { encodeCommand, ObserverRunEvent, observerCodec, type ClientCommand } from "./wire.js"
 
 /** @experimental */
 export type ConnectionStatus =
@@ -52,7 +52,7 @@ export class InvalidConnectOptions extends Schema.TaggedError<InvalidConnectOpti
 
 /** @experimental */
 export interface Connection {
-  readonly events: Stream.Stream<ResolvedRunEvent, TransportError>
+  readonly events: Stream.Stream<ObserverRunEvent, TransportError>
   readonly cancel: (reason?: string) => Effect.Effect<void, TransportError>
   readonly status: Stream.Stream<ConnectionStatus>
   readonly exhausted: Effect.Effect<never, ReconnectExhausted>
@@ -82,7 +82,7 @@ const urlWithCursor = (url: string, cursor: Cursor | undefined): string => {
 export const streamSSE = (options: {
   readonly url: string
   readonly cursor?: Cursor
-}): Stream.Stream<ResolvedRunEvent, TransportError, HttpClient.HttpClient> =>
+}): Stream.Stream<ObserverRunEvent, TransportError, HttpClient.HttpClient> =>
   HttpClientResponse.stream(HttpClient.get(urlWithCursor(options.url, options.cursor))).pipe(
     Stream.decodeText,
     Stream.pipeThroughChannel(Sse.decodeDataSchema(ObserverRunEvent)),
@@ -131,7 +131,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
           }
           const reconnect = options.reconnect ?? defaultReconnectPolicy
           const scope = yield* Effect.scope
-          const eventQueue = yield* Queue.bounded<ResolvedRunEvent, TransportError>(capacity)
+          const eventQueue = yield* Queue.bounded<ObserverRunEvent, TransportError>(capacity)
           const statusQueue = yield* Queue.sliding<ConnectionStatus>(8)
           const writerRef = yield* Ref.make<Option.Option<(chunk: string) => Effect.Effect<void, TransportError>>>(
             Option.none(),

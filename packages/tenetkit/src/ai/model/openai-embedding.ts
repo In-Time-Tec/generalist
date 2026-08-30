@@ -4,7 +4,7 @@ import { EmbeddingModel } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 
 /** @experimental */
-export interface Input {
+export interface Options {
   readonly model: (string & {}) | OpenAiEmbeddingModel.Model
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey">
@@ -13,7 +13,7 @@ export interface Input {
 
 /** @experimental */
 export const layer = (
-  options: Input,
+  options: Options,
 ): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError, HttpClient.HttpClient> =>
   OpenAiEmbeddingModel.layer(
     options.config === undefined ? { model: options.model } : { model: options.model, config: options.config },

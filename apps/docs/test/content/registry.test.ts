@@ -42,7 +42,7 @@ test("the kernel explanation keeps the child-process reproduction and the two-pa
     "SIGTRAP",
     "133",
     "five runs out of five",
-    "AbortSignal",
+    "Effect interruption",
     "breakOnSigint",
     "SIGKILL",
     "descriptors 3 and 4",
@@ -97,9 +97,9 @@ test("the cell guide keeps the execution and failure contracts", () => {
 test("the cell tutorial walks a beginner from an epoch to the real kernel", () => {
   for (const marker of [
     "KernelProfile",
-    "bun add effect@4.0.0-rc.112 tenetkit@0.43.0",
+    "bun add effect@4.0.0-rc.112 tenetkit@0.44.0",
     "TestKernel.layerTestPool",
-    "HostModules",
+    "HostBindings",
     "tenetkit/repl/bun",
     "bindingsDigest",
     "sequence",

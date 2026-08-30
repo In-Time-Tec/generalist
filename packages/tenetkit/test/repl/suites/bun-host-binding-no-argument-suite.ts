@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Schema } from "effect"
-import { HostModules } from "../../../src/repl/index.js"
+import { HostBindings } from "../../../src/repl/index.js"
 import { liveOptions, platform, runCell, withPool } from "../bun-harness.js"
 
 const Out = Schema.Struct({ answered: Schema.Boolean })
@@ -9,7 +9,7 @@ const Input = Schema.Struct({})
 
 const seen: Array<Record<string, never>> = []
 
-const ping: HostModules.AnyOperation = {
+const ping: HostBindings.AnyOperation = {
   name: "ping",
   input: Input,
   output: Out,

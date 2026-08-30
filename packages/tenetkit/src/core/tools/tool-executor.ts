@@ -15,11 +15,11 @@ export type { CancellationOutcome, CancellationRequest, TerminalOutcome } from "
 import {
   FrameworkFailure,
   FrameworkStage,
+  Outcome,
   RemoteRetryMisconfigured,
   toolResultCodec,
   type ClosedToolSet,
   type DomainFailure,
-  type Outcome,
   type ReplayPolicy,
   type Request,
   type SchemaTool,
@@ -28,8 +28,8 @@ import {
   type ToolSchemaServices,
   type ToolkitInput,
 } from "./tool-result-codec.js"
-export { FrameworkFailure, FrameworkStage, RemoteRetryMisconfigured }
-export type { ClosedToolSet, DomainFailure, Outcome, ReplayPolicy, Request, Success, Suspend, ToolkitInput }
+export { FrameworkFailure, FrameworkStage, Outcome, RemoteRetryMisconfigured }
+export type { ClosedToolSet, DomainFailure, ReplayPolicy, Request, Success, Suspend, ToolkitInput }
 import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
 
 type AgentToolSchemaServices<Parameters extends Schema.Top, SuccessSchema extends Schema.Top> =

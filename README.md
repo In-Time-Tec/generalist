@@ -34,7 +34,7 @@ Use `tenetkit` directly for process-local agents and chat streaming. Add `tenetk
 ## Install
 
 ```bash
-bun add effect@4.0.0-rc.112 tenetkit@0.43.0
+bun add effect@4.0.0-rc.112 tenetkit@0.44.0
 # Add only the peer for the provider you select, for example:
 bun add @effect/ai-openrouter@4.0.0-rc.112
 ```
@@ -95,7 +95,7 @@ const durableTools = ToolExecutor.layerRouter([
 
 | TenetKit release | Tested Effect version                            | Notes                                                                               |
 | ---------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `0.43.0`         | `effect@4.0.0-rc.112` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.44.0`         | `effect@4.0.0-rc.112` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 

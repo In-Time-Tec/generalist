@@ -5,7 +5,7 @@ const agent = Agent.make({ name: "bounded-inbox" })
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    const run = yield* Agent.makeRun(agent, {
+    const run = yield* Agent.allocateRun(agent, {
       prompt: "start",
       steering: { steering: { capacity: 1 } },
     })

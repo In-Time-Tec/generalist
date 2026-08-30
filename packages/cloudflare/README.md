@@ -3,7 +3,7 @@
 Cloudflare Workers and Durable Objects adapters for TenetKit.
 
 ```bash
-bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @tenetkit/cloudflare@0.43.0
+bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @tenetkit/cloudflare@0.44.0
 ```
 
 The package root is intentionally not exported. Import only `@tenetkit/cloudflare/workers`, `@tenetkit/cloudflare/durable-objects`, or `@tenetkit/cloudflare/dynamic-workers`; these are Worker entrypoints, not Node or Bun runtime claims.
@@ -12,18 +12,19 @@ The package root is intentionally not exported. Import only `@tenetkit/cloudflar
 
 `@tenetkit/cloudflare/durable-objects` stores only its scheduling projection in
 `tenetkit_activations`. Run authority remains in the existing `tenetkit_*` tables.
-Construct `Activations.makeProjection(sql, rearm)` with the same full-storage SQLite client
+Import `SqliteRunActivation` and `makeExclusiveExecutionRecovery` from
+`tenetkit/runtime/sql-driver`. Construct `SqliteRunActivation.makeProjection(sql, rearm)` with the same full-storage SQLite client
 used by `layerRunStore`; `rearm` must synchronously compute the host-wide minimum
 due time and call the top-level Durable Object storage alarm API. The Run change,
 candidate change, and alarm then share one storage transaction. It must not await
 network work. Final-state projection is limited to Runs touched by that mutation;
 an inactive final state deletes its candidate before `rearm` runs.
 
-Call `Activations.initialize(rearm)` once inside a SQL transaction to reconstruct
+Call `SqliteRunActivation.initialize(rearm)` once inside a SQL transaction to reconstruct
 candidates after the runtime has verified its schema metadata and checksum. The
 runtime schema is one baseline, migration 1 `tenetkit_runtime` at version 1. The
 adapter table is not part of that schema and does not change its version. On each fresh exclusive host incarnation, call
-`makeExclusiveExecutionRecovery(...).recoverClaims(...)` before `Activations.drain(...)`.
+`makeExclusiveExecutionRecovery(...).recoverClaims(...)` before `SqliteRunActivation.drain(...)`.
 Drains are deterministic and fuel-bounded. Execute candidates pass through the
 normal claim and execution host; cancellation candidates use point cancellation
 reconciliation and are conditionally deferred without recreating deleted rows.

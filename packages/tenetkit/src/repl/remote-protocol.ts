@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { CellEvent, CellFailure, CellResult, RestartReason } from "./cell.js"
 import { CheckpointKind } from "./kernel-profile.js"
-import { CommandClaim } from "./kernel-resource-store.js"
+import { CommandClaim } from "./kernel-resource-authority.js"
 
 const NonNegative = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 

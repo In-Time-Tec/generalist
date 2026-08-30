@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Path, PlatformError } from "effect"
 
 /** @experimental Loaded instruction-file content. */
-export interface File {
+export interface InstructionFile {
   readonly path: string
   readonly content: string
 }
@@ -18,7 +18,7 @@ const DEFAULT_FILENAMES = ["AGENTS.md", "CLAUDE.md"] as const
 const readIfExists = (
   fs: FileSystem.FileSystem,
   file: string,
-): Effect.Effect<File | undefined, PlatformError.PlatformError> =>
+): Effect.Effect<InstructionFile | undefined, PlatformError.PlatformError> =>
   Effect.gen(function* () {
     if (!(yield* fs.exists(file))) return undefined
     const content = yield* fs.readFileString(file)
@@ -37,15 +37,15 @@ const ancestors = (path: Path.Path, cwd: string): ReadonlyArray<string> => {
   return directories.toReversed()
 }
 
-/** @experimental Load AGENTS.md / CLAUDE.md instruction files. */
+/** @experimental Load AGENTS.md / CLAUDE.md instruction files from global and ancestor paths. */
 export const load = (
   options: Options = {},
-): Effect.Effect<ReadonlyArray<File>, PlatformError.PlatformError, FileSystem.FileSystem | Path.Path> =>
+): Effect.Effect<ReadonlyArray<InstructionFile>, PlatformError.PlatformError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const filenames = options.filenames ?? DEFAULT_FILENAMES
-    const files: Array<File> = []
+    const files: Array<InstructionFile> = []
     for (const globalFile of options.globalFiles ?? []) {
       const loaded = yield* readIfExists(fs, globalFile)
       if (loaded !== undefined) files.push(loaded)

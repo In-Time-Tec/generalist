@@ -107,7 +107,7 @@ export const codeExecutorConformance = (options: Options): void => {
               1_000,
             ).pipe(Effect.flip),
           ).toMatchObject({
-            _tag: "@tenetkit/core/SandboxGuaranteeUnavailable",
+            _tag: "tenetkit/core/SandboxGuaranteeUnavailable",
             guarantee: "physicalIsolation",
           })
         }),
@@ -204,7 +204,7 @@ export default async () => {
           }),
         ).pipe(Effect.flip)
         expect(failure).toMatchObject({
-          _tag: "@tenetkit/core/SandboxResourceExceeded",
+          _tag: "tenetkit/core/SandboxResourceExceeded",
           resource: "output",
           limit: 128,
         })

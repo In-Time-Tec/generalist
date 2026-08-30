@@ -2,22 +2,22 @@ import { Clock, Effect, Layer, Schema, SynchronizedRef } from "effect"
 import {
   type Claim,
   type CommandClaim,
-  type Service as KernelResourceStoreService,
+  type Service as KernelResourceAuthorityService,
   type KernelResourceFailure,
   KernelResourceRejected,
-  KernelResourceStore,
+  KernelResourceAuthority,
   Lease,
   LeaseMillis,
   Resource,
   type ResourceIdentity,
-} from "./kernel-resource-store.js"
+} from "./kernel-resource-authority.js"
 
-interface ResourceAuthorityState {
+interface AuthorityState {
   readonly generations: ReadonlyMap<string, number>
   readonly leases: ReadonlyMap<string, Lease>
 }
 
-const emptyResourceAuthority: ResourceAuthorityState = {
+const emptyAuthority: AuthorityState = {
   generations: new Map(),
   leases: new Map(),
 }
@@ -50,13 +50,13 @@ const rejected = (
   message: string,
 ): KernelResourceRejected => KernelResourceRejected.make({ sessionId, reason, message })
 
-const setLease = (state: ResourceAuthorityState, lease: Lease): ResourceAuthorityState => ({
+const setLease = (state: AuthorityState, lease: Lease): AuthorityState => ({
   ...state,
   leases: new Map(state.leases).set(lease.claim.sessionId, lease),
 })
 
 const currentLease = (
-  state: ResourceAuthorityState,
+  state: AuthorityState,
   claim: Claim,
   now: number,
 ): Effect.Effect<Lease, KernelResourceRejected> => {
@@ -67,20 +67,18 @@ const currentLease = (
 }
 
 /** @experimental In-memory resource authority controls used only by deterministic provider tests. */
-export interface MemoryResourceStore extends KernelResourceStoreService {
+export interface MemoryResourceAuthority extends KernelResourceAuthorityService {
   readonly expire: (sessionId: string) => Effect.Effect<void>
 }
 
 /**
- * @experimental An atomic in-memory KernelResourceStore. It models ownership, command admission,
+ * @experimental An atomic in-memory KernelResourceAuthority. It models ownership, command admission,
  * takeover reconciliation, and retained cleanup without pretending to be durable storage.
  */
-export const makeMemoryResourceStore: Effect.Effect<MemoryResourceStore> = Effect.gen(function* () {
-  const authority = yield* SynchronizedRef.make(emptyResourceAuthority)
+export const makeMemoryResourceAuthority: Effect.Effect<MemoryResourceAuthority> = Effect.gen(function* () {
+  const authority = yield* SynchronizedRef.make(emptyAuthority)
   const modify = <A>(
-    transition: (
-      state: ResourceAuthorityState,
-    ) => Effect.Effect<readonly [A, ResourceAuthorityState], KernelResourceFailure>,
+    transition: (state: AuthorityState) => Effect.Effect<readonly [A, AuthorityState], KernelResourceFailure>,
   ): Effect.Effect<A, KernelResourceFailure> => SynchronizedRef.modifyEffect(authority, transition)
 
   return {
@@ -243,17 +241,14 @@ export const makeMemoryResourceStore: Effect.Effect<MemoryResourceStore> = Effec
             Effect.flatMap((lease) => {
               const resource = lease.resource
               if (resource === undefined) {
-                return Effect.succeed<readonly [ResourceIdentity | undefined, ResourceAuthorityState]>([
-                  undefined,
-                  state,
-                ])
+                return Effect.succeed<readonly [ResourceIdentity | undefined, AuthorityState]>([undefined, state])
               }
               if (resource.activeCell !== undefined) {
                 return Effect.fail(rejected(claim.sessionId, "cell-active", "an active cell must stop before deletion"))
               }
               const deleting = Resource.make({ ...resource, state: "deleting" })
               const updated = Lease.make({ ...lease, resource: deleting })
-              return Effect.succeed<readonly [ResourceIdentity | undefined, ResourceAuthorityState]>([
+              return Effect.succeed<readonly [ResourceIdentity | undefined, AuthorityState]>([
                 identityOf(deleting),
                 setLease(state, updated),
               ])
@@ -322,7 +317,7 @@ export const makeMemoryResourceStore: Effect.Effect<MemoryResourceStore> = Effec
 })
 
 /** @experimental */
-export const layerMemoryResourceStore: Layer.Layer<KernelResourceStore> = Layer.effect(
-  KernelResourceStore,
-  makeMemoryResourceStore,
+export const layerMemoryResourceAuthority: Layer.Layer<KernelResourceAuthority> = Layer.effect(
+  KernelResourceAuthority,
+  makeMemoryResourceAuthority,
 )

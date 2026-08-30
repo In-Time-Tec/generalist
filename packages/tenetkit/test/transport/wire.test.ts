@@ -22,6 +22,14 @@ describe("Wire", () => {
     }),
   )
 
+  it.effect("strictly validates payloads for known event tags", () =>
+    Effect.gen(function* () {
+      const malformed = { ...event(5), _tag: "RunCompleted" }
+      const error = yield* Wire.observerCodec.decode(encodeJson(malformed)).pipe(Effect.flip)
+      expect(error._tag).toBe("tenetkit/transport/WireCodecFailed")
+    }),
+  )
+
   it.effect("keeps durable model events compact and exposes only host-resolved observer content", () =>
     Effect.gen(function* () {
       const compact = {
@@ -41,7 +49,7 @@ describe("Wire", () => {
       const durable = yield* Wire.producerCodec.decode(yield* Wire.producerCodec.encode(compact))
       expect(durable).not.toHaveProperty("response")
       const unresolved = yield* Wire.observerCodec.decode(encodeJson(compact)).pipe(Effect.flip)
-      expect(unresolved._tag).toBe("tenetkit/transport/WireEncodeFailed")
+      expect(unresolved._tag).toBe("tenetkit/transport/WireCodecFailed")
       const resolved = {
         ...compact,
         response: { content: [Response.makePart("text", { text: "retained" })] },

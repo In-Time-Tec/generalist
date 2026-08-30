@@ -9,7 +9,7 @@ import {
   type ConnectionStatus,
 } from "../../transport/run-client.js"
 import { TransportError } from "../../transport/errors.js"
-import { ObserverRunEvent, type ResolvedRunEvent } from "../../transport/wire.js"
+import { ObserverRunEvent } from "../../transport/wire.js"
 import type { AgentCommand } from "./connection-command.js"
 
 /** @experimental */
@@ -28,7 +28,7 @@ export const ConnectionFailed: CallableTaggedStruct<
 
 /** @experimental */
 export type Incoming =
-  | ResolvedRunEvent
+  | ObserverRunEvent
   | typeof ConnectionOpened.Type
   | typeof ConnectionLost.Type
   | typeof ConnectionFailed.Type

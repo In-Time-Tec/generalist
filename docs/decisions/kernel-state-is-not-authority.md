@@ -4,9 +4,9 @@ A cell's namespace is not durable state. TenetKit operations, events, Session en
 
 Three consequences follow, and each is a contract rather than a convention.
 
-**A restart reports exactly what it kept and what it lost.** `KernelPool.restart` returns `restoredNames` and `droppedNames`, and `KernelStateStore.Manifest` names every binding restored by value, by source, or by import replay, plus every binding dropped with its `DropReason`. `bun-snapshot.test.ts` asserts that a plain value is restored, a function is restored by re-evaluating its source, and a module binding is named as dropped rather than silently missing.
+**A restart reports exactly what it kept and what it lost.** `KernelPool.restart` returns `restoredNames` and `droppedNames`, and `KernelSnapshotStore.Manifest` names every binding restored by value, by source, or by import replay, plus every binding dropped with its `DropReason`. `bun-snapshot.test.ts` asserts that a plain value is restored, a function is restored by re-evaluating its source, and a module binding is named as dropped rather than silently missing.
 
-**A snapshot is best effort and never fatal.** A corrupt payload or a corrupt manifest is reported and the Session still boots a kernel; `BunKernelStateStore.load` fails typed with `reason: "corrupt"` and leaves the file on disk rather than resetting it.
+**A snapshot is best effort and never fatal.** A corrupt payload or a corrupt manifest is reported and the Session still boots a kernel; `BunKernelSnapshotStore.load` fails typed with `reason: "corrupt"` and leaves the file on disk rather than resetting it.
 
 **An uncertain cell is never replayed.** When a kernel dies mid-cell the outcome is `CellOutcomeUnknown`, which states that the cell may or may not have committed its effects. A host resolves it explicitly. Automatic replay would repeat whatever the cell already did outside the namespace, which is precisely what the durable journal exists to prevent.
 

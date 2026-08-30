@@ -93,7 +93,9 @@ export interface ForgetInput {
 
 /** @experimental */
 export class MemoryError extends Schema.TaggedError<MemoryError>()("tenetkit/core/MemoryError", {
+  reason: Schema.optionalKey(Schema.Literals(["embedding", "vector-store", "language-model"])),
   message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
 /** @experimental */

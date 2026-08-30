@@ -5,9 +5,9 @@ import { layer as bunLayer, type BunServices } from "@effect/platform-bun/BunSer
 import { Context, Duration, Effect, FileSystem, Layer, Path, type PlatformError, Scope, Stream } from "effect"
 import type { CellEvent, CellFailure, CellResult } from "../../src/repl/cell.js"
 import type { Execution, Service as KernelPoolService } from "../../src/repl/kernel-pool.js"
-import { KernelStateStore } from "../../src/repl/kernel-state-store.js"
-import { HostModules, KernelProfile } from "../../src/repl/index.js"
-import { BunKernelPool, BunKernelStateStore } from "../../src/repl/bun/index.js"
+import { KernelSnapshotStore } from "../../src/repl/kernel-snapshot-store.js"
+import { HostBindings, KernelProfile } from "../../src/repl/index.js"
+import { BunKernelPool, BunKernelSnapshotStore } from "../../src/repl/bun/index.js"
 
 /** The kernel worker module a real-worker test spawns. */
 export const workerModule = new URL("../../src/repl/bun/worker.ts", import.meta.url).pathname
@@ -40,7 +40,7 @@ export interface PoolOverrides {
   readonly startTimeoutMillis?: number
   readonly workspaceRoot?: string
   readonly workerModuleOverride?: string
-  readonly modules?: ReadonlyArray<HostModules.Module>
+  readonly modules?: ReadonlyArray<HostBindings.Module>
   readonly bootstrap?: string
 }
 
@@ -74,12 +74,12 @@ export const ownWorkers: Effect.Effect<number> = Effect.sync(() =>
 )
 
 const registryContext = (
-  modules: ReadonlyArray<HostModules.Module> | undefined,
+  modules: ReadonlyArray<HostBindings.Module> | undefined,
 ): Effect.Effect<Context.Context<never>> =>
   modules === undefined
     ? Effect.succeed(Context.empty())
-    : HostModules.make(modules).pipe(
-        Effect.map((registry) => Context.make(HostModules.HostModules, registry)),
+    : HostBindings.make(modules).pipe(
+        Effect.map((registry) => Context.make(HostBindings.HostBindings, registry)),
         Effect.orDie,
       )
 
@@ -132,9 +132,9 @@ export const makeHarness = (
     const fileSystem = yield* FileSystem.FileSystem
     const dataRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-kernel-" })
     const profile = profileFor({ root: overrides?.workspaceRoot ?? workspaceRoot, dataRoot, overrides })
-    const store = yield* BunKernelStateStore.make({ dataRoot })
+    const store = yield* BunKernelSnapshotStore.make({ dataRoot })
     const pool = yield* makePool(profile, overrides).pipe(
-      Effect.provideService(KernelStateStore, store),
+      Effect.provideService(KernelSnapshotStore, store),
       Effect.provideContext(yield* registryContext(overrides?.modules)),
     )
     return { pool, dataRoot, profile, ownWorkers }
@@ -156,7 +156,6 @@ export interface CellRequest {
   readonly sessionId: string
   readonly cellId: string
   readonly code: string
-  readonly signal?: AbortSignal
 }
 
 const submit = (request: CellRequest): Effect.Effect<Execution, CellFailure, Scope.Scope> =>
@@ -164,7 +163,6 @@ const submit = (request: CellRequest): Effect.Effect<Execution, CellFailure, Sco
     sessionId: request.sessionId,
     cellId: request.cellId,
     code: request.code,
-    signal: request.signal ?? AbortSignal.any([]),
   })
 
 /** One cell awaited to its terminal outcome. */

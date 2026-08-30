@@ -92,7 +92,6 @@ layer(platform, liveOptions)("Bun kernel cleanup", (it) => {
                 sessionId: "s",
                 cellId: "c1",
                 code: "await new Promise((resolve) => setTimeout(resolve, 10000)); 'never'",
-                signal: AbortSignal.any([]),
               })
               yield* Effect.forkChild(Effect.exit(execution.result))
               yield* Effect.sleep(150)
@@ -136,8 +135,8 @@ layer(platform, liveOptions)("Bun kernel cleanup", (it) => {
           Effect.gen(function* () {
             yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "const value = 1" })
             yield* pool.close("s")
-            const { BunKernelStateStore } = yield* Effect.promise(() => import("../../../src/repl/bun/index.js"))
-            const store = yield* BunKernelStateStore.make({ dataRoot })
+            const { BunKernelSnapshotStore } = yield* Effect.promise(() => import("../../../src/repl/bun/index.js"))
+            const store = yield* BunKernelSnapshotStore.make({ dataRoot })
             yield* store.drop("s")
             expect(yield* store.load("s")).toBeUndefined()
           }),

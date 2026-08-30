@@ -24,7 +24,12 @@ import {
   type KernelProfile as Profile,
   make as makeKernelProfile,
 } from "../../src/repl/kernel-profile.js"
-import type { Claim, CommandClaim, Service as ResourceStore, Lease } from "../../src/repl/kernel-resource-store.js"
+import type {
+  Claim,
+  CommandClaim,
+  Service as ResourceAuthority,
+  Lease,
+} from "../../src/repl/kernel-resource-authority.js"
 import { TestKernel } from "../../src/repl/index.js"
 
 interface NamespaceValue {
@@ -199,7 +204,7 @@ const makeProfile = (imageDigest: string): Profile =>
 const makeRemotePool = (input: {
   readonly ownerId: string
   readonly profile: Profile
-  readonly authority: ResourceStore
+  readonly authority: ResourceAuthority
   readonly state: SynchronizedRef.SynchronizedRef<ProviderState>
 }): Effect.Effect<KernelPool> =>
   Effect.gen(function* () {
@@ -582,7 +587,7 @@ const makeRemotePool = (input: {
 
 /** A deterministic hosted provider with two competing hosts and provider/storage fault controls. */
 export const makeRemoteHarness: Effect.Effect<RemoteHarness> = Effect.gen(function* () {
-  const authority: TestKernel.MemoryResourceStore = yield* TestKernel.makeMemoryResourceStore
+  const authority: TestKernel.MemoryResourceAuthority = yield* TestKernel.makeMemoryResourceAuthority
   const state = yield* SynchronizedRef.make(initialProviderState)
   const profile = makeProfile("template-v1")
   const changedProfile = makeProfile("template-v2")

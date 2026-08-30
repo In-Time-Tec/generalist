@@ -44,6 +44,7 @@ export {
   guardUnknownNeverReplay,
   layerInline,
   layerTest,
+  arrayStreamCodec,
   make as makeInline,
   type Journal,
   type OperationSpec,

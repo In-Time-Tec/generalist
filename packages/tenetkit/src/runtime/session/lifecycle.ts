@@ -3,6 +3,8 @@ import { RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { Service as RunStore } from "../run/store.js"
 
+const rootSubscriptionConcurrency = 16
+
 export const awaitSessionTerminal = (input: {
   readonly store: RunStore
   readonly sessionId: string
@@ -34,6 +36,6 @@ export const awaitSessionTerminal = (input: {
             yield* awaitTerminal
           }),
         ),
-      { concurrency: "unbounded", discard: true },
+      { concurrency: rootSubscriptionConcurrency, discard: true },
     )
   })

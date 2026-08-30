@@ -94,10 +94,10 @@ const chatFrames: ReadonlyArray<Connection.Incoming> = [
 
 const [chatModel] = Chat.update(
   Chat.initialModel("capstone-session"),
-  Chat.ReceivedAgent({ incoming: Connection.ConnectionOpened() }),
+  Chat.ReceivedConnection({ event: Connection.ConnectionOpened() }),
 )
 const renderedChat = chatFrames.reduce(
-  (model, frame) => Chat.update(model, Chat.ReceivedAgent({ incoming: frame }))[0],
+  (model, frame) => Chat.update(model, Chat.ReceivedConnection({ event: frame }))[0],
   chatModel,
 )
 

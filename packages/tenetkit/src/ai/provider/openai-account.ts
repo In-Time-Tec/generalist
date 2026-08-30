@@ -5,7 +5,7 @@ import {
   layer as modelRegistryLayer,
   registration as modelRegistration,
 } from "../../core/model/registry.js"
-import { Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
+import { Context, Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
 import type { Credential, OpenAIAccountAuth } from "./openai-account-auth.js"
 import { failureReason, layerLanguageModel } from "./openai-model.js"
@@ -81,7 +81,7 @@ export const credentialsFromAuth: {
 } = Function.dual(2, credentialsFromAuthImpl)
 
 /** @experimental */
-export interface AccountOptions extends RegistrationOptions {
+export interface Options extends RegistrationOptions {
   readonly model: (string & {}) | OpenAILanguageModelModel
   readonly credentials: OpenAIAccountCredentials
   readonly config?: Config
@@ -142,8 +142,11 @@ const accountClientTransform = (credentials: OpenAIAccountCredentials) => (clien
 const withAccountHeaderRedaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.updateService(Headers.CurrentRedactedNames, (names) => [...names, openAiAccountIdHeader]))
 
-const withoutOpenAISocket = <A, E>(effect: Effect.Effect<A, E>) =>
-  effect.pipe(Effect.provideService(OpenAIClient.OpenAiSocket, undefined!))
+const withHttpOnlyContext = <A, E>(effect: Effect.Effect<A, E>) =>
+  Effect.gen(function* () {
+    const redactedNames = yield* Headers.CurrentRedactedNames
+    return yield* effect.pipe(Effect.setContext(Context.make(Headers.CurrentRedactedNames, redactedNames)))
+  })
 
 const accountError = (method: string, reason: AiError.AiErrorReason) =>
   AiError.make({ module: "OpenAIClient", method, reason })
@@ -173,7 +176,7 @@ const foldedCreateResponse =
   (options) => {
     const { stream: _stream, ...payload } = options
     return client.createResponseStream(payload).pipe(
-      withoutOpenAISocket,
+      withHttpOnlyContext,
       Effect.flatMap(([response, events]) =>
         events.pipe(
           Stream.mapEffect(
@@ -228,7 +231,7 @@ export const layerClient = (credentials: OpenAIAccountCredentials) =>
           createResponse: (options) => withAccountHeaderRedaction(foldedCreateResponse(client)(options)),
           createResponseStream: (options) =>
             client.createResponseStream(options).pipe(
-              withoutOpenAISocket,
+              withHttpOnlyContext,
               withAccountHeaderRedaction,
               Effect.map(
                 ([response, stream]) =>
@@ -247,10 +250,10 @@ export const layerClient = (credentials: OpenAIAccountCredentials) =>
   )
 
 /** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
-export const registration = (input: AccountOptions): Effect.Effect<Registration, never, HttpClient.HttpClient> =>
+export const registration = (input: Options): Effect.Effect<Registration, never, HttpClient.HttpClient> =>
   modelRegistration(registrationOptions(input))
 
-const registrationOptions = (input: AccountOptions) => {
+const registrationOptions = (input: Options) => {
   const required = {
     provider: "openai",
     model: input.model,
@@ -265,5 +268,5 @@ const registrationOptions = (input: AccountOptions) => {
 }
 
 /** @experimental */
-export const layer = (input: AccountOptions): Layer.Layer<ModelRegistry, never, HttpClient.HttpClient> =>
+export const layer = (input: Options): Layer.Layer<ModelRegistry, never, HttpClient.HttpClient> =>
   modelRegistryLayer([registration(input)])

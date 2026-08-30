@@ -10,13 +10,13 @@ The SDK can create from an exact template build reference, reconnect a stored sa
 filesystem when pausing, reconnect a running command by PID, list running and paused sandboxes, and permanently kill
 either state. Those primitives are useful, but they do not provide a provider-side ownership fence. Sandbox metadata
 is create-only, and neither the sandbox nor process APIs expose a generation, conditional update, compare-and-set, or
-fencing token. A delayed old host command can therefore reach the guest after `KernelResourceStore` has granted a new
+fencing token. A delayed old host command can therefore reach the guest after `KernelResourceAuthority` has granted a new
 generation but before the guest learns that generation. A host-side `admit` followed by E2B `sendStdin` is the unfenced
 provider call the Core contract rejects; a guest-maintained maximum generation merely makes arrival order authoritative.
 Giving the guest credentials for the host resource authority would violate the credential boundary rather than fix it.
 
 Creation has a second structural gap. `Sandbox.create` accepts no idempotency key or conditional-create identity. If a
-host loses the response or stops after E2B creates the sandbox but before `KernelResourceStore.bind` stores its opaque
+host loses the response or stops after E2B creates the sandbox but before `KernelResourceAuthority.bind` stores its opaque
 ID, retrying can create a duplicate. Listing by create-time metadata has no documented uniqueness or consistency
 guarantee, so it cannot prove create-before-bind recovery.
 

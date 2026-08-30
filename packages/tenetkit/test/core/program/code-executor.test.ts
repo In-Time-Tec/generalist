@@ -134,7 +134,7 @@ it.effect("admits only fresh isolated requests whose exact guarantees are enforc
 
     const trusted = yield* CodeExecutor.admit(CodeExecutor.testIdentity, request(), 1_000).pipe(Effect.flip)
     expect(trusted).toMatchObject({
-      _tag: "@tenetkit/core/SandboxGuaranteeUnavailable",
+      _tag: "tenetkit/core/SandboxGuaranteeUnavailable",
       guarantee: "physicalIsolation",
     })
 

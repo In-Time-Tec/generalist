@@ -1,12 +1,12 @@
 import { Effect, FileSystem, Layer, Path, PlatformError, Random, Schema } from "effect"
 import type { SessionId } from "../cell.js"
 import {
-  KernelStateStore,
+  KernelSnapshotStore,
   KernelStateUnavailable,
   Manifest,
   type Service,
   type Snapshot,
-} from "../kernel-state-store.js"
+} from "../kernel-snapshot-store.js"
 
 const DIRECTORY_MODE = 0o700
 const FILE_MODE = 0o600
@@ -16,7 +16,7 @@ export interface Options {
   readonly dataRoot: string
 }
 
-const stateError = (
+const snapshotError = (
   sessionId: string,
   reason: KernelStateUnavailable["reason"],
   message: string,
@@ -53,16 +53,18 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
         yield* fileSystem
           .makeDirectory(directory, { recursive: true, mode: DIRECTORY_MODE })
           .pipe(
-            Effect.mapError(() => stateError(sessionId, "io", `kernel state directory is unwritable at ${directory}`)),
+            Effect.mapError(() =>
+              snapshotError(sessionId, "io", `kernel state directory is unwritable at ${directory}`),
+            ),
           )
         yield* write(temporary).pipe(
-          Effect.mapError(() => stateError(sessionId, "io", `kernel state is unwritable at ${file}`)),
+          Effect.mapError(() => snapshotError(sessionId, "io", `kernel state is unwritable at ${file}`)),
           Effect.onExit((exit) =>
             exit._tag === "Success" ? Effect.void : fileSystem.remove(temporary, { force: true }).pipe(Effect.ignore),
           ),
         )
         yield* fileSystem.rename(temporary, file).pipe(
-          Effect.mapError(() => stateError(sessionId, "io", `kernel state cannot be replaced at ${file}`)),
+          Effect.mapError(() => snapshotError(sessionId, "io", `kernel state cannot be replaced at ${file}`)),
           Effect.onExit((exit) =>
             exit._tag === "Success" ? Effect.void : fileSystem.remove(temporary, { force: true }).pipe(Effect.ignore),
           ),
@@ -75,16 +77,16 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
             onFailure: (error) =>
               isNotFound(error)
                 ? Effect.succeedNone
-                : Effect.fail(stateError(sessionId, "io", `kernel state is unreadable for session ${sessionId}`)),
+                : Effect.fail(snapshotError(sessionId, "io", `kernel state is unreadable for session ${sessionId}`)),
             onSuccess: (text) =>
               decodeManifest(text).pipe(
                 Effect.mapError(() =>
-                  stateError(sessionId, "corrupt", `kernel state manifest is corrupt for session ${sessionId}`),
+                  snapshotError(sessionId, "corrupt", `kernel state manifest is corrupt for session ${sessionId}`),
                 ),
                 Effect.flatMap((manifest) =>
                   fileSystem.readFile(payloadFile(sessionId)).pipe(
                     Effect.mapError(() =>
-                      stateError(sessionId, "corrupt", `kernel state payload is missing for session ${sessionId}`),
+                      snapshotError(sessionId, "corrupt", `kernel state payload is missing for session ${sessionId}`),
                     ),
                     Effect.map((payload): Snapshot => ({ manifest, payload })),
                   ),
@@ -98,7 +100,7 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
         Effect.gen(function* () {
           const sessionId = snapshot.manifest.sessionId
           const text = yield* encodeManifest(snapshot.manifest).pipe(
-            Effect.mapError(() => stateError(sessionId, "corrupt", "kernel state manifest cannot be encoded")),
+            Effect.mapError(() => snapshotError(sessionId, "corrupt", "kernel state manifest cannot be encoded")),
           )
           yield* writeAtomic(sessionId, payloadFile(sessionId), (temporary) =>
             fileSystem.writeFile(temporary, snapshot.payload, { mode: FILE_MODE }),
@@ -112,12 +114,12 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
           .remove(directoryOf(sessionId), { recursive: true, force: true })
           .pipe(
             Effect.mapError(() =>
-              stateError(sessionId, "io", `kernel state cannot be dropped for session ${sessionId}`),
+              snapshotError(sessionId, "io", `kernel state cannot be dropped for session ${sessionId}`),
             ),
           ),
     }
   })
 
 /** @experimental One durable filesystem-backed kernel snapshot store. */
-export const layer = (options: Options): Layer.Layer<KernelStateStore, never, FileSystem.FileSystem | Path.Path> =>
-  Layer.effect(KernelStateStore, make(options).pipe(Effect.map(KernelStateStore.of)))
+export const layer = (options: Options): Layer.Layer<KernelSnapshotStore, never, FileSystem.FileSystem | Path.Path> =>
+  Layer.effect(KernelSnapshotStore, make(options).pipe(Effect.map(KernelSnapshotStore.of)))

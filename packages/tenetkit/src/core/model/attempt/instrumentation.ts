@@ -5,7 +5,7 @@ import type { IdentityCell } from "./identity.js"
 import { disabledResponseIdTracker, firstOutputKind, providerUsage, singleFailure } from "./observation.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "../response/failure.js"
 import type { Classification, Policy as Resilience } from "../resilience.js"
-import type { CandidateIdentity, FailureDisposition } from "../registry.js"
+import type { CandidateIdentity, FailureDisposition } from "../registry-internal.js"
 import { type TerminationFailure, requireTerminal } from "../stream-termination.js"
 import {
   InvocationLifecycle,

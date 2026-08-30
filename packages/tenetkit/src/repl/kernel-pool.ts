@@ -7,7 +7,6 @@ export interface ExecuteRequest {
   readonly sessionId: SessionId
   readonly cellId: CellId
   readonly code: string
-  readonly signal: AbortSignal
 }
 
 /** @experimental A cell's streamed lifecycle plus its terminal outcome. */

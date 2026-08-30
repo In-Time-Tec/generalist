@@ -3,7 +3,7 @@
 Effect-native agent framework. Import the Worker-safe agent API from `tenetkit`. Provider-neutral catalog, deterministic model, and route owners live at `tenetkit/ai/model-catalog`, `tenetkit/ai/deterministic`, and `tenetkit/ai/model-route`; optional providers remain exact `tenetkit/ai/*` leaves.
 
 ```bash
-bun add effect@4.0.0-rc.112 tenetkit@0.43.0
+bun add effect@4.0.0-rc.112 tenetkit@0.44.0
 ```
 
 Install only package names. `tenetkit/runtime`, `tenetkit/ai/deterministic`, and the other `tenetkit/*` names below are import subpaths of `tenetkit`, not separate packages. Core, generic Runtime, the model catalog and route, and `tenetkit/ai/deterministic` require no optional provider peer. Each exact provider or integration subpath requires the optional peer named by its reference documentation.
@@ -25,7 +25,7 @@ Construct MCP Streamable HTTP transports at `tenetkit/mcp/client/http`. `tenetki
 
 `KernelProfile` pins the provider, exact runtime and runtime/image/template identity, physical isolation, checkpoint capabilities, host bindings, workspace, and limits for one epoch. Its content-addressed digest excludes credentials, ownership generations, and mutable provider resource IDs. Recovery reports one exact kind: `live-process`, `filesystem`, `namespace`, or `restart-only`.
 
-`tenetkit/repl/bun` is the trusted-local child-process implementation. Hosted providers are explicit Layers and use the host-owned `KernelResourceStore` authority to fence every command by Session, ownership generation, epoch, profile digest, resource, and cell identity. Provider create/pause/resume details do not enter `KernelPool`; uncertain admitted source is never replayed, and failed cleanup remains visible until exact deletion is proven.
+`tenetkit/repl/bun` is the trusted-local child-process implementation. Hosted providers are explicit Layers and use the host-owned `KernelResourceAuthority` authority to fence every command by Session, ownership generation, epoch, profile digest, resource, and cell identity. Provider create/pause/resume details do not enter `KernelPool`; uncertain admitted source is never replayed, and failed cleanup remains visible until exact deletion is proven.
 
 Provider packages can register the reusable `KernelProviderConformance.kernelProviderConformance` suite from `tenetkit/test`. It covers the common Bun lifecycle and deterministic remote ownership, reconnection, recovery, uncertainty, pause, and cleanup semantics. Deterministic fixtures do not prove a hosted vendor's isolation or billing deletion; those require live provider tests.
 

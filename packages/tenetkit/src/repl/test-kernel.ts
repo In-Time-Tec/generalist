@@ -18,12 +18,12 @@ import {
   type Restart,
 } from "./kernel-pool.js"
 import {
-  type Service as KernelStateStoreService,
-  KernelStateStore,
+  type Service as KernelSnapshotStoreService,
+  KernelSnapshotStore,
   KernelStateUnavailable,
   Manifest,
   type Snapshot,
-} from "./kernel-state-store.js"
+} from "./kernel-snapshot-store.js"
 import { type KernelProfile, digest } from "./kernel-profile.js"
 
 /** @experimental What the scripted pool does with one cell. */
@@ -197,7 +197,7 @@ export const layerTestPool = (options: TestPoolOptions): Layer.Layer<KernelPool>
   Layer.effect(KernelPool, makeTest(options))
 
 /** @experimental An in-memory snapshot store keyed by Session identity. */
-export const makeMemoryStore: Effect.Effect<KernelStateStoreService> = Effect.gen(function* () {
+export const makeMemoryStore: Effect.Effect<KernelSnapshotStoreService> = Effect.gen(function* () {
   const snapshots = yield* Ref.make(new Map<string, Snapshot>())
   return {
     load: (sessionId) => Ref.get(snapshots).pipe(Effect.map((all) => all.get(sessionId))),
@@ -221,6 +221,6 @@ export const makeMemoryStore: Effect.Effect<KernelStateStoreService> = Effect.ge
 })
 
 /** @experimental */
-export const layerMemoryStore: Layer.Layer<KernelStateStore> = Layer.effect(KernelStateStore, makeMemoryStore)
+export const layerMemoryStore: Layer.Layer<KernelSnapshotStore> = Layer.effect(KernelSnapshotStore, makeMemoryStore)
 
-export * from "./test-kernel-resource-store.js"
+export * from "./test-kernel-resource-authority.js"

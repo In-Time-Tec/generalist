@@ -92,7 +92,6 @@ layer(platform, liveOptions)("Bun kernel cell failure", (it) => {
             sessionId: "s",
             cellId: "c2",
             code: "await new Promise((resolve) => setTimeout(resolve, 10000)); 'never'",
-            signal: AbortSignal.any([]),
           })
           const awaiting = yield* Effect.forkChild(Effect.exit(execution.result))
           const interruption = yield* pool.interrupt("s", "c2")

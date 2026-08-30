@@ -1,11 +1,11 @@
-import { layer, RunSchema } from "@tenetkit/pg"
+import { layer, RuntimeSchema } from "@tenetkit/pg"
 import { Config, Effect, Layer, Option } from "effect"
 import { provideScoped } from "../../../tenetkit/test/runtime/execution/scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { ExecutableResolver } from "tenetkit/runtime"
 import { RuntimeWorker } from "tenetkit/runtime/sql-driver"
-import type { StoreError } from "../../src/postgres/runtime-layer.js"
+import type { RuntimeError } from "../../src/postgres/runtime-layer.js"
 import {
   analyst,
   analystRef,
@@ -30,7 +30,7 @@ export const postgresAvailable = postgresUrl !== undefined && postgresUrl.length
 
 export const postgresTestMaxConnections = 8
 
-export const postgresClient = (url: string) => RunSchema.layerClient({ url, maxConnections: 2 })
+export const postgresClient = (url: string) => RuntimeSchema.layerClient({ url, maxConnections: 2 })
 
 type PostgresWorkerLayer = Layer.Layer<
   | import("tenetkit/runtime").RunExecutor.RunExecutor
@@ -38,7 +38,7 @@ type PostgresWorkerLayer = Layer.Layer<
   | import("tenetkit/runtime").RunStore.RunStore
   | import("tenetkit/runtime").Runtime.Runtime
   | import("tenetkit/runtime/sql-driver").RuntimeWorker.RuntimeWorker,
-  SqlError | StoreError,
+  SqlError | RuntimeError,
   never
 >
 
@@ -101,11 +101,11 @@ const schemaName = (label: string) =>
 export interface PostgresDatabase {
   readonly url: string
   readonly empty: Effect.Effect<void, SqlError>
-  readonly ready: Effect.Effect<void, SqlError | StoreError>
+  readonly ready: Effect.Effect<void, SqlError | RuntimeError>
   /** The one provisioning this file performs, so reopening a Runtime does not drop its own state. */
-  readonly readyOnce: Effect.Effect<void, SqlError | StoreError>
+  readonly readyOnce: Effect.Effect<void, SqlError | RuntimeError>
   readonly client: Layer.Layer<SqlClient.SqlClient, SqlError>
-  readonly provision: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | SqlError | StoreError, R>
+  readonly provision: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | SqlError | RuntimeError, R>
   readonly provisionEmpty: <A, E, R>(self: Layer.Layer<A, E, R>) => Layer.Layer<A, E | SqlError, R>
 }
 
@@ -126,9 +126,10 @@ export const postgresDatabase = (label: string): PostgresDatabase => {
       yield* sql.unsafe(`CREATE SCHEMA ${schema}`)
     }),
   ).pipe(Effect.scoped, Effect.asVoid)
-  const ready = Effect.andThen(empty, provideScoped(client, RunSchema.apply("postgres-test")).pipe(Effect.scoped)).pipe(
-    Effect.asVoid,
-  )
+  const ready = Effect.andThen(
+    empty,
+    provideScoped(client, RuntimeSchema.apply("postgres-test")).pipe(Effect.scoped),
+  ).pipe(Effect.asVoid)
   const readyOnce = Effect.runSync(Effect.cached(ready))
   return {
     url,

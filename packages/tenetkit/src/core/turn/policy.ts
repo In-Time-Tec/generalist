@@ -65,14 +65,14 @@ export const StopReason = Schema.Union([
 export type StopReason = typeof StopReason.Type
 
 /** @experimental A turn policy could not evaluate its decision. */
-export class Error extends Schema.TaggedError<Error>()("tenetkit/core/TurnPolicyError", {
+export class PolicyError extends Schema.TaggedError<PolicyError>()("tenetkit/core/TurnPolicyError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
 /** @experimental A turn policy in the spirit of `Schedule`. */
 export interface Policy<R = never> {
-  readonly decide: (info: TurnInfo) => Effect.Effect<Decision, Error, R>
+  readonly decide: (info: TurnInfo) => Effect.Effect<Decision, PolicyError, R>
   readonly snapshot?: Snapshot
 }
 
@@ -114,7 +114,7 @@ export const decision = {
 }
 
 /** @experimental Construct a policy from a decide function. */
-export const make = <R = never>(decide: (info: TurnInfo) => Effect.Effect<Decision, Error, R>): Policy<R> => ({
+export const make = <R = never>(decide: (info: TurnInfo) => Effect.Effect<Decision, PolicyError, R>): Policy<R> => ({
   decide,
 })
 

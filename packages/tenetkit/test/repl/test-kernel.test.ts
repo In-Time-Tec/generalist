@@ -1,6 +1,6 @@
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Schema, Stream } from "effect"
-import { Cell, KernelPool, KernelProfile, KernelStateStore, TestKernel } from "../../src/repl/index"
+import { Cell, KernelPool, KernelProfile, KernelSnapshotStore, TestKernel } from "../../src/repl/index"
 
 const sessionId = "session-a"
 const otherSession = "session-b"
@@ -31,8 +31,7 @@ const poolLayer = TestKernel.layerTestPool({ profile, script, bindings })
 const execute = (code: string, cellId: string, session = sessionId) =>
   Effect.gen(function* () {
     const pool = yield* KernelPool.KernelPool
-    const signal = yield* Effect.abortSignal
-    return yield* pool.execute({ sessionId: session, cellId, code, signal })
+    return yield* pool.execute({ sessionId: session, cellId, code })
   })
 
 layer(poolLayer)("test KernelPool", (it) => {
@@ -144,8 +143,8 @@ layer(poolLayer)("test KernelPool", (it) => {
   )
 })
 
-const snapshot = (session: string): KernelStateStore.Snapshot => ({
-  manifest: KernelStateStore.Manifest.make({
+const snapshot = (session: string): KernelSnapshotStore.Snapshot => ({
+  manifest: KernelSnapshotStore.Manifest.make({
     sessionId: session,
     epoch: 1,
     profileDigest: KernelProfile.digest(profile),
@@ -159,17 +158,17 @@ const snapshot = (session: string): KernelStateStore.Snapshot => ({
   payload: new Uint8Array([1, 2, 3]),
 })
 
-layer(TestKernel.layerMemoryStore)("memory KernelStateStore", (it) => {
+layer(TestKernel.layerMemoryStore)("memory KernelSnapshotStore", (it) => {
   it.effect("reports no snapshot before one is saved", () =>
     Effect.gen(function* () {
-      const store = yield* KernelStateStore.KernelStateStore
+      const store = yield* KernelSnapshotStore.KernelSnapshotStore
       expect(yield* store.load("session-none")).toBeUndefined()
     }),
   )
 
   it.effect("round-trips a snapshot and its manifest", () =>
     Effect.gen(function* () {
-      const store = yield* KernelStateStore.KernelStateStore
+      const store = yield* KernelSnapshotStore.KernelSnapshotStore
       yield* store.save(snapshot(sessionId))
       const loaded = yield* store.load(sessionId)
       expect(loaded?.manifest.restored.map((binding) => binding.kind)).toEqual(["value", "source"])
@@ -180,7 +179,7 @@ layer(TestKernel.layerMemoryStore)("memory KernelStateStore", (it) => {
 
   it.effect("keeps snapshots keyed by Session identity", () =>
     Effect.gen(function* () {
-      const store = yield* KernelStateStore.KernelStateStore
+      const store = yield* KernelSnapshotStore.KernelSnapshotStore
       yield* store.save(snapshot("session-x"))
       expect(yield* store.load("session-y")).toBeUndefined()
     }),
@@ -188,7 +187,7 @@ layer(TestKernel.layerMemoryStore)("memory KernelStateStore", (it) => {
 
   it.effect("replaces a Session snapshot on save", () =>
     Effect.gen(function* () {
-      const store = yield* KernelStateStore.KernelStateStore
+      const store = yield* KernelSnapshotStore.KernelSnapshotStore
       const first = snapshot("session-z")
       yield* store.save(first)
       yield* store.save({ ...first, payload: new Uint8Array([9]) })
@@ -198,7 +197,7 @@ layer(TestKernel.layerMemoryStore)("memory KernelStateStore", (it) => {
 
   it.effect("drops a Session snapshot", () =>
     Effect.gen(function* () {
-      const store = yield* KernelStateStore.KernelStateStore
+      const store = yield* KernelSnapshotStore.KernelSnapshotStore
       yield* store.save(snapshot("session-drop"))
       yield* store.drop("session-drop")
       expect(yield* store.load("session-drop")).toBeUndefined()
@@ -207,12 +206,12 @@ layer(TestKernel.layerMemoryStore)("memory KernelStateStore", (it) => {
 
   it.effect("reports a corrupt manifest instead of storing it", () =>
     Effect.gen(function* () {
-      const store = yield* KernelStateStore.KernelStateStore
+      const store = yield* KernelSnapshotStore.KernelSnapshotStore
       const failure = yield* Effect.flip(
         store.save({ manifest: { ...snapshot(sessionId).manifest, sessionId: "" }, payload: new Uint8Array() }),
       )
-      expect(Schema.is(KernelStateStore.KernelStateUnavailable)(failure)).toBe(true)
-      if (Schema.is(KernelStateStore.KernelStateUnavailable)(failure)) expect(failure.reason).toBe("corrupt")
+      expect(Schema.is(KernelSnapshotStore.KernelStateUnavailable)(failure)).toBe(true)
+      if (Schema.is(KernelSnapshotStore.KernelStateUnavailable)(failure)) expect(failure.reason).toBe("corrupt")
     }),
   )
 })
@@ -220,15 +219,15 @@ layer(TestKernel.layerMemoryStore)("memory KernelStateStore", (it) => {
 describe("snapshot manifest", () => {
   standalone("round-trips through its codec", () => {
     const manifest = snapshot(sessionId).manifest
-    const encoded = Schema.encodeSync(KernelStateStore.Manifest)(manifest)
-    expect(Schema.decodeSync(KernelStateStore.Manifest)(encoded)).toEqual(manifest)
+    const encoded = Schema.encodeSync(KernelSnapshotStore.Manifest)(manifest)
+    expect(Schema.decodeSync(KernelSnapshotStore.Manifest)(encoded)).toEqual(manifest)
   })
 
   standalone("rejects an unknown restore kind", () => {
-    expect(() => Schema.decodeUnknownSync(KernelStateStore.RestoreKind)("closure")).toThrow()
+    expect(() => Schema.decodeUnknownSync(KernelSnapshotStore.RestoreKind)("closure")).toThrow()
   })
 
   standalone("rejects an unknown drop reason", () => {
-    expect(() => Schema.decodeUnknownSync(KernelStateStore.DroppedBinding)({ name: "x", reason: "vibes" })).toThrow()
+    expect(() => Schema.decodeUnknownSync(KernelSnapshotStore.DroppedBinding)({ name: "x", reason: "vibes" })).toThrow()
   })
 })

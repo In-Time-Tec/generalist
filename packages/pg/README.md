@@ -3,10 +3,10 @@
 PostgreSQL runtime backend for TenetKit.
 
 ```bash
-bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @tenetkit/pg@0.43.0
+bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @tenetkit/pg@0.44.0
 ```
 
-`layer(options)` supports Node 22+ and Bun 1.4+. Pass URL options to let the adapter acquire its client, or provide an Effect `PgClient` for shared transactions. Import `RunSchema` from this package for predeploy schema work.
+`layer(options)` supports Node 22+ and Bun 1.4+. Pass URL options to let the adapter acquire its client, or provide an Effect `PgClient` for shared transactions. Import `RuntimeSchema` from this package for predeploy schema work.
 
 ## Shared client
 
@@ -40,4 +40,4 @@ const admitWithHostRow = Effect.gen(function* () {
 
 Runtime admission nests through the exact same Effect SQL transaction service, so nested use keeps Effect SQL savepoint behavior. PostgreSQL notifications run on that transaction connection and become visible only after the outermost commit; rollback removes both host and Runtime rows without emitting a notification.
 
-`layer(options)` accepts either URL-backed `UrlOptions` or `Options` with a caller-provided client. Install and import `@effect/sql-pg` directly when using the shared-client form shown above. Schema deployment stays separate through `RunSchema.plan`, `RunSchema.check`, and `RunSchema.apply`.
+`layer(options)` accepts either URL-backed `UrlOptions` or `Options` with a caller-provided client. Install and import `@effect/sql-pg` directly when using the shared-client form shown above. Schema deployment stays separate through `RuntimeSchema.plan`, `RuntimeSchema.check`, and `RuntimeSchema.apply`.

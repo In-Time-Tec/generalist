@@ -8,7 +8,8 @@ export interface Options {
   readonly minScore?: number
 }
 
-const memoryError = (message: string): MemoryError => MemoryError.make({ message })
+const memoryError = (reason: "embedding" | "vector-store", cause: unknown): MemoryError =>
+  MemoryError.make({ reason, message: String(cause), cause })
 
 const textPart = (text: string) => Prompt.makePart("text", { text })
 
@@ -69,7 +70,7 @@ export const make = (
         const text = userText(input.prompt)
         if (text.length === 0) return Effect.succeed([])
         return embeddingModel.embed(text).pipe(
-          Effect.mapError((error) => memoryError(String(error))),
+          Effect.mapError((error) => memoryError("embedding", error)),
           Effect.flatMap((embedding) =>
             store
               .query(
@@ -82,7 +83,7 @@ export const make = (
                       minScore: options.minScore,
                     } satisfies Query),
               )
-              .pipe(Effect.mapError((error) => memoryError(String(error)))),
+              .pipe(Effect.mapError((error) => memoryError("vector-store", error))),
           ),
           Effect.map((matches) => matches.map(itemFromMatch)),
         )
@@ -92,25 +93,26 @@ export const make = (
         const text = finalExchangeText(input.transcript)
         if (text === undefined) return Effect.void
         return embeddingModel.embed(text).pipe(
-          Effect.mapError((error) => memoryError(String(error))),
+          Effect.mapError((error) => memoryError("embedding", error)),
           Effect.flatMap((embedding) =>
             Ref.modify(counter, (current) => [`semantic-${current + 1}`, current + 1]).pipe(
               Effect.flatMap((id) =>
-                store.upsert([
-                  {
-                    id,
-                    key: input.key,
-                    text,
-                    embedding: embedding.vector,
-                  },
-                ]),
+                store
+                  .upsert([
+                    {
+                      id,
+                      key: input.key,
+                      text,
+                      embedding: embedding.vector,
+                    },
+                  ])
+                  .pipe(Effect.mapError((error) => memoryError("vector-store", error))),
               ),
             ),
           ),
-          Effect.mapError((error) => memoryError(String(error))),
         )
       },
-      forget: (input) => store.delete(input).pipe(Effect.mapError((error) => memoryError(String(error)))),
+      forget: (input) => store.delete(input).pipe(Effect.mapError((error) => memoryError("vector-store", error))),
     }
   })
 

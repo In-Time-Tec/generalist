@@ -7,7 +7,7 @@ import {
   type Entry,
   type EntryId,
   type PreparedCheckpoint,
-  type Service,
+  type SessionStore,
   SessionConflict,
   SessionStoreError,
   checkpointMatches,
@@ -157,7 +157,7 @@ export const claimedStore = (options: {
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | import("effect/unstable/sql/SqlError").SqlError, R>
   readonly observe?: <A, E, R>(transition: string, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
-}): Effect.Effect<Service, never, SqlClient.SqlClient> =>
+}): Effect.Effect<SessionStore, never, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const transaction: NonNullable<typeof options.transaction> = options.transaction ?? sql.withTransaction

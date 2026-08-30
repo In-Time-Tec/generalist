@@ -2,6 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, Session, ToolExecutor } from "../../../src/index"
+import { lookupHandoffToolMeta } from "../../../src/core/policy/handoff-tool-meta.js"
 import { ItLayer } from "../it-layer"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"
@@ -107,6 +108,15 @@ layer(Layer.empty)("Handoff", (it) => {
     const delegate = Handoff.delegateTool(registration)
     expect(registration.name).toBe("math")
     expect(Object.keys(delegate.tools)).toEqual(["delegate_to_math"])
+  })
+
+  it("keeps handoff metadata owned by same-named tool instances", () => {
+    const first = Handoff.transferTool(Handoff.target(Agent.make({ name: "first" })), { nameOverride: "handoff" })
+    const second = Handoff.transferTool(Handoff.target(Agent.make({ name: "second" })), { nameOverride: "handoff" })
+
+    expect(first.tool).not.toBe(second.tool)
+    expect(lookupHandoffToolMeta(first.tool)?.specialist).toBe("first")
+    expect(lookupHandoffToolMeta(second.tool)?.specialist).toBe("second")
   })
 
   ItLayer.make(it, "builds a supervisor that same-run handoffs to specialists", () => {

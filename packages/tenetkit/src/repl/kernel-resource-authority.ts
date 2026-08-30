@@ -115,8 +115,8 @@ export class KernelResourceRejected extends Schema.TaggedError<KernelResourceRej
 ) {}
 
 /** @experimental The resource authority could not read or commit its durable state. */
-export class KernelResourceStoreUnavailable extends Schema.TaggedError<KernelResourceStoreUnavailable>()(
-  "tenetkit/repl/KernelResourceStoreUnavailable",
+export class KernelResourceAuthorityUnavailable extends Schema.TaggedError<KernelResourceAuthorityUnavailable>()(
+  "tenetkit/repl/KernelResourceAuthorityUnavailable",
   {
     sessionId: Schema.optionalKey(SessionId),
     message: Schema.String,
@@ -124,7 +124,7 @@ export class KernelResourceStoreUnavailable extends Schema.TaggedError<KernelRes
 ) {}
 
 /** @experimental Closed failure union for host-owned resource authority operations. */
-export type KernelResourceFailure = KernelResourceRejected | KernelResourceStoreUnavailable
+export type KernelResourceFailure = KernelResourceRejected | KernelResourceAuthorityUnavailable
 
 /** @experimental Atomically request ownership using the store's authoritative clock. */
 export interface AcquireRequest {
@@ -162,7 +162,7 @@ export interface DeletionRequest {
 
 /**
  * @experimental Durable authority for a live external kernel resource. This is neither Runtime Run
- * fencing nor KernelStateStore. Implementations must serialize every method per Session. `acquire`
+ * fencing nor KernelSnapshotStore. Implementations must serialize every method per Session. `acquire`
  * issues a greater generation only after the prior lease expires; `admit` validates the exact
  * generation/profile/resource/epoch at the boundary that acts on the resource and records the sole
  * active cell atomically. `expectedCell` lets a new owner interrupt and reconcile an earlier
@@ -181,13 +181,13 @@ export interface Service {
   readonly revoke: (claim: Claim) => Effect.Effect<ResourceIdentity | undefined, KernelResourceFailure>
   readonly failDeletion: (request: DeletionRequest, message: string) => Effect.Effect<Resource, KernelResourceFailure>
   readonly confirmDeletion: (request: DeletionRequest) => Effect.Effect<void, KernelResourceFailure>
-  readonly inspect: (sessionId: SessionId) => Effect.Effect<Lease | undefined, KernelResourceStoreUnavailable>
-  readonly pendingDeletion: Effect.Effect<ReadonlyArray<Lease>, KernelResourceStoreUnavailable>
+  readonly inspect: (sessionId: SessionId) => Effect.Effect<Lease | undefined, KernelResourceAuthorityUnavailable>
+  readonly pendingDeletion: Effect.Effect<ReadonlyArray<Lease>, KernelResourceAuthorityUnavailable>
 }
 
 /** @experimental */
-export class KernelResourceStore extends Context.Service<KernelResourceStore, Service>()(
-  "tenetkit/repl/kernel-resource-store/KernelResourceStore",
+export class KernelResourceAuthority extends Context.Service<KernelResourceAuthority, Service>()(
+  "tenetkit/repl/kernel-resource-authority/KernelResourceAuthority",
 ) {}
 
 /** @experimental Validate a caller-supplied lease duration at an adapter boundary. */

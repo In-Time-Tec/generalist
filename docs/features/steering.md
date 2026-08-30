@@ -1,6 +1,6 @@
 # Steering
 
-`Agent.makeRun` allocates one scoped process-local `RunHandle` addressed by Core Run ID. The handle exposes producer-only `steer` and `followUp` operations plus the Run's lazy event stream; only that Run's private inbox can dequeue input. Session ID remains conversation identity and never selects an inbox.
+`Agent.allocateRun` allocates one scoped process-local `RunHandle` addressed by Core Run ID. The handle exposes producer-only `steer` and `followUp` operations plus the Run's lazy event stream; only that Run's private inbox can dequeue input. Session ID remains conversation identity and never selects an inbox.
 
 Steering input drains after tool results and before the next model turn. Follow-up input drains only when the Run would otherwise complete. Steering defaults to `all`, follow-up to `one-at-a-time`, each lane to 64 entries, and both lanes share a 1 MiB canonical encoded-prompt bound. Overload fails as `Steering.InboxFull` unless process-local interruptible backpressure is selected. Offers, drains, and completion share one transactional lifecycle, so the offer or terminal close has one exact winner. Completion, failure, interruption, and scope close reject later offers as `Steering.RunClosed`, discard undrained process-local input, and wake blocked producers.
 

@@ -6,7 +6,8 @@ import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext
 import { get, type Registry } from "../tools/tool-registry.js"
 import type { CompactionError } from "../turn/compaction.js"
 import type { SkillCatalogError } from "../context/skill-catalog.js"
-import type { Agent, RunError, RunOptions } from "./service.js"
+import type { Agent, RunOptions } from "./service.js"
+import { RunError } from "./run/error.js"
 import { withSystem } from "./message.js"
 import { activateSkillFailure, activateSkillSuccess, activateSkillToolName } from "./skill-tool.js"
 import { checkpointFromHistory } from "./suspension.js"
@@ -246,6 +247,8 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               key: operationKey(logicalId, "memory", "recall", 0),
               input,
               replayPolicy: "pure",
+              success: Prompt.Prompt,
+              failure: RunError,
             },
             recallEffect,
           )
@@ -278,6 +281,8 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               turn,
               input,
               replayPolicy: "pure",
+              success: Schema.Void,
+              failure: RunError,
             },
             rememberEffect,
           )

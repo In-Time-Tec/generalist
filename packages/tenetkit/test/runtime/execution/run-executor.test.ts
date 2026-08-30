@@ -349,7 +349,7 @@ describe("RunExecutor", () => {
         SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
 
-      const withWriter = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
+      const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
@@ -415,7 +415,7 @@ describe("RunExecutor", () => {
         SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
 
-      const withWriter = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
+      const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
@@ -493,7 +493,7 @@ describe("RunExecutor", () => {
         SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
 
-      const withWriter = <A>(body: (session: Session.Service) => Effect.Effect<A>) =>
+      const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime

@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 import {
   type DriverError,
   type DriverInterpreter,
@@ -11,23 +11,18 @@ import type { Exhausted } from "../../core/durable/run-budget.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
+import { relationship, AddressInvalid, type DirectoryEntry, type Relationship } from "../execution/agent/directory.js"
 import {
-  relationship,
-  type AddressInvalid,
-  type DirectoryEntry,
-  type Relationship,
-} from "../execution/agent/directory.js"
-import {
+  AddressNotFound,
+  MailboxFull,
+  MailboxRateLimited,
+  MessageConflict,
   MessagingUnauthorized,
+  RunNotFound,
+  RunTerminal,
   RuntimeUnavailable,
-  type AddressNotFound,
-  type MailboxFull,
-  type MailboxRateLimited,
-  type MessageConflict,
-  type RunNotFound,
-  type RunTerminal,
 } from "../errors.js"
-import type { MailboxEntry, MessageReceipt } from "./mailbox.js"
+import { type MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { Metadata } from "./message.js"
 import type { Service as RunStoreService } from "../run/store.js"
 
@@ -46,23 +41,26 @@ export interface PolicyInput {
  * durable identity. Everything else — notably addressing another Session — is a host decision, so
  * cross-product addressing is opt-in rather than a consequence of knowing an id.
  */
-export interface Service {
-  readonly allow: (input: PolicyInput) => Effect.Effect<boolean>
-  readonly discover: (sender: DirectoryEntry) => Effect.Effect<ReadonlyArray<Address>>
-}
-
 /** @experimental */
-export class MessagingPolicy extends Context.Service<MessagingPolicy, Service>()(
+export class MessagingPolicy extends Context.Service<MessagingPolicy, MessagingPolicy.Service>()(
   "tenetkit/runtime/messaging/service/MessagingPolicy",
 ) {}
 
-const relationshipsOnly: Service = {
+/** @experimental */
+export namespace MessagingPolicy {
+  export interface Service {
+    readonly allow: (input: PolicyInput) => Effect.Effect<boolean>
+    readonly discover: (sender: DirectoryEntry) => Effect.Effect<ReadonlyArray<Address>>
+  }
+}
+
+const relationshipsOnly: MessagingPolicy.Service = {
   allow: () => Effect.succeed(false),
   discover: () => Effect.succeed([]),
 }
 
 /** @experimental */
-const makePolicy = (policy: Partial<Service> = {}): Service => ({
+const makePolicy = (policy: Partial<MessagingPolicy.Service> = {}): MessagingPolicy.Service => ({
   allow: policy.allow ?? relationshipsOnly.allow,
   discover: policy.discover ?? relationshipsOnly.discover,
 })
@@ -71,7 +69,7 @@ const makePolicy = (policy: Partial<Service> = {}): Service => ({
 export const Policy = { make: makePolicy }
 
 /** @experimental Host policy over exact sender and target identity. */
-export const layer = (policy: Partial<Service>): Layer.Layer<MessagingPolicy> =>
+export const layer = (policy: Partial<MessagingPolicy.Service>): Layer.Layer<MessagingPolicy> =>
   Layer.succeed(MessagingPolicy, MessagingPolicy.of(Policy.make(policy)))
 
 /** @experimental Input for one addressed send. Sender identity is a Run id, never caller-supplied text. */
@@ -87,17 +85,21 @@ export interface SendMessageInput {
   readonly metadata?: Metadata
 }
 
+/** @experimental Durable send failure. */
+export const SendMessageError = Schema.Union([
+  AddressNotFound,
+  AddressInvalid,
+  MessagingUnauthorized,
+  MailboxFull,
+  MailboxRateLimited,
+  MessageConflict,
+  RunTerminal,
+  RunNotFound,
+  RuntimeUnavailable,
+])
+
 /** @experimental */
-export type SendMessageError =
-  | AddressNotFound
-  | AddressInvalid
-  | MessagingUnauthorized
-  | MailboxFull
-  | MailboxRateLimited
-  | MessageConflict
-  | RunTerminal
-  | RunNotFound
-  | RuntimeUnavailable
+export type SendMessageError = typeof SendMessageError.Type
 
 /** @experimental */
 export type DirectoryError = RunNotFound | RuntimeUnavailable
@@ -111,7 +113,7 @@ export type DirectoryError = RunNotFound | RuntimeUnavailable
 export const authorize = (input: {
   readonly sender: DirectoryEntry
   readonly target: DirectoryEntry
-  readonly policy: Service
+  readonly policy: MessagingPolicy.Service
 }): Effect.Effect<void, MessagingUnauthorized> =>
   Effect.gen(function* () {
     const derived = relationship(input.sender, input.target)
@@ -134,7 +136,7 @@ export const authorize = (input: {
 /** @experimental Directory entries one Run may reach under TenetKit relationships plus host policy. */
 export const reachable = (input: {
   readonly store: RunStoreService
-  readonly policy: Service
+  readonly policy: MessagingPolicy.Service
   readonly runId: string
 }): Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError> =>
   Effect.gen(function* () {
@@ -204,7 +206,7 @@ const currentRunId = Effect.flatMap(ToolContext, (context) =>
  */
 export const make = (input: {
   readonly store: RunStoreService
-  readonly policy: Service
+  readonly policy: MessagingPolicy.Service
   readonly sendMessage: (request: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
 }): AgentMessaging["Service"] => ({
   send: (request) =>
@@ -216,6 +218,8 @@ export const make = (input: {
           key: operationKey([runId, "send", request.idempotencyKey]),
           input: { to: request.to, idempotencyKey: request.idempotencyKey },
           replayPolicy: "never",
+          success: MessageReceipt,
+          failure: SendMessageError,
         },
         (() => {
           const message: SendMessageInput = {

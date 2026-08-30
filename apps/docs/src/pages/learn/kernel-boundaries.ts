@@ -1,6 +1,6 @@
 import { code, codeBlock, definePage, h2, link, p, table } from "../../prose"
 
-const ladder = `AbortSignal            async work inside the cell
+const ladder = `Effect interruption    async work inside the cell
   │                    the cell settles itself; namespace intact
   ▼
 vm timeout / SIGINT    a synchronous loop the signal cannot reach
@@ -32,9 +32,7 @@ export const kernelBoundaries = definePage({
     ),
     h2("child-process", "A child process, not a worker thread"),
     p(
-      "Killing a wedged kernel is a required operation. A synchronous busy loop escapes the call's ",
-      code("AbortSignal"),
-      " entirely, which is exactly what the last tier of the escalation ladder exists for.",
+      "Killing a wedged kernel is a required operation. A synchronous busy loop cannot observe Effect interruption, which is exactly what the last tier of the escalation ladder exists for.",
     ),
     codeBlock({ label: "The escalation ladder", language: "text", source: ladder }),
     p(

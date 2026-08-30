@@ -1,7 +1,7 @@
 import { type Cause, Deferred, Effect, Fiber, Queue, Ref, Scope } from "effect"
 import type { CellEvent, CellFailure, CellId, CellResult, KernelUnavailable, RestartReason } from "../cell.js"
 import type { Binding, Interruption } from "../kernel-pool.js"
-import type { Service as HostModulesService } from "../host-modules.js"
+import type { Service as HostBindingsService } from "../host-bindings.js"
 import type { Captured, Inspected, Restored, WorkerFrame } from "./protocol.js"
 import { start, type Worker, type WorkerOptions } from "./session.js"
 import {
@@ -61,7 +61,7 @@ export interface Kernel {
 
 /** @experimental Everything a kernel needs to boot and to answer an executing cell. */
 export interface KernelOptions extends WorkerOptions {
-  readonly registry: HostModulesService | undefined
+  readonly registry: HostBindingsService | undefined
   readonly controlTimeoutMillis: number
 }
 

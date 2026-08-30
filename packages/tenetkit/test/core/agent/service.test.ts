@@ -4614,11 +4614,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.scoped(
         Effect.gen(function* () {
           const agent = Agent.make({ name: "same-session-steering-agent" })
-          const first = yield* Agent.makeRun(agent, {
+          const first = yield* Agent.allocateRun(agent, {
             prompt: "initial first",
             sessionId: "shared-conversation",
           })
-          const second = yield* Agent.makeRun(agent, {
+          const second = yield* Agent.allocateRun(agent, {
             prompt: "initial second",
             sessionId: "shared-conversation",
           })
@@ -4675,7 +4675,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           started = yield* Deferred.make<void>()
           release = yield* Deferred.make<void>()
           const agent = Agent.make({ name: "backpressured-steering-agent", toolkit: Toolkit.make(echoTool) })
-          const run = yield* Agent.makeRun(agent, {
+          const run = yield* Agent.allocateRun(agent, {
             prompt: "start",
             steering: { steering: { mode: "one-at-a-time", capacity: 1, onFull: "backpressure" } },
           })
@@ -4724,7 +4724,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "steering-agent", toolkit: Toolkit.make(echoTool) })
-        const run = yield* Agent.makeRun(agent, { prompt: "use tool" })
+        const run = yield* Agent.allocateRun(agent, { prompt: "use tool" })
         yield* run.steer({ prompt: "steer one" })
         yield* run.steer({ prompt: "steer two" })
 
@@ -4773,7 +4773,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "steering-one-agent", toolkit: Toolkit.make(echoTool) })
-        const run = yield* Agent.makeRun(agent, {
+        const run = yield* Agent.allocateRun(agent, {
           prompt: "use tool",
           steering: { steering: { mode: "one-at-a-time" } },
         })
@@ -4806,7 +4806,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "follow-up-agent" })
-        const run = yield* Agent.makeRun(agent, { prompt: "start" })
+        const run = yield* Agent.allocateRun(agent, { prompt: "start" })
         yield* run.followUp({ prompt: "follow one" })
         yield* run.followUp({ prompt: "follow two" })
 
@@ -4839,7 +4839,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "follow-up-all-agent" })
-        const run = yield* Agent.makeRun(agent, {
+        const run = yield* Agent.allocateRun(agent, {
           prompt: "start",
           steering: { followUp: { mode: "all" } },
         })
@@ -4874,7 +4874,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "follow-up-structured-agent" })
-        const run = yield* Agent.makeRun(agent, { prompt: "start", output: { schema: objectSchema } })
+        const run = yield* Agent.allocateRun(agent, { prompt: "start", output: { schema: objectSchema } })
         yield* run.followUp({ prompt: "follow before object" })
 
         const events = yield* Stream.runCollect(run.events)
@@ -4923,7 +4923,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           structuredStarted = yield* Deferred.make<void>()
           releaseStructured = yield* Deferred.make<void>()
           const agent = Agent.make({ name: "structured-completion-steering-agent" })
-          const run = yield* Agent.makeRun(agent, { prompt: "start", output: { schema: objectSchema } })
+          const run = yield* Agent.allocateRun(agent, { prompt: "start", output: { schema: objectSchema } })
           const fiber = yield* Stream.runCollect(run.events).pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(structuredStarted)
           yield* run.followUp({ prompt: "late follow-up" })
@@ -4963,7 +4963,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const currentStarted = yield* Deferred.make<void>()
         started = currentStarted
         const agent = Agent.make({ name: "interrupt-steering-agent" })
-        const run = yield* Agent.makeRun(agent, { prompt: "never finish" })
+        const run = yield* Agent.allocateRun(agent, { prompt: "never finish" })
         yield* run.steer({ prompt: "queued steering" })
         yield* run.followUp({ prompt: "queued follow-up" })
         const fiber = yield* Stream.runDrain(run.events).pipe(Effect.forkChild({ startImmediately: true }))
@@ -6947,7 +6947,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "surfaces a policy evaluation failure without erasing its cause", () => {
     const policyCause = { system: "budget-service", status: "offline" }
-    const policyFailure = Policy.Error.make({ message: "budget unavailable", cause: policyCause })
+    const policyFailure = Policy.PolicyError.make({ message: "budget unavailable", cause: policyCause })
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-policy-failure", "echo", { text: "call" }))),

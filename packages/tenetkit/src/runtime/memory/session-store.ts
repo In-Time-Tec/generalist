@@ -6,7 +6,7 @@ import {
   type CompactionEntry,
   type Entry,
   EntryPayload,
-  type Service,
+  type SessionStore,
   SessionConflict,
   SessionStoreError,
   checkpointMatches,
@@ -411,7 +411,7 @@ export const reader = (config: {
 export const claimedStore = (config: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
   readonly claim: ExecutionClaim
-}): Service => {
+}): SessionStore => {
   const { stateRef, claim } = config
   const sessionId = claim.session.sessionId
   return {

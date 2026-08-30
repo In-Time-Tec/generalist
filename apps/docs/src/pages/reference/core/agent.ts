@@ -5,12 +5,12 @@ export const coreAgentReference = definePage({
   navTitle: "Agent",
   group: "Reference",
   description:
-    "Agent.make, makeRun, stream and generate functions, truthful requirements, RunError, Resume, and Result.",
+    "Agent.make, allocateRun, stream and generate functions, truthful requirements, RunError, Resume, and Result.",
   content: [
     lead(
       "The Agent namespace of tenetkit defines an opaque agent value, scoped Run handles, stream and generate projections, and every option and service a Run consumes.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
     h2("agent-make", "Agent.make"),
     p(
       "An ",
@@ -72,7 +72,7 @@ export const coreAgentReference = definePage({
       ["Function", "Signature", "Notes"],
       [
         [
-          [code("Agent.makeRun")],
+          [code("Agent.allocateRun")],
           [
             code(
               "(agent: Agent<Tools, R>, options: O) => Effect<RunHandle<Tools, R, O>, Steering.PolicyInvalid, Scope>",

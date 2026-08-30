@@ -20,6 +20,7 @@ const eventFrame = (sequence: number, fields: Partial<Connection.Incoming>): Con
       sequence,
       executableRef: agent,
       rootRunId: sessionId,
+      depth: 0,
       occurredAt: "2026-08-03T00:00:00.000Z",
     },
     fields,
@@ -28,7 +29,7 @@ const eventFrame = (sequence: number, fields: Partial<Connection.Incoming>): Con
   return candidate
 }
 
-const agentAction = (incoming: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedAgent({ incoming }) })
+const agentAction = (event: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedConnection({ event }) })
 
 const readyModel = (): Model => {
   const [model] = update(init()[0], OpenedSession({ sessionId }))
@@ -88,6 +89,7 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     sessionId,
     sessionParentId: null,
     sessionEntryId: "model-response-entry-0",
+    budgetCharge: 0,
     response: { content: [toolCall], finishReason: "tool-calls" },
     digest: "model-response-0",
   }),
@@ -105,6 +107,7 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     sessionId,
     sessionParentId: "model-response-entry-0",
     sessionEntryId: "model-response-entry-1",
+    budgetCharge: 0,
     response: {
       content: [
         Response.makePart("reasoning", { text: "Compare transport frames." }),

@@ -2,16 +2,9 @@ import type { Layer } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
 import { SqliteClient } from "@effect/sql-sqlite-do"
 import type { ExternalChildStore, RunStore } from "tenetkit/runtime"
-import {
-  layerSqliteStore,
-  makeExclusiveExecutionRecovery,
-  type SqliteStoreError,
-  type SqliteStoreOptions,
-} from "tenetkit/runtime/sql-driver"
+import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "tenetkit/runtime/sql-driver"
 
-export * as Activations from "./activations.js"
 export * as HibernatingWebSocket from "./hibernating-websocket.js"
-export { makeExclusiveExecutionRecovery }
 
 /** @experimental */
 export type DurableObjectStorage = NonNullable<Parameters<typeof SqliteClient.make>[0]["storage"]>

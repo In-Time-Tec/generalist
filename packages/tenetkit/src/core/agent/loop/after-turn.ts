@@ -2,7 +2,7 @@ import { Effect, Schema, Stream } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
 import type { AgentError, Event } from "../event.js"
 import type { PendingToolResult } from "../tools/result.js"
-import { Error, type Decision, type TurnOverrides } from "../../turn/policy.js"
+import { PolicyError, type Decision, type TurnOverrides } from "../../turn/policy.js"
 import type { Completion } from "../../turn/steering-inbox.js"
 import type { Input } from "../../turn/steering.js"
 import type { ObjectSchema, RunLoopContext, SchemaServicesD } from "./context.js"
@@ -81,7 +81,7 @@ export const afterTurnFor = <
     readonly turn: number
     readonly history: Prompt.Prompt
     readonly pendingToolResults: ReadonlyArray<PendingToolResult>
-  }) => Effect.Effect<Decision, Error | HandoffRequirementsMissing, R>
+  }) => Effect.Effect<Decision, PolicyError | HandoffRequirementsMissing, R>
   readonly takeFollowUp: () => Effect.Effect<ReadonlyArray<Input>>
   readonly takeSteering: () => Effect.Effect<ReadonlyArray<Input>>
   readonly takeCompletion: () => Effect.Effect<Completion>
@@ -101,7 +101,11 @@ export const afterTurnFor = <
   return (
     turn: number,
     alreadyProjectedPending?: ReadonlyArray<PendingToolResult>,
-  ): Effect.Effect<AfterTurnResult<StructuredOutputSchema>, AgentError | Error | RunError, R | DriverInterpreter> =>
+  ): Effect.Effect<
+    AfterTurnResult<StructuredOutputSchema>,
+    AgentError | PolicyError | RunError,
+    R | DriverInterpreter
+  > =>
     Effect.gen(function* () {
       const pending = alreadyProjectedPending ?? pendingResults()
       const transcript = yield* checkpointPending(turn, alreadyProjectedPending === undefined ? pending : [])
@@ -134,7 +138,7 @@ export const afterTurnFor = <
         pendingToolResults: pending,
       })
       if (!isPolicyDecision(evaluated)) {
-        return yield* Error.make({
+        return yield* PolicyError.make({
           message: "Policy returned an invalid decision; Stop decisions must include a reason",
           cause: evaluated,
         })

@@ -8,7 +8,7 @@ export const a2aReference = definePage({
   description: "A2A v1 server projection over the authoritative Runtime lifecycle.",
   content: [
     lead("tenetkit/a2a maps A2A v1 tasks onto Runtime runs without storing a second lifecycle."),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @a2a-js/sdk@1.0.1"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @a2a-js/sdk@1.0.1"),
     p(code("tenetkit/a2a"), " is an import subpath. A2A task IDs are caller-selected Runtime Run IDs."),
     h2("service", "Service"),
     p(

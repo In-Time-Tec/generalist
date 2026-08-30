@@ -1,13 +1,13 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema } from "effect"
 import { ToolContext, ToolExecutor } from "tenetkit"
 import { Response } from "effect/unstable/ai"
-import { Cell, CellTool, HostModules, KernelProfile, TestKernel } from "tenetkit/repl"
+import { Cell, CellTool, HostBindings, KernelProfile, TestKernel } from "tenetkit/repl"
 
 class NotFound extends Schema.TaggedError<NotFound>()("@tenetkit/tutorial/NotFound", {
   path: Schema.String,
 }) {}
 
-const workspace: HostModules.Module = {
+const workspace: HostBindings.Module = {
   name: "workspace",
   operations: [
     {
@@ -52,7 +52,7 @@ const call = Schema.decodeSync(Response.ToolCallPart(CellTool.name, Schema.Struc
 )
 
 const program = Effect.gen(function* () {
-  const registry = yield* HostModules.HostModules
+  const registry = yield* HostBindings.HostBindings
   const mounted = registry.descriptors.map((entry) => `${entry.module}.${entry.operations.join("/")}`)
   yield* Console.log(`mounted: ${mounted.join(" ")}`)
   yield* Console.log(`bindings digest: ${profile.bindingsDigest}`)
@@ -77,7 +77,7 @@ const layer = CellTool.layer.pipe(
   Layer.provideMerge(
     Layer.mergeAll(
       ToolContext.layerDefault,
-      HostModules.layer([workspace]),
+      HostBindings.layer([workspace]),
       TestKernel.layerTestPool({ profile, script }),
     ),
   ),

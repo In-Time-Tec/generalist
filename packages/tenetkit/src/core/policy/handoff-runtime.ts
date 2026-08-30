@@ -15,6 +15,7 @@ import {
   toControlState,
 } from "../agent/handoff/state.js"
 import type { RunOptions } from "../agent/service.js"
+import { RunError } from "../agent/run/error.js"
 import { assemble, type Candidate } from "../tools/tool-registry.js"
 import { intercept, logicalOperationId } from "../durable/driver/run.js"
 import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
@@ -22,13 +23,10 @@ import { defaultContextProjection, Input, type ContextProjection } from "./hando
 import type { Catalog, Target } from "./handoff-target.js"
 import { ModelRegistry } from "../model/registry.js"
 import { validateRef } from "../durable/manifest/executable-manifest.js"
-import type { Service as SessionStore } from "../context/session.js"
+import type { SessionStore } from "../context/session.js"
+import { Rejected } from "./handoff-rejected.js"
 
-export class Rejected extends Schema.TaggedError<Rejected>()("tenetkit/core/HandoffRejected", {
-  handoffId: Schema.String,
-  turn: Schema.Finite,
-  reason: Schema.String,
-}) {}
+export { Rejected }
 
 export interface ExecuteInput {
   readonly catalog: Catalog["Service"]
@@ -54,7 +52,7 @@ const recordRejected = (
   turn: number,
   handoffId: string,
   reason: string,
-): Effect.Effect<void, import("../agent/service.js").RunError, DriverInterpreter> =>
+): Effect.Effect<void, RunError, DriverInterpreter> =>
   intercept(
     {
       kind: "handoff",
@@ -62,6 +60,8 @@ const recordRejected = (
       turn,
       input: { handoffId, turn, reason },
       replayPolicy: "pure",
+      success: Schema.Void,
+      failure: RunError,
     },
     Effect.void,
   )
@@ -179,6 +179,8 @@ export const executeSameRunHandoff = (input: ExecuteInput) =>
         turn: input.turn,
         input: commitInput,
         replayPolicy: "pure",
+        success: Commit,
+        failure: RunError,
       },
       Effect.gen(function* () {
         const totalLimit = maxHandoffs(input.options, current.active.agent)

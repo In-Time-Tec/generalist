@@ -157,7 +157,31 @@ layer(
       const failure = yield* Effect.flip(memory.recall({ key, turn: 0, prompt: prompt(user("color")) }))
 
       expect(failure._tag).toBe("tenetkit/core/MemoryError")
+      expect(failure.reason).toBe("embedding")
       expect(failure.message).toContain("embedding failed")
+      expect(failure.cause).toBe(embeddingError)
+    }),
+  )
+})
+
+const vectorError = VectorStore.VectorStoreError.make({ message: "vector query failed" })
+const failingVectorStore = VectorStore.layerTest({
+  upsert: () => Effect.void,
+  query: () => Effect.fail(vectorError),
+  delete: () => Effect.void,
+})
+
+layer(
+  SemanticRecall.layer({ limit: 5 }).pipe(Layer.provideMerge(failingVectorStore), Layer.provideMerge(embeddingLayer)),
+)((it) => {
+  it.effect("preserves vector store failure category and cause", () =>
+    Effect.gen(function* () {
+      const memory = yield* Memory.Memory
+      const failure = yield* Effect.flip(memory.recall({ key, turn: 0, prompt: prompt(user("color")) }))
+
+      expect(failure.reason).toBe("vector-store")
+      expect(failure.message).toContain("vector query failed")
+      expect(failure.cause).toBe(vectorError)
     }),
   )
 })

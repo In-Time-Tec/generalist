@@ -8,7 +8,7 @@ Over a child process the same case is survivable. `SIGKILL` on a spinning child 
 
 The escalation ladder is therefore three tiers:
 
-1. `AbortSignal` — aborts async work inside the cell.
+1. Effect interruption — stops interruptible async work inside the cell.
 2. `vm` `timeout` and `breakOnSigint` — terminates a synchronous loop in place, leaving the context, its variables, and the worker alive.
 3. child `SIGKILL` — new epoch plus best-effort snapshot restore.
 

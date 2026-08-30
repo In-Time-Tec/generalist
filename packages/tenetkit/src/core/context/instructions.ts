@@ -8,9 +8,9 @@ export interface RenderContext {
 }
 
 /** @experimental Ordered provider of model instructions or contextual updates. */
-export interface Provider {
+export interface Provider<R = never> {
   readonly id: string
-  readonly render: (context: RenderContext) => Effect.Effect<Option.Option<string>, AgentError>
+  readonly render: (context: RenderContext) => Effect.Effect<Option.Option<string>, AgentError, R>
 }
 
 /** @experimental Instructions registry service boundary. */
@@ -51,8 +51,19 @@ export const render: {
 )
 
 /** @experimental Provide an explicit ordered instructions registry. */
-export const layer = (providers: ReadonlyArray<Provider>): Layer.Layer<Instructions> =>
-  Layer.succeed(Instructions, Instructions.of({ providers: [...providers] }))
+export const layer = <R>(providers: ReadonlyArray<Provider<R>>): Layer.Layer<Instructions, never, R> =>
+  Layer.effect(
+    Instructions,
+    Effect.gen(function* () {
+      const context = yield* Effect.context<R>()
+      return Instructions.of({
+        providers: providers.map((provider) => ({
+          id: provider.id,
+          render: (input) => provider.render(input).pipe(Effect.provideContext(context)),
+        })),
+      })
+    }),
+  )
 
 /** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Instructions> =>

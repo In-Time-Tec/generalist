@@ -22,7 +22,7 @@ import type { ExecutionContinuation } from "./steering.js"
 import type { ExecutableRegistration } from "../executable/registration.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { InitialFanOutInput } from "../child/fan-out-internal.js"
-import type { Service as SessionService } from "../../core/context/session.js"
+import type { SessionStore as SessionService } from "../../core/context/session.js"
 
 export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"

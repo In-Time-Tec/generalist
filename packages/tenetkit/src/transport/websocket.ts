@@ -61,7 +61,7 @@ export const handle: Handle = Effect.gen(function* () {
     ).pipe(
       Effect.flatMap(observerCodec.encode),
       Effect.flatMap(writer),
-      Effect.catchTag("tenetkit/transport/WireEncodeFailed", (error) =>
+      Effect.catchTag("tenetkit/transport/WireCodecFailed", (error) =>
         close(1011, "wire encoding failed").pipe(Effect.andThen(Effect.fail(error))),
       ),
     )
@@ -78,7 +78,7 @@ export const handle: Handle = Effect.gen(function* () {
       return runtime.events(options).pipe(
         Stream.runForEach(writeEvent),
         Effect.catchTags({
-          "tenetkit/transport/WireEncodeFailed": () => Effect.void,
+          "tenetkit/transport/WireCodecFailed": () => Effect.void,
           "tenetkit/runtime/SubscriberLagged": (error) => close(4000, `lagged:${error.lastDeliveredSequence}`),
           "tenetkit/runtime/CursorExpired": (error) => close(4001, `cursor-expired:${error.earliestSequence}`),
           "tenetkit/runtime/RunNotFound": () => close(4004, "run-not-found"),
@@ -117,7 +117,7 @@ export const handle: Handle = Effect.gen(function* () {
     decodeCommand(text).pipe(
       Effect.flatMap(dispatch),
       Effect.catchTags({
-        "tenetkit/transport/WireEncodeFailed": () => close(1003, "malformed-command"),
+        "tenetkit/transport/WireCodecFailed": () => close(1003, "malformed-command"),
         "tenetkit/transport/NotAttached": () => close(1008, "not-attached"),
         "tenetkit/transport/RunMismatch": () => close(1008, "run-mismatch"),
         "tenetkit/runtime/RunNotFound": () => close(4004, "run-not-found"),

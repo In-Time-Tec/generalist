@@ -1,7 +1,7 @@
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
 import { AiError, Chat, Prompt, Tokenizer } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./event.js"
-import { Compaction, defaultReserveTokens, type Result as CompactionResult, type Usage } from "../turn/compaction.js"
+import { Compaction, defaultReserveTokens, Result as CompactionResult, type Usage } from "../turn/compaction.js"
 import { diagnose as diagnoseSessionSync } from "../context/session-sync.js"
 import { SessionSyncInternals } from "./session/sync.js"
 import {
@@ -9,7 +9,7 @@ import {
   buildContext,
   SessionConflict,
   type Entry,
-  type Service as SessionStore,
+  type SessionStore,
   type SessionStoreError,
 } from "../context/session.js"
 import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./message.js"
@@ -22,7 +22,8 @@ import {
   type SessionCursor as SessionCursorType,
 } from "./session/cursor.js"
 import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model/telemetry/events.js"
-import type { RunError, RunOptions } from "./service.js"
+import type { RunOptions } from "./service.js"
+import { RunError } from "./run/error.js"
 import type { AgentRunState } from "./run-state.js"
 import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { intercept } from "../durable/driver/run.js"
@@ -151,6 +152,8 @@ export const make = (context: CompactionContext) => {
           transcriptDigest,
         },
         replayPolicy: "pure",
+        success: SessionCursor,
+        failure: RunError,
       },
       syncSessionBody(turn, transcript),
     ).pipe(
@@ -345,6 +348,8 @@ export const make = (context: CompactionContext) => {
         turn,
         input: interceptionInput,
         replayPolicy: "pure",
+        success: Schema.Void,
+        failure: RunError,
       },
       applyCompactionResultBody(turn, result, parentId, commitData, onCommitted),
     )
@@ -405,6 +410,8 @@ export const make = (context: CompactionContext) => {
                   turn,
                   input: { turn, compactionId, agentName: agent.name, sessionId },
                   replayPolicy: "pure",
+                  success: Schema.OptionFromNullOr(CompactionResult),
+                  failure: RunError,
                 },
                 compactEffect,
               )

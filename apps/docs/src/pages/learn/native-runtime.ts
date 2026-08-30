@@ -54,9 +54,9 @@ export const nativeRuntime = definePage({
     ),
     p(
       "PostgreSQL and MySQL startup verifies an already-applied schema rather than running DDL. Use ",
-      code("RunSchema from @tenetkit/pg"),
+      code("RuntimeSchema from @tenetkit/pg"),
       " for PostgreSQL or ",
-      code("RunSchema from @tenetkit/mysql"),
+      code("RuntimeSchema from @tenetkit/mysql"),
       " for MySQL in a predeploy migration step.",
     ),
     p(

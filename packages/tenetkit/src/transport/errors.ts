@@ -28,7 +28,7 @@ export class ReconnectExhausted extends Schema.TaggedError<ReconnectExhausted>()
   },
 ) {}
 
-/** @experimental A client or server wire frame could not be schema-encoded. */
-export class WireEncodeFailed extends Schema.TaggedError<WireEncodeFailed>()("tenetkit/transport/WireEncodeFailed", {
+/** @experimental A client or server wire frame could not be schema-encoded or decoded. */
+export class WireCodecFailed extends Schema.TaggedError<WireCodecFailed>()("tenetkit/transport/WireCodecFailed", {
   message: Schema.String,
 }) {}

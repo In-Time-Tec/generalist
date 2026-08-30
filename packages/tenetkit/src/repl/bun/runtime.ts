@@ -8,8 +8,8 @@ import {
   type Channel,
   KernelUnavailable,
 } from "../cell.js"
-import type { Manifest, Snapshot } from "../kernel-state-store.js"
-import type { Service as HostModulesService, Request as HostRequest } from "../host-modules.js"
+import type { Manifest, Snapshot } from "../kernel-snapshot-store.js"
+import type { Service as HostBindingsService, Request as HostRequest } from "../host-bindings.js"
 import type { WorkerFrame } from "./protocol.js"
 import type { Worker } from "./session.js"
 
@@ -21,7 +21,7 @@ export interface CellOutcome {
 
 /** @experimental Everything a session needs to answer host requests raised by a running cell. */
 export interface HostAnswerOptions {
-  readonly registry: HostModulesService | undefined
+  readonly registry: HostBindingsService | undefined
   readonly worker: Worker
   readonly sessionId?: string
   readonly cellId?: string
@@ -280,7 +280,7 @@ export const outcomeUnknown = (input: {
   readonly message: string
 }): CellOutcomeUnknown => CellOutcomeUnknown.make(input)
 
-/** @experimental Encode one captured namespace as a snapshot the KernelStateStore can persist. */
+/** @experimental Encode one captured namespace as a snapshot the KernelSnapshotStore can persist. */
 export const toSnapshot = (input: {
   readonly sessionId: string
   readonly epoch: number

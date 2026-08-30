@@ -1,5 +1,5 @@
 import { Effect, Function, Option, Ref } from "effect"
-import { Chat } from "effect/unstable/ai"
+import { Chat, type Tool } from "effect/unstable/ai"
 import type { AnyToolCall } from "../tools/result.js"
 import type { RunOptions } from "../service.js"
 import type { HandoffRunState } from "./state.js"
@@ -12,8 +12,9 @@ import { Catalog } from "../../policy/handoff-target.js"
 export const runHandoffTool = (input: {
   readonly turn: number
   readonly call: AnyToolCall
+  readonly tool: Tool.Any
   readonly options: RunOptions
-  readonly activeSession: Option.Option<import("../../context/session.js").Service>
+  readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
   readonly handoffState: Ref.Ref<HandoffRunState>
   readonly chat: Chat.Service
   readonly toolState: Ref.Ref<{
@@ -27,7 +28,7 @@ export const runHandoffTool = (input: {
   import("../../durable/driver/interpreter.js").DriverInterpreter
 > =>
   Effect.gen(function* () {
-    const meta = lookupHandoffToolMeta(input.call.name)
+    const meta = lookupHandoffToolMeta(input.tool)
     if (meta === undefined) {
       return yield* FrameworkFailure.make({
         stage: "missing-handler",
@@ -69,7 +70,7 @@ export const handoffDispatch: {
     registry: Registry,
     input: {
       readonly options: RunOptions
-      readonly activeSession: Option.Option<import("../../context/session.js").Service>
+      readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
       readonly handoffState: Ref.Ref<HandoffRunState>
       readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
@@ -93,7 +94,7 @@ export const handoffDispatch: {
     registry: Registry,
     input: {
       readonly options: RunOptions
-      readonly activeSession: Option.Option<import("../../context/session.js").Service>
+      readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
       readonly handoffState: Ref.Ref<HandoffRunState>
       readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
@@ -116,7 +117,7 @@ export const handoffDispatch: {
     registry: Registry,
     input: {
       readonly options: RunOptions
-      readonly activeSession: Option.Option<import("../../context/session.js").Service>
+      readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
       readonly handoffState: Ref.Ref<HandoffRunState>
       readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
@@ -134,7 +135,7 @@ export const handoffDispatch: {
     | undefined => {
     const registered = get(registry, request.call.name)
     return registered?.dispatch === "Handoff"
-      ? runHandoffTool({ turn: request.turn, call: request.call, ...input })
+      ? runHandoffTool({ turn: request.turn, call: request.call, tool: registered.tool, ...input })
       : undefined
   },
 )

@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, FileSystem, Path, Schema } from "effect"
-import { KernelStateStore } from "../../../../src/repl/index.js"
-import { BunKernelStateStore } from "../../../../src/repl/bun/index.js"
+import { KernelSnapshotStore } from "../../../../src/repl/index.js"
+import { BunKernelSnapshotStore } from "../../../../src/repl/bun/index.js"
 import { liveOptions, platform, runCell, withPool } from "../../bun-harness.js"
 
 layer(platform, liveOptions)("Bun kernel snapshot", (it) => {
@@ -84,11 +84,11 @@ layer(platform, liveOptions)("Bun kernel snapshot", (it) => {
         Effect.gen(function* () {
           yield* runCell({ pool, sessionId: "s", cellId: "c1", code: "const value = 1" })
           yield* pool.close("s")
-          const store = yield* BunKernelStateStore.make({ dataRoot })
+          const store = yield* BunKernelSnapshotStore.make({ dataRoot })
           const snapshot = yield* store.load("s")
           expect(snapshot).toBeDefined()
           if (snapshot !== undefined) {
-            expect(Schema.is(KernelStateStore.Manifest)(snapshot.manifest)).toBe(true)
+            expect(Schema.is(KernelSnapshotStore.Manifest)(snapshot.manifest)).toBe(true)
             expect(snapshot.manifest.sessionId).toBe("s")
             expect(snapshot.payload.byteLength).toBeGreaterThan(0)
           }
@@ -123,7 +123,7 @@ layer(platform, liveOptions)("Bun kernel snapshot", (it) => {
           const fileSystem = yield* FileSystem.FileSystem
           const path = yield* Path.Path
           yield* fileSystem.writeFileString(path.join(dataRoot, "kernel-state", "s", "manifest.json"), "{ not json")
-          const store = yield* BunKernelStateStore.make({ dataRoot })
+          const store = yield* BunKernelSnapshotStore.make({ dataRoot })
           const failure = yield* Effect.flip(store.load("s"))
           expect(failure.reason).toBe("corrupt")
           const result = yield* runCell({ pool, sessionId: "s", cellId: "c2", code: "2 + 3" })
@@ -136,7 +136,7 @@ layer(platform, liveOptions)("Bun kernel snapshot", (it) => {
     withPool({
       use: ({ dataRoot }) =>
         Effect.gen(function* () {
-          const store = yield* BunKernelStateStore.make({ dataRoot })
+          const store = yield* BunKernelSnapshotStore.make({ dataRoot })
           expect(yield* store.load("never-ran")).toBeUndefined()
         }),
     }),

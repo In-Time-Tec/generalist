@@ -1,7 +1,7 @@
 import { Context, Effect, Schema, Stream, Option } from "effect"
 import type { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
 import type { InboxFull } from "../../core/turn/steering.js"
-import type { Service as SessionService } from "../../core/context/session.js"
+import type { SessionStore as SessionService } from "../../core/context/session.js"
 import type { CancellationOutcome } from "../../core/tools/tool-executor.js"
 import type { Address } from "../address.js"
 import type { Cursor } from "../cursor.js"

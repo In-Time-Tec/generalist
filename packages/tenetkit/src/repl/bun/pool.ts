@@ -10,8 +10,8 @@ import {
   KernelPool,
   type Restart,
 } from "../kernel-pool.js"
-import { KernelStateStore } from "../kernel-state-store.js"
-import { HostModules, type Service as HostModulesService } from "../host-modules.js"
+import { KernelSnapshotStore } from "../kernel-snapshot-store.js"
+import { HostBindings, type Service as HostBindingsService } from "../host-bindings.js"
 import { type CheckpointKind, type KernelProfile, digest } from "../kernel-profile.js"
 import { type Kernel, make as makeKernel } from "./kernel.js"
 import { toSnapshot, unavailable } from "./runtime.js"
@@ -51,11 +51,11 @@ const initialState: SessionState = { epoch: 0, recovery: "restart-only", lease: 
  * kernel's reference is held for exactly the duration of a cell, and idle eviction is the map's
  * reference-count expiry rather than a sweep.
  */
-export const make = (options: Options): Effect.Effect<KernelPoolService, never, KernelStateStore | Scope.Scope> =>
+export const make = (options: Options): Effect.Effect<KernelPoolService, never, KernelSnapshotStore | Scope.Scope> =>
   Effect.gen(function* () {
-    const store = yield* KernelStateStore
-    const mounted = yield* Effect.serviceOption(HostModules)
-    const bindings: HostModulesService | undefined = mounted._tag === "Some" ? mounted.value : undefined
+    const store = yield* KernelSnapshotStore
+    const mounted = yield* Effect.serviceOption(HostBindings)
+    const bindings: HostBindingsService | undefined = mounted._tag === "Some" ? mounted.value : undefined
     const boots = yield* Semaphore.make(Math.max(options.maxConcurrentBoots, 1))
     const states = yield* Ref.make(new Map<string, SessionState>())
     const generations = yield* Ref.make(0)
@@ -173,17 +173,6 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
       use: (lease: Lease) => Effect.Effect<A, CellFailure>,
     ): Effect.Effect<A, CellFailure> => Effect.scoped(Effect.flatMap(RcMap.get(kernels, sessionId), use))
 
-    const watchAbort = (signal: AbortSignal): Effect.Effect<void> =>
-      Effect.callback<void>((resume) => {
-        if (signal.aborted) {
-          resume(Effect.void)
-          return
-        }
-        const onAbort = (): void => resume(Effect.void)
-        signal.addEventListener("abort", onAbort, { once: true })
-        return Effect.sync(() => signal.removeEventListener("abort", onAbort))
-      })
-
     return {
       execute: (request: ExecuteRequest) =>
         Effect.gen(function* () {
@@ -230,16 +219,12 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
               cellScope,
               Ref.get(resultHandled).pipe(Effect.flatMap((handled) => (handled ? Effect.void : stopStrongly))),
             )
-            yield* watchAbort(request.signal).pipe(Effect.andThen(stopStrongly), Effect.forkIn(cellScope))
             yield* Effect.sleep(options.profile.limits.cellDeadlineMillis + options.interruptGraceMillis).pipe(
               Effect.andThen(stopStrongly),
               Effect.forkIn(cellScope),
             )
             /**
-             * Interrupting the caller is itself a cancellation, and it is the only one that must
-             * stop the cell outright. The abort signal a host passes is watched by a fiber in
-             * `cellScope`, which closes as this result settles, so an interrupted caller would
-             * tear that watcher down before the signal fired and leave the cell running unstopped.
+             * Interrupting the caller-owned scope is cancellation and must stop the cell outright.
              *
              * Killing the kernel is the honest remedy rather than an in-place interrupt: an
              * interrupt only rejects what the host awaits, while the cell's own continuations keep
@@ -328,5 +313,5 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
   })
 
 /** @experimental One Server-scoped pool of live Bun kernels, one per Session. */
-export const layer = (options: Options): Layer.Layer<KernelPool, never, KernelStateStore> =>
+export const layer = (options: Options): Layer.Layer<KernelPool, never, KernelSnapshotStore> =>
   Layer.effect(KernelPool, make(options).pipe(Effect.map(KernelPool.of)))

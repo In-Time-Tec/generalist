@@ -31,7 +31,7 @@ export const providers = definePage({
       code("@effect/ai-*"),
       " packages.",
     ),
-    command("OpenRouter profile", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @effect/ai-openrouter@4.0.0-rc.112"),
+    command("OpenRouter profile", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @effect/ai-openrouter@4.0.0-rc.112"),
     p(
       "Install only the peer for each provider leaf you import. Anthropic uses ",
       code("@effect/ai-anthropic@4.0.0-rc.112"),

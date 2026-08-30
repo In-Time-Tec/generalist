@@ -7,7 +7,7 @@ import "./suites/program-suite.js"
 import "./suites/runtime-suite.js"
 import "./suites/session-store-suite.js"
 import "./suites/suspend-suite.js"
-import { layer, RunSchema } from "@tenetkit/pg"
+import { layer, RuntimeSchema } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
@@ -152,7 +152,7 @@ const corruptEventExecutableRef = (runId: string, executableRef: Schema.Json) =>
     `
   }).pipe(scopedWith(postgresClient(url)))
 
-const markDirty = () => RunSchema.markDirty("postgres-test").pipe(scopedWith(postgresClient(url)))
+const markDirty = () => RuntimeSchema.markDirty("postgres-test").pipe(scopedWith(postgresClient(url)))
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -2000,7 +2000,7 @@ describePostgres("PostgreSQL run store", () => {
     ),
   )
 
-  it.live("RunSchema plan check apply and typed verify failures", () =>
+  it.live("RuntimeSchema plan check apply and typed verify failures", () =>
     withSchema(
       Effect.gen(function* () {
         const restoreMeta = Effect.gen(function* () {
@@ -2012,10 +2012,10 @@ describePostgres("PostgreSQL run store", () => {
           `
         }).pipe(scopedWith(postgresClient(url)))
 
-        const planned = yield* RunSchema.plan("postgres-test").pipe(scopedWith(postgresClient(url)))
+        const planned = yield* RuntimeSchema.plan("postgres-test").pipe(scopedWith(postgresClient(url)))
         expect(planned.required).toBe(SCHEMA_VERSION)
         expect(planned.upgradeRequired).toBe(false)
-        yield* RunSchema.check("postgres-test").pipe(scopedWith(postgresClient(url)))
+        yield* RuntimeSchema.check("postgres-test").pipe(scopedWith(postgresClient(url)))
         yield* markDirty()
         const dirty = yield* Effect.exit(scopedWith(postgresLayer(url))(Effect.void))
         expect(Exit.isFailure(dirty)).toBe(true)

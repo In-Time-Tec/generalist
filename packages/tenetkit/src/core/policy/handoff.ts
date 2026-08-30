@@ -16,7 +16,7 @@ import type { ClosedToolSet } from "../tools/tool-executor.js"
 import type { Policy } from "../turn/policy.js"
 import { Catalog, layerCatalog, type Target } from "./handoff-target.js"
 import { handoffToolSpec } from "./handoff-runtime.js"
-import { registerHandoffToolMeta } from "./handoff-tool-meta.js"
+import { attachHandoffToolMeta } from "./handoff-tool-meta.js"
 import type { ContextProjection } from "./handoff-projection.js"
 
 const defaultDelegateParameters = Schema.Struct({ prompt: Schema.String })
@@ -395,7 +395,7 @@ export const transferTool: {
     const metadata: HandoffMetadata = { specialist: spec.specialist }
     if (spec.projection !== undefined) metadata.projection = spec.projection
     if (spec.maxRepeatedEdge !== undefined) metadata.maxRepeatedEdge = spec.maxRepeatedEdge
-    registerHandoffToolMeta(spec.tool.name, metadata)
+    attachHandoffToolMeta(spec.tool, metadata)
     return {
       name: spec.tool.name,
       tool: spec.tool,

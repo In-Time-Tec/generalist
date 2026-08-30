@@ -3,13 +3,15 @@ import { LanguageModel, Response } from "effect/unstable/ai"
 import { adapt, invokeGenerateObject, invokeGenerateText, invokeStreamText } from "../../core/model/service.js"
 import {
   type AvailabilityFailureClassifier,
-  type CandidateIdentity,
-  type CandidateRouteInstrumentation,
   type ModelSelection,
   type Registration,
   registration as modelRegistration,
-  withCandidateRoute,
 } from "../../core/model/registry.js"
+import {
+  type CandidateIdentity,
+  type CandidateRouteInstrumentation,
+  withCandidateRoute,
+} from "../../core/model/registry-internal.js"
 
 /** @experimental */
 export interface Input {

@@ -1,6 +1,6 @@
 import { Effect, Option, Ref } from "effect"
 import { Chat } from "effect/unstable/ai"
-import { type Directory, type Service as SessionStore, SessionDirectory } from "../../context/session.js"
+import { type Directory, type SessionStore, SessionDirectory } from "../../context/session.js"
 import { Compaction } from "../../turn/compaction.js"
 import { AgentError, ResumeMismatch } from "../event.js"
 import { validResolutions } from "../suspension.js"

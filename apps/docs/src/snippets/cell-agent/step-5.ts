@@ -1,10 +1,10 @@
 import { Duration, Layer } from "effect"
 import { layer as bunServices } from "@effect/platform-bun/BunServices"
 import { ToolContext, ToolExecutor } from "tenetkit"
-import { CellTool, HostModules, KernelProfile } from "tenetkit/repl"
-import { BunKernelPool, BunKernelStateStore, workerModule } from "tenetkit/repl/bun"
+import { CellTool, HostBindings, KernelProfile } from "tenetkit/repl"
+import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "tenetkit/repl/bun"
 
-declare const workspace: HostModules.Module
+declare const workspace: HostBindings.Module
 declare const dataRoot: string
 declare const bunVersion: string
 
@@ -31,11 +31,11 @@ const kernelPool = BunKernelPool.layer({
   // zero time to live gives every cell a fresh worker and silently loses module bindings.
   idleTimeToLive: Duration.minutes(5),
   environment: {},
-}).pipe(Layer.provide(BunKernelStateStore.layer({ dataRoot })), Layer.provide(bunServices))
+}).pipe(Layer.provide(BunKernelSnapshotStore.layer({ dataRoot })), Layer.provide(bunServices))
 
 export const cellLayer: Layer.Layer<
   ToolExecutor.ToolExecutor | ToolContext.ToolContext,
-  HostModules.HostModuleConflict
+  HostBindings.HostModuleConflict
 > = CellTool.layer.pipe(
-  Layer.provideMerge(Layer.mergeAll(ToolContext.layerDefault, HostModules.layer([workspace]), kernelPool)),
+  Layer.provideMerge(Layer.mergeAll(ToolContext.layerDefault, HostBindings.layer([workspace]), kernelPool)),
 )

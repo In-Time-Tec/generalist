@@ -70,6 +70,7 @@ export const minimumConsumerProfiles = [
       { specifier: "tenetkit/runtime/external-child-placement", runtimes: nodeAndBun },
       { specifier: "tenetkit/runtime/external-child-store", runtimes: nodeAndBun },
       { specifier: "tenetkit/runtime/sql-driver", runtimes: nodeAndBun },
+      { specifier: "tenetkit/instructions", runtimes: nodeAndBun, exports: ["load"] },
       { specifier: "tenetkit/skills", runtimes: nodeAndBun },
       { specifier: "tenetkit/transport", runtimes: nodeAndBun },
       { specifier: "tenetkit/transport/errors", runtimes: nodeAndBun },
@@ -170,8 +171,8 @@ export const minimumConsumerProfiles = [
     packages: ["tenetkit", "pg", "mysql"],
     peers: [],
     imports: [
-      { specifier: "@tenetkit/pg", runtimes: nodeAndBun, exports: ["layer", "RunSchema"] },
-      { specifier: "@tenetkit/mysql", runtimes: nodeAndBun, exports: ["layer", "RunSchema"] },
+      { specifier: "@tenetkit/pg", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
+      { specifier: "@tenetkit/mysql", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
     ],
   },
   {
@@ -182,7 +183,7 @@ export const minimumConsumerProfiles = [
       {
         specifier: "@tenetkit/cloudflare/durable-objects",
         runtimes: workerOnly,
-        exports: ["Activations", "HibernatingWebSocket", "layerRunStore"],
+        exports: ["HibernatingWebSocket", "layerRunStore"],
       },
       { specifier: "@tenetkit/cloudflare/dynamic-workers", runtimes: workerOnly, exports: ["layer", "make"] },
       { specifier: "@tenetkit/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
@@ -241,6 +242,7 @@ export const exactPackageExports = {
     "./ai/openai-responses",
     "./ai/openrouter",
     "./foldkit",
+    "./instructions",
     "./mcp",
     "./mcp/client",
     "./mcp/client/http",

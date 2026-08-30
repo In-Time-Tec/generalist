@@ -3,16 +3,14 @@ import { Effect, Exit, Schema, Scope, Stream } from "effect"
 import { CellOutcomeUnknown, KernelUnavailable, type CellFailure, validateSequence } from "../../repl/cell.js"
 import type { Execution, Service as KernelPool, Inspection } from "../../repl/kernel-pool.js"
 import { digest, type KernelProfile } from "../../repl/kernel-profile.js"
-import type { Service as KernelResourceStore } from "../../repl/kernel-resource-store.js"
-
-const noSignal = (): AbortSignal => AbortSignal.any([])
+import type { Service as KernelResourceAuthority } from "../../repl/kernel-resource-authority.js"
 
 const request = (
   pool: KernelPool,
   sessionId: string,
   cellId: string,
   code: string,
-): Effect.Effect<Execution, CellFailure, Scope.Scope> => pool.execute({ sessionId, cellId, code, signal: noSignal() })
+): Effect.Effect<Execution, CellFailure, Scope.Scope> => pool.execute({ sessionId, cellId, code })
 
 const run = (pool: KernelPool, sessionId: string, cellId: string, code: string) =>
   request(pool, sessionId, cellId, code).pipe(Effect.flatMap((execution) => execution.result))
@@ -47,7 +45,7 @@ export interface RemoteHarness extends Harness {
   readonly hostB: KernelPool
   readonly changedProfileHost: KernelPool
   readonly changedProfile: KernelProfile
-  readonly authority: KernelResourceStore
+  readonly authority: KernelResourceAuthority
   readonly expire: (sessionId: string) => Effect.Effect<void>
   readonly pause: (sessionId: string) => Effect.Effect<boolean, CellFailure>
   readonly loseNextConnection: (loss: ConnectionLoss) => Effect.Effect<void>

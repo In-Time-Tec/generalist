@@ -3,20 +3,19 @@ import { Sse } from "effect/unstable/encoding"
 import { Headers, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiSchema } from "effect/unstable/httpapi"
 import type { Cursor } from "../runtime/cursor.js"
-import type { RunEvent } from "../runtime/run/event.js"
 import { Runtime, type EventsError } from "../runtime/service.js"
 import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from "../runtime/errors.js"
-import { InvalidCursor, WireEncodeFailed } from "./errors.js"
+import { InvalidCursor, WireCodecFailed } from "./errors.js"
 import { CursorFromString, ObserverRunEvent, observerCodec } from "./wire.js"
 
 /** @experimental Typed errors that can terminate an SSE RunEvent stream. */
-export type StreamError = EventsError | WireEncodeFailed
+export type StreamError = EventsError | WireCodecFailed
 export const StreamError: Schema.Schema<StreamError> = Schema.Union([
   RunNotFound,
   CursorExpired,
   SubscriberLagged,
   RuntimeUnavailable,
-  WireEncodeFailed,
+  WireCodecFailed,
 ])
 
 const decodeCursor = (value: string): Effect.Effect<Cursor, InvalidCursor> =>
@@ -49,7 +48,7 @@ const cursorFromRequest = (
 type StreamSuccess = HttpApiSchema.StreamSse<
   HttpApiSchema.SseEventFromData<typeof ObserverRunEvent>,
   typeof StreamError,
-  RunEvent
+  ObserverRunEvent
 >
 
 export const streamSuccess: StreamSuccess = HttpApiSchema.StreamSse({ data: ObserverRunEvent, error: StreamError })
@@ -104,9 +103,7 @@ export const respond = (options: {
   })
 
 /** @experimental Decodes one canonical SSE event and verifies its cursor identity. */
-export const decodeEvent = (
-  event: Sse.Event,
-): Effect.Effect<import("./wire.js").ResolvedRunEvent, InvalidCursor | WireEncodeFailed> =>
+export const decodeEvent = (event: Sse.Event): Effect.Effect<ObserverRunEvent, InvalidCursor | WireCodecFailed> =>
   event._tag === "Event" && event.id !== undefined
     ? decodeCursor(event.id).pipe(
         Effect.flatMap((cursor) =>

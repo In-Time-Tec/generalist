@@ -8,7 +8,7 @@ export const runtimeReference = definePage({
   description: "Addressable Run admission, canonical events, inspection, waits, stores, and workers.",
   content: [
     lead("tenetkit/runtime owns the authoritative lifecycle for addressable TenetKit runs."),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
     h2("surface", "Core surface"),
     table(
       ["Namespace", "Role"],
@@ -68,9 +68,9 @@ export const runtimeReference = definePage({
       " and ",
       code("layer from @tenetkit/mysql"),
       " support multi-worker claims and require the schema to be applied before Runtime startup. PostgreSQL uses ",
-      code("@tenetkit/pg RunSchema"),
+      code("@tenetkit/pg RuntimeSchema"),
       "; MySQL 8+ uses ",
-      code("@tenetkit/mysql RunSchema"),
+      code("@tenetkit/mysql RuntimeSchema"),
       ".",
     ),
     p(

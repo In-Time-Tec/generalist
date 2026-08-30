@@ -81,6 +81,10 @@
       "types": "./dist/skills/index.d.ts",
       "import": "./dist/skills/index.js"
     },
+    "./instructions": {
+      "types": "./dist/instructions.d.ts",
+      "import": "./dist/instructions.js"
+    },
     "./memory": {
       "types": "./dist/memory/index.d.ts",
       "import": "./dist/memory/index.js"

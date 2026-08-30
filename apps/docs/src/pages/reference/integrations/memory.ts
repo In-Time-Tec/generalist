@@ -9,7 +9,7 @@ export const memoryReference = definePage({
     lead(
       "tenetkit/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
     p(code("tenetkit/memory"), " is an import subpath, not a package."),
     h2("exports", "Exports map"),
     table(

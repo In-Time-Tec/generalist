@@ -1,5 +1,5 @@
 import { Cause, Effect, Ref, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
+import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event, type StructuredOutput, DuplicateToolCallId } from "../event.js"
 import {
   CurrentCompactionId,
@@ -8,8 +8,9 @@ import {
   CurrentSummaryCall,
   SinkFailed,
 } from "../../model/telemetry/events.js"
-import { Error, type Decision, type TurnOverrides, type Policy } from "../../turn/policy.js"
-import type { LanguageModelNotRegistered } from "../../model/registry.js"
+import { PolicyError, type Decision, type TurnOverrides, type Policy } from "../../turn/policy.js"
+import { LanguageModelNotRegistered } from "../../model/registry.js"
+import { ModelResponseContent } from "../../context/session.js"
 import type { PendingToolResult } from "../tools/result.js"
 import type { ToolCheckpoint } from "../suspension.js"
 import { pendingResult, projectableResults } from "../tools/checkpoint.js"
@@ -35,6 +36,23 @@ import { afterTurnFor } from "./after-turn.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
+interface RequiredFieldCodec<out T, out E, out RD, out RE> extends Schema.Codec<T, E, RD, RE> {
+  readonly "~type.optionality": "required"
+  readonly "~type.mutability": "readonly"
+  readonly "~encoded.optionality": "required"
+  readonly "~encoded.mutability": "readonly"
+}
+const requiredField = <T, E, RD, RE>(schema: Schema.Codec<T, E, RD, RE>): RequiredFieldCodec<T, E, RD, RE> =>
+  Schema.make<RequiredFieldCodec<T, E, RD, RE>>(schema.ast, { schema })
+const StructuredOutputError = Schema.Union([AgentError, AiError.AiError, LanguageModelNotRegistered])
+const structuredResponseSchema = <S extends ObjectSchema>(
+  schema: S,
+): Schema.Codec<
+  { readonly value: S["Type"]; readonly content: typeof ModelResponseContent.Encoded },
+  unknown,
+  S["DecodingServices"],
+  S["EncodingServices"]
+> => Schema.Struct({ value: requiredField(schema), content: Schema.toEncoded(ModelResponseContent) })
 const hasClosedPolicy = (agent: ActiveAgent): agent is ClosedPolicyAgent =>
   isClosed(agent) || agent.policy.snapshot !== undefined
 
@@ -97,6 +115,8 @@ export const make = <
             turn: structuredTurn,
             input: { turn: structuredTurn, modelCallOrdinal: ordinal },
             replayPolicy: "provider-idempotent",
+            success: structuredResponseSchema(config.schema),
+            failure: StructuredOutputError,
           },
           LanguageModel.generateObject({
             prompt: Prompt.concat(history, transformedPrompt),
@@ -120,17 +140,36 @@ export const make = <
                   : Effect.failCause(cause)
               },
             ),
+            Effect.flatMap((generated) =>
+              Schema.encodeEffect(ModelResponseContent)(generated.content).pipe(
+                Effect.map((content) => ({ value: generated.value, content })),
+                Effect.mapError((error) =>
+                  AgentError.make({
+                    message: `Structured output response cannot be persisted: ${error.message}`,
+                    turn: structuredTurn,
+                    cause: error,
+                  }),
+                ),
+              ),
+            ),
           ),
         )
-        yield* captureStructuredUsage(response.content)
+        const decodedContent = yield* Schema.decodeEffect(ModelResponseContent)(response.content).pipe(
+          Effect.mapError((error) =>
+            DriverStateInvalid.make({ message: `Structured output response cannot be replayed: ${error.message}` }),
+          ),
+        )
+        const content = decodedContent.map((part) => {
+          if (part.type === "tool-call") return Response.makePart("tool-call", part)
+          if (part.type === "tool-result") return Response.makePart("tool-result", part)
+          return part
+        })
+        yield* captureStructuredUsage(content)
         const structuredIdentity = telemetryIdentity.current
         if (structuredIdentity === undefined) {
           return yield* Effect.die(new globalThis.Error("Structured output model attempt identity is missing"))
         }
-        const transcript = Prompt.concat(
-          Prompt.concat(history, transformedPrompt),
-          Prompt.fromResponseParts(response.content),
-        )
+        const transcript = Prompt.concat(Prompt.concat(history, transformedPrompt), Prompt.fromResponseParts(content))
         yield* applyCompactionResult(
           structuredTurn,
           { _tag: "Microcompact", history: transcript, prompt: Prompt.empty },
@@ -142,7 +181,7 @@ export const make = <
           turn: structuredTurn,
           ...structuredIdentity,
           value: response.value,
-          content: response.content,
+          content,
         }
         const completion = yield* inbox.complete
         if (completion._tag === "Closed") {
@@ -165,10 +204,10 @@ export const make = <
       : Ref.get(handoffStateRef).pipe(Effect.map((handoffRun) => handoffRun.active.agent))
   const decidePolicy = (
     info: Parameters<typeof agent.policy.decide>[0],
-  ): Effect.Effect<Decision, Error | HandoffRequirementsMissing, R> => {
+  ): Effect.Effect<Decision, PolicyError | HandoffRequirementsMissing, R> => {
     if (handoffStateRef === undefined) return agent.policy.decide(info)
     return Ref.get(handoffStateRef).pipe(
-      Effect.flatMap((handoffRun): Effect.Effect<Decision, Error | HandoffRequirementsMissing, R> => {
+      Effect.flatMap((handoffRun): Effect.Effect<Decision, PolicyError | HandoffRequirementsMissing, R> => {
         if (handoffRun.active.name === handoffRun.root) return agent.policy.decide(info)
         if (hasClosedPolicy(handoffRun.active.agent)) {
           return handoffRun.active.agent.policy.decide(info)

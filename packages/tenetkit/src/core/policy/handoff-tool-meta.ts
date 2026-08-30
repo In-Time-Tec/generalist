@@ -1,4 +1,5 @@
 import { Function } from "effect"
+import type { Tool } from "effect/unstable/ai"
 import type { ContextProjection } from "./handoff-projection.js"
 
 export interface HandoffToolMeta {
@@ -7,17 +8,13 @@ export interface HandoffToolMeta {
   readonly maxRepeatedEdge?: number
 }
 
-const registry = new Map<string, HandoffToolMeta>()
+const metadata = new WeakMap<Tool.Any, HandoffToolMeta>()
 
-export const registerHandoffToolMeta: {
-  (meta: HandoffToolMeta): (toolName: string) => void
-  (toolName: string, meta: HandoffToolMeta): void
-} = Function.dual(2, (toolName: string, meta: HandoffToolMeta): void => {
-  registry.set(toolName, meta)
+export const attachHandoffToolMeta: {
+  (meta: HandoffToolMeta): (tool: Tool.Any) => void
+  (tool: Tool.Any, meta: HandoffToolMeta): void
+} = Function.dual(2, (tool: Tool.Any, meta: HandoffToolMeta): void => {
+  metadata.set(tool, meta)
 })
 
-export const lookupHandoffToolMeta = (toolName: string): HandoffToolMeta | undefined => registry.get(toolName)
-
-export const clearHandoffToolMeta = (): void => {
-  registry.clear()
-}
+export const lookupHandoffToolMeta = (tool: Tool.Any): HandoffToolMeta | undefined => metadata.get(tool)

@@ -92,57 +92,57 @@ export const Result = Schema.Struct({
 export type Result = typeof Result.Type
 
 /** @experimental */
-export class SandboxUnavailable extends Schema.TaggedError<SandboxUnavailable>()("@tenetkit/core/SandboxUnavailable", {
+export class SandboxUnavailable extends Schema.TaggedError<SandboxUnavailable>()("tenetkit/core/SandboxUnavailable", {
   message: Schema.String,
 }) {}
 /** @experimental */
 export class SandboxSourceInvalid extends Schema.TaggedError<SandboxSourceInvalid>()(
-  "@tenetkit/core/SandboxSourceInvalid",
+  "tenetkit/core/SandboxSourceInvalid",
   {
     message: Schema.String,
   },
 ) {}
 /** @experimental */
 export class SandboxInputInvalid extends Schema.TaggedError<SandboxInputInvalid>()(
-  "@tenetkit/core/SandboxInputInvalid",
+  "tenetkit/core/SandboxInputInvalid",
   {
     message: Schema.String,
   },
 ) {}
 /** @experimental */
 export class SandboxOutputInvalid extends Schema.TaggedError<SandboxOutputInvalid>()(
-  "@tenetkit/core/SandboxOutputInvalid",
+  "tenetkit/core/SandboxOutputInvalid",
   {
     message: Schema.String,
   },
 ) {}
 /** @experimental */
 export class SandboxProtocolViolation extends Schema.TaggedError<SandboxProtocolViolation>()(
-  "@tenetkit/core/SandboxProtocolViolation",
+  "tenetkit/core/SandboxProtocolViolation",
   { message: Schema.String },
 ) {}
 /** @experimental */
 export class SandboxDeadlineExceeded extends Schema.TaggedError<SandboxDeadlineExceeded>()(
-  "@tenetkit/core/SandboxDeadlineExceeded",
+  "tenetkit/core/SandboxDeadlineExceeded",
   { message: Schema.String },
 ) {}
 /** @experimental */
-export class SandboxCancelled extends Schema.TaggedError<SandboxCancelled>()("@tenetkit/core/SandboxCancelled", {
+export class SandboxCancelled extends Schema.TaggedError<SandboxCancelled>()("tenetkit/core/SandboxCancelled", {
   message: Schema.String,
 }) {}
 /** @experimental */
 export class SandboxResourceExceeded extends Schema.TaggedError<SandboxResourceExceeded>()(
-  "@tenetkit/core/SandboxResourceExceeded",
+  "tenetkit/core/SandboxResourceExceeded",
   { resource: Schema.Literals(["cpu", "subrequests", "output"]), limit: positiveInt },
 ) {}
 /** @experimental */
 export class SandboxGuaranteeUnavailable extends Schema.TaggedError<SandboxGuaranteeUnavailable>()(
-  "@tenetkit/core/SandboxGuaranteeUnavailable",
+  "tenetkit/core/SandboxGuaranteeUnavailable",
   { guarantee: guaranteeName, message: Schema.String },
 ) {}
 /** @experimental */
 export class SandboxExecutionFailure extends Schema.TaggedError<SandboxExecutionFailure>()(
-  "@tenetkit/core/SandboxExecutionFailure",
+  "tenetkit/core/SandboxExecutionFailure",
   { message: Schema.String },
 ) {}
 

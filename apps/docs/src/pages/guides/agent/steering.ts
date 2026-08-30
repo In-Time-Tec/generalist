@@ -12,7 +12,7 @@ export const steering = definePage({
     "Inject prompts into one live Run through its scoped handle, and cancel process-local work with Effect interruption.",
   content: [
     p(
-      code("Agent.makeRun"),
+      code("Agent.allocateRun"),
       " allocates one scoped process-local RunHandle with two finite FIFO lanes: ",
       code("steer"),
       " inputs are seen before the next model turn after tool results, and ",

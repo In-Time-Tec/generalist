@@ -75,21 +75,17 @@ export const withLifecycle =
   (request: Request) =>
   <A extends Result, E, R>(work: Effect.Effect<Option.Option<A>, E, R>): Effect.Effect<Option.Option<Result>, E, R> =>
     withCompactionLifecycle(work, request, request.usage)
-/** @experimental Result from tool-output microcompaction. */
-export interface MicrocompactResult {
-  readonly _tag: "Microcompact"
-  readonly history: Prompt.Prompt
-  readonly prompt: Prompt.Prompt
-}
-/** @experimental Result from summary checkpointing. */
-export interface SummarizeResult {
-  readonly _tag: "Summarize"
-  readonly history: Prompt.Prompt
-  readonly prompt: Prompt.Prompt
-  readonly summary: string
-}
 /** @experimental Compaction result applied by the agent loop. */
-export type Result = MicrocompactResult | SummarizeResult
+export const Result = Schema.Union([
+  Schema.TaggedStruct("Microcompact", { history: Prompt.Prompt, prompt: Prompt.Prompt }),
+  Schema.TaggedStruct("Summarize", { history: Prompt.Prompt, prompt: Prompt.Prompt, summary: Schema.String }),
+])
+/** @experimental */
+export type Result = typeof Result.Type
+/** @experimental Result from tool-output microcompaction. */
+export type MicrocompactResult = Extract<Result, { readonly _tag: "Microcompact" }>
+/** @experimental Result from summary checkpointing. */
+export type SummarizeResult = Extract<Result, { readonly _tag: "Summarize" }>
 /** @experimental Compaction strategy: decide, cut, summarize. */
 export interface Strategy {
   readonly shouldCompact: (usage: Usage) => boolean

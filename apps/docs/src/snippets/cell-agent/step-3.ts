@@ -20,8 +20,7 @@ const script = (request: { readonly code: string }): TestKernel.Script =>
 const runCell = (cellId: string, code: string) =>
   Effect.gen(function* () {
     const pool = yield* KernelPool.KernelPool
-    const signal = yield* Effect.abortSignal
-    const execution = yield* pool.execute({ sessionId: "session-a", cellId, code, signal })
+    const execution = yield* pool.execute({ sessionId: "session-a", cellId, code })
     const events = yield* Stream.runCollect(execution.events)
     yield* Console.log(`${cellId} events: ${events.map((event) => `${event.sequence}:${event._tag}`).join(" ")}`)
     return yield* Effect.exit(execution.result)

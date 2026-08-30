@@ -60,7 +60,7 @@ const layers = Layer.mergeAll(
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    const run = yield* Agent.makeRun(agent, { prompt: "Is the api deploy healthy?" })
+    const run = yield* Agent.allocateRun(agent, { prompt: "Is the api deploy healthy?" })
     yield* run.steer({ prompt: "Keep the answer to one sentence." })
     yield* run.followUp({ prompt: "Also check the worker service." })
     const last = yield* Stream.runLast(run.events)

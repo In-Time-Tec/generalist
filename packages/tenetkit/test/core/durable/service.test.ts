@@ -721,6 +721,8 @@ const batchToolFixture = (logicalOperationId: string, ids: ReadonlyArray<string>
       turn: 0,
       input: { turn: 0, callId: call.id, name: call.name },
       replayPolicy: "pure" as const,
+      success: ToolExecutor.Outcome,
+      failure: Schema.Never,
       applyCheckpoint: applyToolOutcome({
         callIndex,
         call,
@@ -802,7 +804,14 @@ describe("DurableDriver Agent.stream integration", () => {
 
         expect(
           yield* interpreter.run(
-            { kind, key: pendingKey, input, replayPolicy: "provider-idempotent" },
+            {
+              kind,
+              key: pendingKey,
+              input,
+              replayPolicy: "provider-idempotent",
+              success: Schema.String,
+              failure: Schema.Never,
+            },
             Effect.die("replayed operation must not execute"),
           ),
         ).toBe("replayed")
@@ -815,6 +824,8 @@ describe("DurableDriver Agent.stream integration", () => {
             key: nextKey,
             input: { turn: 0, modelCallOrdinal: 1 },
             replayPolicy: "provider-idempotent",
+            success: Schema.Void,
+            failure: Schema.Never,
           },
           Effect.void,
         )
@@ -855,6 +866,8 @@ describe("DurableDriver Agent.stream integration", () => {
             ...pending,
             key: `${logicalOperationId}:model:0:1`,
             input: { turn: 0, modelCallOrdinal: 1 },
+            success: Schema.Void,
+            failure: Schema.Never,
           },
           Effect.void,
         )
@@ -1719,7 +1732,14 @@ describe("DurableDriver Agent.stream integration", () => {
       })
       const exit = yield* interpreter
         .run(
-          { kind: "tool", key: "interrupt:tool", input: {}, replayPolicy: "never" },
+          {
+            kind: "tool",
+            key: "interrupt:tool",
+            input: {},
+            replayPolicy: "never",
+            success: Schema.Never,
+            failure: Schema.Never,
+          },
           Effect.acquireUseRelease(
             Effect.sync(() => lifecycle.push("effect committed")),
             () => Effect.interrupt,
@@ -1753,14 +1773,38 @@ describe("DurableDriver Agent.stream integration", () => {
         },
       })
       const typed = { _tag: "TypedHandlerFailure" as const, detail: "kept" }
+      const TypedHandlerFailure = Schema.Struct({
+        _tag: Schema.tag("TypedHandlerFailure"),
+        detail: Schema.String,
+      })
       expect(
         yield* interpreter
-          .run({ kind: "tool", key: "classification:typed", input: {}, replayPolicy: "never" }, Effect.fail(typed))
+          .run(
+            {
+              kind: "tool",
+              key: "classification:typed",
+              input: {},
+              replayPolicy: "never",
+              success: Schema.Never,
+              failure: TypedHandlerFailure,
+            },
+            Effect.fail(typed),
+          )
           .pipe(Effect.flip),
       ).toBe(typed)
       const defect = new Error("handler defect")
       const defectExit = yield* interpreter
-        .run({ kind: "tool", key: "classification:defect", input: {}, replayPolicy: "never" }, Effect.die(defect))
+        .run(
+          {
+            kind: "tool",
+            key: "classification:defect",
+            input: {},
+            replayPolicy: "never",
+            success: Schema.Never,
+            failure: Schema.Never,
+          },
+          Effect.die(defect),
+        )
         .pipe(Effect.exit)
       expect(defectExit._tag).toBe("Failure")
       if (defectExit._tag === "Failure") expect(Cause.squash(defectExit.cause)).toBe(defect)
@@ -1795,11 +1839,53 @@ describe("DurableDriver Agent.stream integration", () => {
         key: "retry-safe:model",
         input: {},
         replayPolicy: "provider-idempotent" as const,
+        success: Schema.String,
+        failure: Schema.Never,
       }
       yield* interpreter.run(spec, Effect.interrupt).pipe(Effect.exit)
       expect(yield* interpreter.run(spec, Effect.succeed("retried"))).toBe("retried")
       expect(scheduled).toEqual([spec.key, spec.key])
       expect(completed).toEqual([{ _tag: "Succeeded", value: "retried" }])
+    }),
+  )
+
+  it.effect("rejects persisted outcomes that do not match the operation codecs", () =>
+    Effect.gen(function* () {
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "strict-replay", sessionId: "strict-replay" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("strict replay"), budget: RunBudget.make({}) })
+      const replay = (outcome: DurableDriver.OperationOutcome) =>
+        DurableDriver.makeInline({
+          driver,
+          initial,
+          journal: {
+            onScheduled: () => Effect.succeed(outcome),
+            onCompleted: () => Effect.void,
+            onCheckpoint: () => Effect.void,
+          },
+        }).pipe(
+          Effect.flatMap((interpreter) =>
+            interpreter.run(
+              {
+                kind: "tool",
+                key: "strict-replay:tool",
+                input: {},
+                replayPolicy: "pure",
+                success: Schema.String,
+                failure: Schema.String,
+              },
+              Effect.die("invalid replay must not execute"),
+            ),
+          ),
+          Effect.flip,
+        )
+
+      const successFailure = yield* replay({ _tag: "Succeeded", value: 42 })
+      const invalidSuccess = yield* Schema.decodeUnknownEffect(DurableDriver.DriverStateInvalid)(successFailure)
+      expect(invalidSuccess.message).toContain("invalid success outcome")
+
+      const failureFailure = yield* replay({ _tag: "Failed", error: { message: "not encoded as a string" } })
+      const invalidFailure = yield* Schema.decodeUnknownEffect(DurableDriver.DriverStateInvalid)(failureFailure)
+      expect(invalidFailure.message).toContain("invalid failure outcome")
     }),
   )
 
@@ -1814,6 +1900,8 @@ describe("DurableDriver Agent.stream integration", () => {
         key: `${logicalOperationId}:model:0:0`,
         input: { turn: 0, modelCallOrdinal: 0 },
         replayPolicy: "provider-idempotent" as const,
+        success: Schema.Array(Schema.String),
+        failure: Schema.Never,
       }
       const initial: DurableDriver.DriverCheckpoint = {
         driverVersion: DurableDriver.currentDriverVersion,
@@ -1852,11 +1940,13 @@ describe("DurableDriver Agent.stream integration", () => {
           }),
         )
 
-      expect(yield* Stream.runCollect(interpreter.runStream(pendingSpec, providerStream(["redispatched"])))).toEqual([
-        "first",
-        "second",
-        "third",
-      ])
+      expect(
+        yield* Stream.runCollect(
+          interpreter.runStream(pendingSpec, providerStream(["redispatched"]), {
+            successCodec: DurableDriver.arrayStreamCodec<string>(),
+          }),
+        ),
+      ).toEqual(["first", "second", "third"])
       const replayedCheckpoint = yield* interpreter.checkpoint
       expect(replayedCheckpoint.state).not.toHaveProperty("pending")
       expect(replayedCheckpoint.state).toMatchObject({ modelCallOrdinal: 1 })
@@ -1868,7 +1958,13 @@ describe("DurableDriver Agent.stream integration", () => {
         key: `${logicalOperationId}:model:0:1`,
         input: { turn: 0, modelCallOrdinal: 1 },
       }
-      expect(yield* Stream.runCollect(interpreter.runStream(nextSpec, providerStream(["next"])))).toEqual(["next"])
+      expect(
+        yield* Stream.runCollect(
+          interpreter.runStream(nextSpec, providerStream(["next"]), {
+            successCodec: DurableDriver.arrayStreamCodec<string>(),
+          }),
+        ),
+      ).toEqual(["next"])
       const nextCheckpoint = yield* interpreter.checkpoint
       expect(nextCheckpoint.state).not.toHaveProperty("pending")
       expect(nextCheckpoint.state).toMatchObject({ modelCallOrdinal: 2 })
@@ -1909,7 +2005,14 @@ describe("DurableDriver Agent.stream integration", () => {
           onCheckpoint: () => Effect.void,
         },
       })
-      const spec = { kind: "tool" as const, key: "stream-codec:tool", input: {}, replayPolicy: "never" as const }
+      const spec = {
+        kind: "tool" as const,
+        key: "stream-codec:tool",
+        input: {},
+        replayPolicy: "never" as const,
+        success: Schema.Struct({ total: Schema.Finite, count: Schema.Finite }),
+        failure: Schema.String,
+      }
       const source = Stream.unwrap(
         Effect.sync(() => {
           sourceRuns += 1
@@ -1963,8 +2066,16 @@ describe("DurableDriver Agent.stream integration", () => {
 
       const failure = yield* interpreter
         .runStream(
-          { kind: "tool", key: "stream-ack:tool", input: {}, replayPolicy: "pure" },
+          {
+            kind: "tool",
+            key: "stream-ack:tool",
+            input: {},
+            replayPolicy: "pure",
+            success: Schema.Array(Schema.String),
+            failure: Schema.Never,
+          },
           Stream.make("paid result"),
+          { successCodec: DurableDriver.arrayStreamCodec<string>() },
         )
         .pipe(Stream.runDrain, Effect.flip)
 
@@ -1993,8 +2104,16 @@ describe("DurableDriver Agent.stream integration", () => {
       const defect = new Error("stream defect")
       const exit = yield* interpreter
         .runStream(
-          { kind: "tool", key: "stream:tool", input: {}, replayPolicy: "never" },
+          {
+            kind: "tool",
+            key: "stream:tool",
+            input: {},
+            replayPolicy: "never",
+            success: Schema.Array(Schema.Never),
+            failure: Schema.Never,
+          },
           Stream.die(defect).pipe(Stream.ensuring(Effect.sync(() => lifecycle.push("stream finalized")))),
+          { successCodec: DurableDriver.arrayStreamCodec<never>() },
         )
         .pipe(Stream.runDrain, Effect.exit)
       expect(exit._tag).toBe("Failure")

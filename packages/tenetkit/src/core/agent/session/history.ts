@@ -1,6 +1,6 @@
 import { Effect, Option, Ref } from "effect"
 import { Chat, Prompt } from "effect/unstable/ai"
-import { buildContext, type Service as SessionStore } from "../../context/session.js"
+import { buildContext, type SessionStore } from "../../context/session.js"
 import type { Event as ModelTelemetryEvent } from "../../model/telemetry/events.js"
 import { AgentError, ResumeMismatch } from "../event.js"
 import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "../suspension.js"

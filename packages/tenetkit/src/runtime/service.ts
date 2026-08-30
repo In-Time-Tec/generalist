@@ -52,7 +52,7 @@ import type {
 import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
-import type { Service as MessagingPolicyService } from "./messaging/service.js"
+import type { MessagingPolicy } from "./messaging/service.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { CompletedModelResponse, RunEvent } from "./run/event.js"
 import type { WaitResolution } from "./run/wait.js"
@@ -79,7 +79,7 @@ export interface LayerOptions {
   readonly addresses: ReadonlyArray<AddressBinding>
   readonly subscriberQueueCapacity?: number
   /** Host policy for addressing beyond TenetKit's derived relationships. Absent means relationships only. */
-  readonly messagingPolicy?: MessagingPolicyService
+  readonly messagingPolicy?: MessagingPolicy.Service
   readonly mailboxBounds?: Partial<MailboxBounds>
   /** Final-state callback executed synchronously inside each authoritative store transaction. */
   readonly activationProjection?: RunActivationProjection

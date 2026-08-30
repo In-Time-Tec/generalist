@@ -19,6 +19,7 @@ import { VectorStore } from "tenetkit/memory"
 import { MCPClient, OAuth } from "tenetkit/mcp"
 import { make as makeMcpHttpTransport } from "tenetkit/mcp/client/http"
 import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "tenetkit/mcp/tools"
+import { load } from "tenetkit/instructions"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
 import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
 import { make as makeModelRoute } from "tenetkit/ai/model-route"
@@ -39,6 +40,10 @@ type Assert<Value extends true> = Value
 type MemberEqual<Left, Right, Key extends keyof Left & keyof Right> = Equal<Left[Key], Right[Key]>
 type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
 type SkillsRoot = typeof import("tenetkit/skills")
+type InstructionsLoad = Assert<Equal<typeof load, typeof import("tenetkit/instructions").load>>
+type InstructionFilesRemovedFromSkills = Assert<
+  Equal<"InstructionFiles" extends keyof SkillsRoot ? true : false, false>
+>
 type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRoot ? true : false, false>>
 type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
 type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>

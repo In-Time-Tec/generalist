@@ -136,7 +136,7 @@ describe("Policy snapshots", () => {
   )
 
   it.effect("preserves typed policy evaluation failures", () => {
-    const failure = Policy.Error.make({ message: "budget unavailable", cause: { code: "offline" } })
+    const failure = Policy.PolicyError.make({ message: "budget unavailable", cause: { code: "offline" } })
     const policy = Policy.make(() => Effect.fail(failure))
 
     return Effect.gen(function* () {

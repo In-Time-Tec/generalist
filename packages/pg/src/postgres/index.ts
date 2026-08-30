@@ -1,3 +1,2 @@
-export { layer, type Options, type UrlOptions, type StoreError } from "./runtime-layer.js"
-export * as RunSchema from "./run-schema.js"
-export * from "tenetkit/runtime"
+export { layer, type Options, type UrlOptions, type RuntimeError } from "./runtime-layer.js"
+export * as RuntimeSchema from "./run-schema.js"

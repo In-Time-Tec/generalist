@@ -25,7 +25,7 @@ export type CancellationOutcome =
 
 /** @experimental A concrete executor could not definitively cancel one admitted operation. */
 export class CancellationFailure extends Schema.TaggedError<CancellationFailure>()(
-  "@tenetkit/core/CancellationFailure",
+  "tenetkit/core/CancellationFailure",
   {
     tool: Schema.String,
     message: Schema.String,

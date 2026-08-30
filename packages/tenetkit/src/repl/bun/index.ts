@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url"
 
 export * as BunKernelPool from "./pool.js"
-export * as BunKernelStateStore from "./state-store.js"
+export * as BunKernelSnapshotStore from "./snapshot-store.js"
 
 const extension = import.meta.url.endsWith(".ts") ? "ts" : "js"
 

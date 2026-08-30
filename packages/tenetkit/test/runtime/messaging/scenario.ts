@@ -22,7 +22,7 @@ const options = {
 /** The mailbox and policy knobs a messaging test chooses when it builds its Runtime. */
 export interface MessagingOverrides {
   readonly mailboxBounds?: Partial<Mailbox.MailboxBounds>
-  readonly messagingPolicy?: Messaging.Service
+  readonly messagingPolicy?: Messaging.MessagingPolicy.Service
 }
 
 /** A memory Runtime whose mailbox bounds and messaging policy the test chooses. */

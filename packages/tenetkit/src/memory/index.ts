@@ -1,13 +1,13 @@
-import { Context, Effect, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
 import { Memory, merge } from "../core/context/memory.js"
-import { type Options as SemanticRecallOptions, layer as semanticRecallLayer } from "./semantic-recall.js"
+import { make as makeSemanticRecall, type Options as SemanticRecallOptions } from "./semantic-recall.js"
 import type { VectorStore } from "./vector-store.js"
 import {
+  make as makeWorkingMemory,
   type Options as WorkingMemoryOptions,
   type SummarizeOptions,
   type SummaryModel,
-  layer as workingMemoryLayer,
 } from "./working-memory.js"
 
 export * as SemanticRecall from "./semantic-recall.js"
@@ -45,14 +45,9 @@ export function layer(
 ): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel> {
   return Layer.effect(
     Memory,
-    Effect.gen(function* () {
-      const workingContext = yield* Layer.build(
-        options.working === undefined ? workingMemoryLayer() : workingMemoryLayer(options.working),
-      )
-      const semanticContext = yield* Layer.build(semanticRecallLayer(options.semantic))
-      const working = Context.get(workingContext, Memory)
-      const semantic = Context.get(semanticContext, Memory)
-      return Memory.of(merge(working, semantic))
-    }),
+    Effect.all([
+      options.working === undefined ? makeWorkingMemory() : makeWorkingMemory(options.working),
+      makeSemanticRecall(options.semantic),
+    ]).pipe(Effect.map(([working, semantic]) => Memory.of(merge(working, semantic)))),
   )
 }

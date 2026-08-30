@@ -59,7 +59,6 @@ layer(platform, liveOptions)("Bun kernel cell isolation", (it) => {
             sessionId: "s",
             cellId: "c1",
             code: "await new Promise((resolve) => setTimeout(resolve, 400)); console.log('c1-resumed'); 'c1'",
-            signal: AbortSignal.any([]),
           })
           yield* pool.interrupt("s", "c1")
           yield* Effect.exit(first.result)

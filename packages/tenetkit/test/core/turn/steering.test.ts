@@ -9,8 +9,8 @@ describe("Steering", () => {
   it.effect("binds finite producer-only inboxes to distinct Runs", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const first = yield* Agent.makeRun(agent, { prompt: "first", sessionId: "shared-session" })
-        const second = yield* Agent.makeRun(agent, { prompt: "second", sessionId: "shared-session" })
+        const first = yield* Agent.allocateRun(agent, { prompt: "first", sessionId: "shared-session" })
+        const second = yield* Agent.allocateRun(agent, { prompt: "second", sessionId: "shared-session" })
 
         expect(first.runId).not.toBe(second.runId)
         const firstReceipt = yield* first.steer({ prompt: "first correction" })
@@ -24,7 +24,7 @@ describe("Steering", () => {
   it.effect("fails fast at the finite entry bound without partial admission", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const run = yield* Agent.makeRun(agent, {
+        const run = yield* Agent.allocateRun(agent, {
           prompt: "start",
           steering: { steering: { capacity: 1 } },
         })
@@ -46,7 +46,7 @@ describe("Steering", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const bytes = Steering.promptBytes(Prompt.make("kept"))
-        const run = yield* Agent.makeRun(agent, {
+        const run = yield* Agent.allocateRun(agent, {
           prompt: "start",
           steering: { maxPendingBytes: bytes },
         })
@@ -67,7 +67,7 @@ describe("Steering", () => {
   it.effect("releases a backpressured producer with RunClosed when the Run scope closes", () =>
     Effect.gen(function* () {
       const scope = yield* Scope.make()
-      const run = yield* Agent.makeRun(agent, {
+      const run = yield* Agent.allocateRun(agent, {
         prompt: "start",
         steering: { steering: { capacity: 1, onFull: "backpressure" } },
       }).pipe(Scope.provide(scope))
@@ -86,7 +86,7 @@ describe("Steering", () => {
   it.effect("closes admission when an allocated Run scope exits before execution", () =>
     Effect.gen(function* () {
       const scope = yield* Scope.make()
-      const run = yield* Agent.makeRun(agent, { prompt: "never started" }).pipe(Scope.provide(scope))
+      const run = yield* Agent.allocateRun(agent, { prompt: "never started" }).pipe(Scope.provide(scope))
       yield* run.followUp({ prompt: "queued" })
       yield* Scope.close(scope, Exit.void)
 
@@ -99,7 +99,7 @@ describe("Steering", () => {
   it.effect("rejects non-positive and non-integer policies before execution", () =>
     Effect.gen(function* () {
       const invalidCapacity = yield* Effect.scoped(
-        Agent.makeRun(agent, {
+        Agent.allocateRun(agent, {
           prompt: "never starts",
           steering: { steering: { capacity: 0 } },
         }).pipe(Effect.flip),
@@ -108,7 +108,7 @@ describe("Steering", () => {
       expect(invalidCapacity).toMatchObject({ field: "steering.capacity", value: "0" })
 
       const invalidBytes = yield* Effect.scoped(
-        Agent.makeRun(agent, {
+        Agent.allocateRun(agent, {
           prompt: "never starts",
           steering: { maxPendingBytes: 1.5 },
         }).pipe(Effect.flip),

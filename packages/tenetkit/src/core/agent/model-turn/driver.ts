@@ -11,7 +11,7 @@ import {
   type AttemptCompleted,
   type AttemptEvent,
 } from "../../model/operation.js"
-import type { RunError } from "../service.js"
+import { RunError } from "../run/error.js"
 import type { ActiveModelServices } from "./context.js"
 import { promptDigest } from "../prompt-identity.js"
 
@@ -181,6 +181,8 @@ export const wrapDriverAttempt =
               promptDigest: persistedPromptDigest ?? promptDigest(requestMessages),
             },
             replayPolicy: "never",
+            success: CompletedModelOperation,
+            failure: RunError,
           },
           input.attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause, operationId),
           {

@@ -15,7 +15,7 @@ import { applyCommit, chargeUsage as chargeCheckpointUsage, withBudget, withHand
 import type { ControlState } from "../../agent/handoff/state.js"
 import { OperationOutcomeResolution } from "./operation-outcome.js"
 import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
-import { decodeReplay, fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
+import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
 import { scheduleOperations } from "./schedule.js"
 export type { OperationSpec } from "./operation.js"
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
@@ -50,21 +50,33 @@ export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServi
   readonly complete: () => Success
   readonly replay: (success: Success) => Stream.Stream<A, ReplayError, ReplayServices>
 }
+
+/** @experimental Collect and replay one stream as its emitted values. */
+export const arrayStreamCodec = <A>(): StreamSuccessCodec<A, ReadonlyArray<A>> => {
+  const values = new Array<A>()
+  return {
+    observe: (value) => void values.push(value),
+    complete: () => values,
+    replay: Stream.fromIterable,
+  }
+}
+
 type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted
+type OperationSpecServices<SRD, SRE, FRD, FRE> = SRD | SRE | FRD | FRE
 /** @experimental Inline interpreter executing driver operations through Effect services. */
 export interface Service {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
-  readonly run: <A, E, R>(spec: OperationSpec, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, OperationError<E>, R>
-  readonly runStream: {
-    <A, E, R>(spec: OperationSpec, stream: Stream.Stream<A, E, R>): Stream.Stream<A, OperationError<E>, R>
-    <A, E, R, Success, ReplayError, ReplayServices>(
-      spec: OperationSpec,
-      stream: Stream.Stream<A, E, R>,
-      options: {
-        readonly successCodec: StreamSuccessCodec<A, Success, ReplayError, ReplayServices>
-      },
-    ): Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices>
-  }
+  readonly run: <A, E, R, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, OperationError<E>, R | OperationSpecServices<SRD, SRE, FRD, FRE>>
+  readonly runStream: <A, E, R, Success, ReplayError, ReplayServices, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<Success, E, SRD, SRE, FRD, FRE>,
+    stream: Stream.Stream<A, E, R>,
+    options: {
+      readonly successCodec: StreamSuccessCodec<A, Success, ReplayError, ReplayServices>
+    },
+  ) => Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices | OperationSpecServices<SRD, SRE, FRD, FRE>>
   readonly setToolBatch: (
     checkpoint: ToolBatchCheckpoint | undefined,
   ) => Effect.Effect<void, DriverError | DriverStateInvalid>
@@ -118,12 +130,32 @@ export const make = (input: {
     const commitSemaphore = yield* Semaphore.make(1)
     const journal = input.journal ?? noopJournal
     const schedule = scheduleOperations({ checkpointRef, driver: input.driver, journal, semaphore: commitSemaphore })
+    const codecFailure = (spec: { readonly key: string }, branch: "success" | "failure", error: Schema.SchemaError) =>
+      DriverStateInvalid.make({ message: `Operation ${spec.key} has an invalid ${branch} outcome: ${error.message}` })
+    const encodeOutcome = <A, E, SRD, SRE, FRD, FRE>(
+      spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
+      outcome: OperationOutcome,
+    ): Effect.Effect<OperationOutcome, DriverStateInvalid, SRE | FRE> => {
+      if (outcome._tag === "Succeeded") {
+        return Schema.encodeUnknownEffect(spec.success)(outcome.value).pipe(
+          Effect.map((value): OperationOutcome => ({ _tag: "Succeeded", value })),
+          Effect.mapError((error) => codecFailure(spec, "success", error)),
+        )
+      }
+      if (outcome._tag === "Failed") {
+        return Schema.encodeUnknownEffect(spec.failure)(outcome.error).pipe(
+          Effect.map((error): OperationOutcome => ({ _tag: "Failed", error })),
+          Effect.mapError((error) => codecFailure(spec, "failure", error)),
+        )
+      }
+      return Effect.succeed(outcome)
+    }
     const commit = (
       operation: DriverOperation,
       outcome: OperationOutcome,
       batchTool = false,
       nested = false,
-      applyCheckpoint?: OperationSpec["applyCheckpoint"],
+      applyCheckpoint?: (checkpoint: DriverCheckpoint, outcome: OperationOutcome) => DriverCheckpoint,
     ): Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay> =>
       commitSemaphore.withPermit(
         Effect.gen(function* () {
@@ -156,7 +188,7 @@ export const make = (input: {
       replay: OperationOutcome,
       batchTool: boolean,
       nested: boolean,
-      applyCheckpoint?: OperationSpec["applyCheckpoint"],
+      applyCheckpoint?: (checkpoint: DriverCheckpoint, outcome: OperationOutcome) => DriverCheckpoint,
     ): Effect.Effect<void, DriverError | DriverStateInvalid> =>
       commitSemaphore.withPermit(
         Effect.gen(function* () {
@@ -179,75 +211,104 @@ export const make = (input: {
           yield* Ref.set(checkpointRef, after)
         }),
       )
-    const run = <A, E, R>(
-      spec: OperationSpec,
+    const run = <A, E, R, SRD, SRE, FRD, FRE>(
+      spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
       effect: Effect.Effect<A, E, R>,
-    ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R> =>
+    ): Effect.Effect<
+      A,
+      E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+      R | OperationSpecServices<SRD, SRE, FRD, FRE>
+    > =>
       Effect.gen(function* () {
         const { operation, replay, batchTool, nested = false } = yield* schedule(spec)
         if (replay !== undefined) {
-          yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
           yield* guardUnknownNeverReplay(operation, replay)
-          if (replay._tag === "Succeeded") return decodeReplay<A>(replay.value)
-          if (replay._tag === "Failed") return yield* Effect.fail(decodeReplay<E>(replay.error))
+          if (replay._tag === "Succeeded") {
+            const value = yield* Schema.decodeUnknownEffect(spec.success)(replay.value).pipe(
+              Effect.mapError((error) => codecFailure(spec, "success", error)),
+            )
+            yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
+            return value
+          }
+          if (replay._tag === "Failed") {
+            const failure = yield* Schema.decodeUnknownEffect(spec.failure)(replay.error).pipe(
+              Effect.mapError((schemaError) => codecFailure(spec, "failure", schemaError)),
+            )
+            yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
+            return yield* Effect.fail(failure)
+          }
+          yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
           return yield* DriverUnknownReplay.make({ operationKey: operation.key, operationId: replay.operationId })
         }
         const ordinal = modelCallOrdinal(spec)
         const exit = yield* effect.pipe(Effect.provideService(CurrentModelCallOrdinal, ordinal), Effect.exit)
         const outcome = OperationOutcomeResolution.outcomeFromExit(operation, exit)
         if (outcome !== undefined) {
-          yield* outcome._tag === "Unknown"
-            ? Effect.uninterruptible(commit(operation, outcome, batchTool, nested, spec.applyCheckpoint))
-            : commit(operation, outcome, batchTool, nested, spec.applyCheckpoint)
+          const encoded = yield* encodeOutcome(spec, outcome)
+          yield* encoded._tag === "Unknown"
+            ? Effect.uninterruptible(commit(operation, encoded, batchTool, nested, spec.applyCheckpoint))
+            : commit(operation, encoded, batchTool, nested, spec.applyCheckpoint)
         }
         return yield* Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause)
       })
     const interpreter: Service = {
       checkpoint: Ref.get(checkpointRef),
       run,
-      runStream: <A, E, R, Success, ReplayError, ReplayServices>(
-        spec: OperationSpec,
+      runStream: <A, E, R, Success, ReplayError, ReplayServices, SRD, SRE, FRD, FRE>(
+        spec: OperationSpec<Success, E, SRD, SRE, FRD, FRE>,
         stream: Stream.Stream<A, E, R>,
-        options?: { readonly successCodec: StreamSuccessCodec<A, Success, ReplayError, ReplayServices> },
-      ): Stream.Stream<A, OperationError<E> | ReplayError, R | ReplayServices> =>
+        options: { readonly successCodec: StreamSuccessCodec<A, Success, ReplayError, ReplayServices> },
+      ): Stream.Stream<
+        A,
+        OperationError<E> | ReplayError,
+        R | ReplayServices | OperationSpecServices<SRD, SRE, FRD, FRE>
+      > =>
         Stream.unwrap<
           A,
           E | DriverError | DriverStateInvalid | DriverUnknownReplay | ReplayError,
-          R | ReplayServices,
+          R | ReplayServices | SRE | FRE,
           OperationError<E>,
-          never
+          SRD | FRD
         >(
           Effect.gen(function* () {
             const { operation, replay, batchTool, nested = false } = yield* schedule(spec)
-            const codec = options?.successCodec
+            const codec = options.successCodec
             if (replay !== undefined) {
-              yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
               yield* guardUnknownNeverReplay(operation, replay)
               if (replay._tag === "Succeeded") {
-                if (codec !== undefined) return codec.replay(decodeReplay<Success>(replay.value))
-                const values = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown))(replay.value)
-                return Stream.fromIterable(Option.getOrElse(values, () => []).map(decodeReplay<A>))
+                const success = yield* Schema.decodeUnknownEffect(spec.success)(replay.value).pipe(
+                  Effect.mapError((error) => codecFailure(spec, "success", error)),
+                )
+                yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
+                return codec.replay(success)
               }
-              if (replay._tag === "Failed") return Stream.fail(decodeReplay<E>(replay.error))
+              if (replay._tag === "Failed") {
+                const failure = yield* Schema.decodeUnknownEffect(spec.failure)(replay.error).pipe(
+                  Effect.mapError((schemaError) => codecFailure(spec, "failure", schemaError)),
+                )
+                yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
+                return Stream.fail(failure)
+              }
+              yield* applyReplay(operation, replay, batchTool, nested, spec.applyCheckpoint)
               return Stream.fail(
                 DriverUnknownReplay.make({ operationKey: operation.key, operationId: replay.operationId }),
               )
             }
             const ordinal = modelCallOrdinal(spec)
-            const emitted = codec === undefined ? new Array<A>() : undefined
             return stream.pipe(
               Stream.provideService(CurrentModelCallOrdinal, ordinal),
-              Stream.tap((value) =>
-                Effect.sync(() => (codec === undefined ? void emitted!.push(value) : codec.observe(value))),
-              ),
+              Stream.tap((value) => Effect.sync(() => codec.observe(value))),
               Stream.catchCause((cause) => {
                 if (Cause.hasInterrupts(cause)) return Stream.failCause(cause)
                 const outcome = OperationOutcomeResolution.outcomeFromExit(operation, Exit.failCause(cause))
                 if (outcome === undefined) return Stream.failCause(cause)
-                const persist =
-                  outcome._tag === "Unknown"
-                    ? Effect.uninterruptible(commit(operation, outcome, batchTool, nested, spec.applyCheckpoint))
-                    : commit(operation, outcome, batchTool, nested, spec.applyCheckpoint)
+                const persist = encodeOutcome(spec, outcome).pipe(
+                  Effect.flatMap((encoded) =>
+                    encoded._tag === "Unknown"
+                      ? Effect.uninterruptible(commit(operation, encoded, batchTool, nested, spec.applyCheckpoint))
+                      : commit(operation, encoded, batchTool, nested, spec.applyCheckpoint),
+                  ),
+                )
                 return Stream.fromEffect(persist).pipe(Stream.drain, Stream.concat(Stream.failCause(cause)))
               }),
               Stream.onExit((exit) =>
@@ -255,17 +316,17 @@ export const make = (input: {
                   if (Exit.isSuccess(exit) || !Cause.hasInterrupts(exit.cause)) return
                   const outcome = OperationOutcomeResolution.outcomeFromExit(operation, exit)
                   if (outcome === undefined) return
-                  yield* Effect.uninterruptible(commit(operation, outcome, batchTool, nested, spec.applyCheckpoint))
+                  const encoded = yield* encodeOutcome(spec, outcome)
+                  yield* Effect.uninterruptible(commit(operation, encoded, batchTool, nested, spec.applyCheckpoint))
                 }).pipe(Effect.orDie),
               ),
               Stream.concat(
                 Stream.fromEffect(
                   Effect.gen(function* () {
                     if (codec?.isComplete?.() === false) return
-                    const value = codec === undefined ? emitted : codec.complete()
-                    yield* Effect.interruptible(
-                      commit(operation, { _tag: "Succeeded", value }, batchTool, nested, spec.applyCheckpoint),
-                    )
+                    const value = codec.complete()
+                    const encoded = yield* encodeOutcome(spec, { _tag: "Succeeded", value })
+                    yield* Effect.interruptible(commit(operation, encoded, batchTool, nested, spec.applyCheckpoint))
                   }),
                 ).pipe(Stream.drain),
               ),

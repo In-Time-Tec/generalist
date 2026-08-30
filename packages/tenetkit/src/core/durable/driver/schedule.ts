@@ -8,6 +8,8 @@ import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../ser
 import type { DriverCheckpoint, DriverOperation, OperationOutcome } from "./contract.js"
 import { fromInput as operationFrom, type OperationSpec } from "./operation.js"
 
+type AnyOperationSpec = OperationSpec<unknown, unknown, unknown, unknown, unknown, unknown>
+
 interface ScheduleJournal {
   readonly onScheduled: (
     operation: DriverOperation,
@@ -43,7 +45,7 @@ const scheduleBatchTool = (
   state: LoopDriverState,
   batch: ToolBatchCheckpoint,
   callIndex: number,
-  spec: OperationSpec,
+  spec: AnyOperationSpec,
   requested: DriverOperation,
 ): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid | Exhausted> =>
   Effect.gen(function* () {
@@ -79,7 +81,7 @@ const schedulePending = (
   input: SchedulerInput,
   before: DriverCheckpoint,
   pendingInput: PendingOperation,
-  spec: OperationSpec,
+  spec: AnyOperationSpec,
   requested: DriverOperation,
 ): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid> =>
   Effect.gen(function* () {
@@ -102,14 +104,14 @@ const schedulePending = (
 const scheduleNew = (
   input: SchedulerInput,
   before: DriverCheckpoint,
-  spec: OperationSpec,
+  spec: AnyOperationSpec,
 ): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid | Exhausted> =>
   Effect.gen(function* () {
     const nowIso = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     yield* assertNotExpired(before.budget, nowIso)
     const charged = yield* chargeScheduled(before, spec.kind)
     const operationTurn = yield* OperationTurn.resolve(charged.turn, spec.turn)
-    const { turn: _turn, applyCheckpoint: _applyCheckpoint, ...pending } = spec
+    const { turn: _turn, success: _success, failure: _failure, applyCheckpoint: _applyCheckpoint, ...pending } = spec
     const scheduled = withPending(charged, pending, operationTurn)
     yield* Ref.set(input.checkpointRef, scheduled)
     const decision = yield* input.driver.decide(scheduled)
@@ -123,7 +125,7 @@ const scheduleNew = (
     return { operation: decision.operation, replay, batchTool: false, nested: false }
   })
 
-export const scheduleOperations = (input: SchedulerInput) => (spec: OperationSpec) =>
+export const scheduleOperations = (input: SchedulerInput) => (spec: AnyOperationSpec) =>
   input.semaphore.withPermit(
     Effect.gen(function* () {
       const before = yield* Ref.get(input.checkpointRef)

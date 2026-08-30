@@ -14,12 +14,12 @@ import {
   type Runtime,
 } from "tenetkit/runtime"
 import {
-  Activations,
   HibernatingWebSocket,
   layerRunStore,
   layerSqlClient,
   type DurableObjectStorage,
 } from "@tenetkit/cloudflare/durable-objects"
+import { SqliteRunActivation } from "tenetkit/runtime/sql-driver"
 import { inspectLogicalSqlSchema } from "../../../tenetkit/test/runtime/sql/schema-conformance.js"
 
 const test = ExecutableManifest.makeTest
@@ -313,7 +313,7 @@ export class SqlObject {
             idempotencyKey: acknowledgementRunId,
             correlationId: acknowledgementRunId,
           })
-          yield* Activations.createSchema
+          yield* SqliteRunActivation.createSchema
           const committedAlarm = 4_000_000_000_000
           const rolledBackAlarm = 3_000_000_000_000
           const rearm = (at: number) =>
@@ -339,7 +339,7 @@ export class SqlObject {
               yield* sql`DELETE FROM tenetkit_activations WHERE run_id = 'workerd-committed'`
               yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-committed'`
               yield* insertRun("workerd-committed")
-              yield* Activations.makeProjection(sql, rearm(committedAlarm)).applyInTransaction([
+              yield* SqliteRunActivation.makeProjection(sql, rearm(committedAlarm)).applyInTransaction([
                 { runId: "workerd-committed", intent: "execute", attemptFence: 1, runStatus: "running" },
               ])
             }),
@@ -349,7 +349,7 @@ export class SqlObject {
               Effect.gen(function* () {
                 yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-rolled-back'`
                 yield* insertRun("workerd-rolled-back")
-                yield* Activations.makeProjection(sql, rearm(rolledBackAlarm)).applyInTransaction([
+                yield* SqliteRunActivation.makeProjection(sql, rearm(rolledBackAlarm)).applyInTransaction([
                   { runId: "workerd-rolled-back", intent: "execute", attemptFence: 1, runStatus: "running" },
                 ])
                 return yield* RuntimeUnavailable.make({ message: "force rollback" })

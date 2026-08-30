@@ -18,7 +18,7 @@ export interface Options extends SqlStoreOptions {
   readonly pollInterval?: Duration.Input
 }
 
-export type StoreError = SqlDriverStoreError
+export type RuntimeError = SqlDriverStoreError
 
 const lockRun = (runId: string) =>
   Effect.gen(function* () {
@@ -60,7 +60,7 @@ const locks: SqlStoreLocks = {
 }
 
 /** MySQL's physical transaction, lock, claim, polling, and host initialization mechanics. */
-export const mysqlDriver = (options: Options): SqlRuntimeDriver<StoreError> => ({
+export const mysqlDriver = (options: Options): SqlRuntimeDriver<RuntimeError> => ({
   backend: "mysql",
   multiWorker: true,
   migrate: checkSchema,

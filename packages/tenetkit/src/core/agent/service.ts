@@ -1,39 +1,16 @@
 import { Effect, type Layer, Option, Schema, Stream, Types } from "effect"
 import { dual } from "effect/Function"
-import { AiError, LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import {
-  AgentError,
-  AgentSuspended,
-  type Completed,
-  DuplicateToolCallId,
-  type Event,
-  MiddlewareViolation,
-  ProgressOverflow,
-  ResumeMismatch,
-  RunEndedWithoutOutput,
-  ToolNameCollision,
-  type ToolOrigin,
-  TurnLimitExceeded,
-  PolicyStopped,
-} from "./event.js"
-import type { InvocationLifecycleFailed, SinkFailed } from "../model/telemetry/events.js"
-import { type BudgetLimits, type RunBudget, Exhausted } from "../durable/run-budget.js"
+import { LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { AgentError, type AgentSuspended, type Completed, type Event, type ToolOrigin } from "./event.js"
+import type { BudgetLimits, RunBudget } from "../durable/run-budget.js"
 import type { DriverCheckpoint } from "../durable/driver/contract.js"
-import type { DriverError, DriverStateInvalid } from "../durable/service.js"
-import type { DriverUnknownReplay } from "../durable/driver/interpreter.js"
-import type { Misconfigured } from "../model/resilience.js"
-import type { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from "../model/tool-call-validation.js"
 import { type Key, Memory } from "../context/memory.js"
-import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } from "../model/registry.js"
+import { type ModelSelection, ModelRegistry } from "../model/registry.js"
 import type { Authorizer } from "../tools/tool-authorization.js"
 import { ToolContext } from "../tools/tool-context.js"
-import { FrameworkFailure } from "../tools/tool-executor.js"
-import { HandoffLimitExceeded, HandoffRequirementsMissing, TargetMissing } from "./handoff/state.js"
-import { ProjectionInvalid } from "../policy/handoff-projection.js"
-import { Rejected } from "../policy/handoff-runtime.js"
-import { defaultPolicy, type Policy, Error } from "../turn/policy.js"
+import { defaultPolicy, type Policy } from "../turn/policy.js"
 import type { RunId as RunIdType } from "../durable/run-id.js"
-import type { PolicyInvalid } from "../turn/steering.js"
+import { RunError } from "./run/error.js"
 
 import { allocateRun, defaultObjectPrompt, type RunHandle } from "./lifecycle/run-handle.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
@@ -45,7 +22,7 @@ export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
 export { streamToolCalls } from "./tool-calls.js"
 export { defaultObjectPrompt, type RunHandle }
 /** @experimental Allocate one scoped Run and its producer handle before consuming its event stream. */
-export const makeRun = allocateRun
+export { allocateRun }
 export type * from "./tool-calls.js"
 export const AgentTypeId = "tenetkit/core/Agent"
 /** @experimental Agent-owned metadata values. */
@@ -337,37 +314,7 @@ export interface RunOptions {
 }
 
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
-/** @experimental The error channel of `stream` and `generate`. */
-export type RunError =
-  | SinkFailed
-  | InvocationLifecycleFailed
-  | AgentError
-  | AgentSuspended
-  | ResumeMismatch
-  | Error
-  | PolicyStopped
-  | TurnLimitExceeded
-  | RunEndedWithoutOutput
-  | MiddlewareViolation
-  | Misconfigured
-  | InvalidToolCallParameters
-  | ToolJsonSchemaCompilerMissing
-  | DuplicateToolCallId
-  | ProgressOverflow
-  | ToolNameCollision
-  | AiError.AiError
-  | LanguageModelNotRegistered
-  | FrameworkFailure
-  | DriverError
-  | DriverStateInvalid
-  | DriverUnknownReplay
-  | Exhausted
-  | TargetMissing
-  | HandoffLimitExceeded
-  | HandoffRequirementsMissing
-  | ProjectionInvalid
-  | Rejected
-  | PolicyInvalid
+export { RunError }
 
 /** @experimental Result of a non-streaming run. */
 export interface Result {
@@ -413,7 +360,7 @@ export const stream: {
     options: O,
   ): Stream.Stream<Event, RunError, RunRequirements<Tools, R, O>>
 } = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  Stream.scoped(Stream.unwrap(makeRun(agent, options).pipe(Effect.map((run) => run.events)))),
+  Stream.scoped(Stream.unwrap(allocateRun(agent, options).pipe(Effect.map((run) => run.events)))),
 )
 
 const generateText = <R>(events: Stream.Stream<Event, RunError, R>) =>
@@ -474,7 +421,7 @@ export const generate: {
   ): Effect.Effect<RunResult<O>, RunError, RunRequirements<Tools, R, O>>
 } = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
   Effect.scoped(
-    makeRun(agent, options).pipe(
+    allocateRun(agent, options).pipe(
       Effect.flatMap((run) =>
         options.output === undefined ? generateText(run.events) : generateObjectResult(run.events),
       ),

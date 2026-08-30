@@ -5,7 +5,7 @@ import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "tenetkit/runtime"
-import { RunClient } from "tenetkit/transport"
+import { RunClient, Wire } from "tenetkit/transport"
 
 const encodeEvents = (value: ReadonlyArray<{ readonly _tag: string }>): string => JSON.stringify(value)
 
@@ -119,8 +119,9 @@ describe("deep-research-agent TenetKit transport e2e", () => {
             ),
             Stream.runCollect,
           )
-          const approvalRequested = Array.from(first).find((event) => event._tag === "ApprovalRequested")
-          const waiting = Array.from(first).find((event) => event._tag === "RunWaiting")
+          const firstEvents = Array.from(first).filter(Wire.isResolvedRunEvent)
+          const approvalRequested = firstEvents.find((event) => event._tag === "ApprovalRequested")
+          const waiting = firstEvents.find((event) => event._tag === "RunWaiting")
           if (waiting === undefined || waiting._tag !== "RunWaiting") {
             return yield* Effect.die(`expected RunWaiting: ${encodeEvents(Array.from(first))}`)
           }
@@ -133,7 +134,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
             Stream.takeUntil((event) => event._tag === "RunCompleted"),
             Stream.runCollect,
           )
-          const all = [...first, ...second]
+          const all = [...first, ...second].filter(Wire.isResolvedRunEvent)
           const committedResponse = all.find((event) => event._tag === "ModelResponseCommitted")
           const toolCall =
             committedResponse?._tag === "ModelResponseCommitted"

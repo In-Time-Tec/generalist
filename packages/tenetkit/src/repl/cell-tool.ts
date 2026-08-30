@@ -116,17 +116,15 @@ const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, Too
       )
       const toolCallId = context.toolCallId ?? request.call.id
       const cellId = cellIdOf(request, context)
-      return yield* pool
-        .execute({ sessionId: request.sessionId, cellId, code: params.code, signal: context.signal })
-        .pipe(
-          Effect.flatMap((execution) =>
-            execution.events.pipe(
-              Stream.runForEach((event) => progress(toolCallId, event).pipe(Effect.flatMap(context.emit))),
-              Effect.andThen(execution.result),
-            ),
+      return yield* pool.execute({ sessionId: request.sessionId, cellId, code: params.code }).pipe(
+        Effect.flatMap((execution) =>
+          execution.events.pipe(
+            Stream.runForEach((event) => progress(toolCallId, event).pipe(Effect.flatMap(context.emit))),
+            Effect.andThen(execution.result),
           ),
-          Effect.matchEffect({ onSuccess: success, onFailure: domainFailure }),
-        )
+        ),
+        Effect.matchEffect({ onSuccess: success, onFailure: domainFailure }),
+      )
     }),
   )
 

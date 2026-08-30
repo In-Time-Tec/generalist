@@ -1,7 +1,12 @@
 import { Cause, Effect, Option, Result, Schema } from "effect"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { ObserverRunEvent, type ResolvedRunEvent } from "../../transport/wire.js"
+import { CompletedModelResponse, RunEvent } from "../../runtime/run/event.js"
+import {
+  ObserverRunEvent,
+  type ObserverRunEvent as ObserverEvent,
+  type ResolvedRunEvent,
+} from "../../transport/wire.js"
 import { AgentCommandError, type CommandOperation, type Connection, type Incoming, SendFailed } from "./connection.js"
 import {
   ApprovalRequired,
@@ -232,12 +237,25 @@ const applyRunEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, 
   }
 }
 
-const isRunEvent = (incoming: Incoming): incoming is ResolvedRunEvent => Schema.is(ObserverRunEvent)(incoming)
+const isObserverEvent = (event: Incoming): event is ObserverEvent => Schema.is(ObserverRunEvent)(event)
+
+const isResolvedRunEvent = (event: ObserverEvent): event is ResolvedRunEvent => {
+  if (!Schema.is(RunEvent)(event)) return false
+  if (event._tag !== "ModelResponseCommitted" && event._tag !== "ModelResponseInterrupted") return true
+  return "response" in event && Schema.is(CompletedModelResponse)(event.response)
+}
+
+const applyUnknownObserverEvent = (model: Model, event: ObserverEvent): readonly [Model, Option.Option<Output>] =>
+  event.sequence <= model.lastSeq
+    ? [model, Option.none()]
+    : [changeModel(model, { lastSeq: event.sequence }), Option.none()]
 
 export const chatUpdateRuntime = {
   Pending,
   Completed,
   catchCommandFailure,
   applyRunEvent,
-  isRunEvent,
+  applyUnknownObserverEvent,
+  isObserverEvent,
+  isResolvedRunEvent,
 }

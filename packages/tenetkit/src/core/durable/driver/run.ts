@@ -1,5 +1,5 @@
 import { Effect, Function, Schema, Stream } from "effect"
-import { DriverInterpreter, DriverUnknownReplay, type OperationSpec } from "./interpreter.js"
+import { arrayStreamCodec, DriverInterpreter, DriverUnknownReplay, type OperationSpec } from "./interpreter.js"
 import { Exhausted, type BudgetLimits, type RunBudget } from "../run-budget.js"
 import { LoopDriverState } from "../loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../service.js"
@@ -20,21 +20,33 @@ export const logicalOperationId = checkpoint.pipe(
 
 /** @experimental */
 export const intercept: {
-  (
-    spec: OperationSpec,
-  ): <A, E, R>(
+  <A, E, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
+  ): <R>(
     effect: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
-  <A, E, R>(
-    spec: OperationSpec,
+  ) => Effect.Effect<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+    R | SRD | SRE | FRD | FRE | DriverInterpreter
+  >
+  <A, E, R, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
+  ): Effect.Effect<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+    R | SRD | SRE | FRD | FRE | DriverInterpreter
+  >
 } = Function.dual(
   2,
-  <A, E, R>(
-    spec: OperationSpec,
+  <A, E, R, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter> =>
+  ): Effect.Effect<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+    R | SRD | SRE | FRD | FRE | DriverInterpreter
+  > =>
     Effect.gen(function* () {
       const interpreter = yield* DriverInterpreter
       return yield* interpreter.run(spec, effect)
@@ -43,25 +55,37 @@ export const intercept: {
 
 /** @experimental */
 export const interceptStream: {
-  (
-    spec: OperationSpec,
-  ): <A, E, R>(
+  <A, E, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<ReadonlyArray<A>, E, SRD, SRE, FRD, FRE>,
+  ): <R>(
     stream: Stream.Stream<A, E, R>,
-  ) => Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
-  <A, E, R>(
-    spec: OperationSpec,
+  ) => Stream.Stream<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+    R | SRD | SRE | FRD | FRE | DriverInterpreter
+  >
+  <A, E, R, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<ReadonlyArray<A>, E, SRD, SRE, FRD, FRE>,
     stream: Stream.Stream<A, E, R>,
-  ): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
+  ): Stream.Stream<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+    R | SRD | SRE | FRD | FRE | DriverInterpreter
+  >
 } = Function.dual(
   2,
-  <A, E, R>(
-    spec: OperationSpec,
+  <A, E, R, SRD, SRE, FRD, FRE>(
+    spec: OperationSpec<ReadonlyArray<A>, E, SRD, SRE, FRD, FRE>,
     stream: Stream.Stream<A, E, R>,
-  ): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter> =>
+  ): Stream.Stream<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+    R | SRD | SRE | FRD | FRE | DriverInterpreter
+  > =>
     Stream.unwrap(
       Effect.gen(function* () {
         const interpreter = yield* DriverInterpreter
-        return interpreter.runStream(spec, stream)
+        return interpreter.runStream(spec, stream, { successCodec: arrayStreamCodec<A>() })
       }),
     ),
 )

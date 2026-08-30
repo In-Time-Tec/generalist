@@ -47,7 +47,7 @@ export const Receipt = Schema.Struct({
 export type Receipt = typeof Receipt.Type
 
 /** @experimental A finite Run inbox rejected an input without admitting it. */
-export class InboxFull extends Schema.TaggedError<InboxFull>()("@tenetkit/core/InboxFull", {
+export class InboxFull extends Schema.TaggedError<InboxFull>()("tenetkit/core/InboxFull", {
   runId: Schema.String,
   queue: Schema.Literals(["steering", "followUp"]),
   dimension: Schema.Literals(["entries", "bytes"]),
@@ -55,12 +55,12 @@ export class InboxFull extends Schema.TaggedError<InboxFull>()("@tenetkit/core/I
 }) {}
 
 /** @experimental A producer attempted to address a Run after its inbox closed. */
-export class RunClosed extends Schema.TaggedError<RunClosed>()("@tenetkit/core/RunClosed", {
+export class RunClosed extends Schema.TaggedError<RunClosed>()("tenetkit/core/RunClosed", {
   runId: Schema.String,
 }) {}
 
 /** @experimental A process-local Run inbox policy is not finite and positive. */
-export class PolicyInvalid extends Schema.TaggedError<PolicyInvalid>()("@tenetkit/core/PolicyInvalid", {
+export class PolicyInvalid extends Schema.TaggedError<PolicyInvalid>()("tenetkit/core/PolicyInvalid", {
   field: Schema.String,
   value: Schema.String,
 }) {}

@@ -481,7 +481,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
         ),
       )
       const events = yield* Effect.gen(function* () {
-        const run = yield* Agent.makeRun(Agent.make({ name: "steered", toolkit: echoToolkit }), {
+        const run = yield* Agent.allocateRun(Agent.make({ name: "steered", toolkit: echoToolkit }), {
           prompt: "start",
         })
         yield* run.steer({ prompt: "steer one" })
