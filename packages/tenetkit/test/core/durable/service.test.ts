@@ -446,7 +446,7 @@ describe("RunBudget", () => {
       const twice = yield* RunBudget.charge(once, { modelCalls: 1 })
       expect(twice.remaining.modelCalls).toBe(0)
       const error = yield* RunBudget.charge(twice, { modelCalls: 1 }).pipe(Effect.flip)
-      expect(error._tag).toBe("tenetkit/core/Exhausted")
+      expect(error._tag).toBe("tenetkit/core/RunBudgetExhausted")
       expect(error.dimension).toBe("modelCalls")
     }),
   )
@@ -460,7 +460,7 @@ describe("RunBudget", () => {
       expect(reserved.parent.remaining.modelCalls).toBe(3)
       expect(reserved.parent.remaining.childRuns).toBe(1)
       const widen = yield* RunBudget.reserveChild(parent, { modelCalls: 6 }).pipe(Effect.flip)
-      expect(widen._tag).toBe("tenetkit/core/GrantWidened")
+      expect(widen._tag).toBe("tenetkit/core/RunBudgetGrantWidened")
     }),
   )
 
@@ -478,7 +478,7 @@ describe("RunBudget", () => {
     Effect.gen(function* () {
       const parent = RunBudget.make({ depth: 1, childRuns: 1 }, 1)
       const error = yield* RunBudget.reserveChild(parent, { modelCalls: 1 }).pipe(Effect.flip)
-      expect(error._tag).toBe("tenetkit/core/Exhausted")
+      expect(error._tag).toBe("tenetkit/core/RunBudgetExhausted")
       expect(error.dimension).toBe("depth")
     }),
   )
@@ -491,7 +491,7 @@ describe("RunBudget", () => {
       expect(narrowed.child.allocation.modelCalls).toBe(2)
       expect(narrowed.parent.remaining.modelCalls).toBe(3)
       const widen = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { modelCalls: 5 }).pipe(Effect.flip)
-      expect(widen._tag).toBe("tenetkit/core/GrantWidened")
+      expect(widen._tag).toBe("tenetkit/core/RunBudgetGrantWidened")
     }),
   )
 

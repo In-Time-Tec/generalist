@@ -149,8 +149,10 @@ describe("tenetkit public surface", () => {
         "ModelTelemetry",
         "ModelToolCallValidation",
         "NestedOperation",
+        "Output",
         "Permissions",
         "Pins",
+        "Policy",
         "ProgramCapabilities",
         "ProgramHandlers",
         "ProgramManifest",
@@ -170,10 +172,9 @@ describe("tenetkit public surface", () => {
         "ToolAuthorization",
         "ToolContext",
         "ToolExecutor",
-        "Output",
         "ToolPlacement",
         "Toolkit",
-        "Policy",
+        "withCacheBreakpoints",
       ])
     }),
   )

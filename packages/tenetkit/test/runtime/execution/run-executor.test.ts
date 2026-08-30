@@ -1705,7 +1705,7 @@ describe("RunExecutor", () => {
         _tag: "tenetkit/runtime/AgentExecutionFailure",
         message: yield* Schema.decodeEffect(Schema.String)(failed.error.message).pipe(Effect.orDie),
         failure: {
-          _tag: "tenetkit/core/Exhausted",
+          _tag: "tenetkit/core/RunBudgetExhausted",
           dimension: "modelCalls",
           requested: 1,
           remaining: 0,
@@ -1794,7 +1794,7 @@ describe("RunExecutor", () => {
       }
       expect(failed.error).toMatchObject({
         failure: {
-          _tag: "tenetkit/core/Exhausted",
+          _tag: "tenetkit/core/RunBudgetExhausted",
           dimension: "totalTokens",
           requested: 10,
           remaining: 5,
