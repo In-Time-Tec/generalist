@@ -1,5 +1,3 @@
-type RunBudgetFacade = typeof import("../run-budget.js")
-
 import {
   BudgetLimits as RunBudget_BudgetLimits,
   RunBudget as RunBudget_RunBudget,
@@ -7,7 +5,6 @@ import {
   RunBudgetGrantWidened as RunBudget_RunBudgetGrantWidened,
   make as RunBudget_make,
   unbounded as RunBudget_unbounded,
-  allocate as RunBudget_allocate,
   charge as RunBudget_charge,
   reserveChild as RunBudget_reserveChild,
   narrowChild as RunBudget_narrowChild,
@@ -22,11 +19,10 @@ import {
 export const RunBudget = {
   BudgetLimits: RunBudget_BudgetLimits,
   RunBudget: RunBudget_RunBudget,
-  RunBudgetExhausted: RunBudget_RunBudgetExhausted,
-  RunBudgetGrantWidened: RunBudget_RunBudgetGrantWidened,
+  Exhausted: RunBudget_RunBudgetExhausted,
+  GrantWidened: RunBudget_RunBudgetGrantWidened,
   make: RunBudget_make,
   unbounded: RunBudget_unbounded,
-  allocate: RunBudget_allocate,
   charge: RunBudget_charge,
   reserveChild: RunBudget_reserveChild,
   narrowChild: RunBudget_narrowChild,
@@ -37,14 +33,13 @@ export const RunBudget = {
   assertNotExpired: RunBudget_assertNotExpired,
   encode: RunBudget_encode,
   decode: RunBudget_decode,
-} satisfies RunBudgetFacade
+}
 export namespace RunBudget {
   export type BudgetLimits = import("../run-budget.js").BudgetLimits
   export type RunBudget = import("../run-budget.js").RunBudget
-  export type RunBudgetExhausted = import("../run-budget.js").RunBudgetExhausted
-  export type RunBudgetGrantWidened = import("../run-budget.js").RunBudgetGrantWidened
+  export type Exhausted = import("../run-budget.js").RunBudgetExhausted
+  export type GrantWidened = import("../run-budget.js").RunBudgetGrantWidened
   export type make = typeof import("../run-budget.js").make
-  export type allocate = typeof import("../run-budget.js").allocate
   export type charge = typeof import("../run-budget.js").charge
   export type reserveChild = typeof import("../run-budget.js").reserveChild
   export type narrowChild = typeof import("../run-budget.js").narrowChild

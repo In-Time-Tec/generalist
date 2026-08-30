@@ -39,8 +39,8 @@ import {
   decodeConfig as amazonBedrockDecodeConfig,
   toolJsonSchemaCompiler as amazonBedrockToolJsonSchemaCompiler,
   layer as amazonBedrockLayer,
-} from "./provider/bedrock/service.js"
-import { make as amazonBedrockRequestMake } from "./provider/bedrock/request.js"
+} from "./provider/amazon-bedrock/service.js"
+import { make as amazonBedrockRequestMake } from "./provider/amazon-bedrock/request.js"
 const AmazonBedrockRequest = { make: amazonBedrockRequestMake }
 export const AmazonBedrock = {
   Client: amazonBedrockClient,
@@ -59,60 +59,60 @@ export const AmazonBedrock = {
   layer: amazonBedrockLayer,
 }
 export namespace AmazonBedrock {
-  export type Client = typeof import("./provider/bedrock/service.js").Client
-  export type ClientFailure = typeof import("./provider/bedrock/service.js").ClientFailure
-  export type CredentialFailure = typeof import("./provider/bedrock/service.js").CredentialFailure
-  export type RecoveryFailure = typeof import("./provider/bedrock/service.js").RecoveryFailure
-  export type defaultChain = typeof import("./provider/bedrock/service.js").defaultChain
+  export type Client = typeof import("./provider/amazon-bedrock/service.js").Client
+  export type ClientFailure = typeof import("./provider/amazon-bedrock/service.js").ClientFailure
+  export type CredentialFailure = typeof import("./provider/amazon-bedrock/service.js").CredentialFailure
+  export type RecoveryFailure = typeof import("./provider/amazon-bedrock/service.js").RecoveryFailure
+  export type defaultChain = typeof import("./provider/amazon-bedrock/service.js").defaultChain
   export type isRecoverableCredentialFailure =
-    typeof import("./provider/bedrock/service.js").isRecoverableCredentialFailure
-  export type layerClient = typeof import("./provider/bedrock/service.js").layerClient
+    typeof import("./provider/amazon-bedrock/service.js").isRecoverableCredentialFailure
+  export type layerClient = typeof import("./provider/amazon-bedrock/service.js").layerClient
   export type Request = typeof AmazonBedrockRequest
-  export type make = typeof import("./provider/bedrock/service.js").make
-  export type layerLanguageModel = typeof import("./provider/bedrock/service.js").layerLanguageModel
-  export type classifyFailure = typeof import("./provider/bedrock/service.js").classifyFailure
-  export type decodeConfig = typeof import("./provider/bedrock/service.js").decodeConfig
-  export type toolJsonSchemaCompiler = typeof import("./provider/bedrock/service.js").toolJsonSchemaCompiler
-  export type layer = typeof import("./provider/bedrock/service.js").layer
-  export type Config = import("./provider/bedrock/service.js").Config
-  export type Credential = import("./provider/bedrock/service.js").Credential
-  export type Credentials = import("./provider/bedrock/service.js").Credentials
-  export type Options = import("./provider/bedrock/service.js").Options
-  export type Service = import("./provider/bedrock/service.js").Service
-  export type ClientOptions = import("./provider/bedrock/service.js").ClientOptions
-  export type Recovery = import("./provider/bedrock/service.js").Recovery
+  export type make = typeof import("./provider/amazon-bedrock/service.js").make
+  export type layerLanguageModel = typeof import("./provider/amazon-bedrock/service.js").layerLanguageModel
+  export type classifyFailure = typeof import("./provider/amazon-bedrock/service.js").classifyFailure
+  export type decodeConfig = typeof import("./provider/amazon-bedrock/service.js").decodeConfig
+  export type toolJsonSchemaCompiler = typeof import("./provider/amazon-bedrock/service.js").toolJsonSchemaCompiler
+  export type layer = typeof import("./provider/amazon-bedrock/service.js").layer
+  export type Config = import("./provider/amazon-bedrock/service.js").Config
+  export type Credential = import("./provider/amazon-bedrock/service.js").Credential
+  export type Credentials = import("./provider/amazon-bedrock/service.js").Credentials
+  export type Options = import("./provider/amazon-bedrock/service.js").Options
+  export type Service = import("./provider/amazon-bedrock/service.js").Service
+  export type ClientOptions = import("./provider/amazon-bedrock/service.js").ClientOptions
+  export type Recovery = import("./provider/amazon-bedrock/service.js").Recovery
 }
 import {
-  ModelMetadataNotFound as ModelCatalog_ModelMetadataNotFound,
+  NotFound as ModelCatalog_NotFound,
   ModelCatalog as ModelCatalog_ModelCatalog,
   bundled as ModelCatalog_bundled,
   layer as ModelCatalog_layer,
   layerTest as ModelCatalog_layerTest,
-  lookup as ModelCatalog_lookup,
-  require as ModelCatalog_require,
-  all as ModelCatalog_all,
-} from "./catalog/service.js"
+  find as ModelCatalog_find,
+  get as ModelCatalog_get,
+  list as ModelCatalog_list,
+} from "./model-catalog.js"
 export const ModelCatalog = {
-  ModelMetadataNotFound: ModelCatalog_ModelMetadataNotFound,
+  NotFound: ModelCatalog_NotFound,
   ModelCatalog: ModelCatalog_ModelCatalog,
   bundled: ModelCatalog_bundled,
   layer: ModelCatalog_layer,
   layerTest: ModelCatalog_layerTest,
-  lookup: ModelCatalog_lookup,
-  require: ModelCatalog_require,
-  all: ModelCatalog_all,
+  find: ModelCatalog_find,
+  get: ModelCatalog_get,
+  list: ModelCatalog_list,
 }
 export namespace ModelCatalog {
-  export type ModelMetadataNotFound = import("./catalog/service.js").ModelMetadataNotFound
-  export type ModelCatalog = import("./catalog/service.js").ModelCatalog
-  export type bundled = typeof import("./catalog/service.js").bundled
-  export type layer = typeof import("./catalog/service.js").layer
-  export type layerTest = typeof import("./catalog/service.js").layerTest
-  export type lookup = typeof import("./catalog/service.js").lookup
-  export type require = typeof import("./catalog/service.js").require
-  export type all = typeof import("./catalog/service.js").all
-  export type Service = import("./catalog/service.js").Service
-  export type ModelMetadata = import("./catalog/service.js").ModelMetadata
+  export type NotFound = import("./model-catalog.js").NotFound
+  export type ModelCatalog = import("./model-catalog.js").ModelCatalog
+  export type bundled = typeof import("./model-catalog.js").bundled
+  export type layer = typeof import("./model-catalog.js").layer
+  export type layerTest = typeof import("./model-catalog.js").layerTest
+  export type find = typeof import("./model-catalog.js").find
+  export type get = typeof import("./model-catalog.js").get
+  export type list = typeof import("./model-catalog.js").list
+  export type Service = import("./model-catalog.js").Service
+  export type Metadata = import("./model-catalog.js").Metadata
 }
 import {
   registration as Deterministic_registration,
@@ -131,14 +131,17 @@ export namespace Deterministic {
   export type Options = import("./provider/deterministic.js").Options
   export type OpenAIFallbackOptions = import("./provider/deterministic.js").OpenAIFallbackOptions
 }
-import { layer as Embedding_layer, layerCompatible as Embedding_layerCompatible } from "./model/embedding.js"
+import {
+  layerOpenAI as Embedding_layerOpenAI,
+  layerOpenAICompatible as Embedding_layerOpenAICompatible,
+} from "./model/embedding.js"
 export const Embedding = {
-  layer: Embedding_layer,
-  layerCompatible: Embedding_layerCompatible,
+  layerOpenAI: Embedding_layerOpenAI,
+  layerOpenAICompatible: Embedding_layerOpenAICompatible,
 }
 export namespace Embedding {
-  export type layer = typeof import("./model/embedding.js").layer
-  export type layerCompatible = typeof import("./model/embedding.js").layerCompatible
+  export type layerOpenAI = typeof import("./model/embedding.js").layerOpenAI
+  export type layerOpenAICompatible = typeof import("./model/embedding.js").layerOpenAICompatible
   export type OpenAICompatibleOptions = import("./model/embedding.js").OpenAICompatibleOptions
   export type OpenAIOptions = import("./model/embedding.js").OpenAIOptions
 }
@@ -166,11 +169,11 @@ import {
   layerConfig as OpenAI_layerConfig,
 } from "./provider/openai.js"
 import {
-  OpenAIAccountCredentialError as OpenAI_OpenAIAccountCredentialError,
-  credentialsFromAccountAuth as OpenAI_credentialsFromAccountAuth,
-  registrationAccount as OpenAI_registrationAccount,
-  layerAccount as OpenAI_layerAccount,
-  layerAccountClient as OpenAI_layerAccountClient,
+  OpenAIAccountCredentialError as OpenAIAccount_OpenAIAccountCredentialError,
+  credentialsFromAuth as OpenAIAccount_credentialsFromAuth,
+  registration as OpenAIAccount_registration,
+  layer as OpenAIAccount_layer,
+  layerClient as OpenAIAccount_layerClient,
 } from "./provider/openai-account.js"
 export const OpenAI = {
   classifyFailure: OpenAI_classifyFailure,
@@ -180,11 +183,6 @@ export const OpenAI = {
   registration: OpenAI_registration,
   normalizeResponsesSSE: OpenAI_normalizeResponsesSSE,
   layerConfig: OpenAI_layerConfig,
-  OpenAIAccountCredentialError: OpenAI_OpenAIAccountCredentialError,
-  credentialsFromAccountAuth: OpenAI_credentialsFromAccountAuth,
-  registrationAccount: OpenAI_registrationAccount,
-  layerAccount: OpenAI_layerAccount,
-  layerAccountClient: OpenAI_layerAccountClient,
 }
 export namespace OpenAI {
   export type classifyFailure = typeof import("./provider/openai.js").classifyFailure
@@ -194,18 +192,27 @@ export namespace OpenAI {
   export type registration = typeof import("./provider/openai.js").registration
   export type normalizeResponsesSSE = typeof import("./provider/openai.js").normalizeResponsesSSE
   export type layerConfig = typeof import("./provider/openai.js").layerConfig
-  export type OpenAIAccountCredentialError = import("./provider/openai-account.js").OpenAIAccountCredentialError
-  export type credentialsFromAccountAuth = typeof import("./provider/openai-account.js").credentialsFromAccountAuth
-  export type registrationAccount = typeof import("./provider/openai-account.js").registrationAccount
-  export type layerAccount = typeof import("./provider/openai-account.js").layerAccount
-  export type layerAccountClient = typeof import("./provider/openai-account.js").layerAccountClient
   export type ClientOptions = import("./provider/openai.js").ClientOptions
   export type Config = import("./provider/openai.js").Config
-  export type OpenAIAccountCredential = import("./provider/openai-account.js").OpenAIAccountCredential
-  export type OpenAIAccountCredentials = import("./provider/openai-account.js").OpenAIAccountCredentials
-  export type AccountOptions = import("./provider/openai-account.js").AccountOptions
   export type Options = import("./provider/openai.js").Options
   export type RegistrationOptions = import("./provider/openai.js").RegistrationOptions
+}
+export const OpenAIAccount = {
+  CredentialError: OpenAIAccount_OpenAIAccountCredentialError,
+  credentialsFromAuth: OpenAIAccount_credentialsFromAuth,
+  registration: OpenAIAccount_registration,
+  layer: OpenAIAccount_layer,
+  layerClient: OpenAIAccount_layerClient,
+}
+export namespace OpenAIAccount {
+  export type CredentialError = import("./provider/openai-account.js").OpenAIAccountCredentialError
+  export type credentialsFromAuth = typeof import("./provider/openai-account.js").credentialsFromAuth
+  export type registration = typeof import("./provider/openai-account.js").registration
+  export type layer = typeof import("./provider/openai-account.js").layer
+  export type layerClient = typeof import("./provider/openai-account.js").layerClient
+  export type Credential = import("./provider/openai-account.js").OpenAIAccountCredential
+  export type Credentials = import("./provider/openai-account.js").OpenAIAccountCredentials
+  export type Options = import("./provider/openai-account.js").AccountOptions
 }
 import {
   issuer as OpenAIAccountAuth_issuer,
@@ -376,29 +383,29 @@ export namespace OpenRouter {
 import {
   layerGroq as OpenAICompatible_layerGroq,
   layerMistral as OpenAICompatible_layerMistral,
-  layerXai as OpenAICompatible_layerXai,
-  layerDeepseek as OpenAICompatible_layerDeepseek,
-  layerGoogleAiStudio as OpenAICompatible_layerGoogleAiStudio,
+  layerXAI as OpenAICompatible_layerXAI,
+  layerDeepSeek as OpenAICompatible_layerDeepSeek,
+  layerGoogleAIStudio as OpenAICompatible_layerGoogleAIStudio,
   layerAzureOpenAI as OpenAICompatible_layerAzureOpenAI,
   layerOllama as OpenAICompatible_layerOllama,
-} from "./catalog/presets.js"
+} from "./openai-compatible.js"
 export const OpenAICompatible = {
   layerGroq: OpenAICompatible_layerGroq,
   layerMistral: OpenAICompatible_layerMistral,
-  layerXai: OpenAICompatible_layerXai,
-  layerDeepseek: OpenAICompatible_layerDeepseek,
-  layerGoogleAiStudio: OpenAICompatible_layerGoogleAiStudio,
+  layerXAI: OpenAICompatible_layerXAI,
+  layerDeepSeek: OpenAICompatible_layerDeepSeek,
+  layerGoogleAIStudio: OpenAICompatible_layerGoogleAIStudio,
   layerAzureOpenAI: OpenAICompatible_layerAzureOpenAI,
   layerOllama: OpenAICompatible_layerOllama,
 }
 export namespace OpenAICompatible {
-  export type layerGroq = typeof import("./catalog/presets.js").layerGroq
-  export type layerMistral = typeof import("./catalog/presets.js").layerMistral
-  export type layerXai = typeof import("./catalog/presets.js").layerXai
-  export type layerDeepseek = typeof import("./catalog/presets.js").layerDeepseek
-  export type layerGoogleAiStudio = typeof import("./catalog/presets.js").layerGoogleAiStudio
-  export type layerAzureOpenAI = typeof import("./catalog/presets.js").layerAzureOpenAI
-  export type layerOllama = typeof import("./catalog/presets.js").layerOllama
-  export type AzureOptions = import("./catalog/presets.js").AzureOptions
-  export type Options = import("./catalog/presets.js").Options
+  export type layerGroq = typeof import("./openai-compatible.js").layerGroq
+  export type layerMistral = typeof import("./openai-compatible.js").layerMistral
+  export type layerXAI = typeof import("./openai-compatible.js").layerXAI
+  export type layerDeepSeek = typeof import("./openai-compatible.js").layerDeepSeek
+  export type layerGoogleAIStudio = typeof import("./openai-compatible.js").layerGoogleAIStudio
+  export type layerAzureOpenAI = typeof import("./openai-compatible.js").layerAzureOpenAI
+  export type layerOllama = typeof import("./openai-compatible.js").layerOllama
+  export type AzureOptions = import("./openai-compatible.js").AzureOptions
+  export type Options = import("./openai-compatible.js").Options
 }

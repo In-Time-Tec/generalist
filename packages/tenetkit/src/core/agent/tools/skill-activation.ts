@@ -16,7 +16,7 @@ export interface ToolState {
 
 interface SkillActivationContext {
   readonly skillRuntime:
-    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
+    | { readonly catalog: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined
   readonly toolState: Ref.Ref<ToolState>
   readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
@@ -43,7 +43,7 @@ export const make =
           message: "Skill activation requires a name",
         })
       }
-      const skill = yield* skillRuntime.source.get(params.value.name)
+      const skill = yield* skillRuntime.catalog.get(params.value.name)
       if (skill === undefined) {
         const failure = { reason: "not-found" as const, message: `Skill not found: ${params.value.name}` }
         return { _tag: "DomainFailure", failure, encodedFailure: failure } satisfies DomainFailure

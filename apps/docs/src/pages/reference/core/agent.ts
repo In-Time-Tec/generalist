@@ -26,7 +26,7 @@ export const coreAgentReference = definePage({
         [[code("name")], [code("string")], "required"],
         [[code("instructions")], [code("string")], "none"],
         [[code("toolkit")], [code("Ai.Toolkit.Toolkit<Tools>")], [code("Ai.Toolkit.empty")]],
-        [[code("policy")], [code("TurnPolicy.TurnPolicy")], [code("TurnPolicy.defaultPolicy")]],
+        [[code("policy")], [code("TurnPolicy.Policy")], [code("TurnPolicy.defaultPolicy")]],
         [[code("model")], [code("ModelRegistry.ModelSelection")], "none"],
         [[code("memory")], [code("Memory.Key")], "none"],
         [[code("metadata")], [code("Readonly<Record<string, unknown>>")], "none"],

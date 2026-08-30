@@ -3,10 +3,10 @@ import { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { RunEvent } from "tenetkit/runtime/driver/run/event"
-import { withSql } from "tenetkit/runtime/driver/sql/effect"
+import { withSql } from "tenetkit/runtime/driver/sql/transactions"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { NOTIFY_CHANNEL } from "../schema.js"
-import type { RunFn } from "../store/ops.js"
+import type { RunTransaction } from "../store/ops.js"
 
 const TransactionEvents = Context.Reference<Array<readonly [string, RunEvent]>>(
   "tenetkit/runtime/driver/sql/postgres/TransactionEvents",
@@ -30,9 +30,9 @@ export const transactionRunner = (input: {
     publish: (runId, event) =>
       Effect.flatMap(TransactionEvents, (events) => Effect.sync(() => void events.push([runId, event]))),
   }
-  const runRaw: RunFn = (effect) =>
+  const runRaw: RunTransaction = (effect) =>
     withSql(input.sql, input.sql.withTransaction(effect.pipe(Effect.provideService(PgClient.PgClient, input.pg))))
-  const run: RunFn = (effect) =>
+  const run: RunTransaction = (effect) =>
     runRaw(
       Effect.gen(function* () {
         const events: Array<readonly [string, RunEvent]> = []
@@ -41,9 +41,9 @@ export const transactionRunner = (input: {
         return result
       }),
     )
-  const runNoTxn: RunFn = (effect) =>
+  const runWithoutTransaction: RunTransaction = (effect) =>
     withSql(input.sql, effect.pipe(Effect.provideService(PgClient.PgClient, input.pg)))
-  return { run, runNoTxn, transactionHub }
+  return { run, runWithoutTransaction, transactionHub }
 }
 
 export const nextId = (prefix: string): Effect.Effect<string> =>

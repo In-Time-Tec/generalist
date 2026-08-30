@@ -116,7 +116,7 @@ const noToolAgent = Agent.make({ name: "no-tool-agent" })
 
 const runAgent = (
   model: Layer.Layer<LanguageModel.LanguageModel>,
-  policy: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.ModelResilienceMisconfigured> = resilience,
+  policy: Layer.Layer<ModelResilience.Policy, ModelResilience.Misconfigured> = resilience,
   middleware: Layer.Layer<ModelMiddleware.ModelMiddleware> = ModelMiddleware.layerIdentity,
 ) =>
   Stream.runCollect(

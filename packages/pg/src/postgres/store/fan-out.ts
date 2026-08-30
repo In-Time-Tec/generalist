@@ -1,9 +1,9 @@
 import { Effect, Function } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
 import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
-import { admitFanOut, inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
+import { admitFanOut, inspectFanOut } from "tenetkit/runtime/driver/sql/fan-out"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
+import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/transactions"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { notifyRun } from "../events/transaction-events.js"
 
@@ -16,7 +16,7 @@ export const fanOutStoreMethods = (input: {
   readonly sql: SqlClient.SqlClient
   readonly hub: EventHub
   readonly run: Run
-  readonly runNoTxn: Run
+  readonly runWithoutTransaction: Run
 }): Pick<RunStoreService, "admitFanOut" | "inspectFanOut"> => ({
   admitFanOut: (fanOut) =>
     input.run(
@@ -30,7 +30,7 @@ export const fanOutStoreMethods = (input: {
         ),
       ),
     ),
-  inspectFanOut: (fanOutId) => input.runNoTxn(inspectFanOut(fanOutId)),
+  inspectFanOut: (fanOutId) => input.runWithoutTransaction(inspectFanOut(fanOutId)),
 })
 
 export const cancelOwnedFanOuts: {

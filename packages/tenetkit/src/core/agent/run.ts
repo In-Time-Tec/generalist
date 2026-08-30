@@ -238,7 +238,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
                   turn: 0,
                 })
               }
-              const skill = yield* skillRuntime.source.get(activation.value.name)
+              const skill = yield* skillRuntime.catalog.get(activation.value.name)
               if (skill === undefined) {
                 return yield* AgentError.make({
                   message: `Skill not found while restoring resume state: ${activation.value.name}`,

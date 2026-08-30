@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
 import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import type { RunFn } from "./ops.js"
+import type { RunTransaction } from "./ops.js"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import {
   admitMessage,
@@ -16,8 +16,8 @@ import {
 
 /** The addressed-messaging half of the Postgres RunStore, kept beside the store it completes. */
 export const messagingStoreMethods = (input: {
-  readonly run: RunFn
-  readonly runNoTxn: RunFn
+  readonly run: RunTransaction
+  readonly runWithoutTransaction: RunTransaction
   readonly hub: EventHub
   readonly lockRun: (runId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
   readonly lockMailbox: (targetSessionId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
@@ -31,14 +31,14 @@ export const messagingStoreMethods = (input: {
   | "pendingMessages"
   | "deliverPendingMessages"
 > => ({
-  directory: (runId) => input.runNoTxn(directory(runId)),
-  resolveAddress: (address) => input.runNoTxn(resolveAddress(address)),
+  directory: (runId) => input.runWithoutTransaction(directory(runId)),
+  resolveAddress: (address) => input.runWithoutTransaction(resolveAddress(address)),
   registerAgentName: (request) =>
     input.run(input.lockRun(request.runId).pipe(Effect.andThen(registerAgentName(request)))),
-  listRelated: (runId) => input.runNoTxn(listRelated(runId)),
+  listRelated: (runId) => input.runWithoutTransaction(listRelated(runId)),
   admitMessage: (request) =>
     input.run(input.lockMailbox(request.targetSessionId).pipe(Effect.andThen(admitMessage(request)))),
-  pendingMessages: (request) => input.runNoTxn(pendingMessages(request)),
+  pendingMessages: (request) => input.runWithoutTransaction(pendingMessages(request)),
   deliverPendingMessages: (request) =>
     input.run(
       input.lockRun(request.runId).pipe(

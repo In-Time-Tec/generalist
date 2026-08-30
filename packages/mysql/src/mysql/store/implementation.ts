@@ -14,7 +14,7 @@ import {
 } from "tenetkit/runtime/driver/sql/store/program"
 import { RunNotFound, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import { checkpointRef } from "tenetkit/runtime/driver/executable/manifest"
-import type { LayerOptions } from "tenetkit/runtime/driver/service"
+import type { LayerOptions } from "tenetkit/runtime/driver/runtime"
 import { RunStore, type Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "tenetkit/runtime/driver/sql/store/admit"
 import { activateRoot } from "tenetkit/runtime/driver/sql/store/activate"
@@ -37,7 +37,7 @@ import {
   operationCancellations,
   recordOperation,
   startOperation,
-} from "tenetkit/runtime/driver/sql/store/operation/operations"
+} from "tenetkit/runtime/driver/sql/operation-store"
 import { recoverRunningOperations } from "tenetkit/runtime/driver/sql/store/operation/recovery"
 import { resolveOperation } from "tenetkit/runtime/driver/sql/store/operation/resolution"
 import {
@@ -46,20 +46,10 @@ import {
   requireExecutionClaim,
   retryExecution,
 } from "tenetkit/runtime/driver/sql/store/execution"
-import {
-  appendEvent,
-  hasAdmission,
-  loadEventsAfter,
-  loadRun,
-  nowIso,
-} from "tenetkit/runtime/driver/sql/store/statements"
+import { appendEvent, hasAdmission, loadEventsAfter, loadRun, nowIso } from "tenetkit/runtime/driver/sql/run-store"
 import { releaseLeasedExecution as releaseExecution } from "tenetkit/runtime/driver/sql/store/release-leased"
 import { make as makeEventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import {
-  admitSteering,
-  readSteering,
-  saveCompletionContinuation,
-} from "tenetkit/runtime/driver/sql/store/steering/service"
+import { admitSteering, readSteering, saveCompletionContinuation } from "tenetkit/runtime/driver/sql/steering"
 import {
   admitMessage,
   deliverPendingMessages,
@@ -78,8 +68,8 @@ import {
 } from "tenetkit/runtime/driver/sql/errors"
 import { check as checkSchema } from "../schema/migrations.js"
 import { inspectionStoreMethods } from "./inspection.js"
-import { initializeReadCommitted, mysqlClaims } from "./claims.js"
-import { admitFanOut, inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
+import { initializeReadCommitted, claimMethods } from "./claims.js"
+import { admitFanOut, inspectFanOut } from "tenetkit/runtime/driver/sql/fan-out"
 
 import { encodeExecutableRef, encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
 import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
@@ -89,11 +79,11 @@ import { encodeReason, WaitResolution } from "tenetkit/runtime/driver/run/wait"
 import { ExecutionCheckpoint, ExecutionSuspension } from "tenetkit/runtime/driver/execution/state"
 import { transactionRunner } from "../transaction/events.js"
 import { settlementNotifications } from "tenetkit/runtime/driver/sql/settlement-notifications"
-import { mysqlSessionStore } from "../session/entries.js"
+import { sessionStore } from "../session/entries.js"
 import { reconcileCancellationRequested } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { cancelSessionRuns } from "../session/cancellation.js"
-import { mysqlModelResponseOperationsWithDefaults } from "./model-response.js"
-import { MysqlOperationCommit } from "./operation-commit.js"
+import { modelResponseMethods } from "./model-response.js"
+import { operationCommit } from "./operation-commit.js"
 import { loadTerminalEvent } from "tenetkit/runtime/driver/sql/store/child/settlement"
 import { reconcileChildWait } from "../session/reconcile-child-wait.js"
 
@@ -109,7 +99,7 @@ export type StoreError =
   | SchemaVersionUnsupported
   | SchemaUpgradeRequired
   | SchemaMigrationFailed
-export const mysqlServices = (
+export const services = (
   options: Options,
 ): Effect.Effect<
   { readonly store: RunStoreService; readonly claims: import("tenetkit/runtime/driver/sql/run/claims").Service },
@@ -147,7 +137,7 @@ export const mysqlServices = (
     if (isolation[0]?.isolation !== "READ-COMMITTED") {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires READ COMMITTED" })
     }
-    const { run, runNoTxn, runInspection, transactionHub } = transactionRunner({ sql, hub })
+    const { run, runWithoutTransaction, runInspection, transactionHub } = transactionRunner({ sql, hub })
     const lockRun = (runId: string) => sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
     const lockParent = (runId: string) =>
       sql<{ parent_run_id: string | null }>`SELECT parent_run_id FROM tenetkit_runs WHERE run_id = ${runId}`.pipe(
@@ -275,11 +265,11 @@ export const mysqlServices = (
           WHERE run_id = ${input.runId} AND owner_worker_id = ${input.ownerId} AND attempt_fence = ${input.attemptFence}
         `
       })
-    const modelResponseOperations = mysqlModelResponseOperationsWithDefaults({ sql, hub: transactionHub, run })
+    const modelResponseOperations = modelResponseMethods({ sql, hub: transactionHub, run })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "mysql", multiWorker: true }),
-      sessionStore: (sessionId) => Effect.succeed(Option.some(mysqlSessionStore({ sessionId, run, runNoTxn }))),
-      hasAdmission: (input) => runNoTxn(hasAdmission(input)),
+      sessionStore: (sessionId) => Effect.succeed(Option.some(sessionStore({ sessionId, run, runWithoutTransaction }))),
+      hasAdmission: (input) => runWithoutTransaction(hasAdmission(input)),
       admitSend: (input) =>
         run(
           lockNamed(
@@ -312,7 +302,7 @@ export const mysqlServices = (
             const pollCursor = yield* Ref.make(input.cursor)
             const deliveredCursor = yield* Ref.make(input.cursor)
             const poll = Ref.get(pollCursor).pipe(
-              Effect.flatMap((after) => runNoTxn(loadEventsAfter(input.runId, after))),
+              Effect.flatMap((after) => runWithoutTransaction(loadEventsAfter(input.runId, after))),
               Effect.flatMap((events) =>
                 Effect.forEach(
                   events,
@@ -328,7 +318,7 @@ export const mysqlServices = (
               .subscribe({
                 runId: input.runId,
                 cursor: input.cursor,
-                loadReplay: runNoTxn(
+                loadReplay: runWithoutTransaction(
                   Effect.gen(function* () {
                     const loaded = yield* loadRun(input.runId)
                     if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
@@ -362,13 +352,13 @@ export const mysqlServices = (
         run(cancelSessionRuns({ hub: transactionHub, lockRun, lockParent, clearClaim, ...input })),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(transactionHub, input)))),
       readSteering: (input) => fenced(input, readSteering(input)),
-      directory: (runId) => runNoTxn(directory(runId)),
-      resolveAddress: (address) => runNoTxn(resolveAddress(address)),
+      directory: (runId) => runWithoutTransaction(directory(runId)),
+      resolveAddress: (address) => runWithoutTransaction(resolveAddress(address)),
       registerAgentName: (input) => run(lockRun(input.runId).pipe(Effect.andThen(registerAgentName(input)))),
-      listRelated: (runId) => runNoTxn(listRelated(runId)),
+      listRelated: (runId) => runWithoutTransaction(listRelated(runId)),
       admitMessage: (input) => run(lockNamed(`tenetkit:mailbox:${input.targetSessionId}`, admitMessage(input))),
-      pendingMessages: (input) => runNoTxn(pendingMessages(input)),
-      settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
+      pendingMessages: (input) => runWithoutTransaction(pendingMessages(input)),
+      settlementNotifications: (input) => runWithoutTransaction(settlementNotifications(input)),
       deliverPendingMessages: (input) =>
         run(
           lockRun(input.runId).pipe(
@@ -378,7 +368,7 @@ export const mysqlServices = (
             ),
           ),
         ),
-      ...inspectionStoreMethods({ hub, runNoTxn, runInspection }),
+      ...inspectionStoreMethods({ hub, runWithoutTransaction, runInspection }),
       complete: (input) =>
         fenced(
           input,
@@ -407,12 +397,12 @@ export const mysqlServices = (
       emitAgentEvent: (input) => fenced(input, emitAgentEvent(transactionHub, input)),
       recordOperation: (input) => fenced(input, recordOperation(transactionHub, input)),
       startOperation: (input) => fenced(input, startOperation(input)),
-      completeOperation: (input) => fenced(input, MysqlOperationCommit.complete(transactionHub, input)),
+      completeOperation: (input) => fenced(input, operationCommit.complete(transactionHub, input)),
       ...modelResponseOperations,
       expireRunningOperation: (input) => fenced(input, expireRunningOperation(transactionHub, input)),
       recoverRunningOperations: (input) => fenced(input, recoverRunningOperations(transactionHub, input)),
-      getOperation: (input) => runNoTxn(getOperation(input)),
-      getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
+      getOperation: (input) => runWithoutTransaction(getOperation(input)),
+      getOperationByKey: (input) => runWithoutTransaction(getOperationByKey(input)),
       operationCancellations: (input) => fenced(input, operationCancellations(input)),
       acknowledgeOperationCancellation: (input) => fenced(input, acknowledgeOperationCancellation(input)),
       resolveOperation: (input) =>
@@ -428,7 +418,7 @@ export const mysqlServices = (
           ),
         ),
       claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(transactionHub, input)))),
-      loadExecution: (runId) => runNoTxn(loadExecution(runId)),
+      loadExecution: (runId) => runWithoutTransaction(loadExecution(runId)),
       releaseExecution: (input) => run(releaseExecution(input)),
       saveExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(saveExecution(input)))),
       retryExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(retryExecution(transactionHub, input)))),
@@ -439,7 +429,7 @@ export const mysqlServices = (
             lockRun(input.parentRunId).pipe(Effect.andThen(admitFanOut(transactionHub, input))),
           ),
         ),
-      inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
+      inspectFanOut: (fanOutId) => runWithoutTransaction(inspectFanOut(fanOutId)),
       reserveProgramOperation: (input) => fenced(input, reserveProgramOperation(input)),
       admitProgramAgents: (input) =>
         fenced(
@@ -454,7 +444,7 @@ export const mysqlServices = (
       settleProgramOperation: (input) => fenced(input, settleProgramOperation(transactionHub, input)),
       startProgramOperation: (input) => fenced(input, startProgramOperation(input)),
       loadProgramState: (runId) =>
-        runNoTxn(
+        runWithoutTransaction(
           Effect.gen(function* () {
             const loaded = yield* loadRun(runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId })
@@ -462,7 +452,7 @@ export const mysqlServices = (
           }),
         ),
       getProgramOperation: (input) =>
-        runNoTxn(
+        runWithoutTransaction(
           Effect.gen(function* () {
             const loaded = yield* loadRun(input.runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
@@ -489,5 +479,5 @@ export const mysqlServices = (
         ),
       commitProgramLog: (input) => fenced(input, commitProgramLog(transactionHub, input)),
     })
-    return { store, claims: mysqlClaims({ sql, hub: transactionHub, run, lockParent, clearClaim }) }
+    return { store, claims: claimMethods({ sql, hub: transactionHub, run, lockParent, clearClaim }) }
   })

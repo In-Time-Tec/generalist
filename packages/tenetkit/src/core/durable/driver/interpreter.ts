@@ -11,7 +11,7 @@ import {
 } from "./contract.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
 import {
-  allocate,
+  make as makeBudget,
   assertNotExpired,
   refundUnused,
   reserveChild,
@@ -454,7 +454,7 @@ export const layerForRun: {
       if (options.driverCheckpoint === undefined) {
         let driverInput: Parameters<typeof driver.initial>[0] = {
           prompt,
-          budget: budget ?? allocate({}),
+          budget: budget ?? makeBudget({}),
         }
         if (options.executableRef !== undefined) driverInput = { ...driverInput, executable: options.executableRef }
         return yield* driver.initial(driverInput)

@@ -5,9 +5,9 @@ import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } fro
 const paging = `import { SessionHistory } from "tenetkit"
 
 // The newest page, then walk backwards until the log runs out.
-let page = SessionHistory.pageHistory(path, { limit: 50 })
+let page = SessionHistory.page(path, { limit: 50 })
 while (page.hasBefore) {
-  page = SessionHistory.pageHistory(path, { limit: 50, before: page.firstEntryId })
+  page = SessionHistory.page(path, { limit: 50, before: page.firstEntryId })
 }
 
 // Paging reads the entry log, not the projection, so entries a compaction dropped from the model's
@@ -44,17 +44,17 @@ export const durableCompositeTools = definePage({
         ],
         [
           "The same identity is seen again with different content",
-          [code("NestedOperationDivergence"), " carrying the recorded and requested kind and digest"],
+          [code("NestedOperation.Divergence"), " carrying the recorded and requested kind and digest"],
         ],
         [
           ["The outcome was never observed under ", code('replayPolicy: "never"')],
-          [code("NestedOperationUnknown"), ", for explicit resolution rather than a silent repeat"],
+          [code("NestedOperation.Unknown"), ", for explicit resolution rather than a silent repeat"],
         ],
-        ["The host denies the declared approval", [code("NestedOperationDenied"), ", recorded as a failed operation"]],
+        ["The host denies the declared approval", [code("NestedOperation.Denied"), ", recorded as a failed operation"]],
         [
           "The host cannot settle the approval in process",
           [
-            code("NestedOperationSuspended"),
+            code("NestedOperation.Suspended"),
             ", which ",
             code("catchSuspension"),
             " turns into the executor's ",
@@ -131,7 +131,7 @@ export const durableCompositeTools = definePage({
     ),
     h2("page-the-log", "5. Page the exact log a compaction rewrote"),
     p(
-      code("SessionHistory.pageHistory"),
+      code("SessionHistory.page"),
       " is pure and reads the entry log, not the model projection. That distinction is the point: compaction drops pre-checkpoint entries from what the model sees, but they remain in the log and remain pageable.",
     ),
     codeBlock({ label: "Paging behind a checkpoint", source: paging }),

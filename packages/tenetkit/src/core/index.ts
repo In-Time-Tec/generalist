@@ -40,11 +40,11 @@ import { Agent } from "./agent/public/service.js"
 import { ActiveModelResponse } from "./model/public/active-model-response.js"
 import { AgentEvent } from "./agent/public/event.js"
 import { AgentTool } from "./agent/public/tool.js"
-import { Approvals } from "./policy/facade-approvals.js"
-import { Compaction } from "./turn/facade-compaction.js"
+import { Approvals } from "./policy/public/approvals.js"
+import { Compaction } from "./turn/public/compaction.js"
 import { ContextOverflow } from "./model/public/context-overflow.js"
-import { Guardrail } from "./policy/facade-guardrail.js"
-import { Handoff } from "./policy/facade-handoff.js"
+import { Guardrail } from "./policy/public/guardrail.js"
+import { Handoff } from "./policy/public/handoff.js"
 import { Instructions } from "./context/public/instructions.js"
 import { Memory } from "./context/public/memory.js"
 import { ModelMiddleware } from "./model/public/middleware.js"
@@ -53,19 +53,19 @@ import { ModelResilience } from "./model/public/resilience.js"
 import { ModelStreamTermination } from "./model/public/stream-termination.js"
 import { ModelTelemetry } from "./model/public/telemetry.js"
 import { ModelToolCallValidation } from "./model/public/tool-call-validation.js"
-import { Permissions } from "./policy/facade-permissions.js"
+import { Permissions } from "./policy/public/permissions.js"
 import { Session } from "./context/public/session.js"
 import { SessionHistory } from "./context/public/session-history.js"
 import { SessionSync } from "./context/public/session-sync.js"
 import { SkillCatalog } from "./context/public/skill-catalog.js"
-import { Steering } from "./turn/facade-steering.js"
+import { Steering } from "./turn/public/steering.js"
 import { ToolAuthorization } from "./tools/public/tool-authorization.js"
 import { NestedOperation } from "./tools/public/nested-operation.js"
 import { ToolContext } from "./tools/public/tool-context.js"
 import { ToolExecutor } from "./tools/public/tool-executor.js"
 import { ToolOutput } from "./tools/public/tool-output.js"
 import { ToolPlacement } from "./tools/public/tool-placement.js"
-import { TurnPolicy } from "./turn/facade-turn-policy.js"
+import { TurnPolicy } from "./turn/public/policy.js"
 import { make as makeAgentProgram, run as runAgentProgram } from "./program/agent-program.js"
 import {
   CapabilityFailure,
@@ -337,8 +337,6 @@ export namespace ExecutableManifest {
   export type ProfileBinding = import("./durable/manifest/executable-manifest.js").ProfileBinding
   export type ExecutableTarget = import("./durable/manifest/executable-manifest.js").ExecutableTarget
 }
-
-export { withCacheBreakpoints } from "./model/prompt-cache.js"
 
 export {
   ActiveModelResponse,

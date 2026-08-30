@@ -5,7 +5,7 @@ import { isTerminal } from "tenetkit/runtime/driver/run"
 import type { RunEvent } from "tenetkit/runtime/driver/run/event"
 import { encodeJson } from "tenetkit/runtime/driver/sql/codec/codecs"
 import type { DecodedRun } from "tenetkit/runtime/driver/sql/codec/rows"
-import { appendEvent } from "tenetkit/runtime/driver/sql/store/statements"
+import { appendEvent } from "tenetkit/runtime/driver/sql/run-store"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { WaitResolution } from "tenetkit/runtime/driver/run/wait"
 

@@ -192,7 +192,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
               .run(request("write", { path: "DIFFERENT" }), Effect.succeed("ok"))
               .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue)),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationDivergence)
+          expect(failure).toBeInstanceOf(NestedOperation.Divergence)
         }),
       ),
     )
@@ -211,7 +211,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
               .run(request("read", { path: "a" }), Effect.succeed("ok"))
               .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue)),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationDivergence)
+          expect(failure).toBeInstanceOf(NestedOperation.Divergence)
         }),
       ),
     )
@@ -279,7 +279,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
               )
               .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue)),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationUnknown)
+          expect(failure).toBeInstanceOf(NestedOperation.Unknown)
           expect(yield* Ref.get(calls)).toBe(0)
         }),
       ),
@@ -301,7 +301,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
                 Effect.provideService(Approvals.Approvals, approvals),
               ),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationSuspended)
+          expect(failure).toBeInstanceOf(NestedOperation.Suspended)
         }),
       ),
     )
@@ -322,7 +322,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
                 Effect.provideService(Approvals.Approvals, approvals),
               ),
           )
-          if (!Schema.is(NestedOperation.NestedOperationSuspended)(failure)) throw new Error("expected suspension")
+          if (!Schema.is(NestedOperation.Suspended)(failure)) throw new Error("expected suspension")
           const expected = nestedApprovalId(nestedOperationKey({ operationKey: OPERATION_KEY, ordinal: 0 }))
           expect(failure.token).toBe(expected)
           const suspension = AgentEvent.AgentSuspended.make({
@@ -359,7 +359,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
                 Effect.provideService(Approvals.Approvals, approvals),
               ),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationDenied)
+          expect(failure).toBeInstanceOf(NestedOperation.Denied)
           expect(yield* Ref.get(calls)).toBe(0)
           const record = yield* store.getOperationByKey({
             runId: claim.runId,

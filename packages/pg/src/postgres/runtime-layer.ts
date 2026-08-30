@@ -2,11 +2,11 @@ import { Context, Effect, Layer } from "effect"
 import { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { makeRuntime } from "tenetkit/runtime/driver/memory/layer"
-import { Runtime, type LayerOptions } from "tenetkit/runtime/driver/service"
+import { makeRuntime } from "tenetkit/runtime/driver/memory/runtime"
+import { Runtime, type LayerOptions } from "tenetkit/runtime/driver/runtime"
 import { RunStore } from "tenetkit/runtime/driver/run/store"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
-import { postgresServices } from "./store/index.js"
+import { services as storeServices } from "./store/index.js"
 import { RunExecutor, make as makeRunExecutor } from "tenetkit/runtime/driver/execution/run-executor"
 import { layer as activeExecutionsLayer } from "tenetkit/runtime/driver/execution/active-executions"
 import { layer as modelPreviewLayer } from "tenetkit/runtime/driver/execution/model-response/preview"
@@ -53,7 +53,7 @@ const layerWithClient = (options: Options): Layer.Layer<PostgresServices, StoreE
     ),
   )
   const services = Layer.effectContext(
-    postgresServices(options).pipe(
+    storeServices(options).pipe(
       Effect.map(({ store, claims }) => Context.make(RunStore, store).pipe(Context.add(RunClaims, claims))),
     ),
   ).pipe(Layer.provide(client))

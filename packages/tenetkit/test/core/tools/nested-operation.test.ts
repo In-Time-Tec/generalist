@@ -6,8 +6,8 @@ import type { Request } from "../../../src/core/tools/nested-operation.js"
 
 /** Build one context+operations environment in the test's own scope, never at a nested boundary. */
 const withEnvironment = <A, E>(
-  environment: Layer.Layer<NestedOperation.NestedOperations | ToolContext.ToolContext>,
-  effect: Effect.Effect<A, E, NestedOperation.NestedOperations | ToolContext.ToolContext>,
+  environment: Layer.Layer<NestedOperation.Operations | ToolContext.ToolContext>,
+  effect: Effect.Effect<A, E, NestedOperation.Operations | ToolContext.ToolContext>,
 ): Effect.Effect<A, E> =>
   Effect.scoped(Effect.flatMap(Layer.build(environment), (context) => effect.pipe(Effect.provideContext(context))))
 
@@ -84,7 +84,7 @@ describe("NestedOperation.layerDirect", () => {
 
   it.effect("keeps sibling operation keys on independent ordinal sequences", () =>
     Effect.gen(function* () {
-      const operations = yield* NestedOperation.NestedOperations
+      const operations = yield* NestedOperation.Operations
       const first = yield* operations
         .run(request("write", { n: 1 }), Effect.succeed("a"))
         .pipe(Effect.provideService(ToolContext.ToolContext, toolContext("op-a")))
@@ -112,7 +112,7 @@ describe("NestedOperation.catchSuspension", () => {
     Effect.gen(function* () {
       const outcome = yield* NestedOperation.catchSuspension(
         Effect.fail(
-          NestedOperation.NestedOperationSuspended.make({
+          NestedOperation.Suspended.make({
             token: "approval-1",
             operationKey: "op",
             ordinal: 0,

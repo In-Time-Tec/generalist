@@ -33,7 +33,7 @@ export const compaction = definePage({
         [[code("reserveTokens")], [code("16_384")], ["Headroom kept free for the next model response"]],
         [[code("keepRecentTokens")], [code("20_000")], ["Recent history kept verbatim past the summary cut"]],
         [[code("summaryModel")], ["the run's model"], ["Dedicated model layer for summary calls"]],
-        [[code("summaryPrompt")], [code("SUMMARY_TEMPLATE")], ["Prompt for the summary call"]],
+        [[code("summaryPrompt")], [code("summaryTemplate")], ["Prompt for the summary call"]],
       ],
     ),
     h2("compose-strategies", "2. Compose independent strategy parts"),

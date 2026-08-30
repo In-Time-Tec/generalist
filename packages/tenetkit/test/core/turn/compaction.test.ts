@@ -1008,7 +1008,7 @@ describe("Compaction", () => {
   ItLayer.make(it, "keeps retained tool results bounded after semantic summarization", () => {
     let stores = 0
     const paths = ["mem:retained-tool", "s3:retained-tool"]
-    const value: ToolOutput.ToolOutput = {
+    const value: ToolOutput.Output = {
       inline: { truncated: true, bytes: 1_000, maxBytes: 12, digest: "a".repeat(64), preview: '"retained-t' },
       outputPaths: paths,
     }

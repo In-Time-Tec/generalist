@@ -28,7 +28,7 @@ const provideRun = <A, E, R>(
   stream: Stream.Stream<A, E, R | LanguageModel.LanguageModel>,
   handle: ActiveModelResponse.Service,
   model: Layer.Layer<LanguageModel.LanguageModel>,
-  resilience?: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.ModelResilienceMisconfigured>,
+  resilience?: Layer.Layer<ModelResilience.Policy, ModelResilience.Misconfigured>,
 ) =>
   stream.pipe(
     Stream.provideService(ActiveModelResponse.ActiveModelResponse, handle),

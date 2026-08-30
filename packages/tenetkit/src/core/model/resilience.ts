@@ -28,7 +28,7 @@ export interface Service {
   readonly streamIdleTimeout?: Duration.Input
 }
 
-interface MutableInterface {
+interface MutableService {
   classify: Service["classify"]
   resolve: Service["resolve"]
   retrySchedule: Service["retrySchedule"]
@@ -100,7 +100,7 @@ export const validate = (implementation: Service): Effect.Effect<Service, ModelR
 
 /** @experimental */
 export const make = (input?: Partial<Service>): Effect.Effect<Service, ModelResilienceMisconfigured> => {
-  const implementation: MutableInterface = {
+  const implementation: MutableService = {
     classify: input?.classify ?? defaultClassify,
     resolve: input?.resolve ?? defaultPolicy.resolve,
     retrySchedule: input?.retrySchedule ?? defaultPolicy.retrySchedule,

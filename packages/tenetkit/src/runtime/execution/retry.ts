@@ -19,7 +19,7 @@ export type Retry = {
   readonly turn: number
 }
 
-const isRecoverable = (event: ModelTelemetry.ModelAttemptFailed): boolean =>
+const isRecoverable = (event: ModelTelemetry.AttemptFailed): boolean =>
   event.classification === "transient" ||
   event.category === "rate-limit" ||
   event.category === "transport" ||

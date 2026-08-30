@@ -2,7 +2,7 @@ import { Clock, DateTime, Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import type { ClaimedRun } from "tenetkit/runtime/driver/sql/run/claims"
-import { decodeRunEffect, loadRun } from "tenetkit/runtime/driver/sql/store/statements"
+import { decodeRunEffect, loadRun } from "tenetkit/runtime/driver/sql/run-store"
 import type { RunRow } from "tenetkit/runtime/driver/sql/codec/rows"
 
 export interface ClaimOptions {

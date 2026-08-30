@@ -6,20 +6,20 @@ Core distinguishes **inline delegation** from **same-run handoff**.
 
 `AgentTool.asTool` and `Handoff.delegateTool` expose a child agent as a tool with its own child invocation identity. The parent run schedules a nested `generate`/`Registration.run` through `reserveChildBudget` / `refundChildBudget`. Child failures and suspension collapse to the tool's declared domain failure unless the host configures otherwise. This path does not switch the active agent for subsequent turns in the parent stream.
 
-## Same-run handoff (`Handoff.supervisor`, `Handoff.sameRunHandoffTool`)
+## Same-run handoff (`Handoff.supervisor`, `Handoff.transferTool`)
 
 Same-run handoff switches the **active agent** for subsequent turns inside one `Agent.stream` invocation. The run keeps one session identity, one `DriverInterpreter`, one tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event ordering.
 
 `Handoff.supervisor` builds a supervisor agent plus:
 
 - `toolkit` — same-run handoff tools (`handoff_to_<specialist>`)
-- `catalog` — `HandoffCatalog` layer resolving `HandoffTarget` entries
+- `catalog` — `Handoff.Catalog` layer resolving `HandoffTarget` entries
 
 Provide `supervisor.catalog` in the run layer alongside the supervisor agent.
 
 ### Handoff input and context projection
 
-Handoff tools accept schema-backed `HandoffInput` (`prompt`, `reason`, `context`). On success they return `HandoffAccepted` with stable `handoffId`, `source`, and `target` agent IDs.
+Handoff tools accept schema-backed `Handoff.Input` (`prompt`, `reason`, `context`). On success they return `HandoffAccepted` with stable `handoffId`, `source`, and `target` agent IDs.
 
 `defaultContextProjection` preserves valid prompt history and rejects unresolved tool-call/tool-result pairs. `filterContextProjection` applies a message predicate then runs the same validation. Custom projections must never emit malformed tool history.
 
@@ -35,7 +35,7 @@ The durable driver records `handoff` operations with deterministic keys:
 
 Each records `handoffId`, source/target `ExecutableRef` IDs, reason, and turn.
 
-After handoff, the target agent's tool registry, permissions, and model selection apply without widening parent authority or budget. Missing catalog entries, projection failures, and missing target requirements fail typed (`HandoffTargetMissing`, `HandoffRejected`, `HandoffRequirementsMissing`, `HandoffProjectionInvalid`, `HandoffLimitExceeded`).
+After handoff, the target agent's tool registry, permissions, and model selection apply without widening parent authority or budget. Missing catalog entries, projection failures, and missing target requirements fail typed (`HandoffTargetMissing`, `Handoff.Rejected`, `HandoffRequirementsMissing`, `Handoff.ProjectionInvalid`, `HandoffLimitExceeded`).
 
 ### Suspension propagation
 

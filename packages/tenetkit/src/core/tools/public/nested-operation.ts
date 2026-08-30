@@ -24,12 +24,12 @@ import {
 export const NestedOperation = {
   ApprovalRequirement: NestedOperation_ApprovalRequirement,
   Identity: NestedOperation_Identity,
-  NestedOperationDenied: NestedOperation_NestedOperationDenied,
-  NestedOperationDivergence: NestedOperation_NestedOperationDivergence,
-  NestedOperationSuspended: NestedOperation_NestedOperationSuspended,
-  NestedOperationUnknown: NestedOperation_NestedOperationUnknown,
-  NestedOperations: NestedOperation_NestedOperations,
-  NestedReplayPolicy: NestedOperation_NestedReplayPolicy,
+  Denied: NestedOperation_NestedOperationDenied,
+  Divergence: NestedOperation_NestedOperationDivergence,
+  Suspended: NestedOperation_NestedOperationSuspended,
+  Unknown: NestedOperation_NestedOperationUnknown,
+  Operations: NestedOperation_NestedOperations,
+  ReplayPolicy: NestedOperation_NestedReplayPolicy,
   Progress: NestedOperation_Progress,
   ProgressStatus: NestedOperation_ProgressStatus,
   Render: NestedOperation_Render,
@@ -49,12 +49,12 @@ export namespace NestedOperation {
   export type Failure = import("../nested-operation.js").Failure
   export type Identity = import("../nested-operation.js").Identity
   export type Service = import("../nested-operation.js").Service
-  export type NestedOperationDenied = import("../nested-operation.js").NestedOperationDenied
-  export type NestedOperationDivergence = import("../nested-operation.js").NestedOperationDivergence
-  export type NestedOperationSuspended = import("../nested-operation.js").NestedOperationSuspended
-  export type NestedOperationUnknown = import("../nested-operation.js").NestedOperationUnknown
-  export type NestedOperations = import("../nested-operation.js").NestedOperations
-  export type NestedReplayPolicy = import("../nested-operation.js").NestedReplayPolicy
+  export type Denied = import("../nested-operation.js").NestedOperationDenied
+  export type Divergence = import("../nested-operation.js").NestedOperationDivergence
+  export type Suspended = import("../nested-operation.js").NestedOperationSuspended
+  export type Unknown = import("../nested-operation.js").NestedOperationUnknown
+  export type Operations = import("../nested-operation.js").NestedOperations
+  export type ReplayPolicy = import("../nested-operation.js").NestedReplayPolicy
   export type Progress = import("../nested-operation.js").Progress
   export type ProgressStatus = import("../nested-operation.js").ProgressStatus
   export type Render = import("../nested-operation.js").Render

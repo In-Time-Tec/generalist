@@ -3,7 +3,7 @@ import { Agent, Prompt, TurnPolicy } from "tenetkit"
 
 const approximateTokens = (history: Prompt.Prompt): number => Math.ceil(JSON.stringify(history.content).length / 4)
 
-export const tokenBudget = (maxTokens: number): TurnPolicy.TurnPolicy =>
+export const tokenBudget = (maxTokens: number): TurnPolicy.Policy =>
   TurnPolicy.make((info) =>
     Effect.succeed(
       approximateTokens(info.history) > maxTokens

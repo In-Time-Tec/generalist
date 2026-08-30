@@ -17,13 +17,13 @@ import { claimReadyRuns, refreshLease, releaseClaim } from "../runs/claims.js"
 import { RunClaims, type Service as ClaimsService } from "tenetkit/runtime/driver/sql/run/claims"
 import { afterTerminal, appendEvent, completeRun, loadEventsAfter, loadRun, settleParent } from "./runtime.js"
 import { lockRunHierarchy } from "../runs/locks.js"
-import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
+import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/transactions"
 import { ExecutionResult } from "tenetkit/runtime/driver/execution/state"
 import { NOTIFY_CHANNEL } from "../schema.js"
 import { notifyRun } from "../events/transaction-events.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
-export type RunFn = <A, E>(
+export type RunTransaction = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlR>,
 ) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
@@ -86,11 +86,11 @@ const wakeupChanges = (config: PgClient.PgClientConfig, source: string) =>
     { bufferSize: 1, strategy: "sliding" },
   )
 
-export const postgresClaims = (input: {
+export const claimMethods = (input: {
   readonly pg: PgClient.PgClient
   readonly source: string
   readonly hub: EventHub
-  readonly run: RunFn
+  readonly run: RunTransaction
   readonly cancelRun: (
     runId: string,
     reason: string | undefined,

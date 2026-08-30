@@ -5,7 +5,7 @@ import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "gemini-agent" })
 
-const providerLayer = OpenAICompatible.layerGoogleAiStudio({
+const providerLayer = OpenAICompatible.layerGoogleAIStudio({
   model: "gemini-2.0-flash",
   apiKey: Config.redacted("GOOGLE_AI_STUDIO_API_KEY"),
 })

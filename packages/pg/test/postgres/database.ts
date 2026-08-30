@@ -35,7 +35,7 @@ type PostgresWorkerLayer = Layer.Layer<
   | import("tenetkit/runtime/driver/execution/run-executor").RunExecutor
   | import("tenetkit/runtime/driver/sql/run/claims").RunClaims
   | import("tenetkit/runtime/driver/run/store").RunStore
-  | import("tenetkit/runtime/driver/service").Runtime
+  | import("tenetkit/runtime/driver/runtime").Runtime
   | import("tenetkit/runtime/driver/sql/worker").RuntimeWorker,
   SqlError | StoreError,
   never

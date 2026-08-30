@@ -66,7 +66,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       ],
     })
     let handoffCheckpoint: DurableDriver.DriverCheckpoint | undefined
-    let handoffCommit: Handoff.HandoffCommit | undefined
+    let handoffCommit: Handoff.Commit | undefined
     let calls = 0
     const journal = Layer.succeed(DurableDriver.DriverJournalService, {
       onScheduled: () => Effect.void,
@@ -78,7 +78,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         Effect.sync(() => {
           if (operation.kind === "handoff" && outcome._tag === "Succeeded") {
             handoffCheckpoint = checkpoint
-            handoffCommit = Schema.decodeUnknownOption(Handoff.HandoffCommit)(outcome.value).pipe(Option.getOrUndefined)
+            handoffCommit = Schema.decodeUnknownOption(Handoff.Commit)(outcome.value).pipe(Option.getOrUndefined)
           }
         }),
       onCheckpoint: () => Effect.void,

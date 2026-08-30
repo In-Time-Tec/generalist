@@ -37,12 +37,12 @@ describe("ModelTelemetry", () => {
     expect(ModelTelemetry.classifyFailureCategory(new Error("plain"))).toBe("unknown")
     expect(
       ModelTelemetry.classifyFailureCategory(
-        ModelStreamTermination.ModelStreamTruncated.make({ turn: 0, emitted: { _tag: "Nothing" } }),
+        ModelStreamTermination.Truncated.make({ turn: 0, emitted: { _tag: "Nothing" } }),
       ),
     ).toBe("truncated-stream")
     expect(
       ModelTelemetry.classifyFailureCategory(
-        ModelStreamTermination.ModelStreamTimeout.make({
+        ModelStreamTermination.Timeout.make({
           turn: 0,
           emitted: { _tag: "Nothing" },
           idleMillis: 120000,
@@ -203,7 +203,7 @@ describe("ModelTelemetry", () => {
   })
 
   it("bounds provider-reported failed-attempt usage to non-negative safe integers", () => {
-    const decode = Schema.decodeUnknownOption(ModelTelemetry.ModelProviderUsage)
+    const decode = Schema.decodeUnknownOption(ModelTelemetry.ProviderUsage)
 
     expect(decode({ totalTokens: 10 })._tag).toBe("Some")
     expect(decode({ inputTokens: 7, outputTokens: 3 })._tag).toBe("Some")

@@ -8,16 +8,16 @@ import {
 } from "../stream-termination.js"
 export const ModelStreamTermination = {
   EmittedOutput: ModelStreamTermination_EmittedOutput,
-  ModelStreamTruncated: ModelStreamTermination_ModelStreamTruncated,
-  ModelStreamTimeout: ModelStreamTermination_ModelStreamTimeout,
+  Truncated: ModelStreamTermination_ModelStreamTruncated,
+  Timeout: ModelStreamTermination_ModelStreamTimeout,
   isTerminationFailure: ModelStreamTermination_isTerminationFailure,
   isModelStreamTimeout: ModelStreamTermination_isModelStreamTimeout,
   requireTerminal: ModelStreamTermination_requireTerminal,
-} satisfies typeof import("../stream-termination.js")
+}
 export namespace ModelStreamTermination {
   export type EmittedOutput = import("../stream-termination.js").EmittedOutput
-  export type ModelStreamTruncated = import("../stream-termination.js").ModelStreamTruncated
-  export type ModelStreamTimeout = import("../stream-termination.js").ModelStreamTimeout
+  export type Truncated = import("../stream-termination.js").ModelStreamTruncated
+  export type Timeout = import("../stream-termination.js").ModelStreamTimeout
   export type isTerminationFailure = typeof import("../stream-termination.js").isTerminationFailure
   export type isModelStreamTimeout = typeof import("../stream-termination.js").isModelStreamTimeout
   export type requireTerminal = typeof import("../stream-termination.js").requireTerminal

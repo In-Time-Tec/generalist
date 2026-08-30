@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { AgentManifest, ExecutableManifest, Pins } from "../packages/tenetkit/src/core/index.js"
-import { Entry, Registration, Snapshot, State } from "../packages/tenetkit/src/harness/index.js"
+import { Entry, Registration, Snapshot, State } from "../packages/tenetkit/src/agent-guidance/index.js"
 import { ExecutableRegistration } from "../packages/tenetkit/src/runtime/index.js"
 import { Effect } from "effect"
 
@@ -50,8 +50,8 @@ const registrationsFor = (
 
 const guidanceRegistration = (overrides: Partial<ExecutableRegistration.ExecutableRegistration> = {}) => ({
   pin: pinned.capability.pin,
-  codec: Snapshot.CODEC,
-  version: Snapshot.VERSION,
+  codec: Snapshot.codec,
+  version: Snapshot.version,
   payload: pinned.payload,
   ...overrides,
 })
@@ -64,7 +64,7 @@ describe("agent-guidance snapshot pinning through the runtime registration seam"
         registrationsFor(executable, guidanceRegistration()),
       )
       const carried = validated.find((registration) => registration.pin === pinned.capability.pin)
-      expect(carried?.codec).toBe(Snapshot.CODEC)
+      expect(carried?.codec).toBe(Snapshot.codec)
       const restored = yield* Snapshot.decode(pinned.id, carried!.payload)
       expect(State.allEntries(restored)).toEqual(State.allEntries(state))
     }),

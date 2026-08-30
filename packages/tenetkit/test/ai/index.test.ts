@@ -520,7 +520,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.mergeAll(
-      ModelRegistry.layerCombined([
+      ModelRegistry.layerMerged([
         Deterministic.layer({ provider: "det-a", model: "model-a" }),
         Deterministic.layer({ provider: "det-b", model: "model-b" }),
       ]),
@@ -555,7 +555,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.provide(
-      ModelRegistry.layerCombined([
+      ModelRegistry.layerMerged([
         anthropicLayer({ model: "claude-test", apiKey }),
         openRouterLayer({ model: "openrouter-test", apiKey }),
         openRouterLayer({ model: "openrouter-test", registrationKey: "secondary", apiKey }),
@@ -588,17 +588,17 @@ describe("providers", () => {
 
   it("builds embedding layers without live calls", () => {
     const baseLayers = tuple(
-      Embedding.layer({ model: "text-embedding-3-small", apiKey }),
-      Embedding.layerCompatible({
+      Embedding.layerOpenAI({ model: "text-embedding-3-small", apiKey }),
+      Embedding.layerOpenAICompatible({
         model: "embed-test",
         baseUrl: "http://localhost:11434/v1",
         apiKey,
       }),
     )
     const fetchLayers = tuple(
-      Layer.provide(Embedding.layer({ model: "text-embedding-3-small", apiKey }), FetchHttpClient.layer),
+      Layer.provide(Embedding.layerOpenAI({ model: "text-embedding-3-small", apiKey }), FetchHttpClient.layer),
       Layer.provide(
-        Embedding.layerCompatible({ model: "embed-test", baseUrl: "http://localhost:11434/v1", apiKey }),
+        Embedding.layerOpenAICompatible({ model: "embed-test", baseUrl: "http://localhost:11434/v1", apiKey }),
         FetchHttpClient.layer,
       ),
     )
@@ -619,9 +619,9 @@ describe("providers", () => {
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
       OpenAICompatible.layerGroq({ model: "model", apiKey }),
       OpenAICompatible.layerMistral({ model: "model", apiKey }),
-      OpenAICompatible.layerXai({ model: "model", apiKey }),
-      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
-      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
+      OpenAICompatible.layerXAI({ model: "model", apiKey }),
+      OpenAICompatible.layerDeepSeek({ model: "model", apiKey }),
+      OpenAICompatible.layerGoogleAIStudio({ model: "model", apiKey }),
       OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
       OpenAICompatible.layerOllama({ model: "model", apiKey }),
     )
@@ -648,9 +648,9 @@ describe("providers", () => {
     const baseOpenAICompatible = tuple(
       OpenAICompatible.layerGroq({ model: "model", apiKey }),
       OpenAICompatible.layerMistral({ model: "model", apiKey }),
-      OpenAICompatible.layerXai({ model: "model", apiKey }),
-      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
-      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
+      OpenAICompatible.layerXAI({ model: "model", apiKey }),
+      OpenAICompatible.layerDeepSeek({ model: "model", apiKey }),
+      OpenAICompatible.layerGoogleAIStudio({ model: "model", apiKey }),
       OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
       OpenAICompatible.layerOllama({ model: "model", apiKey }),
     )
@@ -687,15 +687,15 @@ describe("providers", () => {
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
       OpenAICompatible.layerGroq({ model: "model", apiKey }),
       OpenAICompatible.layerMistral({ model: "model", apiKey }),
-      OpenAICompatible.layerXai({ model: "model", apiKey }),
-      OpenAICompatible.layerDeepseek({ model: "model", apiKey }),
-      OpenAICompatible.layerGoogleAiStudio({ model: "model", apiKey }),
+      OpenAICompatible.layerXAI({ model: "model", apiKey }),
+      OpenAICompatible.layerDeepSeek({ model: "model", apiKey }),
+      OpenAICompatible.layerGoogleAIStudio({ model: "model", apiKey }),
       OpenAICompatible.layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
       OpenAICompatible.layerOllama({ model: "model", apiKey }),
     ]
     const embeddingLayers = [
-      Embedding.layer({ model: "text-embedding-3-small", apiKey }),
-      Embedding.layerCompatible({
+      Embedding.layerOpenAI({ model: "text-embedding-3-small", apiKey }),
+      Embedding.layerOpenAICompatible({
         model: "embed-test",
         baseUrl: "http://localhost:11434/v1",
         apiKey,
@@ -769,9 +769,9 @@ describe("providers", () => {
     expect(deterministicLayerOpenAI).toBeInstanceOf(Function)
     expect(OpenAICompatible.layerGroq).toBeInstanceOf(Function)
     expect(OpenAICompatible.layerMistral).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerXai).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerDeepseek).toBeInstanceOf(Function)
-    expect(OpenAICompatible.layerGoogleAiStudio).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerXAI).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerDeepSeek).toBeInstanceOf(Function)
+    expect(OpenAICompatible.layerGoogleAIStudio).toBeInstanceOf(Function)
     expect(OpenAICompatible.layerAzureOpenAI).toBeInstanceOf(Function)
     expect(OpenAICompatible.layerOllama).toBeInstanceOf(Function)
     expect(FetchHttpClient.layer).toBeDefined()

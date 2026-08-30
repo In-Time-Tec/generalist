@@ -136,7 +136,7 @@ describe("model instrumentation", () => {
 
         const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "must not run" })).pipe(Effect.flip)
 
-        expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(failure)).toBe(true)
+        expect(Schema.is(ModelResilience.Misconfigured)(failure)).toBe(true)
         expect(calls).toBe(0)
         expect(events).toEqual([])
       }),
@@ -352,7 +352,7 @@ describe("model instrumentation", () => {
       const [completed] = byTag(events, "ModelAttemptCompleted")
       expect(completed?.providerMetadata).toEqual(providerMetadata)
       expect(
-        Schema.is(ModelTelemetry.ModelAttemptCompleted)({
+        Schema.is(ModelTelemetry.AttemptCompleted)({
           ...completed,
           deliveryId: "provider-native-telemetry",
         }),
@@ -823,7 +823,7 @@ describe("model instrumentation", () => {
 
       const error = yield* Stream.runDrain(wrapped.streamText({ prompt: "cut" })).pipe(Effect.flip)
 
-      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      expect(Schema.is(ModelStreamTermination.Truncated)(error)).toBe(true)
       const attemptFailures = byTag(events, "ModelAttemptFailed")
       const [callFailed] = byTag(events, "ModelCallFailed")
       expect(attemptFailures).toHaveLength(2)
@@ -923,7 +923,7 @@ describe("model instrumentation", () => {
 
       const error = yield* Stream.runDrain(wrapped.streamText({ prompt: "hello" })).pipe(Effect.flip)
 
-      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      expect(Schema.is(ModelStreamTermination.Truncated)(error)).toBe(true)
       expect(byTag(events, "ModelAttemptCompleted")).toEqual([])
       const [attemptFailed] = byTag(events, "ModelAttemptFailed")
       expect(attemptFailed?.category).toBe("truncated-stream")
@@ -1066,10 +1066,8 @@ describe("model instrumentation", () => {
 
       const error = yield* Stream.runDrain(wrapped.streamText({ prompt: "write" })).pipe(Effect.flip)
 
-      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
-      const truncated = Option.getOrThrow(
-        Schema.decodeUnknownOption(ModelStreamTermination.ModelStreamTruncated)(error),
-      )
+      expect(Schema.is(ModelStreamTermination.Truncated)(error)).toBe(true)
+      const truncated = Option.getOrThrow(Schema.decodeUnknownOption(ModelStreamTermination.Truncated)(error))
       expect(truncated.turn).toBe(3)
       expect(truncated.requestId).toBe("req-1")
       expect(truncated.lastPart).toBe("tool-params-delta")

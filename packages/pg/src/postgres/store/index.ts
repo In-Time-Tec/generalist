@@ -23,28 +23,24 @@ import { enforceChildAdmission } from "tenetkit/runtime/driver/sql/store/admit-s
 import { equals, resolveChild } from "tenetkit/runtime/driver/executable/manifest"
 import { isTerminal } from "tenetkit/runtime/driver/run"
 import { PendingRunOutcome, RunStore } from "tenetkit/runtime/driver/run/store"
-import {
-  admitSteering,
-  readSteering,
-  saveCompletionContinuation,
-} from "tenetkit/runtime/driver/sql/store/steering/service"
+import { admitSteering, readSteering, saveCompletionContinuation } from "tenetkit/runtime/driver/sql/steering"
 import { messagingStoreMethods } from "./messaging.js"
 import type { RunRow } from "tenetkit/runtime/driver/sql/codec/rows"
-import { withSql } from "tenetkit/runtime/driver/sql/effect"
+import { withSql } from "tenetkit/runtime/driver/sql/transactions"
 import { make as makeEventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { check as checkSchema } from "../run-schema.js"
 import "../schema.js"
 import { transactionRunner, nextId } from "../events/transaction-events.js"
 import { eventStream } from "../events/event-stream.js"
-import { postgresClaims } from "./claims.js"
-import { postgresOperations, type RunFn } from "./ops.js"
+import { claimMethods } from "./claims.js"
+import { operationMethods, type RunTransaction } from "./ops.js"
 import { releaseLeasedExecution as releaseExecution } from "tenetkit/runtime/driver/sql/store/release-leased"
-import { hasAdmission, loadRunWait } from "tenetkit/runtime/driver/sql/store/statements"
+import { hasAdmission, loadRunWait } from "tenetkit/runtime/driver/sql/run-store"
 import { WaitResolution } from "tenetkit/runtime/driver/run/wait"
 import { fanOutStoreMethods } from "./fan-out.js"
 import { deferCancelledFanOutParent, cancelRunFor } from "./cancel.js"
 import "tenetkit/runtime/driver/sql/tree-replay"
-import "tenetkit/runtime/driver/sql/inspection/service"
+import "tenetkit/runtime/driver/sql/inspection"
 import { withConsistentSnapshot } from "tenetkit/runtime/driver/sql/inspection/transaction"
 import {
   StringArray,
@@ -77,10 +73,10 @@ import { approvalResponse } from "tenetkit/runtime/driver/sql/respond-approval"
 import { settlementNotifications } from "tenetkit/runtime/driver/sql/settlement-notifications"
 import { reconcileCancellationRequested } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { cancelSessionRuns } from "../sessions/session-cancellation.js"
-import { postgresSessionStore } from "../sessions/session-store.js"
+import { sessionStore } from "../sessions/session-store.js"
 import { readinessForAdmission } from "tenetkit/runtime/driver/sql/store/child/capacity"
 import { hasPendingOperationCancellation } from "tenetkit/runtime/driver/sql/store/child/settlement"
-export const postgresServices = (options: Options) =>
+export const services = (options: Options) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
@@ -91,23 +87,23 @@ export const postgresServices = (options: Options) =>
     const sql = yield* SqlClient.SqlClient
     yield* reconcileCancellationRequested
     const pg = yield* PgClient.PgClient
-    const { run, runNoTxn, transactionHub } = transactionRunner({ sql, pg, hub })
-    const runInspection: RunFn = (effect) =>
+    const { run, runWithoutTransaction, transactionHub } = transactionRunner({ sql, pg, hub })
+    const runInspection: RunTransaction = (effect) =>
       withSql(sql, withConsistentSnapshot(sql, "postgres", effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
     const cancelRun = cancelRunFor({ sql, hub: transactionHub })
-    const operations = postgresOperations({
+    const operations = operationMethods({
       sql,
       hub: transactionHub,
       run,
-      runNoTxn,
+      runWithoutTransaction,
       requireRun,
       requireClaim: requireExecutionClaim,
       nextId,
     })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
-      sessionStore: (sessionId) => Effect.succeed(Option.some(postgresSessionStore({ sessionId, run, runNoTxn }))),
-      hasAdmission: (input) => runNoTxn(hasAdmission(input)),
+      sessionStore: (sessionId) => Effect.succeed(Option.some(sessionStore({ sessionId, run, runWithoutTransaction }))),
+      hasAdmission: (input) => runWithoutTransaction(hasAdmission(input)),
       admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
       admitStart: (input, startOptions) =>
         run(
@@ -225,14 +221,14 @@ export const postgresServices = (options: Options) =>
           runId: input.runId,
           cursor: input.cursor,
           capacity,
-          loadReplay: runNoTxn(
+          loadReplay: runWithoutTransaction(
             Effect.gen(function* () {
               const loaded = yield* requireRun(input.runId)
               const replay = yield* loadEventsAfter(input.runId, input.cursor)
               return { replay, lastSequence: loaded.lastSequence }
             }),
           ),
-          loadAfter: (cursor) => runNoTxn(loadEventsAfter(input.runId, cursor)),
+          loadAfter: (cursor) => runWithoutTransaction(loadEventsAfter(input.runId, cursor)),
         }),
       respond: (input) =>
         run(
@@ -348,10 +344,10 @@ export const postgresServices = (options: Options) =>
       cancelSession: (input) => run(cancelSessionRuns({ lockRun, cancelRun, ...input })),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(transactionHub, input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
-      ...messagingStoreMethods({ run, runNoTxn, hub: transactionHub, lockRun, lockMailbox }),
-      settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
-      ...inspectionStoreMethods({ hub, pg, run, runNoTxn, runInspection }),
-      list: (input) => runNoTxn(listRuns(input)),
+      ...messagingStoreMethods({ run, runWithoutTransaction, hub: transactionHub, lockRun, lockMailbox }),
+      settlementNotifications: (input) => runWithoutTransaction(settlementNotifications(input)),
+      ...inspectionStoreMethods({ hub, pg, run, runWithoutTransaction, runInspection }),
+      list: (input) => runWithoutTransaction(listRuns(input)),
       complete: (input) =>
         run(
           Effect.gen(function* () {
@@ -475,10 +471,10 @@ export const postgresServices = (options: Options) =>
       releaseExecution: (input) => run(releaseExecution(input)),
       saveExecution: (input) => run(saveExecution(input)),
       retryExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(retryExecution(transactionHub, input)))),
-      ...fanOutStoreMethods({ sql, hub: transactionHub, run, runNoTxn }),
+      ...fanOutStoreMethods({ sql, hub: transactionHub, run, runWithoutTransaction }),
       ...operations,
-      ...programStoreMethods({ sql, hub: transactionHub, run, runNoTxn, lockRunHierarchy }),
+      ...programStoreMethods({ sql, hub: transactionHub, run, runWithoutTransaction, lockRunHierarchy }),
     })
-    const claims = postgresClaims({ pg, source, hub: transactionHub, run, cancelRun })
+    const claims = claimMethods({ pg, source, hub: transactionHub, run, cancelRun })
     return { store, claims }
   })

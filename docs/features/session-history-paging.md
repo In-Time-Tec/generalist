@@ -2,7 +2,7 @@
 
 `SessionHistory` pages the exact Session entry log. It is pure: it reads a root-to-leaf path and returns a window plus the cursors that continue it, never mutating what it reads.
 
-- `pageHistory(path, { limit, before?, after? })` returns `HistoryPage { entries, hasBefore, hasAfter, firstEntryId?, lastEntryId? }`. Entries are in path order.
+- `page(path, { limit, before?, after? })` returns `HistoryPage { entries, hasBefore, hasAfter, firstEntryId?, lastEntryId? }`. Entries are in path order.
 - With no cursor it reads the **newest** page. `before` reads strictly older entries, `after` reads strictly newer ones. Walking `before` from `firstEntryId` until `hasBefore` is false traverses the whole log without gaps or repeats.
 - A limit larger than the log yields the whole log with both flags false. A zero limit yields an empty page with no cursors.
 

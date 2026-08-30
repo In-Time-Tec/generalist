@@ -338,7 +338,7 @@ describe("RunBudget Agent.stream integration", () => {
 
   standalone.effect("rejects child grant wider than parent remaining", () =>
     Effect.gen(function* () {
-      const parent = RunBudget.allocate({ modelCalls: 1, childRuns: 1, depth: 1 })
+      const parent = RunBudget.make({ modelCalls: 1, childRuns: 1, depth: 1 })
       const error = yield* RunBudget.reserveChild(parent, { modelCalls: 5 }).pipe(Effect.flip)
       expect(error._tag).toBe("tenetkit/core/RunBudgetGrantWidened")
     }),

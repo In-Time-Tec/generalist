@@ -13,7 +13,6 @@ import {
   packageNames,
   sortRecord,
   tarballName,
-  wildcardExportExamples,
 } from "./package-smoke-config.js"
 
 class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@tenetkit/scripts/PackageSmokeFailed", {
@@ -238,17 +237,7 @@ const program = Effect.gen(function* () {
               if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
                 return yield* smokeError(`@tenetkit/${packageName}${specifier} has invalid ${condition} target`)
               }
-              if (specifier.includes("*")) {
-                const wildcardIndex = value.indexOf("*")
-                const prefix = value.slice(0, wildcardIndex)
-                const suffix = value.slice(wildcardIndex + 1)
-                const matches = entries.filter(
-                  (entry) => entry.startsWith(`package/${prefix.slice(2)}`) && entry.endsWith(suffix),
-                )
-                if (matches.length === 0) {
-                  return yield* smokeError(`@tenetkit/${packageName}${specifier} resolves to no ${condition} target`)
-                }
-              } else if (!entries.includes(`package/${value.slice(2)}`)) {
+              if (!entries.includes(`package/${value.slice(2)}`)) {
                 return yield* smokeError(`@tenetkit/${packageName}${specifier} is missing ${value}`)
               }
             }
@@ -326,14 +315,11 @@ const program = Effect.gen(function* () {
   })
   const { packedManifests, tarballs } = yield* packAndValidatePackages
   const packageExports = sorted(
-    [
-      ...Object.values(packedManifests).flatMap((manifest) =>
-        Object.keys(manifest.exports)
-          .filter((specifier) => !specifier.includes("*"))
-          .map((specifier) => (specifier === "." ? manifest.name : `${manifest.name}${specifier.slice(1)}`)),
+    Object.values(packedManifests).flatMap((manifest) =>
+      Object.keys(manifest.exports).map((specifier) =>
+        specifier === "." ? manifest.name : `${manifest.name}${specifier.slice(1)}`,
       ),
-      ...wildcardExportExamples,
-    ],
+    ),
     (left, right) => left.localeCompare(right),
   )
 

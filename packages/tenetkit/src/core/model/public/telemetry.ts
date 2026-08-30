@@ -1,5 +1,3 @@
-type ModelTelemetryFacade = typeof import("../telemetry/events.js")
-
 import {
   ModelProviderUsage as ModelTelemetry_ModelProviderUsage,
   ModelCallPurpose as ModelTelemetry_ModelCallPurpose,
@@ -45,32 +43,32 @@ import {
   generateId as ModelTelemetry_generateId,
 } from "../telemetry/events.js"
 export const ModelTelemetry = {
-  ModelProviderUsage: ModelTelemetry_ModelProviderUsage,
-  ModelCallPurpose: ModelTelemetry_ModelCallPurpose,
-  ModelFailureCategory: ModelTelemetry_ModelFailureCategory,
-  ModelFailureClassification: ModelTelemetry_ModelFailureClassification,
-  ModelFailureDisposition: ModelTelemetry_ModelFailureDisposition,
-  ModelRetryReason: ModelTelemetry_ModelRetryReason,
-  ModelFirstOutputKind: ModelTelemetry_ModelFirstOutputKind,
+  ProviderUsage: ModelTelemetry_ModelProviderUsage,
+  CallPurpose: ModelTelemetry_ModelCallPurpose,
+  FailureCategory: ModelTelemetry_ModelFailureCategory,
+  FailureClassification: ModelTelemetry_ModelFailureClassification,
+  FailureDisposition: ModelTelemetry_ModelFailureDisposition,
+  RetryReason: ModelTelemetry_ModelRetryReason,
+  FirstOutputKind: ModelTelemetry_ModelFirstOutputKind,
   CompactionTrigger: ModelTelemetry_CompactionTrigger,
   CompactionKind: ModelTelemetry_CompactionKind,
-  ModelInvocationMethod: ModelTelemetry_ModelInvocationMethod,
-  ModelInvocationStarted: ModelTelemetry_ModelInvocationStarted,
-  ModelInvocationCompleted: ModelTelemetry_ModelInvocationCompleted,
-  ModelInvocationFailed: ModelTelemetry_ModelInvocationFailed,
+  InvocationMethod: ModelTelemetry_ModelInvocationMethod,
+  InvocationStarted: ModelTelemetry_ModelInvocationStarted,
+  InvocationCompleted: ModelTelemetry_ModelInvocationCompleted,
+  InvocationFailed: ModelTelemetry_ModelInvocationFailed,
   InvocationCoordinationFailed: ModelTelemetry_InvocationCoordinationFailed,
   InvocationCoordinator: ModelTelemetry_InvocationCoordinator,
   layerInvocationCoordinatorNoop: ModelTelemetry_layerInvocationCoordinatorNoop,
   isInvocationCoordinationFailed: ModelTelemetry_isInvocationCoordinationFailed,
-  ModelCallStarted: ModelTelemetry_ModelCallStarted,
-  ModelAttemptStarted: ModelTelemetry_ModelAttemptStarted,
-  ModelAttemptFirstOutput: ModelTelemetry_ModelAttemptFirstOutput,
-  ModelAttemptCompleted: ModelTelemetry_ModelAttemptCompleted,
-  ModelAttemptFailed: ModelTelemetry_ModelAttemptFailed,
-  ModelRetryScheduled: ModelTelemetry_ModelRetryScheduled,
-  ModelFallbackScheduled: ModelTelemetry_ModelFallbackScheduled,
-  ModelCallCompleted: ModelTelemetry_ModelCallCompleted,
-  ModelCallFailed: ModelTelemetry_ModelCallFailed,
+  CallStarted: ModelTelemetry_ModelCallStarted,
+  AttemptStarted: ModelTelemetry_ModelAttemptStarted,
+  AttemptFirstOutput: ModelTelemetry_ModelAttemptFirstOutput,
+  AttemptCompleted: ModelTelemetry_ModelAttemptCompleted,
+  AttemptFailed: ModelTelemetry_ModelAttemptFailed,
+  RetryScheduled: ModelTelemetry_ModelRetryScheduled,
+  FallbackScheduled: ModelTelemetry_ModelFallbackScheduled,
+  CallCompleted: ModelTelemetry_ModelCallCompleted,
+  CallFailed: ModelTelemetry_ModelCallFailed,
   CompactionStarted: ModelTelemetry_CompactionStarted,
   CompactionSkipped: ModelTelemetry_CompactionSkipped,
   CompactionApplied: ModelTelemetry_CompactionApplied,
@@ -87,34 +85,34 @@ export const ModelTelemetry = {
   CurrentCompactionId: ModelTelemetry_CurrentCompactionId,
   CurrentSummaryCall: ModelTelemetry_CurrentSummaryCall,
   generateId: ModelTelemetry_generateId,
-} satisfies ModelTelemetryFacade
+}
 export namespace ModelTelemetry {
-  export type ModelProviderUsage = import("../telemetry/events.js").ModelProviderUsage
-  export type ModelCallPurpose = import("../telemetry/events.js").ModelCallPurpose
-  export type ModelFailureCategory = import("../telemetry/events.js").ModelFailureCategory
-  export type ModelFailureClassification = import("../telemetry/events.js").ModelFailureClassification
-  export type ModelFailureDisposition = import("../telemetry/events.js").ModelFailureDisposition
-  export type ModelRetryReason = import("../telemetry/events.js").ModelRetryReason
-  export type ModelFirstOutputKind = import("../telemetry/events.js").ModelFirstOutputKind
+  export type ProviderUsage = import("../telemetry/events.js").ModelProviderUsage
+  export type CallPurpose = import("../telemetry/events.js").ModelCallPurpose
+  export type FailureCategory = import("../telemetry/events.js").ModelFailureCategory
+  export type FailureClassification = import("../telemetry/events.js").ModelFailureClassification
+  export type FailureDisposition = import("../telemetry/events.js").ModelFailureDisposition
+  export type RetryReason = import("../telemetry/events.js").ModelRetryReason
+  export type FirstOutputKind = import("../telemetry/events.js").ModelFirstOutputKind
   export type CompactionTrigger = import("../telemetry/events.js").CompactionTrigger
   export type CompactionKind = import("../telemetry/events.js").CompactionKind
-  export type ModelInvocationMethod = import("../telemetry/events.js").ModelInvocationMethod
-  export type ModelInvocationStarted = import("../telemetry/events.js").ModelInvocationStarted
-  export type ModelInvocationCompleted = import("../telemetry/events.js").ModelInvocationCompleted
-  export type ModelInvocationFailed = import("../telemetry/events.js").ModelInvocationFailed
+  export type InvocationMethod = import("../telemetry/events.js").ModelInvocationMethod
+  export type InvocationStarted = import("../telemetry/events.js").ModelInvocationStarted
+  export type InvocationCompleted = import("../telemetry/events.js").ModelInvocationCompleted
+  export type InvocationFailed = import("../telemetry/events.js").ModelInvocationFailed
   export type InvocationCoordinationFailed = import("../telemetry/events.js").InvocationCoordinationFailed
   export type InvocationCoordinator = import("../telemetry/events.js").InvocationCoordinator
   export type layerInvocationCoordinatorNoop = typeof import("../telemetry/events.js").layerInvocationCoordinatorNoop
   export type isInvocationCoordinationFailed = typeof import("../telemetry/events.js").isInvocationCoordinationFailed
-  export type ModelCallStarted = import("../telemetry/events.js").ModelCallStarted
-  export type ModelAttemptStarted = import("../telemetry/events.js").ModelAttemptStarted
-  export type ModelAttemptFirstOutput = import("../telemetry/events.js").ModelAttemptFirstOutput
-  export type ModelAttemptCompleted = import("../telemetry/events.js").ModelAttemptCompleted
-  export type ModelAttemptFailed = import("../telemetry/events.js").ModelAttemptFailed
-  export type ModelRetryScheduled = import("../telemetry/events.js").ModelRetryScheduled
-  export type ModelFallbackScheduled = import("../telemetry/events.js").ModelFallbackScheduled
-  export type ModelCallCompleted = import("../telemetry/events.js").ModelCallCompleted
-  export type ModelCallFailed = import("../telemetry/events.js").ModelCallFailed
+  export type CallStarted = import("../telemetry/events.js").ModelCallStarted
+  export type AttemptStarted = import("../telemetry/events.js").ModelAttemptStarted
+  export type AttemptFirstOutput = import("../telemetry/events.js").ModelAttemptFirstOutput
+  export type AttemptCompleted = import("../telemetry/events.js").ModelAttemptCompleted
+  export type AttemptFailed = import("../telemetry/events.js").ModelAttemptFailed
+  export type RetryScheduled = import("../telemetry/events.js").ModelRetryScheduled
+  export type FallbackScheduled = import("../telemetry/events.js").ModelFallbackScheduled
+  export type CallCompleted = import("../telemetry/events.js").ModelCallCompleted
+  export type CallFailed = import("../telemetry/events.js").ModelCallFailed
   export type CompactionStarted = import("../telemetry/events.js").CompactionStarted
   export type CompactionSkipped = import("../telemetry/events.js").CompactionSkipped
   export type CompactionApplied = import("../telemetry/events.js").CompactionApplied

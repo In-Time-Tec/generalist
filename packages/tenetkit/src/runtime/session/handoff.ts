@@ -1,4 +1,4 @@
-import { Handoff } from "../../core/policy/facade-handoff.js"
+import { Handoff } from "../../core/policy/public/handoff.js"
 import { Function, Option, Schema } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import { RuntimeUnavailable } from "../errors.js"
@@ -13,15 +13,15 @@ export interface HandoffSessionEntry {
   readonly projectedHistory: Prompt.Prompt
 }
 
-const handoffEquivalence = Schema.toEquivalence(Handoff.HandoffCommit)
+const handoffEquivalence = Schema.toEquivalence(Handoff.Commit)
 const checkpointEquivalence = Schema.toEquivalence(ExecutionCheckpoint)
 type HandoffCandidate = typeof Schema.Unknown.Type
 
 export const isHandoffCommit = (value: HandoffCandidate): boolean =>
-  Option.isSome(Schema.decodeUnknownOption(Handoff.HandoffCommit)(value))
+  Option.isSome(Schema.decodeUnknownOption(Handoff.Commit)(value))
 
-export const decodeHandoffCommit = (value: HandoffCandidate): Handoff.HandoffCommit | RuntimeUnavailable => {
-  const decoded = Schema.decodeUnknownOption(Handoff.HandoffCommit)(value)
+export const decodeHandoffCommit = (value: HandoffCandidate): Handoff.Commit | RuntimeUnavailable => {
+  const decoded = Schema.decodeUnknownOption(Handoff.Commit)(value)
   return Option.isNone(decoded)
     ? RuntimeUnavailable.make({ message: "succeeded handoff operation has an invalid projection commit" })
     : decoded.value
@@ -38,8 +38,8 @@ export const sameHandoffCommit: {
   (right: HandoffCandidate): (left: HandoffCandidate) => boolean
   (left: HandoffCandidate, right: HandoffCandidate): boolean
 } = Function.dual(2, (left: HandoffCandidate, right: HandoffCandidate): boolean => {
-  const leftCommit = Schema.decodeUnknownOption(Handoff.HandoffCommit)(left)
-  const rightCommit = Schema.decodeUnknownOption(Handoff.HandoffCommit)(right)
+  const leftCommit = Schema.decodeUnknownOption(Handoff.Commit)(left)
+  const rightCommit = Schema.decodeUnknownOption(Handoff.Commit)(right)
   return (
     Option.isSome(leftCommit) && Option.isSome(rightCommit) && handoffEquivalence(leftCommit.value, rightCommit.value)
   )

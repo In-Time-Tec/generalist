@@ -8,7 +8,7 @@ import {
   SchemaUpgradeRequired,
   SchemaVersionUnsupported,
 } from "tenetkit/runtime/driver/sql/errors"
-import { mapSqlError } from "tenetkit/runtime/driver/sql/effect"
+import { mapSqlError } from "tenetkit/runtime/driver/sql/transactions"
 import {
   MIGRATION_NAME,
   MIGRATIONS_TABLE,

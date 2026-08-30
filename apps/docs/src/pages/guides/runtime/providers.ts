@@ -65,7 +65,7 @@ export const providers = definePage({
       "Every provider layer installs its own fresh registry under the same service tag, so ",
       code("Layer.mergeAll"),
       " keeps only one provider's registrations. Combine registries with ",
-      code("ModelRegistry.layerCombined"),
+      code("ModelRegistry.layerMerged"),
       " instead; on identical identity the later layer wins.",
     ),
     codeBlock({ label: "combine-providers.ts", source: combineProviders }),
@@ -141,10 +141,10 @@ export const providers = definePage({
       [
         [[code("OpenAICompatible.layerGroq")], [code("groq")], [code("https://api.groq.com/openai/v1")]],
         [[code("OpenAICompatible.layerMistral")], [code("mistral")], [code("https://api.mistral.ai/v1")]],
-        [[code("OpenAICompatible.layerXai")], [code("xai")], [code("https://api.x.ai/v1")]],
-        [[code("OpenAICompatible.layerDeepseek")], [code("deepseek")], [code("https://api.deepseek.com/v1")]],
+        [[code("OpenAICompatible.layerXAI")], [code("xai")], [code("https://api.x.ai/v1")]],
+        [[code("OpenAICompatible.layerDeepSeek")], [code("deepseek")], [code("https://api.deepseek.com/v1")]],
         [
-          [code("OpenAICompatible.layerGoogleAiStudio")],
+          [code("OpenAICompatible.layerGoogleAIStudio")],
           [code("google")],
           [code("https://generativelanguage.googleapis.com/v1beta/openai/")],
         ],
@@ -159,7 +159,7 @@ export const providers = definePage({
     h2("recipe-gemini", "Recipe: Gemini via the OpenAI-compatible preset"),
     p(
       "TenetKit has no first-party Google helper yet because the upstream Effect AI Google provider is not compatible with the pinned beta, but Google AI Studio speaks the OpenAI protocol. Register it with the ",
-      code("layerGoogleAiStudio"),
+      code("layerGoogleAIStudio"),
       " preset and select ",
       code('{ provider: "google", model: "gemini-2.0-flash" }'),
       ".",

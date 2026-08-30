@@ -19,7 +19,7 @@ import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { completeRun, requireRun } from "./runtime.js"
 import { suspend } from "./suspend.js"
 import { admitProgramChild } from "tenetkit/runtime/driver/sql/store/admit"
-import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
+import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/transactions"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
@@ -31,7 +31,7 @@ export const programStoreMethods = (input: {
   readonly sql: SqlClient.SqlClient
   readonly hub: EventHub
   readonly run: Run
-  readonly runNoTxn: Run
+  readonly runWithoutTransaction: Run
   readonly lockRunHierarchy: (runId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
 }): Pick<
   RunStore,
@@ -66,9 +66,10 @@ export const programStoreMethods = (input: {
     suspendProgramOperation: (operation) => fenced(operation, suspendProgramOperation(input.hub, operation, suspend)),
     settleProgramOperation: (operation) => fenced(operation, settleProgramOperation(input.hub, operation)),
     startProgramOperation: (operation) => fenced(operation, startProgramOperation(operation)),
-    loadProgramState: (runId) => input.runNoTxn(requireRun(runId).pipe(Effect.andThen(loadProgramState(runId)))),
+    loadProgramState: (runId) =>
+      input.runWithoutTransaction(requireRun(runId).pipe(Effect.andThen(loadProgramState(runId)))),
     getProgramOperation: (operation) =>
-      input.runNoTxn(requireRun(operation.runId).pipe(Effect.andThen(getProgramOperation(operation)))),
+      input.runWithoutTransaction(requireRun(operation.runId).pipe(Effect.andThen(getProgramOperation(operation)))),
     commitProgramLog: (operation) => fenced(operation, commitProgramLog(input.hub, operation)),
     completeProgram: (operation) =>
       input.run(

@@ -261,18 +261,18 @@ const Part = Schema.Union([
 ])
 const optionalMetadata = { metadata: Schema.optionalKey(Metadata) }
 const ModelTelemetryEventSchema = Schema.Union([
-  ModelTelemetry.ModelCallStarted,
-  ModelTelemetry.ModelAttemptStarted,
-  ModelTelemetry.ModelAttemptFirstOutput,
-  Schema.Struct({ ...ModelTelemetry.ModelAttemptCompleted.fields, usage: Usage }),
-  ModelTelemetry.ModelAttemptFailed,
-  ModelTelemetry.ModelRetryScheduled,
-  ModelTelemetry.ModelFallbackScheduled,
+  ModelTelemetry.CallStarted,
+  ModelTelemetry.AttemptStarted,
+  ModelTelemetry.AttemptFirstOutput,
+  Schema.Struct({ ...ModelTelemetry.AttemptCompleted.fields, usage: Usage }),
+  ModelTelemetry.AttemptFailed,
+  ModelTelemetry.RetryScheduled,
+  ModelTelemetry.FallbackScheduled,
   Schema.Struct({
-    ...ModelTelemetry.ModelCallCompleted.fields,
+    ...ModelTelemetry.CallCompleted.fields,
     usage: Schema.optionalKey(Usage),
   }),
-  ModelTelemetry.ModelCallFailed,
+  ModelTelemetry.CallFailed,
   ModelTelemetry.CompactionStarted,
   ModelTelemetry.CompactionSkipped,
   ModelTelemetry.CompactionApplied,

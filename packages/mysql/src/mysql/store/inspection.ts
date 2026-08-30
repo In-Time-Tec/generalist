@@ -1,25 +1,25 @@
 import { Effect } from "effect"
 import { CursorExpired, RunNotFound } from "tenetkit/runtime/driver/errors"
 import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
-import { loadRunSnapshot, loadTreeCheckpoint } from "tenetkit/runtime/driver/sql/inspection/service"
+import { loadRunSnapshot, loadTreeCheckpoint } from "tenetkit/runtime/driver/sql/inspection"
 import { sessionRoots } from "tenetkit/runtime/driver/sql/session/lifecycle"
 import { loadChildReadiness } from "tenetkit/runtime/driver/sql/store/child/capacity"
-import { loadEventsAfter, loadRun, loadRunWait } from "tenetkit/runtime/driver/sql/store/statements"
+import { loadEventsAfter, loadRun, loadRunWait } from "tenetkit/runtime/driver/sql/run-store"
 import { listRuns } from "tenetkit/runtime/driver/sql/store/list"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { loadTreeReplay } from "tenetkit/runtime/driver/sql/tree-replay"
-import type { RunFn } from "../transaction/events.js"
+import type { RunTransaction } from "../transaction/events.js"
 
 export const inspectionStoreMethods = (deps: {
   readonly hub: EventHub
-  readonly runNoTxn: RunFn
-  readonly runInspection: RunFn
+  readonly runWithoutTransaction: RunTransaction
+  readonly runInspection: RunTransaction
 }): Pick<
   RunStoreService,
   "inspect" | "snapshot" | "sessionRoots" | "treeCheckpoint" | "history" | "treeReplay" | "treeChanges" | "list"
 > => ({
   inspect: (runId) =>
-    deps.runNoTxn(
+    deps.runWithoutTransaction(
       Effect.gen(function* () {
         const loaded = yield* loadRun(runId)
         if (loaded === undefined) return yield* RunNotFound.make({ runId })
@@ -41,10 +41,10 @@ export const inspectionStoreMethods = (deps: {
       }),
     ),
   snapshot: (runId) => deps.runInspection(loadRunSnapshot(runId)),
-  sessionRoots: (sessionId) => deps.runNoTxn(sessionRoots(sessionId)),
+  sessionRoots: (sessionId) => deps.runWithoutTransaction(sessionRoots(sessionId)),
   treeCheckpoint: (rootRunId) => deps.runInspection(loadTreeCheckpoint(rootRunId)),
   history: (input) =>
-    deps.runNoTxn(
+    deps.runWithoutTransaction(
       Effect.gen(function* () {
         const loaded = yield* loadRun(input.runId)
         if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
@@ -53,7 +53,7 @@ export const inspectionStoreMethods = (deps: {
         return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
       }),
     ),
-  treeReplay: (input) => deps.runNoTxn(loadTreeReplay(input)),
+  treeReplay: (input) => deps.runWithoutTransaction(loadTreeReplay(input)),
   treeChanges: (rootRunId) => deps.hub.subscribeTree({ rootRunId }),
-  list: (input) => deps.runNoTxn(listRuns(input)),
+  list: (input) => deps.runWithoutTransaction(listRuns(input)),
 })

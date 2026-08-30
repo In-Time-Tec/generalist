@@ -19,9 +19,9 @@ import {
   encodeQueue,
 } from "tenetkit/runtime/driver/sql/codec/codecs"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import { reconcileFanOutWith } from "tenetkit/runtime/driver/sql/store/fan-out/service"
+import { reconcileFanOutWith } from "tenetkit/runtime/driver/sql/fan-out"
 import type { DecodedRun, EventRow, RunRow } from "tenetkit/runtime/driver/sql/codec/rows"
-import { decodePersistedEvents, decodeRunEffect, nowIso } from "tenetkit/runtime/driver/sql/store/statements"
+import { decodePersistedEvents, decodeRunEffect, nowIso } from "tenetkit/runtime/driver/sql/run-store"
 import type { EmittableAgentLoopEvent } from "tenetkit/runtime/driver/execution/agent/event"
 import { PendingRunOutcome, type ExecutionClaim } from "tenetkit/runtime/driver/run/store"
 import type { ExecutionResult } from "tenetkit/runtime/driver/execution/state"

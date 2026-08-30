@@ -137,7 +137,7 @@ describe("TurnPolicy snapshots", () => {
   )
 
   it.effect("preserves typed policy evaluation failures", () => {
-    const failure = TurnPolicy.TurnPolicyError.make({ message: "budget unavailable", cause: { code: "offline" } })
+    const failure = TurnPolicy.Error.make({ message: "budget unavailable", cause: { code: "offline" } })
     const policy = TurnPolicy.make(() => Effect.fail(failure))
 
     return Effect.gen(function* () {

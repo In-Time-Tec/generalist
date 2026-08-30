@@ -31,9 +31,9 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
   readonly codeMode: CodeModeService | undefined
   readonly nested: NestedOperations
 }): Effect.Effect<
-  | Context.Context<Agent.ClosedServices<Tools, R> | ChildRuns | NestedOperation.NestedOperations>
+  | Context.Context<Agent.ClosedServices<Tools, R> | ChildRuns | NestedOperation.Operations>
   | Context.Context<
-      Agent.ClosedServices<Tools, R> | ChildRuns | NestedOperation.NestedOperations | ToolExecutor.ToolExecutor
+      Agent.ClosedServices<Tools, R> | ChildRuns | NestedOperation.Operations | ToolExecutor.ToolExecutor
     >,
   never,
   Scope.Scope
@@ -59,7 +59,7 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
       Context.merge(
         Context.merge(
           Context.make(ChildRuns, children),
-          Context.make(NestedOperation.NestedOperations, NestedOperation.NestedOperations.of(options.nested)),
+          Context.make(NestedOperation.Operations, NestedOperation.Operations.of(options.nested)),
         ),
         Context.make(
           ToolExecutor.ToolExecutor,

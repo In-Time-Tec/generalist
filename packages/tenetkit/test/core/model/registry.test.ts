@@ -333,10 +333,10 @@ describe("ModelRegistry", () => {
 
   ItLayer.make(
     it,
-    "layerCombined resolves models from every combined registry layer",
+    "merge resolves models from every combined registry layer",
     () =>
       [
-        ModelRegistry.layerCombined([
+        ModelRegistry.layerMerged([
           ModelRegistry.layer([
             ModelRegistry.registration({ provider: "prov-a", model: "model-a", layer: modelLayer("from-a") }),
           ]),
@@ -407,10 +407,10 @@ describe("ModelRegistry", () => {
 
   ItLayer.make(
     it,
-    "layerCombined keeps upsert semantics for identical registrations",
+    "merge keeps upsert semantics for identical registrations",
     () =>
       [
-        ModelRegistry.layerCombined([
+        ModelRegistry.layerMerged([
           ModelRegistry.layer([
             ModelRegistry.registration({
               provider: "test",

@@ -94,7 +94,7 @@ describe("ModelStreamTermination.requireTerminal", () => {
         guard(Stream.fromIterable([metadataPart, Response.makePart("text-delta", { id: "t", delta: "cut" })])),
       ).pipe(Effect.flip)
 
-      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      expect(Schema.is(ModelStreamTermination.Truncated)(error)).toBe(true)
       expect(error.turn).toBe(7)
       expect(error.provider).toBe("anthropic")
       expect(error.model).toBe("claude")
@@ -158,8 +158,8 @@ describe("ModelStreamTermination.requireTerminal", () => {
       yield* TestClock.adjust("10 millis")
       const error = yield* Fiber.join(fiber)
 
-      expect(Schema.is(ModelStreamTermination.ModelStreamTimeout)(error)).toBe(true)
-      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(false)
+      expect(Schema.is(ModelStreamTermination.Timeout)(error)).toBe(true)
+      expect(Schema.is(ModelStreamTermination.Truncated)(error)).toBe(false)
       expect(error.requestId).toBe("req-1")
       expect(error.emitted).toEqual({ _tag: "Nothing" })
     }),

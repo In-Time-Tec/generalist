@@ -384,7 +384,7 @@ export const delegateTool: {
   },
 )
 
-export const sameRunHandoffTool: {
+export const transferTool: {
   (options?: HandoffToolOptions): (handoffTarget: HandoffTarget) => HandoffToolkit
   (handoffTarget: HandoffTarget, options?: HandoffToolOptions): HandoffToolkit
 } = Function.dual(
@@ -451,7 +451,7 @@ export const fanOut: {
 
 export const supervisor = (options: SupervisorOptions) => {
   const specialists = options.specialists
-  const handoffTools = specialists.map((specialist) => sameRunHandoffTool(specialist, options.handoffOptions ?? {}))
+  const handoffTools = specialists.map((specialist) => transferTool(specialist, options.handoffOptions ?? {}))
   const toolkit = mergeHandoffTools(handoffTools)
   const agentOptions: SupervisorAgentOptions = {
     name: options.name,
@@ -485,6 +485,6 @@ export {
   filterContextProjection,
   HandoffProjectionInvalid,
 } from "./handoff-projection.js"
-export { executeSameRunHandoff, HandoffRejected } from "./handoff-runtime.js"
+export { HandoffRejected } from "./handoff-runtime.js"
 export { HandoffCommit, HandoffControlState } from "../agent/handoff/state.js"
 export { register, RegistrationError, type Registration } from "../agent/tool.js"

@@ -2028,7 +2028,7 @@ describe("RunExecutor execution", () => {
       })
       yield* store.startOperation({ ...claim, operationId: operation.operationId })
       const projectedHistory = Prompt.make("projected-for-specialist")
-      const commit: Handoff.HandoffCommit = {
+      const commit: Handoff.Commit = {
         _tag: "HandoffCommit",
         state: {
           root: assistant.name,

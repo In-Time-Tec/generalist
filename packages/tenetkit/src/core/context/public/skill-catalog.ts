@@ -3,7 +3,7 @@ type CoreSkillCatalog = import("../skill-catalog.js").SkillCatalog
 type CoreSkillCatalogError = import("../skill-catalog.js").SkillCatalogError
 
 import {
-  DESCRIPTION_CAP,
+  descriptionLimit,
   layer,
   layerEmpty,
   layerSkills,
@@ -15,7 +15,7 @@ import {
 } from "../skill-catalog.js"
 
 export const SkillCatalog: SkillCatalogFacade = {
-  DESCRIPTION_CAP,
+  descriptionLimit,
   SkillCatalogError,
   SkillCatalog: SkillCatalogService,
   layerSkills,
@@ -26,7 +26,7 @@ export const SkillCatalog: SkillCatalogFacade = {
   selectListings,
 }
 export namespace SkillCatalog {
-  export type DESCRIPTION_CAP = typeof import("../skill-catalog.js").DESCRIPTION_CAP
+  export type descriptionLimit = typeof import("../skill-catalog.js").descriptionLimit
   export type SkillCatalogError = CoreSkillCatalogError
   export type SkillCatalog = CoreSkillCatalog
   export type layerSkills = typeof import("../skill-catalog.js").layerSkills

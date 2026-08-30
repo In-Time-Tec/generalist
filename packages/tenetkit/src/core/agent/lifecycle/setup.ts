@@ -22,13 +22,11 @@ import { ToolAuthorizerService, make as makeToolAuthorizer } from "../../tools/t
 import { ToolExecutor } from "../../tools/tool-executor.js"
 import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../../durable/loop-driver-state.js"
 import type { Agent, RunOptions } from "../service.js"
-import { SetupHelpers, setupStaticTools } from "./construction.js"
+import { errorMessage, setupStaticTools } from "./construction.js"
 import { recoverToolCheckpoint } from "../tools/checkpoint-recovery.js"
-import { SetupOptions } from "./options.js"
+import { validate as validateOptions } from "./options.js"
 import { setupChat, setupPersistence } from "./persistence.js"
 import { setupPromptContext } from "./resume.js"
-const { errorMessage } = SetupHelpers
-
 const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
   Effect.gen(function* () {
     const persistence = yield* setupPersistence(options)
@@ -52,7 +50,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
     )
     const activeModelResponse = yield* Effect.serviceOption(ActiveModelResponse)
-    const progressPolicy = yield* SetupOptions.validate(options, agent)
+    const progressPolicy = yield* validateOptions(options, agent)
 
     const sessionId = options.sessionId ?? "local"
     const sessionOwnerToken = options.sessionOwnerToken
@@ -62,7 +60,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const promptContext = yield* setupPromptContext({ agent, options, activeSession, resumeChat, staticCandidates })
     const {
       instructionsService,
-      skillSourceService,
+      skillCatalogService,
       skillRuntime,
       selectedSkills,
       skillListings,
@@ -251,7 +249,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       sessionOwnerToken,
       sessionAppendOptions,
       instructionsService,
-      skillSourceService,
+      skillCatalogService,
       skillRuntime,
       selectedSkills,
       skillListings,

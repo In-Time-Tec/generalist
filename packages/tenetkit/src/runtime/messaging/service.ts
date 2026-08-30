@@ -167,7 +167,7 @@ export interface AgentMessagingService {
     | DurableDriver.DriverError
     | DurableDriver.DriverStateInvalid
     | DurableDriver.DriverUnknownReplay
-    | RunBudget.RunBudgetExhausted,
+    | RunBudget.Exhausted,
     DurableDriver.DriverInterpreter | ToolContext.ToolContext
   >
   readonly inbox: (input: {

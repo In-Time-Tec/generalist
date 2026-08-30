@@ -22,7 +22,7 @@ const openAiModelOptions = (options: OpenAIOptions) => {
 }
 
 /** @experimental */
-export const layer = (
+export const layerOpenAI = (
   options: OpenAIOptions,
 ): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError, HttpClient.HttpClient> =>
   OpenAIEmbeddingModel.layer(openAiModelOptions(options)).pipe(
@@ -56,7 +56,7 @@ const compatibleClientOptions = (options: OpenAICompatibleOptions) => {
 }
 
 /** @experimental */
-export const layerCompatible = (
+export const layerOpenAICompatible = (
   options: OpenAICompatibleOptions,
 ): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError, HttpClient.HttpClient> =>
   OpenAICompatibleEmbeddingModel.layer(compatibleModelOptions(options)).pipe(

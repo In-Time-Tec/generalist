@@ -60,7 +60,7 @@ describe("ToolOutput", () => {
 
   ItLayer.make(it, "recovers a typed store failure as bounded inline success", () => [
     ToolOutput.layerTest({
-      put: () => Effect.fail(ToolOutput.ToolOutputError.make({ message: "store unavailable" })),
+      put: () => Effect.fail(ToolOutput.Error.make({ message: "store unavailable" })),
     }),
     Effect.gen(function* () {
       const bounded = yield* ToolOutput.bound(success("😀".repeat(20)), {
@@ -99,10 +99,7 @@ describe("ToolOutput", () => {
     ToolOutput.layerTest({
       put: () =>
         Effect.failCause(
-          Cause.combine(
-            Cause.fail(ToolOutput.ToolOutputError.make({ message: "store unavailable" })),
-            Cause.interrupt(),
-          ),
+          Cause.combine(Cause.fail(ToolOutput.Error.make({ message: "store unavailable" })), Cause.interrupt()),
         ),
     }),
     Effect.gen(function* () {
@@ -235,7 +232,7 @@ describe("ToolOutput", () => {
         },
       }),
       Effect.gen(function* () {
-        const value: ToolOutput.ToolOutput = {
+        const value: ToolOutput.Output = {
           inline: { truncated: true, bytes: 100, maxBytes: 8, digest: "a".repeat(64), preview: '"xxxxxxx' },
           outputPaths: ["mem:original", "s3:original"],
         }
@@ -283,7 +280,7 @@ describe("ToolOutput", () => {
         },
       }),
       Effect.gen(function* () {
-        const value: ToolOutput.ToolOutput = {
+        const value: ToolOutput.Output = {
           inline: { truncated: true, bytes: 100, maxBytes: 8, digest: "a".repeat(64), preview: '"xxxxxxx' },
         }
 

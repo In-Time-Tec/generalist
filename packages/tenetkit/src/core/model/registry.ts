@@ -369,7 +369,7 @@ export const layer: {
 )
 
 /** @experimental */
-export const layerCombined: {
+export const layerMerged: {
   <E = never, R = never>(
     options?: GovernanceOptions,
   ): (registries: ReadonlyArray<Layer.Layer<ModelRegistry, E, R>>) => Layer.Layer<ModelRegistry, E, R>

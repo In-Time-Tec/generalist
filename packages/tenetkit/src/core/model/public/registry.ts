@@ -1,4 +1,3 @@
-type ModelRegistryFacade = typeof import("../registry.js")
 type CoreModelRegistry = import("../registry.js").ModelRegistry
 type CoreModelRegistryRegistration = import("../registry.js").Registration
 
@@ -13,7 +12,7 @@ import {
   ModelRegistry as ModelRegistry_ModelRegistry,
   registration as ModelRegistry_registration,
   layer as ModelRegistry_layer,
-  layerCombined as ModelRegistry_layerCombined,
+  layerMerged as ModelRegistry_layerMerged,
   layerTest as ModelRegistry_layerTest,
   register as ModelRegistry_register,
   registrations as ModelRegistry_registrations,
@@ -31,13 +30,13 @@ export const ModelRegistry = {
   ModelRegistry: ModelRegistry_ModelRegistry,
   registration: ModelRegistry_registration,
   layer: ModelRegistry_layer,
-  layerCombined: ModelRegistry_layerCombined,
+  layerMerged: ModelRegistry_layerMerged,
   layerTest: ModelRegistry_layerTest,
   register: ModelRegistry_register,
   registrations: ModelRegistry_registrations,
   withModel: ModelRegistry_withModel,
   stream: ModelRegistry_stream,
-} satisfies ModelRegistryFacade
+}
 export namespace ModelRegistry {
   export type classifyFailure = typeof import("../registry.js").classifyFailure
   export type candidateRoute = typeof import("../registry.js").candidateRoute
@@ -49,7 +48,7 @@ export namespace ModelRegistry {
   export type ModelRegistry = CoreModelRegistry
   export type registration = typeof import("../registry.js").registration
   export type layer = typeof import("../registry.js").layer
-  export type layerCombined = typeof import("../registry.js").layerCombined
+  export type layerMerged = typeof import("../registry.js").layerMerged
   export type layerTest = typeof import("../registry.js").layerTest
   export type register = typeof import("../registry.js").register
   export type registrations = typeof import("../registry.js").registrations

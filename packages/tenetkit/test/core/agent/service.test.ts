@@ -1404,10 +1404,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([
-          Instructions.staticSource("first", "first"),
-          Instructions.staticSource("second", "second"),
-        ]),
+        Instructions.layer([Instructions.fromText("first", "first"), Instructions.fromText("second", "second")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-agent", instructions: "fallback instructions" })
@@ -1430,7 +1427,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([Instructions.staticSource("registry", "registry")]),
+        Instructions.layer([Instructions.fromText("registry", "registry")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-system-agent", instructions: "fallback instructions" })
@@ -1455,7 +1452,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([Instructions.staticSource("registry", "registry")]),
+        Instructions.layer([Instructions.fromText("registry", "registry")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-history-agent", instructions: "fallback instructions" })
@@ -1488,7 +1485,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([Instructions.staticSource("empty", "")]),
+        Instructions.layer([Instructions.fromText("empty", "")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "empty-instructions-agent", instructions: "fallback instructions" })
@@ -2118,8 +2115,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           expect(events.some((event) => event._tag === "Completed")).toBe(false)
           expect(failure).toMatchObject({ _tag: "tenetkit/core/AgentError", turn: 0 })
           expect(
-            failure._tag === "tenetkit/core/AgentError" &&
-              Schema.is(ModelStreamTermination.ModelStreamTruncated)(failure.cause),
+            failure._tag === "tenetkit/core/AgentError" && Schema.is(ModelStreamTermination.Truncated)(failure.cause),
           ).toBe(true)
         }),
       ] as const,
@@ -5165,7 +5161,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const session = yield* Session.SessionStore
         const path = yield* session
           .path()
-          .pipe(Effect.mapError((error) => TurnPolicy.TurnPolicyError.make({ message: error.message, cause: error })))
+          .pipe(Effect.mapError((error) => TurnPolicy.Error.make({ message: error.message, cause: error })))
         sessionAtPolicy = Session.buildContext(path)
         return TurnPolicy.decision.continue()
       }),
@@ -6716,7 +6712,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
   ItLayer.make(it, "surfaces a policy evaluation failure without erasing its cause", () => {
     const policyCause = { system: "budget-service", status: "offline" }
-    const policyFailure = TurnPolicy.TurnPolicyError.make({ message: "budget unavailable", cause: policyCause })
+    const policyFailure = TurnPolicy.Error.make({ message: "budget unavailable", cause: policyCause })
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-policy-failure", "echo", { text: "call" }))),
@@ -7965,7 +7961,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     Effect.gen(function* () {
       const agent = Agent.make({ name: "checkpoint-identity-agent" })
       const executable = ExecutableManifest.makeTest("checkpoint-identity-agent", undefined)
-      const budget = RunBudget.allocate({})
+      const budget = RunBudget.make({})
       const checkpoint: DurableDriver.DriverCheckpoint = {
         driverVersion: DurableDriver.currentDriverVersion,
         executable: executable.ref,

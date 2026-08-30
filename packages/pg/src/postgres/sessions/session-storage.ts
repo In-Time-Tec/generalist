@@ -73,7 +73,7 @@ const advanceSession = (input: {
     }
   })
 
-interface PostgresSessionStorage {
+interface SessionStorageContract {
   readonly encodePayload: (payload: Session.EntryPayload) => string
   readonly entryPayloadEquivalence: (self: Session.EntryPayload, that: Session.EntryPayload) => boolean
   readonly storeError: (message: string) => Session.SessionStoreError
@@ -96,7 +96,7 @@ interface PostgresSessionStorage {
   readonly advanceSession: typeof advanceSession
 }
 
-export const PostgresSessionStorage: PostgresSessionStorage = {
+export const sessionStorage: SessionStorageContract = {
   encodePayload,
   entryPayloadEquivalence,
   storeError,

@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
 import { withConsistentSnapshot } from "tenetkit/runtime/driver/sql/inspection/transaction"
-import { withSql } from "tenetkit/runtime/driver/sql/effect"
+import { withSql } from "tenetkit/runtime/driver/sql/transactions"
 
 const isDeadlock = (error: SqlError): boolean => {
   const text = `${error.message} ${String(error.reason)}`.toLowerCase()
@@ -10,7 +10,7 @@ const isDeadlock = (error: SqlError): boolean => {
 }
 
 /** @experimental MySQL-specific transaction runner bound to one SqlClient. */
-export const sqlRunner = (sql: SqlClient.SqlClient) => {
+export const runner = (sql: SqlClient.SqlClient) => {
   const transaction = <A, E>(
     effect: Effect.Effect<A, E, SqlClient.SqlClient>,
     retries = 4,
@@ -27,8 +27,8 @@ export const sqlRunner = (sql: SqlClient.SqlClient) => {
         ),
     )
   const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, transaction(effect))
-  const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
+  const runWithoutTransaction = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
   const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
     withSql(sql, withConsistentSnapshot(sql, "mysql", effect))
-  return { transaction, run, runNoTxn, runInspection }
+  return { transaction, run, runWithoutTransaction, runInspection }
 }

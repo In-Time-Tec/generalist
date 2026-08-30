@@ -14,7 +14,7 @@ import { lockRun } from "../runs/locks.js"
 import { appendEvent, requireRun } from "./runtime.js"
 import { requireExecutionClaim } from "tenetkit/runtime/driver/sql/store/execution"
 import { groupIdFromSuspension, resultFromInspection } from "tenetkit/runtime/driver/child/group"
-import { inspectFanOut } from "tenetkit/runtime/driver/sql/store/fan-out/service"
+import { inspectFanOut } from "tenetkit/runtime/driver/sql/fan-out"
 import { ExecutionCheckpoint, ExecutionSuspension } from "tenetkit/runtime/driver/execution/state"
 import { loadTerminalEvent, reconcileChildWaitWith } from "tenetkit/runtime/driver/sql/store/child/settlement"
 

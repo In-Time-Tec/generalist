@@ -7,7 +7,7 @@ import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/sto
 import type { DecodedRun, OperationRow } from "tenetkit/runtime/driver/sql/codec/rows"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { appendEvent, loadEventsAfter, toOperationRecord } from "./runtime.js"
-import type { RunFn } from "./ops.js"
+import type { RunTransaction } from "./ops.js"
 import { encodeExecutableRef, encodeJson, encodeJsonValue } from "tenetkit/runtime/driver/sql/codec/codecs"
 import { ExecutionCheckpoint } from "tenetkit/runtime/driver/execution/state"
 import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
@@ -77,10 +77,10 @@ const verifySteeringOwnership = (sql: SqlClient.SqlClient, op: CommitModelInput)
     }
   })
 
-export const postgresModelResponseOperations = (input: {
+export const modelResponseMethods = (input: {
   readonly sql: SqlClient.SqlClient
   readonly hub: EventHub
-  readonly run: RunFn
+  readonly run: RunTransaction
   readonly requireRun: (runId: string) => Effect.Effect<DecodedRun, RunNotFound | RuntimeUnavailable | SqlError, SqlR>
   readonly requireClaim: (
     claim: import("tenetkit/runtime/driver/run/store").ExecutionClaim,

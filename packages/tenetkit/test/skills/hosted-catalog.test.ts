@@ -388,7 +388,7 @@ describe("hosted skill catalogs", () => {
       skills: [
         {
           name: "remote",
-          description: "x".repeat(SkillCatalog.DESCRIPTION_CAP + 1),
+          description: "x".repeat(SkillCatalog.descriptionLimit + 1),
           skillPath: "remote/SKILL.md",
           sha256: digest,
         },

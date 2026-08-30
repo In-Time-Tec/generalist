@@ -47,10 +47,7 @@ export interface OpenAIAccountCredentials {
   readonly refreshRejected: (generation: string) => Effect.Effect<OpenAIAccountCredential, OpenAIAccountCredentialError>
 }
 
-const credentialsFromAccountAuthImpl = (
-  service: AuthService,
-  expectedFingerprint: string,
-): OpenAIAccountCredentials => {
+const credentialsFromAuthImpl = (service: AuthService, expectedFingerprint: string): OpenAIAccountCredentials => {
   const mapCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
     Effect.mapError(() => OpenAIAccountCredentialError.make({ operation }))
   const accountCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
@@ -71,10 +68,10 @@ const credentialsFromAccountAuthImpl = (
 }
 
 /** @experimental */
-export const credentialsFromAccountAuth: {
+export const credentialsFromAuth: {
   (service: AuthService, expectedFingerprint: string): OpenAIAccountCredentials
   (expectedFingerprint: string): (service: AuthService) => OpenAIAccountCredentials
-} = Function.dual(2, credentialsFromAccountAuthImpl)
+} = Function.dual(2, credentialsFromAuthImpl)
 
 /** @experimental */
 export interface AccountOptions extends RegistrationOptions {
@@ -211,7 +208,7 @@ const unsupportedCreateEmbedding: OpenAIClient.Service["createEmbedding"] = () =
   )
 
 /** @experimental */
-export const layerAccountClient = (credentials: OpenAIAccountCredentials) =>
+export const layerClient = (credentials: OpenAIAccountCredentials) =>
   Layer.effect(
     OpenAIClient.OpenAiClient,
     OpenAIClient.make({
@@ -243,7 +240,7 @@ export const layerAccountClient = (credentials: OpenAIAccountCredentials) =>
   )
 
 /** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
-export const registrationAccount = (
+export const registration = (
   input: AccountOptions,
 ): Effect.Effect<ModelRegistry.Registration, never, HttpClient.HttpClient> =>
   ModelRegistry.registration(registrationOptions(input))
@@ -252,7 +249,7 @@ const registrationOptions = (input: AccountOptions) => {
   const required = {
     provider: "openai",
     model: input.model,
-    layer: openAiLanguageModelLayer(input).pipe(Layer.provide(layerAccountClient(input.credentials))),
+    layer: openAiLanguageModelLayer(input).pipe(Layer.provide(layerClient(input.credentials))),
     classifyFailure,
     toolJsonSchemaCompiler,
     isAvailabilityFailure,
@@ -263,7 +260,5 @@ const registrationOptions = (input: AccountOptions) => {
 }
 
 /** @experimental */
-export const layerAccount = (
-  input: AccountOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, never, HttpClient.HttpClient> =>
-  ModelRegistry.layer([registrationAccount(input)])
+export const layer = (input: AccountOptions): Layer.Layer<ModelRegistry.ModelRegistry, never, HttpClient.HttpClient> =>
+  ModelRegistry.layer([registration(input)])

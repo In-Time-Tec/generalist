@@ -12,7 +12,7 @@ class WriteFailed extends Schema.TaggedError<WriteFailed>()("@tenetkit/docs/Writ
 
 declare const writeToDisk: (path: string, text: string) => Effect.Effect<Written, WriteFailed>
 
-type InExecution = NestedOperation.NestedOperations | ToolContext.ToolContext
+type InExecution = NestedOperation.Operations | ToolContext.ToolContext
 
 /**
  * One boundary crossing inside a composite tool call. Identity is derived from the ambient
@@ -44,7 +44,7 @@ const returned = (tag: string, detail: string): Effect.Effect<ToolExecutor.Outco
   })
 
 /**
- * A crossing whose approval the host cannot settle in process fails NestedOperationSuspended.
+ * A crossing whose approval the host cannot settle in process fails NestedOperation.Suspended.
  * `catchSuspension` converts exactly that error into the executor's Suspend outcome; every other
  * failure is mapped first, so the suspension is still on the error channel when it reaches it.
  */

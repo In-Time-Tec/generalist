@@ -70,8 +70,8 @@
       "import": "./dist/memory/index.js"
     },
     "./agent-guidance": {
-      "types": "./dist/harness/index.d.ts",
-      "import": "./dist/harness/index.js"
+      "types": "./dist/agent-guidance/index.d.ts",
+      "import": "./dist/agent-guidance/index.js"
     },
     "./transport": {
       "types": "./dist/transport/index.d.ts",
@@ -102,8 +102,8 @@
       "import": "./dist/repl/index.js"
     },
     "./ai/model-catalog": {
-      "types": "./dist/ai/catalog/service.d.ts",
-      "import": "./dist/ai/catalog/service.js"
+      "types": "./dist/ai/model-catalog.d.ts",
+      "import": "./dist/ai/model-catalog.js"
     },
     "./ai/openai": {
       "types": "./dist/ai/provider/openai.d.ts",
@@ -122,8 +122,8 @@
       "import": "./dist/ai/provider/anthropic.js"
     },
     "./ai/amazon-bedrock": {
-      "types": "./dist/ai/provider/bedrock/service.d.ts",
-      "import": "./dist/ai/provider/bedrock/service.js"
+      "types": "./dist/ai/provider/amazon-bedrock/service.d.ts",
+      "import": "./dist/ai/provider/amazon-bedrock/service.js"
     },
     "./ai/openrouter": {
       "types": "./dist/ai/provider/openrouter.d.ts",
@@ -142,8 +142,8 @@
       "import": "./dist/ai/provider/deterministic.js"
     },
     "./ai/openai-compatible": {
-      "types": "./dist/ai/catalog/presets.d.ts",
-      "import": "./dist/ai/catalog/presets.js"
+      "types": "./dist/ai/openai-compatible.d.ts",
+      "import": "./dist/ai/openai-compatible.js"
     },
     "./ai/embedding": {
       "types": "./dist/ai/model/embedding.d.ts",
@@ -158,8 +158,8 @@
       "import": "./dist/repl/bun/index.js"
     },
     "./transport/run-client": {
-      "types": "./dist/transport/client.d.ts",
-      "import": "./dist/transport/client.js"
+      "types": "./dist/transport/run-client.d.ts",
+      "import": "./dist/transport/run-client.js"
     },
     "./transport/errors": {
       "types": "./dist/transport/errors.d.ts",
@@ -201,13 +201,265 @@
       "types": "./dist/runtime/driver/sql.d.ts",
       "import": "./dist/runtime/driver/sql.js"
     },
-    "./runtime/driver/*": {
-      "types": "./dist/runtime/*.d.ts",
-      "import": "./dist/runtime/*.js"
+    "./runtime/driver/address": {
+      "types": "./dist/runtime/address.d.ts",
+      "import": "./dist/runtime/address.js"
     },
-    "./runtime/driver/sql/*": {
-      "types": "./dist/runtime/sql/*.d.ts",
-      "import": "./dist/runtime/sql/*.js"
+    "./runtime/driver/child/external/store": {
+      "types": "./dist/runtime/child/external/store.d.ts",
+      "import": "./dist/runtime/child/external/store.js"
+    },
+    "./runtime/driver/child/group": {
+      "types": "./dist/runtime/child/group.d.ts",
+      "import": "./dist/runtime/child/group.js"
+    },
+    "./runtime/driver/cursor": {
+      "types": "./dist/runtime/cursor.d.ts",
+      "import": "./dist/runtime/cursor.js"
+    },
+    "./runtime/driver/errors": {
+      "types": "./dist/runtime/errors.d.ts",
+      "import": "./dist/runtime/errors.js"
+    },
+    "./runtime/driver/executable/manifest": {
+      "types": "./dist/runtime/executable/manifest.d.ts",
+      "import": "./dist/runtime/executable/manifest.js"
+    },
+    "./runtime/driver/executable/registration": {
+      "types": "./dist/runtime/executable/registration.d.ts",
+      "import": "./dist/runtime/executable/registration.js"
+    },
+    "./runtime/driver/execution/active-executions": {
+      "types": "./dist/runtime/execution/active-executions.d.ts",
+      "import": "./dist/runtime/execution/active-executions.js"
+    },
+    "./runtime/driver/execution/agent/event": {
+      "types": "./dist/runtime/execution/agent/event.d.ts",
+      "import": "./dist/runtime/execution/agent/event.js"
+    },
+    "./runtime/driver/execution/local-scheduler": {
+      "types": "./dist/runtime/execution/local-scheduler.d.ts",
+      "import": "./dist/runtime/execution/local-scheduler.js"
+    },
+    "./runtime/driver/execution/model-response/commit": {
+      "types": "./dist/runtime/execution/model-response/commit.d.ts",
+      "import": "./dist/runtime/execution/model-response/commit.js"
+    },
+    "./runtime/driver/execution/model-response/interrupted": {
+      "types": "./dist/runtime/execution/model-response/interrupted.d.ts",
+      "import": "./dist/runtime/execution/model-response/interrupted.js"
+    },
+    "./runtime/driver/execution/model-response/preview": {
+      "types": "./dist/runtime/execution/model-response/preview.d.ts",
+      "import": "./dist/runtime/execution/model-response/preview.js"
+    },
+    "./runtime/driver/execution/recovery/exclusive": {
+      "types": "./dist/runtime/execution/recovery/exclusive.d.ts",
+      "import": "./dist/runtime/execution/recovery/exclusive.js"
+    },
+    "./runtime/driver/execution/run-executor": {
+      "types": "./dist/runtime/execution/run-executor.d.ts",
+      "import": "./dist/runtime/execution/run-executor.js"
+    },
+    "./runtime/driver/execution/state": {
+      "types": "./dist/runtime/execution/state.d.ts",
+      "import": "./dist/runtime/execution/state.js"
+    },
+    "./runtime/driver/memory/digest": {
+      "types": "./dist/runtime/memory/digest.d.ts",
+      "import": "./dist/runtime/memory/digest.js"
+    },
+    "./runtime/driver/memory/runtime": {
+      "types": "./dist/runtime/memory/layer.d.ts",
+      "import": "./dist/runtime/memory/layer.js"
+    },
+    "./runtime/driver/messaging/message": {
+      "types": "./dist/runtime/messaging/message.d.ts",
+      "import": "./dist/runtime/messaging/message.js"
+    },
+    "./runtime/driver/operation/resolution": {
+      "types": "./dist/runtime/operation/resolution.d.ts",
+      "import": "./dist/runtime/operation/resolution.js"
+    },
+    "./runtime/driver/run": {
+      "types": "./dist/runtime/run.d.ts",
+      "import": "./dist/runtime/run.js"
+    },
+    "./runtime/driver/run/activation": {
+      "types": "./dist/runtime/run/activation.d.ts",
+      "import": "./dist/runtime/run/activation.js"
+    },
+    "./runtime/driver/run/event": {
+      "types": "./dist/runtime/run/event.d.ts",
+      "import": "./dist/runtime/run/event.js"
+    },
+    "./runtime/driver/run/steering": {
+      "types": "./dist/runtime/run/steering.d.ts",
+      "import": "./dist/runtime/run/steering.js"
+    },
+    "./runtime/driver/run/store": {
+      "types": "./dist/runtime/run/store.d.ts",
+      "import": "./dist/runtime/run/store.js"
+    },
+    "./runtime/driver/run/wait": {
+      "types": "./dist/runtime/run/wait.d.ts",
+      "import": "./dist/runtime/run/wait.js"
+    },
+    "./runtime/driver/runtime": {
+      "types": "./dist/runtime/service.d.ts",
+      "import": "./dist/runtime/service.js"
+    },
+    "./runtime/driver/session/handoff": {
+      "types": "./dist/runtime/session/handoff.d.ts",
+      "import": "./dist/runtime/session/handoff.js"
+    },
+    "./runtime/driver/sql/codec/codecs": {
+      "types": "./dist/runtime/sql/codec/codecs.d.ts",
+      "import": "./dist/runtime/sql/codec/codecs.js"
+    },
+    "./runtime/driver/sql/codec/rows": {
+      "types": "./dist/runtime/sql/codec/rows.d.ts",
+      "import": "./dist/runtime/sql/codec/rows.js"
+    },
+    "./runtime/driver/sql/errors": {
+      "types": "./dist/runtime/sql/errors.d.ts",
+      "import": "./dist/runtime/sql/errors.js"
+    },
+    "./runtime/driver/sql/executable/registrations": {
+      "types": "./dist/runtime/sql/executable/registrations.d.ts",
+      "import": "./dist/runtime/sql/executable/registrations.js"
+    },
+    "./runtime/driver/sql/fan-out": {
+      "types": "./dist/runtime/sql/store/fan-out/service.d.ts",
+      "import": "./dist/runtime/sql/store/fan-out/service.js"
+    },
+    "./runtime/driver/sql/inspection": {
+      "types": "./dist/runtime/sql/inspection/service.d.ts",
+      "import": "./dist/runtime/sql/inspection/service.js"
+    },
+    "./runtime/driver/sql/inspection/transaction": {
+      "types": "./dist/runtime/sql/inspection/transaction.d.ts",
+      "import": "./dist/runtime/sql/inspection/transaction.js"
+    },
+    "./runtime/driver/sql/operation-store": {
+      "types": "./dist/runtime/sql/store/operation/operations.d.ts",
+      "import": "./dist/runtime/sql/store/operation/operations.js"
+    },
+    "./runtime/driver/sql/operations": {
+      "types": "./dist/runtime/sql/operations.d.ts",
+      "import": "./dist/runtime/sql/operations.js"
+    },
+    "./runtime/driver/sql/respond-approval": {
+      "types": "./dist/runtime/sql/respond-approval.d.ts",
+      "import": "./dist/runtime/sql/respond-approval.js"
+    },
+    "./runtime/driver/sql/run-store": {
+      "types": "./dist/runtime/sql/store/statements.d.ts",
+      "import": "./dist/runtime/sql/store/statements.js"
+    },
+    "./runtime/driver/sql/run/claims": {
+      "types": "./dist/runtime/sql/run/claims.d.ts",
+      "import": "./dist/runtime/sql/run/claims.js"
+    },
+    "./runtime/driver/sql/session/lifecycle": {
+      "types": "./dist/runtime/sql/session/lifecycle.d.ts",
+      "import": "./dist/runtime/sql/session/lifecycle.js"
+    },
+    "./runtime/driver/sql/session/store": {
+      "types": "./dist/runtime/sql/session/store.d.ts",
+      "import": "./dist/runtime/sql/session/store.js"
+    },
+    "./runtime/driver/sql/session/terminalization": {
+      "types": "./dist/runtime/sql/session/terminalization.d.ts",
+      "import": "./dist/runtime/sql/session/terminalization.js"
+    },
+    "./runtime/driver/sql/settlement-notifications": {
+      "types": "./dist/runtime/sql/settlement-notifications.d.ts",
+      "import": "./dist/runtime/sql/settlement-notifications.js"
+    },
+    "./runtime/driver/sql/steering": {
+      "types": "./dist/runtime/sql/store/steering/service.d.ts",
+      "import": "./dist/runtime/sql/store/steering/service.js"
+    },
+    "./runtime/driver/sql/store": {
+      "types": "./dist/runtime/sql/store.d.ts",
+      "import": "./dist/runtime/sql/store.js"
+    },
+    "./runtime/driver/sql/store/activate": {
+      "types": "./dist/runtime/sql/store/activate.d.ts",
+      "import": "./dist/runtime/sql/store/activate.js"
+    },
+    "./runtime/driver/sql/store/admit": {
+      "types": "./dist/runtime/sql/store/admit.d.ts",
+      "import": "./dist/runtime/sql/store/admit.js"
+    },
+    "./runtime/driver/sql/store/admit-send": {
+      "types": "./dist/runtime/sql/store/admit-send.d.ts",
+      "import": "./dist/runtime/sql/store/admit-send.js"
+    },
+    "./runtime/driver/sql/store/child/capacity": {
+      "types": "./dist/runtime/sql/store/child/capacity.d.ts",
+      "import": "./dist/runtime/sql/store/child/capacity.js"
+    },
+    "./runtime/driver/sql/store/child/settlement": {
+      "types": "./dist/runtime/sql/store/child/settlement.d.ts",
+      "import": "./dist/runtime/sql/store/child/settlement.js"
+    },
+    "./runtime/driver/sql/store/control": {
+      "types": "./dist/runtime/sql/store/control.d.ts",
+      "import": "./dist/runtime/sql/store/control.js"
+    },
+    "./runtime/driver/sql/store/directory": {
+      "types": "./dist/runtime/sql/store/directory.d.ts",
+      "import": "./dist/runtime/sql/store/directory.js"
+    },
+    "./runtime/driver/sql/store/execution": {
+      "types": "./dist/runtime/sql/store/execution.d.ts",
+      "import": "./dist/runtime/sql/store/execution.js"
+    },
+    "./runtime/driver/sql/store/list": {
+      "types": "./dist/runtime/sql/store/list.d.ts",
+      "import": "./dist/runtime/sql/store/list.js"
+    },
+    "./runtime/driver/sql/store/operation/recovery": {
+      "types": "./dist/runtime/sql/store/operation/recovery.d.ts",
+      "import": "./dist/runtime/sql/store/operation/recovery.js"
+    },
+    "./runtime/driver/sql/store/operation/resolution": {
+      "types": "./dist/runtime/sql/store/operation/resolution.d.ts",
+      "import": "./dist/runtime/sql/store/operation/resolution.js"
+    },
+    "./runtime/driver/sql/store/program": {
+      "types": "./dist/runtime/sql/store/program.d.ts",
+      "import": "./dist/runtime/sql/store/program.js"
+    },
+    "./runtime/driver/sql/store/release-leased": {
+      "types": "./dist/runtime/sql/store/release-leased.d.ts",
+      "import": "./dist/runtime/sql/store/release-leased.js"
+    },
+    "./runtime/driver/sql/store/steering/disposition": {
+      "types": "./dist/runtime/sql/store/steering/disposition.d.ts",
+      "import": "./dist/runtime/sql/store/steering/disposition.js"
+    },
+    "./runtime/driver/sql/subscribers": {
+      "types": "./dist/runtime/sql/subscribers.d.ts",
+      "import": "./dist/runtime/sql/subscribers.js"
+    },
+    "./runtime/driver/sql/transactions": {
+      "types": "./dist/runtime/sql/effect.d.ts",
+      "import": "./dist/runtime/sql/effect.js"
+    },
+    "./runtime/driver/sql/tree-replay": {
+      "types": "./dist/runtime/sql/tree-replay.d.ts",
+      "import": "./dist/runtime/sql/tree-replay.js"
+    },
+    "./runtime/driver/sql/worker": {
+      "types": "./dist/runtime/sql/worker.d.ts",
+      "import": "./dist/runtime/sql/worker.js"
+    },
+    "./runtime/driver/tree/policy": {
+      "types": "./dist/runtime/tree/policy.d.ts",
+      "import": "./dist/runtime/tree/policy.js"
     }
   },
   "scripts": {

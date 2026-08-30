@@ -1,20 +1,20 @@
 import {
   RunClient as Client_RunClient,
   layerWebSocket as Client_layerWebSocket,
-  sseEvents as Client_sseEvents,
-} from "./client.js"
+  streamSSE as Client_streamSSE,
+} from "./run-client.js"
 export const RunClient = {
   RunClient: Client_RunClient,
   layerWebSocket: Client_layerWebSocket,
-  sseEvents: Client_sseEvents,
+  streamSSE: Client_streamSSE,
 }
 export namespace RunClient {
-  export type RunClient = import("./client.js").RunClient
-  export type Service = import("./client.js").Service
-  export type ConnectOptions = import("./client.js").ConnectOptions
-  export type Connection = import("./client.js").Connection
-  export type ConnectionStatus = import("./client.js").ConnectionStatus
-  export type ReconnectPolicy = import("./client.js").ReconnectPolicy
+  export type RunClient = import("./run-client.js").RunClient
+  export type Service = import("./run-client.js").Service
+  export type ConnectOptions = import("./run-client.js").ConnectOptions
+  export type Connection = import("./run-client.js").Connection
+  export type ConnectionStatus = import("./run-client.js").ConnectionStatus
+  export type ReconnectPolicy = import("./run-client.js").ReconnectPolicy
 }
 
 import {

@@ -8,7 +8,7 @@ import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/sto
 import { encodeExecutableRef, encodeJson, encodeJsonValue } from "tenetkit/runtime/driver/sql/codec/codecs"
 import type { DecodedRun, OperationRow } from "tenetkit/runtime/driver/sql/codec/rows"
 import type { OperationRecord } from "tenetkit/runtime/driver/sql/operations"
-import { appendEvent, loadRun, toOperationRecord } from "tenetkit/runtime/driver/sql/store/statements"
+import { appendEvent, loadRun, toOperationRecord } from "tenetkit/runtime/driver/sql/run-store"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
 import { appendHandoffSessionEntry, verifyHandoffSessionEntry } from "../session/entries.js"
@@ -156,4 +156,4 @@ const completeMysqlOperation = (
     return toOperationRecord(completed[0]!)
   })
 
-export const MysqlOperationCommit = { complete: completeMysqlOperation } as const
+export const operationCommit = { complete: completeMysqlOperation } as const

@@ -176,7 +176,7 @@ export const parseFrontmatter: {
     }
     return yield* Schema.decodeUnknownEffect(Frontmatter)(parsed).pipe(
       Effect.mapError((cause) =>
-        sourceError(source, `SKILL.md description must contain 1-${SkillCatalog.DESCRIPTION_CAP} characters`, cause),
+        sourceError(source, `SKILL.md description must contain 1-${SkillCatalog.descriptionLimit} characters`, cause),
       ),
     )
   }),

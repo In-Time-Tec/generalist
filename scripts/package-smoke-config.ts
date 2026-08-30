@@ -28,10 +28,6 @@ export const packedProviderDependencies = {
   "@aws-sdk/credential-provider-node": "3.859.0",
   "@smithy/types": "4.3.1",
 } as const
-export const wildcardExportExamples = [
-  "tenetkit/runtime/driver/run/store",
-  "tenetkit/runtime/driver/sql/store",
-] as const
 export const forbiddenPackageExports = ["@tenetkit/cloudflare"] as const
 const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
   Array.from(values).reduce<Array<A>>((result, value) => {

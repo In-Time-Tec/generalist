@@ -153,7 +153,7 @@ export const skillsReference = definePage({
       "See ",
       link("/docs/guides/skills", "How to add skills"),
       " and ",
-      link("/docs/guides/instructions", "How to compose instructions and context sources"),
+      link("/docs/guides/instructions", "How to compose instructions and instruction providers"),
       ".",
     ),
   ],

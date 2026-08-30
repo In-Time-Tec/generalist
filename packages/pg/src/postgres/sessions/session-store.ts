@@ -5,9 +5,9 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { CompletedSessionEntry } from "tenetkit/runtime/driver/execution/model-response/commit"
 import type { InterruptedSessionEntry } from "tenetkit/runtime/driver/execution/agent/event"
 import { handoffPayload, type HandoffSessionEntry } from "tenetkit/runtime/driver/session/handoff"
-import type { RunFn } from "../store/ops.js"
+import type { RunTransaction } from "../store/ops.js"
 import type { EntryRow, SessionRow } from "tenetkit/runtime/driver/sql/session/store"
-import { PostgresSessionStorage } from "./session-storage.js"
+import { sessionStorage } from "./session-storage.js"
 
 const {
   advanceSession,
@@ -19,7 +19,7 @@ const {
   requireActive,
   storeError,
   toEntry,
-} = PostgresSessionStorage
+} = sessionStorage
 
 type Entry = Session.Entry
 type EntryId = Session.EntryId
@@ -292,12 +292,12 @@ const mapReadError = <A, E>(effect: Effect.Effect<A, E>) =>
   Effect.mapError(effect, (error) => (Schema.is(Session.SessionStoreError)(error) ? error : storeError(String(error))))
 
 /** Dialect-native durable PostgreSQL Session authority bound to one session identity. */
-export const postgresSessionStore = (options: {
+export const sessionStore = (options: {
   readonly sessionId: string
-  readonly run: RunFn
-  readonly runNoTxn: RunFn
+  readonly run: RunTransaction
+  readonly runWithoutTransaction: RunTransaction
 }): Session.Service => {
-  const { sessionId, run, runNoTxn } = options
+  const { sessionId, run, runWithoutTransaction } = options
 
   const append = (entry: AppendInput, appendOptions?: AppendOptions) =>
     Effect.gen(function* () {
@@ -439,7 +439,7 @@ export const postgresSessionStore = (options: {
     append: (entry, appendOptions) => run(append(entry, appendOptions)).pipe(mapSessionError),
     appendCheckpoint: (prepared) => run(appendCheckpoint(prepared)).pipe(mapSessionError),
     path: (leaf) =>
-      runNoTxn(
+      runWithoutTransaction(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           const sessions = yield* sql<SessionRow>`
@@ -468,7 +468,7 @@ export const postgresSessionStore = (options: {
         }),
       ).pipe(mapReadError),
     leaf: Effect.orDie(
-      runNoTxn(
+      runWithoutTransaction(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           const rows = yield* sql<SessionRow>`

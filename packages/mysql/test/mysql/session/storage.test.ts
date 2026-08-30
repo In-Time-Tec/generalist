@@ -437,7 +437,7 @@ describeMysql("mysql Session authority", () => {
         budget: { allocation: {}, remaining: {}, depth: 0 },
         state: {},
       }
-      const commit: Handoff.HandoffCommit = {
+      const commit: Handoff.Commit = {
         _tag: "HandoffCommit",
         state: {
           root: assistant.name,

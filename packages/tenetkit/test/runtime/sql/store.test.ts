@@ -2,15 +2,8 @@ import { Database } from "bun:sqlite"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import {
-  Agent,
-  ExecutableManifest,
-  Handoff,
-  Pins,
-  Session,
-  ToolExecutor,
-  withCacheBreakpoints,
-} from "../../../src/index.js"
+import { Agent, ExecutableManifest, Handoff, Pins, Session, ToolExecutor } from "../../../src/index.js"
+import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache.js"
 import {
   Address,
   RunExecutor,
@@ -496,7 +489,7 @@ it.live("atomically imports SQLite handoff projections with exact retry and dive
     budget: { allocation: {}, remaining: {}, depth: 0 },
     state: {},
   }
-  const commit = Schema.decodeSync(Handoff.HandoffCommit)({
+  const commit = Schema.decodeSync(Handoff.Commit)({
     _tag: "HandoffCommit",
     state: {
       root: assistant.name,

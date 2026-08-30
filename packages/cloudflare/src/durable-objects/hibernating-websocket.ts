@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/async-function, no-await-in-loop */
 import { Effect, Option, Schema } from "effect"
 import { Cursor, origin } from "tenetkit/runtime/driver/cursor"
-import { Runtime, type Service } from "tenetkit/runtime/driver/service"
+import { Runtime, type Service } from "tenetkit/runtime/driver/runtime"
 import { page } from "tenetkit/transport/replay"
 import { decodeCommand } from "tenetkit/transport/wire"
 

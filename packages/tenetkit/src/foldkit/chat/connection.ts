@@ -7,7 +7,7 @@ import {
   RunClient,
   type Connection,
   type ConnectionStatus,
-} from "../../transport/client.js"
+} from "../../transport/run-client.js"
 import { TransportError } from "../../transport/errors.js"
 import { ObserverRunEvent, type ResolvedRunEvent } from "../../transport/wire.js"
 

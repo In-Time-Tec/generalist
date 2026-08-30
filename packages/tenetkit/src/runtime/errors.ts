@@ -42,12 +42,12 @@ export class ExecutableIdentityMismatch extends Schema.TaggedError<ExecutableIde
 ) {}
 
 /** @experimental The structured Agent failures a durable terminal event preserves verbatim. */
-export type StructuredAgentFailure = RunBudget.RunBudgetExhausted | AgentEvent.ResumeMismatch
+export type StructuredAgentFailure = RunBudget.Exhausted | AgentEvent.ResumeMismatch
 
 export const StructuredAgentFailure: Schema.Codec<
   StructuredAgentFailure,
-  typeof RunBudget.RunBudgetExhausted.Encoded | typeof AgentEvent.ResumeMismatch.Encoded
-> = Schema.Union([RunBudget.RunBudgetExhausted, AgentEvent.ResumeMismatch])
+  typeof RunBudget.Exhausted.Encoded | typeof AgentEvent.ResumeMismatch.Encoded
+> = Schema.Union([RunBudget.Exhausted, AgentEvent.ResumeMismatch])
 
 export class AgentExecutionFailure extends Schema.TaggedError<AgentExecutionFailure>()(
   "tenetkit/runtime/AgentExecutionFailure",

@@ -56,7 +56,7 @@ export const memory = definePage({
       " and an ",
       code("Ai.EmbeddingModel"),
       "; ",
-      code("Embedding.layer"),
+      code("Embedding.layerOpenAI"),
       " from ",
       code("tenetkit/ai"),
       " supplies the latter:",

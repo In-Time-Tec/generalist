@@ -4,7 +4,7 @@ import { SemanticRecall, VectorStore, WorkingMemory } from "tenetkit/memory"
 import { Embedding } from "tenetkit/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
-const embeddingLayer = Embedding.layer({
+const embeddingLayer = Embedding.layerOpenAI({
   model: "text-embedding-3-small",
   apiKey: Config.redacted("OPENAI_API_KEY"),
 })

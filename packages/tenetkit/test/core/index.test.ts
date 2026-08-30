@@ -89,7 +89,6 @@ describe("tenetkit public surface", () => {
         "ToolPlacement",
         "Toolkit",
         "TurnPolicy",
-        "withCacheBreakpoints",
       ])
     }),
   )
@@ -118,23 +117,23 @@ describe("tenetkit public surface", () => {
 
   it("exports the model telemetry contract", () => {
     expect(ModelTelemetry.Event).toBeDefined()
-    expect(ModelTelemetry.ModelCallStarted).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptStarted).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptFirstOutput).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptCompleted).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptFailed).toBeDefined()
-    expect(ModelTelemetry.ModelRetryScheduled).toBeDefined()
-    expect(ModelTelemetry.ModelCallCompleted).toBeDefined()
-    expect(ModelTelemetry.ModelCallFailed).toBeDefined()
+    expect(ModelTelemetry.CallStarted).toBeDefined()
+    expect(ModelTelemetry.AttemptStarted).toBeDefined()
+    expect(ModelTelemetry.AttemptFirstOutput).toBeDefined()
+    expect(ModelTelemetry.AttemptCompleted).toBeDefined()
+    expect(ModelTelemetry.AttemptFailed).toBeDefined()
+    expect(ModelTelemetry.RetryScheduled).toBeDefined()
+    expect(ModelTelemetry.CallCompleted).toBeDefined()
+    expect(ModelTelemetry.CallFailed).toBeDefined()
     expect(ModelTelemetry.CompactionStarted).toBeDefined()
     expect(ModelTelemetry.CompactionSkipped).toBeDefined()
     expect(ModelTelemetry.CompactionApplied).toBeDefined()
     expect(ModelTelemetry.CompactionFailed).toBeDefined()
-    expect(ModelTelemetry.ModelCallPurpose).toBeDefined()
-    expect(ModelTelemetry.ModelFailureCategory).toBeDefined()
-    expect(ModelTelemetry.ModelFailureClassification).toBeDefined()
-    expect(ModelTelemetry.ModelRetryReason).toBeDefined()
-    expect(ModelTelemetry.ModelFirstOutputKind).toBeDefined()
+    expect(ModelTelemetry.CallPurpose).toBeDefined()
+    expect(ModelTelemetry.FailureCategory).toBeDefined()
+    expect(ModelTelemetry.FailureClassification).toBeDefined()
+    expect(ModelTelemetry.RetryReason).toBeDefined()
+    expect(ModelTelemetry.FirstOutputKind).toBeDefined()
     expect(ModelTelemetry.CompactionTrigger).toBeDefined()
     expect(ModelTelemetry.CompactionKind).toBeDefined()
     expect(ModelTelemetry.classifyFailureCategory).toBeTypeOf("function")

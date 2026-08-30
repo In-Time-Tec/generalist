@@ -62,7 +62,7 @@ type SessionCanonical = Assert<
   Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionStore, never, never]>
 >
 type ToolOutputCanonical = Assert<
-  Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.ToolOutputStore, never, never]>
+  Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.Store, never, never]>
 >
 type VectorStoreCanonical = Assert<
   Equal<LayerShape<typeof VectorStore.layerMemory>, readonly [VectorStore.VectorStore, never, never]>
@@ -162,7 +162,7 @@ type ProviderOpenAICompatibleSubpath = Assert<
   MemberEqual<ProviderRoot["OpenAICompatible"], typeof import("tenetkit/ai/openai-compatible"), "layerGroq">
 >
 type ProviderEmbeddingSubpath = Assert<
-  MemberEqual<ProviderRoot["Embedding"], typeof import("tenetkit/ai/embedding"), "layer">
+  MemberEqual<ProviderRoot["Embedding"], typeof import("tenetkit/ai/embedding"), "layerOpenAI">
 >
 type TransportClientSubpath = Assert<
   MemberEqual<TransportRoot["RunClient"], typeof import("tenetkit/transport/run-client"), "layerWebSocket">

@@ -5,8 +5,8 @@ import { RunNotFound, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
 import type { Service as RunStoreService } from "tenetkit/runtime/driver/run/store"
 import type { DecodedRun, OperationRow } from "tenetkit/runtime/driver/sql/codec/rows"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
-import { appendEvent, loadEventsAfter, loadRun, toOperationRecord } from "tenetkit/runtime/driver/sql/store/statements"
-import type { RunFn } from "../transaction/events.js"
+import { appendEvent, loadEventsAfter, loadRun, toOperationRecord } from "tenetkit/runtime/driver/sql/run-store"
+import type { RunTransaction } from "../transaction/events.js"
 import { requireExecutionClaim } from "tenetkit/runtime/driver/sql/store/execution"
 import { encodeExecutableRef, encodeJson, encodeJsonValue } from "tenetkit/runtime/driver/sql/codec/codecs"
 import { ExecutionCheckpoint } from "tenetkit/runtime/driver/execution/state"
@@ -77,10 +77,10 @@ const verifySteeringOwnership = (sql: SqlClient.SqlClient, op: CommitModelInput)
     }
   })
 
-export const mysqlModelResponseOperations = (input: {
+const modelResponseOperations = (input: {
   readonly sql: SqlClient.SqlClient
   readonly hub: EventHub
-  readonly run: RunFn
+  readonly run: RunTransaction
   readonly requireRun: (runId: string) => Effect.Effect<DecodedRun, RunNotFound | RuntimeUnavailable | SqlError, SqlR>
   readonly requireClaim: (
     claim: import("tenetkit/runtime/driver/run/store").ExecutionClaim,
@@ -233,12 +233,12 @@ export const mysqlModelResponseOperations = (input: {
   }
 }
 
-export const mysqlModelResponseOperationsWithDefaults = (input: {
+export const modelResponseMethods = (input: {
   readonly sql: SqlClient.SqlClient
   readonly hub: EventHub
-  readonly run: RunFn
+  readonly run: RunTransaction
 }) =>
-  mysqlModelResponseOperations({
+  modelResponseOperations({
     ...input,
     requireRun: (runId) =>
       loadRun(runId).pipe(

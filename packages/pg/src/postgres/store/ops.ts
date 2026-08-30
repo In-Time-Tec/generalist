@@ -21,12 +21,9 @@ import { encodeContinuation } from "tenetkit/runtime/driver/run/steering"
 import { checkpointRef } from "tenetkit/runtime/driver/executable/manifest"
 import { getProgramOperation, resolveProgramOperation } from "tenetkit/runtime/driver/sql/store/program"
 import { settleAdmittedCancellation } from "tenetkit/runtime/driver/sql/store/control"
-import {
-  acknowledgeOperationCancellation,
-  operationCancellations,
-} from "tenetkit/runtime/driver/sql/store/operation/operations"
-import { postgresModelResponseOperations } from "./model-response.js"
-import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
+import { acknowledgeOperationCancellation, operationCancellations } from "tenetkit/runtime/driver/sql/operation-store"
+import { modelResponseMethods } from "./model-response.js"
+import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/transactions"
 import { appendHandoffSessionEntry, verifyHandoffSessionEntry } from "../sessions/session-store.js"
 import {
   handoffSessionEntry,
@@ -44,15 +41,15 @@ const isCompletedOperationStatus = (status: OperationRow["status"]): boolean =>
   status === "failed" ||
   status === "unknown"
 
-export type RunFn = <A, E>(
+export type RunTransaction = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlR>,
 ) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
-export const postgresOperations = (input: {
+export const operationMethods = (input: {
   readonly sql: SqlClient.SqlClient
   readonly hub: EventHub
-  readonly run: RunFn
-  readonly runNoTxn: RunFn
+  readonly run: RunTransaction
+  readonly runWithoutTransaction: RunTransaction
   readonly requireRun: (runId: string) => Effect.Effect<DecodedRun, RunNotFound | RuntimeUnavailable | SqlError, SqlR>
   readonly requireClaim: (
     claim: import("tenetkit/runtime/driver/run/store").ExecutionClaim,
@@ -77,7 +74,7 @@ export const postgresOperations = (input: {
   | "acknowledgeOperationCancellation"
   | "resolveOperation"
 > => {
-  const { sql, hub, run, runNoTxn, requireRun, requireClaim, nextId } = input
+  const { sql, hub, run, runWithoutTransaction, requireRun, requireClaim, nextId } = input
   const fenced = <A, E>(
     claim: import("tenetkit/runtime/driver/run/store").ExecutionClaim,
     effect: Effect.Effect<A, E, SqlR>,
@@ -359,7 +356,7 @@ export const postgresOperations = (input: {
           return toOperationRecord(rows[0]!)
         }),
       ),
-    ...postgresModelResponseOperations(input),
+    ...modelResponseMethods(input),
     expireRunningOperation: (op) => fenced(op, expire(op)),
     recoverRunningOperations: (claim) =>
       fenced(
@@ -378,7 +375,7 @@ export const postgresOperations = (input: {
         }),
       ),
     getOperation: (op) =>
-      runNoTxn(
+      runWithoutTransaction(
         Effect.gen(function* () {
           yield* requireRun(op.runId)
           const rows = yield* sql<OperationRow>`
@@ -390,7 +387,7 @@ export const postgresOperations = (input: {
         }),
       ),
     getOperationByKey: (op) =>
-      runNoTxn(
+      runWithoutTransaction(
         Effect.gen(function* () {
           yield* requireRun(op.runId)
           const rows = yield* sql<OperationRow>`

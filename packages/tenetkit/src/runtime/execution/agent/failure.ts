@@ -14,7 +14,7 @@ const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; reado
  * phrase. Every variant is named here so a terminal failure always states what actually happened.
  */
 const SummaryFailure = Schema.Union([
-  RunBudget.RunBudgetExhausted,
+  RunBudget.Exhausted,
   AgentEvent.ResumeMismatch,
   AgentEvent.TurnLimitExceeded,
   AgentEvent.TurnPolicyStopped,
@@ -27,7 +27,7 @@ const SummaryFailure = Schema.Union([
 type SummaryFailure = typeof SummaryFailure.Type
 
 const summary = (failure: SummaryFailure): string | undefined => {
-  if (Schema.is(RunBudget.RunBudgetExhausted)(failure)) {
+  if (Schema.is(RunBudget.Exhausted)(failure)) {
     const remaining = failure.remaining === undefined ? "unavailable" : failure.remaining
     return `Run budget exhausted for ${failure.dimension}: requested ${failure.requested}, remaining ${remaining}`
   }
@@ -62,9 +62,9 @@ const summary = (failure: SummaryFailure): string | undefined => {
 const typedFailure = (cause: Cause.Cause<unknown>) => {
   const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
-  return Schema.decodeUnknownOption(Schema.Union([RunBudget.RunBudgetExhausted, AgentEvent.ResumeMismatch]))(
-    reason.error,
-  ).pipe((decoded) => (decoded._tag === "Some" ? decoded.value : undefined))
+  return Schema.decodeUnknownOption(Schema.Union([RunBudget.Exhausted, AgentEvent.ResumeMismatch]))(reason.error).pipe(
+    (decoded) => (decoded._tag === "Some" ? decoded.value : undefined),
+  )
 }
 
 /**

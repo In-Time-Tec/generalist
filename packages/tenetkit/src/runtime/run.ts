@@ -184,16 +184,16 @@ export type RawUsageFact =
   | (RawUsageCommon & {
       readonly _tag: "Completed"
       readonly usageAt: number
-      readonly usage: ModelTelemetry.ModelAttemptCompleted["usage"]
+      readonly usage: ModelTelemetry.AttemptCompleted["usage"]
       readonly requestId?: string
       readonly responseModel?: string
       readonly serviceTier?: string
     })
   | (RawUsageCommon & {
       readonly _tag: "Failed"
-      readonly category: ModelTelemetry.ModelFailureCategory
+      readonly category: ModelTelemetry.FailureCategory
       readonly usageAt: number
-      readonly providerUsage: ModelTelemetry.ModelProviderUsage
+      readonly providerUsage: ModelTelemetry.ProviderUsage
     })
 
 type RawUsageFactEncoded = RawUsageFact
@@ -207,7 +207,7 @@ export const RawUsageFact: Schema.Codec<RawUsageFact, RawUsageFactEncoded> = Sch
     modelAttemptId: Schema.String,
     attempt: Schema.Int,
     usageAt: Schema.Finite,
-    usage: ModelTelemetry.ModelAttemptCompleted.fields.usage,
+    usage: ModelTelemetry.AttemptCompleted.fields.usage,
     provider: Schema.optionalKey(Schema.String),
     model: Schema.optionalKey(Schema.String),
     requestId: Schema.optionalKey(Schema.String),
@@ -221,9 +221,9 @@ export const RawUsageFact: Schema.Codec<RawUsageFact, RawUsageFactEncoded> = Sch
     modelCallId: Schema.String,
     modelAttemptId: Schema.String,
     attempt: Schema.Int,
-    category: ModelTelemetry.ModelFailureCategory,
+    category: ModelTelemetry.FailureCategory,
     usageAt: Schema.Finite,
-    providerUsage: ModelTelemetry.ModelProviderUsage,
+    providerUsage: ModelTelemetry.ProviderUsage,
     provider: Schema.optionalKey(Schema.String),
     model: Schema.optionalKey(Schema.String),
   }),

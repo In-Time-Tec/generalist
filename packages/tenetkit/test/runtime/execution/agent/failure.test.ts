@@ -57,7 +57,7 @@ describe("terminal agent failure messages", () => {
     },
     {
       name: "RunBudgetExhausted",
-      error: RunBudget.RunBudgetExhausted.make({ dimension: "totalTokens", requested: 165703, remaining: 43421 }),
+      error: RunBudget.Exhausted.make({ dimension: "totalTokens", requested: 165703, remaining: 43421 }),
       expected: "Run budget exhausted for totalTokens: requested 165703, remaining 43421",
     },
   ])("states what happened for $name", ({ error, expected }) => {
@@ -75,7 +75,7 @@ describe("terminal agent failure messages", () => {
   })
 
   it("keeps the structured budget failure attached for callers that branch on it", () => {
-    const error = RunBudget.RunBudgetExhausted.make({ dimension: "modelCalls", requested: 2, remaining: 1 })
+    const error = RunBudget.Exhausted.make({ dimension: "modelCalls", requested: 2, remaining: 1 })
     expect(makeAgentExecutionFailure(Cause.fail(error)).failure).toStrictEqual(error)
   })
 

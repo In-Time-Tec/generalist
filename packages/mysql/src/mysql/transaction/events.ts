@@ -4,10 +4,10 @@ import type { RunEvent } from "tenetkit/runtime/driver/run/event"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
-import { sqlRunner } from "./scope.js"
+import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/transactions"
+import { runner } from "./scope.js"
 
-export type RunFn = <A, E>(
+export type RunTransaction = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlClient.SqlClient>,
 ) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
@@ -22,8 +22,8 @@ export const transactionRunner = (input: { readonly sql: SqlClient.SqlClient; re
     publish: (runId, event) =>
       Effect.flatMap(TransactionEvents, (events) => Effect.sync(() => void events.push([runId, event]))),
   }
-  const { run: runRaw, runNoTxn, runInspection } = sqlRunner(input.sql)
-  const run: RunFn = (effect) =>
+  const { run: runRaw, runWithoutTransaction: runRawWithoutTransaction, runInspection } = runner(input.sql)
+  const run: RunTransaction = (effect) =>
     runRaw(
       Effect.gen(function* () {
         const events: Array<readonly [string, RunEvent]> = []
@@ -36,6 +36,6 @@ export const transactionRunner = (input: { readonly sql: SqlClient.SqlClient; re
       ),
       Effect.map(([result]) => result),
     )
-  const runWithoutTransaction: RunFn = (effect) => runNoTxn(effect)
-  return { run, runNoTxn: runWithoutTransaction, runInspection, transactionHub }
+  const runWithoutTransaction: RunTransaction = (effect) => runRawWithoutTransaction(effect)
+  return { run, runWithoutTransaction, runInspection, transactionHub }
 }

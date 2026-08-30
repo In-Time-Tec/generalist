@@ -195,9 +195,6 @@ export const make: {
 export const unbounded: BudgetLimits = {}
 
 /** @experimental */
-export const allocate = make
-
-/** @experimental */
 export const charge: {
   (usage: BudgetLimits): (budget: RunBudget) => Effect.Effect<RunBudget, RunBudgetExhausted>
   (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, RunBudgetExhausted>

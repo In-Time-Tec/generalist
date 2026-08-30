@@ -4,14 +4,14 @@ import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
 import { AgentExecutionFailure, RuntimeUnavailable, failureMessage } from "tenetkit/runtime/driver/errors"
 import { RunClaims, type ClaimedRun, type Service as ClaimsService } from "tenetkit/runtime/driver/sql/run/claims"
 import type { RunRow } from "tenetkit/runtime/driver/sql/codec/rows"
-import { appendEvent, loadRun } from "tenetkit/runtime/driver/sql/store/statements"
+import { appendEvent, loadRun } from "tenetkit/runtime/driver/sql/run-store"
 import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
 import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
 import { cancel, complete, fail } from "tenetkit/runtime/driver/sql/store/control"
-import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/effect"
+import type { WithoutSqlError } from "tenetkit/runtime/driver/sql/transactions"
 import { ExecutionResult } from "tenetkit/runtime/driver/execution/state"
 
-export type RunFn = <A, E>(
+export type RunTransaction = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlClient.SqlClient>,
 ) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
@@ -39,10 +39,10 @@ export const initializeReadCommitted = (input: { readonly sql: SqlClient.SqlClie
     }),
   )
 
-export const mysqlClaims = (input: {
+export const claimMethods = (input: {
   readonly sql: SqlClient.SqlClient
   readonly hub: EventHub
-  readonly run: RunFn
+  readonly run: RunTransaction
   readonly lockParent: (runId: string) => Effect.Effect<void, SqlError>
   readonly clearClaim: (runId: string) => Effect.Effect<void, SqlError>
 }): ClaimsService => {

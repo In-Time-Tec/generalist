@@ -46,7 +46,7 @@ export const coreModelsReference = definePage({
             " caps concurrent provided runs with a semaphore",
           ],
         ],
-        [[code("layerCombined(registries, options?)")], "Merges the registrations of several registry layers into one"],
+        [[code("merge(registries, options?)")], "Merges the registrations of several registry layers into one"],
         [
           [code("register"), " / ", code("registrations"), " / ", code("withModel")],
           "Module-level call helpers over the service",

@@ -164,7 +164,7 @@ const makeSqliteStoreServices = (
           }),
         ),
       )
-    const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
+    const runWithoutTransaction = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
     const runBuffered = <A, E>(
       makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
       touched: ReadonlyArray<string> = [],
@@ -200,7 +200,7 @@ const makeSqliteStoreServices = (
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
       sessionStore: (sessionId: string) =>
         withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie, Effect.map(Option.some)),
-      hasAdmission: (input) => runNoTxn(hasAdmission(input)),
+      hasAdmission: (input) => runWithoutTransaction(hasAdmission(input)),
       admitSend: (input) => runBuffered((transactionHub) => admitSend(transactionHub, addressBindings, input)),
       admitStart: (input, startOptions) =>
         runBuffered((transactionHub) => admitStart(transactionHub, input, startOptions)),
@@ -221,7 +221,7 @@ const makeSqliteStoreServices = (
         hub.subscribe({
           runId: input.runId,
           cursor: input.cursor,
-          loadReplay: runNoTxn(
+          loadReplay: runWithoutTransaction(
             Effect.gen(function* () {
               const loaded = yield* loadRun(input.runId)
               if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
@@ -238,16 +238,16 @@ const makeSqliteStoreServices = (
       cancelSession: (input) => runBuffered((transactionHub) => cancelSession(transactionHub, input)),
       admitSteering: (input) => runBuffered((transactionHub) => admitSteering(transactionHub, input)),
       readSteering: (input) => fenced(input, () => readSteering(input)),
-      directory: (runId) => runNoTxn(directory(runId)),
-      resolveAddress: (address) => runNoTxn(resolveAddress(address)),
+      directory: (runId) => runWithoutTransaction(directory(runId)),
+      resolveAddress: (address) => runWithoutTransaction(resolveAddress(address)),
       registerAgentName: (input) => run(registerAgentName(input)),
-      listRelated: (runId) => runNoTxn(listRelated(runId)),
+      listRelated: (runId) => runWithoutTransaction(listRelated(runId)),
       admitMessage: (input) => run(admitMessage(input)),
-      pendingMessages: (input) => runNoTxn(pendingMessages(input)),
-      settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
+      pendingMessages: (input) => runWithoutTransaction(pendingMessages(input)),
+      settlementNotifications: (input) => runWithoutTransaction(settlementNotifications(input)),
       deliverPendingMessages: (input) => runBuffered((transactionHub) => deliverPendingMessages(transactionHub, input)),
       inspect: (runId) =>
-        runNoTxn(
+        runWithoutTransaction(
           Effect.gen(function* () {
             const loaded = yield* loadRun(runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId })
@@ -271,9 +271,9 @@ const makeSqliteStoreServices = (
         ),
       snapshot: (runId) => run(loadRunSnapshot(runId)),
       treeCheckpoint: (rootRunId) => run(loadTreeCheckpoint(rootRunId)),
-      sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
+      sessionRoots: (sessionId) => runWithoutTransaction(sessionRoots(sessionId)),
       history: (input) =>
-        runNoTxn(
+        runWithoutTransaction(
           Effect.gen(function* () {
             const loaded = yield* loadRun(input.runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
@@ -283,9 +283,9 @@ const makeSqliteStoreServices = (
             return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
           }),
         ),
-      treeReplay: (input) => runNoTxn(loadTreeReplay(input)),
+      treeReplay: (input) => runWithoutTransaction(loadTreeReplay(input)),
       treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
-      list: (input) => runNoTxn(listRuns(input)),
+      list: (input) => runWithoutTransaction(listRuns(input)),
       complete: (input) =>
         runBuffered(
           (transactionHub) =>
@@ -322,8 +322,8 @@ const makeSqliteStoreServices = (
         fenced(input, (transactionHub) => expireRunningOperation(transactionHub, input)),
       recoverRunningOperations: (input) =>
         fenced(input, (transactionHub) => recoverRunningOperations(transactionHub, input)),
-      getOperation: (input) => runNoTxn(getOperation(input)),
-      getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
+      getOperation: (input) => runWithoutTransaction(getOperation(input)),
+      getOperationByKey: (input) => runWithoutTransaction(getOperationByKey(input)),
       operationCancellations: (input) => fenced(input, () => operationCancellations(input)),
       acknowledgeOperationCancellation: (input) => fenced(input, () => acknowledgeOperationCancellation(input)),
       resolveOperation: (input) =>
@@ -338,12 +338,12 @@ const makeSqliteStoreServices = (
           [input.runId],
         ),
       claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input), [input.runId]),
-      loadExecution: (runId) => runNoTxn(loadExecution(runId)),
+      loadExecution: (runId) => runWithoutTransaction(loadExecution(runId)),
       releaseExecution: (input) => run(releaseExecution(input), [input.runId]),
       saveExecution: (input) => run(saveExecution(input)),
       retryExecution: (input) => runBuffered((transactionHub) => retryExecution(transactionHub, input)),
       admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),
-      inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
+      inspectFanOut: (fanOutId) => runWithoutTransaction(inspectFanOut(fanOutId)),
       reserveProgramOperation: (input) => fenced(input, () => reserveProgramOperation(input)),
       admitProgramAgents: (input) =>
         runBuffered((transactionHub) =>
@@ -361,7 +361,7 @@ const makeSqliteStoreServices = (
         ),
       startProgramOperation: (input) => fenced(input, () => startProgramOperation(input)),
       loadProgramState: (runId) =>
-        runNoTxn(
+        runWithoutTransaction(
           Effect.gen(function* () {
             const loaded = yield* loadRun(runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId })
@@ -369,7 +369,7 @@ const makeSqliteStoreServices = (
           }),
         ),
       getProgramOperation: (input) =>
-        runNoTxn(
+        runWithoutTransaction(
           Effect.gen(function* () {
             const loaded = yield* loadRun(input.runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
@@ -405,10 +405,10 @@ const makeSqliteStoreServices = (
       admitRoot: (input) => runBuffered((transactionHub) => externalRootOperations.admit(transactionHub, input)),
       activateRoot: (placementId) =>
         runBuffered((transactionHub) => externalRootOperations.activate(transactionHub, placementId)),
-      inspectRoot: (placementId) => runNoTxn(inspectExternalRoot(placementId)),
+      inspectRoot: (placementId) => runWithoutTransaction(inspectExternalRoot(placementId)),
       cancelRoot: (placementId, reason) =>
         runBuffered((transactionHub) => externalRootOperations.cancel(transactionHub, placementId, reason)),
-      rootSettlement: (placementId) => runNoTxn(externalRootSettlement(placementId)),
+      rootSettlement: (placementId) => runWithoutTransaction(externalRootSettlement(placementId)),
       acknowledgeRootSettlement: (input) => run(acknowledgeExternalRootSettlement(input)),
     })
     return { runStore, externalChildStore }

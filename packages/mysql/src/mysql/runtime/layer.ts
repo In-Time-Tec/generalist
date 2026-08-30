@@ -3,11 +3,11 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { RunExecutor, make as makeRunExecutor } from "tenetkit/runtime/driver/execution/run-executor"
 import { layer as activeExecutionsLayer } from "tenetkit/runtime/driver/execution/active-executions"
-import { makeRuntime } from "tenetkit/runtime/driver/memory/layer"
-import { Runtime } from "tenetkit/runtime/driver/service"
+import { makeRuntime } from "tenetkit/runtime/driver/memory/runtime"
+import { Runtime } from "tenetkit/runtime/driver/runtime"
 import { RunStore } from "tenetkit/runtime/driver/run/store"
 import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
-import { mysqlServices, type StoreError, type Options } from "../store/implementation.js"
+import { services as storeServices, type StoreError, type Options } from "../store/implementation.js"
 import { layer as modelPreviewLayer } from "tenetkit/runtime/driver/execution/model-response/preview"
 
 export type { Options }
@@ -21,7 +21,7 @@ export const layer = (
     maxConnections,
   })
   const services = Layer.effectContext(
-    mysqlServices({ ...options, maxConnections }).pipe(
+    storeServices({ ...options, maxConnections }).pipe(
       Effect.map(({ store, claims }) => Context.make(RunStore, store).pipe(Context.add(RunClaims, claims))),
     ),
   ).pipe(Layer.provide(client))

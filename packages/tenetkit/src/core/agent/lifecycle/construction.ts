@@ -1,20 +1,23 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { AgentError } from "../event.js"
 import type { Agent, ToolDeclaration } from "../service.js"
 import { dispatchForOrigin } from "../tools/dispatch.js"
 import { type Candidate, assemble } from "../../tools/tool-registry.js"
 
-const errorMessage = <E>(error: E): string =>
+export const errorMessage = <E>(error: E): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
+export const appendInstructionFragment: {
+  (fragment: string | undefined): (base: string | undefined) => string | undefined
+  (base: string | undefined, fragment: string | undefined): string | undefined
+} = Function.dual(2, (base: string | undefined, fragment: string | undefined): string | undefined => {
   if (fragment === undefined || fragment.length === 0) return base
   if (base === undefined || base.length === 0) return fragment
   return `${base}\n\n${fragment}`
-}
-const defaultProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 } as const
+})
+export const defaultProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 } as const
 const progressCapacitySchema = Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThan(0)))
-const progressOverflowPolicySchema = Schema.Union([
+export const progressOverflowPolicySchema = Schema.Union([
   Schema.TaggedStruct("Backpressure", { capacity: progressCapacitySchema }),
   Schema.TaggedStruct("Dropping", { capacity: progressCapacitySchema }),
   Schema.TaggedStruct("Sliding", { capacity: progressCapacitySchema }),
@@ -55,11 +58,4 @@ export const setupStaticTools = <T extends Record<string, Tool.Any>, R>(agent: A
     return { staticCandidates: candidates, staticRegistry: registry, staticToolkit }
   })
 
-/** @internal Small setup codecs and normalizers kept outside the composition root. */
-export const SetupHelpers = {
-  errorMessage,
-  appendInstructionFragment,
-  defaultProgressOverflowPolicy,
-  progressOverflowPolicySchema,
-}
 export type { StaticDeclaration }

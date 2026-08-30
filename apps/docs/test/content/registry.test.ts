@@ -136,10 +136,10 @@ test("the composite-tool guide keeps nested identity, render provenance, and adm
   for (const marker of [
     "NestedOperation.run(request, effect)",
     "<operationKey>#<ordinal>",
-    "NestedOperationDivergence",
-    "NestedOperationUnknown",
-    "NestedOperationDenied",
-    "NestedOperationSuspended",
+    "NestedOperation.Divergence",
+    "NestedOperation.Unknown",
+    "NestedOperation.Denied",
+    "NestedOperation.Suspended",
     "never from the request payload",
     "NestedOperation.maxRenderBytes",
     "renderWithheldBytes",
@@ -149,7 +149,7 @@ test("the composite-tool guide keeps nested identity, render provenance, and adm
     "ChildOrigin",
     "unforgeable",
     "idempotency key",
-    "SessionHistory.pageHistory",
+    "SessionHistory.page",
     "hasBefore",
     "compactionCheckpoints",
   ]) {

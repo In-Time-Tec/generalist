@@ -12,8 +12,8 @@ import {
   defaultResolveFailure as ModelResilience_defaultResolveFailure,
 } from "../resilience.js"
 export const ModelResilience = {
-  ModelResilience: ModelResilience_ModelResilience,
-  ModelResilienceMisconfigured: ModelResilience_ModelResilienceMisconfigured,
+  Policy: ModelResilience_ModelResilience,
+  Misconfigured: ModelResilience_ModelResilienceMisconfigured,
   defaultClassify: ModelResilience_defaultClassify,
   defaultPolicy: ModelResilience_defaultPolicy,
   none: ModelResilience_none,
@@ -23,10 +23,10 @@ export const ModelResilience = {
   layerTest: ModelResilience_layerTest,
   apply: ModelResilience_apply,
   defaultResolveFailure: ModelResilience_defaultResolveFailure,
-} satisfies typeof import("../resilience.js")
+}
 export namespace ModelResilience {
-  export type ModelResilience = import("../resilience.js").ModelResilience
-  export type ModelResilienceMisconfigured = import("../resilience.js").ModelResilienceMisconfigured
+  export type Policy = import("../resilience.js").ModelResilience
+  export type Misconfigured = import("../resilience.js").ModelResilienceMisconfigured
   export type defaultClassify = typeof import("../resilience.js").defaultClassify
   export type defaultPolicy = typeof import("../resilience.js").defaultPolicy
   export type none = typeof import("../resilience.js").none
