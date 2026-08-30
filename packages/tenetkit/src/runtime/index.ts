@@ -390,20 +390,20 @@ export namespace RunClaims {
   export type Service = import("./sql/run/claims.js").Service
 }
 
-import { RuntimeWorker as RuntimeWorker_RuntimeWorker, layerWorker as RuntimeWorker_layerWorker } from "./sql/worker.js"
+import { RuntimeWorker as RuntimeWorker_RuntimeWorker, layer as RuntimeWorker_layer } from "./sql/worker.js"
 export const RuntimeWorker = {
   RuntimeWorker: RuntimeWorker_RuntimeWorker,
-  layerWorker: RuntimeWorker_layerWorker,
+  layer: RuntimeWorker_layer,
 }
 export namespace RuntimeWorker {
   export type RuntimeWorker = import("./sql/worker.js").RuntimeWorker
   export type Service = import("./sql/worker.js").Service
-  export type WorkerOptions = import("./sql/worker.js").WorkerOptions
-  export type WorkerFailure = import("./sql/worker.js").WorkerFailure
-  export type WorkerScan = import("./sql/worker.js").WorkerScan
-  export type WorkerWakeup = import("./sql/worker.js").WorkerWakeup
-  export type WorkerStatus = import("./sql/worker.js").WorkerStatus
-  export type layerWorker = typeof import("./sql/worker.js").layerWorker
+  export type Options = import("./sql/worker.js").Options
+  export type Failure = import("./sql/worker.js").Failure
+  export type Scan = import("./sql/worker.js").Scan
+  export type Wakeup = import("./sql/worker.js").Wakeup
+  export type Status = import("./sql/worker.js").Status
+  export type layer = typeof import("./sql/worker.js").layer
 }
 
 import { LocalScheduler as LocalScheduler_LocalScheduler } from "./execution/local-scheduler.js"

@@ -162,7 +162,7 @@ import {
   toolJsonSchemaCompiler as OpenAI_toolJsonSchemaCompiler,
   layer as OpenAI_layer,
   registration as OpenAI_registration,
-  normalizeResponsesSse as OpenAI_normalizeResponsesSse,
+  normalizeResponsesSSE as OpenAI_normalizeResponsesSSE,
   layerConfig as OpenAI_layerConfig,
 } from "./provider/openai.js"
 import {
@@ -178,7 +178,7 @@ export const OpenAI = {
   toolJsonSchemaCompiler: OpenAI_toolJsonSchemaCompiler,
   layer: OpenAI_layer,
   registration: OpenAI_registration,
-  normalizeResponsesSse: OpenAI_normalizeResponsesSse,
+  normalizeResponsesSSE: OpenAI_normalizeResponsesSSE,
   layerConfig: OpenAI_layerConfig,
   OpenAIAccountCredentialError: OpenAI_OpenAIAccountCredentialError,
   credentialsFromAccountAuth: OpenAI_credentialsFromAccountAuth,
@@ -192,7 +192,7 @@ export namespace OpenAI {
   export type toolJsonSchemaCompiler = typeof import("./provider/openai.js").toolJsonSchemaCompiler
   export type layer = typeof import("./provider/openai.js").layer
   export type registration = typeof import("./provider/openai.js").registration
-  export type normalizeResponsesSse = typeof import("./provider/openai.js").normalizeResponsesSse
+  export type normalizeResponsesSSE = typeof import("./provider/openai.js").normalizeResponsesSSE
   export type layerConfig = typeof import("./provider/openai.js").layerConfig
   export type OpenAIAccountCredentialError = import("./provider/openai-account.js").OpenAIAccountCredentialError
   export type credentialsFromAccountAuth = typeof import("./provider/openai-account.js").credentialsFromAccountAuth

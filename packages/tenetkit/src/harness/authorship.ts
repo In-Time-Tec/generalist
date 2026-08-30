@@ -32,7 +32,7 @@ const carriesRevision = (value: typeof Schema.Unknown.Type): boolean =>
  * @experimental Accept one proposal from an untrusted author. A pinned `revision` is refused rather than trusted or
  * silently dropped, so model-originated input can never choose an entry's createdAt, updatedAt, or version.
  */
-export const authorProposal = Function.flow(
+export const author = Function.flow(
   decodeProposalInput,
   Effect.flatMap((input) =>
     carriesRevision(input)

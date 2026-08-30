@@ -1274,7 +1274,7 @@ describePostgres("PostgreSQL run store", () => {
           resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
-        const workerLayer = RuntimeWorker.layerWorker({
+        const workerLayer = RuntimeWorker.layer({
           workerId: "postgres-model-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
@@ -1362,7 +1362,7 @@ describePostgres("PostgreSQL run store", () => {
           resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
-        const workerLayer = RuntimeWorker.layerWorker({
+        const workerLayer = RuntimeWorker.layer({
           workerId: "postgres-tool-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",

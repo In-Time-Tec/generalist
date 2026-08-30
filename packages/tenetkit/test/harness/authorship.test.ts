@@ -10,7 +10,7 @@ const seeded = State.make({
 
 const authored = (edits: ReadonlyArray<unknown>) => ({ id: "model-1", at: at(2), edits })
 
-const expectRejected = (failure: Effect.Error<ReturnType<typeof Authorship.authorProposal>>) => {
+const expectRejected = (failure: Effect.Error<ReturnType<typeof Authorship.author>>) => {
   expect(failure._tag).toBe("tenetkit/agent-guidance/AuthorshipRejected")
   if (!Schema.is(Authorship.AuthorshipRejected)(failure)) {
     throw new Error("Expected an AuthorshipRejected failure", { cause: failure })
@@ -18,10 +18,10 @@ const expectRejected = (failure: Effect.Error<ReturnType<typeof Authorship.autho
   return failure
 }
 
-describe("Authorship.authorProposal", () => {
+describe("Authorship.author", () => {
   it.effect("accepts a well-formed untrusted create", () =>
     Effect.gen(function* () {
-      const accepted = yield* Authorship.authorProposal(
+      const accepted = yield* Authorship.author(
         authored([{ _tag: "Create", kind: "memory", id: "learned", value: { title: "t", content: "c" } }]),
       )
       expect(accepted.id).toBe("model-1")
@@ -32,7 +32,7 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("accepts an untrusted update that pins only baseVersion", () =>
     Effect.gen(function* () {
-      const accepted = yield* Authorship.authorProposal(
+      const accepted = yield* Authorship.author(
         authored([
           { _tag: "Update", kind: "memory", id: "target", value: { title: "t", content: "c" }, baseVersion: 5 },
         ]),
@@ -43,7 +43,7 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("accepts an untrusted delete", () =>
     Effect.gen(function* () {
-      const accepted = yield* Authorship.authorProposal(
+      const accepted = yield* Authorship.author(
         authored([{ _tag: "Delete", kind: "memory", id: "target", baseVersion: 5 }]),
       )
       expect(accepted.edits[0]).toMatchObject({ _tag: "Delete", id: "target" })
@@ -52,7 +52,7 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("refuses a create that pins a revision", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal(
+      const failure = yield* Authorship.author(
         authored([
           {
             _tag: "Create",
@@ -69,7 +69,7 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("refuses an update that pins a revision", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal(
+      const failure = yield* Authorship.author(
         authored([
           {
             _tag: "Update",
@@ -86,7 +86,7 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("refuses a revision hidden behind a valid leading edit", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal(
+      const failure = yield* Authorship.author(
         authored([
           { _tag: "Create", kind: "memory", id: "ok", value: { title: "t", content: "c" } },
           {
@@ -113,14 +113,14 @@ describe("Authorship.authorProposal", () => {
           revision: { createdAt: at(0), updatedAt: at(0), version: 99 },
         },
       ])
-      const outcome = yield* Effect.result(Authorship.authorProposal(input))
+      const outcome = yield* Effect.result(Authorship.author(input))
       expect(Result.isFailure(outcome)).toBe(true)
     }),
   )
 
   it.effect("refuses an undefined revision key as an explicit pin attempt", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal(
+      const failure = yield* Authorship.author(
         authored([
           { _tag: "Create", kind: "memory", id: "x", value: { title: "t", content: "c" }, revision: undefined },
         ]),
@@ -131,14 +131,14 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("refuses malformed untrusted input", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal({ id: "model-1" }).pipe(Effect.flip)
+      const failure = yield* Authorship.author({ id: "model-1" }).pipe(Effect.flip)
       expect(expectRejected(failure).reason).toBe("malformed")
     }),
   )
 
   it.effect("refuses an unknown edit tag", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal(authored([{ _tag: "Replace", kind: "memory", id: "x" }])).pipe(
+      const failure = yield* Authorship.author(authored([{ _tag: "Replace", kind: "memory", id: "x" }])).pipe(
         Effect.flip,
       )
       expect(expectRejected(failure).reason).toBe("malformed")
@@ -147,14 +147,14 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("refuses an empty edit list", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal(authored([])).pipe(Effect.flip)
+      const failure = yield* Authorship.author(authored([])).pipe(Effect.flip)
       expect(expectRejected(failure).reason).toBe("malformed")
     }),
   )
 
   it.effect("refuses an excess proposal property", () =>
     Effect.gen(function* () {
-      const failure = yield* Authorship.authorProposal({
+      const failure = yield* Authorship.author({
         id: "model-1",
         at: at(2),
         edits: [{ _tag: "Delete", kind: "memory", id: "target" }],
@@ -166,7 +166,7 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("cannot forge an entry's audit trail through an accepted create", () =>
     Effect.gen(function* () {
-      const accepted = yield* Authorship.authorProposal(
+      const accepted = yield* Authorship.author(
         authored([{ _tag: "Create", kind: "skill", id: "fresh", value: { title: "t", content: "c" } }]),
       )
       const result = applied({ state: seeded, proposal: accepted })
@@ -179,7 +179,7 @@ describe("Authorship.authorProposal", () => {
 
   it.effect("cannot forge an entry's version through an accepted update", () =>
     Effect.gen(function* () {
-      const accepted = yield* Authorship.authorProposal(
+      const accepted = yield* Authorship.author(
         authored([{ _tag: "Update", kind: "memory", id: "target", value: { title: "t", content: "next" } }]),
       )
       const result = applied({ state: seeded, proposal: accepted })
@@ -196,7 +196,7 @@ describe("Authorship.authorProposal", () => {
         state: seeded,
         proposal: proposal({ edits: [{ _tag: "Delete", kind: "memory", id: "target" }] }),
       })
-      const accepted = yield* Authorship.authorProposal(
+      const accepted = yield* Authorship.author(
         authored([{ _tag: "Create", kind: "memory", id: "target", value: { title: "t", content: "restored" } }]),
       )
       const result = applied({ state: removed.state, proposal: accepted })
@@ -206,9 +206,9 @@ describe("Authorship.authorProposal", () => {
 
   it("reports a trusted rollback proposal as not authored", () => {
     const change = applied({ state: seeded, proposal: proposal({ edits: [update({ kind: "memory", id: "target" })] }) })
-    const inverse = Refinement.rollbackProposal(change, { id: "rollback-1", at: at(9) })
+    const inverse = Refinement.makeRollback(change, { id: "rollback-1", at: at(9) })
     expect(Authorship.isAuthored(inverse)).toBe(false)
-    expect(Refinement.applyTrustedProposal(inverse.edits.length > 0 ? change.state : seeded, inverse)).toBeDefined()
+    expect(Refinement.applyTrusted(inverse.edits.length > 0 ? change.state : seeded, inverse)).toBeDefined()
   })
 
   it("reports a delete-only trusted proposal as authored", () => {
@@ -222,7 +222,7 @@ describe("Authorship.authorProposal", () => {
     })
     const restored = applied({
       state: change.state,
-      proposal: Refinement.rollbackProposal(change, { id: "rollback-1", at: at(9) }),
+      proposal: Refinement.makeRollback(change, { id: "rollback-1", at: at(9) }),
     })
     const entryValue = State.findEntry(restored.state, "memory", "target")!
     expect(entryValue.version).toBe(5)
@@ -264,7 +264,7 @@ describe("Authorship.authorProposal", () => {
       at: at(2),
       edits: [{ _tag: "Create", kind: "memory", id: "x", value: { title: "t", content: "c" } }],
     }
-    expect(Result.isSuccess(Refinement.applyTrustedProposal(State.empty(scope), value))).toBe(true)
+    expect(Result.isSuccess(Refinement.applyTrusted(State.empty(scope), value))).toBe(true)
     expect(create({ kind: "memory", id: "x" })._tag).toBe("Create")
   })
 })

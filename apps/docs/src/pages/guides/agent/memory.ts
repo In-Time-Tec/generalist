@@ -64,7 +64,7 @@ export const memory = definePage({
     codeBlock({ label: "semantic-recall.ts", source: semanticRecall }),
     p(
       "To run both kinds of memory on one key, use ",
-      code("layerCombined"),
+      code("layer"),
       " from ",
       code("tenetkit/memory"),
       ": recall merges items from both, remember writes to both.",

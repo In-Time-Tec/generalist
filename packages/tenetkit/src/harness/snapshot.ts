@@ -1,6 +1,6 @@
 import { Effect, Function, Schema } from "effect"
 import { GuidanceEntry, GuidanceScope, GuidanceSnapshotId } from "./entry.js"
-import { GuidanceState, allEntries, make, snapshotId } from "./state.js"
+import { GuidanceState, allEntries, make as makeState, snapshotId } from "./state.js"
 
 /** @experimental Codec name a durable host records alongside a pinned guidance snapshot. */
 export const CODEC = "tenetkit/agent-guidance/snapshot"
@@ -40,7 +40,7 @@ export class SnapshotInvalid extends Schema.TaggedError<SnapshotInvalid>()("tene
 }) {}
 
 /** @experimental Pin one exact state as a content-addressed snapshot. */
-export const snapshot = (state: GuidanceState): GuidanceSnapshot => ({
+export const make = (state: GuidanceState): GuidanceSnapshot => ({
   id: snapshotId(state),
   payload: { schemaVersion: state.schemaVersion, scope: state.scope, entries: allEntries(state) },
 })
@@ -49,7 +49,7 @@ const decodePayload = Schema.decodeUnknownEffect(SnapshotPayload, { onExcessProp
 const encodePayload = Schema.encodeSync(SnapshotPayload)
 
 /** @experimental Encode one snapshot payload as the closed JSON a registration carries. */
-export const encode = (state: GuidanceState): typeof SnapshotPayload.Encoded => encodePayload(snapshot(state).payload)
+export const encode = (state: GuidanceState): typeof SnapshotPayload.Encoded => encodePayload(make(state).payload)
 
 /** @experimental Reconstruct the exact state one pinned snapshot identifies. */
 export const decode: {
@@ -69,7 +69,7 @@ export const decode: {
     decodePayload(payload).pipe(
       Effect.mapError((error) => SnapshotInvalid.make({ message: String(error) })),
       Effect.flatMap((decoded) => {
-        const state = make({ scope: decoded.scope, entries: decoded.entries })
+        const state = makeState({ scope: decoded.scope, entries: decoded.entries })
         const actual = snapshotId(state)
         return actual === id ? Effect.succeed(state) : Effect.fail(SnapshotMismatch.make({ expected: id, actual }))
       }),

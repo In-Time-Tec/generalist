@@ -19,7 +19,7 @@ import { RunExecutor } from "../execution/run-executor.js"
 import { RunStore } from "../run/store.js"
 import { isTerminal } from "../run.js"
 
-export interface WorkerOptions {
+export interface Options {
   readonly workerId: string
   readonly concurrency?: number
   readonly lease?: Duration.Input
@@ -28,26 +28,26 @@ export interface WorkerOptions {
   readonly onClaim?: (claim: ClaimedRun) => Effect.Effect<void>
 }
 
-export interface WorkerFailure {
+export interface Failure {
   readonly at: number
   readonly message: string
 }
 
-export type WorkerScan =
+export type Scan =
   | { readonly _tag: "Starting" }
   | { readonly _tag: "Succeeded"; readonly at: number }
   | { readonly _tag: "Failed"; readonly at: number; readonly message: string }
 
-export type WorkerWakeup =
+export type Wakeup =
   | { readonly _tag: "Starting" }
   | { readonly _tag: "Ready"; readonly at: number }
   | { readonly _tag: "Failed"; readonly at: number; readonly message: string }
 
-export interface WorkerStatus {
-  readonly scan: WorkerScan
-  readonly wakeup: WorkerWakeup
+export interface Status {
+  readonly scan: Scan
+  readonly wakeup: Wakeup
   readonly lastFallbackAt: number | undefined
-  readonly lastFailure: WorkerFailure | undefined
+  readonly lastFailure: Failure | undefined
   readonly active: number
   readonly capacity: number
   readonly oldestClaimAt: number | undefined
@@ -59,17 +59,17 @@ interface ActiveClaim {
 }
 
 interface WorkerState {
-  readonly scan: WorkerScan
-  readonly wakeup: WorkerWakeup
+  readonly scan: Scan
+  readonly wakeup: Wakeup
   readonly lastFallbackAt: number | undefined
-  readonly lastFailure: WorkerFailure | undefined
+  readonly lastFailure: Failure | undefined
   readonly claims: ReadonlyMap<string, ActiveClaim>
 }
 
 export interface Service {
   readonly workerId: string
   readonly active: Effect.Effect<number>
-  readonly status: Effect.Effect<WorkerStatus>
+  readonly status: Effect.Effect<Status>
   readonly poll: Effect.Effect<ReadonlyArray<ClaimedRun>, RuntimeUnavailable>
   readonly idle: Effect.Effect<void>
   readonly run: Effect.Effect<never>
@@ -79,8 +79,8 @@ export class RuntimeWorker extends Context.Service<RuntimeWorker, Service>()(
   "tenetkit/runtime/sql/worker/RuntimeWorker",
 ) {}
 
-export const makeWorker = (
-  options: WorkerOptions,
+export const make = (
+  options: Options,
 ): Effect.Effect<Service, never, RunClaims | RunExecutor | RunStore | Scope.Scope> =>
   Effect.gen(function* () {
     const claims = yield* RunClaims
@@ -284,7 +284,7 @@ export const makeWorker = (
     )
 
     const status = Ref.get(state).pipe(
-      Effect.map((current): WorkerStatus => {
+      Effect.map((current): Status => {
         let oldestClaimAt: number | undefined
         for (const claim of current.claims.values())
           if (oldestClaimAt === undefined || claim.claimedAt < oldestClaimAt) oldestClaimAt = claim.claimedAt
@@ -349,7 +349,5 @@ export const makeWorker = (
     }
   })
 
-export const layerWorker = (
-  options: WorkerOptions,
-): Layer.Layer<RuntimeWorker, never, RunClaims | RunExecutor | RunStore> =>
-  Layer.effect(RuntimeWorker, makeWorker(options).pipe(Effect.map((service) => RuntimeWorker.of(service))))
+export const layer = (options: Options): Layer.Layer<RuntimeWorker, never, RunClaims | RunExecutor | RunStore> =>
+  Layer.effect(RuntimeWorker, make(options).pipe(Effect.map((service) => RuntimeWorker.of(service))))

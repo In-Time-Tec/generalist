@@ -18,7 +18,7 @@ const entry = (id: string, kind: Entry.GuidanceKind): Entry.GuidanceEntry => ({
 const state = State.make({ scope, entries: [entry("prefers-bun", "memory"), entry("review", "skill")] })
 
 const program = Effect.gen(function* () {
-  const pinned = Registration.registration(state, "guidance")
+  const pinned = Registration.make(state, "guidance")
   yield* Console.log(`snapshot: ${pinned.id}`)
   yield* Console.log(`capability: ${pinned.capability.name}`)
   yield* Console.log(`codec: ${pinned.capability.content?.codec} version: ${pinned.capability.content?.version}`)

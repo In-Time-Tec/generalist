@@ -190,7 +190,7 @@ export type AuthoredProposal = typeof AuthoredProposal.Type
 /**
  * @experimental One proposal that has passed untrusted authorship, carried as an opaque value.
  *
- * The brand is unforgeable by construction: `Authorship.authorProposal` is the only thing that mints it, so the
+ * The brand is unforgeable by construction: `Authorship.author` is the only thing that mints it, so the
  * apply seam can distinguish "an author asked for this" from "a caller assembled a proposal shape" at the type
  * level. Structural typing cannot make that distinction, because an edit carrying a `revision` is still
  * assignable to an authored edit.

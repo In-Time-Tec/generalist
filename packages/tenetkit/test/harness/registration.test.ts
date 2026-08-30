@@ -13,7 +13,7 @@ const state = State.make({
   ],
 })
 
-const pinned = Registration.registration(state, "guidance")
+const pinned = Registration.make(state, "guidance")
 
 describe("Registration", () => {
   it("names the capability the host mounts", () => {
@@ -38,7 +38,7 @@ describe("Registration", () => {
   })
 
   it("is stable for one exact state", () => {
-    expect(Registration.registration(state, "guidance")).toEqual(pinned)
+    expect(Registration.make(state, "guidance")).toEqual(pinned)
   })
 
   it("changes the capability pin and digest when the state changes", () => {
@@ -46,7 +46,7 @@ describe("Registration", () => {
       state,
       proposal: proposal({ edits: [create({ kind: "memory", id: "extra" })] }),
     }).state
-    const other = Registration.registration(changed, "guidance")
+    const other = Registration.make(changed, "guidance")
     expect(other.capability.pin).not.toBe(pinned.capability.pin)
     expect(other.capability.content?.digest).not.toBe(pinned.capability.content?.digest)
   })
@@ -56,11 +56,11 @@ describe("Registration", () => {
       state,
       proposal: proposal({ edits: [] }),
     }).state
-    expect(Registration.registration(withHistory, "guidance").capability.pin).toBe(pinned.capability.pin)
+    expect(Registration.make(withHistory, "guidance").capability.pin).toBe(pinned.capability.pin)
   })
 
   it("supports data-last application", () => {
-    expect(Registration.registration("guidance")(state)).toEqual(pinned)
+    expect(Registration.make("guidance")(state)).toEqual(pinned)
   })
 
   it.effect("reconstructs the exact state from the pinned payload", () =>
@@ -84,7 +84,7 @@ describe("Registration", () => {
   )
 
   it("pins an empty state", () => {
-    const empty = Registration.registration(State.empty(scope), "guidance")
+    const empty = Registration.make(State.empty(scope), "guidance")
     expect(empty.id).toBe(State.snapshotId(State.empty(scope)))
     expect(empty.capability.pin).not.toBe(pinned.capability.pin)
   })

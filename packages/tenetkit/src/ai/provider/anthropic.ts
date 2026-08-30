@@ -1,5 +1,5 @@
 import { AnthropicClient, AnthropicLanguageModel, Generated } from "@effect/ai-anthropic"
-import { ContextOverflow, type ModelRegistryFacade } from "../../core/index.js"
+import { ContextOverflow } from "../../core/index.js"
 import { ModelRegistry } from "../../core/model/public/registry.js"
 import { Config as EffectConfig, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
@@ -165,7 +165,7 @@ export const layer = (
   )
 
 /** @experimental Bare registration effect; the consumer provides the Anthropic client (see layerConfig). */
-export const registration = (input: Options): ReturnType<ModelRegistryFacade["registration"]> =>
+export const registration = (input: Options): ReturnType<typeof ModelRegistry.registration> =>
   ModelRegistry.registration(registrationOptions(input))
 
 /** @experimental */

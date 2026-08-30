@@ -144,7 +144,7 @@ describeMysql("mysql worker cancellation", () => {
               addresses: [{ address, executable, registrations: registrationsFor(executable) }],
             }
             yield* provideScoped(
-              RuntimeWorker.layerWorker({
+              RuntimeWorker.layer({
                 workerId: "mysql-model-worker",
                 cancellationInterval: "10 millis",
                 lease: "30 seconds",
@@ -232,7 +232,7 @@ describeMysql("mysql worker cancellation", () => {
             addresses: [{ address, executable, registrations: registrationsFor(executable) }],
           }
           yield* provideScoped(
-            RuntimeWorker.layerWorker({
+            RuntimeWorker.layer({
               workerId: "mysql-tool-worker",
               cancellationInterval: "10 millis",
               lease: "30 seconds",

@@ -11,7 +11,7 @@ export interface OverviewOptions {
 }
 
 /** @experimental Default overview bounds. */
-export const defaultOverviewOptions = {
+export const defaults = {
   maxEntriesPerKind: 8,
   maxContentLength: 240,
   maxTitleLength: 80,
@@ -19,10 +19,10 @@ export const defaultOverviewOptions = {
 } as const satisfies Required<OverviewOptions>
 
 const bounded = (options: OverviewOptions): Required<OverviewOptions> => ({
-  maxEntriesPerKind: Math.max(0, options.maxEntriesPerKind ?? defaultOverviewOptions.maxEntriesPerKind),
-  maxContentLength: Math.max(0, options.maxContentLength ?? defaultOverviewOptions.maxContentLength),
-  maxTitleLength: Math.max(0, options.maxTitleLength ?? defaultOverviewOptions.maxTitleLength),
-  maxRefinements: Math.max(0, options.maxRefinements ?? defaultOverviewOptions.maxRefinements),
+  maxEntriesPerKind: Math.max(0, options.maxEntriesPerKind ?? defaults.maxEntriesPerKind),
+  maxContentLength: Math.max(0, options.maxContentLength ?? defaults.maxContentLength),
+  maxTitleLength: Math.max(0, options.maxTitleLength ?? defaults.maxTitleLength),
+  maxRefinements: Math.max(0, options.maxRefinements ?? defaults.maxRefinements),
 })
 
 const clamp = (text: string, limit: number): string => {
@@ -76,7 +76,7 @@ const refinementSection = (state: GuidanceState, limits: Required<OverviewOption
  * @experimental Render one deterministic, bounded prompt overview of a guidance state. Output size depends only on
  * the supplied bounds, never on how many entries or refinements the state holds.
  */
-export const formatOverview: {
+export const format: {
   (options?: OverviewOptions): (state: GuidanceState) => string
   (state: GuidanceState, options?: OverviewOptions): string
 } = Function.dual(

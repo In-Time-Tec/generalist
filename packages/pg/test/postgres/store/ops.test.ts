@@ -102,7 +102,7 @@ describePostgres("PostgreSQL Program store contract", () => {
   {
     const database = postgresDatabase("program-exact-root-worker")
     const fixture = programFixture()
-    const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "postgres-exact-root-worker" }).pipe(
+    const runtimeLayer = RuntimeWorker.layer({ workerId: "postgres-exact-root-worker" }).pipe(
       Layer.provideMerge(
         backendLayer({
           url: database.url,

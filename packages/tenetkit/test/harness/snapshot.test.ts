@@ -12,7 +12,7 @@ const state = State.make({
   ],
 })
 
-const snapshot = Snapshot.snapshot(state)
+const snapshot = Snapshot.make(state)
 const malformedVersion = Schema.decodeSync(Schema.Unknown)({ schemaVersion: "2" })
 const encode = (value: State.GuidanceState): Snapshot.SnapshotPayload =>
   Schema.decodeSync(Snapshot.SnapshotPayload)(Snapshot.encode(value))
@@ -38,7 +38,7 @@ describe("Snapshot", () => {
       state,
       proposal: proposal({ edits: [create({ kind: "memory", id: "later" })] }),
     }).state
-    const pinned = Snapshot.snapshot(withHistory)
+    const pinned = Snapshot.make(withHistory)
     expect(pinned.payload).not.toHaveProperty("refinements")
     expect(pinned.id).toBe(State.snapshotId(withHistory))
   })

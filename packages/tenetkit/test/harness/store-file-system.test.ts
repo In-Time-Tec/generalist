@@ -15,7 +15,7 @@ const seeded = State.make({
 })
 
 const rollback = (result: Refinement.RefinementResult) =>
-  Refinement.rollbackProposal(result, { id: "rollback-1", at: at(9), rationale: "undo", source: "refine" })
+  Refinement.makeRollback(result, { id: "rollback-1", at: at(9), rationale: "undo", source: "refine" })
 
 const roundTrip = (edits: ReadonlyArray<ReturnType<typeof create>>): void => {
   const before = State.snapshotId(seeded)
@@ -25,7 +25,7 @@ const roundTrip = (edits: ReadonlyArray<ReturnType<typeof create>>): void => {
   expect(State.allEntries(restored.state)).toEqual(State.allEntries(seeded))
 }
 
-describe("Refinement.rollbackProposal", () => {
+describe("Refinement.makeRollback", () => {
   it("restores the exact prior state after a create", () => {
     roundTrip([create({ kind: "memory", id: "added", value: { content: "new" } })])
   })
@@ -92,7 +92,7 @@ describe("Refinement.rollbackProposal", () => {
 
   it("omits an absent rationale and source", () => {
     const result = applied({ state: seeded, proposal: proposal({ edits: [create({ kind: "memory", id: "a" })] }) })
-    const inverse = Refinement.rollbackProposal(result, { id: "rollback-2", at: at(9) })
+    const inverse = Refinement.makeRollback(result, { id: "rollback-2", at: at(9) })
     expect("rationale" in inverse).toBe(false)
     expect("source" in inverse).toBe(false)
   })
@@ -148,7 +148,7 @@ describe("Refinement.rollbackProposal", () => {
     const restored = applied({ state: result.state, proposal: rollback(result) })
     const redo = applied({
       state: restored.state,
-      proposal: Refinement.rollbackProposal(restored, { id: "rollback-2", at: at(10) }),
+      proposal: Refinement.makeRollback(restored, { id: "rollback-2", at: at(10) }),
     })
     expect(State.allEntries(redo.state)).toEqual(State.allEntries(result.state))
   })

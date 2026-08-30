@@ -6,6 +6,6 @@ export const repoSources: Effect.Effect<
   ReadonlyArray<Instructions.Source>,
   PlatformError.PlatformError,
   FileSystem.FileSystem | Path.Path
-> = InstructionFiles.loadInstructionFiles({ cwd: "." }).pipe(
+> = InstructionFiles.load({ cwd: "." }).pipe(
   Effect.map((files) => files.map((file) => Instructions.staticSource(file.path, file.content))),
 )

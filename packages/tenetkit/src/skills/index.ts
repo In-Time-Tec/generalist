@@ -18,14 +18,14 @@ export namespace HttpCatalog {
   export type layer = typeof import("./http-catalog.js").layer
   export type Options = import("./http-catalog.js").Options
 }
-import { loadInstructionFiles as InstructionFiles_loadInstructionFiles } from "./instructions-files.js"
+import { load as InstructionFiles_load } from "./instructions-files.js"
 export const InstructionFiles = {
-  loadInstructionFiles: InstructionFiles_loadInstructionFiles,
+  load: InstructionFiles_load,
 }
 export namespace InstructionFiles {
-  export type loadInstructionFiles = typeof import("./instructions-files.js").loadInstructionFiles
-  export type InstructionFile = import("./instructions-files.js").InstructionFile
-  export type LoadInstructionFilesOptions = import("./instructions-files.js").LoadInstructionFilesOptions
+  export type load = typeof import("./instructions-files.js").load
+  export type File = import("./instructions-files.js").File
+  export type Options = import("./instructions-files.js").Options
 }
 import { make as S3Catalog_make, layer as S3Catalog_layer } from "./s3-catalog.js"
 export const S3Catalog = {

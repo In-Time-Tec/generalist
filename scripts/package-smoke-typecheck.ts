@@ -16,13 +16,14 @@ import {
 } from "tenetkit"
 import { A2A } from "tenetkit/a2a"
 import { AGUI } from "tenetkit/ag-ui"
-import { VectorStore } from "tenetkit/memory"
+import { Authorship, Overview, Refinement, Registration, Snapshot as GuidanceSnapshot, State } from "tenetkit/agent-guidance"
+import { layer as memoryLayer, type Options as MemoryOptions, VectorStore } from "tenetkit/memory"
 import { MCPClient, OAuth } from "tenetkit/mcp"
 import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "tenetkit/mcp/tools"
-import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
+import { GitHubCatalog, HttpCatalog, InstructionFiles, S3Catalog } from "tenetkit/skills"
 import { AmazonBedrock, ModelCatalog, OpenAI } from "tenetkit/ai"
 import { TestModel } from "tenetkit/test"
-import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
+import { Cursor, Runtime, RuntimeWorker, RunEvent } from "tenetkit/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
 import { RunClient, Snapshot, SSE, WebSocket, Wire } from "tenetkit/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
@@ -42,6 +43,11 @@ type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRo
 type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
 type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
+type InstructionFile = InstructionFiles.File
+type InstructionFileOptions = InstructionFiles.Options
+type CombinedMemoryOptions = MemoryOptions
+type RuntimeWorkerOptions = RuntimeWorker.Options
+type RuntimeWorkerStatus = RuntimeWorker.Status
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
@@ -79,6 +85,18 @@ type PersistedRunRequirements = Assert<
   >
 >
 void Handoff
+void InstructionFiles.load
+void memoryLayer
+void RuntimeWorker.layer
+void Authorship.author
+void Refinement.apply
+void Refinement.applyTrusted
+void Refinement.makeRollback
+void State.merge
+void Overview.format
+void GuidanceSnapshot.make
+void Registration.make
+void OpenAI.normalizeResponsesSSE
 type ProviderRoot = typeof import("tenetkit/ai")
 type TransportRoot = typeof import("tenetkit/transport")
 type RuntimeRoot = typeof import("tenetkit/runtime")

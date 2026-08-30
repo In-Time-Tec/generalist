@@ -215,9 +215,9 @@ const duplicateTarget = (proposal: RefinementProposal): RefinementRejected | und
  *
  * This is the trusted route: a pinned `revision` chooses an entry's `createdAt`, `updatedAt`, and `version` outright.
  * Only a host that already owns the audit trail may use it, which is why rollback and restore name it explicitly while
- * every ordinary refinement goes through `applyProposal`.
+ * every ordinary refinement goes through `apply`.
  */
-export const applyTrustedProposal: {
+export const applyTrusted: {
   (
     proposal: RefinementProposal,
     options?: ApplyOptions,
@@ -284,7 +284,7 @@ export const applyTrustedProposal: {
  * A host that mounts this behind an `unknown` boundary gets that check even when a cast erased the brand. Revision
  * stays the engine's: a create lands at version 1 and an update bumps the entry it replaces.
  */
-export const applyProposal: {
+export const apply: {
   (
     proposal: AuthoredRefinementProposal,
     options?: ApplyOptions,
@@ -302,7 +302,7 @@ export const applyProposal: {
     options: ApplyOptions = {},
   ): Result.Result<RefinementResult, RefinementRejected> =>
     isAuthored(proposal)
-      ? applyTrustedProposal(state, proposal, options)
+      ? applyTrusted(state, proposal, options)
       : Result.fail(rejection(proposal.id, "pinned-revision", "an authored proposal may not pin a revision")),
 )
 
@@ -341,7 +341,7 @@ export interface RollbackOptions {
 }
 
 /** @experimental Build the proposal that restores the exact entries one refinement replaced. */
-export const rollbackProposal: {
+export const rollback: {
   (options: RollbackOptions): (result: RefinementResult) => RefinementProposal
   (result: RefinementResult, options: RollbackOptions): RefinementProposal
 } = Function.dual(2, (result: RefinementResult, options: RollbackOptions): RefinementProposal => {

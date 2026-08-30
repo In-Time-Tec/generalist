@@ -8,7 +8,7 @@ const seeded = State.make({
   entries: [entry({ id: "keep", kind: "memory" }), entry({ id: "target", kind: "skill", version: 3 })],
 })
 
-describe("Refinement.applyProposal", () => {
+describe("Refinement.apply", () => {
   it("creates one entry at version 1 with the proposal instant", () => {
     const result = applied({
       state: State.empty(scope),
@@ -157,7 +157,7 @@ describe("Refinement.applyProposal", () => {
   })
 })
 
-describe("Refinement.applyProposal rejection", () => {
+describe("Refinement.apply rejection", () => {
   it("rejects a drifted baseline without changing state", () => {
     const failure = rejected({
       state: seeded,
@@ -289,10 +289,7 @@ describe("Refinement.applyProposal rejection", () => {
   })
 
   it("returns a failure Result rather than throwing", () => {
-    const result = Refinement.applyTrustedProposal(
-      seeded,
-      proposal({ edits: [create({ kind: "memory", id: "keep" })] }),
-    )
+    const result = Refinement.applyTrusted(seeded, proposal({ edits: [create({ kind: "memory", id: "keep" })] }))
     expect(Result.isFailure(result)).toBe(true)
   })
 })

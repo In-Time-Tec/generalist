@@ -7,7 +7,7 @@ import {
   type Config,
   type RegistrationOptions,
   classifyFailure,
-  normalizeResponsesSse,
+  normalizeResponsesSSE,
   openAiFailureReason,
   openAiLanguageModelLayer,
   toolJsonSchemaCompiler,
@@ -152,7 +152,7 @@ const isTerminalEvent = (event: ResponseStreamEvent): event is TerminalEvent =>
   event.type === "response.completed" || event.type === "response.incomplete"
 
 /**
- * `normalizeResponsesSse` has already flattened nested `response.failed` payloads into flat `error`
+ * `normalizeResponsesSSE` has already flattened nested `response.failed` payloads into flat `error`
  * frames by the time the stream is folded, so only `error` needs promotion here.
  */
 const terminalResponse = (event: ResponseStreamEvent): FoldedResponse | undefined =>
@@ -216,7 +216,7 @@ export const layerAccountClient = (credentials: OpenAIAccountCredentials) =>
     OpenAIClient.OpenAiClient,
     OpenAIClient.make({
       apiUrl: openAiAccountApiUrl,
-      transformClient: (client) => client.pipe(normalizeResponsesSse, accountClientTransform(credentials)),
+      transformClient: (client) => client.pipe(normalizeResponsesSSE, accountClientTransform(credentials)),
     }).pipe(
       Effect.map((client) =>
         OpenAIClient.OpenAiClient.of({

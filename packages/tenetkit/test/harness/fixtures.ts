@@ -100,14 +100,14 @@ export const applied = (input: {
   readonly proposal: Entry.RefinementProposal
   readonly options?: Refinement.ApplyOptions
 }): Refinement.RefinementResult =>
-  Result.getOrThrow(Refinement.applyTrustedProposal(input.state, input.proposal, input.options ?? {}))
+  Result.getOrThrow(Refinement.applyTrusted(input.state, input.proposal, input.options ?? {}))
 
 export const rejected = (input: {
   readonly state: State.GuidanceState
   readonly proposal: Entry.RefinementProposal
   readonly options?: Refinement.ApplyOptions
 }): Refinement.RefinementRejected => {
-  const result = Refinement.applyTrustedProposal(input.state, input.proposal, input.options ?? {})
+  const result = Refinement.applyTrusted(input.state, input.proposal, input.options ?? {})
   if (Result.isSuccess(result)) throw new Error("expected a rejected proposal")
   return result.failure
 }

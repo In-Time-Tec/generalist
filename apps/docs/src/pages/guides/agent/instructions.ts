@@ -48,7 +48,7 @@ export const instructions = definePage({
     ),
     h2("load-instruction-files", "3. Load AGENTS.md files as sources"),
     p(
-      code("InstructionFiles.loadInstructionFiles"),
+      code("InstructionFiles.load"),
       " from ",
       code("tenetkit/skills"),
       " walks ancestor directories for ",

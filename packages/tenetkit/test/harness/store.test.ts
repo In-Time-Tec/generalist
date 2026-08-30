@@ -74,7 +74,7 @@ layer(Store.layerMemory)("Store.layerMemory", (test) => {
       yield* store.save(change.state)
       const undone = applied({
         state: yield* store.load("cycle"),
-        proposal: Refinement.rollbackProposal(change, { id: "rollback-1", at: "2024-01-01T00:09:00.000Z" }),
+        proposal: Refinement.makeRollback(change, { id: "rollback-1", at: "2024-01-01T00:09:00.000Z" }),
       })
       yield* store.save(undone.state)
       const final = yield* store.load("cycle")

@@ -58,33 +58,34 @@ export namespace WorkingMemory {
   export type SummarizeOptions = import("./working-memory.js").SummarizeOptions
 }
 /** @experimental */
-export interface CombinedOptions {
+interface MemoryOptions {
   readonly working?: import("./working-memory.js").Options
   readonly semantic?: import("./semantic-recall.js").Options
 }
+export type { MemoryOptions as Options }
 
-type WithoutSummaryCombinedOptions = CombinedOptions & {
+type WithoutSummaryOptions = MemoryOptions & {
   readonly working?: import("./working-memory.js").Options & { readonly summarize?: undefined }
 }
 
 /** @experimental */
-export function layerCombined(
-  options: CombinedOptions & {
+export function layer(
+  options: MemoryOptions & {
     readonly working: import("./working-memory.js").Options & {
       readonly summarize: import("./working-memory.js").SummarizeOptions
     }
   },
 ): Layer.Layer<Memory.Memory, never, VectorStoreService | EmbeddingModel.EmbeddingModel | SummaryModel>
 /** @experimental */
-export function layerCombined(
-  options?: WithoutSummaryCombinedOptions,
+export function layer(
+  options?: WithoutSummaryOptions,
 ): Layer.Layer<Memory.Memory, never, VectorStoreService | EmbeddingModel.EmbeddingModel>
 /** @experimental */
-export function layerCombined(
-  options: CombinedOptions,
+export function layer(
+  options: MemoryOptions,
 ): Layer.Layer<Memory.Memory, never, VectorStoreService | EmbeddingModel.EmbeddingModel | SummaryModel>
-export function layerCombined(
-  options: CombinedOptions = {},
+export function layer(
+  options: MemoryOptions = {},
 ): Layer.Layer<Memory.Memory, never, VectorStoreService | EmbeddingModel.EmbeddingModel | SummaryModel> {
   return Layer.effect(
     Memory.Memory,

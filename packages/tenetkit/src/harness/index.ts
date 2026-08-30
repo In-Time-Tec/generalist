@@ -79,19 +79,19 @@ export namespace Entry {
 import {
   AuthorshipRejected as Authorship_AuthorshipRejected,
   AuthorshipRejection as Authorship_AuthorshipRejection,
-  authorProposal as Authorship_authorProposal,
+  author as Authorship_author,
   isAuthored as Authorship_isAuthored,
 } from "./authorship.js"
 export const Authorship = {
   AuthorshipRejected: Authorship_AuthorshipRejected,
   AuthorshipRejection: Authorship_AuthorshipRejection,
-  authorProposal: Authorship_authorProposal,
+  author: Authorship_author,
   isAuthored: Authorship_isAuthored,
 } satisfies typeof import("./authorship.js")
 export namespace Authorship {
   export type AuthorshipRejected = import("./authorship.js").AuthorshipRejected
   export type AuthorshipRejection = import("./authorship.js").AuthorshipRejection
-  export type authorProposal = typeof import("./authorship.js").authorProposal
+  export type author = typeof import("./authorship.js").author
   export type isAuthored = typeof import("./authorship.js").isAuthored
 }
 import {
@@ -104,6 +104,8 @@ import {
   snapshotId as State_snapshotId,
   withEntries as State_withEntries,
 } from "./state.js"
+import { merge as State_merge } from "./merge.js"
+type StateFacade = typeof import("./state.js") & { readonly merge: typeof import("./merge.js").merge }
 export const State = {
   GuidanceEntries: State_GuidanceEntries,
   GuidanceState: State_GuidanceState,
@@ -111,9 +113,10 @@ export const State = {
   empty: State_empty,
   findEntry: State_findEntry,
   make: State_make,
+  merge: State_merge,
   snapshotId: State_snapshotId,
   withEntries: State_withEntries,
-} satisfies typeof import("./state.js")
+} satisfies StateFacade
 export namespace State {
   export type GuidanceEntries = import("./state.js").GuidanceEntries
   export type GuidanceState = import("./state.js").GuidanceState
@@ -121,6 +124,7 @@ export namespace State {
   export type empty = typeof import("./state.js").empty
   export type findEntry = typeof import("./state.js").findEntry
   export type make = typeof import("./state.js").make
+  export type merge = typeof import("./merge.js").merge
   export type snapshotId = typeof import("./state.js").snapshotId
   export type withEntries = typeof import("./state.js").withEntries
 }
@@ -128,51 +132,46 @@ import {
   RefinementRejected as Refinement_RefinementRejected,
   RefinementRejection as Refinement_RefinementRejection,
   RefinementResult as Refinement_RefinementResult,
-  applyProposal as Refinement_applyProposal,
-  applyTrustedProposal as Refinement_applyTrustedProposal,
+  apply as Refinement_apply,
+  applyTrusted as Refinement_applyTrusted,
   isAuthored as Refinement_isAuthored,
-  rollbackProposal as Refinement_rollbackProposal,
+  rollback as Refinement_makeRollback,
   rollbackTarget as Refinement_rollbackTarget,
 } from "./refinement.js"
+type RefinementFacade = Omit<typeof import("./refinement.js"), "rollback"> & {
+  readonly makeRollback: typeof import("./refinement.js").rollback
+}
 export const Refinement = {
   RefinementRejected: Refinement_RefinementRejected,
   RefinementRejection: Refinement_RefinementRejection,
   RefinementResult: Refinement_RefinementResult,
-  applyProposal: Refinement_applyProposal,
-  applyTrustedProposal: Refinement_applyTrustedProposal,
+  apply: Refinement_apply,
+  applyTrusted: Refinement_applyTrusted,
   isAuthored: Refinement_isAuthored,
-  rollbackProposal: Refinement_rollbackProposal,
+  makeRollback: Refinement_makeRollback,
   rollbackTarget: Refinement_rollbackTarget,
-} satisfies typeof import("./refinement.js")
+} satisfies RefinementFacade
 export namespace Refinement {
   export type ApplyOptions = import("./refinement.js").ApplyOptions
   export type RefinementRejected = import("./refinement.js").RefinementRejected
   export type RefinementRejection = import("./refinement.js").RefinementRejection
   export type RefinementResult = import("./refinement.js").RefinementResult
   export type RollbackOptions = import("./refinement.js").RollbackOptions
-  export type applyProposal = typeof import("./refinement.js").applyProposal
-  export type applyTrustedProposal = typeof import("./refinement.js").applyTrustedProposal
+  export type apply = typeof import("./refinement.js").apply
+  export type applyTrusted = typeof import("./refinement.js").applyTrusted
   export type isAuthored = typeof import("./refinement.js").isAuthored
-  export type rollbackProposal = typeof import("./refinement.js").rollbackProposal
+  export type makeRollback = typeof import("./refinement.js").rollback
   export type rollbackTarget = typeof import("./refinement.js").rollbackTarget
 }
-import { mergeStates as Merge_mergeStates } from "./merge.js"
-export const Merge = { mergeStates: Merge_mergeStates } satisfies typeof import("./merge.js")
-export namespace Merge {
-  export type mergeStates = typeof import("./merge.js").mergeStates
-}
-import {
-  defaultOverviewOptions as Overview_defaultOverviewOptions,
-  formatOverview as Overview_formatOverview,
-} from "./overview.js"
+import { defaults as Overview_defaults, format as Overview_format } from "./overview.js"
 export const Overview = {
-  defaultOverviewOptions: Overview_defaultOverviewOptions,
-  formatOverview: Overview_formatOverview,
+  defaults: Overview_defaults,
+  format: Overview_format,
 } satisfies typeof import("./overview.js")
 export namespace Overview {
   export type OverviewOptions = import("./overview.js").OverviewOptions
-  export type defaultOverviewOptions = typeof import("./overview.js").defaultOverviewOptions
-  export type formatOverview = typeof import("./overview.js").formatOverview
+  export type defaults = typeof import("./overview.js").defaults
+  export type format = typeof import("./overview.js").format
 }
 import {
   CODEC as Snapshot_CODEC,
@@ -183,7 +182,7 @@ import {
   VERSION as Snapshot_VERSION,
   decode as Snapshot_decode,
   encode as Snapshot_encode,
-  snapshot as Snapshot_snapshot,
+  make as Snapshot_make,
 } from "./snapshot.js"
 export const Snapshot = {
   CODEC: Snapshot_CODEC,
@@ -194,7 +193,7 @@ export const Snapshot = {
   VERSION: Snapshot_VERSION,
   decode: Snapshot_decode,
   encode: Snapshot_encode,
-  snapshot: Snapshot_snapshot,
+  make: Snapshot_make,
 } satisfies typeof import("./snapshot.js")
 export namespace Snapshot {
   export type GuidanceSnapshot = import("./snapshot.js").GuidanceSnapshot
@@ -203,15 +202,15 @@ export namespace Snapshot {
   export type SnapshotPayload = import("./snapshot.js").SnapshotPayload
   export type decode = typeof import("./snapshot.js").decode
   export type encode = typeof import("./snapshot.js").encode
-  export type snapshot = typeof import("./snapshot.js").snapshot
+  export type make = typeof import("./snapshot.js").make
 }
-import { registration as Registration_registration } from "./registration.js"
+import { make as Registration_make } from "./registration.js"
 export const Registration = {
-  registration: Registration_registration,
+  make: Registration_make,
 } satisfies typeof import("./registration.js")
 export namespace Registration {
   export type PinnedRegistration = import("./registration.js").PinnedRegistration
-  export type registration = typeof import("./registration.js").registration
+  export type make = typeof import("./registration.js").make
 }
 import {
   Store as Store_Store,

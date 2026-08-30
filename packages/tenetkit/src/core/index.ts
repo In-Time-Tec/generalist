@@ -375,20 +375,6 @@ export {
   TurnPolicy,
 }
 
-export type AgentFacade = typeof import("./agent/service.js")
-export type AgentEventFacade = typeof import("./agent/event.js")
-export type ModelTelemetryFacade = typeof import("./model/telemetry/events.js")
-export type ToolExecutorFacade = typeof import("./tools/tool-executor.js")
-export type TurnPolicyFacade = typeof import("./turn/policy.js")
-export type ModelRegistryFacade = typeof import("./model/registry.js")
-export type SkillCatalogFacade = typeof import("./context/skill-catalog.js")
-export type CoreAgent = import("./agent/service.js").Agent
-export type CoreMemory = import("./context/memory.js").Memory
-export type CoreSkillCatalog = import("./context/skill-catalog.js").SkillCatalog
-export type CoreSkillCatalogError = import("./context/skill-catalog.js").SkillCatalogError
-export type CoreModelRegistry = import("./model/registry.js").ModelRegistry
-export type CoreModelRegistryRegistration = import("./model/registry.js").Registration
-
 export {
   AiError,
   Chat,

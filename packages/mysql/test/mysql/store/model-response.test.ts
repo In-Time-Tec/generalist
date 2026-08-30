@@ -60,7 +60,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = programFixture()
-    const runtimeLayer = RuntimeWorker.layerWorker({ workerId: "mysql-exact-root-worker" }).pipe(
+    const runtimeLayer = RuntimeWorker.layer({ workerId: "mysql-exact-root-worker" }).pipe(
       Layer.provideMerge(
         backendLayer({
           url,

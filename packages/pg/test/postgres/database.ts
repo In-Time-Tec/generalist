@@ -87,7 +87,7 @@ export interface PostgresWorkerOptions {
 }
 
 export const postgresWithWorker = (options: PostgresWorkerOptions): PostgresWorkerLayer =>
-  RuntimeWorker.layerWorker({
+  RuntimeWorker.layer({
     workerId: options.workerId,
     concurrency: options.concurrency ?? 4,
     lease: "5 seconds",

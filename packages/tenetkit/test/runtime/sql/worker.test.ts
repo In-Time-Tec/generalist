@@ -8,14 +8,14 @@ import { RuntimeUnavailable } from "../../../src/runtime/errors.js"
 import { makeStatic as makeExecutableResolver } from "../../../src/runtime/executable/resolver.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { makeRunStore } from "../../../src/runtime/memory/store.js"
-import { makeWorker } from "../../../src/runtime/sql/worker.js"
+import { make } from "../../../src/runtime/sql/worker.js"
 import type { DecodedRun } from "../../../src/runtime/sql/codec/rows.js"
 import { RunClaims, type ClaimedRun, type Service as ClaimsService } from "../../../src/runtime/sql/run/claims.js"
 import { RunStore, type Service as StoreService } from "../../../src/runtime/run/store.js"
 import type { RunInspection, RunStatus } from "../../../src/runtime/run.js"
 import { assistantRef } from "../execution/fixtures.js"
 
-workerWakeupSuite({ makeExecutableResolver, makeRunStore, makeWorker })
+workerWakeupSuite({ makeExecutableResolver, makeRunStore, make })
 
 const decodedRun: DecodedRun = {
   runId: "run:worker",
@@ -90,7 +90,7 @@ it.effect("renews a claim for the lifetime of agent execution", () =>
         execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(release))),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
+      const worker = yield* make({ workerId: "worker-a", lease: "100 millis" }).pipe(
         Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(
@@ -120,7 +120,7 @@ it.effect("interrupts a claimed Run once another node persists cancellation", ()
         execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(interrupted))),
         interrupt: () => Deferred.succeed(interrupted, undefined),
       })
-      const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
+      const worker = yield* make({ workerId: "worker-a", lease: "100 millis" }).pipe(
         Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("cancelling")),
         Effect.provideService(
@@ -150,7 +150,7 @@ it.effect("interrupts stale execution when lease renewal loses ownership", () =>
           ),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
+      const worker = yield* make({ workerId: "worker-a", lease: "100 millis" }).pipe(
         Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(
@@ -200,7 +200,7 @@ it.effect("refills capacity while another Run remains active", () =>
         },
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({
+      const worker = yield* make({
         workerId: "worker-a",
         concurrency: 2,
         lease: "1 second",
@@ -241,7 +241,7 @@ it.effect("reports scan, wakeup, fallback, capacity, claim age, and the last fai
         execute: () => Deferred.await(release),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({ workerId: "worker-a", concurrency: 2 }).pipe(
+      const worker = yield* make({ workerId: "worker-a", concurrency: 2 }).pipe(
         Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
@@ -303,7 +303,7 @@ it.effect("continuous run survives an unavailable claim poll", () =>
         execute: () => Deferred.succeed(started, undefined),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({ workerId: "worker-a", fallbackInterval: "10 millis" }).pipe(
+      const worker = yield* make({ workerId: "worker-a", fallbackInterval: "10 millis" }).pipe(
         Effect.provideService(RunExecutor, host),
         Effect.provideService(RunStore, storeService("running")),
         Effect.provideService(RunClaims, claims),
@@ -335,7 +335,7 @@ it.effect("does not restart an active Run for the same claim fence", () =>
           ),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({
+      const worker = yield* make({
         workerId: "worker-a",
         concurrency: 2,
         onClaim: () => Ref.update(observations, (count) => count + 1),
@@ -392,7 +392,7 @@ it.effect("replaces stale execution when the same Run is claimed with a newer fe
           ),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({
+      const worker = yield* make({
         workerId: "worker-a",
         concurrency: 2,
         onClaim: ({ attemptFence }) => Ref.update(observedFences, (values) => [...values, attemptFence]),
@@ -422,7 +422,7 @@ it.effect("awaits claim observation before host execution", () =>
         execute: () => Deferred.succeed(executed, undefined),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({
+      const worker = yield* make({
         workerId: "worker-a",
         onClaim: () => Deferred.succeed(observed, undefined).pipe(Effect.andThen(Deferred.await(continueObservation))),
       }).pipe(
@@ -464,7 +464,7 @@ it.effect("releases an unobserved claim when claim observation defects", () =>
         execute: ({ attemptFence }) => Ref.update(executedFences, (values) => [...values, attemptFence]),
         interrupt: () => Effect.void,
       })
-      const worker = yield* makeWorker({
+      const worker = yield* make({
         workerId: "worker-a",
         onClaim: ({ attemptFence }) =>
           Ref.getAndUpdate(observationAttempts, (count) => count + 1).pipe(
@@ -510,7 +510,7 @@ it.effect("closing the worker scope interrupts active execution", () =>
     })
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const worker = yield* makeWorker({ workerId: "worker-a" }).pipe(
+        const worker = yield* make({ workerId: "worker-a" }).pipe(
           Effect.provideService(RunExecutor, host),
           Effect.provideService(RunStore, storeService("running")),
           Effect.provideService(

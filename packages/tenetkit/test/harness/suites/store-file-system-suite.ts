@@ -389,7 +389,7 @@ describe("FileSystemStore", () => {
       yield* store.save(change.state)
       const undone = applied({
         state: yield* store.load(scope),
-        proposal: Refinement.rollbackProposal(change, { id: "rollback-1", at: at(9) }),
+        proposal: Refinement.makeRollback(change, { id: "rollback-1", at: at(9) }),
       })
       yield* store.save(undone.state)
       const final = yield* store.load(scope)

@@ -72,7 +72,7 @@ export const agentGuidanceReference = definePage({
       ["Path", "Contract"],
       [
         [
-          [code("Authorship.authorProposal")],
+          [code("Authorship.author")],
           [
             "The only entry point for model-originated input. It decodes against ",
             code("AuthoredProposal"),
@@ -82,7 +82,7 @@ export const agentGuidanceReference = definePage({
           ],
         ],
         [
-          [code("Refinement.applyProposal")],
+          [code("Refinement.apply")],
           [
             "Accepts only the opaque ",
             code("AuthoredRefinementProposal"),
@@ -90,7 +90,7 @@ export const agentGuidanceReference = definePage({
           ],
         ],
         [
-          [code("Refinement.applyTrustedProposal")],
+          [code("Refinement.applyTrusted")],
           [
             "The separately named route for a proposal that may pin a ",
             code("revision"),
@@ -98,7 +98,7 @@ export const agentGuidanceReference = definePage({
           ],
         ],
         [
-          [code("Refinement.rollbackProposal")],
+          [code("Refinement.makeRollback")],
           ["The trusted path, which does set ", code("revision"), " so a rollback restores the exact earlier entry"],
         ],
         [
@@ -120,9 +120,9 @@ export const agentGuidanceReference = definePage({
     ),
     h2("refinement", "Apply and rollback"),
     p(
-      code("Refinement.applyProposal(state, proposal, options?)"),
+      code("Refinement.apply(state, proposal, options?)"),
       " takes the authored proposal and ",
-      code("Refinement.applyTrustedProposal(state, proposal, options?)"),
+      code("Refinement.applyTrusted(state, proposal, options?)"),
       " takes one that may pin a revision. Both are pure and atomic: they return ",
       code("Result<RefinementResult, RefinementRejected>"),
       ", apply every edit or none, and never mutate their input. Each applied edit records the exact ",
@@ -145,7 +145,7 @@ export const agentGuidanceReference = definePage({
       ],
     ),
     p(
-      code("Refinement.rollbackProposal(result, options)"),
+      code("Refinement.makeRollback(result, options)"),
       " builds the inverse proposal: edits reversed, each guarded by the version it undoes, and ",
       code("baseSnapshot"),
       " derived from the supplied current state. It marks the refinement being reversed, so applying anything other than the newest fails ",
@@ -154,12 +154,12 @@ export const agentGuidanceReference = definePage({
     ),
     h2("merge", "Scope merge"),
     p(
-      code("Merge.mergeStates(outer, inner)"),
+      code("State.merge(outer, inner)"),
       " overlays one scope on another. An inner entry wins over an outer entry of the same kind and id, an override applies only within a kind, every surviving entry keeps the scope that authored it, and the merged state takes the inner scope. Refinement history merges by instant, then scope, then proposal id, so the result is deterministic.",
     ),
     h2("overview", "Bounded prompt overview"),
     p(
-      code("Overview.formatOverview(state, options?)"),
+      code("Overview.format(state, options?)"),
       " renders the compact overview a system prompt carries. Its size depends only on ",
       code("maxEntriesPerKind"),
       ", ",
@@ -172,7 +172,7 @@ export const agentGuidanceReference = definePage({
     ),
     h2("snapshot", "Snapshot identity"),
     p(
-      code("Snapshot.snapshot(state)"),
+      code("Snapshot.make(state)"),
       " pins one exact state as ",
       code("guidance-snapshot:v1:sha256:<digest>"),
       " over the schema version, scope, and encoded entries. Refinement history is audit data and stays outside the identity, so recording an event does not change what a snapshot means. ",

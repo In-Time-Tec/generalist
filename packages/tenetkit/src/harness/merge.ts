@@ -12,7 +12,7 @@ const compareText = (left: string, right: string): number => {
  * @experimental Overlay one inner scope on one outer scope. An inner entry wins over an outer entry of the same
  * kind and id; every surviving entry keeps the scope that authored it.
  */
-export const mergeStates: {
+export const merge: {
   (inner: GuidanceState): (outer: GuidanceState) => GuidanceState
   (outer: GuidanceState, inner: GuidanceState): GuidanceState
 } = Function.dual(2, (outer: GuidanceState, inner: GuidanceState): GuidanceState => {

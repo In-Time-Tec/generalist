@@ -612,7 +612,7 @@ describeMysql("mysql run store", () => {
         ).toBe(false)
       }).pipe(
         scopedWith(
-          RuntimeWorker.layerWorker({
+          RuntimeWorker.layer({
             workerId: "mysql-worker",
             concurrency: 2,
             lease: "5 seconds",

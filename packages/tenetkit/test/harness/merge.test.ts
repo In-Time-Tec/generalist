@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
-import { Entry, Merge, State } from "../../src/harness/index.js"
+import { Entry, State } from "../../src/harness/index.js"
 import { at, entry } from "./fixtures.js"
 
 const outerScope = "global"
@@ -40,9 +40,9 @@ const inner = State.make({
   refinements: [event("inner-1", innerScope, at(2))],
 })
 
-const merged = Merge.mergeStates(outer, inner)
+const merged = State.merge(outer, inner)
 
-describe("Merge.mergeStates", () => {
+describe("State.merge", () => {
   it("lets the inner scope win an id collision within a kind", () => {
     const winner = State.findEntry(merged, "memory", "shared")!
     expect(winner.content).toBe("inner")
@@ -79,15 +79,15 @@ describe("Merge.mergeStates", () => {
   it("orders equal instants by scope then proposal deterministically", () => {
     const left = State.make({ scope: "a", refinements: [event("z", "a", at(3)), event("y", "a", at(3))] })
     const right = State.make({ scope: "b", refinements: [event("x", "b", at(3))] })
-    expect(Merge.mergeStates(left, right).refinements.map((value) => value.proposal)).toEqual(["y", "z", "x"])
+    expect(State.merge(left, right).refinements.map((value) => value.proposal)).toEqual(["y", "z", "x"])
   })
 
   it("is deterministic across repeated merges", () => {
-    expect(State.snapshotId(Merge.mergeStates(outer, inner))).toBe(State.snapshotId(merged))
+    expect(State.snapshotId(State.merge(outer, inner))).toBe(State.snapshotId(merged))
   })
 
   it("is not commutative when a scope overrides", () => {
-    const reversed = Merge.mergeStates(inner, outer)
+    const reversed = State.merge(inner, outer)
     expect(State.findEntry(reversed, "memory", "shared")?.content).toBe("outer")
     expect(State.snapshotId(reversed)).not.toBe(State.snapshotId(merged))
   })
@@ -97,18 +97,18 @@ describe("Merge.mergeStates", () => {
       scope: "workspace",
       entries: [entry({ id: "shared", kind: "memory", scope: "workspace", content: "middle" })],
     })
-    const chained = Merge.mergeStates(Merge.mergeStates(outer, middle), inner)
+    const chained = State.merge(State.merge(outer, middle), inner)
     expect(State.findEntry(chained, "memory", "shared")?.content).toBe("inner")
     expect(State.findEntry(chained, "memory", "outer-only")).toBeDefined()
   })
 
   it("returns the inner state unchanged against an empty outer scope", () => {
-    const result = Merge.mergeStates(State.empty(outerScope), inner)
+    const result = State.merge(State.empty(outerScope), inner)
     expect(State.allEntries(result)).toEqual(State.allEntries(inner))
   })
 
   it("adopts every outer entry against an empty inner scope", () => {
-    const result = Merge.mergeStates(outer, State.empty(innerScope))
+    const result = State.merge(outer, State.empty(innerScope))
     expect(State.allEntries(result).map((value) => value.id)).toEqual(State.allEntries(outer).map((value) => value.id))
     expect(result.scope).toBe(innerScope)
   })

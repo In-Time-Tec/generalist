@@ -19,7 +19,7 @@ const entry = (id: string, kind: Entry.GuidanceKind): Entry.GuidanceEntry => ({
 })
 
 const state = State.make({ scope, entries: [entry("a", "memory"), entry("b", "skill")] })
-const pinned = Registration.registration(state, "guidance")
+const pinned = Registration.make(state, "guidance")
 
 const executableFor = (capability: AgentManifest.NamedCapability) => {
   const agent = AgentManifest.make({
@@ -117,7 +117,7 @@ describe("agent-guidance snapshot pinning through the runtime registration seam"
   )
 
   it("changes the Agent manifest and executable digests when the pinned guidance state changes", () => {
-    const changed = Registration.registration(
+    const changed = Registration.make(
       State.make({ scope, entries: [entry("a", "memory"), entry("b", "skill"), entry("d", "memory")] }),
       "guidance",
     )
@@ -128,7 +128,7 @@ describe("agent-guidance snapshot pinning through the runtime registration seam"
 
   it.effect("rejects a payload pinned for one state supplied against another pinned executable", () =>
     Effect.gen(function* () {
-      const changed = Registration.registration(State.make({ scope, entries: [entry("a", "memory")] }), "guidance")
+      const changed = Registration.make(State.make({ scope, entries: [entry("a", "memory")] }), "guidance")
       const other = executableFor(changed.capability)
       const failure = yield* ExecutableRegistration.validate(
         other,
