@@ -50,9 +50,7 @@ type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitSt
 type MutableSendAdmission = { -readonly [Key in keyof AdmitSendInput]: AdmitSendInput[Key] }
 type MutableMessageAdmission = { -readonly [Key in keyof AdmitMessageInput]: AdmitMessageInput[Key] }
 
-export const serviceEffect = (
-  options: LayerOptions,
-): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions> =>
+export const makeRuntime = (options: LayerOptions): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions> =>
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
@@ -497,4 +495,4 @@ export const serviceEffect = (
       awaitFanOut,
     })
   })
-export const layer = (options: LayerOptions) => Layer.effect(Runtime, serviceEffect(options))
+export const layer = (options: LayerOptions) => Layer.effect(Runtime, makeRuntime(options))

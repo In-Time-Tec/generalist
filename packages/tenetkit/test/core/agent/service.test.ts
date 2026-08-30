@@ -1597,7 +1597,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const journal: DurableDriver.DriverJournal = {
+        const journal: DurableDriver.Journal = {
           onScheduled: (operation) => {
             const input = Schema.decodeUnknownOption(Schema.Struct({ name: Schema.String }))(operation.input)
             return operation.kind === "tool" && Option.isSome(input) && input.value.name === "activate_skill"
@@ -1612,7 +1612,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events = yield* Agent.stream(agent, {
           prompt: "replay activation",
           logicalOperationId: "replayed-skill-run",
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, journal))
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, journal))
 
         expect(events.at(-1)?._tag).toBe("Completed")
         expect(bodyReads).toBe(1)
@@ -5398,7 +5398,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "spill-agent", toolkit: Toolkit.make(echoTool) })
         const tracing = testTracer()
-        const journal: DurableDriver.DriverJournal = {
+        const journal: DurableDriver.Journal = {
           onScheduled: () => Effect.void,
           onCompleted: (operation, outcome) =>
             operation.kind !== "tool"
@@ -5419,7 +5419,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               : Effect.void,
           ),
           Stream.runCollect,
-          Effect.provideService(DurableDriver.DriverJournalService, journal),
+          Effect.provideService(DurableDriver.DriverJournal, journal),
           Effect.provideService(Tracer.Tracer, tracing.tracer),
         )
 
@@ -8482,7 +8482,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const executable = ExecutableManifest.makeTest("journal-restart-agent", undefined)
         const pendingKey = "journal-restart:model:12:52:conversation"
         let pending: DurableDriver.DriverCheckpoint | undefined
-        const crashingJournal: DurableDriver.DriverJournal = {
+        const crashingJournal: DurableDriver.Journal = {
           onScheduled: (operation, checkpoint) => {
             if (operation.key !== pendingKey) return Effect.void
             return Effect.sync(() => {
@@ -8498,11 +8498,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           executableRef: executable.ref,
           modelCallOrdinalStart: 40,
           sessionId: "journal-restart",
-        }).pipe(
-          Stream.runDrain,
-          Effect.provideService(DurableDriver.DriverJournalService, crashingJournal),
-          Effect.exit,
-        )
+        }).pipe(Stream.runDrain, Effect.provideService(DurableDriver.DriverJournal, crashingJournal), Effect.exit)
         expect(modelCalls).toBe(12)
         expect(pending).toBeDefined()
         expect(pending?.turn).toBe(12)
@@ -8513,7 +8509,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const scheduled: Array<string> = []
         let safeCheckpoint: DurableDriver.DriverCheckpoint | undefined
-        const resumedJournal: DurableDriver.DriverJournal = {
+        const resumedJournal: DurableDriver.Journal = {
           onScheduled: (operation) =>
             Effect.sync(() => {
               scheduled.push(operation.key)
@@ -8533,7 +8529,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           executableRef: executable.ref,
           driverCheckpoint: pending!,
           sessionId: "journal-restart",
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, resumedJournal))
         expect(scheduled.find((key) => key.includes(":model:"))).toBe(pendingKey)
         const turnStarted = events.find((event) => event._tag === "TurnStarted")
         const call = events.find((event) => event._tag === "ModelCallStarted")
@@ -8554,7 +8550,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(safeState.pending).toBeUndefined()
 
         const overrideScheduled: Array<{ readonly key: string; readonly turn: number }> = []
-        const overrideJournal: DurableDriver.DriverJournal = {
+        const overrideJournal: DurableDriver.Journal = {
           onScheduled: (operation, checkpoint) =>
             Effect.sync(() => {
               overrideScheduled.push({ key: operation.key, turn: checkpoint.turn })
@@ -8569,7 +8565,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           driverCheckpoint: safeCheckpoint!,
           sessionId: "journal-restart",
           turnStart: 13,
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, overrideJournal))
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, overrideJournal))
         expect(overrideScheduled.every(({ turn }) => turn >= 12)).toBe(true)
         expect(overrideScheduled.find(({ key }) => key.includes(":model:"))?.key).toBe(
           "journal-restart:model:13:53:conversation",

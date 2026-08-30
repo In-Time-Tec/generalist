@@ -20,12 +20,12 @@ export const setupPromptContext = <T extends Record<string, import("effect/unsta
 }) =>
   Effect.gen(function* () {
     const instructionsService = yield* Effect.serviceOption(Instructions)
-    const skillSourceService = yield* Effect.serviceOption(SkillCatalog)
-    const skillRuntime = Option.isNone(skillSourceService)
+    const skillCatalog = yield* Effect.serviceOption(SkillCatalog)
+    const skillRuntime = Option.isNone(skillCatalog)
       ? undefined
       : {
-          catalog: skillSourceService.value,
-          skills: yield* skillSourceService.value.all.pipe(
+          catalog: skillCatalog.value,
+          skills: yield* skillCatalog.value.all.pipe(
             Effect.mapError((error) => AgentError.make({ message: error.message, turn: 0, cause: error })),
           ),
         }
@@ -64,7 +64,7 @@ export const setupPromptContext = <T extends Record<string, import("effect/unsta
     )
     return {
       instructionsService,
-      skillSourceService,
+      skillCatalog,
       skillRuntime,
       selectedSkills,
       skillListings,

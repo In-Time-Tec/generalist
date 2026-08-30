@@ -176,7 +176,11 @@ export const minimumConsumerProfiles = [
     packages: ["tenetkit", "cloudflare"],
     peers: [],
     imports: [
-      { specifier: "@tenetkit/cloudflare/durable-objects", runtimes: workerOnly, exports: ["layerRunStore"] },
+      {
+        specifier: "@tenetkit/cloudflare/durable-objects",
+        runtimes: workerOnly,
+        exports: ["Activations", "HibernatingWebSocket", "layerRunStore"],
+      },
       { specifier: "@tenetkit/cloudflare/dynamic-workers", runtimes: workerOnly, exports: ["layer", "make"] },
       { specifier: "@tenetkit/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
     ],

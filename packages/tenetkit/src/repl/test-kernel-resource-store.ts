@@ -2,7 +2,7 @@ import { Clock, Effect, Layer, Schema, SynchronizedRef } from "effect"
 import {
   type Claim,
   type CommandClaim,
-  type Service as KernelResourceStoreInterface,
+  type Service as KernelResourceStoreService,
   type KernelResourceFailure,
   KernelResourceRejected,
   KernelResourceStore,
@@ -67,7 +67,7 @@ const currentLease = (
 }
 
 /** @experimental In-memory resource authority controls used only by deterministic provider tests. */
-export interface MemoryResourceStore extends KernelResourceStoreInterface {
+export interface MemoryResourceStore extends KernelResourceStoreService {
   readonly expire: (sessionId: string) => Effect.Effect<void>
 }
 

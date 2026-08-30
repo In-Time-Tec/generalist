@@ -14,11 +14,10 @@ import {
   type Runtime,
 } from "tenetkit/runtime"
 import {
+  Activations,
+  HibernatingWebSocket,
   layerRunStore,
   layerSqlClient,
-  makeHibernatingWebSocket,
-  makeProjection,
-  schema as activationSchema,
   type DurableObjectStorage,
 } from "@tenetkit/cloudflare/durable-objects"
 import { inspectLogicalSqlSchema } from "../../../tenetkit/test/runtime/sql/schema-conformance.js"
@@ -52,13 +51,8 @@ interface Env {
 
 interface DurableObjectState {
   readonly storage: DurableObjectStorage
-  readonly acceptWebSocket: (
-    socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket,
-    tags?: ReadonlyArray<string>,
-  ) => void
-  readonly getWebSockets: (
-    tag?: string,
-  ) => ReadonlyArray<import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket>
+  readonly acceptWebSocket: (socket: HibernatingWebSocket.Socket, tags?: ReadonlyArray<string>) => void
+  readonly getWebSockets: (tag?: string) => ReadonlyArray<HibernatingWebSocket.Socket>
 }
 
 const lookup = Tool.make("lookup", {
@@ -233,14 +227,14 @@ const replayRuntime: Runtime.Service = {
 
 interface SocketPair {
   readonly 0: WebSocket
-  readonly 1: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket
+  readonly 1: HibernatingWebSocket.Socket
 }
 
 export class ReplayObject {
-  private readonly replay: ReturnType<typeof makeHibernatingWebSocket>
+  private readonly replay: ReturnType<typeof HibernatingWebSocket.make>
 
   constructor(state: DurableObjectState) {
-    this.replay = makeHibernatingWebSocket({ state, runtime: replayRuntime, pageSize: 1, fuel: 1 })
+    this.replay = HibernatingWebSocket.make({ state, runtime: replayRuntime, pageSize: 1, fuel: 1 })
   }
 
   fetch(request: Request): Promise<Response> {
@@ -252,18 +246,15 @@ export class ReplayObject {
     return Promise.resolve(new Response(null, { status: 101, webSocket: pair[0] }))
   }
 
-  webSocketMessage(
-    socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket,
-    message: string | ArrayBuffer,
-  ): Promise<void> {
+  webSocketMessage(socket: HibernatingWebSocket.Socket, message: string | ArrayBuffer): Promise<void> {
     return this.replay.webSocketMessage(socket, message)
   }
 
-  webSocketClose(socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket): void {
+  webSocketClose(socket: HibernatingWebSocket.Socket): void {
     this.replay.webSocketClose(socket)
   }
 
-  webSocketError(socket: import("@tenetkit/cloudflare/durable-objects").HibernatingWebSocket): void {
+  webSocketError(socket: HibernatingWebSocket.Socket): void {
     this.replay.webSocketError(socket)
   }
 }
@@ -322,7 +313,7 @@ export class SqlObject {
             idempotencyKey: acknowledgementRunId,
             correlationId: acknowledgementRunId,
           })
-          yield* activationSchema
+          yield* Activations.createSchema
           const committedAlarm = 4_000_000_000_000
           const rolledBackAlarm = 3_000_000_000_000
           const rearm = (at: number) =>
@@ -348,7 +339,7 @@ export class SqlObject {
               yield* sql`DELETE FROM tenetkit_activations WHERE run_id = 'workerd-committed'`
               yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-committed'`
               yield* insertRun("workerd-committed")
-              yield* makeProjection(sql, rearm(committedAlarm)).applyInTransaction([
+              yield* Activations.makeProjection(sql, rearm(committedAlarm)).applyInTransaction([
                 { runId: "workerd-committed", intent: "execute", attemptFence: 1, runStatus: "running" },
               ])
             }),
@@ -358,7 +349,7 @@ export class SqlObject {
               Effect.gen(function* () {
                 yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-rolled-back'`
                 yield* insertRun("workerd-rolled-back")
-                yield* makeProjection(sql, rearm(rolledBackAlarm)).applyInTransaction([
+                yield* Activations.makeProjection(sql, rearm(rolledBackAlarm)).applyInTransaction([
                   { runId: "workerd-rolled-back", intent: "execute", attemptFence: 1, runStatus: "running" },
                 ])
                 return yield* RuntimeUnavailable.make({ message: "force rollback" })

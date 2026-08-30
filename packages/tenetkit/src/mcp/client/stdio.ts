@@ -26,9 +26,7 @@ export const make = (options: TransportOptions): Transport => {
   return new StdioClientTransport(parameters)
 }
 
-const makeInterface = (
-  options: Options,
-): Effect.Effect<Service, MCPConnectionFailed | OAuthProviderError, Scope.Scope> =>
+const makeClient = (options: Options): Effect.Effect<Service, MCPConnectionFailed | OAuthProviderError, Scope.Scope> =>
   Effect.try({
     try: () => make(options.transport),
     catch: (error) => MCPConnectionFailed.make({ server: options.name, message: String(error) }),
@@ -42,7 +40,7 @@ const makeInterface = (
 
 /** @experimental */
 export const layer = (options: Options): Layer.Layer<MCPClient, MCPConnectionFailed | OAuthProviderError> =>
-  Layer.effect(MCPClient, makeInterface(options))
+  Layer.effect(MCPClient, makeClient(options))
 
 /** @experimental */
 export const layerTagged: {
@@ -56,5 +54,5 @@ export const layerTagged: {
     options: Options,
   ): Layer.Layer<Identifier, MCPConnectionFailed | OAuthProviderError>
 } = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Service>, options: Options) =>
-  Layer.effect(tag, makeInterface(options)),
+  Layer.effect(tag, makeClient(options)),
 )

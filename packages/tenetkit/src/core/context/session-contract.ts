@@ -18,7 +18,7 @@ export {
   type BranchSummaryEntry,
   type CheckpointAppend,
   type CompactionEntry,
-  type DirectoryInterface,
+  type Directory,
   type Entry,
   type EntryId,
   type HandoffEntry,

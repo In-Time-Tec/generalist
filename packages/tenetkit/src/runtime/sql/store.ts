@@ -90,7 +90,7 @@ import { layer as activeExecutionsLayer } from "../execution/active-executions.j
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
 import { RunExecutor } from "../execution/run-executor.js"
 import { make as makeRunExecutor } from "../execution/run-executor-internal.js"
-import { serviceEffect as makeRuntime } from "../memory/layer/service.js"
+import { layer as runtimeLayer } from "../memory/layer/service.js"
 import { Runtime } from "../service.js"
 import { sqlClaims } from "./store/kernel/claims.js"
 import { SqlObservability } from "./store/kernel/observability.js"
@@ -469,7 +469,7 @@ export const layerSqlRuntime = (input: {
     ),
   )
   const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = Layer.effect(Runtime, makeRuntime(input.options)).pipe(Layer.provide(dependencies))
+  const runtime = runtimeLayer(input.options).pipe(Layer.provide(dependencies))
   const host = Layer.effect(
     RunExecutor,
     makeRunExecutor({ workerId: input.workerId, resolver: input.options.resolver }),

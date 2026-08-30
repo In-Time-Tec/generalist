@@ -4,14 +4,14 @@ import {
 } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Context, type Duration, Effect, Function, Layer, Option, type Scope } from "effect"
-import { OAuthPending, type Service as OAuthInterface, OAuthProviderError } from "../oauth.js"
+import { OAuthPending, type Service as OAuthService, OAuthProviderError } from "../oauth.js"
 import { fromTransport, type Service, MCPConnectionFailed, MCPClient } from "../client.js"
 
 /** @experimental Process-local HTTP transport options. Construct request headers at this boundary. */
 export interface TransportOptions {
   readonly url: string
   readonly requestInit?: StreamableHTTPClientTransportOptions["requestInit"]
-  readonly oauth?: OAuthInterface
+  readonly oauth?: OAuthService
 }
 
 /** @experimental */
@@ -45,7 +45,7 @@ export const make = (options: TransportOptions): Transport => {
 const sanitizedConnectionError = (server: string): MCPConnectionFailed =>
   MCPConnectionFailed.make({ server, message: "MCP connection failed" })
 
-const makeInterface = (
+const makeClient = (
   options: Options,
 ): Effect.Effect<Service, MCPConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> => {
   const connect = Effect.try({
@@ -84,7 +84,7 @@ const makeInterface = (
 export const layer = (
   options: Options,
 ): Layer.Layer<MCPClient, MCPConnectionFailed | OAuthPending | OAuthProviderError> =>
-  Layer.effect(MCPClient, makeInterface(options))
+  Layer.effect(MCPClient, makeClient(options))
 
 /** @experimental */
 export const layerTagged: {
@@ -98,5 +98,5 @@ export const layerTagged: {
     options: Options,
   ): Layer.Layer<Identifier, MCPConnectionFailed | OAuthPending | OAuthProviderError>
 } = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Service>, options: Options) =>
-  Layer.effect(tag, makeInterface(options)),
+  Layer.effect(tag, makeClient(options)),
 )

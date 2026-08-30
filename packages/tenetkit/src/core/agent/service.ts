@@ -25,7 +25,7 @@ import type { Misconfigured } from "../model/resilience.js"
 import type { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from "../model/tool-call-validation.js"
 import { type Key, Memory } from "../context/memory.js"
 import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } from "../model/registry.js"
-import type { ToolAuthorizer } from "../tools/tool-authorization.js"
+import type { Authorizer } from "../tools/tool-authorization.js"
 import { ToolContext } from "../tools/tool-context.js"
 import { FrameworkFailure } from "../tools/tool-executor.js"
 import { HandoffLimitExceeded, HandoffRequirementsMissing, TargetMissing } from "./handoff/state.js"
@@ -75,7 +75,7 @@ export interface Agent<
   readonly policy: Policy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
-  readonly authorization?: ToolAuthorizer<AuthorizationServices>
+  readonly authorization?: Authorizer<AuthorizationServices>
   readonly toolScheduling: ToolSchedulingPolicy
   readonly metadata?: AgentMetadata
   readonly budget?: BudgetLimits
@@ -144,7 +144,7 @@ export interface MakeOptions<
   readonly policy?: Policy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
-  readonly authorization?: ToolAuthorizer<AuthorizationServices>
+  readonly authorization?: Authorizer<AuthorizationServices>
   readonly toolScheduling?: ToolSchedulingPolicy
   readonly metadata?: AgentMetadata
   readonly budget?: BudgetLimits
@@ -169,7 +169,7 @@ type ModelRequirement<O> = [Exclude<OptionValue<O, "model">, undefined>] extends
     : ModelRegistry
 type MemoryRequirement<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
 type PolicyRequirement<O> = O extends { readonly policy: Policy<infer R> } ? R : never
-type AuthorizationRequirement<O> = O extends { readonly authorization: ToolAuthorizer<infer R> } ? R : never
+type AuthorizationRequirement<O> = O extends { readonly authorization: Authorizer<infer R> } ? R : never
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>

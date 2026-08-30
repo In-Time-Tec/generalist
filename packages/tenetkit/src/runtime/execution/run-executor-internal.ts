@@ -3,7 +3,7 @@ import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
 import type { Event } from "../../core/agent/event.js"
 import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
-import { type DriverCheckpoint, type DriverJournal, DriverJournalService } from "../../core/durable/driver.js"
+import { type DriverCheckpoint, DriverJournal, type Journal } from "../../core/durable/driver.js"
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
 import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
@@ -174,7 +174,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
                           }
                         >(),
                       )
-                      const journal: DriverJournal = {
+                      const journal: Journal = {
                         onScheduled: (operation, checkpoint) =>
                           Effect.gen(function* () {
                             const [steeringEntryIds, steeringPrompt, steeringEvents] =
@@ -299,7 +299,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
                           }).pipe(Effect.mapError((error) => journalFailure("completion", operation.key, error))),
                         onCheckpoint: (checkpoint) => saveJournalCheckpoint({ store, claim, checkpoint }),
                       }
-                      const context = Context.merge(baseContext, Context.make(DriverJournalService, journal))
+                      const context = Context.merge(baseContext, Context.make(DriverJournal, journal))
                       if (
                         !matchesActiveRunOptions(claimed.executableRef, claimed.executableManifest, resolved.runOptions)
                       ) {

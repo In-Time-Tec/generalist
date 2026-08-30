@@ -18,7 +18,7 @@ const Attachment = Schema.Union([
 export type Attachment = typeof Attachment.Type
 
 /** @experimental Narrow Cloudflare hibernating WebSocket surface. */
-export interface HibernatingWebSocket {
+export interface Socket {
   readonly send: (message: string) => void
   readonly close: (code?: number, reason?: string) => void
   readonly serializeAttachment: (attachment: Attachment) => void
@@ -26,14 +26,14 @@ export interface HibernatingWebSocket {
 }
 
 /** @experimental Narrow Cloudflare Durable Object hibernation surface. */
-export interface HibernatingWebSocketState {
-  readonly acceptWebSocket: (socket: HibernatingWebSocket, tags?: ReadonlyArray<string>) => void
-  readonly getWebSockets: (tag?: string) => ReadonlyArray<HibernatingWebSocket>
+export interface State {
+  readonly acceptWebSocket: (socket: Socket, tags?: ReadonlyArray<string>) => void
+  readonly getWebSockets: (tag?: string) => ReadonlyArray<Socket>
 }
 
 /** @experimental Bounded adapter configuration. */
-export interface HibernatingWebSocketOptions {
-  readonly state: HibernatingWebSocketState
+export interface Options {
+  readonly state: State
   readonly runtime: Runtime.Service
   readonly pageSize?: number
   readonly fuel?: number
@@ -49,21 +49,21 @@ export interface FlushResult {
 const tag = "tenetkit:replay:v1"
 const maxAttachmentBytes = 2_048
 const textEncoder = new TextEncoder()
-const operations = new WeakMap<HibernatingWebSocket, Promise<unknown>>()
+const operations = new WeakMap<Socket, Promise<unknown>>()
 
-const decodeAttachment = (socket: HibernatingWebSocket): Option.Option<Attachment> =>
+const decodeAttachment = (socket: Socket): Option.Option<Attachment> =>
   Schema.decodeUnknownOption(Attachment)(socket.deserializeAttachment())
 
-const persist = (socket: HibernatingWebSocket, attachment: Attachment): boolean => {
+const persist = (socket: Socket, attachment: Attachment): boolean => {
   if (textEncoder.encode(JSON.stringify(attachment)).byteLength > maxAttachmentBytes) return false
   socket.serializeAttachment(attachment)
   return true
 }
 
-const close = (socket: HibernatingWebSocket, code: number, reason: string): void => socket.close(code, reason)
+const close = (socket: Socket, code: number, reason: string): void => socket.close(code, reason)
 
 /** @experimental Construct native handlers with no resident subscription, fiber, or timer. */
-export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) => {
+export const make = (options: Options) => {
   const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 64), 1), 1_000)
   const fuel = Math.min(Math.max(Math.trunc(options.fuel ?? 4), 1), 32)
   const runPage = (runId: string, cursor: Cursor.Cursor) =>
@@ -71,7 +71,7 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
       page({ runId, cursor, limit: pageSize }).pipe(Effect.provideService(Runtime.Runtime, options.runtime)),
     )
 
-  const drainSocket = async (socket: HibernatingWebSocket): Promise<FlushResult> => {
+  const drainSocket = async (socket: Socket): Promise<FlushResult> => {
     const decoded = decodeAttachment(socket)
     if (Option.isNone(decoded)) {
       close(socket, 1002, "malformed-attachment")
@@ -102,7 +102,7 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
     return { sockets: 1, frames, hasMore }
   }
 
-  const enqueue = <A>(socket: HibernatingWebSocket, operation: () => Promise<A>): Promise<A> => {
+  const enqueue = <A>(socket: Socket, operation: () => Promise<A>): Promise<A> => {
     const previous = operations.get(socket)
     const current = (previous === undefined ? Promise.resolve() : previous.catch(() => undefined)).then(operation)
     operations.set(socket, current)
@@ -113,7 +113,7 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
     return current
   }
 
-  const flushSocket = (socket: HibernatingWebSocket): Promise<FlushResult> => enqueue(socket, () => drainSocket(socket))
+  const flushSocket = (socket: Socket): Promise<FlushResult> => enqueue(socket, () => drainSocket(socket))
 
   const flush = async (runId?: string): Promise<FlushResult> => {
     let frames = 0
@@ -137,12 +137,12 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
   }
 
   return {
-    accept(socket: HibernatingWebSocket): void {
+    accept(socket: Socket): void {
       const attachment: Attachment = { version: 1, state: "unattached" }
       if (!persist(socket, attachment)) return close(socket, 1009, "attachment-too-large")
       options.state.acceptWebSocket(socket, [tag])
     },
-    async webSocketMessage(socket: HibernatingWebSocket, message: string | ArrayBuffer): Promise<void> {
+    async webSocketMessage(socket: Socket, message: string | ArrayBuffer): Promise<void> {
       if (message instanceof ArrayBuffer) return close(socket, 1003, "binary-command")
       await enqueue(socket, async () => {
         const command = await Effect.runPromiseExit(decodeCommand(message))
@@ -179,8 +179,8 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
         )
       })
     },
-    webSocketClose(_socket: HibernatingWebSocket): void {},
-    webSocketError(_socket: HibernatingWebSocket): void {},
+    webSocketClose(_socket: Socket): void {},
+    webSocketError(_socket: Socket): void {},
     flush,
     flushSocket,
   }

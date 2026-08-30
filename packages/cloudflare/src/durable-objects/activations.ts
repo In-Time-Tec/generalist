@@ -9,8 +9,8 @@ export type Rearm = Effect.Effect<void, Errors.RuntimeUnavailable>
 const unavailable = (cause: unknown) =>
   Errors.RuntimeUnavailable.make({ message: `activation projection failed: ${String(cause)}` })
 
-/** @experimental Adapter-owned activation schema. */
-export const schema = Effect.gen(function* () {
+/** @experimental Create the adapter-owned activation schema. */
+export const createSchema = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql`CREATE TABLE IF NOT EXISTS tenetkit_activations (
     run_id TEXT PRIMARY KEY,
@@ -54,11 +54,11 @@ export const makeProjection: {
 )
 
 /** @experimental Create, backfill, and arm adapter candidates in the caller's transaction. */
-export const migrateAndBackfill = (rearm: Rearm): Effect.Effect<void, Errors.RuntimeUnavailable, SqlClient.SqlClient> =>
+export const initialize = (rearm: Rearm): Effect.Effect<void, Errors.RuntimeUnavailable, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const now = yield* Clock.currentTimeMillis
-    yield* schema
+    yield* createSchema
     yield* sql`DELETE FROM tenetkit_activations`
     yield* sql`INSERT INTO tenetkit_activations
         (run_id, intent, due_at_millis, attempt_fence, run_status)
@@ -83,3 +83,5 @@ export const nextDueAt = Effect.gen(function* () {
   `
   return rows[0]?.due_at_millis ?? undefined
 })
+
+export { drain, type DrainOptions, type DrainResult } from "./drain.js"

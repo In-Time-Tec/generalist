@@ -11,9 +11,9 @@ import { Runtime, type LayerOptions } from "../service.js"
 import { layer as runtimeLayer } from "./layer/service.js"
 import { layerMemory as storeLayer } from "./store.js"
 
-export { serviceEffect as makeRuntime } from "./layer/service.js"
+export { makeRuntime } from "./layer/service.js"
 
-export const layer = (
+export const layerMemory = (
   options: LayerOptions,
 ): Layer.Layer<Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler> => {
   const store = storeLayer(options)
@@ -28,5 +28,3 @@ export const layer = (
   )
   return Layer.mergeAll(runtime, host, store, scheduler)
 }
-
-export const layerMemory = layer

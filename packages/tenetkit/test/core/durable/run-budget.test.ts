@@ -46,7 +46,7 @@ const journalCapture = () => {
   const completedCheckpoints = new Array<DriverCheckpoint>()
   const checkpointWrites = new Array<DriverCheckpoint>()
   let lastCheckpoint: DriverCheckpoint | undefined
-  const journal: DurableDriver.DriverJournal = {
+  const journal: DurableDriver.Journal = {
     onScheduled: (operation) =>
       Effect.sync(() => {
         scheduled.push({ kind: operation.kind, key: operation.key })
@@ -69,7 +69,7 @@ const journalCapture = () => {
     get lastCheckpoint() {
       return lastCheckpoint
     },
-    journalLayer: Layer.succeed(DurableDriver.DriverJournalService, journal),
+    journalLayer: Layer.succeed(DurableDriver.DriverJournal, journal),
   }
 }
 
@@ -101,7 +101,7 @@ const makeToolCallModelLayer = () => {
   )
 }
 
-const baseLayers = (journalLayer: Layer.Layer<DurableDriver.DriverJournalService>) =>
+const baseLayers = (journalLayer: Layer.Layer<DurableDriver.DriverJournal>) =>
   Layer.mergeAll(
     makeToolCallModelLayer(),
     ToolExecutor.layerTest({

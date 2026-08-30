@@ -18,7 +18,7 @@ import {
 } from "../../model/telemetry/events.js"
 import { Permissions, RuleStore } from "../../policy/permissions.js"
 import { restoreCheckpointTelemetry } from "../session/history.js"
-import { ToolAuthorizerService, make as makeToolAuthorizer } from "../../tools/tool-authorization.js"
+import { ToolAuthorizer, make as makeToolAuthorizer } from "../../tools/tool-authorization.js"
 import { ToolExecutor } from "../../tools/tool-executor.js"
 import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../../durable/loop-driver-state.js"
 import type { Agent, RunOptions } from "../service.js"
@@ -33,7 +33,7 @@ import type { ModelSource } from "../model-turn/model-source.js"
 export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(agent: Agent<T, R, P, A>) =>
   Effect.gen(function* () {
     if (agent.authorization !== undefined) return agent.authorization
-    const configured = yield* Effect.serviceOption(ToolAuthorizerService)
+    const configured = yield* Effect.serviceOption(ToolAuthorizer)
     if (Option.isSome(configured)) return configured.value
     const permissions = yield* Effect.serviceOption(Permissions)
     const approvals = yield* Effect.serviceOption(Approvals)
@@ -71,7 +71,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const promptContext = yield* setupPromptContext({ agent, options, activeSession, resumeChat, staticCandidates })
     const {
       instructionsService,
-      skillSourceService,
+      skillCatalog,
       skillRuntime,
       selectedSkills,
       skillListings,
@@ -248,7 +248,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       sessionId,
       sessionAppendOptions,
       instructionsService,
-      skillSourceService,
+      skillCatalog,
       skillRuntime,
       selectedSkills,
       skillListings,

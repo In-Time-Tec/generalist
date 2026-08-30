@@ -54,13 +54,13 @@ export interface Request extends AccessRequest {
 }
 
 /** @experimental Final tool authorization boundary. */
-export interface ToolAuthorizer<R = never> {
+export interface Authorizer<R = never> {
   readonly authorize: (request: Request) => Effect.Effect<ToolAuthorization, AuthorizationError, R>
 }
 
 /** @experimental Optional exact tool authorizer service for run-layer composition. */
-export class ToolAuthorizerService extends Context.Service<ToolAuthorizerService, ToolAuthorizer<never>>()(
-  "tenetkit/core/tools/tool-authorization/ToolAuthorizerService",
+export class ToolAuthorizer extends Context.Service<ToolAuthorizer, Authorizer<never>>()(
+  "tenetkit/core/tools/tool-authorization/ToolAuthorizer",
 ) {}
 
 /** @experimental Required services used by the linear authorization pass. */
@@ -93,7 +93,7 @@ const suspend = (request: Request, token: string): Suspend => ({
 })
 
 /** @experimental Build the authorizer from its three required policy seams. */
-export const make = (options: Options): ToolAuthorizer => ({
+export const make = (options: Options): Authorizer => ({
   authorize: (request) =>
     Effect.gen(function* () {
       if (!request.active || request.tool === undefined)
@@ -142,5 +142,5 @@ export const make = (options: Options): ToolAuthorizer => ({
 })
 
 /** @experimental Provide an exact authorizer for tests or run-layer composition. */
-export const layerTest = (authorizer: ToolAuthorizer): Layer.Layer<ToolAuthorizerService> =>
-  Layer.succeed(ToolAuthorizerService, ToolAuthorizerService.of(authorizer))
+export const layerTest = (authorizer: Authorizer): Layer.Layer<ToolAuthorizer> =>
+  Layer.succeed(ToolAuthorizer, ToolAuthorizer.of(authorizer))

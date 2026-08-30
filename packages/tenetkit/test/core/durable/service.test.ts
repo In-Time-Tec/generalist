@@ -674,7 +674,7 @@ const provideScoped = Function.dual<
 
 const captureJournal = () => {
   const scheduled = new Array<{ readonly kind: string; readonly key: string; readonly replayPolicy: string }>()
-  const journal: DurableDriver.DriverJournal = {
+  const journal: DurableDriver.Journal = {
     onScheduled: (operation) =>
       Effect.sync(() => {
         scheduled.push({ kind: operation.kind, key: operation.key, replayPolicy: operation.replayPolicy })
@@ -682,7 +682,7 @@ const captureJournal = () => {
     onCompleted: () => Effect.void,
     onCheckpoint: () => Effect.void,
   }
-  return { scheduled, journalLayer: Layer.succeed(DurableDriver.DriverJournalService, journal) }
+  return { scheduled, journalLayer: Layer.succeed(DurableDriver.DriverJournal, journal) }
 }
 
 const batchToolFixture = (logicalOperationId: string, ids: ReadonlyArray<string>) =>
@@ -1078,7 +1078,7 @@ describe("DurableDriver Agent.stream integration", () => {
 
   it.effect("records bounded Session sync cursors as the path grows", () => {
     const outcomes = new Array<DurableDriver.OperationOutcome>()
-    const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+    const journalLayer = Layer.succeed(DurableDriver.DriverJournal, {
       onScheduled: () => Effect.void,
       onCompleted: (operation, outcome) =>
         Effect.sync(() => {
@@ -1140,7 +1140,7 @@ describe("DurableDriver Agent.stream integration", () => {
       string,
       { operation: DurableDriver.DriverOperation; outcome: DurableDriver.OperationOutcome }
     >()
-    const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+    const journalLayer = Layer.succeed(DurableDriver.DriverJournal, {
       onScheduled: (operation) =>
         Effect.gen(function* () {
           if (operation.kind !== "memory" || !operation.key.includes(":memory:sync:")) return undefined
@@ -1202,7 +1202,7 @@ describe("DurableDriver Agent.stream integration", () => {
     const remembered = new Array<Prompt.Prompt>()
     let replayMemory = false
     let appendCalls = 0
-    const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+    const journalLayer = Layer.succeed(DurableDriver.DriverJournal, {
       onScheduled: (operation) =>
         Effect.sync(() =>
           replayMemory && operation.kind === "memory" && operation.key.includes(":memory:sync:")
@@ -1353,7 +1353,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const recorded = new Map<string, DurableDriver.OperationOutcome>()
       let replay = false
       let providerCalls = 0
-      const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+      const journalLayer = Layer.succeed(DurableDriver.DriverJournal, {
         onScheduled: (operation) => Effect.sync(() => (replay ? recorded.get(operation.key) : undefined)),
         onCompleted: (operation, outcome) =>
           Effect.sync(() => {
@@ -1401,7 +1401,7 @@ describe("DurableDriver Agent.stream integration", () => {
 
   it.effect("surfaces a model completion acknowledgement failure through Agent.stream", () =>
     Effect.gen(function* () {
-      const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+      const journalLayer = Layer.succeed(DurableDriver.DriverJournal, {
         onScheduled: () => Effect.void,
         onCompleted: (operation: DurableDriver.DriverOperation) =>
           operation.kind === "model"
@@ -1497,7 +1497,7 @@ describe("DurableDriver Agent.stream integration", () => {
       let replaySettled = false
       const completionStarted = yield* Deferred.make<void>()
       const completionRelease = yield* Deferred.make<void>()
-      const journal: DurableDriver.DriverJournal = {
+      const journal: DurableDriver.Journal = {
         onScheduled: (operation, checkpoint) =>
           Effect.sync(() => {
             if (operation.key !== targetOperation) return undefined
@@ -1532,7 +1532,7 @@ describe("DurableDriver Agent.stream integration", () => {
           ToolExecutor.layerTest({
             execute: () => Effect.succeed({ _tag: "Success", result: "echoed", encodedResult: "echoed" }),
           }),
-          Layer.succeed(DurableDriver.DriverJournalService, journal),
+          Layer.succeed(DurableDriver.DriverJournal, journal),
           unusedToolHandlerLayer,
           Session.layerMemory,
         ),
@@ -1613,7 +1613,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const recorded = new Map<string, DurableDriver.OperationOutcome>()
       let replayTools = false
       let executions = 0
-      const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+      const journalLayer = Layer.succeed(DurableDriver.DriverJournal, {
         onScheduled: (operation) =>
           Effect.sync(() => (replayTools && operation.kind === "tool" ? recorded.get(operation.key) : undefined)),
         onCompleted: (operation, outcome) =>

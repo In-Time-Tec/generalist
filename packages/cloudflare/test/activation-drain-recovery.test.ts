@@ -13,13 +13,7 @@ import {
   TreePolicy,
 } from "tenetkit/runtime"
 import type { RunActivation, RunActivationProjection } from "tenetkit/runtime/sql-driver"
-import {
-  drain,
-  makeExclusiveExecutionRecovery,
-  makeProjection,
-  nextDueAt,
-  schema,
-} from "../src/durable-objects/index.js"
+import { Activations, makeExclusiveExecutionRecovery } from "../src/durable-objects/index.js"
 import {
   assistant,
   assistantAddress,
@@ -69,10 +63,10 @@ const projectedRuntimeLayer = (rearm: Effect.Effect<void, Errors.RuntimeUnavaila
     RunStore,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* schema
+      yield* Activations.createSchema
       return yield* makeSqliteRunStore({
         ...runtimeOptions,
-        activationProjection: makeProjection(sql, rearm),
+        activationProjection: Activations.makeProjection(sql, rearm),
       })
     }),
   ).pipe(Layer.provide(client))
@@ -200,8 +194,8 @@ it.live("deletes inactive projections and rolls candidate writes back with the c
     runtimeLayer(),
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* schema
-      const projection = makeProjection(sql, Effect.void)
+      yield* Activations.createSchema
+      const projection = Activations.makeProjection(sql, Effect.void)
       yield* sql.withTransaction(
         projection.applyInTransaction([{ runId: "run", intent: "execute", attemptFence: 0, runStatus: "running" }]),
       )
@@ -225,12 +219,12 @@ it.live("rearms a shared host alarm from final transaction state and lets earlie
     runtimeLayer(),
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* schema
+      yield* Activations.createSchema
       yield* sql`CREATE TABLE host_ready_work (due_at_millis INTEGER NOT NULL)`
       yield* sql`INSERT INTO host_ready_work VALUES (0)`
       const observed: Array<{ readonly tenetkit?: number; readonly shared: number }> = []
       const rearm = Effect.gen(function* () {
-        const tenetkit = yield* nextDueAt
+        const tenetkit = yield* Activations.nextDueAt
         const host = yield* sql<{ readonly due_at_millis: number }>`
           SELECT MIN(due_at_millis) AS due_at_millis FROM host_ready_work
         `
@@ -242,7 +236,7 @@ it.live("rearms a shared host alarm from final transaction state and lets earlie
         Effect.mapError(() => RuntimeUnavailable.make({ message: "shared alarm rearm failed" })),
       )
       yield* sql.withTransaction(
-        makeProjection(sql, rearm).applyInTransaction([
+        Activations.makeProjection(sql, rearm).applyInTransaction([
           { runId: "tenetkit", intent: "execute", attemptFence: 1, runStatus: "running" },
         ]),
       )
@@ -259,7 +253,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
     runtimeLayer(),
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* schema
+      yield* Activations.createSchema
       const future = (yield* Clock.currentTimeMillis) + 60_000
       yield* sql`INSERT INTO tenetkit_activations VALUES
         ('b', 'execute', 0, 0, 'queued'),
@@ -311,7 +305,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
         ...liveScheduler,
         reconcileCancellation: () => Effect.succeed("inactive"),
       })
-      const result = yield* drain({ ownerId: "owner", fuel: 1, rearm: Effect.void }).pipe(
+      const result = yield* Activations.drain({ ownerId: "owner", fuel: 1, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, store),
         Effect.provideService(RunExecutor, executor),
         Effect.provideService(LocalScheduler, scheduler),
@@ -329,7 +323,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
         claimExecution: ({ runId }: { readonly runId: string }) =>
           Effect.fail(StaleClaim.make({ runId, workerId: "owner", attemptFence: 0 })),
       })
-      const stale = yield* drain({ ownerId: "owner", fuel: 5, rearm: Effect.void }).pipe(
+      const stale = yield* Activations.drain({ ownerId: "owner", fuel: 5, rearm: Effect.void }).pipe(
         Effect.provideService(RunStore, harmless),
         Effect.provideService(RunExecutor, executor),
         Effect.provideService(LocalScheduler, scheduler),

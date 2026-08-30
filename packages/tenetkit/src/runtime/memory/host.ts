@@ -63,4 +63,4 @@ export type {
   Event as ModelPreviewEvent,
 } from "../execution/model-response/preview.js"
 export type { SteeringReceipt } from "../run/steering.js"
-export { layer, layerMemory } from "../memory/layer.js"
+export { layerMemory } from "../memory/layer.js"
