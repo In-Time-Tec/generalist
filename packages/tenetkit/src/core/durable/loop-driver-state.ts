@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { DriverOperationKind, ReplayPolicy } from "./driver/contract.js"
-import { HandoffControlState } from "../agent/handoff/state.js"
-import { RunBudgetExhausted } from "./run-budget.js"
+import { ControlState } from "../agent/handoff/state.js"
+import { Exhausted } from "./run-budget.js"
 import { ToolBatchCheckpoint } from "../agent/tools/checkpoint.js"
 
 /** @experimental Pending operation the interpreter schedules before decide. */
@@ -21,10 +21,10 @@ export const LoopDriverState = Schema.Struct({
   sessionId: Schema.String,
   modelCallOrdinal: Schema.Finite,
   modelCallOrdinalStart: Schema.Finite,
-  handoff: Schema.optionalKey(HandoffControlState),
+  handoff: Schema.optionalKey(ControlState),
   pending: Schema.optionalKey(PendingOperation),
   toolBatch: Schema.optionalKey(ToolBatchCheckpoint),
-  postCommitFailure: Schema.optionalKey(RunBudgetExhausted),
+  postCommitFailure: Schema.optionalKey(Exhausted),
   terminal: Schema.optionalKey(
     Schema.Struct({
       text: Schema.String,

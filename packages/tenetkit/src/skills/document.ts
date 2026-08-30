@@ -1,5 +1,5 @@
 import { Effect, Function, Schema } from "effect"
-import { DESCRIPTION_CAP, SkillCatalogError } from "../core/context/skill-catalog.js"
+import { descriptionLimit, SkillCatalogError } from "../core/context/skill-catalog.js"
 import { Frontmatter } from "../core/context/skill-catalog-internal.js"
 
 export interface ParsedDocument {
@@ -176,7 +176,7 @@ export const parseFrontmatter: {
     }
     return yield* Schema.decodeUnknownEffect(Frontmatter)(parsed).pipe(
       Effect.mapError((cause) =>
-        sourceError(source, `SKILL.md description must contain 1-${DESCRIPTION_CAP} characters`, cause),
+        sourceError(source, `SKILL.md description must contain 1-${descriptionLimit} characters`, cause),
       ),
     )
   }),

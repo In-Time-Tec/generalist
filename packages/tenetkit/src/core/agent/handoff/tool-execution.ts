@@ -7,7 +7,7 @@ import { FrameworkFailure, type Outcome, type Success } from "../../tools/tool-e
 import { type Registry, get } from "../../tools/tool-registry.js"
 import { executeSameRunHandoff } from "../../policy/handoff-runtime.js"
 import { lookupHandoffToolMeta } from "../../policy/handoff-tool-meta.js"
-import { HandoffCatalog } from "../../policy/handoff-target.js"
+import { Catalog } from "../../policy/handoff-target.js"
 
 export const runHandoffTool = (input: {
   readonly turn: number
@@ -35,7 +35,7 @@ export const runHandoffTool = (input: {
         message: `Handoff metadata missing for ${input.call.name}`,
       })
     }
-    const catalog = yield* Effect.serviceOption(HandoffCatalog)
+    const catalog = yield* Effect.serviceOption(Catalog)
     if (Option.isNone(catalog)) {
       return yield* FrameworkFailure.make({
         stage: "missing-handler",
@@ -55,7 +55,7 @@ export const runHandoffTool = (input: {
       chat: input.chat,
       toolState: input.toolState,
     }
-    const executionInput: import("../../policy/handoff-runtime.js").ExecuteHandoffInput = handoffInput
+    const executionInput: import("../../policy/handoff-runtime.js").ExecuteInput = handoffInput
     if (input.resolvingToolCallIds !== undefined)
       Object.assign(executionInput, { resolvingToolCallIds: input.resolvingToolCallIds })
     if (meta.projection !== undefined) Object.assign(executionInput, { projection: meta.projection })

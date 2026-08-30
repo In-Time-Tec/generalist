@@ -21,7 +21,7 @@ const chatCompletions = chatCompletionsLayer({
 })
 
 export const registryLayer: Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =
-  ModelRegistry.layerCombined([responses, chatCompletions])
+  ModelRegistry.layerMerged([responses, chatCompletions])
 
 export const responsesSelection: ModelRegistry.ModelSelection = {
   provider: "my-responses-endpoint",

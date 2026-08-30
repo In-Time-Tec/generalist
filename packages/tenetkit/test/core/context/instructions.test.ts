@@ -7,14 +7,14 @@ const context: Instructions.RenderContext = { agentName: "agent", turn: 0 }
 const source = (
   id: string,
   render: (context: Instructions.RenderContext) => Option.Option<string>,
-): Instructions.Source => ({ id, render: (input) => Effect.succeed(render(input)) })
+): Instructions.Provider => ({ id, render: (input) => Effect.succeed(render(input)) })
 
 describe("Instructions", () => {
   it.effect("renders every source once and joins non-empty results in order", () =>
     Effect.gen(function* () {
-      const baseline = yield* Instructions.openEpoch(
+      const baseline = yield* Instructions.render(
         {
-          sources: [
+          providers: [
             source("base", () => Option.some("base")),
             source("empty", () => Option.none()),
             source("turn", (input) => Option.some(`turn:${input.turn}`)),
@@ -26,10 +26,10 @@ describe("Instructions", () => {
     }),
   )
 
-  it.effect("staticSource contributes non-empty text", () =>
+  it.effect("fromText contributes non-empty text", () =>
     Effect.gen(function* () {
-      const full = yield* Instructions.openEpoch({ sources: [Instructions.staticSource("base", "hello")] }, context)
-      const empty = yield* Instructions.openEpoch({ sources: [Instructions.staticSource("empty", "")] }, context)
+      const full = yield* Instructions.render({ providers: [Instructions.fromText("base", "hello")] }, context)
+      const empty = yield* Instructions.render({ providers: [Instructions.fromText("empty", "")] }, context)
       expect(full).toBe("hello")
       expect(empty).toBe("")
     }),

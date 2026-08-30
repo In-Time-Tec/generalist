@@ -39,7 +39,7 @@ const modelLayer = Layer.effect(
             Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
           )
         : Stream.make(
-            Response.makePart("text-delta", { id: "assistant", delta: "TurnPolicy caps follow-up turns." }),
+            Response.makePart("text-delta", { id: "assistant", delta: "Policy caps follow-up turns." }),
             Response.makePart("finish", { reason: "stop", usage, response: undefined }),
           )
     },
@@ -48,7 +48,7 @@ const modelLayer = Layer.effect(
 
 const layers = Layer.mergeAll(
   modelLayer,
-  toolkit.toLayer({ search_docs: () => Effect.succeed("TurnPolicy is a plain value with a default of forever.") }),
+  toolkit.toLayer({ search_docs: () => Effect.succeed("Policy is a plain value with a default of forever.") }),
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )
@@ -56,7 +56,7 @@ const layers = Layer.mergeAll(
 const describe = (event: AgentEvent.Event): string =>
   event._tag === "Completed" ? `Completed after ${event.turns} turns` : `turn ${event.turn} ${event._tag}`
 
-const program = Agent.stream(agent, { prompt: "What does TurnPolicy do?" }).pipe(
+const program = Agent.stream(agent, { prompt: "What does Policy do?" }).pipe(
   Stream.filter((event) => event._tag !== "ModelPart"),
   Stream.runForEach((event) => Console.log(describe(event))),
 )

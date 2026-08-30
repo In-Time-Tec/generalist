@@ -20,7 +20,7 @@ import { withProviderFinish } from "../provider-finish.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { sha256Text } from "../../../src/core/durable/canonical-json.js"
 import { edgeCount, incrementEdge } from "../../../src/core/agent/handoff/state.js"
-import { applyHandoffCommit } from "../../../src/core/durable/loop-driver.js"
+import { applyCommit } from "../../../src/core/durable/loop-driver.js"
 import { makeAgent, makeExecutable } from "../../../src/core/durable/pin-internal.js"
 import { withDerivedSystem } from "../../../src/core/agent/session/history.js"
 import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
@@ -52,7 +52,7 @@ describe("executable identity", () => {
     const executable = makeExecutable({ root, child })
     const projectedHistory = Prompt.make("committed projection")
     const commit = {
-      _tag: "HandoffCommit" as const,
+      _tag: "Commit" as const,
       state: {
         root: "a",
         active: "b",
@@ -67,7 +67,7 @@ describe("executable identity", () => {
       targetAgentPin: child,
     }
     return Effect.gen(function* () {
-      const checkpoint = yield* applyHandoffCommit(
+      const checkpoint = yield* applyCommit(
         {
           driverVersion: "1",
           executable: { executable, active: root },
@@ -428,45 +428,45 @@ describe("executable identity", () => {
 describe("RunBudget", () => {
   it("rejects negative, fractional, and unsafe dimensions", () => {
     for (const modelCalls of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
-      expect(() => RunBudget.allocate({ modelCalls })).toThrow()
+      expect(() => RunBudget.make({ modelCalls })).toThrow()
     }
     expect(() => RunBudget.make({}, -1)).toThrow()
   })
 
   it("round-trips through JSON", () => {
-    const budget = RunBudget.allocate({ modelCalls: 4, toolCalls: 2, childRuns: 1, depth: 2 })
+    const budget = RunBudget.make({ modelCalls: 4, toolCalls: 2, childRuns: 1, depth: 2 })
     expect(roundTrip(budget)).toEqual(budget)
   })
 
   it.effect("charges usage and fails on exhaustion", () =>
     Effect.gen(function* () {
-      const start = RunBudget.allocate({ modelCalls: 2 })
+      const start = RunBudget.make({ modelCalls: 2 })
       const once = yield* RunBudget.charge(start, { modelCalls: 1 })
       expect(once.remaining.modelCalls).toBe(1)
       const twice = yield* RunBudget.charge(once, { modelCalls: 1 })
       expect(twice.remaining.modelCalls).toBe(0)
       const error = yield* RunBudget.charge(twice, { modelCalls: 1 }).pipe(Effect.flip)
-      expect(error._tag).toBe("tenetkit/core/RunBudgetExhausted")
+      expect(error._tag).toBe("tenetkit/core/Exhausted")
       expect(error.dimension).toBe("modelCalls")
     }),
   )
 
   it.effect("reserves child grants without widening", () =>
     Effect.gen(function* () {
-      const parent = RunBudget.allocate({ modelCalls: 5, toolCalls: 4, childRuns: 2, depth: 2 })
+      const parent = RunBudget.make({ modelCalls: 5, toolCalls: 4, childRuns: 2, depth: 2 })
       const reserved = yield* RunBudget.reserveChild(parent, { modelCalls: 2, toolCalls: 1 })
       expect(reserved.child.depth).toBe(1)
       expect(reserved.child.remaining.modelCalls).toBe(2)
       expect(reserved.parent.remaining.modelCalls).toBe(3)
       expect(reserved.parent.remaining.childRuns).toBe(1)
       const widen = yield* RunBudget.reserveChild(parent, { modelCalls: 6 }).pipe(Effect.flip)
-      expect(widen._tag).toBe("tenetkit/core/RunBudgetGrantWidened")
+      expect(widen._tag).toBe("tenetkit/core/GrantWidened")
     }),
   )
 
   it.effect("refunds unused child allocation to the parent", () =>
     Effect.gen(function* () {
-      const parent = RunBudget.allocate({ modelCalls: 4, childRuns: 1, depth: 1 })
+      const parent = RunBudget.make({ modelCalls: 4, childRuns: 1, depth: 1 })
       const reserved = yield* RunBudget.reserveChild(parent, { modelCalls: 3 })
       const spent = yield* RunBudget.charge(reserved.child, { modelCalls: 1 })
       const refunded = RunBudget.refundUnused(reserved.parent, spent)
@@ -478,26 +478,26 @@ describe("RunBudget", () => {
     Effect.gen(function* () {
       const parent = RunBudget.make({ depth: 1, childRuns: 1 }, 1)
       const error = yield* RunBudget.reserveChild(parent, { modelCalls: 1 }).pipe(Effect.flip)
-      expect(error._tag).toBe("tenetkit/core/RunBudgetExhausted")
+      expect(error._tag).toBe("tenetkit/core/Exhausted")
       expect(error.dimension).toBe("depth")
     }),
   )
 
   it.effect("narrows child grants and returns the difference", () =>
     Effect.gen(function* () {
-      const parent = RunBudget.allocate({ modelCalls: 5, childRuns: 1, depth: 2 })
+      const parent = RunBudget.make({ modelCalls: 5, childRuns: 1, depth: 2 })
       const reserved = yield* RunBudget.reserveChild(parent, { modelCalls: 4 })
       const narrowed = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { modelCalls: 2 })
       expect(narrowed.child.allocation.modelCalls).toBe(2)
       expect(narrowed.parent.remaining.modelCalls).toBe(3)
       const widen = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { modelCalls: 5 }).pipe(Effect.flip)
-      expect(widen._tag).toBe("tenetkit/core/RunBudgetGrantWidened")
+      expect(widen._tag).toBe("tenetkit/core/GrantWidened")
     }),
   )
 
   it.effect("detects deadline expiry", () =>
     Effect.gen(function* () {
-      const budget = RunBudget.allocate({ deadline: "2026-01-01T00:00:00.000Z" })
+      const budget = RunBudget.make({ deadline: "2026-01-01T00:00:00.000Z" })
       expect(RunBudget.isDeadlineExpired(budget, "2026-01-02T00:00:00.000Z")).toBe(true)
       yield* RunBudget.assertNotExpired(budget, "2025-12-31T00:00:00.000Z")
       const error = yield* RunBudget.assertNotExpired(budget, "2026-02-01T00:00:00.000Z").pipe(Effect.flip)
@@ -509,7 +509,7 @@ describe("RunBudget", () => {
 describe("DurableDriver tracer", () => {
   const input = {
     prompt: Prompt.make("hello"),
-    budget: RunBudget.allocate({ modelCalls: 3, toolCalls: 2 }),
+    budget: RunBudget.make({ modelCalls: 3, toolCalls: 2 }),
   }
 
   it("uses deterministic operation keys and input digests", () => {
@@ -607,7 +607,7 @@ describe("DurableDriver tracer", () => {
       const driver = DurableDriver.makeTracer([{ toolCalls: [{ name: "echo", params: {} }] }, { text: "ok" }])
       let checkpoint = yield* driver.initial({
         ...input,
-        budget: RunBudget.allocate({ modelCalls: 1, toolCalls: 1 }),
+        budget: RunBudget.make({ modelCalls: 1, toolCalls: 1 }),
       })
       yield* driver.decide(checkpoint)
       checkpoint = yield* DurableDriver.applyOperation(driver, checkpoint, {
@@ -699,7 +699,7 @@ const batchToolFixture = (logicalOperationId: string, ids: ReadonlyArray<string>
     const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
     const initial = yield* driver.initial({
       prompt: Prompt.make("parallel tools"),
-      budget: RunBudget.allocate({ toolCalls: ids.length }),
+      budget: RunBudget.make({ toolCalls: ids.length }),
     })
     const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(initial.state)
     const ready = makeToolBatch({
@@ -751,7 +751,7 @@ describe("DurableDriver Agent.stream integration", () => {
       suite.effect("rejects a checkpoint with no executable identity for another standalone Agent", () =>
         Effect.gen(function* () {
           const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "first", sessionId: "first" })
-          const checkpoint = yield* driver.initial({ prompt: Prompt.make("first"), budget: RunBudget.allocate({}) })
+          const checkpoint = yield* driver.initial({ prompt: Prompt.make("first"), budget: RunBudget.make({}) })
           const second = Agent.make({ name: "second" })
           const failure = yield* Agent.stream(second, { prompt: "second", driverCheckpoint: checkpoint }).pipe(
             Stream.runDrain,
@@ -767,7 +767,7 @@ describe("DurableDriver Agent.stream integration", () => {
   for (const kind of ["model", "structured-output"] as const) {
     it.effect(`reconciles a pending ${kind} without recharging its ordinal or budget`, () =>
       Effect.gen(function* () {
-        const allocated = RunBudget.allocate({ modelCalls: 3 })
+        const allocated = RunBudget.make({ modelCalls: 3 })
         const charged = yield* RunBudget.charge(allocated, { modelCalls: 1 })
         const logicalOperationId = `${kind}-replay`
         const input = { turn: 0, modelCallOrdinal: 0 }
@@ -839,7 +839,7 @@ describe("DurableDriver Agent.stream integration", () => {
         initial: {
           driverVersion: DurableDriver.currentDriverVersion,
           turn: 0,
-          budget: RunBudget.allocate({ modelCalls: 2 }),
+          budget: RunBudget.make({ modelCalls: 2 }),
           state: {
             logicalOperationId,
             sessionId: logicalOperationId,
@@ -1706,7 +1706,7 @@ describe("DurableDriver Agent.stream integration", () => {
     Effect.gen(function* () {
       const lifecycle: Array<string> = []
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "interrupt", sessionId: "interrupt" })
-      const initial = yield* driver.initial({ prompt: Prompt.make("interrupt"), budget: RunBudget.allocate({}) })
+      const initial = yield* driver.initial({ prompt: Prompt.make("interrupt"), budget: RunBudget.make({}) })
       const interpreter = yield* DurableDriver.makeInline({
         driver,
         initial,
@@ -1742,7 +1742,7 @@ describe("DurableDriver Agent.stream integration", () => {
     Effect.gen(function* () {
       const outcomes: Array<DurableDriver.OperationOutcome> = []
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "classification", sessionId: "classification" })
-      const initial = yield* driver.initial({ prompt: Prompt.make("classification"), budget: RunBudget.allocate({}) })
+      const initial = yield* driver.initial({ prompt: Prompt.make("classification"), budget: RunBudget.make({}) })
       const interpreter = yield* DurableDriver.makeInline({
         driver,
         initial,
@@ -1776,7 +1776,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const completed: Array<DurableDriver.OperationOutcome> = []
       const scheduled: Array<string> = []
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "retry-safe", sessionId: "retry-safe" })
-      const initial = yield* driver.initial({ prompt: Prompt.make("retry-safe"), budget: RunBudget.allocate({}) })
+      const initial = yield* driver.initial({ prompt: Prompt.make("retry-safe"), budget: RunBudget.make({}) })
       const interpreter = yield* DurableDriver.makeInline({
         driver,
         initial,
@@ -1807,7 +1807,7 @@ describe("DurableDriver Agent.stream integration", () => {
     Effect.gen(function* () {
       const logicalOperationId = "stream-replay"
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
-      const allocated = RunBudget.allocate({ modelCalls: 3 })
+      const allocated = RunBudget.make({ modelCalls: 3 })
       const charged = yield* RunBudget.charge(allocated, { modelCalls: 1 })
       const pendingSpec = {
         kind: "model" as const,
@@ -1881,7 +1881,7 @@ describe("DurableDriver Agent.stream integration", () => {
   it.effect("journals and replays a custom stream success without retaining emitted values", () =>
     Effect.gen(function* () {
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream-codec", sessionId: "stream-codec" })
-      const initial = yield* driver.initial({ prompt: Prompt.make("stream-codec"), budget: RunBudget.allocate({}) })
+      const initial = yield* driver.initial({ prompt: Prompt.make("stream-codec"), budget: RunBudget.make({}) })
       const outcomes = new Map<string, DurableDriver.OperationOutcome>()
       let replay = false
       let sourceRuns = 0
@@ -1946,7 +1946,7 @@ describe("DurableDriver Agent.stream integration", () => {
   it.effect("surfaces successful stream acknowledgement failure in the typed channel", () =>
     Effect.gen(function* () {
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream-ack", sessionId: "stream-ack" })
-      const initial = yield* driver.initial({ prompt: Prompt.make("stream-ack"), budget: RunBudget.allocate({}) })
+      const initial = yield* driver.initial({ prompt: Prompt.make("stream-ack"), budget: RunBudget.make({}) })
       let completionAttempts = 0
       const interpreter = yield* DurableDriver.makeInline({
         driver,
@@ -1980,7 +1980,7 @@ describe("DurableDriver Agent.stream integration", () => {
     Effect.gen(function* () {
       const lifecycle: Array<string> = []
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream", sessionId: "stream" })
-      const initial = yield* driver.initial({ prompt: Prompt.make("stream"), budget: RunBudget.allocate({}) })
+      const initial = yield* driver.initial({ prompt: Prompt.make("stream"), budget: RunBudget.make({}) })
       const interpreter = yield* DurableDriver.makeInline({
         driver,
         initial,

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { ResumeMismatch } from "../core/agent/event.js"
-import { RunBudgetExhausted } from "../core/durable/run-budget.js"
+import { Exhausted } from "../core/durable/run-budget.js"
 import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
 import { ExecutableRef } from "./executable/manifest.js"
@@ -51,12 +51,12 @@ export class ExecutableIdentityMismatch extends Schema.TaggedError<ExecutableIde
 ) {}
 
 /** @experimental The structured Agent failures a durable terminal event preserves verbatim. */
-export type StructuredAgentFailure = RunBudgetExhausted | ResumeMismatch
+export type StructuredAgentFailure = Exhausted | ResumeMismatch
 
 export const StructuredAgentFailure: Schema.Codec<
   StructuredAgentFailure,
-  typeof RunBudgetExhausted.Encoded | typeof ResumeMismatch.Encoded
-> = Schema.Union([RunBudgetExhausted, ResumeMismatch])
+  typeof Exhausted.Encoded | typeof ResumeMismatch.Encoded
+> = Schema.Union([Exhausted, ResumeMismatch])
 
 export class AgentExecutionFailure extends Schema.TaggedError<AgentExecutionFailure>()(
   "tenetkit/runtime/AgentExecutionFailure",

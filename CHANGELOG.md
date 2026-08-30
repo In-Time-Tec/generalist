@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Rename public APIs around established agent-framework vocabulary: `SkillCatalog`, `MCPClient`, `ProgramHandlers`, `ProgramRunner`, `CodeExecutor`, `RunExecutor`, `HostModules`, `ModelCatalog`, `OpenAICompatible`, `RunClient`, `SSE`, `WebSocket`, `AGUI`, and Agent Guidance. Public Effect service implementation shapes now use `Service` instead of `Interface`, provider and database adapter options are package-qualified, and Skill values expose flattened metadata with lazy `instructions`.
+- Simplify namespace-qualified APIs to `InstructionFiles.load`, the `tenetkit/memory` root `layer`, `RuntimeWorker.layer`, `Authorship.author`, `Refinement.apply`, `Refinement.applyTrusted`, `Refinement.makeRollback`, `State.merge`, `Overview.format`, `Snapshot.make`, and `Registration.make`; consistently capitalize `OpenAI.normalizeResponsesSSE` and remove leaked root `Core*` and `*Facade` implementation types.
 
 ## 0.42.0
 

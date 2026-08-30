@@ -3,7 +3,7 @@ import { Effect, Layer, Stream } from "effect"
 import { EmbeddingModel, LanguageModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "../../src/index.js"
 import { expectTypeOf } from "vitest"
-import { layerCombined, VectorStore, WorkingMemory, type CombinedOptions } from "../../src/memory/index"
+import { layer as layerMemory, VectorStore, WorkingMemory, type Options } from "../../src/memory/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 
@@ -41,8 +41,8 @@ const combinedOptions = {
   working: { maxMessages: 1, summarize: { prompt: "Preserve facts." } },
   semantic: { limit: 5 },
 }
-const widenedCombinedOptions: CombinedOptions = combinedOptions
-expectTypeOf(layerCombined(widenedCombinedOptions)).toEqualTypeOf<
+const widenedOptions: Options = combinedOptions
+expectTypeOf(layerMemory(widenedOptions)).toEqualTypeOf<
   Layer.Layer<
     Memory.Memory,
     never,
@@ -50,12 +50,12 @@ expectTypeOf(layerCombined(widenedCombinedOptions)).toEqualTypeOf<
   >
 >()
 const memoryLayer: Layer.Layer<Memory.Memory, never, VectorStore.VectorStore | EmbeddingModel.EmbeddingModel> =
-  layerCombined(combinedOptions).pipe(Layer.provide(WorkingMemory.layerSummaryModel), Layer.provide(summaryModel))
+  layerMemory(combinedOptions).pipe(Layer.provide(WorkingMemory.layerSummaryModel), Layer.provide(summaryModel))
 
 layer(memoryLayer.pipe(Layer.provideMerge(VectorStore.layerMemory), Layer.provideMerge(embeddingLayer)))(
   "tenetkit/memory",
   (it) => {
-    it.effect("layerCombined recalls working memory before semantic matches", () =>
+    it.effect("layer recalls working memory before semantic matches", () =>
       Effect.gen(function* () {
         const memory = yield* Memory.Memory
 

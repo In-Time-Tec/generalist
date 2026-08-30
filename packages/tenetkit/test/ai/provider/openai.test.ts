@@ -3,7 +3,7 @@ import { Config, Effect, Layer, Redacted, Schedule, Schema, Stream } from "effec
 import { AiError, LanguageModel } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { ModelRegistry, ModelResilience } from "tenetkit"
-import { classifyFailure, layer, normalizeResponsesSse } from "tenetkit/ai/openai"
+import { classifyFailure, layer, normalizeResponsesSSE } from "tenetkit/ai/openai"
 
 const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const encoder = new TextEncoder()
@@ -81,14 +81,14 @@ const stubClient = (chunks: Array<string>, contentType = "text/event-stream") =>
 
 const readThrough = (chunks: Array<string>, url: string, contentType?: string) =>
   Effect.scoped(
-    normalizeResponsesSse(stubClient(chunks, contentType))
+    normalizeResponsesSSE(stubClient(chunks, contentType))
       .execute(HttpClientRequest.post(url))
       .pipe(Effect.flatMap((response) => response.text)),
   )
 
 const responsesUrl = "https://api.openai.com/v1/responses"
 
-describe("normalizeResponsesSse", () => {
+describe("normalizeResponsesSSE", () => {
   it.effect("flattens nested error frames and leaves other frames byte-identical", () =>
     Effect.gen(function* () {
       const body = `${deltaFrame}event: error\ndata: ${nestedError}\n\n`

@@ -56,7 +56,7 @@ export const steering = definePage({
         ".",
       ],
       [
-        code("TurnPolicy"),
+        code("Policy"),
         " still gates follow-up turns; steering does not bypass the cap (",
         link("/docs/guides/turn-policy", "How to control turn budgets"),
         ").",

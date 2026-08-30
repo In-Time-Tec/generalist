@@ -8,7 +8,7 @@ import {
   CurrentSummaryCall,
   DeliveryFailed,
 } from "../../model/telemetry/events.js"
-import { TurnPolicyError, type Decision, type TurnOverrides, type TurnPolicy } from "../../turn/policy.js"
+import { Error, type Decision, type TurnOverrides, type Policy } from "../../turn/policy.js"
 import type { LanguageModelNotRegistered } from "../../model/registry.js"
 import type { PendingToolResult } from "../tools/result.js"
 import type { ToolCheckpoint } from "../suspension.js"
@@ -34,7 +34,7 @@ import { isClosed } from "../lifecycle/closure-identity.js"
 import { afterTurnFor } from "./after-turn.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
-type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: TurnPolicy<never> }
+type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
 const hasClosedPolicy = (agent: ActiveAgent): agent is ClosedPolicyAgent =>
   isClosed(agent) || agent.policy.snapshot !== undefined
 
@@ -125,7 +125,7 @@ export const make = <
         yield* captureStructuredUsage(response.content)
         const structuredIdentity = telemetryIdentity.current
         if (structuredIdentity === undefined) {
-          return yield* Effect.die(new Error("Structured output model attempt identity is missing"))
+          return yield* Effect.die(new globalThis.Error("Structured output model attempt identity is missing"))
         }
         const transcript = Prompt.concat(
           Prompt.concat(history, transformedPrompt),
@@ -165,10 +165,10 @@ export const make = <
       : Ref.get(handoffStateRef).pipe(Effect.map((handoffRun) => handoffRun.active.agent))
   const decidePolicy = (
     info: Parameters<typeof agent.policy.decide>[0],
-  ): Effect.Effect<Decision, TurnPolicyError | HandoffRequirementsMissing, R> => {
+  ): Effect.Effect<Decision, Error | HandoffRequirementsMissing, R> => {
     if (handoffStateRef === undefined) return agent.policy.decide(info)
     return Ref.get(handoffStateRef).pipe(
-      Effect.flatMap((handoffRun): Effect.Effect<Decision, TurnPolicyError | HandoffRequirementsMissing, R> => {
+      Effect.flatMap((handoffRun): Effect.Effect<Decision, Error | HandoffRequirementsMissing, R> => {
         if (handoffRun.active.name === handoffRun.root) return agent.policy.decide(info)
         if (hasClosedPolicy(handoffRun.active.agent)) {
           return handoffRun.active.agent.policy.decide(info)

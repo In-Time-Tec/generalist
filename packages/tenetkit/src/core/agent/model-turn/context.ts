@@ -9,7 +9,7 @@ import type { RunError, ToolSchedulingPolicy } from "../service.js"
 import type { Middleware } from "../../model/middleware.js"
 import type { ModelResilience } from "../../model/resilience.js"
 import type { EventPayload as DeliveryEventPayload } from "../../model/telemetry/events.js"
-import type { ModelProviderUsage } from "../../model/attempt/observation.js"
+import type { ProviderUsage } from "../../model/attempt/observation.js"
 import type { Request } from "../../tools/tool-executor.js"
 import type { Registry } from "../../tools/tool-registry.js"
 import type { ToolContext } from "../../tools/tool-context.js"
@@ -46,7 +46,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
       | { readonly modelCallId: string; readonly modelAttemptId: string; readonly attempt: number }
       | undefined
   }
-  readonly modelCallUsage: ReadonlyMap<string, ModelProviderUsage | undefined>
+  readonly modelCallUsage: ReadonlyMap<string, ProviderUsage | undefined>
   readonly instrumentModel: (model: LanguageModel.Service, turn: number) => LanguageModel.Service
   readonly chain: ReadonlyArray<Middleware>
   readonly preparePrompt: (

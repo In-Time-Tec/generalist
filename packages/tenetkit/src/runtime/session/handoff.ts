@@ -1,4 +1,4 @@
-import { HandoffCommit } from "../../core/policy/handoff.js"
+import { Commit } from "../../core/policy/handoff.js"
 import { Function, Option, Schema } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import { RuntimeUnavailable } from "../errors.js"
@@ -13,15 +13,14 @@ export interface HandoffSessionEntry {
   readonly projectedHistory: Prompt.Prompt
 }
 
-const handoffEquivalence = Schema.toEquivalence(HandoffCommit)
+const handoffEquivalence = Schema.toEquivalence(Commit)
 const checkpointEquivalence = Schema.toEquivalence(ExecutionCheckpoint)
 type HandoffCandidate = typeof Schema.Unknown.Type
 
-export const isHandoffCommit = (value: HandoffCandidate): boolean =>
-  Option.isSome(Schema.decodeUnknownOption(HandoffCommit)(value))
+export const isCommit = (value: HandoffCandidate): boolean => Option.isSome(Schema.decodeUnknownOption(Commit)(value))
 
-export const decodeHandoffCommit = (value: HandoffCandidate): HandoffCommit | RuntimeUnavailable => {
-  const decoded = Schema.decodeUnknownOption(HandoffCommit)(value)
+export const decodeCommit = (value: HandoffCandidate): Commit | RuntimeUnavailable => {
+  const decoded = Schema.decodeUnknownOption(Commit)(value)
   return Option.isNone(decoded)
     ? RuntimeUnavailable.make({ message: "succeeded handoff operation has an invalid projection commit" })
     : decoded.value
@@ -34,12 +33,12 @@ export const sameHandoffCheckpoint: {
   left === undefined ? right === undefined : right !== undefined && checkpointEquivalence(left, right),
 )
 
-export const sameHandoffCommit: {
+export const sameCommit: {
   (right: HandoffCandidate): (left: HandoffCandidate) => boolean
   (left: HandoffCandidate, right: HandoffCandidate): boolean
 } = Function.dual(2, (left: HandoffCandidate, right: HandoffCandidate): boolean => {
-  const leftCommit = Schema.decodeUnknownOption(HandoffCommit)(left)
-  const rightCommit = Schema.decodeUnknownOption(HandoffCommit)(right)
+  const leftCommit = Schema.decodeUnknownOption(Commit)(left)
+  const rightCommit = Schema.decodeUnknownOption(Commit)(right)
   return (
     Option.isSome(leftCommit) && Option.isSome(rightCommit) && handoffEquivalence(leftCommit.value, rightCommit.value)
   )
@@ -50,7 +49,7 @@ export const handoffSessionEntry = (input: {
   readonly operationKey: string
   readonly value: unknown
 }): HandoffSessionEntry | RuntimeUnavailable => {
-  const commit = decodeHandoffCommit(input.value)
+  const commit = decodeCommit(input.value)
   if (Schema.is(RuntimeUnavailable)(commit)) return commit
   const frame = commit.state.path.at(-1)
   if (frame === undefined || frame.handoffId !== input.operationKey || frame.target !== commit.state.active) {

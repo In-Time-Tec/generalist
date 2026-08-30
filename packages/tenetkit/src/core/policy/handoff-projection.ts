@@ -1,29 +1,31 @@
 import { Effect, Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 
-export const HandoffInput = Schema.Struct({
+export const Input = Schema.Struct({
   prompt: Schema.optionalKey(Schema.String),
   reason: Schema.optionalKey(Schema.String),
   context: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
 })
 
-export type HandoffInput = typeof HandoffInput.Type
+export type Input = typeof Input.Type
 
-export const HandoffOutput = Schema.Struct({
+export const Output = Schema.Struct({
   summary: Schema.optionalKey(Schema.String),
 })
 
-export type HandoffOutput = typeof HandoffOutput.Type
+export type Output = typeof Output.Type
 
-export class HandoffProjectionInvalid extends Schema.TaggedError<HandoffProjectionInvalid>()(
+export class ProjectionInvalid extends Schema.TaggedError<ProjectionInvalid>()(
   "tenetkit/core/HandoffProjectionInvalid",
-  { message: Schema.String },
+  {
+    message: Schema.String,
+  },
 ) {}
 
 export type ContextProjection = (
   history: Prompt.Prompt,
-  input: HandoffInput,
-) => Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, HandoffProjectionInvalid>
+  input: Input,
+) => Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, ProjectionInvalid>
 
 const hasUnresolvedToolCall = (
   messages: ReadonlyArray<Prompt.Message>,
@@ -42,27 +44,27 @@ const hasUnresolvedToolCall = (
 
 export const defaultContextProjection: {
   (
-    input: HandoffInput,
+    input: Input,
   ): (
     history: Prompt.Prompt,
-  ) => Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, HandoffProjectionInvalid>
+  ) => Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, ProjectionInvalid>
   (
     history: Prompt.Prompt,
-    input: HandoffInput,
-  ): Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, HandoffProjectionInvalid>
+    input: Input,
+  ): Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, ProjectionInvalid>
 } = Function.dual(
   2,
   (
     history: Prompt.Prompt,
-    input: HandoffInput,
-  ): Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, HandoffProjectionInvalid> => {
+    input: Input,
+  ): Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, ProjectionInvalid> => {
     const resolvingToolCallIds = Schema.is(Schema.Array(Schema.String))(input.context?.resolvingToolCallIds)
       ? input.context.resolvingToolCallIds
       : []
     const excluding = new Set(resolvingToolCallIds)
     if (hasUnresolvedToolCall(history.content, excluding)) {
       return Effect.fail(
-        HandoffProjectionInvalid.make({
+        ProjectionInvalid.make({
           message: "Handoff context projection cannot include unresolved tool calls",
         }),
       )

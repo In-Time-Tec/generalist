@@ -1,32 +1,36 @@
-import contextSources from "virtual:source/src/snippets/guides/agent/instructions/context-sources.ts"
-import contextSourcesExpected from "virtual:source/src/snippets/guides/agent/instructions/context-sources.expected.txt"
+import instructionProviders from "virtual:source/src/snippets/guides/agent/instructions/instruction-providers.ts"
+import instructionProvidersExpected from "virtual:source/src/snippets/guides/agent/instructions/instruction-providers.expected.txt"
 import instructionFiles from "virtual:source/src/snippets/guides/agent/instructions/instruction-files.ts"
 import { bullets, callout, code, codeBlock, definePage, h2, link, p } from "../../../prose"
 export const instructions = definePage({
   path: "/docs/guides/instructions",
-  title: "How to compose instructions and context sources",
+  title: "How to compose instructions and instruction providers",
   navTitle: "Instructions",
   group: "Guides",
-  description: "Register ordered baseline sources with Instructions.layer and load AGENTS.md files as sources.",
+  description: "Register ordered instruction providers with Instructions.layer and load AGENTS.md files as providers.",
   content: [
     p(
       "The ",
       code("Instructions"),
       " service replaces a single instruction string with an ordered registry of ",
-      code("Source"),
-      " values. At run start the loop opens a context epoch and baseline sources render once into the system message. Persona, house style, and repository files compose as sources instead of string concatenation.",
+      code("Provider"),
+      " values. At run start the loop renders instruction providers once into the system message. Persona, house style, and repository files compose as providers instead of string concatenation.",
     ),
-    h2("register-sources", "1. Register ordered sources"),
+    h2("register-providers", "1. Register ordered providers"),
     p(
       "Build baselines with ",
-      code("Instructions.staticSource(id, text)"),
+      code("Instructions.fromText(id, text)"),
       ". Provide them in order with ",
       code("Instructions.layer"),
       ". When the registry produces a non-empty baseline, it replaces ",
       code("agent.instructions"),
       ", and rendered fragments join with one blank line:",
     ),
-    codeBlock({ label: "context-sources.ts", source: contextSources, expectedOutput: contextSourcesExpected }),
+    codeBlock({
+      label: "instruction-providers.ts",
+      source: instructionProviders,
+      expectedOutput: instructionProvidersExpected,
+    }),
     callout(
       "info",
       "Precedence",
@@ -34,21 +38,21 @@ export const instructions = definePage({
       code("RunOptions.system"),
       " wins over the registry, and a ",
       code("RunOptions.history"),
-      " transcript is used verbatim. Both skip epoch rendering entirely.",
+      " transcript is used verbatim. Both skip provider rendering entirely.",
     ),
     h2("baseline-contract", "2. Keep Agent instructions in the baseline"),
     p(
-      "Every source renders once at run start into the stable system-message baseline. This makes provider prompt caching effective. A source returning ",
+      "Every provider renders once at run start into the stable system-message baseline. This makes model-provider prompt caching effective. A provider returning ",
       code("Option.none()"),
       " contributes nothing. Use ",
-      code("staticSource"),
+      code("fromText"),
       ", provide it through ",
       code("Instructions.layer"),
-      ", and let Agent open the epoch. TurnPolicy instruction overrides are independent: they prepend a system message once to the selected follow-up prompt, and that message remains in chat history.",
+      ", and let Agent render the providers. Policy instruction overrides are independent: they prepend a system message once to the selected follow-up prompt, and that message remains in chat history.",
     ),
-    h2("load-instruction-files", "3. Load AGENTS.md files as sources"),
+    h2("load-instruction-files", "3. Load AGENTS.md files as providers"),
     p(
-      code("InstructionFiles.loadInstructionFiles"),
+      code("InstructionFiles.load"),
       " from ",
       code("tenetkit/skills"),
       " walks ancestor directories for ",
@@ -57,7 +61,7 @@ export const instructions = definePage({
       code("CLAUDE.md"),
       " (root first, nearest last), plus any ",
       code("globalFiles"),
-      " you list. Map the results into static sources:",
+      " you list. Map the results into text providers:",
     ),
     codeBlock({ label: "instruction-files.ts", source: instructionFiles }),
     p(

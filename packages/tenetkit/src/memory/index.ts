@@ -15,33 +15,33 @@ export * as VectorStore from "./vector-store.js"
 export * as WorkingMemory from "./working-memory.js"
 
 /** @experimental */
-export interface CombinedOptions {
+export interface Options {
   readonly working?: WorkingMemoryOptions
   readonly semantic?: SemanticRecallOptions
 }
 
-type WithoutSummaryCombinedOptions = CombinedOptions & {
+type WithoutSummaryOptions = Options & {
   readonly working?: WorkingMemoryOptions & { readonly summarize?: undefined }
 }
 
 /** @experimental */
-export function layerCombined(
-  options: CombinedOptions & {
+export function layer(
+  options: Options & {
     readonly working: WorkingMemoryOptions & {
       readonly summarize: SummarizeOptions
     }
   },
 ): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel>
 /** @experimental */
-export function layerCombined(
-  options?: WithoutSummaryCombinedOptions,
+export function layer(
+  options?: WithoutSummaryOptions,
 ): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel>
 /** @experimental */
-export function layerCombined(
-  options: CombinedOptions,
+export function layer(
+  options: Options,
 ): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel>
-export function layerCombined(
-  options: CombinedOptions = {},
+export function layer(
+  options: Options = {},
 ): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel> {
   return Layer.effect(
     Memory,

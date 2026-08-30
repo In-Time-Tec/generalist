@@ -92,14 +92,14 @@ export const skills = definePage({
       ": skills marked ",
       code("disableModelInvocation"),
       " are excluded, and least-recently-used listings drop first when over budget. Descriptions are capped at ",
-      code("DESCRIPTION_CAP"),
+      code("descriptionLimit"),
       " (1,024 characters), matching the Agent Skills description limit, so front-load the sentence that tells the model when to activate.",
     ),
     h2("next-steps", "Next steps"),
     bullets(
       [
         "Compose skills with the rest of the system message: ",
-        link("/docs/guides/instructions", "How to compose instructions and context sources"),
+        link("/docs/guides/instructions", "How to compose instructions and instruction providers"),
         ".",
       ],
       [

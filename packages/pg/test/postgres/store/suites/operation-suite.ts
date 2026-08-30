@@ -4,7 +4,7 @@ import { Clock, Effect, Layer } from "effect"
 import { Pins } from "tenetkit"
 import { SqlClient } from "effect/unstable/sql"
 import { Errors, RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker, layerWorker } from "tenetkit/runtime/sql-driver"
+import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -108,7 +108,7 @@ describePostgres("PostgreSQL Program store contract", () => {
   {
     const database = postgresDatabase("program-exact-root-worker")
     const fixture = programFixture()
-    const runtimeLayer = layerWorker({ workerId: "postgres-exact-root-worker" }).pipe(
+    const runtimeLayer = RuntimeWorker.layer({ workerId: "postgres-exact-root-worker" }).pipe(
       Layer.provideMerge(
         backendLayer({
           url: database.url,
@@ -124,7 +124,7 @@ describePostgres("PostgreSQL Program store contract", () => {
         it.effect("claims and executes a running parentless exact root without a lane", () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const worker = yield* RuntimeWorker
+            const worker = yield* RuntimeWorker.RuntimeWorker
             const receipt = yield* runtime.start({
               executable: programExecutable,
               registrations: registrationsFor(programExecutable),

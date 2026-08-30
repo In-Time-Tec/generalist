@@ -7,9 +7,9 @@ import {
   RunEndedWithoutOutput,
   ToolNameCollision,
   TurnLimitExceeded,
-  TurnPolicyStopped,
+  PolicyStopped,
 } from "../../../core/agent/event.js"
-import { RunBudgetExhausted } from "../../../core/durable/run-budget.js"
+import { Exhausted } from "../../../core/durable/run-budget.js"
 import { AgentExecutionFailure } from "../../errors.js"
 
 const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; readonly tool_call_id: string }>): string =>
@@ -23,10 +23,10 @@ const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; reado
  * phrase. Every variant is named here so a terminal failure always states what actually happened.
  */
 const SummaryFailure = Schema.Union([
-  RunBudgetExhausted,
+  Exhausted,
   ResumeMismatch,
   TurnLimitExceeded,
-  TurnPolicyStopped,
+  PolicyStopped,
   RunEndedWithoutOutput,
   MiddlewareViolation,
   DuplicateToolCallId,
@@ -36,7 +36,7 @@ const SummaryFailure = Schema.Union([
 type SummaryFailure = typeof SummaryFailure.Type
 
 const summary = (failure: SummaryFailure): string | undefined => {
-  if (Schema.is(RunBudgetExhausted)(failure)) {
+  if (Schema.is(Exhausted)(failure)) {
     const remaining = failure.remaining === undefined ? "unavailable" : failure.remaining
     return `Run budget exhausted for ${failure.dimension}: requested ${failure.requested}, remaining ${remaining}`
   }
@@ -46,7 +46,7 @@ const summary = (failure: SummaryFailure): string | undefined => {
   if (Schema.is(TurnLimitExceeded)(failure)) {
     return `Turn limit of ${failure.limit} reached at turn ${failure.turn} with ${pendingCalls(failure.pending)}`
   }
-  if (Schema.is(TurnPolicyStopped)(failure)) {
+  if (Schema.is(PolicyStopped)(failure)) {
     return `Turn policy stopped the run at turn ${failure.turn} (${failure.reason._tag}) with ${pendingCalls(failure.pending)}`
   }
   if (Schema.is(RunEndedWithoutOutput)(failure)) {
@@ -71,7 +71,7 @@ const summary = (failure: SummaryFailure): string | undefined => {
 const typedFailure = (cause: Cause.Cause<unknown>) => {
   const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
-  return Schema.decodeUnknownOption(Schema.Union([RunBudgetExhausted, ResumeMismatch]))(reason.error).pipe((decoded) =>
+  return Schema.decodeUnknownOption(Schema.Union([Exhausted, ResumeMismatch]))(reason.error).pipe((decoded) =>
     decoded._tag === "Some" ? decoded.value : undefined,
   )
 }

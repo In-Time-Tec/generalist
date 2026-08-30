@@ -12,7 +12,7 @@ import {
   type Config,
   type RegistrationOptions,
   classifyFailure,
-  normalizeResponsesSse,
+  normalizeResponsesSSE,
   openAiFailureReason,
   openAiLanguageModelLayer,
   toolJsonSchemaCompiler,
@@ -52,10 +52,7 @@ export interface OpenAIAccountCredentials {
   readonly refreshRejected: (generation: string) => Effect.Effect<OpenAIAccountCredential, OpenAIAccountCredentialError>
 }
 
-const credentialsFromAccountAuthImpl = (
-  service: AuthService,
-  expectedFingerprint: string,
-): OpenAIAccountCredentials => {
+const credentialsFromAuthImpl = (service: AuthService, expectedFingerprint: string): OpenAIAccountCredentials => {
   const mapCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
     Effect.mapError(() => OpenAIAccountCredentialError.make({ operation }))
   const accountCredential = (operation: OpenAIAccountCredentialError["operation"]) =>
@@ -76,10 +73,10 @@ const credentialsFromAccountAuthImpl = (
 }
 
 /** @experimental */
-export const credentialsFromAccountAuth: {
+export const credentialsFromAuth: {
   (service: AuthService, expectedFingerprint: string): OpenAIAccountCredentials
   (expectedFingerprint: string): (service: AuthService) => OpenAIAccountCredentials
-} = Function.dual(2, credentialsFromAccountAuthImpl)
+} = Function.dual(2, credentialsFromAuthImpl)
 
 /** @experimental */
 export interface AccountOptions extends RegistrationOptions {
@@ -157,7 +154,7 @@ const isTerminalEvent = (event: ResponseStreamEvent): event is TerminalEvent =>
   event.type === "response.completed" || event.type === "response.incomplete"
 
 /**
- * `normalizeResponsesSse` has already flattened nested `response.failed` payloads into flat `error`
+ * `normalizeResponsesSSE` has already flattened nested `response.failed` payloads into flat `error`
  * frames by the time the stream is folded, so only `error` needs promotion here.
  */
 const terminalResponse = (event: ResponseStreamEvent): FoldedResponse | undefined =>
@@ -216,12 +213,12 @@ const unsupportedCreateEmbedding: OpenAIClient.Service["createEmbedding"] = () =
   )
 
 /** @experimental */
-export const layerAccountClient = (credentials: OpenAIAccountCredentials) =>
+export const layerClient = (credentials: OpenAIAccountCredentials) =>
   Layer.effect(
     OpenAIClient.OpenAiClient,
     OpenAIClient.make({
       apiUrl: openAiAccountApiUrl,
-      transformClient: (client) => client.pipe(normalizeResponsesSse, accountClientTransform(credentials)),
+      transformClient: (client) => client.pipe(normalizeResponsesSSE, accountClientTransform(credentials)),
     }).pipe(
       Effect.map((client) =>
         OpenAIClient.OpenAiClient.of({
@@ -248,14 +245,14 @@ export const layerAccountClient = (credentials: OpenAIAccountCredentials) =>
   )
 
 /** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
-export const registrationAccount = (input: AccountOptions): Effect.Effect<Registration, never, HttpClient.HttpClient> =>
+export const registration = (input: AccountOptions): Effect.Effect<Registration, never, HttpClient.HttpClient> =>
   modelRegistration(registrationOptions(input))
 
 const registrationOptions = (input: AccountOptions) => {
   const required = {
     provider: "openai",
     model: input.model,
-    layer: openAiLanguageModelLayer(input).pipe(Layer.provide(layerAccountClient(input.credentials))),
+    layer: openAiLanguageModelLayer(input).pipe(Layer.provide(layerClient(input.credentials))),
     classifyFailure,
     toolJsonSchemaCompiler,
     isAvailabilityFailure,
@@ -266,5 +263,5 @@ const registrationOptions = (input: AccountOptions) => {
 }
 
 /** @experimental */
-export const layerAccount = (input: AccountOptions): Layer.Layer<ModelRegistry, never, HttpClient.HttpClient> =>
-  modelRegistryLayer([registrationAccount(input)])
+export const layer = (input: AccountOptions): Layer.Layer<ModelRegistry, never, HttpClient.HttpClient> =>
+  modelRegistryLayer([registration(input)])

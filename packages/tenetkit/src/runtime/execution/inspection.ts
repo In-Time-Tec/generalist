@@ -57,7 +57,7 @@ const outcomeFor = (run: InspectionRun): Effect.Effect<RunOutcome | void, Runtim
   return Effect.fail(corruption(`Run ${run.inspection.runId} terminal status and event disagree`))
 }
 
-type ModelCallStarted = Extract<RunEvent, { readonly _tag: "ModelCallStarted" }>
+type CallStarted = Extract<RunEvent, { readonly _tag: "ModelCallStarted" }>
 type ModelAttemptTerminal = Extract<RunEvent, { readonly _tag: "ModelAttemptCompleted" | "ModelAttemptFailed" }>
 
 interface FactProjection {
@@ -68,13 +68,13 @@ interface FactProjection {
 }
 
 interface RunFactProjection {
-  readonly calls: Map<string, ModelCallStarted>
+  readonly calls: Map<string, CallStarted>
   readonly callsWithAttempts: Set<string>
 }
 
 const recordModelCall = (
   runId: string,
-  event: ModelCallStarted,
+  event: CallStarted,
   projection: RunFactProjection,
 ): Effect.Effect<void, RuntimeUnavailable> => {
   const key = `${runId}\u0000${event.modelCallId}`
@@ -89,7 +89,7 @@ const recordModelCall = (
   return Effect.void
 }
 
-const usageFactFor = (runId: string, call: ModelCallStarted, event: ModelAttemptTerminal): RawUsageFact | undefined => {
+const usageFactFor = (runId: string, call: CallStarted, event: ModelAttemptTerminal): RawUsageFact | undefined => {
   const common = Object.assign(
     {
       runId,

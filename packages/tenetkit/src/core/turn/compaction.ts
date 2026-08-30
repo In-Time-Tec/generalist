@@ -11,11 +11,11 @@ import type { Success } from "../tools/tool-executor.js"
 import { bound } from "../tools/tool-output.js"
 
 /** @experimental Default headroom kept for the next model response. */
-export const DEFAULT_RESERVE_TOKENS = 16_384
+export const defaultReserveTokens = 16_384
 /** @experimental Default recent-session suffix target kept verbatim. */
-export const DEFAULT_KEEP_RECENT_TOKENS = 20_000
+export const defaultKeepRecentTokens = 20_000
 /** @experimental Fixed prompt used for dedicated summary calls. */
-export const SUMMARY_TEMPLATE = `Summarize the conversation so another agent can continue seamlessly.
+export const summaryTemplate = `Summarize the conversation so another agent can continue seamlessly.
 
 Use Markdown with these sections:
 
@@ -143,7 +143,7 @@ export interface LayerOptions extends DefaultOptions {
 }
 
 /** @experimental Options for lossless tool-output bounding. */
-export interface ToolOutputBoundOptions {
+export interface OutputBoundOptions {
   readonly maxBytes: number
 }
 
@@ -267,7 +267,7 @@ const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
     ? usage.contextWindow
     : (options.contextWindow ?? Number.POSITIVE_INFINITY),
   reserveTokens:
-    options.reserveTokens ?? (Number.isFinite(usage.reserveTokens) ? usage.reserveTokens : DEFAULT_RESERVE_TOKENS),
+    options.reserveTokens ?? (Number.isFinite(usage.reserveTokens) ? usage.reserveTokens : defaultReserveTokens),
 })
 
 const makeMicrocompact = (history: Prompt.Prompt, prompt: Prompt.Prompt): MicrocompactResult => ({
@@ -297,7 +297,7 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
           request.toolOutputMaxBytes === undefined
             ? ([head, false] as const)
             : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
-        const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
+        const prompt = summaryPrompt(options.summaryPrompt ?? summaryTemplate, compactedHead)
         const model = yield* summaryLanguageModel
         return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
           Effect.map((response) => response.text),
@@ -324,14 +324,14 @@ export const strategy: {
       }
       const toolOutputMaxBytes = part.toolOutputMaxBytes ?? current.toolOutputMaxBytes
       const keepRecentTokens = part.keepRecentTokens ?? current.keepRecentTokens
-      const withToolOutput = toolOutputMaxBytes === undefined ? required : { ...required, toolOutputMaxBytes }
-      return keepRecentTokens === undefined ? withToolOutput : { ...withToolOutput, keepRecentTokens }
+      const withOutput = toolOutputMaxBytes === undefined ? required : { ...required, toolOutputMaxBytes }
+      return keepRecentTokens === undefined ? withOutput : { ...withOutput, keepRecentTokens }
     }, base),
 )
 
 /** @experimental Configure lossless successful-tool-result bounding. */
-export const toolOutputBound = (options: ToolOutputBoundOptions): StrategyPart => ({
-  toolOutputMaxBytes: safeNonNegativeInteger("ToolOutputBoundOptions.maxBytes", options.maxBytes),
+export const toolOutputBound = (options: OutputBoundOptions): StrategyPart => ({
+  toolOutputMaxBytes: safeNonNegativeInteger("OutputBoundOptions.maxBytes", options.maxBytes),
 })
 
 /** @experimental Configure the token target retained verbatim after a summary cut. */
@@ -351,7 +351,7 @@ export const structuredSummary = (options: StructuredSummaryOptions = {}): Strat
           request.toolOutputMaxBytes === undefined
             ? ([head, false] as const)
             : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
-        const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
+        const prompt = summaryPrompt(options.summaryPrompt ?? summaryTemplate, compactedHead)
         const model = yield* summaryLanguageModel
         return yield* model
           .generateObject({
@@ -435,7 +435,7 @@ const compact = (
 
     const plan = compactionStrategy.cut(
       input.path ?? [],
-      compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? DEFAULT_KEEP_RECENT_TOKENS,
+      compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? defaultKeepRecentTokens,
     )
     if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
 

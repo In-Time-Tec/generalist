@@ -14,7 +14,7 @@ import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode.js"
 import { hostContext, sessionBinding } from "./context.js"
-import { make as makeNestedOperations } from "../operation/nested-operations.js"
+import { make as makeOperations } from "../operation/nested-operations.js"
 import { make as makeExecutionInterruption } from "./interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { make as makeAgentExecutionFailure } from "./agent/failure.js"
@@ -107,7 +107,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
               environment: Layer.Layer<ClosedServices<Tools, R>>,
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
-                const nested = yield* makeNestedOperations({ claim, claimed, store })
+                const nested = yield* makeOperations({ claim, claimed, store })
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
                 const boundSession = yield* sessionBinding({ store, claim })
                 const baseContext = Context.mergeAll(

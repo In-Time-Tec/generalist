@@ -57,7 +57,7 @@ type SessionCanonical = Assert<
   Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionDirectory, never, never]>
 >
 type ToolOutputCanonical = Assert<
-  Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.ToolOutputStore, never, never]>
+  Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.Store, never, never]>
 >
 type VectorStoreCanonical = Assert<
   Equal<LayerShape<typeof VectorStore.layerMemory>, readonly [VectorStore.VectorStore, never, never]>

@@ -3,15 +3,8 @@ import { layer as sqliteClientLayer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import {
-  Agent,
-  ExecutableManifest,
-  Handoff,
-  Pins,
-  Session,
-  ToolExecutor,
-  withCacheBreakpoints,
-} from "../../../src/index.js"
+import { Agent, ExecutableManifest, Handoff, Pins, Session, ToolExecutor } from "../../../src/index.js"
+import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache.js"
 import {
   Address,
   RunExecutor,
@@ -45,9 +38,9 @@ import {
 import { sqliteLayer, tempDbPath } from "./scenario.js"
 import { closedTestAgent, pinnedTestAgent } from "../run/identity.js"
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
-import { HandoffControlState } from "../../../src/core/agent/handoff/state.js"
+import { ControlState } from "../../../src/core/agent/handoff/state.js"
 const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
-const CheckpointState = Schema.Struct({ handoff: Schema.optionalKey(HandoffControlState) })
+const CheckpointState = Schema.Struct({ handoff: Schema.optionalKey(ControlState) })
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -523,8 +516,8 @@ it.live("atomically imports SQLite handoff projections with exact retry and dive
     budget: { allocation: {}, remaining: {}, depth: 0 },
     state: {},
   }
-  const commit = Schema.decodeSync(Handoff.HandoffCommit)({
-    _tag: "HandoffCommit",
+  const commit = Schema.decodeSync(Handoff.Commit)({
+    _tag: "Commit",
     state: {
       root: assistant.name,
       active: researcher.name,

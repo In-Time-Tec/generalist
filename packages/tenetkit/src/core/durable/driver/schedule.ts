@@ -3,7 +3,7 @@ import { updateCall, type ToolBatchCheckpoint } from "../../agent/tools/checkpoi
 import { chargeScheduled, withPending } from "../loop-driver.js"
 import { LoopDriverState, type PendingOperation } from "../loop-driver-state.js"
 import { OperationTurn } from "../operation-turn.js"
-import { assertNotExpired, RunBudgetExhausted } from "../run-budget.js"
+import { assertNotExpired, Exhausted } from "../run-budget.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
 import type { DriverCheckpoint, DriverOperation, OperationOutcome } from "./contract.js"
 import { fromInput as operationFrom, type OperationSpec } from "./operation.js"
@@ -45,7 +45,7 @@ const scheduleBatchTool = (
   callIndex: number,
   spec: OperationSpec,
   requested: DriverOperation,
-): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid | RunBudgetExhausted> =>
+): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid | Exhausted> =>
   Effect.gen(function* () {
     let scheduled = before
     const entry = batch.calls[callIndex]!
@@ -103,7 +103,7 @@ const scheduleNew = (
   input: SchedulerInput,
   before: DriverCheckpoint,
   spec: OperationSpec,
-): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid | RunBudgetExhausted> =>
+): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid | Exhausted> =>
   Effect.gen(function* () {
     const nowIso = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
     yield* assertNotExpired(before.budget, nowIso)

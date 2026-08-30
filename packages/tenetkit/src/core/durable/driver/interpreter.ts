@@ -6,18 +6,13 @@ import {
   reserveChild,
   type BudgetLimits,
   type RunBudget,
-  RunBudgetExhausted,
-  type RunBudgetGrantWidened,
+  Exhausted,
+  type GrantWidened,
 } from "../run-budget.js"
 import { CurrentModelCallOrdinal } from "../operation-context.js"
 import { LoopDriverState } from "../loop-driver-state.js"
-import {
-  applyHandoffCommit,
-  chargeUsage as chargeCheckpointUsage,
-  withBudget,
-  withHandoffState,
-} from "../loop-driver.js"
-import type { HandoffControlState } from "../../agent/handoff/state.js"
+import { applyCommit, chargeUsage as chargeCheckpointUsage, withBudget, withHandoffState } from "../loop-driver.js"
+import type { ControlState } from "../../agent/handoff/state.js"
 import { OperationOutcomeResolution } from "./operation-outcome.js"
 import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import { decodeReplay, fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
@@ -55,7 +50,7 @@ export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServi
   readonly complete: () => Success
   readonly replay: (success: Success) => Stream.Stream<A, ReplayError, ReplayServices>
 }
-type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted
+type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted
 /** @experimental Inline interpreter executing driver operations through Effect services. */
 export interface Service {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
@@ -80,13 +75,11 @@ export interface Service {
   readonly abortPending: (
     error: OperationFailure,
   ) => Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay>
-  readonly chargeUsage: (usage: BudgetLimits) => Effect.Effect<void, DriverError | RunBudgetExhausted>
+  readonly chargeUsage: (usage: BudgetLimits) => Effect.Effect<void, DriverError | Exhausted>
   readonly setBudget: (budget: RunBudget) => Effect.Effect<void, DriverError>
-  readonly reserveChild: (
-    grant: BudgetLimits,
-  ) => Effect.Effect<RunBudget, DriverError | RunBudgetExhausted | RunBudgetGrantWidened>
+  readonly reserveChild: (grant: BudgetLimits) => Effect.Effect<RunBudget, DriverError | Exhausted | GrantWidened>
   readonly refundChild: (child: RunBudget) => Effect.Effect<void, DriverError>
-  readonly setHandoffState: (state: HandoffControlState) => Effect.Effect<void, DriverError | DriverStateInvalid>
+  readonly setHandoffState: (state: ControlState) => Effect.Effect<void, DriverError | DriverStateInvalid>
 }
 /** @experimental */
 export class DriverUnknownReplay extends Schema.TaggedError<DriverUnknownReplay>()(
@@ -139,7 +132,7 @@ export const make = (input: {
           if (nested) {
             after =
               outcome._tag === "Succeeded" && operation.kind === "handoff"
-                ? yield* applyHandoffCommit(before, outcome.value)
+                ? yield* applyCommit(before, outcome.value)
                 : before
             if (applyCheckpoint !== undefined) after = applyCheckpoint(after, outcome)
           } else if (batchTool) {
@@ -171,7 +164,7 @@ export const make = (input: {
           let after = before
           if (nested) {
             if (replay._tag === "Succeeded" && operation.kind === "handoff") {
-              after = yield* applyHandoffCommit(before, replay.value)
+              after = yield* applyCommit(before, replay.value)
             }
           } else if (batchTool) {
             if (applyCheckpoint === undefined) {
@@ -189,7 +182,7 @@ export const make = (input: {
     const run = <A, E, R>(
       spec: OperationSpec,
       effect: Effect.Effect<A, E, R>,
-    ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R> =>
+    ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R> =>
       Effect.gen(function* () {
         const { operation, replay, batchTool, nested = false } = yield* schedule(spec)
         if (replay !== undefined) {

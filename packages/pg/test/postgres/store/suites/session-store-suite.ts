@@ -511,8 +511,8 @@ describePostgres("PostgreSQL Session authority", () => {
         budget: { allocation: {}, remaining: {}, depth: 0 },
         state: {},
       }
-      const commit: Handoff.HandoffCommit = {
-        _tag: "HandoffCommit",
+      const commit: Handoff.Commit = {
+        _tag: "Commit",
         state: {
           root: assistant.name,
           active: "specialist",

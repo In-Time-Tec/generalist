@@ -4,16 +4,16 @@ export const corePoliciesReference = definePage({
   title: "Policies and gating",
   navTitle: "Policies",
   group: "Reference",
-  description: "TurnPolicy, Approvals, and Permissions: every decision union and layer constructor.",
+  description: "Policy, Approvals, and Permissions: every decision union and layer constructor.",
   content: [
     lead(
-      "Three namespaces of tenetkit gate what a run may do next: TurnPolicy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
+      "Three namespaces of tenetkit gate what a run may do next: Policy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
     ),
     command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
-    h2("turn-policy", "TurnPolicy"),
+    h2("turn-policy", "Policy"),
     p(
       "A policy is ",
-      code("TurnPolicy<R> = { decide: (info: TurnInfo) => Effect<Decision, TurnPolicyError, R> }"),
+      code("Policy<R> = { decide: (info: TurnInfo) => Effect<Decision, Error, R> }"),
       ", consulted before each follow-up turn. ",
       code("TurnInfo"),
       " carries ",

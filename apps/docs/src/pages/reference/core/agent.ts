@@ -27,7 +27,7 @@ export const coreAgentReference = definePage({
         [[code("name")], [code("string")], "required"],
         [[code("instructions")], [code("string")], "none"],
         [[code("toolkit")], [code("Ai.Toolkit.Toolkit<Tools>")], [code("Ai.Toolkit.empty")]],
-        [[code("policy")], [code("TurnPolicy.TurnPolicy")], [code("TurnPolicy.defaultPolicy")]],
+        [[code("policy")], [code("Policy.Policy")], [code("Policy.defaultPolicy")]],
         [[code("model")], [code("ModelRegistry.ModelSelection")], "none"],
         [[code("memory")], [code("Memory.Key")], "none"],
         [[code("metadata")], [code("Readonly<Record<string, unknown>>")], "none"],
@@ -184,7 +184,7 @@ export const coreAgentReference = definePage({
     p(
       "The error channel of every run function is the union ",
       code(
-        "AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflow | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
+        "AgentError | AgentSuspended | ResumeMismatch | Error | PolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflow | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
       ),
       ". Field shapes are tabulated in ",
       link("/docs/reference/core-events", "AgentEvent and errors"),

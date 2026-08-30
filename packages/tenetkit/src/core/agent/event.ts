@@ -84,8 +84,8 @@ interface HandoffCompleted {
 }
 
 /** @experimental A same-run handoff was rejected before switching agents. */
-interface HandoffRejectedEvent {
-  readonly _tag: "HandoffRejected"
+interface RejectedEvent {
+  readonly _tag: "Rejected"
   readonly turn: number
   readonly handoffId: string
   readonly reason: string
@@ -224,7 +224,7 @@ export type Event =
   | ToolExecutionWaiting
   | HandoffRequested
   | HandoffCompleted
-  | HandoffRejectedEvent
+  | RejectedEvent
   | ApprovalRequested
   | SteeringDrained
   | TurnCompleted
@@ -253,7 +253,7 @@ export class TurnLimitExceeded extends Schema.TaggedError<TurnLimitExceeded>()("
 }) {}
 
 /** @experimental A turn policy successfully stopped for a reason other than a configured turn limit. */
-export class TurnPolicyStopped extends Schema.TaggedError<TurnPolicyStopped>()("tenetkit/core/TurnPolicyStopped", {
+export class PolicyStopped extends Schema.TaggedError<PolicyStopped>()("tenetkit/core/PolicyStopped", {
   turn: Schema.Finite,
   reason: StopReason,
   pending: Schema.Array(

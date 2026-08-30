@@ -48,7 +48,7 @@ export interface BudgetExhausted {
 }
 
 /** @experimental A custom policy stopped for a host-defined detail. */
-export interface Policy {
+export interface CustomReason {
   readonly _tag: "Policy"
   readonly detail: string
 }
@@ -65,14 +65,14 @@ export const StopReason = Schema.Union([
 export type StopReason = typeof StopReason.Type
 
 /** @experimental A turn policy could not evaluate its decision. */
-export class TurnPolicyError extends Schema.TaggedError<TurnPolicyError>()("tenetkit/core/TurnPolicyError", {
+export class Error extends Schema.TaggedError<Error>()("tenetkit/core/TurnPolicyError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
 /** @experimental A turn policy in the spirit of `Schedule`. */
-export interface TurnPolicy<R = never> {
-  readonly decide: (info: TurnInfo) => Effect.Effect<Decision, TurnPolicyError, R>
+export interface Policy<R = never> {
+  readonly decide: (info: TurnInfo) => Effect.Effect<Decision, Error, R>
   readonly snapshot?: Snapshot
 }
 
@@ -114,19 +114,19 @@ export const decision = {
 }
 
 /** @experimental Construct a policy from a decide function. */
-export const make = <R = never>(
-  decide: (info: TurnInfo) => Effect.Effect<Decision, TurnPolicyError, R>,
-): TurnPolicy<R> => ({ decide })
+export const make = <R = never>(decide: (info: TurnInfo) => Effect.Effect<Decision, Error, R>): Policy<R> => ({
+  decide,
+})
 
 /** @experimental Continue after every turn; a run still completes naturally without pending tool results. */
-export const forever: TurnPolicy = {
+export const forever: Policy = {
   decide: () => Effect.succeed(decision.continue()),
   snapshot: { _tag: "Forever" },
 }
 
 /** @experimental Continue for at most `n` follow-up turns after the first. */
-export const recurs = (n: number): TurnPolicy => {
-  const policy: TurnPolicy = {
+export const recurs = (n: number): Policy => {
+  const policy: Policy = {
     decide: (info) =>
       Effect.succeed(
         info.turn < n + 1
@@ -142,7 +142,7 @@ export const recurs = (n: number): TurnPolicy => {
 }
 
 /** @experimental Continue while a named tool has not yet been called this run. */
-export const untilToolCall = (name: string): TurnPolicy => ({
+export const untilToolCall = (name: string): Policy => ({
   decide: (info) =>
     Effect.succeed(
       info.pendingToolResults.some((result) => result.name === name)
@@ -160,10 +160,10 @@ const mergeOverrides = (first?: TurnOverrides, second?: TurnOverrides): TurnOver
 
 /** @experimental Both must continue; overrides merge with `second` winning. */
 export const both: {
-  <R2>(second: TurnPolicy<R2>): <R1>(first: TurnPolicy<R1>) => TurnPolicy<R1 | R2>
-  <R1, R2>(first: TurnPolicy<R1>, second: TurnPolicy<R2>): TurnPolicy<R1 | R2>
-} = dual(2, <R1, R2>(first: TurnPolicy<R1>, second: TurnPolicy<R2>): TurnPolicy<R1 | R2> => {
-  const policy: TurnPolicy<R1 | R2> = {
+  <R2>(second: Policy<R2>): <R1>(first: Policy<R1>) => Policy<R1 | R2>
+  <R1, R2>(first: Policy<R1>, second: Policy<R2>): Policy<R1 | R2>
+} = dual(2, <R1, R2>(first: Policy<R1>, second: Policy<R2>): Policy<R1 | R2> => {
+  const policy: Policy<R1 | R2> = {
     decide: (info) =>
       Effect.gen(function* () {
         const left = yield* first.decide(info)
@@ -179,4 +179,4 @@ export const both: {
 })
 
 /** @experimental Default policy: `forever` — no framework-imposed follow-up cap. */
-export const defaultPolicy: TurnPolicy = forever
+export const defaultPolicy: Policy = forever

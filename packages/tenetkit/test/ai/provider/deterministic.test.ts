@@ -38,12 +38,12 @@ import {
 } from "tenetkit/ai/openrouter"
 import {
   layerAzureOpenAI,
-  layerDeepseek,
-  layerGoogleAiStudio,
+  layerDeepSeek,
+  layerGoogleAIStudio,
   layerGroq,
   layerMistral,
   layerOllama,
-  layerXai,
+  layerXAI,
 } from "tenetkit/ai/openai-compatible"
 import { layer as deterministicLayer } from "../../../src/ai/provider/deterministic.js"
 
@@ -531,7 +531,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.mergeAll(
-      ModelRegistry.layerCombined([
+      ModelRegistry.layerMerged([
         deterministicLayer({ provider: "det-a", model: "model-a" }),
         deterministicLayer({ provider: "det-b", model: "model-b" }),
       ]),
@@ -566,7 +566,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.provide(
-      ModelRegistry.layerCombined([
+      ModelRegistry.layerMerged([
         anthropicLayer({ model: "claude-test", apiKey }),
         openRouterLayer({ model: "openrouter-test", apiKey }),
         openRouterLayer({ model: "openrouter-test", registrationKey: "secondary", apiKey }),
@@ -630,9 +630,9 @@ describe("providers", () => {
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
       layerGroq({ model: "model", apiKey }),
       layerMistral({ model: "model", apiKey }),
-      layerXai({ model: "model", apiKey }),
-      layerDeepseek({ model: "model", apiKey }),
-      layerGoogleAiStudio({ model: "model", apiKey }),
+      layerXAI({ model: "model", apiKey }),
+      layerDeepSeek({ model: "model", apiKey }),
+      layerGoogleAIStudio({ model: "model", apiKey }),
       layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
       layerOllama({ model: "model", apiKey }),
     )
@@ -658,9 +658,9 @@ describe("providers", () => {
     const baseOpenAICompatible = tuple(
       layerGroq({ model: "model", apiKey }),
       layerMistral({ model: "model", apiKey }),
-      layerXai({ model: "model", apiKey }),
-      layerDeepseek({ model: "model", apiKey }),
-      layerGoogleAiStudio({ model: "model", apiKey }),
+      layerXAI({ model: "model", apiKey }),
+      layerDeepSeek({ model: "model", apiKey }),
+      layerGoogleAIStudio({ model: "model", apiKey }),
       layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
       layerOllama({ model: "model", apiKey }),
     )
@@ -697,9 +697,9 @@ describe("providers", () => {
       chatCompletionsLayer({ model: "chat-compatible-test", apiKey }),
       layerGroq({ model: "model", apiKey }),
       layerMistral({ model: "model", apiKey }),
-      layerXai({ model: "model", apiKey }),
-      layerDeepseek({ model: "model", apiKey }),
-      layerGoogleAiStudio({ model: "model", apiKey }),
+      layerXAI({ model: "model", apiKey }),
+      layerDeepSeek({ model: "model", apiKey }),
+      layerGoogleAIStudio({ model: "model", apiKey }),
       layerAzureOpenAI({ model: "model", resource: "resource", apiKey }),
       layerOllama({ model: "model", apiKey }),
     ]
@@ -779,9 +779,9 @@ describe("providers", () => {
     expect(openAiLayerOrDeterministic).toBeInstanceOf(Function)
     expect(layerGroq).toBeInstanceOf(Function)
     expect(layerMistral).toBeInstanceOf(Function)
-    expect(layerXai).toBeInstanceOf(Function)
-    expect(layerDeepseek).toBeInstanceOf(Function)
-    expect(layerGoogleAiStudio).toBeInstanceOf(Function)
+    expect(layerXAI).toBeInstanceOf(Function)
+    expect(layerDeepSeek).toBeInstanceOf(Function)
+    expect(layerGoogleAIStudio).toBeInstanceOf(Function)
     expect(layerAzureOpenAI).toBeInstanceOf(Function)
     expect(layerOllama).toBeInstanceOf(Function)
     expect(FetchHttpClient.layer).toBeDefined()

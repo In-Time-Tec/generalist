@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, ToolOutput } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Output } from "tenetkit"
 import { docsToolLayer } from "./executor"
 import { toolkit } from "./search-tool"
 
@@ -8,7 +8,7 @@ const agent = Agent.make({ name: "docs-assistant", toolkit })
 export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.LanguageModel> = Effect.scoped(
   Effect.flatMap(
     Layer.build(
-      Layer.mergeAll(docsToolLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, ToolOutput.layerMemory),
+      Layer.mergeAll(docsToolLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, Output.layerMemory),
     ),
     (services) =>
       Agent.generate(agent, {

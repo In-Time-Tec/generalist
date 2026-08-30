@@ -2,7 +2,7 @@ import { Effect, Schema, Stream } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
 import type { AgentError, Event } from "../event.js"
 import type { PendingToolResult } from "../tools/result.js"
-import { TurnPolicyError, type Decision, type TurnOverrides } from "../../turn/policy.js"
+import { Error, type Decision, type TurnOverrides } from "../../turn/policy.js"
 import type { Completion } from "../../turn/steering-inbox.js"
 import type { Input } from "../../turn/steering.js"
 import type { ObjectSchema, RunLoopContext, SchemaServicesD } from "./context.js"
@@ -81,7 +81,7 @@ export const afterTurnFor = <
     readonly turn: number
     readonly history: Prompt.Prompt
     readonly pendingToolResults: ReadonlyArray<PendingToolResult>
-  }) => Effect.Effect<Decision, TurnPolicyError | HandoffRequirementsMissing, R>
+  }) => Effect.Effect<Decision, Error | HandoffRequirementsMissing, R>
   readonly takeFollowUp: () => Effect.Effect<ReadonlyArray<Input>>
   readonly takeSteering: () => Effect.Effect<ReadonlyArray<Input>>
   readonly takeCompletion: () => Effect.Effect<Completion>
@@ -90,7 +90,7 @@ export const afterTurnFor = <
   const {
     checkpointPending,
     handoffStateRef,
-    isTurnPolicyDecision,
+    isPolicyDecision,
     pendingResults,
     rememberTurn,
     state,
@@ -101,11 +101,7 @@ export const afterTurnFor = <
   return (
     turn: number,
     alreadyProjectedPending?: ReadonlyArray<PendingToolResult>,
-  ): Effect.Effect<
-    AfterTurnResult<StructuredOutputSchema>,
-    AgentError | TurnPolicyError | RunError,
-    R | DriverInterpreter
-  > =>
+  ): Effect.Effect<AfterTurnResult<StructuredOutputSchema>, AgentError | Error | RunError, R | DriverInterpreter> =>
     Effect.gen(function* () {
       const pending = alreadyProjectedPending ?? pendingResults()
       const transcript = yield* checkpointPending(turn, alreadyProjectedPending === undefined ? pending : [])
@@ -137,9 +133,9 @@ export const afterTurnFor = <
         history: transcript,
         pendingToolResults: pending,
       })
-      if (!isTurnPolicyDecision(evaluated)) {
-        return yield* TurnPolicyError.make({
-          message: "TurnPolicy returned an invalid decision; Stop decisions must include a reason",
+      if (!isPolicyDecision(evaluated)) {
+        return yield* Error.make({
+          message: "Policy returned an invalid decision; Stop decisions must include a reason",
           cause: evaluated,
         })
       }

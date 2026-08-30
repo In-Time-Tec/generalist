@@ -1,12 +1,12 @@
 import { Context, Effect, Function, Layer, Option, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../../core/agent/service.js"
-import { NestedOperations as NestedOperationsService } from "../../core/tools/nested-operation.js"
+import { Operations as OperationsService } from "../../core/tools/nested-operation.js"
 import { type Service as SessionService, SessionDirectory, SessionStoreError } from "../../core/context/session.js"
 import { type Service as ToolExecutorService, ToolExecutor } from "../../core/tools/tool-executor.js"
 import { ChildRuns, Executor as ChildRunsExecutor, make as makeChildRuns } from "../child/runs.js"
 import { Executor as CodeModeExecutor, type Service as CodeModeService } from "../code-mode.js"
-import type { Service as NestedOperations } from "../operation/nested-operations.js"
+import type { Service as Operations } from "../operation/nested-operations.js"
 import type { Service as RunStoreService } from "../run/store.js"
 
 /** @experimental Select the resolved executable's ToolExecutor before the ambient host executor. */
@@ -27,10 +27,10 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
   readonly environment: Layer.Layer<ClosedServices<Tools, R>>
   readonly store: RunStoreService
   readonly codeMode: CodeModeService | undefined
-  readonly nested: NestedOperations
+  readonly nested: Operations
 }): Effect.Effect<
-  | Context.Context<ClosedServices<Tools, R> | ChildRuns | NestedOperationsService>
-  | Context.Context<ClosedServices<Tools, R> | ChildRuns | NestedOperationsService | ToolExecutor>,
+  | Context.Context<ClosedServices<Tools, R> | ChildRuns | OperationsService>
+  | Context.Context<ClosedServices<Tools, R> | ChildRuns | OperationsService | ToolExecutor>,
   never,
   Scope.Scope
 > =>
@@ -55,7 +55,7 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
       Context.merge(
         Context.merge(
           Context.make(ChildRuns, children),
-          Context.make(NestedOperationsService, NestedOperationsService.of(options.nested)),
+          Context.make(OperationsService, OperationsService.of(options.nested)),
         ),
         Context.make(
           ToolExecutor,

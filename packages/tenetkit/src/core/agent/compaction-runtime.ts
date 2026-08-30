@@ -1,7 +1,7 @@
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
 import { AiError, Chat, Prompt, Tokenizer } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./event.js"
-import { Compaction, DEFAULT_RESERVE_TOKENS, type Result as CompactionResult, type Usage } from "../turn/compaction.js"
+import { Compaction, defaultReserveTokens, type Result as CompactionResult, type Usage } from "../turn/compaction.js"
 import { diagnose as diagnoseSessionSync } from "../context/session-sync.js"
 import { SessionSyncInternals } from "./session/sync.js"
 import {
@@ -211,7 +211,7 @@ export const make = (context: CompactionContext) => {
         return {
           contextTokens,
           contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
-          reserveTokens: options.compaction?.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
+          reserveTokens: options.compaction?.reserveTokens ?? defaultReserveTokens,
         }
       }),
     )

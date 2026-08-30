@@ -37,8 +37,8 @@ import {
   Steering,
   ToolContext,
   ToolExecutor,
-  ToolOutput,
-  TurnPolicy,
+  Output,
+  Policy,
 } from "../../../src/index"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
@@ -1373,10 +1373,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([
-          Instructions.staticSource("first", "first"),
-          Instructions.staticSource("second", "second"),
-        ]),
+        Instructions.layer([Instructions.fromText("first", "first"), Instructions.fromText("second", "second")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-agent", instructions: "fallback instructions" })
@@ -1399,7 +1396,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([Instructions.staticSource("registry", "registry")]),
+        Instructions.layer([Instructions.fromText("registry", "registry")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-system-agent", instructions: "fallback instructions" })
@@ -1424,7 +1421,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([Instructions.staticSource("registry", "registry")]),
+        Instructions.layer([Instructions.fromText("registry", "registry")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-history-agent", instructions: "fallback instructions" })
@@ -1457,7 +1454,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Instructions.layer([Instructions.staticSource("empty", "")]),
+        Instructions.layer([Instructions.fromText("empty", "")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "empty-instructions-agent", instructions: "fallback instructions" })
@@ -2171,8 +2168,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           expect(events.some((event) => event._tag === "Completed")).toBe(false)
           expect(failure).toMatchObject({ _tag: "tenetkit/core/AgentError", turn: 0 })
           expect(
-            failure._tag === "tenetkit/core/AgentError" &&
-              Schema.is(ModelStreamTermination.ModelStreamTruncated)(failure.cause),
+            failure._tag === "tenetkit/core/AgentError" && Schema.is(ModelStreamTermination.Truncated)(failure.cause),
           ).toBe(true)
         }),
       ] as const,
@@ -3107,8 +3103,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   ItLayer.make(it, "rejects middleware changing a call to an excluded static tool", () => {
     let modelCalls = 0
     let gatedExecutions = 0
-    const policy = TurnPolicy.make(({ turn }) =>
-      Effect.succeed(TurnPolicy.decision.continue(turn === 1 ? { activeTools: ["echo"] } : undefined)),
+    const policy = Policy.make(({ turn }) =>
+      Effect.succeed(Policy.decision.continue(turn === 1 ? { activeTools: ["echo"] } : undefined)),
     )
     return [
       Layer.mergeAll(
@@ -3176,9 +3172,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ...testSkill("review-active", "Review active tool behavior.", "REVIEW BODY"),
       tools: [reviewTool],
     }
-    const policy = TurnPolicy.make(() =>
-      Effect.succeed(TurnPolicy.decision.continue({ activeTools: ["activate_skill"] })),
-    )
+    const policy = Policy.make(() => Effect.succeed(Policy.decision.continue({ activeTools: ["activate_skill"] })))
     return [
       Layer.mergeAll(
         modelLayer(() => {
@@ -5391,7 +5385,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               return { _tag: "Success" as const, result: largeOutput, encodedResult: largeOutput }
             }),
         }),
-        ToolOutput.layerTest({
+        Output.layerTest({
           put: (toolCallId, content) => {
             order.push("spill")
             stored = { toolCallId, content }
@@ -5474,11 +5468,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let policyHistory: Prompt.Prompt | undefined
     let sessionAtPolicy: Prompt.Prompt | undefined
     const remembered: Array<Memory.RememberInput> = []
-    const policy = TurnPolicy.make<Session.SessionDirectory>((info) =>
+    const policy = Policy.make<Session.SessionDirectory>((info) =>
       Effect.sync(() => {
         policyHistory = info.history
         sessionAtPolicy = info.history
-        return TurnPolicy.decision.continue()
+        return Policy.decision.continue()
       }),
     )
 
@@ -6707,7 +6701,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           name: "override-model-retry-agent",
           model: overflowSelection,
           toolkit: Toolkit.make(echoTool),
-          policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.continue({ model: overrideModel }))),
+          policy: Policy.make(() => Effect.succeed(Policy.decision.continue({ model: overrideModel }))),
         })
 
         const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool then override" }))
@@ -6737,7 +6731,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({
           name: "policy-stop-agent",
           toolkit: Toolkit.make(echoTool),
-          policy: TurnPolicy.recurs(0),
+          policy: Policy.recurs(0),
         })
 
         const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "loop forever" })))
@@ -6769,7 +6763,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       const agent = Agent.make({
         name: "ordered-policy-stop-agent",
         toolkit: Toolkit.make(echoTool),
-        policy: TurnPolicy.recurs(0),
+        policy: Policy.recurs(0),
         toolScheduling: { maxConcurrency: 2, parallelSafe: ["echo"] },
       })
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "call twice" })))
@@ -6891,12 +6885,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         budgetLayer,
       ),
       Effect.gen(function* () {
-        const policy = TurnPolicy.make<Budget>((info) =>
+        const policy = Policy.make<Budget>((info) =>
           Effect.gen(function* () {
             const budget = yield* Budget
             return budget.remaining(info.turn) === 0
-              ? TurnPolicy.decision.stop({ _tag: "BudgetExhausted", budget: "tokens" })
-              : TurnPolicy.decision.continue()
+              ? Policy.decision.stop({ _tag: "BudgetExhausted", budget: "tokens" })
+              : Policy.decision.continue()
           }),
         )
         const agent = Agent.make({ name: "budget-policy-agent", toolkit: Toolkit.make(echoTool), policy })
@@ -6907,8 +6901,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(requirementProof).toBe(true)
         expect(calls).toBe(1)
-        expect(failure._tag).toBe("tenetkit/core/TurnPolicyStopped")
-        if (failure._tag === "tenetkit/core/TurnPolicyStopped") {
+        expect(failure._tag).toBe("tenetkit/core/PolicyStopped")
+        if (failure._tag === "tenetkit/core/PolicyStopped") {
           expect(failure.reason).toEqual({ _tag: "BudgetExhausted", budget: "tokens" })
           expect(failure.pending).toEqual([{ tool_call_id: "tool-call-1", tool_name: "echo" }])
         }
@@ -6929,7 +6923,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const reasons: ReadonlyArray<Exclude<TurnPolicy.StopReason, { readonly _tag: "TurnLimit" }>> = [
+        const reasons: ReadonlyArray<Exclude<Policy.StopReason, { readonly _tag: "TurnLimit" }>> = [
           { _tag: "GoalSatisfied" },
           { _tag: "BudgetExhausted", budget: "requests" },
           { _tag: "Policy", detail: "operator requested stop" },
@@ -6939,11 +6933,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           const agent = Agent.make({
             name: `stop-reason-${reason._tag}`,
             toolkit: Toolkit.make(echoTool),
-            policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.stop(reason))),
+            policy: Policy.make(() => Effect.succeed(Policy.decision.stop(reason))),
           })
           const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "stop" })))
-          expect(failure._tag).toBe("tenetkit/core/TurnPolicyStopped")
-          if (failure._tag === "tenetkit/core/TurnPolicyStopped") expect(failure.reason).toEqual(reason)
+          expect(failure._tag).toBe("tenetkit/core/PolicyStopped")
+          if (failure._tag === "tenetkit/core/PolicyStopped") expect(failure.reason).toEqual(reason)
         }
 
         expect(calls).toBe(reasons.length)
@@ -6953,7 +6947,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "surfaces a policy evaluation failure without erasing its cause", () => {
     const policyCause = { system: "budget-service", status: "offline" }
-    const policyFailure = TurnPolicy.TurnPolicyError.make({ message: "budget unavailable", cause: policyCause })
+    const policyFailure = Policy.Error.make({ message: "budget unavailable", cause: policyCause })
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-policy-failure", "echo", { text: "call" }))),
@@ -6965,7 +6959,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({
           name: "policy-failure-agent",
           toolkit: Toolkit.make(echoTool),
-          policy: TurnPolicy.make(() => Effect.fail(policyFailure)),
+          policy: Policy.make(() => Effect.fail(policyFailure)),
         })
 
         const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use policy" })))
@@ -6977,7 +6971,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   })
 
   ItLayer.make(it, "fails typed when a policy returns a reasonless Stop", () => {
-    const policy = TurnPolicy.recurs(0)
+    const policy = Policy.recurs(0)
     Reflect.set(policy, "decide", () => Effect.succeed({ _tag: "Stop" }))
     return [
       Layer.mergeAll(
@@ -7018,8 +7012,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({
           name: "override-agent",
           toolkit: Toolkit.make(echoTool),
-          policy: TurnPolicy.make(() =>
-            Effect.succeed(TurnPolicy.decision.continue({ instructions: "injected system content" })),
+          policy: Policy.make(() =>
+            Effect.succeed(Policy.decision.continue({ instructions: "injected system content" })),
           ),
         })
 
@@ -7055,7 +7049,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({
           name: "active-tools-agent",
           toolkit: Toolkit.make(echoTool),
-          policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.continue({ activeTools: [] }))),
+          policy: Policy.make(() => Effect.succeed(Policy.decision.continue({ activeTools: [] }))),
         })
 
         const failure = yield* Agent.stream(agent, { prompt: "use then hide echo" }).pipe(Stream.runDrain, Effect.flip)
@@ -7947,8 +7941,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ...testSkill("resumable-review", "Review with resumable approval.", "RESUMABLE REVIEW BODY"),
       tools: [reviewTool],
     }
-    const policy = TurnPolicy.make(() =>
-      Effect.succeed(TurnPolicy.decision.continue({ activeTools: ["activate_skill", "resumable_review"] })),
+    const policy = Policy.make(() =>
+      Effect.succeed(Policy.decision.continue({ activeTools: ["activate_skill", "resumable_review"] })),
     )
     return [
       Layer.mergeAll(
@@ -8433,7 +8427,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     Effect.gen(function* () {
       const agent = Agent.make({ name: "checkpoint-identity-agent" })
       const executable = ExecutableManifest.makeTest("checkpoint-identity-agent", undefined)
-      const budget = RunBudget.allocate({})
+      const budget = RunBudget.make({})
       const checkpoint: DurableDriver.DriverCheckpoint = {
         driverVersion: DurableDriver.currentDriverVersion,
         executable: executable.ref,

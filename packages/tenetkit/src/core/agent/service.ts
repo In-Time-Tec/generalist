@@ -14,24 +14,24 @@ import {
   ToolNameCollision,
   type ToolOrigin,
   TurnLimitExceeded,
-  TurnPolicyStopped,
+  PolicyStopped,
 } from "./event.js"
 import type { DeliveryFailed, InvocationCoordinationFailed } from "../model/telemetry/events.js"
-import { type BudgetLimits, type RunBudget, RunBudgetExhausted } from "../durable/run-budget.js"
+import { type BudgetLimits, type RunBudget, Exhausted } from "../durable/run-budget.js"
 import type { DriverCheckpoint } from "../durable/driver/contract.js"
 import type { DriverError, DriverStateInvalid } from "../durable/service.js"
 import type { DriverUnknownReplay } from "../durable/driver/interpreter.js"
-import type { ModelResilienceMisconfigured } from "../model/resilience.js"
+import type { Misconfigured } from "../model/resilience.js"
 import type { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from "../model/tool-call-validation.js"
 import { type Key, Memory } from "../context/memory.js"
 import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } from "../model/registry.js"
 import type { ToolAuthorizer } from "../tools/tool-authorization.js"
 import { ToolContext } from "../tools/tool-context.js"
 import { FrameworkFailure } from "../tools/tool-executor.js"
-import { HandoffLimitExceeded, HandoffRequirementsMissing, HandoffTargetMissing } from "./handoff/state.js"
-import { HandoffProjectionInvalid } from "../policy/handoff-projection.js"
-import { HandoffRejected } from "../policy/handoff-runtime.js"
-import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "../turn/policy.js"
+import { HandoffLimitExceeded, HandoffRequirementsMissing, TargetMissing } from "./handoff/state.js"
+import { ProjectionInvalid } from "../policy/handoff-projection.js"
+import { Rejected } from "../policy/handoff-runtime.js"
+import { defaultPolicy, type Policy, Error } from "../turn/policy.js"
 import type { RunId as RunIdType } from "../durable/run-id.js"
 import type { PolicyInvalid } from "../turn/steering.js"
 
@@ -72,7 +72,7 @@ export interface Agent<
   readonly instructions?: string
   readonly supplemental?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
-  readonly policy: TurnPolicy<PolicyServices>
+  readonly policy: Policy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly authorization?: ToolAuthorizer<AuthorizationServices>
@@ -103,7 +103,7 @@ export interface Any {
   readonly name: string
   readonly instructions?: string
   readonly toolkit: Toolkit.Any
-  readonly policy: TurnPolicy<unknown>
+  readonly policy: Policy<unknown>
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly toolScheduling: ToolSchedulingPolicy
@@ -141,7 +141,7 @@ export interface MakeOptions<
   readonly supplemental?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
   readonly tools?: never
-  readonly policy?: TurnPolicy<PolicyServices>
+  readonly policy?: Policy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly authorization?: ToolAuthorizer<AuthorizationServices>
@@ -168,7 +168,7 @@ type ModelRequirement<O> = [Exclude<OptionValue<O, "model">, undefined>] extends
     ? LanguageModel.LanguageModel | ModelRegistry
     : ModelRegistry
 type MemoryRequirement<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
-type PolicyRequirement<O> = O extends { readonly policy: TurnPolicy<infer R> } ? R : never
+type PolicyRequirement<O> = O extends { readonly policy: Policy<infer R> } ? R : never
 type AuthorizationRequirement<O> = O extends { readonly authorization: ToolAuthorizer<infer R> } ? R : never
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<Tools>
@@ -344,12 +344,12 @@ export type RunError =
   | AgentError
   | AgentSuspended
   | ResumeMismatch
-  | TurnPolicyError
-  | TurnPolicyStopped
+  | Error
+  | PolicyStopped
   | TurnLimitExceeded
   | RunEndedWithoutOutput
   | MiddlewareViolation
-  | ModelResilienceMisconfigured
+  | Misconfigured
   | InvalidToolCallParameters
   | ToolJsonSchemaCompilerMissing
   | DuplicateToolCallId
@@ -361,12 +361,12 @@ export type RunError =
   | DriverError
   | DriverStateInvalid
   | DriverUnknownReplay
-  | RunBudgetExhausted
-  | HandoffTargetMissing
+  | Exhausted
+  | TargetMissing
   | HandoffLimitExceeded
   | HandoffRequirementsMissing
-  | HandoffProjectionInvalid
-  | HandoffRejected
+  | ProjectionInvalid
+  | Rejected
   | PolicyInvalid
 
 /** @experimental Result of a non-streaming run. */

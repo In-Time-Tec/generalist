@@ -3,7 +3,7 @@ import { Effect, Layer, Ref, Schema } from "effect"
 import { Approvals, NestedOperation, ToolContext } from "../../../../src/index.js"
 import { Runtime, RunStore } from "../../../../src/runtime/index.js"
 import {
-  make as makeNestedOperations,
+  make as makeOperations,
   nestedApprovalId,
   nestedOperationKey,
 } from "../../../../src/runtime/operation/nested-operations.js"
@@ -65,11 +65,11 @@ const claimed = <R>(label: string, activate: (runId: string) => Effect.Effect<vo
     })
     yield* activate(receipt.runId)
     const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: `owner:${label}` })
-    const nested = yield* makeNestedOperations({ claim, claimed: claim, store })
+    const nested = yield* makeOperations({ claim, claimed: claim, store })
     return { runtime, store, claim, nested, runId: receipt.runId }
   })
 
-export interface NestedOperationsSuiteOptions<StoreError, Extra = never> {
+export interface OperationsSuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
   readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore.RunStore | Extra>
@@ -77,7 +77,7 @@ export interface NestedOperationsSuiteOptions<StoreError, Extra = never> {
 }
 
 export const nestedOperationsSuite = <StoreError, Extra = never>(
-  options: NestedOperationsSuiteOptions<StoreError, Extra>,
+  options: OperationsSuiteOptions<StoreError, Extra>,
 ) => {
   const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
@@ -155,7 +155,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const { store, claim } = yield* claimedRun("duplicate")
           const calls = yield* Ref.make(0)
-          const first = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const first = yield* makeOperations({ claim, claimed: claim, store })
           const declaration = { ...request("write", { path: "a" }), success: Schema.Finite }
           const value = yield* first
             .run(
@@ -165,7 +165,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
             .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue))
           expect(value).toBe(1)
           // A fresh executor replays the same ordinal sequence, exactly as a retried attempt would.
-          const replayed = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const replayed = yield* makeOperations({ claim, claimed: claim, store })
           const again = yield* replayed
             .run(
               declaration,
@@ -182,17 +182,17 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { store, claim } = yield* claimedRun("divergence")
-          const first = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const first = yield* makeOperations({ claim, claimed: claim, store })
           yield* first
             .run(request("write", { path: "a" }), Effect.succeed("ok"))
             .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue))
-          const replayed = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const replayed = yield* makeOperations({ claim, claimed: claim, store })
           const failure = yield* Effect.flip(
             replayed
               .run(request("write", { path: "DIFFERENT" }), Effect.succeed("ok"))
               .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue)),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationDivergence)
+          expect(failure).toBeInstanceOf(NestedOperation.Divergence)
         }),
       ),
     )
@@ -201,17 +201,17 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { store, claim } = yield* claimedRun("divergent-kind")
-          const first = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const first = yield* makeOperations({ claim, claimed: claim, store })
           yield* first
             .run(request("write", { path: "a" }), Effect.succeed("ok"))
             .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue))
-          const replayed = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const replayed = yield* makeOperations({ claim, claimed: claim, store })
           const failure = yield* Effect.flip(
             replayed
               .run(request("read", { path: "a" }), Effect.succeed("ok"))
               .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue)),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationDivergence)
+          expect(failure).toBeInstanceOf(NestedOperation.Divergence)
         }),
       ),
     )
@@ -263,14 +263,14 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { store, claim } = yield* claimedRun("unknown-replay")
-          const first = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const first = yield* makeOperations({ claim, claimed: claim, store })
           yield* Effect.exit(
             first
               .run(request("write", { path: "a" }), Effect.interrupt)
               .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue)),
           )
           const calls = yield* Ref.make(0)
-          const replayed = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const replayed = yield* makeOperations({ claim, claimed: claim, store })
           const failure = yield* Effect.flip(
             replayed
               .run(
@@ -279,7 +279,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
               )
               .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue)),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationUnknown)
+          expect(failure).toBeInstanceOf(NestedOperation.Unknown)
           expect(yield* Ref.get(calls)).toBe(0)
         }),
       ),
@@ -301,7 +301,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
                 Effect.provideService(Approvals.Approvals, approvals),
               ),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationSuspended)
+          expect(failure).toBeInstanceOf(NestedOperation.Suspended)
         }),
       ),
     )
@@ -322,7 +322,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
                 Effect.provideService(Approvals.Approvals, approvals),
               ),
           )
-          if (!Schema.is(NestedOperation.NestedOperationSuspended)(failure)) throw new Error("expected suspension")
+          if (!Schema.is(NestedOperation.Suspended)(failure)) throw new Error("expected suspension")
           const expected = nestedApprovalId(nestedOperationKey({ operationKey: OPERATION_KEY, ordinal: 0 }))
           expect(failure.token).toBe(expected)
           const suspended = suspension({
@@ -359,7 +359,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
                 Effect.provideService(Approvals.Approvals, approvals),
               ),
           )
-          expect(failure).toBeInstanceOf(NestedOperation.NestedOperationDenied)
+          expect(failure).toBeInstanceOf(NestedOperation.Denied)
           expect(yield* Ref.get(calls)).toBe(0)
           const record = yield* store.getOperationByKey({
             runId: claim.runId,
@@ -573,13 +573,13 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
               patch: value.patch,
             }),
           }
-          const first = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const first = yield* makeOperations({ claim, claimed: claim, store })
           yield* first
             .run(declaration, Effect.succeed({ patch: "recorded" }))
             .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue))
           const recorded = yield* Ref.make<Array<ToolContext.Progress>>([])
           const calls = yield* Ref.make(0)
-          const replayed = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const replayed = yield* makeOperations({ claim, claimed: claim, store })
           yield* replayed
             .run(declaration, Ref.updateAndGet(calls, (n) => n + 1).pipe(Effect.as({ patch: "re-run" })))
             .pipe(Effect.provideService(ToolContext.ToolContext, recordingContext(recorded)))
@@ -594,11 +594,11 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { store, claim } = yield* claimedRun("progress-identity")
-          const first = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const first = yield* makeOperations({ claim, claimed: claim, store })
           yield* first
             .run(request("replace", { path: "/w/a.ts" }), Effect.succeed({ patch: "recorded" }))
             .pipe(Effect.provideService(ToolContext.ToolContext, toolContextValue))
-          const replayed = yield* makeNestedOperations({ claim, claimed: claim, store })
+          const replayed = yield* makeOperations({ claim, claimed: claim, store })
           const value = yield* replayed
             .run(
               {

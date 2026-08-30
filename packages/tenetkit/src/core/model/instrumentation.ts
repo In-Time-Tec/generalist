@@ -8,14 +8,14 @@ import { memoized, singleFailure, tapRetryTelemetry } from "./attempt/observatio
 import { candidateRoute, classifyFailure, registrationIdentity, type CandidateIdentity } from "./registry.js"
 import { adapt, invokeGenerateObject, invokeGenerateText, type StreamTextOptions } from "./service.js"
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./tool-call-validation.js"
-import { type Classification, type ModelResilienceMisconfigured, apply, validate } from "./resilience.js"
+import { type Classification, type Misconfigured, apply, validate } from "./resilience.js"
 import type { TerminationFailure } from "./stream-termination.js"
 import {
   CurrentCompactionId,
   CurrentPurpose,
   CurrentSummaryCall,
   InvocationCoordinationFailed,
-  type ModelFailureCategory,
+  type FailureCategory,
   classifyFailureCategory,
   generateId,
   isInvocationCoordinationFailed,
@@ -206,7 +206,7 @@ const callCompleted = (context: CallContext): Effect.Effect<void> =>
 
 const callFailed = (
   context: CallContext,
-  category: ModelFailureCategory,
+  category: FailureCategory,
   classification: Classification,
 ): Effect.Effect<void> =>
   Effect.flatMap(context.options.clock.currentTimeMillis, (failedAt) =>
@@ -261,7 +261,7 @@ const callEffect = <A extends AnyResponse, E, R>(
   model: LanguageModel.Service,
   options: InstrumentOptions,
   invoke: (stack: LanguageModel.Service) => Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | InvocationCoordinationFailed | ModelResilienceMisconfigured, R> =>
+): Effect.Effect<A, E | InvocationCoordinationFailed | Misconfigured, R> =>
   Effect.flatMap(validateOptions(options).pipe(Effect.andThen(beginCall(model, options))), ({ context, stack }) =>
     invoke(stack).pipe(
       Effect.tap((response) =>
@@ -283,7 +283,7 @@ const callStream = (
   | InvalidToolCallParameters
   | InvocationCoordinationFailed
   | TerminationFailure
-  | import("./resilience.js").ModelResilienceMisconfigured,
+  | import("./resilience.js").Misconfigured,
   ToolContext | Tool.Handler<string>
 > =>
   Stream.unwrap(

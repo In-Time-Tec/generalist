@@ -14,7 +14,7 @@ import { SqlClient } from "effect/unstable/sql"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Steering, ToolExecutor } from "tenetkit"
 import { Address, Cursor, Errors, RunExecutor, ExecutableResolver, Runtime, RunStore, RunTree } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker, layerWorker } from "tenetkit/runtime/sql-driver"
+import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
 import { transitionRunWait } from "../../../../tenetkit/src/runtime/sql/store/wait-transition.js"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/postgres/schema.js"
 import {
@@ -1103,7 +1103,7 @@ describePostgres("PostgreSQL run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const worker = yield* RuntimeWorker
+        const worker = yield* RuntimeWorker.RuntimeWorker
         const sessionId = uniqueSession("worker")
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -1496,14 +1496,14 @@ describePostgres("PostgreSQL run store", () => {
           resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
-        const workerLayer = layerWorker({
+        const workerLayer = RuntimeWorker.layer({
           workerId: "postgres-model-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
         }).pipe(Layer.provideMerge(layer(options)))
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const worker = yield* RuntimeWorker
+          const worker = yield* RuntimeWorker.RuntimeWorker
           const receipt = yield* runtime.send({
             to: address,
             sessionId: uniqueSession("cross-process-model"),
@@ -1584,7 +1584,7 @@ describePostgres("PostgreSQL run store", () => {
           resolver,
           addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         }
-        const workerLayer = layerWorker({
+        const workerLayer = RuntimeWorker.layer({
           workerId: "postgres-tool-worker",
           cancellationInterval: "10 millis",
           lease: "30 seconds",
@@ -1592,7 +1592,7 @@ describePostgres("PostgreSQL run store", () => {
         return yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const worker = yield* RuntimeWorker
+          const worker = yield* RuntimeWorker.RuntimeWorker
           const receipt = yield* runtime.send({
             to: address,
             sessionId: uniqueSession("cross-process-tool"),

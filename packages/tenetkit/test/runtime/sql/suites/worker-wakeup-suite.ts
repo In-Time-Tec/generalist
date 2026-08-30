@@ -8,7 +8,7 @@ import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import type { DecodedRun } from "../../../../src/runtime/sql/codec/rows.js"
 import { RunClaims, type ClaimedRun, type Service as ClaimsService } from "../../../../src/runtime/sql/run/claims.js"
-import type { WorkerOptions } from "../../../../src/runtime/sql/worker.js"
+import type { Options } from "../../../../src/runtime/sql/worker.js"
 import { assistantRef } from "../../execution/fixtures.js"
 
 const decodedRun: DecodedRun = {
@@ -56,7 +56,7 @@ const claim = (runId: string): ClaimedRun => ({
 export const workerWakeupSuite = (constructors: {
   readonly makeExecutableResolver: typeof import("../../../../src/runtime/executable/resolver.js").makeStatic
   readonly makeRunStore: typeof import("../../../../src/runtime/memory/store.js").makeRunStore
-  readonly makeWorker: typeof import("../../../../src/runtime/sql/worker.js").makeWorker
+  readonly make: typeof import("../../../../src/runtime/sql/worker.js").make
 }) => {
   const store = Effect.runSync(
     Effect.scoped(constructors.makeRunStore({ resolver: constructors.makeExecutableResolver([]), addresses: [] })),
@@ -74,10 +74,10 @@ export const workerWakeupSuite = (constructors: {
   const make = (input: {
     readonly claims: ClaimsService
     readonly execute: RunExecutor["Service"]["execute"]
-    readonly options?: Omit<WorkerOptions, "workerId">
+    readonly options?: Omit<Options, "workerId">
   }) =>
     constructors
-      .makeWorker({ workerId: "worker-wakeup", ...input.options })
+      .make({ workerId: "worker-wakeup", ...input.options })
       .pipe(
         Effect.provideService(RunExecutor, RunExecutor.of({ execute: input.execute, interrupt: () => Effect.void })),
         Effect.provideService(RunStore, store),

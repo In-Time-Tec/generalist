@@ -1,6 +1,6 @@
 import { Effect, Option, Schema } from "effect"
 import { assemble, type Candidate } from "../../tools/tool-registry.js"
-import { Instructions, openEpoch } from "../../context/instructions.js"
+import { Instructions, render } from "../../context/instructions.js"
 import { SkillCatalog, selectListings } from "../../context/skill-catalog.js"
 import { listing } from "../../context/skill-catalog-internal.js"
 import { refreshResumeSystem } from "../session/history.js"
@@ -8,9 +8,7 @@ import { activateSkillTool, skillListingBudgetTokens } from "../skill-tool.js"
 import { skillListingsInstructions } from "../message.js"
 import { AgentError } from "../event.js"
 import type { Agent, RunOptions } from "../service.js"
-import { SetupHelpers } from "./construction.js"
-
-const { appendInstructionFragment, errorMessage } = SetupHelpers
+import { appendInstructionFragment, errorMessage } from "./construction.js"
 
 /** @internal Resolve skills and the authoritative system instructions for this run. */
 export const setupPromptContext = <T extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(args: {
@@ -26,7 +24,7 @@ export const setupPromptContext = <T extends Record<string, import("effect/unsta
     const skillRuntime = Option.isNone(skillSourceService)
       ? undefined
       : {
-          source: skillSourceService.value,
+          catalog: skillSourceService.value,
           skills: yield* skillSourceService.value.all.pipe(
             Effect.mapError((error) => AgentError.make({ message: error.message, turn: 0, cause: error })),
           ),
@@ -50,7 +48,7 @@ export const setupPromptContext = <T extends Record<string, import("effect/unsta
     const derivesCurrentSystem = args.options.history === undefined || Option.isSome(args.activeSession)
     const instructionsEpoch =
       args.options.system === undefined && derivesCurrentSystem && Option.isSome(instructionsService)
-        ? yield* openEpoch(instructionsService.value, { agentName: args.agent.name, turn: 0 })
+        ? yield* render(instructionsService.value, { agentName: args.agent.name, turn: 0 })
         : undefined
     const epochSystem =
       instructionsEpoch === undefined || instructionsEpoch.length === 0 ? args.agent.instructions : instructionsEpoch

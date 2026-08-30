@@ -7,7 +7,7 @@ import {
   intercept,
   operationKey,
 } from "../../core/durable/driver.js"
-import type { RunBudgetExhausted } from "../../core/durable/run-budget.js"
+import type { Exhausted } from "../../core/durable/run-budget.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
@@ -170,7 +170,7 @@ export interface AgentMessagingService {
     readonly metadata?: Metadata
   }) => Effect.Effect<
     MessageReceipt,
-    SendMessageError | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    SendMessageError | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
     DriverInterpreter | ToolContext
   >
   readonly inbox: (input: {

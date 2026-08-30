@@ -10,12 +10,12 @@ import {
   RunEndedWithoutOutput,
   ToolNameCollision,
   TurnLimitExceeded,
-  TurnPolicyStopped,
+  PolicyStopped,
 } from "./event.js"
-import { TurnPolicyError } from "../turn/policy.js"
+import { Error as TurnPolicyError } from "../turn/policy.js"
 
 import { DriverInterpreter } from "../durable/driver/interpreter.js"
-import { RunBudgetExhausted, RunBudgetGrantWidened, type RunBudget } from "../durable/run-budget.js"
+import { Exhausted, GrantWidened, type RunBudget } from "../durable/run-budget.js"
 import { RegistrationError, type Registration } from "./tool/registration.js"
 
 export { RegistrationError }
@@ -120,16 +120,16 @@ const errorMessage = (error: typeof Schema.Unknown.Type): string => {
     const reason = error.finishReason ?? "no terminal event"
     return `ended turn ${error.turn} without output (provider finish reason: ${reason})`
   }
-  if (Schema.is(TurnPolicyStopped)(error)) {
+  if (Schema.is(PolicyStopped)(error)) {
     return `policy stopped at turn ${error.turn}: ${error.reason._tag}`
   }
   if (Schema.is(TurnPolicyError)(error)) {
     return `turn policy failed: ${error.message}`
   }
-  if (Schema.is(RunBudgetExhausted)(error)) {
+  if (Schema.is(Exhausted)(error)) {
     return `run budget exhausted (${error.dimension})`
   }
-  if (Schema.is(RunBudgetGrantWidened)(error)) {
+  if (Schema.is(GrantWidened)(error)) {
     return `child budget grant widened (${error.dimension})`
   }
   if (Schema.is(MiddlewareViolation)(error)) {
@@ -153,7 +153,7 @@ const errorMessage = (error: typeof Schema.Unknown.Type): string => {
     }
     return `tool name collision: ${error.name} (${error.origins.map(originName).join(", ")})`
   }
-  return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+  return error instanceof globalThis.Error ? `${error.name}: ${error.message}` : String(error)
 }
 
 const causeMessage = (agentName: string, cause: Cause.Cause<unknown>): string =>
@@ -300,9 +300,7 @@ export const asTool: {
           .reserveChild(grant)
           .pipe(
             Effect.mapError((error) =>
-              Schema.is(RunBudgetExhausted)(error) || Schema.is(RunBudgetGrantWidened)(error)
-                ? errorMessage(error)
-                : errorMessage(error),
+              Schema.is(Exhausted)(error) || Schema.is(GrantWidened)(error) ? errorMessage(error) : errorMessage(error),
             ),
           )
         const result = yield* runChild({ prompt, inheritedBudget: childBudget }).pipe(

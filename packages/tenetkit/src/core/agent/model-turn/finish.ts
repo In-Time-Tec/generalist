@@ -6,10 +6,10 @@ import {
   RunEndedWithoutOutput,
   type TurnCompleted,
   TurnLimitExceeded,
-  TurnPolicyStopped,
+  PolicyStopped,
 } from "../event.js"
 import type { AgentRunState } from "../run-state.js"
-import type { ModelProviderUsage } from "../../model/attempt/observation.js"
+import type { ProviderUsage } from "../../model/attempt/observation.js"
 
 const missingOutputFailure = (state: AgentRunState, turn: number) => {
   const common = {
@@ -29,7 +29,7 @@ const policyStopFailure = (
 ) =>
   decision.reason._tag === "TurnLimit"
     ? TurnLimitExceeded.make({ turn, limit: decision.reason.limit, pending })
-    : TurnPolicyStopped.make({ turn, reason: decision.reason, pending })
+    : PolicyStopped.make({ turn, reason: decision.reason, pending })
 
 export const TurnFinish = { missingOutputFailure, policyStopFailure }
 
@@ -62,12 +62,12 @@ export const terminalCompletedEvent: {
 )
 
 const safeTokenSum = (left: number, right: number): number => Math.min(left + right, Number.MAX_SAFE_INTEGER)
-const providerUsageTokens = (usage: ModelProviderUsage | undefined): number =>
+const providerUsageTokens = (usage: ProviderUsage | undefined): number =>
   usage?.totalTokens ?? safeTokenSum(usage?.inputTokens ?? 0, usage?.outputTokens ?? 0)
 
 export const modelBudgetCharge = (input: {
   readonly usage: Response.Usage | undefined
-  readonly failedAttemptUsage: ModelProviderUsage | undefined
+  readonly failedAttemptUsage: ProviderUsage | undefined
   readonly fallbackTokens: number | undefined
 }): number => {
   const finalReported =

@@ -18,11 +18,11 @@ export const suspensionApplicationIdentity = (suspension: AgentSuspended): strin
   Function.pipe(suspension, Schema.encodeUnknownSync(AgentSuspended), inputDigest)
 
 export const isToolNameCollision = Schema.is(ToolNameCollision)
-const TurnPolicyDecision = Schema.Union([
+const PolicyDecision = Schema.Union([
   Schema.TaggedStruct("Continue", {}),
   Schema.TaggedStruct("Stop", { reason: StopReason }),
 ])
-export const isTurnPolicyDecision = Schema.is(TurnPolicyDecision)
+export const isPolicyDecision = Schema.is(PolicyDecision)
 
 export interface SuspensionMetadata extends Record<string, Schema.Json> {
   token: string

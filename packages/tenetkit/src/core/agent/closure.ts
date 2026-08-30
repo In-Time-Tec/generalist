@@ -5,7 +5,7 @@ import type { BudgetLimits } from "../durable/run-budget.js"
 import type { Key } from "../context/memory.js"
 import type { ModelSelection } from "../model/registry.js"
 import type { ToolContext } from "../tools/tool-context.js"
-import type { TurnPolicy } from "../turn/policy.js"
+import type { Policy } from "../turn/policy.js"
 import { ClosedTypeId, isClosed as hasClosedIdentity } from "./lifecycle/closure-identity.js"
 
 export { ClosedTypeId } from "./lifecycle/closure-identity.js"
@@ -16,7 +16,7 @@ export interface Any<PolicyServices = unknown> {
   readonly name: string
   readonly instructions?: string
   readonly toolkit: Toolkit.Any
-  readonly policy: TurnPolicy<PolicyServices>
+  readonly policy: Policy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly toolScheduling: ToolSchedulingPolicy
@@ -52,7 +52,7 @@ export interface Closed extends Any<never> {
 export const isClosed = (agent: Any): agent is Closed => hasClosedIdentity(agent)
 
 interface ClosedPolicyAgent extends Omit<Any, "policy"> {
-  readonly policy: TurnPolicy<never>
+  readonly policy: Policy<never>
 }
 
 /** @internal Whether an erased Agent's policy requires no external services. */

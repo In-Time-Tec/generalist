@@ -3,35 +3,35 @@ import { Chat, Prompt, Tool } from "effect/unstable/ai"
 import {
   edgeCount,
   edgeLabel,
-  HandoffCommit,
+  Commit,
   HandoffAccepted,
   HandoffLimitExceeded,
   HandoffRequirementsMissing,
-  HandoffTargetMissing,
+  TargetMissing,
   type HandoffRunState,
   maxHandoffs,
   incrementEdge,
-  fromHandoffControlState,
-  toHandoffControlState,
+  fromControlState,
+  toControlState,
 } from "../agent/handoff/state.js"
 import type { RunOptions } from "../agent/service.js"
 import { assemble, type Candidate } from "../tools/tool-registry.js"
 import { intercept, logicalOperationId } from "../durable/driver/run.js"
 import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
-import { defaultContextProjection, HandoffInput, type ContextProjection } from "./handoff-projection.js"
-import type { HandoffTarget } from "./handoff-target.js"
+import { defaultContextProjection, Input, type ContextProjection } from "./handoff-projection.js"
+import type { Target } from "./handoff-target.js"
 import { ModelRegistry } from "../model/registry.js"
 import { validateRef } from "../durable/manifest/executable-manifest.js"
 import type { Service as SessionStore } from "../context/session.js"
 
-export class HandoffRejected extends Schema.TaggedError<HandoffRejected>()("tenetkit/core/HandoffRejected", {
+export class Rejected extends Schema.TaggedError<Rejected>()("tenetkit/core/HandoffRejected", {
   handoffId: Schema.String,
   turn: Schema.Finite,
   reason: Schema.String,
 }) {}
 
-export interface ExecuteHandoffInput {
-  readonly catalog: import("./handoff-target.js").HandoffCatalogService
+export interface ExecuteInput {
+  readonly catalog: import("./handoff-target.js").CatalogService
   readonly turn: number
   readonly toolCallId: string
   readonly specialist: string
@@ -66,7 +66,7 @@ const recordRejected = (
     Effect.void,
   )
 
-const staticCandidates = (handoffTarget: HandoffTarget): ReadonlyArray<Candidate> =>
+const staticCandidates = (handoffTarget: Target): ReadonlyArray<Candidate> =>
   (
     handoffTarget.agent.toolDeclarations ??
     Object.values(handoffTarget.agent.toolkit.tools).map((tool) => ({
@@ -79,10 +79,7 @@ const staticCandidates = (handoffTarget: HandoffTarget): ReadonlyArray<Candidate
     dispatch: "Static" as const,
   }))
 
-const withResolvingToolCalls = (
-  decoded: HandoffInput,
-  resolvingToolCallIds: ReadonlyArray<string> | undefined,
-): HandoffInput => {
+const withResolvingToolCalls = (decoded: Input, resolvingToolCallIds: ReadonlyArray<string> | undefined): Input => {
   if (resolvingToolCallIds === undefined || resolvingToolCallIds.length === 0) return decoded
   return {
     ...decoded,
@@ -90,7 +87,7 @@ const withResolvingToolCalls = (
   }
 }
 
-const verifyTargetModel = (target: HandoffTarget, turn: number, logicalId: string, handoffId: string) => {
+const verifyTargetModel = (target: Target, turn: number, logicalId: string, handoffId: string) => {
   const model = target.agent.model
   return model === undefined
     ? Effect.void
@@ -115,13 +112,13 @@ const verifyTargetModel = (target: HandoffTarget, turn: number, logicalId: strin
       })
 }
 
-const verifyPinnedTarget = (target: HandoffTarget, options: RunOptions, handoffId: string, turn: number) =>
+const verifyPinnedTarget = (target: Target, options: RunOptions, handoffId: string, turn: number) =>
   Effect.gen(function* () {
     const pinnedRef = options.executableRef
     if (pinnedRef === undefined) return
     const pinnedManifest = options.executableManifest
     if (pinnedManifest === undefined || target.pin === undefined) {
-      return yield* HandoffRejected.make({
+      return yield* Rejected.make({
         handoffId,
         turn,
         reason: "Pinned handoff requires an executable closure and exact target Agent pin",
@@ -129,10 +126,10 @@ const verifyPinnedTarget = (target: HandoffTarget, options: RunOptions, handoffI
     }
     yield* Effect.try({
       try: () => validateRef(pinnedRef, pinnedManifest),
-      catch: (error) => HandoffRejected.make({ handoffId, turn, reason: String(error) }),
+      catch: (error) => Rejected.make({ handoffId, turn, reason: String(error) }),
     })
     if (!pinnedManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === target.pin)) {
-      return yield* HandoffRejected.make({
+      return yield* Rejected.make({
         handoffId,
         turn,
         reason: "Handoff target is outside the closure",
@@ -140,11 +137,11 @@ const verifyPinnedTarget = (target: HandoffTarget, options: RunOptions, handoffI
     }
   })
 
-export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
+export const executeSameRunHandoff = (input: ExecuteInput) =>
   Effect.gen(function* () {
-    const decoded = yield* Schema.decodeUnknownEffect(HandoffInput)(input.params).pipe(
+    const decoded = yield* Schema.decodeUnknownEffect(Input)(input.params).pipe(
       Effect.mapError((error) =>
-        HandoffRejected.make({
+        Rejected.make({
           handoffId: "invalid-input",
           turn: input.turn,
           reason: String(error),
@@ -154,7 +151,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     const handoffInput = withResolvingToolCalls(decoded, input.resolvingToolCallIds)
     const resolved = input.catalog.resolve(input.specialist)
     if (resolved === undefined) {
-      return yield* HandoffTargetMissing.make({ target: input.specialist, turn: input.turn })
+      return yield* TargetMissing.make({ target: input.specialist, turn: input.turn })
     }
     const logicalId = yield* logicalOperationId
     const current = yield* Ref.get(input.handoffState)
@@ -204,7 +201,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
         const history = yield* Ref.get(input.chat.history)
         const project = input.projection ?? defaultContextProjection
         const projected = yield* project(history, handoffInput).pipe(
-          Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message })),
+          Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: error.message })),
         )
         const projectedHistory = Prompt.fromMessages(
           projected.history.content.filter((message) => message.role !== "system"),
@@ -214,9 +211,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
           : ((yield* sessionService.value
               .path()
               .pipe(
-                Effect.mapError((error) =>
-                  HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message }),
-                ),
+                Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: error.message })),
               )).at(-1)?.id ?? null)
         const frame =
           decoded.reason === undefined
@@ -235,21 +230,21 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
           pendingContinuation,
         }
         const durableCommit = {
-          _tag: "HandoffCommit",
-          state: toHandoffControlState(next),
+          _tag: "Commit",
+          state: toControlState(next),
           sessionEntryId,
           sessionParentId,
           projectedHistory,
-        } satisfies HandoffCommit
+        } satisfies Commit
         return resolved.pin === undefined ? durableCommit : { ...durableCommit, targetAgentPin: resolved.pin }
       }),
     )
-    const durable = yield* Schema.decodeEffect(HandoffCommit)(commit).pipe(
-      Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) })),
+    const durable = yield* Schema.decodeEffect(Commit)(commit).pipe(
+      Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: String(error) })),
     )
     const committedTarget = input.catalog.resolve(durable.state.active)
     if (committedTarget === undefined) {
-      return yield* HandoffTargetMissing.make({ target: durable.state.active, turn: input.turn })
+      return yield* TargetMissing.make({ target: durable.state.active, turn: input.turn })
     }
     if (Option.isSome(sessionService)) {
       yield* sessionService.value
@@ -262,7 +257,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
           },
           { id: durable.sessionEntryId, expectedLeafId: durable.sessionParentId },
         )
-        .pipe(Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message })))
+        .pipe(Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: error.message })))
     }
     yield* Ref.set(input.chat.history, durable.projectedHistory)
     const registry = yield* assemble(staticCandidates(committedTarget))
@@ -270,7 +265,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
       registry,
       activatedSkillBodies: new Map(),
     })
-    yield* Ref.set(input.handoffState, fromHandoffControlState(durable.state, committedTarget))
+    yield* Ref.set(input.handoffState, fromControlState(durable.state, committedTarget))
     const accepted: HandoffAccepted = {
       _tag: "HandoffAccepted",
       handoffId,
@@ -285,7 +280,7 @@ export interface HandoffToolSpecResult {
   readonly tool: Tool.Tool<
     string,
     {
-      readonly parameters: typeof HandoffInput
+      readonly parameters: typeof Input
       readonly success: typeof HandoffAccepted
       readonly failure: typeof Schema.String
       readonly failureMode: "return"
@@ -302,9 +297,9 @@ export const handoffToolSpec: {
     readonly description?: string
     readonly projection?: ContextProjection
     readonly maxRepeatedEdge?: number
-  }): (handoffTarget: HandoffTarget) => HandoffToolSpecResult
+  }): (handoffTarget: Target) => HandoffToolSpecResult
   (
-    handoffTarget: HandoffTarget,
+    handoffTarget: Target,
     options?: {
       readonly nameOverride?: string
       readonly description?: string
@@ -315,7 +310,7 @@ export const handoffToolSpec: {
 } = Function.dual(
   (args) => args.length > 1 || "agent" in args[0],
   (
-    handoffTarget: HandoffTarget,
+    handoffTarget: Target,
     options: {
       readonly nameOverride?: string
       readonly description?: string
@@ -326,7 +321,7 @@ export const handoffToolSpec: {
     const name = options.nameOverride ?? `handoff_to_${handoffTarget.name}`
     const tool = Tool.make(name, {
       description: options.description ?? `Hand off to ${handoffTarget.name} for subsequent turns in this run`,
-      parameters: HandoffInput,
+      parameters: Input,
       success: HandoffAccepted,
       failure: Schema.String,
       failureMode: "return",

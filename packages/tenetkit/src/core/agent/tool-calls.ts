@@ -15,7 +15,7 @@ import { InvalidToolCallParameters } from "../model/tool-call-validation.js"
 import { AgentError, AgentSuspended, DuplicateToolCallId, type Event, ResumeMismatch } from "./event.js"
 import type { Agent, ProgressOverflowPolicy, Resume, RunError, RunOptions } from "./service.js"
 import { setupStaticTools } from "./lifecycle/construction.js"
-import { SetupOptions } from "./lifecycle/options.js"
+import { validate as validateOptions } from "./lifecycle/options.js"
 import { setupToolAuthorizer } from "./lifecycle/setup.js"
 import { providerOutputState } from "./message.js"
 import { scheduleBatch } from "./model-turn/tool-batch.js"
@@ -289,7 +289,7 @@ const streamToolCallsImpl = <Tools extends Record<string, Tool.Any>, R, P, A>(
       const { staticRegistry, staticToolkit } = yield* setupStaticTools(agent)
       const { options, messages, turn, registry, calls, activeTools, checkpoint, resolutions, runBudget } =
         yield* prepareInput(input, staticRegistry, agent.budget)
-      const progressPolicy: ProgressOverflowPolicy = yield* SetupOptions.validate(options, agent)
+      const progressPolicy: ProgressOverflowPolicy = yield* validateOptions(options, agent)
       const authorizer = yield* setupToolAuthorizer(agent)
       const executor = yield* Effect.serviceOption(ToolExecutor)
       const chat = yield* Chat.fromPrompt(messages)

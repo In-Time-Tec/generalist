@@ -1,7 +1,7 @@
 import { Effect, Ref } from "effect"
 import type { Event } from "../../core/agent/event.js"
 import type { DriverCheckpoint } from "../../core/durable/driver.js"
-import type { ModelAttemptFailed } from "../../core/model/telemetry/events.js"
+import type { AttemptFailed } from "../../core/model/telemetry/events.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import type { ExecutionClaim, Service as RunStore } from "../run/store.js"
 
@@ -19,7 +19,7 @@ export type Retry = {
   readonly turn: number
 }
 
-const isRecoverable = (event: ModelAttemptFailed): boolean =>
+const isRecoverable = (event: AttemptFailed): boolean =>
   event.classification === "transient" ||
   event.category === "rate-limit" ||
   event.category === "transport" ||

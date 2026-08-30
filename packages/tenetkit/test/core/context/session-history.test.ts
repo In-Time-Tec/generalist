@@ -32,11 +32,11 @@ const texts = (page: SessionHistory.HistoryPage): ReadonlyArray<string> =>
       : [entry._tag],
   )
 
-describe("SessionHistory.pageHistory", () => {
+describe("SessionHistory.page", () => {
   it.effect("reads the newest page when no cursor is supplied", () =>
     Effect.gen(function* () {
       const path = yield* seed(10)
-      const page = SessionHistory.pageHistory(path, { limit: 3 })
+      const page = SessionHistory.page(path, { limit: 3 })
       expect(page.entries).toHaveLength(3)
       expect(page.entries.map((entry) => entry.id)).toEqual(path.slice(7).map((entry) => entry.id))
       expect(page.hasBefore).toBe(true)
@@ -52,8 +52,8 @@ describe("SessionHistory.pageHistory", () => {
       for (let guard = 0; guard < 10; guard += 1) {
         const page: SessionHistory.HistoryPage =
           cursor === undefined
-            ? SessionHistory.pageHistory(path, { limit: 4 })
-            : SessionHistory.pageHistory(path, { limit: 4, before: cursor })
+            ? SessionHistory.page(path, { limit: 4 })
+            : SessionHistory.page(path, { limit: 4, before: cursor })
         collected.unshift(...page.entries.map((entry) => entry.id))
         if (!page.hasBefore) break
         cursor = page.firstEntryId
@@ -65,7 +65,7 @@ describe("SessionHistory.pageHistory", () => {
   it.effect("reads forwards from an after cursor", () =>
     Effect.gen(function* () {
       const path = yield* seed(6)
-      const page = SessionHistory.pageHistory(path, { limit: 2, after: path[1]!.id })
+      const page = SessionHistory.page(path, { limit: 2, after: path[1]!.id })
       expect(page.entries.map((entry) => entry.id)).toEqual([path[2]!.id, path[3]!.id])
       expect(page.hasBefore).toBe(true)
       expect(page.hasAfter).toBe(true)
@@ -75,7 +75,7 @@ describe("SessionHistory.pageHistory", () => {
   it.effect("returns an empty page for a zero limit and reports both directions", () =>
     Effect.gen(function* () {
       const path = yield* seed(4)
-      const page = SessionHistory.pageHistory(path, { limit: 0 })
+      const page = SessionHistory.page(path, { limit: 0 })
       expect(page.entries).toEqual([])
       expect(page.firstEntryId).toBeUndefined()
       expect(page.lastEntryId).toBeUndefined()
@@ -92,10 +92,10 @@ describe("SessionHistory.pageHistory", () => {
           const store = yield* Session.acquire("unknown-cursor")
           for (const text of ["a", "b", "c"]) yield* store.append(userEntry(text))
           const path = yield* store.path()
-          const page = SessionHistory.pageHistory(path, { limit: 2, before: "no-such-entry" })
+          const page = SessionHistory.page(path, { limit: 2, before: "no-such-entry" })
           expect(page.entries.map((entry) => entry.id)).toEqual(path.slice(-2).map((entry) => entry.id))
           expect(page.unknownCursors).toEqual(["no-such-entry"])
-          expect(SessionHistory.pageHistory(path, { limit: 2 }).unknownCursors).toBeUndefined()
+          expect(SessionHistory.page(path, { limit: 2 }).unknownCursors).toBeUndefined()
           expect(page.hasAfter).toBe(false)
         }),
       ),
@@ -105,7 +105,7 @@ describe("SessionHistory.pageHistory", () => {
   it.effect("bounds a limit larger than the log to the log itself", () =>
     Effect.gen(function* () {
       const path = yield* seed(3)
-      const page = SessionHistory.pageHistory(path, { limit: 500 })
+      const page = SessionHistory.page(path, { limit: 500 })
       expect(page.entries).toHaveLength(3)
       expect(page.hasBefore).toBe(false)
       expect(page.hasAfter).toBe(false)
@@ -116,8 +116,8 @@ describe("SessionHistory.pageHistory", () => {
     Effect.gen(function* () {
       const path = yield* seed(5)
       const before = path.map((entry) => entry.id)
-      SessionHistory.pageHistory(path, { limit: 2 })
-      SessionHistory.pageHistory(path, { limit: 2, before: path[3]!.id })
+      SessionHistory.page(path, { limit: 2 })
+      SessionHistory.page(path, { limit: 2, before: path[3]!.id })
       expect(path.map((entry) => entry.id)).toEqual(before)
     }),
   )
@@ -150,7 +150,7 @@ describe("Session history behind a compaction checkpoint", () => {
     Effect.gen(function* () {
       const path = yield* compacted
       const checkpoint = SessionHistory.compactionCheckpoints(path).at(-1)!
-      const page = SessionHistory.pageHistory(path, { limit: 50, before: checkpoint.id })
+      const page = SessionHistory.page(path, { limit: 50, before: checkpoint.id })
       expect(texts(page).join(" ")).toContain("pre-1")
       expect(texts(page).join(" ")).toContain("pre-2")
       expect(page.entries.some((entry) => entry._tag === "Compaction")).toBe(false)
@@ -167,7 +167,7 @@ describe("Session history behind a compaction checkpoint", () => {
       )
       expect(projected.some((text) => text.includes("pre-1"))).toBe(false)
       expect(projected.some((text) => text.includes("summary"))).toBe(true)
-      expect(texts(SessionHistory.pageHistory(path, { limit: 50 })).some((text) => text.includes("pre-1"))).toBe(true)
+      expect(texts(SessionHistory.page(path, { limit: 50 })).some((text) => text.includes("pre-1"))).toBe(true)
     }),
   )
 
@@ -183,7 +183,7 @@ describe("Session history behind a compaction checkpoint", () => {
   it.effect("treats the checkpoint as an ordinary entry in the full page", () =>
     Effect.gen(function* () {
       const path = yield* compacted
-      const page = SessionHistory.pageHistory(path, { limit: 50 })
+      const page = SessionHistory.page(path, { limit: 50 })
       expect(page.entries.map((entry) => entry._tag)).toEqual(["Message", "Message", "Compaction", "Message"])
     }),
   )

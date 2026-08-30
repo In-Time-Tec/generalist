@@ -24,12 +24,7 @@ import {
   verifyHandoffSessionEntry,
   verifyInterruptedSessionEntry,
 } from "../../session-store.js"
-import {
-  handoffSessionEntry,
-  isHandoffCommit,
-  sameHandoffCheckpoint,
-  sameHandoffCommit,
-} from "../../../session/handoff.js"
+import { handoffSessionEntry, isCommit, sameHandoffCheckpoint, sameCommit } from "../../../session/handoff.js"
 
 const getRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -82,10 +77,10 @@ const verifyCompletedHandoffRetry = (
   input: Parameters<typeof completeOperation>[1],
 ) =>
   Effect.gen(function* () {
-    if (current.kind !== "handoff" || current.status !== "succeeded" || !isHandoffCommit(current.result)) return
+    if (current.kind !== "handoff" || current.status !== "succeeded" || !isCommit(current.result)) return
     if (
       input.outcome._tag !== "Succeeded" ||
-      !sameHandoffCommit(current.result, input.outcome.value) ||
+      !sameCommit(current.result, input.outcome.value) ||
       !sameHandoffCheckpoint(run.checkpoint, input.checkpoint)
     ) {
       return yield* RuntimeUnavailable.make({ message: "handoff operation has a divergent completion retry" })
@@ -287,7 +282,7 @@ export const completeOperation: {
         catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
       })
       let withSession = state
-      if (current.kind === "handoff" && input.outcome._tag === "Succeeded" && isHandoffCommit(input.outcome.value)) {
+      if (current.kind === "handoff" && input.outcome._tag === "Succeeded" && isCommit(input.outcome.value)) {
         const entry = handoffSessionEntry({
           sessionId: run.message.sessionId,
           operationKey: current.operationKey,

@@ -3,10 +3,10 @@ import { Response } from "effect/unstable/ai"
 import { Approvals, type Service as ApprovalsService } from "../../core/policy/approvals.js"
 import {
   type Failure,
-  NestedOperationDenied,
-  NestedOperationDivergence,
-  NestedOperationSuspended,
-  NestedOperationUnknown,
+  Denied,
+  Divergence,
+  Suspended,
+  Unknown,
   type ProgressStatus,
   type Render,
   type Request,
@@ -111,7 +111,7 @@ export const make = (input: {
             attempt: input.claimed.attempt,
           })
           .pipe(Effect.orDie)
-        const unknown = () => NestedOperationUnknown.make({ operationKey, ordinal, operationId: record.operationId })
+        const unknown = () => Unknown.make({ operationKey, ordinal, operationId: record.operationId })
         const replayFailure = (recorded: { readonly error?: unknown }) => {
           if (request.failure === undefined) return Effect.fail(unknown())
           return Schema.decodeUnknownEffect(request.failure)(recorded.error).pipe(
@@ -120,7 +120,7 @@ export const make = (input: {
         }
         const persisted = Option.getOrUndefined(recordedInput(record.input))
         if (record.inputDigest !== payloadDigest || persisted?.kind !== request.kind) {
-          return yield* NestedOperationDivergence.make({
+          return yield* Divergence.make({
             operationKey,
             ordinal,
             recordedKind: persisted?.kind ?? record.kind,
@@ -192,7 +192,7 @@ export const make = (input: {
             const prior = resolvedApproval(approvalId)
             const denied = (reason: string) =>
               Effect.gen(function* () {
-                const failure = NestedOperationDenied.make({
+                const failure = Denied.make({
                   operationKey,
                   ordinal,
                   capability,
@@ -228,7 +228,7 @@ export const make = (input: {
                   })
                   return next
                 })
-                return yield* NestedOperationSuspended.make({
+                return yield* Suspended.make({
                   token: approvalId,
                   operationKey,
                   ordinal,

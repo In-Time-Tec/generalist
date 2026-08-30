@@ -31,7 +31,7 @@ describe("InstructionFiles", () => {
   it.layer(Layer.mergeAll(testFsLayer(files), Path.layer))((test) => {
     test.effect("loads global files before root-to-cwd ancestors with AGENTS.md preferred", () =>
       Effect.gen(function* () {
-        const loaded = yield* InstructionFiles.loadInstructionFiles({
+        const loaded = yield* InstructionFiles.load({
           cwd: "/repo/a/b",
           globalFiles: ["/global/AGENTS.md"],
         })
@@ -52,7 +52,7 @@ describe("InstructionFiles", () => {
   it.layer(Layer.mergeAll(testFsLayer(customFiles), Path.layer))((test) => {
     test.effect("supports custom filenames and skips missing files", () =>
       Effect.gen(function* () {
-        const loaded = yield* InstructionFiles.loadInstructionFiles({ cwd: "/repo/a", filenames: ["NOTES.md"] })
+        const loaded = yield* InstructionFiles.load({ cwd: "/repo/a", filenames: ["NOTES.md"] })
 
         expect(loaded).toEqual([{ path: "/repo/a/NOTES.md", content: "notes" }])
       }),

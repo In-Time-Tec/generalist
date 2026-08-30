@@ -86,8 +86,8 @@
       "import": "./dist/memory/index.js"
     },
     "./agent-guidance": {
-      "types": "./dist/harness/index.d.ts",
-      "import": "./dist/harness/index.js"
+      "types": "./dist/agent-guidance/index.d.ts",
+      "import": "./dist/agent-guidance/index.js"
     },
     "./transport": {
       "types": "./dist/transport/index.d.ts",
@@ -118,8 +118,8 @@
       "import": "./dist/repl/index.js"
     },
     "./ai/model-catalog": {
-      "types": "./dist/ai/catalog/service.d.ts",
-      "import": "./dist/ai/catalog/service.js"
+      "types": "./dist/ai/model-catalog.d.ts",
+      "import": "./dist/ai/model-catalog.js"
     },
     "./ai/model-route": {
       "types": "./dist/ai/model/route.d.ts",
@@ -142,8 +142,8 @@
       "import": "./dist/ai/provider/anthropic.js"
     },
     "./ai/amazon-bedrock": {
-      "types": "./dist/ai/provider/bedrock/service.d.ts",
-      "import": "./dist/ai/provider/bedrock/service.js"
+      "types": "./dist/ai/provider/amazon-bedrock/service.d.ts",
+      "import": "./dist/ai/provider/amazon-bedrock/service.js"
     },
     "./ai/openrouter": {
       "types": "./dist/ai/provider/openrouter.d.ts",
@@ -162,8 +162,8 @@
       "import": "./dist/ai/provider/deterministic.js"
     },
     "./ai/openai-compatible": {
-      "types": "./dist/ai/catalog/presets.d.ts",
-      "import": "./dist/ai/catalog/presets.js"
+      "types": "./dist/ai/openai-compatible.d.ts",
+      "import": "./dist/ai/openai-compatible.js"
     },
     "./ai/openai-embedding": {
       "types": "./dist/ai/model/openai-embedding.d.ts",
@@ -182,8 +182,8 @@
       "import": "./dist/repl/bun/index.js"
     },
     "./transport/run-client": {
-      "types": "./dist/transport/client.d.ts",
-      "import": "./dist/transport/client.js"
+      "types": "./dist/transport/run-client.d.ts",
+      "import": "./dist/transport/run-client.js"
     },
     "./transport/errors": {
       "types": "./dist/transport/errors.d.ts",

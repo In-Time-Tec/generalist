@@ -1,4 +1,4 @@
-import { Agent, TurnPolicy } from "tenetkit"
+import { Agent, Policy } from "tenetkit"
 import type { LanguageModel, Tool } from "effect/unstable/ai"
 import { SearchProvider } from "./search-provider"
 import { toolkit, type webSearchTool } from "./tools"
@@ -10,5 +10,5 @@ export const agent: Agent.Agent<Tools, LanguageModel.LanguageModel | SearchProvi
     name: "research-agent",
     instructions: "Plan briefly, call web_search as needed, then synthesize a cited answer with source URLs.",
     toolkit,
-    policy: TurnPolicy.recurs(6),
+    policy: Policy.recurs(6),
   })

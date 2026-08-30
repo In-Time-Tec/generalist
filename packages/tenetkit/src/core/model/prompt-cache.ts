@@ -1,7 +1,7 @@
 import { Clock, Effect, Function, Option, Schema } from "effect"
 import type { Json } from "effect/Schema"
 import { Prompt } from "effect/unstable/ai"
-import type { ModelCallPurpose } from "./telemetry/events.js"
+import type { CallPurpose } from "./telemetry/events.js"
 import type { SendClock } from "./send-clock.js"
 
 const maximumBreakpoints = 4
@@ -85,20 +85,16 @@ export const conversationEscalationMillis = 5 * 60 * 1_000
 
 /** @experimental Mark one wire send with provider cache breakpoints derived from the run's send clock. */
 export const withWireCache: {
+  (prompt: Prompt.Prompt, purpose: CallPurpose, sendClock: SendClock): Effect.Effect<Prompt.Prompt, never, Clock.Clock>
   (
-    prompt: Prompt.Prompt,
-    purpose: ModelCallPurpose,
-    sendClock: SendClock,
-  ): Effect.Effect<Prompt.Prompt, never, Clock.Clock>
-  (
-    purpose: ModelCallPurpose,
+    purpose: CallPurpose,
     sendClock: SendClock,
   ): (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, never, Clock.Clock>
 } = Function.dual(
   3,
   (
     prompt: Prompt.Prompt,
-    purpose: ModelCallPurpose,
+    purpose: CallPurpose,
     sendClock: SendClock,
   ): Effect.Effect<Prompt.Prompt, never, Clock.Clock> =>
     Effect.gen(function* () {
@@ -107,22 +103,18 @@ export const withWireCache: {
 )
 
 interface WithCacheBreakpoints {
-  (prompt: Prompt.Prompt, purpose: ModelCallPurpose, idleMillis: number | undefined): Prompt.Prompt
-  (purpose: ModelCallPurpose, idleMillis: number | undefined): (prompt: Prompt.Prompt) => Prompt.Prompt
+  (prompt: Prompt.Prompt, purpose: CallPurpose, idleMillis: number | undefined): Prompt.Prompt
+  (purpose: CallPurpose, idleMillis: number | undefined): (prompt: Prompt.Prompt) => Prompt.Prompt
 }
 
 /** @experimental Provider cache breakpoints derived for one send; markers are never persisted. */
 export const withCacheBreakpoints: WithCacheBreakpoints = Function.dual(
   3,
-  (prompt: Prompt.Prompt, purpose: ModelCallPurpose, idleMillis: number | undefined): Prompt.Prompt =>
+  (prompt: Prompt.Prompt, purpose: CallPurpose, idleMillis: number | undefined): Prompt.Prompt =>
     applyCacheBreakpoints(prompt, purpose, idleMillis),
 )
 
-const applyCacheBreakpoints = (
-  prompt: Prompt.Prompt,
-  purpose: ModelCallPurpose,
-  idleMillis?: number,
-): Prompt.Prompt => {
+const applyCacheBreakpoints = (prompt: Prompt.Prompt, purpose: CallPurpose, idleMillis?: number): Prompt.Prompt => {
   if (purpose !== "conversation") return prompt
   const conversationTtl = idleMillis !== undefined && idleMillis > conversationEscalationMillis ? "1h" : undefined
   const lastUserLikeIndex = lastIndex(prompt.content, isUserLike)

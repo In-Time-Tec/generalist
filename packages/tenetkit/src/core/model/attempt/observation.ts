@@ -1,7 +1,7 @@
 import { Cause, Clock, Duration, Effect, Option, Schedule, Schema } from "effect"
 import { AiError, Response, ResponseIdTracker } from "effect/unstable/ai"
-import type { Classification, Service as Resilience } from "../resilience.js"
-import type { EventPayload, ModelFailureCategory, ModelFirstOutputKind } from "../telemetry/events.js"
+import type { Classification, Policy as Resilience } from "../resilience.js"
+import type { EventPayload, FailureCategory, FirstOutputKind } from "../telemetry/events.js"
 
 export const disabledResponseIdTracker: ResponseIdTracker.Service = {
   clearUnsafe: () => undefined,
@@ -14,18 +14,18 @@ const ProviderTokenCount = Schema.Int.check(
   Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
 )
 
-export const ModelProviderUsage = Schema.Struct({
+export const ProviderUsage = Schema.Struct({
   inputTokens: Schema.optionalKey(ProviderTokenCount),
   outputTokens: Schema.optionalKey(ProviderTokenCount),
   totalTokens: Schema.optionalKey(ProviderTokenCount),
 })
 
-export type ModelProviderUsage = typeof ModelProviderUsage.Type
+export type ProviderUsage = typeof ProviderUsage.Type
 
 type ObservedFailure = Parameters<Resilience["classify"]>[0]
 
 const InvalidToolCallUsage = Schema.TaggedStruct("tenetkit/core/InvalidToolCallParameters", {
-  providerUsage: ModelProviderUsage,
+  providerUsage: ProviderUsage,
 })
 
 const tokenCount = (value: number | undefined): number | undefined =>
@@ -35,22 +35,22 @@ const makeProviderUsage = (
   input: number | undefined,
   output: number | undefined,
   total: number | undefined,
-): ModelProviderUsage | undefined => {
+): ProviderUsage | undefined => {
   const inputTokens = tokenCount(input)
   const outputTokens = tokenCount(output)
   const totalTokens = tokenCount(total)
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) return undefined
-  let usage: ModelProviderUsage = {}
+  let usage: ProviderUsage = {}
   if (inputTokens !== undefined) usage = { ...usage, inputTokens }
   if (outputTokens !== undefined) usage = { ...usage, outputTokens }
   if (totalTokens !== undefined) usage = { ...usage, totalTokens }
   return usage
 }
 
-const responseUsageToProviderUsage = (usage: Response.Usage): ModelProviderUsage | undefined =>
+const responseUsageToProviderUsage = (usage: Response.Usage): ProviderUsage | undefined =>
   makeProviderUsage(usage.inputTokens.total, usage.outputTokens.total, undefined)
 
-const providerUsageFromError = (error: ObservedFailure): ModelProviderUsage | undefined => {
+const providerUsageFromError = (error: ObservedFailure): ProviderUsage | undefined => {
   if (Schema.is(InvalidToolCallUsage)(error)) return error.providerUsage
   if (!AiError.isAiError(error)) return undefined
   if (error.reason._tag !== "InvalidOutputError" && error.reason._tag !== "StructuredOutputError") return undefined
@@ -68,15 +68,15 @@ const addTokenCount = (left: number | undefined, right: number | undefined): num
 }
 
 const addProviderUsage = (
-  left: ModelProviderUsage | undefined,
-  right: ModelProviderUsage | undefined,
-): ModelProviderUsage | undefined => {
+  left: ProviderUsage | undefined,
+  right: ProviderUsage | undefined,
+): ProviderUsage | undefined => {
   if (left === undefined) return right
   if (right === undefined) return left
   const inputTokens = addTokenCount(left.inputTokens, right.inputTokens)
   const outputTokens = addTokenCount(left.outputTokens, right.outputTokens)
   const totalTokens = addTokenCount(left.totalTokens, right.totalTokens)
-  let usage: ModelProviderUsage = {}
+  let usage: ProviderUsage = {}
   if (inputTokens !== undefined) usage = { ...usage, inputTokens }
   if (outputTokens !== undefined) usage = { ...usage, outputTokens }
   if (totalTokens !== undefined) usage = { ...usage, totalTokens }
@@ -105,7 +105,7 @@ export const singleFailure = (cause: Cause.Cause<unknown>): Option.Option<unknow
   return reason !== undefined && Cause.isFailReason(reason) ? Option.some(reason.error) : Option.none()
 }
 
-export const firstOutputKind = (part: Response.AnyPart): ModelFirstOutputKind | undefined => {
+export const firstOutputKind = (part: Response.AnyPart): FirstOutputKind | undefined => {
   switch (part.type) {
     case "reasoning-start":
     case "reasoning-delta":
@@ -126,7 +126,7 @@ export const firstOutputKind = (part: Response.AnyPart): ModelFirstOutputKind | 
 interface RetryContext {
   readonly resilience: Resilience
   readonly classify: (error: ObservedFailure) => Classification
-  readonly categorize: (error: ObservedFailure) => ModelFailureCategory
+  readonly categorize: (error: ObservedFailure) => FailureCategory
   readonly attempt: () => number
   readonly turn: number
   readonly modelCallId: string

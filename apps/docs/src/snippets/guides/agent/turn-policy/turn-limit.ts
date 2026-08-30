@@ -1,15 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import {
-  Agent,
-  AgentEvent,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Response,
-  Tool,
-  Toolkit,
-  TurnPolicy,
-} from "tenetkit"
+import { Agent, AgentEvent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit, Policy } from "tenetkit"
 
 const lookupTool = Tool.make("lookup", {
   description: "Look up one fact",
@@ -22,7 +12,7 @@ const toolkit = Toolkit.make(lookupTool)
 const agent = Agent.make({
   name: "looper",
   toolkit,
-  policy: TurnPolicy.recurs(1),
+  policy: Policy.recurs(1),
 })
 
 let calls = 0

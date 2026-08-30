@@ -48,15 +48,7 @@ export const providersReference = definePage({
       [
         [
           [code("./openai")],
-          [
-            code("layer"),
-            ", ",
-            code("layerAccount"),
-            ", ",
-            code("credentialsFromAccountAuth"),
-            ", ",
-            code("layerConfig"),
-          ],
+          [code("layer"), ", ", code("layer"), ", ", code("credentialsFromAuth"), ", ", code("layerConfig")],
         ],
         [
           [code("./openai-account-auth")],
@@ -203,10 +195,10 @@ export const providersReference = definePage({
       [
         [[code("layerGroq")], [code("groq")], [code("https://api.groq.com/openai/v1")]],
         [[code("layerMistral")], [code("mistral")], [code("https://api.mistral.ai/v1")]],
-        [[code("layerXai")], [code("xai")], [code("https://api.x.ai/v1")]],
-        [[code("layerDeepseek")], [code("deepseek")], [code("https://api.deepseek.com/v1")]],
+        [[code("layerXAI")], [code("xai")], [code("https://api.x.ai/v1")]],
+        [[code("layerDeepSeek")], [code("deepseek")], [code("https://api.deepseek.com/v1")]],
         [
-          [code("layerGoogleAiStudio")],
+          [code("layerGoogleAIStudio")],
           [code("google")],
           [code("https://generativelanguage.googleapis.com/v1beta/openai/")],
         ],

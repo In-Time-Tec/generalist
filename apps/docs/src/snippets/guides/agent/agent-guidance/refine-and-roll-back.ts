@@ -33,25 +33,28 @@ const program = Store.Store.use((store) =>
   Effect.gen(function* () {
     const state = yield* store.load(scope)
 
-    const proposal = yield* Authorship.authorProposal(modelProposal)
-    const applied = Refinement.applyProposal(state, proposal)
+    const proposal = yield* Authorship.author(modelProposal)
+    const applied = Refinement.apply(state, proposal)
     if (Result.isFailure(applied)) return yield* Console.log(`rejected: ${applied.failure.reason}`)
     yield* store.save(applied.success.state)
 
     const created = State.findEntry(applied.success.state, "memory", "prefers-bun")
     yield* Console.log(`created version: ${created?.version}, createdAt: ${created?.createdAt}`)
 
-    const refused = yield* Effect.flip(Authorship.authorProposal(forged))
+    const refused = yield* Effect.flip(Authorship.author(forged))
     yield* Console.log(`authorship refused: ${refused.reason}`)
 
-    const inverse = Refinement.rollbackProposal(applied.success, { id: "rollback-1", at: "2024-01-02T00:00:00.000Z" })
-    const restored = Refinement.applyTrustedProposal(applied.success.state, inverse)
+    const inverse = Refinement.makeRollback(applied.success, {
+      id: "rollback-1",
+      at: "2024-01-02T00:00:00.000Z",
+    })
+    const restored = Refinement.applyTrusted(applied.success.state, inverse)
     if (Result.isFailure(restored)) return yield* Console.log(`rollback rejected: ${restored.failure.reason}`)
     yield* store.save(restored.success.state)
     yield* Console.log(
       `after rollback: ${State.findEntry(restored.success.state, "memory", "prefers-bun") === undefined ? "absent" : "present"}`,
     )
-    yield* Console.log(Overview.formatOverview(restored.success.state, { maxEntriesPerKind: 2 }))
+    yield* Console.log(Overview.format(restored.success.state, { maxEntriesPerKind: 2 }))
   }),
 )
 

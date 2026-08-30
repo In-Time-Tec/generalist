@@ -252,7 +252,7 @@ const hostLayer = (input: {
   readonly backend: "memory" | "sqlite"
   readonly label: string
   readonly streamText: Parameters<typeof LanguageModel.make>[0]["streamText"]
-  readonly resilience?: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.ModelResilienceMisconfigured>
+  readonly resilience?: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.Misconfigured>
 }) => {
   const agent = Agent.make({ name: input.label })
   const executable = testExecutable(agent, `${input.label}-v1`)

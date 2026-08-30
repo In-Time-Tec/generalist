@@ -2,7 +2,7 @@ import "./suites/openai-account-auth-lifecycle-suite.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Crypto, Effect, Encoding, Layer, Option, Redacted, Schema } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
-import { credentialsFromAccountAuth } from "../../../src/ai/provider/openai-account.js"
+import { credentialsFromAuth } from "../../../src/ai/provider/openai-account.js"
 import {
   AuthError,
   authorizationUrl,
@@ -210,7 +210,7 @@ describe("OpenAI account authorization protocol", () => {
         acquire: Effect.fail(secretError),
         refreshRejected: () => Effect.succeed(credential),
       }
-      const credentials = credentialsFromAccountAuth(service, "fingerprint")
+      const credentials = credentialsFromAuth(service, "fingerprint")
       const error = yield* Effect.flip(credentials.acquire)
       expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(error)).not.toMatch(
         /token-secret|account-secret/,
@@ -219,7 +219,7 @@ describe("OpenAI account authorization protocol", () => {
       expect(Redacted.value(mappedCredential.accessToken)).toBe("access-secret")
       expect(mappedCredential.accountId).toBe("account-secret")
       expect(mappedCredential.generation).toBe("generation")
-      const mismatch = credentialsFromAccountAuth(service, "another-fingerprint")
+      const mismatch = credentialsFromAuth(service, "another-fingerprint")
       expect((yield* Effect.flip(mismatch.refreshRejected("old"))).operation).toBe("refreshRejected")
     }),
   )

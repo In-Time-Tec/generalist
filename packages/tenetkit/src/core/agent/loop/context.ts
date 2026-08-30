@@ -7,7 +7,7 @@ import type { ModelTurnServices } from "../model-turn/context.js"
 import type { PendingToolResult, AnyToolCall } from "../tools/result.js"
 import type { Result as CompactionResult } from "../../turn/compaction.js"
 import type { LanguageModelNotRegistered } from "../../model/registry.js"
-import type { ModelCallPurpose, DeliveryFailed } from "../../model/telemetry/events.js"
+import type { CallPurpose, DeliveryFailed } from "../../model/telemetry/events.js"
 import type { Decision, TurnOverrides } from "../../turn/policy.js"
 import type { Key, Memory } from "../../context/memory.js"
 import type { Middleware } from "../../model/middleware.js"
@@ -76,7 +76,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   ) => Effect.Effect<void>
   readonly withModelTelemetry: <A, E, R2>(
     turn: number,
-    purpose: ModelCallPurpose,
+    purpose: CallPurpose,
   ) => (effect: Effect.Effect<A, E, R2>) => Effect.Effect<A, E, R2 | LanguageModel.LanguageModel>
   readonly withAgentModel: <A, E, R2>(
     effect: Effect.Effect<A, E, R2 | LanguageModel.LanguageModel>,
@@ -135,5 +135,5 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     queue: "steering" | "followUp",
     inputs: ReadonlyArray<Input>,
   ) => SteeringDrained
-  readonly isTurnPolicyDecision: (input: typeof Schema.Unknown.Type) => input is Decision
+  readonly isPolicyDecision: (input: typeof Schema.Unknown.Type) => input is Decision
 }

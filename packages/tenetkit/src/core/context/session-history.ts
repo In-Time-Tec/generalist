@@ -36,7 +36,7 @@ export interface HistoryPage {
  * Paging reads the entry log, not the projection, so entries recorded before a compaction
  * checkpoint stay reachable. A checkpoint is an ordinary entry in the page, never a floor.
  */
-export const pageHistory: {
+export const page: {
   (input: HistoryPageInput): (path: ReadonlyArray<Entry>) => HistoryPage
   (path: ReadonlyArray<Entry>, input: HistoryPageInput): HistoryPage
 } = Function.dual(2, (path: ReadonlyArray<Entry>, input: HistoryPageInput): HistoryPage => {
@@ -55,15 +55,15 @@ export const pageHistory: {
   const end = start + entries.length
   const first = entries[0]
   const last = entries.at(-1)
-  let page: HistoryPage = {
+  let result: HistoryPage = {
     entries,
     hasBefore: start > 0,
     hasAfter: end < path.length,
   }
-  if (unknownCursors.length > 0) page = { ...page, unknownCursors }
-  if (first !== undefined) page = { ...page, firstEntryId: first.id }
-  if (last !== undefined) page = { ...page, lastEntryId: last.id }
-  return page
+  if (unknownCursors.length > 0) result = { ...result, unknownCursors }
+  if (first !== undefined) result = { ...result, firstEntryId: first.id }
+  if (last !== undefined) result = { ...result, lastEntryId: last.id }
+  return result
 })
 
 /** @experimental Every compaction checkpoint on one path, oldest first. */

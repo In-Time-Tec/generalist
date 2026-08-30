@@ -4,7 +4,7 @@ import { Authorship, Overview, Store, Refinement } from "tenetkit/agent-guidance
 const program = Store.Store.use((store) =>
   Effect.gen(function* () {
     const state = yield* store.load("thread:demo")
-    const proposal = yield* Authorship.authorProposal({
+    const proposal = yield* Authorship.author({
       id: "proposal-1",
       at: "2024-01-01T00:00:00.000Z",
       rationale: "record one durable preference",
@@ -17,10 +17,10 @@ const program = Store.Store.use((store) =>
         },
       ],
     })
-    const result = Refinement.applyProposal(state, proposal)
+    const result = Refinement.apply(state, proposal)
     if (Result.isFailure(result)) return yield* Console.log(`rejected: ${result.failure.reason}`)
     yield* store.save(result.success.state)
-    yield* Console.log(Overview.formatOverview(result.success.state, { maxEntriesPerKind: 4 }))
+    yield* Console.log(Overview.format(result.success.state, { maxEntriesPerKind: 4 }))
   }),
 )
 

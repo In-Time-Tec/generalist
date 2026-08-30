@@ -1,6 +1,6 @@
 import { Cause, Context, Effect, Function, Layer, Option, Ref, Schema } from "effect"
 import { digest as canonicalDigest } from "../durable/canonical-json.js"
-import { ReplayPolicy } from "../durable/driver/contract.js"
+import { ReplayPolicy as ReplayPolicySchema } from "../durable/driver/contract.js"
 import { ToolContext } from "./tool-context.js"
 import type { Outcome } from "./tool-executor.js"
 
@@ -11,9 +11,9 @@ const singleFailureReason = <E>(cause: Cause.Cause<E>) => {
 }
 
 /** @experimental Replay policy for one nested durable operation. */
-export const NestedReplayPolicy = ReplayPolicy
+export const ReplayPolicy = ReplayPolicySchema
 /** @experimental */
-export type NestedReplayPolicy = typeof NestedReplayPolicy.Type
+export type ReplayPolicy = typeof ReplayPolicy.Type
 
 const Kind = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
 const Ordinal = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65535))
@@ -125,7 +125,7 @@ type Payload = typeof Schema.Unknown.Type
 export interface Request<A = unknown, E = unknown> {
   readonly kind: string
   readonly payload: Payload
-  readonly replayPolicy: NestedReplayPolicy
+  readonly replayPolicy: ReplayPolicy
   readonly success?: Schema.Codec<A, unknown, never, never>
   readonly failure?: Schema.Codec<E, unknown, never, never>
   readonly approval?: ApprovalRequirement
@@ -133,42 +133,40 @@ export interface Request<A = unknown, E = unknown> {
 }
 
 /** @experimental The same nested identity was reused with different content. */
-export class NestedOperationDivergence extends Schema.TaggedError<NestedOperationDivergence>()(
-  "tenetkit/core/NestedOperationDivergence",
-  {
-    operationKey: Schema.String,
-    ordinal: Ordinal,
-    recordedKind: Kind,
-    recordedDigest: Schema.String,
-    requestedKind: Kind,
-    requestedDigest: Schema.String,
-  },
-) {}
+export class Divergence extends Schema.TaggedError<Divergence>()("tenetkit/core/NestedOperationDivergence", {
+  operationKey: Schema.String,
+  ordinal: Ordinal,
+  recordedKind: Kind,
+  recordedDigest: Schema.String,
+  requestedKind: Kind,
+  requestedDigest: Schema.String,
+}) {}
 
 /** @experimental A non-idempotent nested operation crossed its boundary with an unobserved outcome. */
-export class NestedOperationUnknown extends Schema.TaggedError<NestedOperationUnknown>()(
-  "tenetkit/core/NestedOperationUnknown",
-  { operationKey: Schema.String, ordinal: Ordinal, operationId: Schema.String },
-) {}
+export class Unknown extends Schema.TaggedError<Unknown>()("tenetkit/core/NestedOperationUnknown", {
+  operationKey: Schema.String,
+  ordinal: Ordinal,
+  operationId: Schema.String,
+}) {}
 
 /** @experimental The host denied the nested operation's approval request. */
-export class NestedOperationDenied extends Schema.TaggedError<NestedOperationDenied>()(
-  "tenetkit/core/NestedOperationDenied",
-  { operationKey: Schema.String, ordinal: Ordinal, capability: Kind, reason: Schema.String },
-) {}
+export class Denied extends Schema.TaggedError<Denied>()("tenetkit/core/NestedOperationDenied", {
+  operationKey: Schema.String,
+  ordinal: Ordinal,
+  capability: Kind,
+  reason: Schema.String,
+}) {}
 
 /** @experimental The run must suspend until the host resolves the nested operation's approval. */
-export class NestedOperationSuspended extends Schema.TaggedError<NestedOperationSuspended>()(
-  "tenetkit/core/NestedOperationSuspended",
-  { token: Schema.String, operationKey: Schema.String, ordinal: Ordinal, capability: Kind },
-) {}
+export class Suspended extends Schema.TaggedError<Suspended>()("tenetkit/core/NestedOperationSuspended", {
+  token: Schema.String,
+  operationKey: Schema.String,
+  ordinal: Ordinal,
+  capability: Kind,
+}) {}
 
 /** @experimental */
-export type Failure =
-  | NestedOperationDivergence
-  | NestedOperationUnknown
-  | NestedOperationDenied
-  | NestedOperationSuspended
+export type Failure = Divergence | Unknown | Denied | Suspended
 
 /**
  * @experimental Host seam executing one nested durable operation for a composite tool call.
@@ -185,8 +183,8 @@ export interface Service {
 }
 
 /** @experimental */
-export class NestedOperations extends Context.Service<NestedOperations, Service>()(
-  "tenetkit/core/tools/nested-operation/NestedOperations",
+export class Operations extends Context.Service<Operations, Service>()(
+  "tenetkit/core/tools/nested-operation/Operations",
 ) {}
 
 /** @experimental Canonical payload digest shared by every nested-operation implementation. */
@@ -203,23 +201,23 @@ export const operationId = (input: { readonly operationKey: string; readonly ord
 export const run: {
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
-  ): (request: Request<A, E>) => Effect.Effect<A, E | Failure, R | NestedOperations | ToolContext>
+  ): (request: Request<A, E>) => Effect.Effect<A, E | Failure, R | Operations | ToolContext>
   <A, E, R>(
     request: Request<A, E>,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | Failure, R | NestedOperations | ToolContext>
+  ): Effect.Effect<A, E | Failure, R | Operations | ToolContext>
 } = Function.dual(
   2,
   <A, E, R>(
     request: Request<A, E>,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | Failure, R | NestedOperations | ToolContext> =>
-    Effect.flatMap(NestedOperations, (operations) => operations.run(request, effect)),
+  ): Effect.Effect<A, E | Failure, R | Operations | ToolContext> =>
+    Effect.flatMap(Operations, (operations) => operations.run(request, effect)),
 )
 
 /** @experimental Translate a nested-operation approval suspension into the tool executor's Suspend outcome. */
 export const catchSuspension = <E, R>(effect: Effect.Effect<Outcome, E, R>) =>
-  Effect.catchIf(effect, Schema.is(NestedOperationSuspended), (error) =>
+  Effect.catchIf(effect, Schema.is(Suspended), (error) =>
     Effect.succeed<Outcome>({ _tag: "Suspend", token: error.token }),
   )
 
@@ -237,12 +235,12 @@ interface DirectRecord {
  * Identity, duplicate return, and divergence hold for the life of the run; approvals auto-approve
  * because a process-local host owns no resolution seam.
  */
-export const layerDirect: Layer.Layer<NestedOperations> = Layer.effect(
-  NestedOperations,
+export const layerDirect: Layer.Layer<Operations> = Layer.effect(
+  Operations,
   Effect.gen(function* () {
     const recordsRef = yield* Ref.make(new Map<string, DirectRecord>())
     const ordinalsRef = yield* Ref.make(new Map<string, number>())
-    return NestedOperations.of({
+    return Operations.of({
       run: <A, E, R>(request: Request<A, E>, effect: Effect.Effect<A, E, R>) =>
         Effect.gen(function* () {
           const context = yield* ToolContext
@@ -258,7 +256,7 @@ export const layerDirect: Layer.Layer<NestedOperations> = Layer.effect(
           const recorded = (yield* Ref.get(recordsRef)).get(id)
           if (recorded !== undefined && request.success !== undefined && request.failure !== undefined) {
             if (recorded.kind !== request.kind || recorded.payloadDigest !== requestedDigest) {
-              return yield* NestedOperationDivergence.make({
+              return yield* Divergence.make({
                 operationKey,
                 ordinal,
                 recordedKind: recorded.kind,
@@ -299,5 +297,5 @@ export const layerDirect: Layer.Layer<NestedOperations> = Layer.effect(
 )
 
 /** @experimental */
-export const layerTest = (implementation: Service): Layer.Layer<NestedOperations> =>
-  Layer.succeed(NestedOperations, NestedOperations.of(implementation))
+export const layerTest = (implementation: Service): Layer.Layer<Operations> =>
+  Layer.succeed(Operations, Operations.of(implementation))

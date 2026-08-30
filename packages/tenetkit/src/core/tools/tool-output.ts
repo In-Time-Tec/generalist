@@ -2,13 +2,13 @@ import { Cause, Clock, Context, Effect, Function, HashMap, Layer, Option, Ref, S
 import type { Success } from "./tool-executor.js"
 import { sha256Text } from "../durable/canonical-json.js"
 /** @experimental A bounded tool result: inline content plus optional spilled overflow references. */
-export interface ToolOutput {
+export interface Output {
   readonly inline: unknown
   readonly outputPaths?: ReadonlyArray<string>
 }
 
 /** @experimental Content persisted by a tool-output store. */
-type ToolOutputContent = Success["encodedResult"]
+type OutputContent = Success["encodedResult"]
 
 /** @experimental A successful tool result after applying the output bound. */
 export interface BoundedSuccess extends Success {
@@ -17,34 +17,29 @@ export interface BoundedSuccess extends Success {
 
 /** @experimental Stores tool-output overflow out of context. */
 export interface StoreService {
-  readonly put: (
-    toolCallId: string,
-    content: ToolOutputContent,
-  ) => Effect.Effect<Option.Option<string>, ToolOutputError>
+  readonly put: (toolCallId: string, content: OutputContent) => Effect.Effect<Option.Option<string>, Error>
 }
 
 /** @experimental */
-export class ToolOutputStore extends Context.Service<ToolOutputStore, StoreService>()(
-  "tenetkit/core/tools/tool-output/ToolOutputStore",
-) {}
+export class Store extends Context.Service<Store, StoreService>()("tenetkit/core/tools/tool-output/Store") {}
 
 /** @experimental */
-export class ToolOutputError extends Schema.TaggedError<ToolOutputError>()("tenetkit/core/ToolOutputError", {
+export class Error extends Schema.TaggedError<Error>()("tenetkit/core/ToolOutputError", {
   message: Schema.String,
 }) {}
 
 /** @experimental */
-export const layerNoop: Layer.Layer<ToolOutputStore> = Layer.succeed(
-  ToolOutputStore,
-  ToolOutputStore.of({ put: () => Effect.succeed(Option.none()) }),
+export const layerNoop: Layer.Layer<Store> = Layer.succeed(
+  Store,
+  Store.of({ put: () => Effect.succeed(Option.none()) }),
 )
 
 /** @experimental */
-export const layerMemory: Layer.Layer<ToolOutputStore> = Layer.effect(
-  ToolOutputStore,
+export const layerMemory: Layer.Layer<Store> = Layer.effect(
+  Store,
   Ref.make({ next: 0, records: HashMap.empty<string, unknown>() }).pipe(
     Effect.map((state) =>
-      ToolOutputStore.of({
+      Store.of({
         put: (toolCallId, content) =>
           Ref.modify(state, ({ next, records }) => {
             const id = `mem:tool-output-${next + 1}`
@@ -56,8 +51,8 @@ export const layerMemory: Layer.Layer<ToolOutputStore> = Layer.effect(
 )
 
 /** @experimental */
-export const layerTest = (implementation: StoreService): Layer.Layer<ToolOutputStore> =>
-  Layer.succeed(ToolOutputStore, ToolOutputStore.of(implementation))
+export const layerTest = (implementation: StoreService): Layer.Layer<Store> =>
+  Layer.succeed(Store, Store.of(implementation))
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -88,20 +83,20 @@ const BoundedInline = Schema.Struct({
 
 type BoundedInline = typeof BoundedInline.Type
 
-interface BoundedToolOutput extends ToolOutput {
+interface BoundedOutput extends Output {
   readonly inline: BoundedInline
   readonly outputPaths?: ReadonlyArray<string>
 }
 
-const BoundedToolOutput = Schema.Struct({
+const BoundedOutput = Schema.Struct({
   inline: BoundedInline,
   outputPaths: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 
-const decodeBoundedToolOutput = Schema.decodeUnknownOption(BoundedToolOutput)
+const decodeBoundedOutput = Schema.decodeUnknownOption(BoundedOutput)
 
 const bounded = (inline: BoundedInline, outputPaths: ReadonlyArray<string>): BoundedSuccess => {
-  const output: BoundedToolOutput = { inline, outputPaths }
+  const output: BoundedOutput = { inline, outputPaths }
   return { _tag: "Success", result: output, encodedResult: output, outputPaths }
 }
 
@@ -169,7 +164,7 @@ export const bound: {
   (result: Success, options: { readonly toolCallId: string; readonly maxBytes: number }): Effect.Effect<BoundedSuccess>
 } = Function.dual(2, (result: Success, options: { readonly toolCallId: string; readonly maxBytes: number }) =>
   Effect.gen(function* () {
-    const decodedOutput = decodeBoundedToolOutput(result.encodedResult)
+    const decodedOutput = decodeBoundedOutput(result.encodedResult)
     if (Option.isSome(decodedOutput)) {
       const output = decodedOutput.value
       const outputPaths = output.outputPaths ?? []
@@ -216,7 +211,7 @@ export const bound: {
       return { ...result, outputPaths: [] }
     }
 
-    const maybeStore = yield* Effect.serviceOption(ToolOutputStore)
+    const maybeStore = yield* Effect.serviceOption(Store)
     if (Option.isNone(maybeStore)) {
       const inline = boundedInlineFromOriginal(encoded, bytes, options.maxBytes)
       yield* observeBound({

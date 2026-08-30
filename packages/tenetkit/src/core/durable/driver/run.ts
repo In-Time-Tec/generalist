@@ -1,9 +1,9 @@
 import { Effect, Function, Schema, Stream } from "effect"
 import { DriverInterpreter, DriverUnknownReplay, type OperationSpec } from "./interpreter.js"
-import { RunBudgetExhausted, type BudgetLimits, type RunBudget } from "../run-budget.js"
+import { Exhausted, type BudgetLimits, type RunBudget } from "../run-budget.js"
 import { LoopDriverState } from "../loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../service.js"
-import type { HandoffControlState } from "../../agent/handoff/state.js"
+import type { ControlState } from "../../agent/handoff/state.js"
 
 /** @experimental */
 export const checkpoint = Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.checkpoint)
@@ -24,29 +24,17 @@ export const intercept: {
     spec: OperationSpec,
   ): <A, E, R>(
     effect: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<
-    A,
-    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
-    R | DriverInterpreter
-  >
+  ) => Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
   <A, E, R>(
     spec: OperationSpec,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<
-    A,
-    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
-    R | DriverInterpreter
-  >
+  ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
 } = Function.dual(
   2,
   <A, E, R>(
     spec: OperationSpec,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<
-    A,
-    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
-    R | DriverInterpreter
-  > =>
+  ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter> =>
     Effect.gen(function* () {
       const interpreter = yield* DriverInterpreter
       return yield* interpreter.run(spec, effect)
@@ -59,29 +47,17 @@ export const interceptStream: {
     spec: OperationSpec,
   ): <A, E, R>(
     stream: Stream.Stream<A, E, R>,
-  ) => Stream.Stream<
-    A,
-    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
-    R | DriverInterpreter
-  >
+  ) => Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
   <A, E, R>(
     spec: OperationSpec,
     stream: Stream.Stream<A, E, R>,
-  ): Stream.Stream<
-    A,
-    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
-    R | DriverInterpreter
-  >
+  ): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter>
 } = Function.dual(
   2,
   <A, E, R>(
     spec: OperationSpec,
     stream: Stream.Stream<A, E, R>,
-  ): Stream.Stream<
-    A,
-    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
-    R | DriverInterpreter
-  > =>
+  ): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted, R | DriverInterpreter> =>
     Stream.unwrap(
       Effect.gen(function* () {
         const interpreter = yield* DriverInterpreter
@@ -122,7 +98,7 @@ export const refundChildBudget = (child: RunBudget) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.refundChild(child))
 
 /** @internal Persist a live handoff control transition in the owning checkpoint. */
-export const setHandoffState = (state: HandoffControlState) =>
+export const setHandoffState = (state: ControlState) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.setHandoffState(state))
 
 /** @experimental */

@@ -1,9 +1,9 @@
-import { Agent, LanguageModel, Tool, TurnPolicy } from "tenetkit"
+import { Agent, LanguageModel, Tool, Policy } from "tenetkit"
 import { SearchProvider } from "./search-provider"
 import { toolkit, webSearchTool } from "./tools"
 
 /** @experimental The bounded research policy used by the demo agent. */
-export const policy: TurnPolicy.TurnPolicy = TurnPolicy.recurs(6)
+export const policy: Policy.Policy = Policy.recurs(6)
 
 /** @experimental The deep-research agent: plan briefly, search as needed, then synthesize a cited answer. */
 export const agent: Agent.Agent<

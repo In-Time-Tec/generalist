@@ -116,7 +116,7 @@ const noToolAgent = Agent.make({ name: "no-tool-agent" })
 
 const runAgent = (
   model: Layer.Layer<LanguageModel.LanguageModel>,
-  policy: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.ModelResilienceMisconfigured> = resilience,
+  policy: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.Misconfigured> = resilience,
   middleware: Layer.Layer<ModelMiddleware.ModelMiddleware> = ModelMiddleware.layerIdentity,
 ) =>
   Stream.runCollect(
@@ -346,7 +346,7 @@ describe("agent model stream replay safety", () => {
       const failure = yield* Fiber.join(fiber)
 
       expect(model.attempts()).toBe(1)
-      expect(String(failure)).toContain("ModelStreamTimeout")
+      expect(String(failure)).toContain("Timeout")
     }),
   )
 

@@ -217,7 +217,7 @@ export const toolInput: {
   )
 })
 
-export type ToolOutputConfig<ParentMessage> = SlotConfig<ParentMessage> &
+export type OutputConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     isError?: boolean
   }>
@@ -227,11 +227,11 @@ export type ToolOutputConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * `isError: true` switches the heading to "Error" and the destructive tint.
  */
 export const toolOutput: {
-  <ParentMessage>(config: ToolOutputConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
-  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: ToolOutputConfig<ParentMessage>) => Html
+  <ParentMessage>(config: OutputConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: OutputConfig<ParentMessage>) => Html
 } = Function.dual(
   2,
-  <ParentMessage>(config: ToolOutputConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+  <ParentMessage>(config: OutputConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
     const h = html<ParentMessage>()
     const isError = config.isError ?? false
     return h.div(

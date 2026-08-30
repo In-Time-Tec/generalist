@@ -1,6 +1,6 @@
 import { Context, Effect } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
-import type { EventPayload, ModelCallPurpose } from "./events.js"
+import type { EventPayload, CallPurpose } from "./events.js"
 
 /** @experimental The active loop's model-call telemetry seam. */
 export interface Instrumentation {
@@ -14,7 +14,7 @@ export const CurrentInstrumentation: Context.Reference<Instrumentation | undefin
 >("tenetkit/ModelTelemetry/CurrentInstrumentation", { defaultValue: () => undefined })
 
 /** @experimental Purpose stamped onto model calls issued within the current region. */
-export const CurrentPurpose: Context.Reference<ModelCallPurpose> = Context.Reference<ModelCallPurpose>(
+export const CurrentPurpose: Context.Reference<CallPurpose> = Context.Reference<CallPurpose>(
   "tenetkit/ModelTelemetry/CurrentPurpose",
   { defaultValue: () => "conversation" },
 )

@@ -1,7 +1,7 @@
 import { Effect, Function, Schema, Stream } from "effect"
 import { adapt, type BroadTool, type BroadTools } from "./service.js"
 import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { ModelProviderUsage, providerUsage } from "./attempt/observation.js"
+import { ProviderUsage, providerUsage } from "./attempt/observation.js"
 import { type ToolJsonSchemaCompiler, toolJsonSchemaCompiler } from "./registry.js"
 
 /** @experimental A model emitted parameters that do not satisfy the named Effect tool schema. */
@@ -9,7 +9,7 @@ export class InvalidToolCallParameters extends Schema.TaggedError<InvalidToolCal
   "tenetkit/core/InvalidToolCallParameters",
   {
     toolName: Schema.String,
-    providerUsage: Schema.optionalKey(ModelProviderUsage),
+    providerUsage: Schema.optionalKey(ProviderUsage),
   },
 ) {}
 
@@ -143,7 +143,7 @@ const invalid = (name: string, usage?: Response.Usage): InvalidToolCallParameter
 
 interface InvalidToolCallFields {
   toolName: string
-  providerUsage?: ModelProviderUsage
+  providerUsage?: ProviderUsage
 }
 
 /** @experimental Decode one raw model tool call with the original Effect parameter schema. */

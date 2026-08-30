@@ -94,7 +94,7 @@ export const coreEventsReference = definePage({
             ", ",
             code("HandoffCompleted"),
             ", ",
-            code("HandoffRejected"),
+            code("Rejected"),
           ],
           "Record observed steering and same-run specialist transitions",
         ],
@@ -125,7 +125,7 @@ export const coreEventsReference = definePage({
         [[code("AgentError")], "The loop fails and preserves its 0-based turn and cause"],
         [[code("RunEndedWithoutOutput")], "A terminal model turn leaves no committed assistant answer"],
         [
-          [code("TurnLimitExceeded"), " / ", code("TurnPolicyStopped")],
+          [code("TurnLimitExceeded"), " / ", code("PolicyStopped")],
           "Pending tool results cannot be re-fed under the active policy",
         ],
         [[code("MiddlewareViolation")], "A middleware hook breaks the loop contract, such as dropping a tool call"],

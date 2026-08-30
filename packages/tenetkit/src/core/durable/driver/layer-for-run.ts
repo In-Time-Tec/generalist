@@ -2,7 +2,7 @@ import { Effect, Function, Layer, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
 import type { Agent, RunOptions } from "../../agent/service.js"
 import { make as makeLoopDriver, type LoopDriverOptions } from "../loop-driver.js"
-import { allocate, type RunBudget } from "../run-budget.js"
+import { make, type RunBudget } from "../run-budget.js"
 import { DriverError, DriverStateInvalid } from "../service.js"
 import { currentDriverVersion, type DriverCheckpoint } from "./contract.js"
 import { DriverInterpreter, layerInline } from "./interpreter.js"
@@ -41,7 +41,7 @@ export const layerForRun: {
       if (options.driverCheckpoint === undefined) {
         let driverInput: Parameters<typeof driver.initial>[0] = {
           prompt,
-          budget: budget ?? allocate({}),
+          budget: budget ?? make({}),
         }
         if (options.executableRef !== undefined) driverInput = { ...driverInput, executable: options.executableRef }
         return yield* driver.initial(driverInput)

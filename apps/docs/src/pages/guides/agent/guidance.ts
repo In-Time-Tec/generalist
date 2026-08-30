@@ -27,7 +27,7 @@ export const agentGuidance = definePage({
     h2("accept-a-refinement", "1. Accept a refinement from the model"),
     p(
       "Model-originated input goes through ",
-      code("Authorship.authorProposal"),
+      code("Authorship.author"),
       " and nowhere else. It decodes against ",
       code("AuthoredProposal"),
       ", whose create and update edits have no ",
@@ -36,7 +36,7 @@ export const agentGuidance = definePage({
     ),
     codeBlock({ label: "refine-and-roll-back.ts", source: refine, expectedOutput: refineExpected }),
     p(
-      code("Refinement.applyProposal"),
+      code("Refinement.apply"),
       " is pure and atomic: it returns ",
       code("Result<RefinementResult, RefinementRejected>"),
       ", applies every edit or none, and never mutates its input. Revision stays the engine's — an accepted create lands at version 1 with the proposal instant, and an accepted update bumps to ",
@@ -48,7 +48,7 @@ export const agentGuidance = definePage({
     callout(
       "info",
       "The brand is not the boundary",
-      'applyProposal accepts only the opaque AuthoredRefinementProposal that authorship mints, which is a compile-time discriminator a cast can erase. The runtime authorization boundary is the check inside applyProposal itself: a proposal whose edits pin a revision is rejected with RefinementRejected { reason: "pinned-revision" } even when a cast erased the brand. A host mounting this behind an unknown boundary gets that check without re-deriving it.',
+      'apply accepts only the opaque AuthoredRefinementProposal that authorship mints, which is a compile-time discriminator a cast can erase. The runtime authorization boundary is the check inside apply itself: a proposal whose edits pin a revision is rejected with RefinementRejected { reason: "pinned-revision" } even when a cast erased the brand. A host mounting this behind an unknown boundary gets that check without re-deriving it.',
     ),
     h2("roll-it-back", "2. Roll one back exactly"),
     p(
@@ -57,7 +57,7 @@ export const agentGuidance = definePage({
       " and ",
       code("after"),
       " entry, which is what makes rollback exact rather than approximate. ",
-      code("Refinement.rollbackProposal"),
+      code("Refinement.makeRollback"),
       " builds the inverse proposal: edits reversed, each guarded by the version it undoes, and ",
       code("baseSnapshot"),
       " derived from the supplied current state. Applying any target other than the newest fails ",
@@ -68,7 +68,7 @@ export const agentGuidance = definePage({
       "Rollback is the trusted path and does set ",
       code("revision"),
       ", which is how it restores the exact earlier entry instead of a bumped one. It is applied with the separately named ",
-      code("Refinement.applyTrustedProposal"),
+      code("Refinement.applyTrusted"),
       ", so the two authority levels never share one call site.",
     ),
     h2("persist-it", "3. Persist it durably"),
@@ -109,7 +109,7 @@ export const agentGuidance = definePage({
     h2("pin-a-snapshot", "4. Pin one exact state into a durable Execution"),
     p(
       "A durable host must reconstruct the same guidance a Run started with, not whatever the store holds now. ",
-      code("Registration.registration(state, name)"),
+      code("Registration.make(state, name)"),
       " produces the named capability and the exact secret-free payload for it.",
     ),
     codeBlock({ label: "pin-a-snapshot.ts", source: pinSnapshot, expectedOutput: pinSnapshotExpected }),

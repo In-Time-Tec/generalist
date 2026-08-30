@@ -74,19 +74,8 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   ],
   [
     "agent-guidance",
-    () => import("../src/harness/index.js"),
-    [
-      "Authorship",
-      "Entry",
-      "FileSystemStore",
-      "Merge",
-      "Overview",
-      "Refinement",
-      "Registration",
-      "Snapshot",
-      "State",
-      "Store",
-    ],
+    () => import("../src/agent-guidance/index.js"),
+    ["Authorship", "Entry", "FileSystemStore", "Overview", "Refinement", "Registration", "Snapshot", "State", "Store"],
   ],
   [
     "skills",
@@ -123,11 +112,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   ["ag-ui", () => import("../src/interoperability/ag-ui/index.js"), ["AGUI", "Errors"]],
   ["a2a", () => import("../src/interoperability/a2a/index.js"), ["A2A", "Content", "Errors", "Projection"]],
   ["foldkit", () => import("../src/foldkit/index.js"), ["Chat", "Connection"]],
-  [
-    "memory",
-    () => import("../src/memory/index.js"),
-    ["SemanticRecall", "VectorStore", "WorkingMemory", "layerCombined"],
-  ],
+  ["memory", () => import("../src/memory/index.js"), ["SemanticRecall", "VectorStore", "WorkingMemory", "layer"]],
 ]
 
 describe("tenetkit public surface", () => {
@@ -185,11 +170,10 @@ describe("tenetkit public surface", () => {
         "ToolAuthorization",
         "ToolContext",
         "ToolExecutor",
-        "ToolOutput",
+        "Output",
         "ToolPlacement",
         "Toolkit",
-        "TurnPolicy",
-        "withCacheBreakpoints",
+        "Policy",
       ])
     }),
   )
@@ -228,23 +212,23 @@ describe("tenetkit public surface", () => {
 
   it("exports the model telemetry contract", () => {
     expect(ModelTelemetry.Event).toBeDefined()
-    expect(ModelTelemetry.ModelCallStarted).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptStarted).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptFirstOutput).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptCompleted).toBeDefined()
-    expect(ModelTelemetry.ModelAttemptFailed).toBeDefined()
-    expect(ModelTelemetry.ModelRetryScheduled).toBeDefined()
-    expect(ModelTelemetry.ModelCallCompleted).toBeDefined()
-    expect(ModelTelemetry.ModelCallFailed).toBeDefined()
+    expect(ModelTelemetry.CallStarted).toBeDefined()
+    expect(ModelTelemetry.AttemptStarted).toBeDefined()
+    expect(ModelTelemetry.AttemptFirstOutput).toBeDefined()
+    expect(ModelTelemetry.AttemptCompleted).toBeDefined()
+    expect(ModelTelemetry.AttemptFailed).toBeDefined()
+    expect(ModelTelemetry.RetryScheduled).toBeDefined()
+    expect(ModelTelemetry.CallCompleted).toBeDefined()
+    expect(ModelTelemetry.CallFailed).toBeDefined()
     expect(ModelTelemetry.CompactionStarted).toBeDefined()
     expect(ModelTelemetry.CompactionSkipped).toBeDefined()
     expect(ModelTelemetry.CompactionApplied).toBeDefined()
     expect(ModelTelemetry.CompactionFailed).toBeDefined()
-    expect(ModelTelemetry.ModelCallPurpose).toBeDefined()
-    expect(ModelTelemetry.ModelFailureCategory).toBeDefined()
-    expect(ModelTelemetry.ModelFailureClassification).toBeDefined()
-    expect(ModelTelemetry.ModelRetryReason).toBeDefined()
-    expect(ModelTelemetry.ModelFirstOutputKind).toBeDefined()
+    expect(ModelTelemetry.CallPurpose).toBeDefined()
+    expect(ModelTelemetry.FailureCategory).toBeDefined()
+    expect(ModelTelemetry.FailureClassification).toBeDefined()
+    expect(ModelTelemetry.RetryReason).toBeDefined()
+    expect(ModelTelemetry.FirstOutputKind).toBeDefined()
     expect(ModelTelemetry.CompactionTrigger).toBeDefined()
     expect(ModelTelemetry.CompactionKind).toBeDefined()
     expect(ModelTelemetry.classifyFailureCategory).toBeTypeOf("function")

@@ -25,7 +25,7 @@ import { layerForRun } from "../durable/driver/layer-for-run.js"
 import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import {
   isToolNameCollision,
-  isTurnPolicyDecision,
+  isPolicyDecision,
   type RecallInput,
   type RememberInput,
   type RunStream,
@@ -412,7 +412,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               pendingResults,
               toolCallEvents,
               resumeApproved,
-              isTurnPolicyDecision,
+              isPolicyDecision,
               steeringDrainedEvent,
               withSystem,
               rememberTurn,

@@ -3,9 +3,9 @@ import { RunId as CoreRunId, type RunId as CoreRunIdType } from "../core/durable
 import {
   CompactionCommit,
   CompactionTrigger,
-  ModelAttemptCompleted,
-  ModelFailureCategory,
-  ModelProviderUsage,
+  AttemptCompleted,
+  FailureCategory,
+  ProviderUsage,
 } from "../core/model/telemetry/events.js"
 import { ExecutionFailure } from "../core/program/runner.js"
 import { decodePinned } from "./executable/manifest-internal.js"
@@ -193,16 +193,16 @@ export type RawUsageFact =
   | (RawUsageCommon & {
       readonly _tag: "Completed"
       readonly usageAt: number
-      readonly usage: ModelAttemptCompleted["usage"]
+      readonly usage: AttemptCompleted["usage"]
       readonly requestId?: string
       readonly responseModel?: string
       readonly serviceTier?: string
     })
   | (RawUsageCommon & {
       readonly _tag: "Failed"
-      readonly category: ModelFailureCategory
+      readonly category: FailureCategory
       readonly usageAt: number
-      readonly providerUsage: ModelProviderUsage
+      readonly providerUsage: ProviderUsage
     })
 
 type RawUsageFactEncoded = RawUsageFact
@@ -216,7 +216,7 @@ export const RawUsageFact: Schema.Codec<RawUsageFact, RawUsageFactEncoded> = Sch
     modelAttemptId: Schema.String,
     attempt: Schema.Int,
     usageAt: Schema.Finite,
-    usage: ModelAttemptCompleted.fields.usage,
+    usage: AttemptCompleted.fields.usage,
     provider: Schema.optionalKey(Schema.String),
     model: Schema.optionalKey(Schema.String),
     requestId: Schema.optionalKey(Schema.String),
@@ -230,9 +230,9 @@ export const RawUsageFact: Schema.Codec<RawUsageFact, RawUsageFactEncoded> = Sch
     modelCallId: Schema.String,
     modelAttemptId: Schema.String,
     attempt: Schema.Int,
-    category: ModelFailureCategory,
+    category: FailureCategory,
     usageAt: Schema.Finite,
-    providerUsage: ModelProviderUsage,
+    providerUsage: ProviderUsage,
     provider: Schema.optionalKey(Schema.String),
     model: Schema.optionalKey(Schema.String),
   }),

@@ -15,14 +15,7 @@ export {
 } from "./sql/store.js"
 export type { EventHub } from "./sql/subscribers.js"
 export { RunClaims, type ClaimedRun, type Service as RunClaimsService } from "./sql/run/claims.js"
-export {
-  RuntimeWorker,
-  layerWorker,
-  makeWorker,
-  type Service as RuntimeWorkerService,
-  type WorkerOptions,
-  type WorkerStatus,
-} from "./sql/worker.js"
+export * as RuntimeWorker from "./sql/worker.js"
 export type { DecodedRun, RunRow } from "./sql/codec/rows.js"
 export { decodeRunEffect, loadRun } from "./sql/store/statements.js"
 export { acquireSessionWriteClaim } from "./sql/session/claim.js"

@@ -7,7 +7,7 @@ import { applyPartChain, applyPromptChain } from "../message.js"
 import { type Registry, select } from "../../tools/tool-registry.js"
 import type { Request } from "../../tools/tool-executor.js"
 import { classifyFailure as classifyModelFailure } from "../../model/registry.js"
-import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../../model/telemetry/events.js"
+import { CurrentInstrumentation, CurrentPurpose, type CallPurpose } from "../../model/telemetry/events.js"
 import { withWireCache } from "../../model/prompt-cache.js"
 import type { AnyToolCall, ToolCallIdState } from "../tools/result.js"
 import type { ActiveModelServices, ModelTurnServices, RuntimeContext } from "./context.js"
@@ -61,7 +61,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
   if (handoffStateRef !== undefined) Object.assign(activeTurnInput, { handoffStateRef })
   const { activeAgentName, activeModelSelection, activeToolScheduling, sendClock } = makeActiveTurn(activeTurnInput)
   const withModelTelemetry =
-    (turn: number, purpose: ModelCallPurpose) =>
+    (turn: number, purpose: CallPurpose) =>
     <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
       Effect.flatMap(LanguageModel.LanguageModel, (model) =>
         effect.pipe(

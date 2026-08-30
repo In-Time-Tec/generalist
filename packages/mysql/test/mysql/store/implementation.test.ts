@@ -12,7 +12,7 @@ import { MysqlClient } from "@effect/sql-mysql2"
 import { RunSchema } from "@tenetkit/mysql"
 import { Steering } from "tenetkit"
 import { Errors, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker, layerWorker } from "tenetkit/runtime/sql-driver"
+import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
 import { transitionRunWait } from "../../../../tenetkit/src/runtime/sql/store/wait-transition.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
@@ -764,7 +764,7 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const worker = yield* RuntimeWorker
+        const worker = yield* RuntimeWorker.RuntimeWorker
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("worker"),
@@ -797,7 +797,7 @@ describeMysql("mysql run store", () => {
         ).toBe(false)
       }).pipe(
         scopedWith(
-          layerWorker({
+          RuntimeWorker.layer({
             workerId: "mysql-worker",
             concurrency: 2,
             lease: "5 seconds",

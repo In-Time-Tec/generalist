@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { Agent, Tool, Toolkit, TurnPolicy } from "tenetkit"
+import { Agent, Tool, Toolkit, Policy } from "tenetkit"
 
 const submitAnswerTool = Tool.make("submit_answer", {
   description: "Submit the final answer",
@@ -10,5 +10,5 @@ const submitAnswerTool = Tool.make("submit_answer", {
 const _agent = Agent.make({
   name: "researcher",
   toolkit: Toolkit.make(submitAnswerTool),
-  policy: TurnPolicy.both(TurnPolicy.recurs(4), TurnPolicy.untilToolCall("submit_answer")),
+  policy: Policy.both(Policy.recurs(4), Policy.untilToolCall("submit_answer")),
 })

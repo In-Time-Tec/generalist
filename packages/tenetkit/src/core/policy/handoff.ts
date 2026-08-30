@@ -13,8 +13,8 @@ import type { HandoffAccepted } from "../agent/handoff/state.js"
 import { type AgentToolToolkit, asTool, RegistrationError } from "../agent/tool.js"
 import type { Registration } from "../agent/tool/registration.js"
 import type { ClosedToolSet } from "../tools/tool-executor.js"
-import type { TurnPolicy } from "../turn/policy.js"
-import { HandoffCatalog, layerCatalog, type HandoffTarget } from "./handoff-target.js"
+import type { Policy } from "../turn/policy.js"
+import { Catalog, layerCatalog, type Target } from "./handoff-target.js"
 import { handoffToolSpec } from "./handoff-runtime.js"
 import { registerHandoffToolMeta } from "./handoff-tool-meta.js"
 import type { ContextProjection } from "./handoff-projection.js"
@@ -79,7 +79,7 @@ interface SupervisorAgentOptions {
   name: string
   instructions?: string
   tools: ReadonlyArray<HandoffToolkit["tool"]>
-  policy?: TurnPolicy
+  policy?: Policy
 }
 
 export interface FanOutAllSuccessOptions extends FanOutBaseOptions {
@@ -120,14 +120,14 @@ export class FanOutUnsatisfied extends Schema.TaggedError<FanOutUnsatisfied>()("
 export interface Supervisor<R, Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>> {
   readonly agent: Agent<Tools, R | LanguageModel.LanguageModel>
   readonly toolkit: ClosedToolSet<never, Tools[keyof Tools]>
-  readonly catalog: Layer.Layer<HandoffCatalog>
+  readonly catalog: Layer.Layer<Catalog>
 }
 
 export interface SupervisorOptions {
   readonly name: string
   readonly instructions?: string
-  readonly specialists: ReadonlyArray<HandoffTarget>
-  readonly policy?: TurnPolicy
+  readonly specialists: ReadonlyArray<Target>
+  readonly policy?: Policy
   readonly handoffOptions?: HandoffToolOptions
 }
 
@@ -385,12 +385,12 @@ export const delegateTool: {
   },
 )
 
-export const sameRunHandoffTool: {
-  (options?: HandoffToolOptions): (handoffTarget: HandoffTarget) => HandoffToolkit
-  (handoffTarget: HandoffTarget, options?: HandoffToolOptions): HandoffToolkit
+export const transferTool: {
+  (options?: HandoffToolOptions): (handoffTarget: Target) => HandoffToolkit
+  (handoffTarget: Target, options?: HandoffToolOptions): HandoffToolkit
 } = Function.dual(
   (args) => args.length > 1 || "agent" in args[0],
-  (handoffTarget: HandoffTarget, options: HandoffToolOptions = {}): HandoffToolkit => {
+  (handoffTarget: Target, options: HandoffToolOptions = {}): HandoffToolkit => {
     const spec = handoffToolSpec(handoffTarget, options)
     const metadata: HandoffMetadata = { specialist: spec.specialist }
     if (spec.projection !== undefined) metadata.projection = spec.projection
@@ -452,7 +452,7 @@ export const fanOut: {
 
 export const supervisor = (options: SupervisorOptions) => {
   const specialists = options.specialists
-  const handoffTools = specialists.map((specialist) => sameRunHandoffTool(specialist, options.handoffOptions ?? {}))
+  const handoffTools = specialists.map((specialist) => transferTool(specialist, options.handoffOptions ?? {}))
   const toolkit = mergeHandoffTools(handoffTools)
   const agentOptions: SupervisorAgentOptions = {
     name: options.name,
@@ -478,15 +478,15 @@ export const supervisor = (options: SupervisorOptions) => {
   return result
 }
 
-export { target, layerCatalog, HandoffCatalog, type HandoffTarget } from "./handoff-target.js"
+export { target, layerCatalog, Catalog, type Target } from "./handoff-target.js"
 export {
-  HandoffInput,
-  HandoffOutput,
+  Input,
+  Output,
   defaultContextProjection,
   filterContextProjection,
-  HandoffProjectionInvalid,
+  ProjectionInvalid,
 } from "./handoff-projection.js"
-export { executeSameRunHandoff, HandoffRejected } from "./handoff-runtime.js"
-export { HandoffCommit, HandoffControlState } from "../agent/handoff/state.js"
+export { Rejected } from "./handoff-runtime.js"
+export { Commit, ControlState } from "../agent/handoff/state.js"
 export { register, RegistrationError } from "../agent/tool.js"
 export type { Registration } from "../agent/tool/registration.js"

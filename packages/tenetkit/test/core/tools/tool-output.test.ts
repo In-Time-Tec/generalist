@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Json } from "../json.js"
 import { Cause, Effect, Option, Schema } from "effect"
-import { ToolOutput, ToolExecutor } from "../../../src/index"
+import { Output, ToolExecutor } from "../../../src/index"
 import { ItLayer } from "../it-layer.js"
 
 const success = (encodedResult: ToolExecutor.Success["result"]): ToolExecutor.Success => ({
@@ -10,12 +10,12 @@ const success = (encodedResult: ToolExecutor.Success["result"]): ToolExecutor.Su
   encodedResult,
 })
 
-describe("ToolOutput", () => {
+describe("Output", () => {
   it.effect("bounds oversized outputs inline when no store is present", () =>
     Effect.gen(function* () {
       const result = success("x".repeat(100))
 
-      const bounded = yield* ToolOutput.bound(result, { toolCallId: "tool-call-absent", maxBytes: 8 })
+      const bounded = yield* Output.bound(result, { toolCallId: "tool-call-absent", maxBytes: 8 })
 
       expect(bounded.outputPaths).toEqual([])
       expect(bounded.result).toEqual(bounded.encodedResult)
@@ -37,11 +37,11 @@ describe("ToolOutput", () => {
     "bounds oversized outputs inline when the store declines spill",
     () =>
       [
-        ToolOutput.layerNoop,
+        Output.layerNoop,
         Effect.gen(function* () {
           const result = success("x".repeat(100))
 
-          const bounded = yield* ToolOutput.bound(result, { toolCallId: "tool-call-noop", maxBytes: 8 })
+          const bounded = yield* Output.bound(result, { toolCallId: "tool-call-noop", maxBytes: 8 })
 
           expect(bounded.outputPaths).toEqual([])
           expect(bounded.encodedResult).toMatchObject({
@@ -59,11 +59,11 @@ describe("ToolOutput", () => {
   )
 
   ItLayer.make(it, "recovers a typed store failure as bounded inline success", () => [
-    ToolOutput.layerTest({
-      put: () => Effect.fail(ToolOutput.ToolOutputError.make({ message: "store unavailable" })),
+    Output.layerTest({
+      put: () => Effect.fail(Output.Error.make({ message: "store unavailable" })),
     }),
     Effect.gen(function* () {
-      const bounded = yield* ToolOutput.bound(success("😀".repeat(20)), {
+      const bounded = yield* Output.bound(success("😀".repeat(20)), {
         toolCallId: "tool-call-failing",
         maxBytes: 6,
       })
@@ -83,9 +83,9 @@ describe("ToolOutput", () => {
   ])
 
   ItLayer.make(it, "preserves store interruption", () => [
-    ToolOutput.layerTest({ put: () => Effect.interrupt }),
+    Output.layerTest({ put: () => Effect.interrupt }),
     Effect.gen(function* () {
-      const exit = yield* ToolOutput.bound(success("x".repeat(100)), {
+      const exit = yield* Output.bound(success("x".repeat(100)), {
         toolCallId: "tool-call-interrupted",
         maxBytes: 8,
       }).pipe(Effect.exit)
@@ -96,17 +96,14 @@ describe("ToolOutput", () => {
   ])
 
   ItLayer.make(it, "preserves interruption combined with a typed store failure", () => [
-    ToolOutput.layerTest({
+    Output.layerTest({
       put: () =>
         Effect.failCause(
-          Cause.combine(
-            Cause.fail(ToolOutput.ToolOutputError.make({ message: "store unavailable" })),
-            Cause.interrupt(),
-          ),
+          Cause.combine(Cause.fail(Output.Error.make({ message: "store unavailable" })), Cause.interrupt()),
         ),
     }),
     Effect.gen(function* () {
-      const exit = yield* ToolOutput.bound(success("x".repeat(100)), {
+      const exit = yield* Output.bound(success("x".repeat(100)), {
         toolCallId: "tool-call-composite-interrupt",
         maxBytes: 8,
       }).pipe(Effect.exit)
@@ -118,9 +115,9 @@ describe("ToolOutput", () => {
 
   it.effect("bounds multibyte previews at very small UTF-8 limits", () =>
     Effect.gen(function* () {
-      const bounded = yield* ToolOutput.bound(success("😀"), { toolCallId: "tool-call-small-limit", maxBytes: 2 })
-      const empty = yield* ToolOutput.bound(success("😀"), { toolCallId: "tool-call-zero-limit", maxBytes: 0 })
-      const fractional = yield* ToolOutput.bound(success("😀"), {
+      const bounded = yield* Output.bound(success("😀"), { toolCallId: "tool-call-small-limit", maxBytes: 2 })
+      const empty = yield* Output.bound(success("😀"), { toolCallId: "tool-call-zero-limit", maxBytes: 0 })
+      const fractional = yield* Output.bound(success("😀"), {
         toolCallId: "tool-call-fractional-limit",
         maxBytes: 2.5,
       })
@@ -162,7 +159,7 @@ describe("ToolOutput", () => {
   ItLayer.make(it, "leaves outputs unchanged when encoded size is within the max", () => {
     let stores = 0
     return [
-      ToolOutput.layerTest({
+      Output.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:unexpected"))
@@ -171,7 +168,7 @@ describe("ToolOutput", () => {
       Effect.gen(function* () {
         const result = success({ ok: true })
 
-        const bounded = yield* ToolOutput.bound(result, { toolCallId: "tool-call-small", maxBytes: 1_000 })
+        const bounded = yield* Output.bound(result, { toolCallId: "tool-call-small", maxBytes: 1_000 })
 
         expect(bounded).toEqual({ ...result, outputPaths: [] })
         expect(bounded.result).toBe(result.result)
@@ -181,11 +178,11 @@ describe("ToolOutput", () => {
     ] as const
   })
 
-  ItLayer.make(it, "stores oversized outputs and returns a bounded inline ToolOutput value", () => {
+  ItLayer.make(it, "stores oversized outputs and returns a bounded inline Output value", () => {
     let stores = 0
     let stored: unknown
     return [
-      ToolOutput.layerTest({
+      Output.layerTest({
         put: (_toolCallId, content) => {
           stores += 1
           stored = content
@@ -195,8 +192,8 @@ describe("ToolOutput", () => {
       Effect.gen(function* () {
         const full = "abcdef".repeat(20)
 
-        const bounded = yield* ToolOutput.bound(success(full), { toolCallId: "tool-call-large", maxBytes: 12 })
-        const rebound = yield* ToolOutput.bound(bounded, { toolCallId: "tool-call-large", maxBytes: 12 })
+        const bounded = yield* Output.bound(success(full), { toolCallId: "tool-call-large", maxBytes: 12 })
+        const rebound = yield* Output.bound(bounded, { toolCallId: "tool-call-large", maxBytes: 12 })
 
         expect(stores).toBe(1)
         expect(stored).toEqual({ result: full, encodedResult: full })
@@ -225,22 +222,22 @@ describe("ToolOutput", () => {
     ] as const
   })
 
-  ItLayer.make(it, "tightens existing ToolOutput values without storing or changing their paths", () => {
+  ItLayer.make(it, "tightens existing Output values without storing or changing their paths", () => {
     let stores = 0
     return [
-      ToolOutput.layerTest({
+      Output.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:unexpected"))
         },
       }),
       Effect.gen(function* () {
-        const value: ToolOutput.ToolOutput = {
+        const value: Output.Output = {
           inline: { truncated: true, bytes: 100, maxBytes: 8, digest: "a".repeat(64), preview: '"xxxxxxx' },
           outputPaths: ["mem:original", "s3:original"],
         }
 
-        const bounded = yield* ToolOutput.bound(success(value), { toolCallId: "tool-call-repeat", maxBytes: 1 })
+        const bounded = yield* Output.bound(success(value), { toolCallId: "tool-call-repeat", maxBytes: 1 })
 
         expect(stores).toBe(0)
         expect(bounded.outputPaths).toEqual(["mem:original", "s3:original"])
@@ -253,10 +250,10 @@ describe("ToolOutput", () => {
     ] as const
   })
 
-  ItLayer.make(it, "does not mistake domain values for canonical ToolOutput values", () => {
+  ItLayer.make(it, "does not mistake domain values for canonical Output values", () => {
     let stores = 0
     return [
-      ToolOutput.layerTest({
+      Output.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:actual-value"))
@@ -265,7 +262,7 @@ describe("ToolOutput", () => {
       Effect.gen(function* () {
         const value = { inline: "x".repeat(100), outputPaths: ["domain:path"] }
 
-        const bounded = yield* ToolOutput.bound(success(value), { toolCallId: "tool-call-domain-value", maxBytes: 8 })
+        const bounded = yield* Output.bound(success(value), { toolCallId: "tool-call-domain-value", maxBytes: 8 })
 
         expect(stores).toBe(1)
         expect(bounded.outputPaths).toEqual(["mem:actual-value"])
@@ -273,21 +270,21 @@ describe("ToolOutput", () => {
     ] as const
   })
 
-  ItLayer.make(it, "recognizes canonical ToolOutput values with omitted optional paths", () => {
+  ItLayer.make(it, "recognizes canonical Output values with omitted optional paths", () => {
     let stores = 0
     return [
-      ToolOutput.layerTest({
+      Output.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:unexpected"))
         },
       }),
       Effect.gen(function* () {
-        const value: ToolOutput.ToolOutput = {
+        const value: Output.Output = {
           inline: { truncated: true, bytes: 100, maxBytes: 8, digest: "a".repeat(64), preview: '"xxxxxxx' },
         }
 
-        const bounded = yield* ToolOutput.bound(success(value), { toolCallId: "tool-call-no-paths", maxBytes: 8 })
+        const bounded = yield* Output.bound(success(value), { toolCallId: "tool-call-no-paths", maxBytes: 8 })
 
         expect(stores).toBe(0)
         expect(bounded.outputPaths).toEqual([])

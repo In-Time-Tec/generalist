@@ -43,7 +43,7 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, Polic
   readonly executor: Option.Option<typeof ToolExecutor.Service>
   readonly authorizer: ToolAuthorizer<AuthorizationR>
   readonly skillRuntime:
-    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
+    | { readonly catalog: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined
   readonly toolState: Ref.Ref<ToolState>
   readonly handoffState?: Ref.Ref<HandoffRunState>

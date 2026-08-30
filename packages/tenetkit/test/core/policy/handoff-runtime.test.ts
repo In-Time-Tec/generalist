@@ -66,7 +66,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       ],
     })
     let handoffCheckpoint: DurableDriver.DriverCheckpoint | undefined
-    let handoffCommit: Handoff.HandoffCommit | undefined
+    let handoffCommit: Handoff.Commit | undefined
     let calls = 0
     const journal = Layer.succeed(DurableDriver.DriverJournalService, {
       onScheduled: () => Effect.void,
@@ -78,7 +78,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         Effect.sync(() => {
           if (operation.kind === "handoff" && outcome._tag === "Succeeded") {
             handoffCheckpoint = checkpoint
-            handoffCommit = Schema.decodeUnknownOption(Handoff.HandoffCommit)(outcome.value).pipe(Option.getOrUndefined)
+            handoffCommit = Schema.decodeUnknownOption(Handoff.Commit)(outcome.value).pipe(Option.getOrUndefined)
           }
         }),
       onCheckpoint: () => Effect.void,
@@ -252,7 +252,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       ),
       Effect.gen(function* () {
         const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, { prompt: "go" })))
-        expect(failure._tag).toBe("tenetkit/core/HandoffTargetMissing")
+        expect(failure._tag).toBe("tenetkit/core/TargetMissing")
       }),
     ] as const
   })

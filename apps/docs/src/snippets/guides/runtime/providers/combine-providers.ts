@@ -6,7 +6,7 @@ import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "router" })
 
-const registryLayer = ModelRegistry.layerCombined([
+const registryLayer = ModelRegistry.layerMerged([
   anthropicLayer({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
   openRouterLayer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
 ])

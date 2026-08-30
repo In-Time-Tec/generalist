@@ -13,7 +13,7 @@ import {
   InvocationCoordinator,
   type Event as ModelTelemetryEvent,
   type EventPayload as ModelTelemetryEventPayload,
-  type ModelProviderUsage,
+  type ProviderUsage,
   generateId,
 } from "../../model/telemetry/events.js"
 import { Permissions, RuleStore } from "../../policy/permissions.js"
@@ -22,13 +22,12 @@ import { ToolAuthorizerService, make as makeToolAuthorizer } from "../../tools/t
 import { ToolExecutor } from "../../tools/tool-executor.js"
 import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../../durable/loop-driver-state.js"
 import type { Agent, RunOptions } from "../service.js"
-import { SetupHelpers, setupStaticTools } from "./construction.js"
+import { errorMessage, setupStaticTools } from "./construction.js"
 import { recoverToolCheckpoint } from "../tools/checkpoint-recovery.js"
-import { SetupOptions } from "./options.js"
+import { validate as validateOptions } from "./options.js"
 import { setupChat, setupSession } from "./session.js"
 import { setupPromptContext } from "./resume.js"
 import type { ModelSource } from "../model-turn/model-source.js"
-const { errorMessage } = SetupHelpers
 
 /** @internal Resolve the same configured or default authorization policy for every Agent tool execution surface. */
 export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(agent: Agent<T, R, P, A>) =>
@@ -64,7 +63,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
     )
     const activeModelResponse = yield* Effect.serviceOption(ActiveModelResponse)
-    const progressPolicy = yield* SetupOptions.validate(options, agent)
+    const progressPolicy = yield* validateOptions(options, agent)
 
     const sessionId = options.sessionId ?? "local"
     const sessionAppendOptions = (expectedLeafId: string | null) => ({ expectedLeafId })
@@ -141,7 +140,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
             ),
           )
     let modelCallOrdinal = restoredModelCallOrdinal ?? options.modelCallOrdinalStart ?? 0
-    const modelCallUsage = new Map<string, ModelProviderUsage | undefined>()
+    const modelCallUsage = new Map<string, ProviderUsage | undefined>()
     const clock = yield* Effect.clockWith((currentClock) => Effect.succeed(currentClock))
     const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service => {
       const baseInstrumentation = {
@@ -151,7 +150,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
         identity: telemetryIdentity,
         onCallCompleted: (completion: {
           readonly modelCallId: string
-          readonly failedAttemptUsage: ModelProviderUsage | undefined
+          readonly failedAttemptUsage: ProviderUsage | undefined
         }) => {
           modelCallUsage.set(completion.modelCallId, completion.failedAttemptUsage)
         },

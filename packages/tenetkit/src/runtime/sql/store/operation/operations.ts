@@ -24,12 +24,7 @@ import {
   verifyCompletedSessionEntry,
   verifyHandoffSessionEntry,
 } from "../../model-response/completed-model-response.js"
-import {
-  handoffSessionEntry,
-  isHandoffCommit,
-  sameHandoffCheckpoint,
-  sameHandoffCommit,
-} from "../../../session/handoff.js"
+import { handoffSessionEntry, isCommit, sameHandoffCheckpoint, sameCommit } from "../../../session/handoff.js"
 import type { CancellationOutcome } from "../../../../core/tools/tool-executor.js"
 import { decodeCancellableOperation } from "../../../../core/tools/tool-executor-cancellation.js"
 import { markSqlTransitionDivergentRetry, markSqlTransitionExactRetry } from "../kernel/observability.js"
@@ -78,10 +73,10 @@ const completeExisting = (
   checkpoint: ExecutionCheckpoint | undefined,
 ) =>
   Effect.gen(function* () {
-    if (current.kind !== "handoff" || current.status !== "succeeded" || !isHandoffCommit(current.result)) return current
+    if (current.kind !== "handoff" || current.status !== "succeeded" || !isCommit(current.result)) return current
     if (
       input.outcome._tag !== "Succeeded" ||
-      !sameHandoffCommit(current.result, input.outcome.value) ||
+      !sameCommit(current.result, input.outcome.value) ||
       !sameHandoffCheckpoint(checkpoint, input.checkpoint)
     ) {
       return yield* RuntimeUnavailable.make({ message: "handoff operation has a divergent completion retry" })
@@ -267,7 +262,7 @@ export const completeOperation: {
       try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
     })
-    if (existing[0].kind === "handoff" && input.outcome._tag === "Succeeded" && isHandoffCommit(input.outcome.value)) {
+    if (existing[0].kind === "handoff" && input.outcome._tag === "Succeeded" && isCommit(input.outcome.value)) {
       const entry = handoffSessionEntry({
         sessionId: run.message.sessionId,
         operationKey: existing[0].operation_key,

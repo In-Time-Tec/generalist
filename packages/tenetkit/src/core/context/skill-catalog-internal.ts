@@ -1,12 +1,12 @@
 import { Schema } from "effect"
 
 /** @experimental Per-entry description character cap. */
-export const DESCRIPTION_CAP = 1_024
+export const descriptionLimit = 1_024
 
 /** @internal Parsed SKILL.md frontmatter shared by catalog implementations. */
 export const Frontmatter = Schema.Struct({
   name: Schema.String,
-  description: Schema.String.pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(DESCRIPTION_CAP))),
+  description: Schema.String.pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(descriptionLimit))),
   whenToUse: Schema.optionalKey(Schema.String),
   allowedTools: Schema.optionalKey(Schema.Array(Schema.String)),
   disableModelInvocation: Schema.optionalKey(Schema.Boolean),

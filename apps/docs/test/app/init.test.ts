@@ -205,7 +205,7 @@ it.effect(
 test("search finds pages by body text with title matches first", () => {
   if (allPages.length === 0) return
   expect(searchDocs("Runtime").length).toBeGreaterThan(0)
-  expect(searchDocs("TurnPolicy").length).toBeGreaterThan(0)
+  expect(searchDocs("Policy").length).toBeGreaterThan(0)
 })
 
 test("multi-agent guide preserves the two-channel child-run contract", () => {

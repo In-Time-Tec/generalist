@@ -193,7 +193,7 @@ it.effect("enforces authorization, deadline, and tool-call budget before handler
         Effect.provide(Permissions.layerAllowAll),
       ),
     )
-    expect(exhausted).toMatchObject({ _tag: "tenetkit/core/RunBudgetExhausted", dimension: "toolCalls" })
+    expect(exhausted).toMatchObject({ _tag: "tenetkit/core/Exhausted", dimension: "toolCalls" })
     expect(handlerCalls).toBe(0)
 
     const expired = yield* Effect.flip(
@@ -201,7 +201,7 @@ it.effect("enforces authorization, deadline, and tool-call budget before handler
         Agent.streamToolCalls(agent, { ...options, budget: { deadline: "1900-01-01T00:00:00.000Z" } }),
       ).pipe(Effect.provide(Permissions.layerAllowAll)),
     )
-    expect(expired).toMatchObject({ _tag: "tenetkit/core/RunBudgetExhausted", dimension: "deadline" })
+    expect(expired).toMatchObject({ _tag: "tenetkit/core/Exhausted", dimension: "deadline" })
     expect(handlerCalls).toBe(0)
   }).pipe(
     Effect.provide(Layer.mergeAll(handlers, Permissions.layerRuleset({ rules: [{ pattern: "echo", level: "deny" }] }))),

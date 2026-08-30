@@ -338,7 +338,7 @@ const normalizeSseErrorFrames = <E>(body: Stream.Stream<Uint8Array, E>): Stream.
   )
 
 /** @experimental */
-export const normalizeResponsesSse = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
+export const normalizeResponsesSSE = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
   HttpClient.transformResponse(client, (effect) =>
     Effect.map(effect, (response) => {
       if (!isResponsesUrl(response.request.url)) return response
@@ -358,8 +358,8 @@ export const layerConfig = (options?: Parameters<typeof OpenAIClient.layerConfig
     ...options,
     transformClient: (client) =>
       options?.transformClient === undefined
-        ? normalizeResponsesSse(client)
-        : client.pipe(normalizeResponsesSse, options.transformClient),
+        ? normalizeResponsesSSE(client)
+        : client.pipe(normalizeResponsesSSE, options.transformClient),
   })
 
 /** @experimental */

@@ -12,15 +12,15 @@ import {
   CompactionFailed,
   CompactionSkipped,
   CompactionStarted,
-  ModelAttemptCompleted,
-  ModelAttemptFailed,
-  ModelAttemptFirstOutput,
-  ModelAttemptStarted,
-  ModelCallCompleted,
-  ModelCallFailed,
-  ModelCallStarted,
-  ModelFallbackScheduled,
-  ModelRetryScheduled,
+  AttemptCompleted,
+  AttemptFailed,
+  AttemptFirstOutput,
+  AttemptStarted,
+  CallCompleted,
+  CallFailed,
+  CallStarted,
+  FallbackScheduled,
+  RetryScheduled,
 } from "../../core/model/telemetry/events.js"
 import { FanOutJoin, FanOutRemainder } from "../child/fan-out.js"
 import { FanOutMemberOrigin, type FanOutMemberOrigin as FanOutOrigin } from "../child/fan-out-internal.js"
@@ -271,18 +271,18 @@ const Part = Schema.Union([
 ])
 const optionalMetadata = { metadata: Schema.optionalKey(Metadata) }
 const ModelTelemetryEventSchema = Schema.Union([
-  ModelCallStarted,
-  ModelAttemptStarted,
-  ModelAttemptFirstOutput,
-  Schema.Struct({ ...ModelAttemptCompleted.fields, usage: Usage }),
-  ModelAttemptFailed,
-  ModelRetryScheduled,
-  ModelFallbackScheduled,
+  CallStarted,
+  AttemptStarted,
+  AttemptFirstOutput,
+  Schema.Struct({ ...AttemptCompleted.fields, usage: Usage }),
+  AttemptFailed,
+  RetryScheduled,
+  FallbackScheduled,
   Schema.Struct({
-    ...ModelCallCompleted.fields,
+    ...CallCompleted.fields,
     usage: Schema.optionalKey(Usage),
   }),
-  ModelCallFailed,
+  CallFailed,
   CompactionStarted,
   CompactionSkipped,
   CompactionApplied,
@@ -365,7 +365,7 @@ const AgentLoopEventSchema = Schema.Union([
     target: Schema.String,
     ...optionalMetadata,
   }),
-  Schema.TaggedStruct("HandoffRejected", {
+  Schema.TaggedStruct("Rejected", {
     turn: Schema.Finite,
     handoffId: Schema.String,
     reason: Schema.String,

@@ -3,7 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import type { RunOptions } from "../service.js"
 import type { Any as AnyAgent } from "../closure.js"
 import type { TurnOverrides } from "../../turn/policy.js"
-import type { HandoffTarget } from "../../policy/handoff-target.js"
+import type { Target } from "../../policy/handoff-target.js"
 import { AgentPin } from "../../durable/pin.js"
 
 export const HandoffFrame = Schema.Struct({
@@ -22,7 +22,7 @@ export const HandoffEdgeCount = Schema.Struct({
   count: Schema.Finite,
 })
 
-export const HandoffControlState = Schema.Struct({
+export const ControlState = Schema.Struct({
   root: Schema.String,
   active: Schema.String,
   path: Schema.Array(HandoffFrame),
@@ -36,21 +36,21 @@ export const HandoffControlState = Schema.Struct({
   ),
 })
 
-export type HandoffControlState = typeof HandoffControlState.Type
+export type ControlState = typeof ControlState.Type
 
-export const HandoffCommit = Schema.TaggedStruct("HandoffCommit", {
-  state: HandoffControlState,
+export const Commit = Schema.TaggedStruct("Commit", {
+  state: ControlState,
   sessionEntryId: Schema.String,
   sessionParentId: Schema.NullOr(Schema.String),
   projectedHistory: Prompt.Prompt,
   targetAgentPin: Schema.optionalKey(AgentPin),
 })
 
-export type HandoffCommit = typeof HandoffCommit.Type
+export type Commit = typeof Commit.Type
 
 export interface HandoffRunState {
   readonly root: string
-  readonly active: HandoffTarget
+  readonly active: Target
   readonly path: ReadonlyArray<HandoffFrame>
   readonly edgeCounts: ReadonlyMap<string, ReadonlyMap<string, number>>
   readonly handoffCount: number
@@ -62,7 +62,7 @@ export interface HandoffRunState {
     | undefined
 }
 
-export const toHandoffControlState = (state: HandoffRunState): HandoffControlState => {
+export const toControlState = (state: HandoffRunState): ControlState => {
   const control = {
     root: state.root,
     active: state.active.name,
@@ -85,32 +85,32 @@ export const toHandoffControlState = (state: HandoffRunState): HandoffControlSta
 
 export const takePendingContinuation: {
   <E, R>(
-    persist: (state: HandoffControlState) => Effect.Effect<void, E, R>,
+    persist: (state: ControlState) => Effect.Effect<void, E, R>,
   ): (stateRef: Ref.Ref<HandoffRunState>) => Effect.Effect<HandoffRunState["pendingContinuation"], E, R>
   <E, R>(
     stateRef: Ref.Ref<HandoffRunState>,
-    persist: (state: HandoffControlState) => Effect.Effect<void, E, R>,
+    persist: (state: ControlState) => Effect.Effect<void, E, R>,
   ): Effect.Effect<HandoffRunState["pendingContinuation"], E, R>
 } = Function.dual(
   2,
   <E, R>(
     stateRef: Ref.Ref<HandoffRunState>,
-    persist: (state: HandoffControlState) => Effect.Effect<void, E, R>,
+    persist: (state: ControlState) => Effect.Effect<void, E, R>,
   ): Effect.Effect<HandoffRunState["pendingContinuation"], E, R> =>
     Effect.gen(function* () {
       const state = yield* Ref.get(stateRef)
       if (state.pendingContinuation === undefined) return undefined
       const continued = { ...state, pendingContinuation: undefined }
-      yield* persist(toHandoffControlState(continued))
+      yield* persist(toControlState(continued))
       yield* Ref.set(stateRef, continued)
       return state.pendingContinuation
     }),
 )
 
-export const fromHandoffControlState: {
-  (active: HandoffTarget): (state: HandoffControlState) => HandoffRunState
-  (state: HandoffControlState, active: HandoffTarget): HandoffRunState
-} = Function.dual(2, (state: HandoffControlState, active: HandoffTarget): HandoffRunState => {
+export const fromControlState: {
+  (active: Target): (state: ControlState) => HandoffRunState
+  (state: ControlState, active: Target): HandoffRunState
+} = Function.dual(2, (state: ControlState, active: Target): HandoffRunState => {
   const edgeCounts = new Map<string, Map<string, number>>()
   for (const edge of state.edgeCounts) {
     const targets = edgeCounts.get(edge.source) ?? new Map<string, number>()
@@ -142,7 +142,7 @@ export const initialHandoffRunState: {
 } = Function.dual(
   (args) => args.length >= 1 && !Schema.is(AgentPin)(args[0]),
   (agent: AnyAgent, activePin?: AgentPin): HandoffRunState => {
-    const active: HandoffTarget =
+    const active: Target =
       activePin === undefined ? { name: agent.name, agent } : { name: agent.name, agent, pin: activePin }
     return {
       root: agent.name,
@@ -183,10 +183,10 @@ export const incrementEdge: {
   },
 )
 
-export class HandoffTargetMissing extends Schema.TaggedError<HandoffTargetMissing>()(
-  "tenetkit/core/HandoffTargetMissing",
-  { target: Schema.String, turn: Schema.Finite },
-) {}
+export class TargetMissing extends Schema.TaggedError<TargetMissing>()("tenetkit/core/TargetMissing", {
+  target: Schema.String,
+  turn: Schema.Finite,
+}) {}
 
 export class HandoffLimitExceeded extends Schema.TaggedError<HandoffLimitExceeded>()(
   "tenetkit/core/HandoffLimitExceeded",

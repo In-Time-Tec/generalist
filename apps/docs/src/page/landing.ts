@@ -174,7 +174,7 @@ const promiseSection = (): Html =>
               ),
               pillarCard(
                 "Explicit seams",
-                "ToolExecutor, Approvals, TurnPolicy, and ModelRegistry are Effect services with test layers.",
+                "ToolExecutor, Approvals, Policy, and ModelRegistry are Effect services with test layers.",
               ),
               pillarCard(
                 "Native durability",
@@ -304,7 +304,7 @@ const featureCards: ReadonlyArray<FeatureCard> = [
   {
     symbol: "=>",
     title: "Agent loop",
-    body: "Turn 0 always runs; TurnPolicy gates every turn after it.",
+    body: "Turn 0 always runs; Policy gates every turn after it.",
     href: "/docs/learn/agent-loop",
   },
   {

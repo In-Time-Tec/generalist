@@ -19,7 +19,7 @@ export type { FailureInput, FailureResolver } from "./response/failure.js"
 export type Classification = "transient" | "terminal"
 
 /** @experimental Retry and correction policy for one logical model call. */
-export interface Service {
+export interface Policy {
   readonly classify: (cause: unknown) => Classification
   readonly resolve: FailureResolver
   readonly retrySchedule: Schedule.Schedule<unknown>
@@ -27,27 +27,24 @@ export interface Service {
   readonly streamIdleTimeout?: Duration.Input
 }
 
-interface MutableInterface {
-  classify: Service["classify"]
-  resolve: Service["resolve"]
-  retrySchedule: Service["retrySchedule"]
+interface MutablePolicy {
+  classify: Policy["classify"]
+  resolve: Policy["resolve"]
+  retrySchedule: Policy["retrySchedule"]
   invalidToolCallCorrectionLimit: number
   streamIdleTimeout?: Duration.Input
 }
 
 /** @experimental */
-export class ModelResilience extends Context.Service<ModelResilience, Service>()(
+export class ModelResilience extends Context.Service<ModelResilience, Policy>()(
   "tenetkit/core/model/resilience/ModelResilience",
 ) {}
 
 /** @experimental A model resilience policy contains an unsafe correction bound. */
-export class ModelResilienceMisconfigured extends Schema.TaggedError<ModelResilienceMisconfigured>()(
-  "tenetkit/core/ModelResilienceMisconfigured",
-  {
-    reason: Schema.Literal("invalid-tool-call-correction-limit"),
-    message: Schema.String,
-  },
-) {}
+export class Misconfigured extends Schema.TaggedError<Misconfigured>()("tenetkit/core/ModelResilienceMisconfigured", {
+  reason: Schema.Literal("invalid-tool-call-correction-limit"),
+  message: Schema.String,
+}) {}
 
 /**
  * @experimental A stream that ended without its terminal event is retryable
@@ -68,7 +65,7 @@ const defaultProviderClassify = (cause: unknown): Classification =>
     : "terminal"
 
 /** @experimental */
-export const defaultPolicy: Service = {
+export const defaultPolicy: Policy = {
   classify: defaultProviderClassify,
   resolve: defaultResolveFailure,
   retrySchedule: Schedule.exponential("2 seconds").pipe(Schedule.upTo({ times: 2, duration: "30 seconds" })),
@@ -76,20 +73,20 @@ export const defaultPolicy: Service = {
 }
 
 /** @experimental */
-export const none: Service = {
+export const none: Policy = {
   ...defaultPolicy,
   classify: () => "terminal",
   retrySchedule: Schedule.recurs(0),
 }
 
-const misconfigured = (): ModelResilienceMisconfigured =>
-  ModelResilienceMisconfigured.make({
+const misconfigured = (): Misconfigured =>
+  Misconfigured.make({
     reason: "invalid-tool-call-correction-limit",
     message: "invalidToolCallCorrectionLimit must be a safe integer between 0 and 2",
   })
 
 /** @experimental Validate a structurally supplied model resilience policy. */
-export const validate = (implementation: Service): Effect.Effect<Service, ModelResilienceMisconfigured> =>
+export const validate = (implementation: Policy): Effect.Effect<Policy, Misconfigured> =>
   Effect.suspend(() => {
     const limit = implementation.invalidToolCallCorrectionLimit
     return Number.isSafeInteger(limit) && limit >= 0 && limit <= 2
@@ -98,8 +95,8 @@ export const validate = (implementation: Service): Effect.Effect<Service, ModelR
   })
 
 /** @experimental */
-export const make = (input?: Partial<Service>): Effect.Effect<Service, ModelResilienceMisconfigured> => {
-  const implementation: MutableInterface = {
+export const make = (input?: Partial<Policy>): Effect.Effect<Policy, Misconfigured> => {
+  const implementation: MutablePolicy = {
     classify: input?.classify ?? defaultClassify,
     resolve: input?.resolve ?? defaultPolicy.resolve,
     retrySchedule: input?.retrySchedule ?? defaultPolicy.retrySchedule,
@@ -110,14 +107,14 @@ export const make = (input?: Partial<Service>): Effect.Effect<Service, ModelResi
 }
 
 /** @experimental */
-export const layer = (input?: Partial<Service>): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
+export const layer = (input?: Partial<Policy>): Layer.Layer<ModelResilience, Misconfigured> =>
   Layer.effect(ModelResilience, make(input).pipe(Effect.map(ModelResilience.of)))
 
 /** @experimental */
-export const layerTest = (implementation: Service): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
+export const layerTest = (implementation: Policy): Layer.Layer<ModelResilience, Misconfigured> =>
   Layer.effect(ModelResilience, validate(implementation).pipe(Effect.map(ModelResilience.of)))
 
-const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: Service): Effect.Effect<A, E, R> =>
+const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: Policy): Effect.Effect<A, E, R> =>
   Effect.suspend(effect).pipe(
     Effect.map((value): Result.Result<A, Cause.Cause<E>> => Result.succeed(value)),
     Effect.catchCause((cause): Effect.Effect<Result.Result<A, Cause.Cause<E>>, E> => {
@@ -135,13 +132,13 @@ const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: 
     ),
   )
 
-const retryStreamSchedule = (resilience: Service): Schedule.Schedule<unknown, unknown> =>
+const retryStreamSchedule = (resilience: Policy): Schedule.Schedule<unknown, unknown> =>
   resilience.retrySchedule.pipe(Schedule.while(({ input }) => resilience.classify(input) === "transient"))
 
 const retryStream = <A, B, E, R>(
   stream: () => Stream.Stream<A, E, R>,
   onEmittedFailure: (error: E) => B,
-  resilience: Service,
+  resilience: Policy,
   consumesReplay: (value: A) => boolean,
 ): Stream.Stream<A | B, E, R> =>
   Stream.suspend(() => {
@@ -180,16 +177,12 @@ const retryStream = <A, B, E, R>(
 
 /** @experimental */
 export const apply: {
-  (resilience: Service): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, resilience: Service): LanguageModel.Service
+  (resilience: Policy): (model: LanguageModel.Service) => LanguageModel.Service
+  (model: LanguageModel.Service, resilience: Policy): LanguageModel.Service
 } = Function.dual(
   2,
-  (model: LanguageModel.Service, resilience: Service): LanguageModel.Service =>
-    adapt<
-      AiError.AiError | ModelResilienceMisconfigured,
-      AiError.AiError | ModelResilienceMisconfigured,
-      AiError.AiError | ModelResilienceMisconfigured
-    >(model, {
+  (model: LanguageModel.Service, resilience: Policy): LanguageModel.Service =>
+    adapt<AiError.AiError | Misconfigured, AiError.AiError | Misconfigured, AiError.AiError | Misconfigured>(model, {
       generateText: (_options, invoke) =>
         Effect.flatMap(validate(resilience), (validated) =>
           retryEffect(

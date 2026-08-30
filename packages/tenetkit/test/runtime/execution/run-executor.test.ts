@@ -1705,7 +1705,7 @@ describe("RunExecutor", () => {
         _tag: "tenetkit/runtime/AgentExecutionFailure",
         message: yield* Schema.decodeEffect(Schema.String)(failed.error.message).pipe(Effect.orDie),
         failure: {
-          _tag: "tenetkit/core/RunBudgetExhausted",
+          _tag: "tenetkit/core/Exhausted",
           dimension: "modelCalls",
           requested: 1,
           remaining: 0,
@@ -1794,7 +1794,7 @@ describe("RunExecutor", () => {
       }
       expect(failed.error).toMatchObject({
         failure: {
-          _tag: "tenetkit/core/RunBudgetExhausted",
+          _tag: "tenetkit/core/Exhausted",
           dimension: "totalTokens",
           requested: 10,
           remaining: 5,
@@ -2477,8 +2477,8 @@ describe("RunExecutor", () => {
       })
       yield* store.startOperation({ ...claim, operationId: operation.operationId })
       const projectedHistory = Prompt.make("projected-for-specialist")
-      const commit: Handoff.HandoffCommit = {
-        _tag: "HandoffCommit",
+      const commit: Handoff.Commit = {
+        _tag: "Commit",
         state: {
           root: assistant.name,
           active: "specialist",

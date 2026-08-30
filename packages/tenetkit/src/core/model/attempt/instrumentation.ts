@@ -4,18 +4,18 @@ import { adapt } from "../service.js"
 import type { IdentityCell } from "./identity.js"
 import { disabledResponseIdTracker, firstOutputKind, providerUsage, singleFailure } from "./observation.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "../response/failure.js"
-import type { Classification, Service as Resilience } from "../resilience.js"
+import type { Classification, Policy as Resilience } from "../resilience.js"
 import type { CandidateIdentity, FailureDisposition } from "../registry.js"
 import { type TerminationFailure, requireTerminal } from "../stream-termination.js"
 import {
   InvocationCoordinationFailed,
   type EventPayload,
   type InvocationCoordinatorService,
-  type ModelCallPurpose,
-  type ModelFailureCategory,
-  type ModelFirstOutputKind,
+  type CallPurpose,
+  type FailureCategory,
+  type FirstOutputKind,
   type ModelInvocationMethod,
-  type ModelProviderUsage,
+  type ProviderUsage,
   generateId,
 } from "../telemetry/events.js"
 
@@ -28,7 +28,7 @@ export interface InstrumentOptions {
   readonly identity?: IdentityCell
   readonly onCallCompleted?: (completion: {
     readonly modelCallId: string
-    readonly failedAttemptUsage: ModelProviderUsage | undefined
+    readonly failedAttemptUsage: ProviderUsage | undefined
   }) => void
   readonly resilience?: Resilience
   readonly logicalOperationId?: string
@@ -39,9 +39,9 @@ export interface InstrumentOptions {
 export interface CallState {
   attempts: number
   usage: Response.Usage | undefined
-  failedAttemptUsage: ModelProviderUsage | undefined
+  failedAttemptUsage: ProviderUsage | undefined
   finishReason: Response.FinishReason | undefined
-  errorCategory: ModelFailureCategory | undefined
+  errorCategory: FailureCategory | undefined
   pendingFailure: PendingFailure | undefined
 }
 
@@ -50,19 +50,19 @@ export interface CallContext {
   readonly modelCallId: string
   readonly logicalOperationId: string | undefined
   readonly callOrdinal: number
-  readonly purpose: ModelCallPurpose
+  readonly purpose: CallPurpose
   readonly provider: string | undefined
   readonly model: string | undefined
-  readonly categorize: (error: ModelFailure) => ModelFailureCategory
+  readonly categorize: (error: ModelFailure) => FailureCategory
   readonly classify: (error: ModelFailure) => Classification
   readonly state: CallState
 }
 
 interface PendingFailure {
   readonly attempt: AttemptContext
-  readonly category: ModelFailureCategory
+  readonly category: FailureCategory
   readonly classification: Classification
-  readonly usage: ModelProviderUsage | undefined
+  readonly usage: ProviderUsage | undefined
 }
 
 interface Finished {
@@ -76,7 +76,7 @@ interface Finished {
 type Termination = { readonly _tag: "Open" } | Finished
 
 interface AttemptState {
-  firstOutputs: Set<ModelFirstOutputKind>
+  firstOutputs: Set<FirstOutputKind>
   termination: Termination
   settled: boolean
   coordinated: boolean
@@ -162,7 +162,7 @@ const attemptCompleted = (
 const attemptFailed = (
   context: CallContext,
   attempt: AttemptContext,
-  category: ModelFailureCategory,
+  category: FailureCategory,
   classification: Classification,
   error?: ModelFailure,
 ): Effect.Effect<void> => {

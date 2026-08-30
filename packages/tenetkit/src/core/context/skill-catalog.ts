@@ -3,7 +3,7 @@ import { Tool } from "effect/unstable/ai"
 import { listing } from "./skill-catalog-internal.js"
 
 /** @experimental Per-entry description character cap. */
-export { DESCRIPTION_CAP } from "./skill-catalog-internal.js"
+export { descriptionLimit } from "./skill-catalog-internal.js"
 
 /** @experimental Skill catalog operation failed. */
 export class SkillCatalogError extends Schema.TaggedError<SkillCatalogError>()("tenetkit/core/SkillCatalogError", {

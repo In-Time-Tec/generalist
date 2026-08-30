@@ -3,7 +3,7 @@ import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/
 import { ToolContext } from "../tools/tool-context.js"
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./tool-call-validation.js"
 import { invokeStreamText, type StreamTextOptions } from "./service.js"
-import type { EventPayload, ModelFailureCategory } from "./telemetry/events.js"
+import type { EventPayload, FailureCategory } from "./telemetry/events.js"
 
 export type StreamTextPart = Response.StreamPart<Record<string, Tool.Any>>
 
@@ -13,7 +13,7 @@ export interface Context {
   readonly turn: number
   readonly correctionLimit: number
   readonly attempt: () => number
-  readonly categorize: <E>(error: E) => ModelFailureCategory
+  readonly categorize: <E>(error: E) => FailureCategory
   readonly emit: (event: EventPayload) => Effect.Effect<void>
   readonly settleFailure: Effect.Effect<void>
 }

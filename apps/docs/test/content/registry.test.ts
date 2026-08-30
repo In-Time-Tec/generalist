@@ -113,12 +113,12 @@ test("the cell tutorial walks a beginner from an epoch to the real kernel", () =
 
 test("the agent-guidance guide keeps the authorship boundary and the durable-store guarantees", () => {
   for (const marker of [
-    "Authorship.authorProposal",
+    "Authorship.author",
     "AuthoredProposal",
     "revision",
-    "Refinement.applyProposal",
-    "Refinement.applyTrustedProposal",
-    "Refinement.rollbackProposal",
+    "Refinement.apply",
+    "Refinement.applyTrusted",
+    "Refinement.makeRollback",
     "pinned-revision",
     "compile-time discriminator",
     "rollback-not-newest",
@@ -126,7 +126,7 @@ test("the agent-guidance guide keeps the authorship boundary and the durable-sto
     "0600",
     "0700",
     "corrupt",
-    "Registration.registration(state, name)",
+    "Registration.make(state, name)",
   ]) {
     expect(agentGuidance.markdown, marker).toContain(marker)
   }
@@ -136,10 +136,10 @@ test("the composite-tool guide keeps nested identity, render provenance, and adm
   for (const marker of [
     "NestedOperation.run(request, effect)",
     "<operationKey>#<ordinal>",
-    "NestedOperationDivergence",
-    "NestedOperationUnknown",
-    "NestedOperationDenied",
-    "NestedOperationSuspended",
+    "NestedOperation.Divergence",
+    "NestedOperation.Unknown",
+    "NestedOperation.Denied",
+    "NestedOperation.Suspended",
     "never from the request payload",
     "NestedOperation.maxRenderBytes",
     "renderWithheldBytes",
@@ -149,7 +149,7 @@ test("the composite-tool guide keeps nested identity, render provenance, and adm
     "ChildOrigin",
     "unforgeable",
     "idempotency key",
-    "SessionHistory.pageHistory",
+    "SessionHistory.page",
     "hasBefore",
     "compactionCheckpoints",
   ]) {

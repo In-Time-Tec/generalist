@@ -1,7 +1,7 @@
 import { DateTime, Effect } from "effect"
 import type { AgentSuspended } from "../../../core/agent/event.js"
 import type { Service as CodeMode } from "../../code-mode.js"
-import type { Service as NestedOperations } from "../../operation/nested-operations.js"
+import type { Service as Operations } from "../../operation/nested-operations.js"
 import type { ExecutionClaim, Service as RunStore } from "../../run/store.js"
 import { approvalReason } from "../../run/wait.js"
 
@@ -10,7 +10,7 @@ export const suspend = (input: {
   readonly runId: string
   readonly claim: ExecutionClaim
   readonly store: RunStore
-  readonly nested: NestedOperations
+  readonly nested: Operations
   readonly codeMode?: CodeMode
   readonly suspension: AgentSuspended
 }) =>

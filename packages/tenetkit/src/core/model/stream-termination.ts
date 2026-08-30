@@ -34,29 +34,29 @@ const terminationFields = {
  * @experimental A provider part stream reached a clean end without its terminal
  * `finish` part, so the attempt produced no finish reason and no usage.
  */
-export class ModelStreamTruncated extends Schema.TaggedError<ModelStreamTruncated>()(
+export class Truncated extends Schema.TaggedError<Truncated>()(
   "tenetkit/core/ModelStreamTruncated",
   terminationFields,
 ) {}
 
 /** @experimental A provider part stream exceeded its configured idle deadline. */
-export class ModelStreamTimeout extends Schema.TaggedError<ModelStreamTimeout>()("tenetkit/core/ModelStreamTimeout", {
+export class Timeout extends Schema.TaggedError<Timeout>()("tenetkit/core/ModelStreamTimeout", {
   ...terminationFields,
   idleMillis: Schema.Finite,
 }) {}
 
 /** @experimental A model part stream did not reach a provider-reported terminal event. */
-export type TerminationFailure = ModelStreamTruncated | ModelStreamTimeout
+export type TerminationFailure = Truncated | Timeout
 
-const isTruncated = Schema.is(ModelStreamTruncated)
-const isTimeout = Schema.is(ModelStreamTimeout)
+const isTruncated = Schema.is(Truncated)
+const isTimeoutFailure = Schema.is(Timeout)
 
 /** @experimental Whether a failure means the stream did not reach its terminal event. */
 export const isTerminationFailure = (cause: unknown): cause is TerminationFailure =>
-  isTruncated(cause) || isTimeout(cause)
+  isTruncated(cause) || isTimeoutFailure(cause)
 
 /** @experimental Whether a model stream exceeded its configured idle deadline. */
-export const isModelStreamTimeout = (cause: unknown): cause is ModelStreamTimeout => isTimeout(cause)
+export const isTimeout = (cause: unknown): cause is Timeout => isTimeoutFailure(cause)
 
 interface Observation {
   lastPart: string | undefined
@@ -148,9 +148,9 @@ const originFields = (origin: Origin, observation: Observation) => {
 
 /**
  * @experimental Fail a provider part stream that ended without its terminal
- * `finish` part. A clean end with no `finish` fails with `ModelStreamTruncated`.
+ * `finish` part. A clean end with no `finish` fails with `Truncated`.
  * When `idleTimeout` is present, a pull that exceeds it fails with
- * `ModelStreamTimeout`; absence applies no idle deadline.
+ * `Timeout`; absence applies no idle deadline.
  */
 export const requireTerminal: {
   <A>(
@@ -182,7 +182,7 @@ export const requireTerminal: {
                 orElse: () => {
                   const idle = Duration.fromInputUnsafe(idleInput)
                   return Stream.fail(
-                    ModelStreamTimeout.make({
+                    Timeout.make({
                       ...originFields(options, observation),
                       idleMillis: Duration.toMillis(idle),
                     }),
@@ -193,9 +193,7 @@ export const requireTerminal: {
       return guarded.pipe(
         Stream.onEnd(
           Effect.suspend(() =>
-            observation.finished
-              ? Effect.void
-              : Effect.fail(ModelStreamTruncated.make(originFields(options, observation))),
+            observation.finished ? Effect.void : Effect.fail(Truncated.make(originFields(options, observation))),
           ),
         ),
       )

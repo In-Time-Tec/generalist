@@ -1,10 +1,10 @@
 import { Schema, Cause } from "effect"
 import { AiError, Response } from "effect/unstable/ai"
 import {
-  ModelProviderUsage as ModelProviderUsageSchema,
-  type ModelProviderUsage as ModelProviderUsageValue,
+  ProviderUsage as ProviderUsageSchema,
+  type ProviderUsage as ProviderUsageValue,
 } from "../attempt/observation.js"
-import { isModelStreamTimeout, isTerminationFailure } from "../stream-termination.js"
+import { isTimeout, isTerminationFailure } from "../stream-termination.js"
 import { isInvalidToolCallParameters } from "../tool-call-validation.js"
 export {
   Delivery,
@@ -28,19 +28,19 @@ export {
 } from "./context.js"
 
 /** @experimental */
-export const ModelProviderUsage = ModelProviderUsageSchema
+export const ProviderUsage = ProviderUsageSchema
 
 /** @experimental */
-export type ModelProviderUsage = ModelProviderUsageValue
+export type ProviderUsage = ProviderUsageValue
 
 /** @experimental Bounded purpose of one model call issued by the loop. */
-export const ModelCallPurpose = Schema.Literals(["conversation", "structured-output", "compaction-summary"])
+export const CallPurpose = Schema.Literals(["conversation", "structured-output", "compaction-summary"])
 
 /** @experimental */
-export type ModelCallPurpose = typeof ModelCallPurpose.Type
+export type CallPurpose = typeof CallPurpose.Type
 
 /** @experimental Bounded provider-neutral model failure category. */
-export const ModelFailureCategory = Schema.Literals([
+export const FailureCategory = Schema.Literals([
   "authentication",
   "rate-limit",
   "transport",
@@ -56,33 +56,33 @@ export const ModelFailureCategory = Schema.Literals([
 ])
 
 /** @experimental */
-export type ModelFailureCategory = typeof ModelFailureCategory.Type
+export type FailureCategory = typeof FailureCategory.Type
 
 /** @experimental Classification a retry decision was based on. */
-export const ModelFailureClassification = Schema.Literals(["transient", "terminal"])
+export const FailureClassification = Schema.Literals(["transient", "terminal"])
 
 /** @experimental */
-export type ModelFailureClassification = typeof ModelFailureClassification.Type
+export type FailureClassification = typeof FailureClassification.Type
 
 /** @experimental Decision taken after a provider attempt failed. */
-export const ModelFailureDisposition = Schema.Literals(["retry", "fallback", "terminal"])
+export const FailureDisposition = Schema.Literals(["retry", "fallback", "terminal"])
 
 /** @experimental */
-export type ModelFailureDisposition = typeof ModelFailureDisposition.Type
+export type FailureDisposition = typeof FailureDisposition.Type
 
 /**
  * @experimental Bounded reason a model attempt retry was scheduled.
  */
-export const ModelRetryReason = Schema.Literals(["provider-resilience", "invalid-tool-call-correction"])
+export const RetryReason = Schema.Literals(["provider-resilience", "invalid-tool-call-correction"])
 
 /** @experimental */
-export type ModelRetryReason = typeof ModelRetryReason.Type
+export type RetryReason = typeof RetryReason.Type
 
 /** @experimental Kind of the first output part produced by a model attempt. */
-export const ModelFirstOutputKind = Schema.Literals(["reasoning", "text", "tool-call"])
+export const FirstOutputKind = Schema.Literals(["reasoning", "text", "tool-call"])
 
 /** @experimental */
-export type ModelFirstOutputKind = typeof ModelFirstOutputKind.Type
+export type FirstOutputKind = typeof FirstOutputKind.Type
 
 /** @experimental What caused a compaction pass to run. */
 export const CompactionTrigger = Schema.Literals(["threshold", "overflow"])
@@ -108,7 +108,7 @@ export const ModelInvocationStarted = Schema.Struct({
   callOrdinal: attemptOrdinal,
   attempt: attemptOrdinal,
   turn: Schema.Finite,
-  purpose: ModelCallPurpose,
+  purpose: CallPurpose,
   method: ModelInvocationMethod,
   provider: Schema.optionalKey(Schema.String),
   model: Schema.optionalKey(Schema.String),
@@ -142,9 +142,9 @@ export const ModelInvocationFailed = Schema.Struct({
   modelAttemptId: Schema.String,
   attempt: attemptOrdinal,
   failedAt: Schema.Finite,
-  category: ModelFailureCategory,
-  classification: ModelFailureClassification,
-  disposition: ModelFailureDisposition,
+  category: FailureCategory,
+  classification: FailureClassification,
+  disposition: FailureDisposition,
   provider: Schema.optionalKey(Schema.String),
   model: Schema.optionalKey(Schema.String),
   registrationKey: Schema.optionalKey(Schema.String),
@@ -157,12 +157,12 @@ export type ModelInvocationFailed = typeof ModelInvocationFailed.Type
  * for one prepared input. All timestamps are epoch milliseconds sampled from
  * the Effect Clock at the operation boundary.
  */
-export const ModelCallStarted = Schema.Struct({
+export const CallStarted = Schema.Struct({
   _tag: Schema.tag("ModelCallStarted"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
-  purpose: ModelCallPurpose,
+  purpose: CallPurpose,
   provider: Schema.optionalKey(Schema.String),
   model: Schema.optionalKey(Schema.String),
   compactionId: Schema.optionalKey(Schema.String),
@@ -170,10 +170,10 @@ export const ModelCallStarted = Schema.Struct({
 })
 
 /** @experimental */
-export type ModelCallStarted = typeof ModelCallStarted.Type
+export type CallStarted = typeof CallStarted.Type
 
 /** @experimental One provider invocation within a model call began. `attempt` is 0-based. */
-export const ModelAttemptStarted = Schema.Struct({
+export const AttemptStarted = Schema.Struct({
   _tag: Schema.tag("ModelAttemptStarted"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
@@ -188,33 +188,33 @@ export const ModelAttemptStarted = Schema.Struct({
 })
 
 /** @experimental */
-export type ModelAttemptStarted = typeof ModelAttemptStarted.Type
+export type AttemptStarted = typeof AttemptStarted.Type
 
 /** @experimental The first reasoning, text, or tool-call output of one attempt; at most one event per kind. */
-export const ModelAttemptFirstOutput = Schema.Struct({
+export const AttemptFirstOutput = Schema.Struct({
   _tag: Schema.tag("ModelAttemptFirstOutput"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
   attempt: attemptOrdinal,
-  kind: ModelFirstOutputKind,
+  kind: FirstOutputKind,
   at: Schema.Finite,
 })
 
 /** @experimental */
-export type ModelAttemptFirstOutput = typeof ModelAttemptFirstOutput.Type
+export type AttemptFirstOutput = typeof AttemptFirstOutput.Type
 
 /**
  * @experimental A provider invocation finished. A completed attempt always
  * carries the provider's terminal `finish` part, so usage, `usageAt`, and
  * `finishReason` are required; an attempt whose stream ended without one is
- * reported as `ModelAttemptFailed` with category `truncated-stream`. Absent
+ * reported as `AttemptFailed` with category `truncated-stream`. Absent
  * request correlation and service tier fields mean unknown, never zero.
  * `usageAt` is sampled when provider-reported usage was received, which can
  * precede stream completion.
  */
-export const ModelAttemptCompleted = Schema.Struct({
+export const AttemptCompleted = Schema.Struct({
   _tag: Schema.tag("ModelAttemptCompleted"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
@@ -236,10 +236,10 @@ export const ModelAttemptCompleted = Schema.Struct({
 })
 
 /** @experimental */
-export type ModelAttemptCompleted = typeof ModelAttemptCompleted.Type
+export type AttemptCompleted = typeof AttemptCompleted.Type
 
 /** @experimental A provider invocation failed with a bounded category. */
-export const ModelAttemptFailed = Schema.Struct({
+export const AttemptFailed = Schema.Struct({
   _tag: Schema.tag("ModelAttemptFailed"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
@@ -247,21 +247,21 @@ export const ModelAttemptFailed = Schema.Struct({
   modelAttemptId: Schema.String,
   attempt: attemptOrdinal,
   failedAt: Schema.Finite,
-  category: ModelFailureCategory,
-  classification: ModelFailureClassification,
-  disposition: ModelFailureDisposition,
+  category: FailureCategory,
+  classification: FailureClassification,
+  disposition: FailureDisposition,
   provider: Schema.optionalKey(Schema.String),
   model: Schema.optionalKey(Schema.String),
   registrationKey: Schema.optionalKey(Schema.String),
   candidate: Schema.optionalKey(attemptOrdinal),
-  providerUsage: Schema.optionalKey(ModelProviderUsage),
+  providerUsage: Schema.optionalKey(ProviderUsage),
 })
 
 /** @experimental */
-export type ModelAttemptFailed = typeof ModelAttemptFailed.Type
+export type AttemptFailed = typeof AttemptFailed.Type
 
 /** @experimental An unavailable candidate was exhausted before any replay-sensitive output escaped. */
-export const ModelFallbackScheduled = Schema.Struct({
+export const FallbackScheduled = Schema.Struct({
   _tag: Schema.tag("ModelFallbackScheduled"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
@@ -275,12 +275,12 @@ export const ModelFallbackScheduled = Schema.Struct({
   toProvider: Schema.String,
   toModel: Schema.String,
   toRegistrationKey: Schema.optionalKey(Schema.String),
-  category: ModelFailureCategory,
+  category: FailureCategory,
   at: Schema.Finite,
 })
 
 /** @experimental */
-export type ModelFallbackScheduled = typeof ModelFallbackScheduled.Type
+export type FallbackScheduled = typeof FallbackScheduled.Type
 
 /** @experimental Atomic checkpoint record joining a compaction pass to its telemetry and projection. */
 export const CompactionCommit = Schema.Struct({
@@ -301,61 +301,61 @@ export type CompactionCommit = typeof CompactionCommit.Type
  * 0-based ordinal of the attempt that failed; emitted before the backoff
  * sleep. `delayMillis` is the accepted backoff delay.
  */
-export const ModelRetryScheduled = Schema.Struct({
+export const RetryScheduled = Schema.Struct({
   _tag: Schema.tag("ModelRetryScheduled"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   attempt: attemptOrdinal,
-  reason: ModelRetryReason,
-  category: ModelFailureCategory,
+  reason: RetryReason,
+  category: FailureCategory,
   delayMillis: Schema.Finite,
   at: Schema.Finite,
 })
 
 /** @experimental */
-export type ModelRetryScheduled = typeof ModelRetryScheduled.Type
+export type RetryScheduled = typeof RetryScheduled.Type
 
 /** @experimental The model call reached a successful terminal outcome. */
-export const ModelCallCompleted = Schema.Struct({
+export const CallCompleted = Schema.Struct({
   _tag: Schema.tag("ModelCallCompleted"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
-  purpose: ModelCallPurpose,
+  purpose: CallPurpose,
   attempts: attemptOrdinal,
   completedAt: Schema.Finite,
   usage: Schema.optionalKey(Response.Usage),
-  failedAttemptUsage: Schema.optionalKey(ModelProviderUsage),
+  failedAttemptUsage: Schema.optionalKey(ProviderUsage),
   finishReason: Schema.optionalKey(Response.FinishReason),
 })
 
 /** @experimental */
-export type ModelCallCompleted = typeof ModelCallCompleted.Type
+export type CallCompleted = typeof CallCompleted.Type
 
 /**
  * @experimental The model call reached a failed terminal outcome. `category`
- * and `classification` are decided the same way as on `ModelAttemptFailed`, so
+ * and `classification` are decided the same way as on `AttemptFailed`, so
  * a consumer never has to infer retryability from an absent field. The two
  * levels differ only when resilience refuses to replay a retryable failure
  * because output already escaped: the attempt reports the failure's own
  * classification while the call reports `terminal`.
  */
-export const ModelCallFailed = Schema.Struct({
+export const CallFailed = Schema.Struct({
   _tag: Schema.tag("ModelCallFailed"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
-  purpose: ModelCallPurpose,
+  purpose: CallPurpose,
   attempts: attemptOrdinal,
   failedAt: Schema.Finite,
-  category: ModelFailureCategory,
-  classification: ModelFailureClassification,
-  failedAttemptUsage: Schema.optionalKey(ModelProviderUsage),
+  category: FailureCategory,
+  classification: FailureClassification,
+  failedAttemptUsage: Schema.optionalKey(ProviderUsage),
 })
 
 /** @experimental */
-export type ModelCallFailed = typeof ModelCallFailed.Type
+export type CallFailed = typeof CallFailed.Type
 
 /** @experimental A compaction pass that decided to do work began. */
 export const CompactionStarted = Schema.Struct({
@@ -388,7 +388,7 @@ export type CompactionSkipped = typeof CompactionSkipped.Type
  * @experimental A compaction pass produced its result. Session checkpoint and
  * projection application follow, and their failure fails the run typed.
  * `summaryModelCallId` names the summary model call when one ran; that call
- * also carries this pass's `compactionId` on its `ModelCallStarted` event.
+ * also carries this pass's `compactionId` on its `CallStarted` event.
  */
 export const CompactionApplied = Schema.Struct({
   _tag: Schema.tag("CompactionApplied"),
@@ -423,15 +423,15 @@ export type CompactionFailed = typeof CompactionFailed.Type
  * next event boundary or at stream end.
  */
 export const Event = Schema.Union([
-  ModelCallStarted,
-  ModelAttemptStarted,
-  ModelAttemptFirstOutput,
-  ModelAttemptCompleted,
-  ModelAttemptFailed,
-  ModelRetryScheduled,
-  ModelFallbackScheduled,
-  ModelCallCompleted,
-  ModelCallFailed,
+  CallStarted,
+  AttemptStarted,
+  AttemptFirstOutput,
+  AttemptCompleted,
+  AttemptFailed,
+  RetryScheduled,
+  FallbackScheduled,
+  CallCompleted,
+  CallFailed,
   CompactionStarted,
   CompactionSkipped,
   CompactionApplied,
@@ -474,11 +474,11 @@ const failureCategoryByReason = {
   ToolResultEncodingError: "invalid-tool-call",
   ToolkitRequiredError: "invalid-tool-call",
   UnknownError: "unknown",
-} satisfies Record<AiError.AiError["reason"]["_tag"], ModelFailureCategory>
+} satisfies Record<AiError.AiError["reason"]["_tag"], FailureCategory>
 
 /** @experimental Map a model failure onto the bounded cross-provider category. */
-export const classifyFailureCategory = <E>(error: E): ModelFailureCategory => {
-  if (isModelStreamTimeout(error) || Cause.isTimeoutError(error)) return "timeout"
+export const classifyFailureCategory = <E>(error: E): FailureCategory => {
+  if (isTimeout(error) || Cause.isTimeoutError(error)) return "timeout"
   if (isTerminationFailure(error)) return "truncated-stream"
   if (isInvalidToolCallParameters(error)) return "invalid-tool-call"
   if (!AiError.isAiError(error)) return "unknown"

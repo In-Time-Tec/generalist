@@ -28,7 +28,7 @@ const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text
 const responseMetadata = (id: string) =>
   Response.makePart("response-metadata", { id, modelId: "m", timestamp: undefined, request: undefined })
 
-const makeResilience = (input?: Partial<ModelResilience.Service>): ModelResilience.Service =>
+const makeResilience = (input?: Partial<ModelResilience.Policy>): ModelResilience.Policy =>
   Effect.runSync(ModelResilience.make(input))
 
 const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service => ({
@@ -56,7 +56,7 @@ describe("ModelResilience", () => {
     Effect.gen(function* () {
       const failure = yield* ModelResilience.make({ invalidToolCallCorrectionLimit: limit }).pipe(Effect.flip)
 
-      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(failure)).toBe(true)
+      expect(Schema.is(ModelResilience.Misconfigured)(failure)).toBe(true)
       expect(failure.reason).toBe("invalid-tool-call-correction-limit")
     }).pipe(Effect.orDie),
   )
@@ -72,8 +72,8 @@ describe("ModelResilience", () => {
         Effect.flip,
       )
 
-      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(fromOptions)).toBe(true)
-      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(fromInterface)).toBe(true)
+      expect(Schema.is(ModelResilience.Misconfigured)(fromOptions)).toBe(true)
+      expect(Schema.is(ModelResilience.Misconfigured)(fromInterface)).toBe(true)
     }).pipe(Effect.orDie),
   )
 
@@ -95,7 +95,7 @@ describe("ModelResilience", () => {
     return Effect.gen(function* () {
       const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "must not run" })).pipe(Effect.flip)
 
-      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(failure)).toBe(true)
+      expect(Schema.is(ModelResilience.Misconfigured)(failure)).toBe(true)
       expect(calls).toBe(0)
     })
   })
@@ -408,7 +408,7 @@ describe("ModelResilience", () => {
     return Effect.gen(function* () {
       const error = yield* Stream.runCollect(guarded).pipe(Effect.flip)
 
-      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      expect(Schema.is(ModelStreamTermination.Truncated)(error)).toBe(true)
       expect(ModelStreamTermination.isTerminationFailure(error) && error.emitted).toEqual({ _tag: "Nothing" })
       expect(ModelResilience.defaultClassify(error)).toBe("transient")
     })

@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Json } from "../json"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
-import { Compaction, Session, ToolOutput } from "../../../src/index"
+import { Compaction, Session, Output } from "../../../src/index"
 import { ItLayer } from "../it-layer"
 import { estimatePromptTokens } from "../../../src/core/turn/prompt-token-estimate"
 import { make as makeThresholdState } from "../../../src/core/turn/compaction-threshold-state"
@@ -471,7 +471,7 @@ describe("Compaction", () => {
     const padding = "pad ".repeat(300)
     return [
       Layer.mergeAll(
-        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
+        Output.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
         modelLayer(() => {
           summaryCalls += 1
           return Effect.succeed([{ type: "text", text: "unexpected summary" }])
@@ -509,7 +509,7 @@ describe("Compaction", () => {
     const large = "abcdef".repeat(40)
     return [
       Layer.mergeAll(
-        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
+        Output.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
         modelLayer(() => {
           summaryCalls += 1
           return Effect.succeed([{ type: "text", text: "unexpected summary" }])
@@ -547,7 +547,7 @@ describe("Compaction", () => {
     const large = "abcdef".repeat(40)
     return [
       Layer.mergeAll(
-        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
+        Output.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
         modelLayer(() => {
           summaryCalls += 1
           return Effect.succeed([{ type: "text", text: "unexpected summary" }])
@@ -900,7 +900,7 @@ describe("Compaction", () => {
     const large = "tool-output".repeat(60)
     return [
       Layer.mergeAll(
-        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:head")) }),
+        Output.layerTest({ put: () => Effect.succeed(Option.some("mem:head")) }),
         modelLayer((options) => {
           summaryPrompt = Json.stringify(options.prompt.content)
           return Effect.succeed([{ type: "text", text: "summary" }])
@@ -993,7 +993,7 @@ describe("Compaction", () => {
     })
     return [
       Layer.mergeAll(
-        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:composed-bound")) }),
+        Output.layerTest({ put: () => Effect.succeed(Option.some("mem:composed-bound")) }),
         modelLayer(() => {
           summaryCalls += 1
           return Effect.succeed([{ type: "text", text: "unexpected summary" }])
@@ -1025,7 +1025,7 @@ describe("Compaction", () => {
   ItLayer.make(it, "keeps retained tool results bounded after semantic summarization", () => {
     let stores = 0
     const paths = ["mem:retained-tool", "s3:retained-tool"]
-    const value: ToolOutput.ToolOutput = {
+    const value: Output.Output = {
       inline: { truncated: true, bytes: 1_000, maxBytes: 12, digest: "a".repeat(64), preview: '"retained-t' },
       outputPaths: paths,
     }
@@ -1036,7 +1036,7 @@ describe("Compaction", () => {
     const service = Compaction.make(composed, { contextWindow: 1, reserveTokens: 0 })
     return [
       Layer.mergeAll(
-        ToolOutput.layerTest({
+        Output.layerTest({
           put: () => {
             stores += 1
             return Effect.succeed(Option.some("mem:retained-tool"))

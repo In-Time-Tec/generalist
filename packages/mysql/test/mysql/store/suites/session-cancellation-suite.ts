@@ -5,7 +5,7 @@ import { Deferred, Effect, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "tenetkit"
 import { Address, Errors, ExecutableResolver, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker, layerWorker } from "tenetkit/runtime/sql-driver"
+import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
 import { closedTestAgent, testExecutable } from "../../../../../tenetkit/test/runtime/run/identity.js"
 import {
   assistant,
@@ -146,14 +146,14 @@ describeMysql("mysql worker cancellation", () => {
               addresses: [{ address, executable, registrations: registrationsFor(executable) }],
             }
             yield* provideScoped(
-              layerWorker({
+              RuntimeWorker.layer({
                 workerId: "mysql-model-worker",
                 cancellationInterval: "10 millis",
                 lease: "30 seconds",
               }).pipe(Layer.provideMerge(backendLayer(options))),
               Effect.gen(function* () {
                 const runtime = yield* Runtime.Runtime
-                const worker = yield* RuntimeWorker
+                const worker = yield* RuntimeWorker.RuntimeWorker
                 const sessionId = uniqueSession("cancel-model")
                 const receipt = yield* runtime.send({
                   to: address,
@@ -234,7 +234,7 @@ describeMysql("mysql worker cancellation", () => {
             addresses: [{ address, executable, registrations: registrationsFor(executable) }],
           }
           yield* provideScoped(
-            layerWorker({
+            RuntimeWorker.layer({
               workerId: "mysql-tool-worker",
               cancellationInterval: "10 millis",
               lease: "30 seconds",
@@ -242,7 +242,7 @@ describeMysql("mysql worker cancellation", () => {
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
               const store = yield* RunStore.RunStore
-              const worker = yield* RuntimeWorker
+              const worker = yield* RuntimeWorker.RuntimeWorker
               const receipt = yield* runtime.send({
                 to: address,
                 sessionId: uniqueSession("cancel-tool"),

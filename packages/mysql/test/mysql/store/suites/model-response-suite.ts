@@ -3,7 +3,7 @@ import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Errors, RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker, layerWorker } from "tenetkit/runtime/sql-driver"
+import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -61,7 +61,7 @@ describeMysql("mysql Program store contract", () => {
   {
     const url = database.url
     const fixture = programFixture()
-    const runtimeLayer = layerWorker({ workerId: "mysql-exact-root-worker" }).pipe(
+    const runtimeLayer = RuntimeWorker.layer({ workerId: "mysql-exact-root-worker" }).pipe(
       Layer.provideMerge(
         backendLayer({
           url,
@@ -78,7 +78,7 @@ describeMysql("mysql Program store contract", () => {
           Effect.gen(function* () {
             yield* database.truncated
             const runtime = yield* Runtime.Runtime
-            const worker = yield* RuntimeWorker
+            const worker = yield* RuntimeWorker.RuntimeWorker
             const receipt = yield* runtime.start({
               executable: programExecutable,
               registrations: registrationsFor(programExecutable),

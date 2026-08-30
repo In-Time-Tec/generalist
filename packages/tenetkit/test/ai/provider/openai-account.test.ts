@@ -8,9 +8,9 @@ import {
   type OpenAIAccountCredential,
   OpenAIAccountCredentialError,
   type OpenAIAccountCredentials,
-  credentialsFromAccountAuth,
-  layerAccount,
-  layerAccountClient,
+  credentialsFromAuth,
+  layer as openAIAccountLayer,
+  layerClient,
 } from "../../../src/ai/provider/openai-account.js"
 import { classifyFailure, layer as openAiLayer } from "../../../src/ai/provider/openai.js"
 import type { AuthService } from "../../../src/ai/provider/openai-account-auth.js"
@@ -99,7 +99,7 @@ const provideLayer =
 
 const provideAccount = (accountCredentials: OpenAIAccountCredentials, client: HttpClient.HttpClient) => {
   const layer = Layer.provide(
-    layerAccount({ model: "gpt-test", credentials: accountCredentials }),
+    openAIAccountLayer({ model: "gpt-test", credentials: accountCredentials }),
     Layer.succeed(HttpClient.HttpClient, client),
   )
   return provideLayer(layer)
@@ -108,7 +108,7 @@ const provideAccount = (accountCredentials: OpenAIAccountCredentials, client: Ht
 const provideAccountStream = (accountCredentials: OpenAIAccountCredentials, client: HttpClient.HttpClient) =>
   Stream.provide(
     Layer.provide(
-      layerAccount({ model: "gpt-test", credentials: accountCredentials }),
+      openAIAccountLayer({ model: "gpt-test", credentials: accountCredentials }),
       Layer.succeed(HttpClient.HttpClient, client),
     ),
   )
@@ -129,7 +129,7 @@ describe("OpenAI account Responses registration", () => {
       const registrations = yield* Effect.scoped(
         Layer.build(
           Layer.provide(
-            layerAccount({
+            openAIAccountLayer({
               model: "gpt-test",
               credentials: accountCredentials,
               registrationKey: "account",
@@ -303,13 +303,13 @@ describe("OpenAI account Responses registration", () => {
       acquire: Effect.succeed(authCredential("profile-a", "old")),
       refreshRejected: () => Effect.succeed(authCredential("profile-b", "new")),
     }
-    const accountCredentials = credentialsFromAccountAuth(auth, "profile-a")
+    const accountCredentials = credentialsFromAuth(auth, "profile-a")
 
     return Effect.gen(function* () {
       yield* Effect.flip(generate(accountCredentials, mockClient([401], requests)))
       expect(requests.map(({ headers }) => headers.authorization)).toEqual(["Bearer token-old"])
 
-      const replaced = credentialsFromAccountAuth(
+      const replaced = credentialsFromAuth(
         { ...auth, acquire: Effect.succeed(authCredential("profile-b", "replacement")) },
         "profile-a",
       )
@@ -393,7 +393,7 @@ describe("OpenAI account Responses registration", () => {
       { preconnect: () => {} },
     )
     const layer = Layer.provide(
-      layerAccount({ model: "gpt-test", credentials: credentials(Effect.succeed(credential("current"))) }),
+      openAIAccountLayer({ model: "gpt-test", credentials: credentials(Effect.succeed(credential("current"))) }),
       FetchHttpClient.layer,
     )
 
@@ -629,7 +629,7 @@ describe("OpenAI account Responses registration", () => {
     const requests: Array<CapturedRequest> = []
     const accountCredentials = credentials(Effect.succeed(credential("current")))
     const accountClientLayer = Layer.provide(
-      layerAccountClient(accountCredentials),
+      layerClient(accountCredentials),
       Layer.succeed(HttpClient.HttpClient, mockClient([200], requests)),
     )
 
@@ -646,6 +646,6 @@ describe("OpenAI account Responses registration", () => {
     const accountCredentials = credentials(Effect.succeed(credential("current")))
 
     expect(Layer.isLayer(openAiLayer({ model: "gpt-test", apiKey: Config.succeed(Redacted.make("key")) }))).toBe(true)
-    expect(Layer.isLayer(layerAccount({ model: "gpt-test", credentials: accountCredentials }))).toBe(true)
+    expect(Layer.isLayer(openAIAccountLayer({ model: "gpt-test", credentials: accountCredentials }))).toBe(true)
   })
 })

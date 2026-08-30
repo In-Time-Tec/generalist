@@ -1,11 +1,11 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { layerGoogleAiStudio } from "tenetkit/ai/openai-compatible"
+import { layerGoogleAIStudio } from "tenetkit/ai/openai-compatible"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "gemini-agent" })
 
-const providerLayer = layerGoogleAiStudio({
+const providerLayer = layerGoogleAIStudio({
   model: "gemini-2.0-flash",
   apiKey: Config.redacted("GOOGLE_AI_STUDIO_API_KEY"),
 })

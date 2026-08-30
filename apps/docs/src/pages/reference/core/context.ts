@@ -12,19 +12,19 @@ export const coreContextReference = definePage({
     command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
     h2("instructions", "Instructions"),
     p(
-      "An ordered registry of ",
-      code("Source"),
+      "An ordered registry of instruction ",
+      code("Provider"),
       " values: ",
       code("{ id, render }"),
-      ". Every source renders once into the system message when an epoch opens.",
+      ". Every provider renders once into the system message at run start.",
     ),
     table(
       ["Export", "Notes"],
       [
-        [[code("staticSource(id, text)")], "A static baseline source; empty text renders nothing"],
-        [[code("openEpoch(instructions, context)")], "Renders every source once and returns the joined baseline"],
+        [[code("fromText(id, text)")], "A static instruction provider; empty text renders nothing"],
+        [[code("render(instructions, context)")], "Renders every provider once and returns the joined baseline"],
         [
-          [code("layer(sources)"), " / ", code("layerTest(implementation)")],
+          [code("layer(providers)"), " / ", code("layerTest(implementation)")],
           "Explicit ordered registry; layer from a service",
         ],
       ],
@@ -186,7 +186,7 @@ export const coreContextReference = definePage({
           [code("strategy(parts, base?)")],
           "Compiles ordered capability parts onto a complete strategy; the last part for one capability wins",
         ],
-        [[code("toolOutputBound({ maxBytes })")], "Lossless successful-tool-result bound backed by ToolOutputStore"],
+        [[code("toolOutputBound({ maxBytes })")], "Lossless successful-tool-result bound backed by Store"],
         [
           [code("structuredSummary(options?)")],
           ["Validated ", code("AgentSummary"), " generation with deterministic string checkpoint rendering"],
@@ -211,7 +211,7 @@ export const coreContextReference = definePage({
             ", ",
             code("summaryPrompt"),
             " (default ",
-            code("SUMMARY_TEMPLATE"),
+            code("summaryTemplate"),
             "), and an optional compiled ",
             code("strategy"),
           ],
@@ -280,7 +280,7 @@ export const coreContextReference = definePage({
     ),
     p(
       "See ",
-      link("/docs/guides/instructions", "How to compose instructions and context sources"),
+      link("/docs/guides/instructions", "How to compose instructions and instruction providers"),
       ", ",
       link("/docs/guides/skills", "How to add skills"),
       ", ",
