@@ -171,6 +171,8 @@ const scopedWith =
   <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
+const manualClaimSqliteLayer = (filename: string) => sqliteLayer(filename, { scheduler: { pollInterval: "1 hour" } })
+
 type MetricSnapshots = Effect.Success<typeof Metric.snapshot>
 
 const observedMetric = (snapshots: MetricSnapshots, id: string, transition?: string) =>
@@ -216,7 +218,7 @@ it.live("observes SQLite model commits, exact retries, divergence, and stale cla
     },
   })
   const metrics = new Map()
-  return scopedWith(sqliteLayer(tempDbPath("model-response-observability")))(
+  return scopedWith(manualClaimSqliteLayer(tempDbPath("model-response-observability")))(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const receipt = yield* runtime.send({
@@ -314,7 +316,7 @@ it.live("observes SQLite model commits, exact retries, divergence, and stale cla
 it.live("rolls back every SQLite model transition statement boundary", () => {
   const filename = tempDbPath("model-response-boundaries")
   const quote = (value: string) => value.replaceAll("'", "''")
-  return scopedWith(sqliteLayer(filename))(
+  return scopedWith(manualClaimSqliteLayer(filename))(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const checkpoints = [
@@ -420,7 +422,7 @@ it.live("rolls back every SQLite model transition statement boundary", () => {
 
 it.live("keeps rolled-back SQLite model completion invisible until commit", () => {
   const filename = tempDbPath("model-response-rollback")
-  return scopedWith(sqliteLayer(filename))(
+  return scopedWith(manualClaimSqliteLayer(filename))(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const receipt = yield* runtime.send({
@@ -518,7 +520,7 @@ it.live("keeps rolled-back SQLite model completion invisible until commit", () =
 
 it.live("rejects mutated completed model response references and Session storage", () => {
   const filename = tempDbPath("model-response-hydration-corruption")
-  return scopedWith(sqliteLayer(filename))(
+  return scopedWith(manualClaimSqliteLayer(filename))(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const receipt = yield* runtime.send({

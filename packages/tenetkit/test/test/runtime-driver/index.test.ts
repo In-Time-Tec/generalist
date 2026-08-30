@@ -13,6 +13,7 @@ const claim: ClaimExecution = ({ store }, { runId, workerId }) =>
   store.claimExecution({ runId, ownerId: workerId }).pipe(Effect.orDie)
 
 const sqlitePath = tempDbPath("runtime-driver-conformance")
+const sqliteTestLayer = sqliteLayer(sqlitePath, { scheduler: { pollInterval: "1 hour" } })
 const triggerName = (boundary: ModelResponseFaultBoundary) => `tenetkit_fault_${boundary.replaceAll("-", "_")}`
 const quote = (value: string): string => value.replaceAll("'", "''")
 
@@ -72,7 +73,7 @@ driverConformance({
 driverConformance({
   name: "sqlite",
   address: assistantAddress,
-  layer: sqliteLayer(sqlitePath),
+  layer: sqliteTestLayer,
   capabilities: {
     admission: true,
     runtime: { claim },
@@ -83,7 +84,7 @@ driverConformance({
 modelResponseFaultConformance({
   name: "SQLite",
   address: assistantAddress,
-  layer: sqliteLayer(sqlitePath),
+  layer: sqliteTestLayer,
   claim: ({ store, runId, workerId }) => store.claimExecution({ runId, ownerId: workerId }).pipe(Effect.orDie),
   install: ({ boundary, runId, sessionId }) =>
     Effect.sync(() => {

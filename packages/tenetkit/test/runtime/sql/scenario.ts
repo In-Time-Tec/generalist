@@ -34,7 +34,8 @@ const options = {
   subscriberQueueCapacity: 8,
 } satisfies Omit<SqliteRuntime.Options, "filename">
 
-export const sqliteLayer = (filename: string) => SqliteRuntime.layerSqlite({ filename, ...options })
+export const sqliteLayer = (filename: string, overrides: Partial<Omit<SqliteRuntime.Options, "filename">> = {}) =>
+  SqliteRuntime.layerSqlite({ filename, ...options, ...overrides })
 
 /**
  * A SQLite Runtime whose mailbox bounds and messaging policy the test chooses.
