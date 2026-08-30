@@ -9,7 +9,7 @@ export const corePoliciesReference = definePage({
     lead(
       "Three namespaces of tenetkit gate what a run may do next: TurnPolicy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
     ),
-    command("Install", "bun add tenetkit"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
     h2("turn-policy", "TurnPolicy"),
     p(
       "A policy is ",

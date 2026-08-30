@@ -2,6 +2,12 @@
 
 Effect-native agent framework. Import the Worker-safe agent API from `tenetkit`. Provider-neutral catalog, deterministic model, and route owners live at `tenetkit/ai/model-catalog`, `tenetkit/ai/deterministic`, and `tenetkit/ai/model-route`; optional providers remain exact `tenetkit/ai/*` leaves.
 
+```bash
+bun add effect@4.0.0-rc.112 tenetkit@0.43.0
+```
+
+Install only package names. `tenetkit/runtime`, `tenetkit/ai/deterministic`, and the other `tenetkit/*` names below are import subpaths of `tenetkit`, not separate packages. Core, generic Runtime, the model catalog and route, and `tenetkit/ai/deterministic` require no optional provider peer. Each exact provider or integration subpath requires the optional peer named by its reference documentation.
+
 ## Worker-safe entrypoints
 
 The packed-artifact smoke suite bundles and executes these public entrypoints under workerd without `nodejs_compat`:

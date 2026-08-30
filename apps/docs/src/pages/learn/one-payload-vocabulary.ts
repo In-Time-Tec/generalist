@@ -69,7 +69,7 @@ export const onePayloadVocabulary = definePage({
     p(
       "The printed roles (",
       code("system user assistant tool"),
-      ") are upstream message roles, not TenetKit inventions. The same portability holds outward: a durable host can persist the transcript, transport can serialize semantic response events with upstream payload schemas, and an eval harness can assert on normalized response parts, all against types owned by ",
+      ") are upstream message roles, not TenetKit inventions. The same portability holds outward: a durable host stores normalized response content once in Session and persists a compact event reference, transport resolves that reference into a semantic observer event with upstream payload schemas, and an eval harness can assert on normalized response parts, all against types owned by ",
       code("effect"),
       " rather than by this framework.",
     ),

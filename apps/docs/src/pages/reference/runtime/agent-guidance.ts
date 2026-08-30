@@ -10,8 +10,8 @@ export const agentGuidanceReference = definePage({
     lead(
       "tenetkit/agent-guidance is the generic engine for agent guidance an agent may refine and a host may pin into a later Execution. It owns entry identity, versions, atomic proposals, rollback, scope overlay, bounded prompt overviews, and snapshot identity. Store locations, scope policy, and refine flows stay host-owned.",
     ),
-    command("Install", "bun add tenetkit tenetkit/agent-guidance"),
-    p("Requires ", code("tenetkit"), "."),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    p(code("tenetkit/agent-guidance"), " is an import subpath, not a package."),
     h2("entries", "Entry kinds"),
     p(
       "One guidance state holds four kinds of entry, each keyed by ",

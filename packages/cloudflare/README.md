@@ -2,6 +2,12 @@
 
 Cloudflare Workers and Durable Objects adapters for TenetKit.
 
+```bash
+bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @tenetkit/cloudflare@0.43.0
+```
+
+The package root is intentionally not exported. Import only `@tenetkit/cloudflare/workers`, `@tenetkit/cloudflare/durable-objects`, or `@tenetkit/cloudflare/dynamic-workers`; these are Worker entrypoints, not Node or Bun runtime claims.
+
 ## Durable Run activation
 
 `@tenetkit/cloudflare/durable-objects` stores only its scheduling projection in

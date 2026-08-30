@@ -1,50 +1,38 @@
 import { code, definePage, h2, lead, link, p, pills, table } from "../../../prose"
 
-const version = "0.14.0"
+const version = "0.43.0"
 
 export const versioningReference = definePage({
   path: "/docs/reference/versioning",
   title: "Versioning and releases",
   navTitle: "Versioning",
   group: "Reference",
-  description: "The published 0.14.0 set, experimental policy, Effect compatibility, and release train.",
+  description: "The 0.43.0 package set, experimental policy, Effect compatibility, and release train.",
   content: [
-    lead("All eleven @tenetkit packages publish to npm as a coordinated train at the same version."),
+    lead("The four TenetKit packages publish to npm as a coordinated train at the same version."),
     h2("published-set", "Published packages"),
     table(
       ["Package", "Version", "Subpath exports"],
       [
-        [[code("tenetkit/a2a")], [code(version)], [code(".")]],
-        [[code("tenetkit/ag-ui")], [code(version)], [code(".")]],
-        [[code("tenetkit")], [code(version)], [code(".")]],
-        [[code("tenetkit/foldkit")], [code(version)], [code(".")]],
-        [[code("tenetkit/mcp")], [code(version)], [code("."), ", ", code("./tools")]],
-        [[code("tenetkit/memory")], [code(version)], [code(".")]],
         [
-          [code("tenetkit/ai/*")],
-          [code(version)],
-          ["Exact catalog, route, deterministic, provider, authentication, preset, and embedding leaves"],
-        ],
-        [[code("tenetkit/runtime")], [code(version)], [code(".")]],
-        [[code("tenetkit/skills")], [code(version)], [code(".")]],
-        [[code("tenetkit/test")], [code(version)], [code(".")]],
-        [
-          [code("tenetkit/transport")],
+          [code("tenetkit")],
           [code(version)],
           [
-            code("."),
+            "44 explicit exports for Core, Runtime, exact AI leaves, MCP, memory, skills, test hosts, transport, and integrations",
+          ],
+        ],
+        [[code("@tenetkit/pg")], [code(version)], [code(".")]],
+        [[code("@tenetkit/mysql")], [code(version)], [code(".")]],
+        [
+          [code("@tenetkit/cloudflare")],
+          [code(version)],
+          [
+            code("./workers"),
             ", ",
-            code("./client"),
+            code("./durable-objects"),
             ", ",
-            code("./errors"),
-            ", ",
-            code("./sse"),
-            ", ",
-            code("./ws"),
-            ", ",
-            code("./wire"),
-            ", ",
-            code("./snapshot"),
+            code("./dynamic-workers"),
+            "; no package-root export",
           ],
         ],
       ],
@@ -60,13 +48,13 @@ export const versioningReference = definePage({
     h2("effect-compat", "Effect compatibility"),
     table(
       ["TenetKit", "effect", "Notes"],
-      [[[code("0.38.x")], [code("4.0.0-rc.111")], "The exact peer and tested workspace catalog version"]],
+      [[[code("0.43.0")], [code("4.0.0-rc.112")], "The exact peer and tested workspace catalog version"]],
     ),
     h2("release-train", "The release train"),
     p("Every release builds and publishes all packages from one committed lockstep version:"),
-    pills(["a2a", "ag-ui", "core", "foldkit", "mcp", "memory", "providers", "runtime", "skills", "test", "transport"]),
+    pills(["tenetkit", "@tenetkit/pg", "@tenetkit/mysql", "@tenetkit/cloudflare"]),
     p(
-      "The tag workflow builds once, verifies eleven unchanged tarballs in clean consumers, emits checksums and release evidence, attaches the same thirteen assets to GitHub, and publishes the exact tarballs to npm. A manual run only reconciles an existing immutable tag and commit.",
+      "The tag workflow builds once, verifies four unchanged tarballs in clean minimum-dependency consumers, emits checksums and release evidence, attaches those six assets to GitHub, and publishes the exact four tarballs to npm. A manual run only reconciles an existing immutable tag and commit.",
     ),
     p("For install commands and package roles, see ", link("/docs/start/installation", "Installation"), "."),
   ],

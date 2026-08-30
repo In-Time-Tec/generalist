@@ -9,8 +9,39 @@ export const providersReference = definePage({
     lead(
       "Exact tenetkit/ai/* leaves own the model catalog, deterministic test model, model routes, provider adapters, presets, and embeddings. There is no aggregate entry that loads every optional provider.",
     ),
-    command("Install", "bun add effect tenetkit"),
-    p("Published on npm. Requires ", code("tenetkit"), " and the pinned effect version."),
+    command("Install core", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    p(
+      "Provider-neutral deterministic, catalog, and route leaves need no optional provider peer. For a provider leaf, add exactly the dependency shown below.",
+    ),
+    table(
+      ["Import", "Additional dependency", "Runtime"],
+      [
+        [[code("tenetkit/ai/deterministic")], "none", "Node and Bun"],
+        [[code("tenetkit/ai/anthropic")], [code("@effect/ai-anthropic@4.0.0-rc.112")], "Node and Bun"],
+        [
+          [code("tenetkit/ai/openai"), " and OpenAI protocol leaves"],
+          [code("@effect/ai-openai@4.0.0-rc.112")],
+          "Node and Bun",
+        ],
+        [
+          [code("tenetkit/ai/openai-compatible"), " and compatible protocol leaves"],
+          [code("@effect/ai-openai-compat@4.0.0-rc.112")],
+          "Node and Bun",
+        ],
+        [[code("tenetkit/ai/openrouter")], [code("@effect/ai-openrouter@4.0.0-rc.112")], "Node and Bun"],
+        [
+          [code("tenetkit/ai/amazon-bedrock")],
+          [
+            code("@aws-sdk/client-bedrock-runtime@3.859.0"),
+            ", ",
+            code("@aws-sdk/credential-provider-node@3.859.0"),
+            ", ",
+            code("@smithy/types@4.3.1"),
+          ],
+          "Node 22+",
+        ],
+      ],
+    ),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

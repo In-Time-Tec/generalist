@@ -1,3 +1,3 @@
 mkdir cell-agent && cd cell-agent
 bun init -y
-bun add effect tenetkit tenetkit/repl
+bun add effect@4.0.0-rc.112 tenetkit@0.43.0

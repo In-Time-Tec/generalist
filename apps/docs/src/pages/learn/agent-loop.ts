@@ -76,7 +76,7 @@ export const agentLoop = definePage({
       code("Completed"),
       ". Each ",
       code("TurnCompleted"),
-      " carries the full transcript so far. Runtime persists semantic response events and the transcript projection, never the provider fragments. The event contracts live in ",
+      " carries the full transcript so far. A durable Runtime stores normalized response content once in Session and persists a compact semantic event referencing that exact entry; observer transports hydrate the reference. Provider fragments are never durable. The event contracts live in ",
       link("/docs/reference/core-events", "AgentEvent and errors"),
       ".",
     ),

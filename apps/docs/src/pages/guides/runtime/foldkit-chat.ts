@@ -20,7 +20,7 @@ export const foldkitChat = definePage({
       code("update"),
       " that projects those frames into display state. It ships no styled components; rendering stays yours.",
     ),
-    command("Terminal", "bun add tenetkit/foldkit tenetkit/transport foldkit"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0 foldkit@0.148.2"),
     h2("embed-the-chat-model", "1. Open a session and embed the chat model"),
     p(
       "Embed ",

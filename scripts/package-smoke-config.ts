@@ -29,6 +29,160 @@ export const packedProviderDependencies = {
   "@smithy/types": "4.3.1",
 } as const
 
+export type ConsumerRuntime = "bun" | "node" | "worker"
+export interface ConsumerImport {
+  readonly specifier: string
+  readonly runtimes: ReadonlyArray<ConsumerRuntime>
+  readonly exports?: ReadonlyArray<string>
+}
+export interface MinimumConsumerProfile {
+  readonly name: string
+  readonly packages: ReadonlyArray<(typeof packages)[number]>
+  readonly peers: ReadonlyArray<string>
+  readonly imports: ReadonlyArray<ConsumerImport>
+}
+
+const nodeAndBun = ["bun", "node"] as const
+const bunOnly = ["bun"] as const
+const nodeOnly = ["node"] as const
+const workerOnly = ["worker"] as const
+
+export const minimumConsumerProfiles = [
+  {
+    name: "core-runtime",
+    packages: ["tenetkit"],
+    peers: [],
+    imports: [
+      { specifier: "tenetkit", runtimes: nodeAndBun, exports: ["Agent", "Session"] },
+      { specifier: "tenetkit/agent-guidance", runtimes: nodeAndBun },
+      { specifier: "tenetkit/ai/deterministic", runtimes: nodeAndBun, exports: ["layer"] },
+      { specifier: "tenetkit/ai/model-catalog", runtimes: nodeAndBun, exports: ["layer"] },
+      { specifier: "tenetkit/ai/model-route", runtimes: nodeAndBun, exports: ["make"] },
+      { specifier: "tenetkit/ai/openai-account-auth", runtimes: nodeAndBun },
+      { specifier: "tenetkit/ai/openai-account-auth-http", runtimes: nodeAndBun },
+      { specifier: "tenetkit/memory", runtimes: nodeAndBun },
+      { specifier: "tenetkit/repl", runtimes: nodeAndBun },
+      { specifier: "tenetkit/repl/bun", runtimes: bunOnly },
+      { specifier: "tenetkit/runtime", runtimes: nodeAndBun, exports: ["Runtime"] },
+      { specifier: "tenetkit/runtime/external-child-placement", runtimes: nodeAndBun },
+      { specifier: "tenetkit/runtime/external-child-store", runtimes: nodeAndBun },
+      { specifier: "tenetkit/runtime/sql-driver", runtimes: nodeAndBun },
+      { specifier: "tenetkit/skills", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport/errors", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport/replay", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport/run-client", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport/snapshot", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport/sse", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport/websocket", runtimes: nodeAndBun },
+      { specifier: "tenetkit/transport/wire", runtimes: nodeAndBun },
+    ],
+  },
+  {
+    name: "sqlite-bun",
+    packages: ["tenetkit"],
+    peers: ["@effect/sql-sqlite-bun"],
+    imports: [{ specifier: "tenetkit/runtime/sqlite-bun", runtimes: bunOnly, exports: ["Runtime", "RunStore"] }],
+  },
+  {
+    name: "mcp",
+    packages: ["tenetkit"],
+    peers: ["@modelcontextprotocol/sdk"],
+    imports: [
+      { specifier: "tenetkit/mcp", runtimes: nodeAndBun },
+      { specifier: "tenetkit/mcp/client", runtimes: nodeAndBun },
+      { specifier: "tenetkit/mcp/client/http", runtimes: nodeAndBun },
+      { specifier: "tenetkit/mcp/client/stdio", runtimes: nodeAndBun },
+      { specifier: "tenetkit/mcp/oauth", runtimes: nodeAndBun },
+      { specifier: "tenetkit/mcp/tools", runtimes: nodeAndBun },
+    ],
+  },
+  {
+    name: "foldkit",
+    packages: ["tenetkit"],
+    peers: ["foldkit"],
+    imports: [{ specifier: "tenetkit/foldkit", runtimes: nodeAndBun }],
+  },
+  {
+    name: "a2a",
+    packages: ["tenetkit"],
+    peers: ["@a2a-js/sdk"],
+    imports: [{ specifier: "tenetkit/a2a", runtimes: nodeAndBun }],
+  },
+  {
+    name: "ag-ui",
+    packages: ["tenetkit"],
+    peers: ["@ag-ui/core"],
+    imports: [{ specifier: "tenetkit/ag-ui", runtimes: nodeAndBun }],
+  },
+  {
+    name: "test-host",
+    packages: ["tenetkit"],
+    peers: ["@effect/vitest", "vitest"],
+    imports: [
+      { specifier: "tenetkit/test", runtimes: nodeAndBun, exports: ["TestModel"] },
+      { specifier: "tenetkit/test/runtime-driver", runtimes: nodeAndBun },
+    ],
+  },
+  {
+    name: "anthropic",
+    packages: ["tenetkit"],
+    peers: ["@effect/ai-anthropic"],
+    imports: [{ specifier: "tenetkit/ai/anthropic", runtimes: nodeAndBun, exports: ["layer"] }],
+  },
+  {
+    name: "openai",
+    packages: ["tenetkit"],
+    peers: ["@effect/ai-openai"],
+    imports: [
+      { specifier: "tenetkit/ai/openai", runtimes: nodeAndBun, exports: ["layer"] },
+      { specifier: "tenetkit/ai/openai-embedding", runtimes: nodeAndBun },
+      { specifier: "tenetkit/ai/openai-responses", runtimes: nodeAndBun },
+    ],
+  },
+  {
+    name: "openai-compatible",
+    packages: ["tenetkit"],
+    peers: ["@effect/ai-openai-compat"],
+    imports: [
+      { specifier: "tenetkit/ai/openai-chat-completions", runtimes: nodeAndBun },
+      { specifier: "tenetkit/ai/openai-compatible", runtimes: nodeAndBun },
+      { specifier: "tenetkit/ai/openai-compatible-embedding", runtimes: nodeAndBun },
+    ],
+  },
+  {
+    name: "openrouter",
+    packages: ["tenetkit"],
+    peers: ["@effect/ai-openrouter"],
+    imports: [{ specifier: "tenetkit/ai/openrouter", runtimes: nodeAndBun, exports: ["layer"] }],
+  },
+  {
+    name: "amazon-bedrock",
+    packages: ["tenetkit"],
+    peers: ["@aws-sdk/client-bedrock-runtime", "@aws-sdk/credential-provider-node", "@smithy/types"],
+    imports: [{ specifier: "tenetkit/ai/amazon-bedrock", runtimes: nodeOnly, exports: ["layer"] }],
+  },
+  {
+    name: "sql-adapters",
+    packages: ["tenetkit", "pg", "mysql"],
+    peers: [],
+    imports: [
+      { specifier: "@tenetkit/pg", runtimes: nodeAndBun, exports: ["layer", "RunSchema"] },
+      { specifier: "@tenetkit/mysql", runtimes: nodeAndBun, exports: ["layer", "RunSchema"] },
+    ],
+  },
+  {
+    name: "cloudflare",
+    packages: ["tenetkit", "cloudflare"],
+    peers: [],
+    imports: [
+      { specifier: "@tenetkit/cloudflare/durable-objects", runtimes: workerOnly, exports: ["layerRunStore"] },
+      { specifier: "@tenetkit/cloudflare/dynamic-workers", runtimes: workerOnly, exports: ["layer", "make"] },
+      { specifier: "@tenetkit/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
+    ],
+  },
+] as const satisfies ReadonlyArray<MinimumConsumerProfile>
+
 export const workerSafePackageExports = [
   "tenetkit",
   "tenetkit/mcp",

@@ -1,4 +1,4 @@
 mkdir web && cd web
 bun init -y
-bun add foldkit@0.122.0 tenetkit/foldkit tenetkit/transport
+bun add effect@4.0.0-rc.112 tenetkit@0.43.0 foldkit@0.148.2
 bun add -d vite

@@ -23,7 +23,7 @@ export const serveTransport = definePage({
       code("WebSocket.handle"),
       ".",
     ),
-    command("Terminal", "bun add tenetkit/runtime tenetkit/transport"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
     h2("run-in-memory", "1. Run an agent in memory"),
     p(
       code("Runtime.layerMemory"),
@@ -44,9 +44,9 @@ export const serveTransport = definePage({
       [code("sequence"), " is 0-based and monotonic per run. SSE IDs and WebSocket cursors use the same value."],
       [
         code("ModelResponseCommitted"),
-        " carries the complete normalized response for a successful model operation; ",
+        " references the exact Session entry containing the complete normalized response for a successful model operation; ",
         code("ModelResponseInterrupted"),
-        " carries normalized output retained before cancellation or failure. Neither event contains provider deltas.",
+        " references normalized output retained before cancellation or failure. Runtime stores the content once in Session, and transport resolves that reference into the observer view. Neither persisted event contains response content or provider deltas.",
       ],
       [
         "Terminal lifecycle facts are ",

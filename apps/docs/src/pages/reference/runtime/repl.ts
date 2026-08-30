@@ -9,8 +9,8 @@ export const replReference = definePage({
     lead(
       "tenetkit/repl gives an agent one persistent TypeScript cell per Session. The root export is contracts only, so projections, decoders, and test hosts import it without any worker code; tenetkit/repl/bun carries the Bun kernel and is the only module with process dependencies.",
     ),
-    command("Install", "bun add tenetkit tenetkit/repl"),
-    p("Requires ", code("tenetkit"), "."),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    p(code("tenetkit/repl"), " and ", code("tenetkit/repl/bun"), " are import subpaths, not packages."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

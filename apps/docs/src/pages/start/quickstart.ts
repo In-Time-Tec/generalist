@@ -32,7 +32,7 @@ export const quickstart = definePage({
     codeBlock({ label: "Terminal", language: "bash", source: step1 }),
     p(
       "The install summary lists ",
-      code("tenetkit@0.14.0"),
+      code("tenetkit@0.43.0"),
       ". Provider leaves are subpaths of that package, not separate installs. npm and pnpm work the same way; ",
       link("/docs/start/installation", "Installation"),
       " has the variants.",

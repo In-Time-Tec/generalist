@@ -10,7 +10,8 @@ export const testReference = definePage({
     lead(
       "tenetkit/test runs the real TenetKit loop against scripted Effect AI responses, captures normalized provider requests, and needs no provider credentials or test-runner dependency.",
     ),
-    command("Install", "bun add -d tenetkit/test @effect/vitest"),
+    command("Install", "bun add -d effect@4.0.0-rc.112 tenetkit@0.43.0 @effect/vitest@4.0.0-rc.112 vitest@4.1.11"),
+    p(code("tenetkit/test"), " is an import subpath, not a package."),
     h2("script", "Script responses"),
     table(
       ["API", "Purpose"],

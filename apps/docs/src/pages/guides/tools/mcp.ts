@@ -18,7 +18,7 @@ export const mcp = definePage({
       code("tenetkit"),
       ".",
     ),
-    command("Terminal", "bun add tenetkit/mcp"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @modelcontextprotocol/sdk@1.29.0"),
     h2("connect-to-a-server", "1. Connect to a server"),
     p(
       code("MCPClient.layer"),

@@ -7,8 +7,11 @@ import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
   catalogVersion,
   compressedSizeLimits,
+  type ConsumerRuntime,
   exactPackageExports,
   forbiddenPackageExports,
+  type MinimumConsumerProfile,
+  minimumConsumerProfiles,
   packedEffectDependencies,
   packedProviderDependencies,
   packages,
@@ -119,6 +122,68 @@ const installedPackages = Effect.fn("PackageSmoke.installedPackages")(function* 
   }
   return found
 })
+
+const runtimeLabel = (runtime: ConsumerRuntime): string => {
+  switch (runtime) {
+    case "bun":
+      return "Bun"
+    case "node":
+      return "Node/npm"
+    case "worker":
+      return "Worker/workerd"
+  }
+}
+
+const profileContext = (
+  profile: MinimumConsumerProfile,
+  runtime: ConsumerRuntime,
+  specifiers: ReadonlyArray<string>,
+): string =>
+  `[consumer profile ${profile.name}] [runtime ${runtimeLabel(runtime)}] [specifier ${specifiers.join(", ")}]`
+
+const runProfileCommand = Effect.fn("PackageSmoke.runProfileCommand")(function* (input: {
+  readonly profile: MinimumConsumerProfile
+  readonly runtime: ConsumerRuntime
+  readonly specifiers: ReadonlyArray<string>
+  readonly command: string
+  readonly args: ReadonlyArray<string>
+  readonly cwd: string
+  readonly env?: Record<string, string>
+}) {
+  return yield* run(input.command, input.args, input.cwd, input.env).pipe(
+    Effect.mapError((error) =>
+      smokeError(
+        `${profileContext(input.profile, input.runtime, input.specifiers)} command failed; expected dependency set: ${input.profile.peers.length === 0 ? "effect only" : `effect, ${input.profile.peers.join(", ")}`}\n${error.message}`,
+      ),
+    ),
+  )
+})
+
+const profileProbe = (profile: MinimumConsumerProfile, runtime: ConsumerRuntime): string => {
+  const probes = profile.imports
+    .filter((item) => item.runtimes.includes(runtime))
+    .map((item) => ({ specifier: item.specifier, exports: item.exports ?? [] }))
+  return `const profile = ${JSON.stringify(profile.name)}
+const runtime = ${JSON.stringify(runtimeLabel(runtime))}
+const probes = ${JSON.stringify(probes)}
+for (const probe of probes) {
+  let loaded
+  try {
+    loaded = await import(probe.specifier)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const missing = message.match(/(?:Cannot find package|Cannot find module|Could not resolve) ['"]([^'"]+)/)?.[1] ?? "unknown"
+    throw new Error(\`[consumer profile \${profile}] [runtime \${runtime}] [specifier \${probe.specifier}] missing package \${missing}: \${message}\`)
+  }
+  for (const name of probe.exports) {
+    if (loaded[name] === undefined) {
+      throw new Error(\`[consumer profile \${profile}] [runtime \${runtime}] [specifier \${probe.specifier}] expected export \${name} is missing\`)
+    }
+  }
+}
+console.log(\`[consumer profile \${profile}] [runtime \${runtime}] imported \${probes.length} specifiers\`)
+`
+}
 
 const emittedFiles = Effect.fn("PackageSmoke.emittedFiles")(function* (directory: string, extension: ".js" | ".d.ts") {
   const listing = yield* run("find", [directory, "-type", "f", "-name", `*${extension}`, "-print"], directory)
@@ -345,6 +410,147 @@ const worker :Workerd.Worker = (
       `${group.specifiers.length} ${group.name} Worker-safe entrypoints: ${graph.size} graph entries, 0 forbidden; ${workerdVersion} passed without compatibility flags`,
     )
   }
+})
+
+const verifyCloudflareProfile = Effect.fn("PackageSmoke.verifyCloudflareProfile")(function* (input: {
+  readonly root: string
+  readonly directory: string
+  readonly profile: MinimumConsumerProfile
+}) {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const runtime = "worker" as const
+  const specifiers = input.profile.imports
+    .filter((item) => item.runtimes.includes(runtime))
+    .map((item) => item.specifier)
+  const wrangler = path.join(input.root, "examples/cloudflare-worker/node_modules/.bin/wrangler")
+  const workerd = path.join(input.root, "packages/cloudflare/node_modules/.bin/workerd")
+  yield* fileSystem.writeFileString(
+    path.join(input.directory, "forbidden-root.mjs"),
+    `let blocked = false
+try {
+  await import("@tenetkit/cloudflare")
+} catch (error) {
+  blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED" || error?.code === "ERR_MODULE_NOT_FOUND"
+}
+if (!blocked) throw new Error("${profileContext(input.profile, runtime, ["@tenetkit/cloudflare"])} unexpected package root export")
+`,
+  )
+  yield* runProfileCommand({
+    profile: input.profile,
+    runtime,
+    specifiers: ["@tenetkit/cloudflare"],
+    command: "bun",
+    args: ["forbidden-root.mjs"],
+    cwd: input.directory,
+  })
+
+  const imports = input.profile.imports
+    .filter((item) => item.runtimes.includes(runtime))
+    .map((item, index) => `import * as Entry${index} from ${JSON.stringify(item.specifier)}`)
+    .join("\n")
+  const checks = input.profile.imports
+    .filter((item) => item.runtimes.includes(runtime))
+    .flatMap((item, index) => (item.exports ?? []).map((name) => `[Entry${index}, ${JSON.stringify(name)}]`))
+    .join(", ")
+  yield* fileSystem.writeFileString(
+    path.join(input.directory, "cloudflare.ts"),
+    `${imports}
+const checks = [${checks}]
+if (checks.some(([entry, name]) => entry[name] === undefined)) throw new Error("Cloudflare profile export is missing")
+export default { test: () => void checks }
+`,
+  )
+  const wranglerConfig = path.join(input.directory, "wrangler.json")
+  const bundleDirectory = path.join(input.directory, "worker-out")
+  const metafile = path.join(input.directory, "worker.meta.json")
+  yield* fileSystem.writeFileString(
+    wranglerConfig,
+    encodeJson({ name: "tenetkit-cloudflare-package-smoke", main: "cloudflare.ts", compatibility_date: "2026-08-19" }),
+  )
+  yield* runProfileCommand({
+    profile: input.profile,
+    runtime,
+    specifiers,
+    command: wrangler,
+    args: ["deploy", "--config", wranglerConfig, "--dry-run", "--outdir", bundleDirectory, "--metafile", metafile],
+    cwd: input.directory,
+  })
+  const metadata = parseWranglerMetafile(yield* fileSystem.readFileString(metafile))
+  const graph = new Set<string>(Object.keys(metadata.inputs))
+  for (const output of Object.values(metadata.outputs)) {
+    for (const item of output.imports ?? []) graph.add(item.path)
+  }
+  const nodeBuiltins = new Set(builtinModules.map((specifier) => specifier.replace(/^node:/, "").split("/")[0]))
+  const forbidden = sorted(
+    Array.from(graph).filter((item) => {
+      const normalized = item.replaceAll("\\", "/").toLowerCase()
+      const bare = normalized.replace(/^node:/, "").split("/")[0] ?? normalized
+      return (
+        normalized.startsWith("node:") ||
+        normalized.startsWith("bun:") ||
+        nodeBuiltins.has(bare) ||
+        normalized.includes("node-built-in-modules:") ||
+        normalized.includes("unenv/runtime/node/")
+      )
+    }),
+    (left, right) => left.localeCompare(right),
+  )
+  if (forbidden.length > 0) {
+    return yield* smokeError(
+      `${profileContext(input.profile, runtime, specifiers)} unexpected package or runtime module:\n${forbidden.join("\n")}`,
+    )
+  }
+  yield* fileSystem.writeFileString(
+    path.join(input.directory, "worker.capnp"),
+    `using Workerd = import "/workerd/workerd.capnp";
+
+const config :Workerd.Config = (services = [(name = "main", worker = .worker)]);
+const worker :Workerd.Worker = (
+  compatibilityDate = "2026-08-19",
+  modules = [(name = "cloudflare.js", esModule = embed "worker-out/cloudflare.js")],
+);
+`,
+  )
+  yield* runProfileCommand({
+    profile: input.profile,
+    runtime,
+    specifiers,
+    command: workerd,
+    args: ["test", "worker.capnp", "--no-verbose"],
+    cwd: input.directory,
+  })
+  yield* Console.log(
+    `${profileContext(input.profile, runtime, specifiers)} ${graph.size} graph entries, 0 forbidden modules`,
+  )
+})
+
+const validateMinimumConsumerProfiles = Effect.fn("PackageSmoke.validateMinimumConsumerProfiles")(function* (input: {
+  readonly tenetkitManifest: typeof PackageManifest.Type
+  readonly packageExports: ReadonlyArray<string>
+}) {
+  const optionalPeers = Object.keys(input.tenetkitManifest.peerDependencies ?? {}).filter(
+    (dependency) => dependency !== "effect",
+  )
+  const profiledPeers = new Set(minimumConsumerProfiles.flatMap((profile) => profile.peers))
+  for (const dependency of optionalPeers) {
+    if (!profiledPeers.has(dependency)) {
+      return yield* smokeError(`minimum consumer profile matrix is missing optional peer ${dependency}`)
+    }
+  }
+  for (const profile of minimumConsumerProfiles) {
+    for (const dependency of profile.peers) {
+      if (!optionalPeers.includes(dependency)) {
+        return yield* smokeError(`consumer profile ${profile.name} names undeclared optional peer ${dependency}`)
+      }
+    }
+    for (const item of profile.imports) {
+      if (!input.packageExports.includes(item.specifier)) {
+        return yield* smokeError(`consumer profile ${profile.name} names unknown package export ${item.specifier}`)
+      }
+    }
+  }
+  return optionalPeers
 })
 
 const program = Effect.gen(function* () {
@@ -622,9 +828,14 @@ const program = Effect.gen(function* () {
        * The driver packages depend on an exact `tenetkit` version that only exists once this
        * release is published, and an unscoped name cannot be pointed at the local registry the way
        * `@tenetkit:registry` can. Overriding it to the packed tarball resolves the transitive
-       * dependency without redirecting every unrelated package through a stub server.
+       * dependency without redirecting every unrelated package through a stub server. FoldKit
+       * 0.148.2 still declares rc.109, so its targeted override proves the current rc.112 runtime
+       * instead of disabling peer resolution for the whole consumer.
        */
-      overrides: { tenetkit: tarballs["tenetkit"] },
+      overrides: {
+        tenetkit: tarballs["tenetkit"],
+        foldkit: { effect: effectVersion },
+      },
       resolutions: { tenetkit: tarballs["tenetkit"] },
     }),
   )
@@ -804,231 +1015,12 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
 
   yield* verifyWorkerEntrypoints({ root, consumerDirectory })
 
-  const coreConsumerDirectory = path.join(directory, "core-consumer")
-  yield* fileSystem.makeDirectory(coreConsumerDirectory)
-  yield* fileSystem.writeFileString(
-    path.join(coreConsumerDirectory, "package.json"),
-    encodeJson({
-      name: "tenetkit-core-consumer",
-      private: true,
-      type: "module",
-      dependencies: {
-        effect: effectVersion,
-        esbuild: rootManifest.workspaces.catalog.esbuild,
-        tenetkit: tarballs.tenetkit,
-        typescript: rootManifest.workspaces.catalog.typescript,
-        "@types/node": rootManifest.workspaces.catalog["@types/node"],
-      },
-    }),
-  )
-  yield* fileSystem.writeFileString(
-    path.join(coreConsumerDirectory, "runtime.mjs"),
-    `import { Agent, Session } from "tenetkit"
-import { Runtime } from "tenetkit/runtime"
-import { layer as modelCatalogLayer } from "tenetkit/ai/model-catalog"
-import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
-import { make as makeModelRoute } from "tenetkit/ai/model-route"
-if (Agent === undefined || Session === undefined) throw new Error("core export is missing")
-if (Runtime.layerMemory === undefined) throw new Error("generic Runtime export is missing")
-if (modelCatalogLayer === undefined || deterministicLayer === undefined || makeModelRoute === undefined) throw new Error("provider-neutral AI leaf is missing")
-`,
-  )
-  yield* fileSystem.writeFileString(
-    path.join(coreConsumerDirectory, "typecheck.ts"),
-    `import { layer as modelCatalogLayer } from "tenetkit/ai/model-catalog"
-import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
-import { make as makeModelRoute } from "tenetkit/ai/model-route"
-void [modelCatalogLayer, deterministicLayer, makeModelRoute]
-`,
-  )
-  yield* fileSystem.writeFileString(
-    path.join(coreConsumerDirectory, "tsconfig.json"),
-    encodeJson({
-      compilerOptions: {
-        strict: true,
-        skipLibCheck: false,
-        lib: ["ESNext", "DOM", "DOM.Iterable"],
-        types: ["node"],
-        noEmit: true,
-        module: "NodeNext",
-        moduleResolution: "NodeNext",
-        target: "ES2024",
-      },
-      include: ["typecheck.ts"],
-    }),
-  )
-  yield* fileSystem.writeFileString(
-    path.join(coreConsumerDirectory, "root-bundle.ts"),
-    `import { Agent, Session } from "tenetkit"
-console.log(Agent, Session)
-`,
-  )
-  yield* fileSystem.writeFileString(
-    path.join(coreConsumerDirectory, "runtime-bundle.ts"),
-    `import { Runtime } from "tenetkit/runtime"
-console.log(Runtime.layerMemory)
-`,
-  )
-  yield* run("bun", ["install", "--linker=isolated"], coreConsumerDirectory, {
-    BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache"),
-  })
-  const unexpectedIntegrations = yield* installedPackages(coreConsumerDirectory, [
-    "@effect/ai-anthropic",
-    "@effect/ai-openai",
-    "@effect/ai-openai-compat",
-    "@effect/ai-openrouter",
-    "@aws-sdk/client-bedrock-runtime",
-    "@aws-sdk/credential-provider-node",
-  ])
-  if (unexpectedIntegrations.length > 0) {
-    return yield* smokeError(
-      `provider-free consumer installed optional provider SDKs:\n${unexpectedIntegrations.join("\n")}`,
-    )
-  }
-  const unexpectedSqlite = (yield* run(
-    "find",
-    ["node_modules", "-path", "*/@effect/sql-sqlite-bun/package.json", "-print"],
-    coreConsumerDirectory,
-  )).trim()
-  if (unexpectedSqlite.length > 0) {
-    return yield* smokeError(`generic Runtime consumer installed the optional SQLite peer:\n${unexpectedSqlite}`)
-  }
-  for (const entry of ["root", "runtime"]) {
-    yield* run(
-      "bun",
-      [
-        "node_modules/esbuild/bin/esbuild",
-        `${entry}-bundle.ts`,
-        "--bundle",
-        "--format=esm",
-        "--platform=node",
-        `--outfile=${entry}-bundle.js`,
-      ],
-      coreConsumerDirectory,
-    )
-  }
-  yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], coreConsumerDirectory)
-  yield* run("bun", ["tsc", "--noEmit"], coreConsumerDirectory)
-
-  const openRouterConsumerDirectory = path.join(directory, "openrouter-consumer")
-  yield* fileSystem.makeDirectory(openRouterConsumerDirectory)
-  yield* fileSystem.writeFileString(
-    path.join(openRouterConsumerDirectory, "package.json"),
-    encodeJson({
-      name: "tenetkit-openrouter-consumer",
-      private: true,
-      type: "module",
-      dependencies: {
-        "@effect/ai-openrouter": rootManifest.workspaces.catalog["@effect/ai-openrouter"],
-        "@types/node": rootManifest.workspaces.catalog["@types/node"],
-        effect: effectVersion,
-        tenetkit: tarballs.tenetkit,
-        typescript: rootManifest.workspaces.catalog.typescript,
-      },
-    }),
-  )
-  yield* fileSystem.writeFileString(
-    path.join(openRouterConsumerDirectory, "proof.ts"),
-    `import { layer, type ClientOptions } from "tenetkit/ai/openrouter"
-const options = null as unknown as ClientOptions
-void [layer, options]
-`,
-  )
-  yield* fileSystem.writeFileString(
-    path.join(openRouterConsumerDirectory, "tsconfig.json"),
-    encodeJson({
-      compilerOptions: {
-        strict: true,
-        skipLibCheck: true,
-        lib: ["ESNext", "DOM", "DOM.Iterable"],
-        types: ["node"],
-        noEmit: true,
-        module: "NodeNext",
-        moduleResolution: "NodeNext",
-        target: "ES2024",
-      },
-      include: ["proof.ts"],
-    }),
-  )
-  yield* run("bun", ["install", "--linker=isolated"], openRouterConsumerDirectory, {
-    BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache"),
-  })
-  yield* run("bun", ["tsc", "--noEmit"], openRouterConsumerDirectory)
-  const unexpectedOpenRouterPeers = yield* installedPackages(openRouterConsumerDirectory, [
-    "@effect/ai-anthropic",
-    "@effect/ai-openai",
-    "@effect/ai-openai-compat",
-    "@aws-sdk/client-bedrock-runtime",
-    "@aws-sdk/credential-provider-node",
-  ])
-  if (unexpectedOpenRouterPeers.length > 0) {
-    return yield* smokeError(
-      `OpenRouter-only Bun consumer installed unrelated provider SDKs:\n${unexpectedOpenRouterPeers.join("\n")}`,
-    )
-  }
-  yield* run(
-    "env",
-    [
-      "-u",
-      "NODE_PATH",
-      "-u",
-      "NODE_OPTIONS",
-      "node",
-      "--input-type=module",
-      "-e",
-      'await import("tenetkit/ai/openrouter")',
-    ],
-    openRouterConsumerDirectory,
-  )
-  yield* run(
-    "env",
-    ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "bun", "-e", 'await import("tenetkit/ai/openrouter")'],
-    openRouterConsumerDirectory,
-  )
-
-  const npmOpenRouterConsumerDirectory = path.join(directory, "npm-openrouter-consumer")
-  yield* fileSystem.makeDirectory(npmOpenRouterConsumerDirectory)
-  for (const filename of ["package.json", "tsconfig.json", "proof.ts"]) {
-    yield* fileSystem.copyFile(
-      path.join(openRouterConsumerDirectory, filename),
-      path.join(npmOpenRouterConsumerDirectory, filename),
-    )
-  }
-  yield* run("npm", ["install", "--ignore-scripts", "--legacy-peer-deps"], npmOpenRouterConsumerDirectory)
-  yield* run("npx", ["tsc", "--noEmit"], npmOpenRouterConsumerDirectory)
-  const unexpectedNpmOpenRouterPeers = yield* installedPackages(npmOpenRouterConsumerDirectory, [
-    "@effect/ai-anthropic",
-    "@effect/ai-openai",
-    "@effect/ai-openai-compat",
-    "@aws-sdk/client-bedrock-runtime",
-    "@aws-sdk/credential-provider-node",
-  ])
-  if (unexpectedNpmOpenRouterPeers.length > 0) {
-    return yield* smokeError(
-      `OpenRouter-only npm consumer installed unrelated provider SDKs:\n${unexpectedNpmOpenRouterPeers.join("\n")}`,
-    )
-  }
-  yield* run(
-    "env",
-    [
-      "-u",
-      "NODE_PATH",
-      "-u",
-      "NODE_OPTIONS",
-      "node",
-      "--input-type=module",
-      "-e",
-      'await import("tenetkit/ai/openrouter")',
-    ],
-    npmOpenRouterConsumerDirectory,
-  )
-
   const npmConsumerDirectory = path.join(directory, "npm-consumer")
   yield* fileSystem.makeDirectory(npmConsumerDirectory)
   for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs", ".npmrc"]) {
     yield* fileSystem.copyFile(path.join(consumerDirectory, filename), path.join(npmConsumerDirectory, filename))
   }
-  yield* run("npm", ["install", "--ignore-scripts", "--legacy-peer-deps"], npmConsumerDirectory)
+  yield* run("npm", ["install", "--ignore-scripts"], npmConsumerDirectory)
   const npmEffects = (yield* run(
     "find",
     ["node_modules", "-path", "*/effect/package.json", "-print"],
@@ -1049,6 +1041,131 @@ void [layer, options]
   ) {
     return yield* smokeError("npm consumer resolved a TenetKit package from npm")
   }
+
+  const tenetkitManifest = packedManifests.tenetkit
+  if (tenetkitManifest === undefined) return yield* smokeError("packed tenetkit manifest is missing")
+  const optionalPeers = yield* validateMinimumConsumerProfiles({ tenetkitManifest, packageExports })
+
+  const runMinimumProfile = Effect.fn("PackageSmoke.runMinimumProfile")(function* (
+    profile: MinimumConsumerProfile,
+    runtime: ConsumerRuntime,
+  ) {
+    const specifiers = profile.imports.filter((item) => item.runtimes.includes(runtime)).map((item) => item.specifier)
+    const profileDirectory = path.join(directory, "profiles", `${profile.name}-${runtime}`)
+    yield* fileSystem.makeDirectory(profileDirectory, { recursive: true })
+    const peerDependencies: Record<string, string> = {}
+    for (const dependency of profile.peers) {
+      const dependencyVersion = tenetkitManifest.peerDependencies?.[dependency]
+      if (dependencyVersion === undefined) {
+        return yield* smokeError(
+          `${profileContext(profile, runtime, specifiers)} missing package ${dependency} version`,
+        )
+      }
+      peerDependencies[dependency] = dependencyVersion
+    }
+    const packageDependencies = Object.fromEntries(
+      profile.packages.map((packageName) => [packageNames[packageName], tarballs[packageNames[packageName]]]),
+    )
+    const baseOverrides = { tenetkit: tarballs.tenetkit }
+    const overrides = profile.peers.includes("foldkit")
+      ? { ...baseOverrides, foldkit: { effect: effectVersion } }
+      : baseOverrides
+    yield* fileSystem.writeFileString(
+      path.join(profileDirectory, "package.json"),
+      encodeJson({
+        name: `tenetkit-package-smoke-${profile.name}-${runtime}`,
+        private: true,
+        type: "module",
+        dependencies: { effect: effectVersion, ...packageDependencies, ...peerDependencies },
+        overrides,
+        resolutions: { tenetkit: tarballs.tenetkit },
+      }),
+    )
+    if (runtime === "node") {
+      yield* runProfileCommand({
+        profile,
+        runtime,
+        specifiers,
+        command: "npm",
+        args: ["install", "--ignore-scripts"],
+        cwd: profileDirectory,
+      })
+    } else {
+      yield* runProfileCommand({
+        profile,
+        runtime,
+        specifiers,
+        command: "bun",
+        args: ["install", "--linker=isolated"],
+        cwd: profileDirectory,
+        env: { BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache") },
+      })
+    }
+
+    for (const dependency of ["effect", ...Object.keys(packageDependencies), ...profile.peers]) {
+      if ((yield* installedPackages(profileDirectory, [dependency])).length === 0) {
+        return yield* smokeError(`${profileContext(profile, runtime, specifiers)} missing package ${dependency}`)
+      }
+    }
+    for (const dependency of optionalPeers) {
+      if (profile.peers.includes(dependency)) continue
+      const installed = yield* installedPackages(profileDirectory, [dependency])
+      if (installed.length > 0) {
+        return yield* smokeError(
+          `${profileContext(profile, runtime, specifiers)} unexpected package ${dependency}:\n${installed.join("\n")}`,
+        )
+      }
+    }
+    const installedEffectsForProfile = (yield* run(
+      "find",
+      ["node_modules", "-path", "*/effect/package.json", "-print"],
+      profileDirectory,
+    ))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+    if (installedEffectsForProfile.length !== 1) {
+      return yield* smokeError(
+        `${profileContext(profile, runtime, specifiers)} unexpected package effect copies: ${installedEffectsForProfile.length}`,
+      )
+    }
+
+    if (runtime === "worker") {
+      yield* verifyCloudflareProfile({ root, directory: profileDirectory, profile })
+    } else {
+      yield* fileSystem.writeFileString(path.join(profileDirectory, "probe.mjs"), profileProbe(profile, runtime))
+      const output = yield* runProfileCommand({
+        profile,
+        runtime,
+        specifiers,
+        command: "env",
+        args: ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", runtime, "probe.mjs"],
+        cwd: profileDirectory,
+      })
+      yield* Console.log(output.trim())
+    }
+
+    const lockfile = path.join(profileDirectory, runtime === "node" ? "package-lock.json" : "bun.lock")
+    if ((yield* fileSystem.readFileString(lockfile)).includes("npmjs.org/@tenetkit")) {
+      return yield* smokeError(
+        `${profileContext(profile, runtime, specifiers)} unexpected package source npmjs.org/@tenetkit`,
+      )
+    }
+  })
+
+  const profileRuns = minimumConsumerProfiles.flatMap((profile) =>
+    Array.from(new Set<ConsumerRuntime>(profile.imports.flatMap((item) => item.runtimes))).map((runtime) => ({
+      profile,
+      runtime,
+    })),
+  )
+  yield* Effect.all(
+    profileRuns.map(({ profile, runtime }) => runMinimumProfile(profile, runtime)),
+    {
+      concurrency: 4,
+      discard: true,
+    },
+  )
 
   const writeReleaseEvidence = Effect.gen(function* () {
     const evidencePackages: Array<{

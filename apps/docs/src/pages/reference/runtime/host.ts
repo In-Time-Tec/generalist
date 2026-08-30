@@ -8,8 +8,7 @@ export const runtimeReference = definePage({
   description: "Addressable Run admission, canonical events, inspection, waits, stores, and workers.",
   content: [
     lead("tenetkit/runtime owns the authoritative lifecycle for addressable TenetKit runs."),
-    command("Install", "bun add tenetkit tenetkit/runtime"),
-    p("Published on npm at 0.14.0. All Runtime events and protocol adapters project from this package."),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
     h2("surface", "Core surface"),
     table(
       ["Namespace", "Role"],
@@ -20,8 +19,6 @@ export const runtimeReference = definePage({
         ],
         [[code("RunEvent")], "Canonical persisted lifecycle and agent-loop event schema"],
         [[code("RunStore")], "Memory and SQLite storage seam"],
-        [[code("RunSchema")], "PostgreSQL schema plan, check, and predeploy apply operations"],
-        [[code("MysqlRunSchema")], "MySQL schema plan, check, predeploy apply, and dirty-state operations"],
         [[code("tenetkit/runtime/sql-driver")], [code("RunClaims"), " multi-worker claims and leases"]],
         [[code("tenetkit/runtime/sql-driver")], [code("RuntimeWorker"), " hosted worker loops"]],
         [[code("Address"), " / ", code("ExecutableRef"), " / ", code("Cursor")], "Schema-backed boundary identities"],
@@ -47,7 +44,9 @@ export const runtimeReference = definePage({
       code("ModelResponseCommitted"),
       " after a successful model operation, or one ",
       code("ModelResponseInterrupted"),
-      " when a run settles after partial output. Their normalized response content is stored, cursor-addressed, replayable, and projected by transport adapters.",
+      " when a run settles after partial output. Each compact persisted event references the exact Session entry that stores the normalized response content once. ",
+      code("Runtime.resolveModelResponse"),
+      " verifies and hydrates that reference, and transport adapters emit the resolved observer view.",
     ),
     p(
       code("Runtime.previews({ runId })"),

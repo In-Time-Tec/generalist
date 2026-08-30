@@ -1,3 +1,3 @@
 mkdir research-agent && cd research-agent
 bun init -y
-bun add effect tenetkit @effect/ai-openrouter @effect/platform-bun
+bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @effect/ai-openrouter@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112

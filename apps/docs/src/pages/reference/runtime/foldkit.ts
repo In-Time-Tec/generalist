@@ -10,8 +10,8 @@ export const foldkitReference = definePage({
     lead(
       "tenetkit/foldkit adapts Runtime RunEvents and explicit commands to FoldKit's Elm architecture without owning run lifecycle state.",
     ),
-    command("Install", "bun add foldkit@0.122.0 tenetkit/runtime tenetkit/transport tenetkit/foldkit"),
-    p("Published on npm at 0.14.0. Depends on Runtime and transport; foldkit is a peer dependency."),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0 foldkit@0.148.2"),
+    p(code("tenetkit/foldkit"), " is an import subpath; foldkit is its optional peer dependency."),
     h2("exports", "Exports"),
     table(
       ["Namespace", "Role"],

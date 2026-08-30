@@ -387,7 +387,7 @@
   },
   "catalogs": {
     "peer": {
-      "foldkit": ">=0.148.0 <1",
+      "foldkit": "0.148.2",
     },
   },
   "packages": {

@@ -9,11 +9,10 @@ export const mcpReference = definePage({
     lead(
       "tenetkit/mcp connects Model Context Protocol servers to TenetKit: MCPClient discovers and calls MCP tools, and the tools subpath adapts them into a toolkit and a ToolExecutor.",
     ),
-    command("Install", "bun add tenetkit tenetkit/mcp"),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0 @modelcontextprotocol/sdk@1.29.0"),
     p(
-      "Published on npm at 0.14.0. Requires ",
-      code("tenetkit"),
-      " and depends on ",
+      code("tenetkit/mcp"),
+      " is an import subpath and requires the optional peer ",
       code("@modelcontextprotocol/sdk"),
       ".",
     ),

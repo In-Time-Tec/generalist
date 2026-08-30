@@ -34,16 +34,16 @@ Use `tenetkit` directly for process-local agents and chat streaming. Add `tenetk
 ## Install
 
 ```bash
-bun add effect tenetkit
+bun add effect@4.0.0-rc.112 tenetkit@0.43.0
 # Add only the peer for the provider you select, for example:
-bun add @effect/ai-openrouter
+bun add @effect/ai-openrouter@4.0.0-rc.112
 ```
 
-GitHub releases and npm contain the same versioned package tarballs with compiled ESM and declarations for Node 22+ and Bun 1.3+.
+GitHub releases and npm contain the same four versioned package tarballs—`tenetkit`, `@tenetkit/pg`, `@tenetkit/mysql`, and `@tenetkit/cloudflare`—with compiled ESM and declarations. `tenetkit/*` names are import subpaths, not packages to pass to a package manager. The supported engines are Node 22+ and Bun 1.4+; Bun SQLite is Bun-only and Cloudflare adapters run in Workers.
 
 ## Capability matrix
 
-| Capability                                                          | Package                   | Status       |
+| Capability                                                          | Import                    | Status       |
 | ------------------------------------------------------------------- | ------------------------- | ------------ |
 | Agent loop, events, typed suspension, turn policy, tools, approvals | `tenetkit`                | experimental |
 | Addressable runs, replay, inspection, waits, and durable stores     | `tenetkit/runtime`        | experimental |
@@ -92,21 +92,9 @@ const durableTools = ToolExecutor.layerRouter([
 
 ## Effect compatibility
 
-| TenetKit release | Tested Effect version                             | Notes                                                                               |
-| ---------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| next release     | `effect@4.0.0-rc.112` from the workspace catalog  | The scheduled canary tests the newest Effect v4 release candidate.                  |
-| `0.40.x–0.43.x`  | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.39.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.38.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.37.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.36.x`         | `effect@4.0.0-rc.111` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.35.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.34.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.33.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.32.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.31.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.30.x`         | `effect@4.0.0-rc.109` from the workspace catalog  | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
-| `0.29.x`         | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| TenetKit release | Tested Effect version                            | Notes                                                                               |
+| ---------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `0.43.0`         | `effect@4.0.0-rc.112` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 

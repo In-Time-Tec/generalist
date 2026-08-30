@@ -10,8 +10,8 @@ export const skillsReference = definePage({
     lead(
       "tenetkit/skills implements the core SkillCatalog seam through filesystem and manifest-backed HTTP, S3, and GitHub adapters. InstructionFiles loads AGENTS.md/CLAUDE.md instruction files.",
     ),
-    command("Install", "bun add tenetkit tenetkit/skills"),
-    p("Published on npm at 0.14.0. Requires ", code("tenetkit"), "."),
+    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
+    p(code("tenetkit/skills"), " is an import subpath, not a package."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
