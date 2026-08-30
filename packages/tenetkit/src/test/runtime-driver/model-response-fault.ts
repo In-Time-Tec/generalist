@@ -5,7 +5,7 @@ import { digest as pinDigest } from "../../core/durable/pin.js"
 import type { Address } from "../../runtime/address.js"
 import { RunStore, type ExecutionClaim } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
-import { RunClaims, type Service as RunClaimsService } from "../../runtime/sql/run/claims.js"
+import { RunClaims } from "../../runtime/sql/run/claims.js"
 
 /** A failure point after each durable statement in the completed-model-response projection. */
 export const modelResponseFaultBoundaries = [
@@ -28,7 +28,7 @@ export interface ModelResponseFaultOptions<LayerError = never> {
   readonly layer: Layer.Layer<Runtime | RunStore, LayerError, never>
   readonly claim: (input: {
     readonly store: RunStore["Service"]
-    readonly claims?: RunClaimsService
+    readonly claims?: RunClaims["Service"]
     readonly runId: string
     readonly workerId: string
   }) => Effect.Effect<ExecutionClaim>

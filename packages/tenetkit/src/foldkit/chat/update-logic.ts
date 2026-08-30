@@ -1,7 +1,7 @@
 import { Effect, Equivalence, Option, Schema, Stream } from "effect"
 import { dual } from "effect/Function"
 import { make } from "foldkit/subscription"
-import { AgentConnection } from "./connection.js"
+import { Connection } from "./connection.js"
 import {
   Action,
   type ChatCommand,
@@ -120,7 +120,7 @@ export const update: {
 })
 
 /** @experimental */
-export const subscriptions = make<Model, Action, AgentConnection>()((entry) => ({
+export const subscriptions = make<Model, Action, Connection>()((entry) => ({
   agentFrames: entry(
     { sessionId: Schema.NullOr(Schema.String), afterSeq: Schema.Finite },
     {
@@ -129,7 +129,7 @@ export const subscriptions = make<Model, Action, AgentConnection>()((entry) => (
       dependenciesToStream: ({ sessionId }, readDependencies) => {
         if (sessionId === null) return Stream.empty
         return Stream.unwrap(
-          AgentConnection.use((connection) => {
+          Connection.use((connection) => {
             const afterSeq = readDependencies().afterSeq
             return connection
               .session(afterSeq < 0 ? { sessionId } : { sessionId, afterSeq })

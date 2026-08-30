@@ -13,7 +13,7 @@ export const foldkitChat = definePage({
     p(
       code("tenetkit/foldkit"),
       " adapts transport frames into FoldKit's Elm architecture. ",
-      code("Connection.AgentConnection"),
+      code("Connection.Connection"),
       " is a long-lived resource that observes decoded durable RunEvent frames and connection facts; ",
       code("Chat"),
       " is a headless submodel with a pure ",

@@ -7,7 +7,7 @@ import type {
   SessionWriteClaim,
 } from "../../runtime/run/store.js"
 import type { Runtime, Service as RuntimeService } from "../../runtime/service.js"
-import type { RunClaims, Service as RunClaimsService } from "../../runtime/sql/run/claims.js"
+import type { RunClaims } from "../../runtime/sql/run/claims.js"
 
 /** @experimental A multi-worker claim without the driver's decoded persisted Run representation. */
 export interface WorkerClaim {
@@ -21,7 +21,7 @@ export interface WorkerClaim {
 export interface Services {
   readonly runtime: RuntimeService
   readonly store: RunStoreService
-  readonly claims?: RunClaimsService
+  readonly claims?: RunClaims["Service"]
 }
 
 /** @experimental Driver-specific activation or worker claim needed before a fenced mutation. */

@@ -2,6 +2,7 @@
 
 ## 0.44.0
 
+- Finish the current naming contract: FoldKit exposes `Connection.Connection`, test connections implement the scoped `session` API directly, SQL adapters use `RunClaims["Service"]`, and research examples call their concrete capability `WebSearch`. OpenAI model assembly now stays in a private provider module instead of leaking internal helpers from `tenetkit/ai/openai`.
 - Simplify the remaining public service vocabulary: service implementation types now live on their owning Effect service classes, OpenAI account seams use `BrowserAuthorization`, `DeviceAuthorizationPresenter`, `OAuthClient`, and `CredentialStore`, model telemetry uses `Sink` and `InvocationLifecycle`, and the root tool-result namespace is `ToolOutput`.
 - Make Runtime resolver composition Layer-native. Memory, SQLite, PostgreSQL, and MySQL Runtime layers now require `ExecutableResolver`; static resolver construction is an effect with a typed `ExecutableRegistrationInvalid` failure and `ExecutableResolver.layerStatic` is the standard composition path. Provider `decodeConfig` functions are also effectful and fail with typed `SchemaError` values.
 - Strengthen interruption boundaries: Bun kernels are replaced and recover only their last completed snapshot after strong interruption, Cloudflare Dynamic Workers cancel promptly even when loader promises ignore abort, malformed Bun worker commands no longer crash the worker, and invalid WebSocket event capacity fails as typed `InvalidConnectOptions`.

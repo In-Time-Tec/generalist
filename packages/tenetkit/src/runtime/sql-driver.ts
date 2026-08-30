@@ -19,7 +19,7 @@ export {
   type SqliteRuntimeServices,
 } from "./sql/run/exclusive-runtime.js"
 export type { EventHub } from "./sql/subscribers.js"
-export { RunClaims, type ClaimedRun, type Service as RunClaimsService } from "./sql/run/claims.js"
+export { RunClaims, type ClaimedRun } from "./sql/run/claims.js"
 export * as RuntimeWorker from "./sql/worker.js"
 export type { DecodedRun, RunRow } from "./sql/codec/rows.js"
 export { decodeRunEffect, loadRun } from "./sql/store/statements.js"

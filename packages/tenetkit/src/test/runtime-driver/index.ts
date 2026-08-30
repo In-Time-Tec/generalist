@@ -5,7 +5,7 @@ import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
 import { StaleClaim } from "../../runtime/sql/errors.js"
-import { RunClaims, type Service as RunClaimsService } from "../../runtime/sql/run/claims.js"
+import { RunClaims } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
 import type {
@@ -51,7 +51,7 @@ const provide = <A, E, LayerError, ClaimsLayerError>(
 
 const provideClaims = <A, E, LayerError>(
   layer: Layer.Layer<Runtime | RunStore | RunClaims, LayerError, never>,
-  use: (services: Services & { readonly claims: RunClaimsService }) => Effect.Effect<A, E>,
+  use: (services: Services & { readonly claims: RunClaims["Service"] }) => Effect.Effect<A, E>,
 ): Effect.Effect<A, E | LayerError> =>
   Effect.scoped(
     Effect.flatMap(Layer.build(layer), (context) =>

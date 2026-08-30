@@ -119,7 +119,10 @@ const runtimeLayer = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
   SkillCatalog.layerSkills([researchSkill]),
   WorkingMemory.layer({ maxMessages: 4 }),
-  Connection.layerTest({ frames: () => Stream.empty, send: () => Effect.void }),
+  Connection.layerTest({
+    session: ({ sessionId }) => Effect.succeed({ sessionId, frames: Stream.empty, send: () => Effect.void }),
+    send: () => Effect.void,
+  }),
   compactionLayer,
 )
 

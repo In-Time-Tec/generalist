@@ -5,8 +5,8 @@ import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { agent } from "./agent"
 import { modelLayer } from "./model"
-import { cannedLayer } from "./search-provider"
 import { toolkit, toolkitLayer, webSearchTool } from "./tools"
+import { cannedLayer } from "./web-search"
 
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
   model: Pins.makeModel({ fixture: "research-agent", revision: "1" }),

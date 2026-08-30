@@ -71,7 +71,7 @@ export type Message = typeof Message.Type
 
 // INIT
 
-export const init: ApplicationInit<Model, Message, void, Connection.AgentConnection> = () => [
+export const init: ApplicationInit<Model, Message, void, Connection.Connection> = () => [
   {
     chat: Chat.initialModel(null),
     session: SessionOpening(),
@@ -103,13 +103,13 @@ export const OpenSession = define("OpenSession", {
 
 // UPDATE
 
-type ProgramCommand = Command<Message, never, Connection.AgentConnection>
+type ProgramCommand = Command<Message, never, Connection.Connection>
 
 const toggle = (keys: ReadonlyArray<string>, key: string): ReadonlyArray<string> =>
   keys.includes(key) ? keys.filter((existing) => existing !== key) : [...keys, key]
 
 const asProgramCommands = (
-  commands: ReadonlyArray<Command<Message, Connection.AgentCommandError, Connection.AgentConnection>>,
+  commands: ReadonlyArray<Command<Message, Connection.AgentCommandError, Connection.Connection>>,
 ): ReadonlyArray<ProgramCommand> =>
   commands.map((command) =>
     Object.assign({}, command, {
@@ -161,7 +161,7 @@ export const update: {
 
 // SUBSCRIPTION
 
-export const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
+export const subscriptions: Subscriptions<Model, Message, Connection.Connection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
   toParentMessage: (chatAction) => GotChatAction({ action: chatAction }),
 })

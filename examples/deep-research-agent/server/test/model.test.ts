@@ -2,8 +2,8 @@ import { describe, expect, layer } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Stream } from "effect"
 import { LanguageModel, Prompt } from "tenetkit"
 import { layerOrDeterministic } from "../src/model"
-import { testLayer } from "../src/search-provider"
 import { toolkit, toolkitLayer } from "../src/tools"
+import { testLayer } from "../src/web-search"
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 

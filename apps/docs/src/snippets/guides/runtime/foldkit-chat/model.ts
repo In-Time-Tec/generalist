@@ -50,15 +50,15 @@ const OpenSession = define("OpenSession", {
   ),
 })
 
-export const init: ApplicationInit<Model, Message, void, Connection.AgentConnection> = () => [
+export const init: ApplicationInit<Model, Message, void, Connection.Connection> = () => [
   { chat: Chat.initialModel(null) },
   [OpenSession()],
 ]
 
-type ProgramCommand = Command<Message, never, Connection.AgentConnection>
+type ProgramCommand = Command<Message, never, Connection.Connection>
 
 const asProgramCommands = <Failure>(
-  commands: ReadonlyArray<Command<Message, Failure, Connection.AgentConnection>>,
+  commands: ReadonlyArray<Command<Message, Failure, Connection.Connection>>,
 ): ReadonlyArray<ProgramCommand> =>
   commands.map((command) => ({
     ...command,
@@ -82,7 +82,7 @@ export const update: {
   }
 })
 
-export const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
+export const subscriptions: Subscriptions<Model, Message, Connection.Connection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
   toParentMessage: (chatAction) => GotChatAction({ action: chatAction }),
 })

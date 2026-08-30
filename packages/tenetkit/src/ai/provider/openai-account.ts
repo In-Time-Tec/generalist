@@ -8,13 +8,12 @@ import {
 import { Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
 import type { Credential, OpenAIAccountAuth } from "./openai-account-auth.js"
+import { failureReason, layerLanguageModel } from "./openai-model.js"
 import {
   type Config,
   type RegistrationOptions,
   classifyFailure,
   normalizeResponsesSSE,
-  openAiFailureReason,
-  openAiLanguageModelLayer,
   toolJsonSchemaCompiler,
 } from "./openai.js"
 import { isAvailabilityFailure } from "../model/failure.js"
@@ -88,7 +87,7 @@ export interface AccountOptions extends RegistrationOptions {
   readonly config?: Config
 }
 
-type OpenAILanguageModelModel = Parameters<typeof openAiLanguageModelLayer>[0]["model"]
+type OpenAILanguageModelModel = Parameters<typeof layerLanguageModel>[0]["model"]
 
 const credentialFailure = (request: HttpClientRequest.HttpClientRequest, error: OpenAIAccountCredentialError) =>
   new HttpClientError.HttpClientError({
@@ -180,7 +179,7 @@ const foldedCreateResponse =
           Stream.mapEffect(
             (event): Effect.Effect<FoldedResponse | undefined, AiError.AiError> =>
               event.type === "error"
-                ? Effect.fail(accountError("createResponse", openAiFailureReason({ error: event, requestId: null })))
+                ? Effect.fail(accountError("createResponse", failureReason({ error: event, requestId: null })))
                 : Effect.succeed(terminalResponse(event)),
           ),
           Stream.runFold(
@@ -255,7 +254,7 @@ const registrationOptions = (input: AccountOptions) => {
   const required = {
     provider: "openai",
     model: input.model,
-    layer: openAiLanguageModelLayer(input).pipe(Layer.provide(layerClient(input.credentials))),
+    layer: layerLanguageModel(input).pipe(Layer.provide(layerClient(input.credentials))),
     classifyFailure,
     toolJsonSchemaCompiler,
     isAvailabilityFailure,

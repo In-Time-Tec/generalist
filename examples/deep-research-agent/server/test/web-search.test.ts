@@ -1,7 +1,7 @@
 import { describe, expect, layer as layerHost } from "@effect/vitest"
 import { ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
-import { SearchProvider, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/search-provider"
+import { WebSearch, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/web-search"
 const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
@@ -15,7 +15,7 @@ const bodyJson = (body: HttpBody.HttpBody): Schema.Json => {
   return Schema.decodeSync(Schema.fromJsonString(Schema.Json))(new TextDecoder().decode(body.body))
 }
 
-describe("SearchProvider", () => {
+describe("WebSearch", () => {
   layerHost(layer.pipe(Layer.provide(withEnv({}))))("uses the canned corpus when EXA_API_KEY is absent", (it) => {
     it.effect("uses the canned corpus when EXA_API_KEY is absent", () =>
       Effect.gen(function* () {
@@ -96,7 +96,7 @@ describe("SearchProvider", () => {
     (it) => {
       it.effect("builds the configured Exa provider when EXA_API_KEY is present", () =>
         Effect.gen(function* () {
-          const service = yield* SearchProvider
+          const service = yield* WebSearch
 
           expect(service.search).toBeTypeOf("function")
         }),

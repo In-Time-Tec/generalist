@@ -8,7 +8,7 @@ import {
 } from "effect/unstable/http"
 
 /** @experimental */
-export class ExaSearchProviderError extends Schema.TaggedError<ExaSearchProviderError>()("ExaSearchProviderError", {
+export class ExaSearchError extends Schema.TaggedError<ExaSearchError>()("ExaSearchError", {
   message: Schema.String,
 }) {}
 
@@ -115,8 +115,8 @@ export interface Service {
 }
 
 /** @experimental */
-export class SearchProvider extends Context.Service<SearchProvider, Service>()(
-  "@tenetkit/example-deep-research-agent-server/search-provider/SearchProvider",
+export class WebSearch extends Context.Service<WebSearch, Service>()(
+  "@tenetkit/example-deep-research-agent-server/web-search/WebSearch",
 ) {}
 
 const exaSearchBody = (query: string) => ({
@@ -126,7 +126,7 @@ const exaSearchBody = (query: string) => ({
 })
 
 const toExaError = (error: HttpClientError.HttpClientError | Schema.SchemaError) =>
-  ExaSearchProviderError.make({ message: `Exa search failed: ${String(error)}` })
+  ExaSearchError.make({ message: `Exa search failed: ${String(error)}` })
 
 const snippetFor = (result: ExaResult): string => {
   if (result.text !== undefined && result.text !== null) return result.text
@@ -144,7 +144,7 @@ const searchExa = (
   client: HttpClient.HttpClient,
   apiKey: Redacted.Redacted<string>,
   query: string,
-): Effect.Effect<ReadonlyArray<SearchResult>, ExaSearchProviderError> => {
+): Effect.Effect<ReadonlyArray<SearchResult>, ExaSearchError> => {
   const request = HttpClientRequest.post("https://api.exa.ai/search").pipe(
     HttpClientRequest.setHeader("x-api-key", Redacted.value(apiKey)),
     HttpClientRequest.acceptJson,
@@ -160,22 +160,22 @@ const searchExa = (
 
 /** @experimental */
 export const cannedLayer = Layer.succeed(
-  SearchProvider,
-  SearchProvider.of({
-    search: Effect.fn("SearchProvider.Canned.search")((query: string) => Effect.succeed(cannedResultsFor(query))),
+  WebSearch,
+  WebSearch.of({
+    search: Effect.fn("WebSearch.Canned.search")((query: string) => Effect.succeed(cannedResultsFor(query))),
   }),
 )
 
 /** @experimental */
 export const exaLayerFromApiKey = (
   apiKey: Redacted.Redacted<string>,
-): Layer.Layer<SearchProvider, never, HttpClient.HttpClient> =>
+): Layer.Layer<WebSearch, never, HttpClient.HttpClient> =>
   Layer.effect(
-    SearchProvider,
+    WebSearch,
     Effect.gen(function* () {
       const client = yield* HttpClient.HttpClient
-      return SearchProvider.of({
-        search: Effect.fn("SearchProvider.Exa.search")(function* (query: string) {
+      return WebSearch.of({
+        search: Effect.fn("WebSearch.Exa.search")(function* (query: string) {
           return yield* searchExa(client, apiKey, query).pipe(Effect.orElseSucceed(() => cannedResultsFor(query)))
         }),
       })
@@ -203,13 +203,10 @@ export const layer = Layer.unwrap(
 )
 
 /** @experimental */
-export const searchProviderLayer = layer
+export const testLayer = (implementation: Service) => Layer.succeed(WebSearch, WebSearch.of(implementation))
 
 /** @experimental */
-export const testLayer = (implementation: Service) => Layer.succeed(SearchProvider, SearchProvider.of(implementation))
-
-/** @experimental */
-export const search = Effect.fn("SearchProvider.search.call")(function* (query: string) {
-  const searchProvider = yield* SearchProvider
-  return yield* searchProvider.search(query)
+export const search = Effect.fn("WebSearch.search")(function* (query: string) {
+  const webSearch = yield* WebSearch
+  return yield* webSearch.search(query)
 })

@@ -2,7 +2,7 @@ import { Cause, Effect, Result, Schema } from "effect"
 import { define, type Command } from "foldkit/command"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { AgentCommandError, AgentConnection, CommandOperation, Incoming, SendFailed } from "./connection.js"
+import { AgentCommandError, CommandOperation, Connection, Incoming, SendFailed } from "./connection.js"
 import type { ClientApproval } from "./connection-command.js"
 
 type EmptyFields = Record<never, never>
@@ -310,7 +310,7 @@ export const ConversationItem: Schema.Schema<ConversationItem> = Schema.Union([
 ])
 
 /** @experimental */
-export type ChatCommand = Command<Action, AgentCommandError, AgentConnection>
+export type ChatCommand = Command<Action, AgentCommandError, Connection>
 
 /** @experimental */
 export const initialModel = (sessionId: string | null = null): Model => ({
@@ -322,10 +322,7 @@ export const initialModel = (sessionId: string | null = null): Model => ({
   draft: "",
 })
 
-const catchCommandFailure = <A>(
-  operation: CommandOperation,
-  effect: Effect.Effect<A, AgentCommandError, AgentConnection>,
-) =>
+const catchCommandFailure = <A>(operation: CommandOperation, effect: Effect.Effect<A, AgentCommandError, Connection>) =>
   effect.pipe(
     Effect.catchCause((cause) => {
       const unexpected: Array<Cause.Reason<never>> = []
@@ -352,7 +349,7 @@ export const SendUserMessage = define("SendUserMessage", {
   args: { sessionId: Schema.String, text: Schema.String },
   messages: [SentUserMessage, FailedAgentCommand],
   execute: ({ sessionId, text }) =>
-    AgentConnection.use((connection) =>
+    Connection.use((connection) =>
       catchCommandFailure(
         "send",
         connection.send({ _tag: "SendMessage", sessionId, prompt: text }).pipe(Effect.as(SentUserMessage())),
@@ -374,7 +371,7 @@ export const ResolveApproval = define("ResolveApproval", {
     if (approved) decision = { _tag: "Approved" }
     else if (reason === null) decision = { _tag: "Denied" }
     else decision = { _tag: "Denied", reason }
-    return AgentConnection.use((connection) =>
+    return Connection.use((connection) =>
       catchCommandFailure(
         "resolveApproval",
         connection.send({ _tag: "ResolveApproval", sessionId, token, decision }).pipe(Effect.as(ResolvedApproval())),
@@ -388,7 +385,7 @@ export const CancelRun = define("CancelRun", {
   args: { sessionId: Schema.String },
   messages: [CancelledRun, FailedAgentCommand],
   execute: ({ sessionId }) =>
-    AgentConnection.use((connection) =>
+    Connection.use((connection) =>
       catchCommandFailure("cancel", connection.send({ _tag: "Cancel", sessionId }).pipe(Effect.as(CancelledRun()))),
     ),
 })

@@ -2,13 +2,7 @@ import { Cause, Effect, Option, Result, Schema } from "effect"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { ObserverRunEvent, type ResolvedRunEvent } from "../../transport/wire.js"
-import {
-  AgentCommandError,
-  type AgentConnection,
-  type CommandOperation,
-  type Incoming,
-  SendFailed,
-} from "./connection.js"
+import { AgentCommandError, type CommandOperation, type Connection, type Incoming, SendFailed } from "./connection.js"
 import {
   ApprovalRequired,
   AssistantEntry,
@@ -59,10 +53,7 @@ const commandFailed = (operation: CommandOperation, error: AgentCommandError): F
     reason: Schema.is(SendFailed)(error) ? error.reason : error.message,
   })
 
-const catchCommandFailure = <A>(
-  operation: CommandOperation,
-  effect: Effect.Effect<A, AgentCommandError, AgentConnection>,
-) =>
+const catchCommandFailure = <A>(operation: CommandOperation, effect: Effect.Effect<A, AgentCommandError, Connection>) =>
   effect.pipe(
     Effect.catchCause((cause) =>
       Option.match(unexpectedCause(cause), {

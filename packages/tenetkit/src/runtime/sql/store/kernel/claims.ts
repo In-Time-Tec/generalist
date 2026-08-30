@@ -5,7 +5,7 @@ import { AgentExecutionFailure, RunTerminal, RuntimeUnavailable } from "../../..
 import { ExecutionResult } from "../../../execution/state.js"
 import { isTerminal } from "../../../run.js"
 import { StaleClaim } from "../../errors.js"
-import { RunClaims, type ClaimedRun, type Service as RunClaimsService } from "../../run/claims.js"
+import { RunClaims, type ClaimedRun } from "../../run/claims.js"
 import { revokeSessionWriteClaim } from "../../session/claim.js"
 import { cancel, complete, fail } from "../control.js"
 import { releaseExecution, requireExecutionClaim } from "../execution.js"
@@ -22,7 +22,7 @@ export const sqlClaims = (input: {
   readonly run: SqlStoreRun
   readonly transactionHub: EventHub
   readonly locks: SqlStoreLocks
-}): RunClaimsService => {
+}): RunClaims["Service"] => {
   const claim = (
     runId: string,
     workerId: string,

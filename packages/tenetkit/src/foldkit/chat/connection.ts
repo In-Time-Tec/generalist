@@ -5,7 +5,7 @@ import type { CallableTaggedStruct } from "foldkit/schema"
 import {
   layerWebSocket as runClientLayerWebSocket,
   RunClient,
-  type Connection,
+  type Connection as RunConnection,
   type ConnectionStatus,
 } from "../../transport/run-client.js"
 import { TransportError } from "../../transport/errors.js"
@@ -65,22 +65,15 @@ export interface Service {
     readonly sessionId: string
     readonly afterSeq?: number
   }) => Effect.Effect<SessionConnection, never, Scope.Scope>
-  readonly frames: (options: {
-    readonly sessionId: string
-    readonly afterSeq?: number
-  }) => Stream.Stream<Incoming, never>
   readonly send: (command: AgentCommand) => Effect.Effect<void, AgentCommandError>
 }
 /** @experimental */
-export class AgentConnection extends Context.Service<AgentConnection, Service>()(
-  "tenetkit/foldkit/chat/connection/AgentConnection",
-) {}
+export class Connection extends Context.Service<Connection, Service>()("tenetkit/foldkit/chat/connection/Connection") {}
 
 interface ActiveConnection {
   readonly runId: string
-  readonly connection: Connection
+  readonly connection: RunConnection
 }
-type LegacyService = Omit<Service, "session">
 
 const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<never>> => {
   const reasons: Array<Cause.Reason<never>> = []
@@ -103,25 +96,15 @@ const statusIncoming = (status: ConnectionStatus): Option.Option<Incoming> => {
 }
 
 /** @experimental */
-export const layerTest = (implementation: Service | LegacyService): Layer.Layer<AgentConnection> => {
-  const session =
-    "session" in implementation
-      ? implementation.session
-      : (options: { readonly sessionId: string; readonly afterSeq?: number }) =>
-          Effect.succeed<SessionConnection>({
-            sessionId: options.sessionId,
-            frames: implementation.frames(options),
-            send: implementation.send,
-          })
-  return Layer.succeed(AgentConnection, AgentConnection.of({ ...implementation, session }))
-}
+export const layerTest = (implementation: Connection["Service"]): Layer.Layer<Connection> =>
+  Layer.succeed(Connection, Connection.of(implementation))
 
 /** @experimental */
 export const layerWebSocket = (options: {
   readonly url: string
-}): Layer.Layer<AgentConnection, never, Socket.WebSocketConstructor> =>
+}): Layer.Layer<Connection, never, Socket.WebSocketConstructor> =>
   Layer.effect(
-    AgentConnection,
+    Connection,
     Effect.gen(function* () {
       const client = yield* RunClient
       const active = yield* Ref.make<ReadonlyMap<string, ActiveConnection>>(new Map())
@@ -180,9 +163,8 @@ export const layerWebSocket = (options: {
           }
         })
 
-      return AgentConnection.of({
+      return Connection.of({
         session,
-        frames: (sessionOptions) => Stream.unwrap(session(sessionOptions).pipe(Effect.map((owned) => owned.frames))),
         send: (command) =>
           Ref.get(active).pipe(
             Effect.flatMap((current) => {

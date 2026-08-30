@@ -12,8 +12,8 @@ export interface Service {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<SearchResult>>
 }
 
-export class SearchProvider extends Context.Service<SearchProvider, Service>()(
-  "@tenetkit/docs/snippets/research-agent/search-provider/SearchProvider",
+export class WebSearch extends Context.Service<WebSearch, Service>()(
+  "@tenetkit/docs/snippets/research-agent/web-search/WebSearch",
 ) {}
 
 const cannedResults: ReadonlyArray<SearchResult> = [
@@ -29,7 +29,7 @@ const cannedResults: ReadonlyArray<SearchResult> = [
   },
 ]
 
-export const cannedLayer: Layer.Layer<SearchProvider> = Layer.succeed(
-  SearchProvider,
-  SearchProvider.of({ search: () => Effect.succeed(cannedResults) }),
+export const cannedLayer: Layer.Layer<WebSearch> = Layer.succeed(
+  WebSearch,
+  WebSearch.of({ search: () => Effect.succeed(cannedResults) }),
 )

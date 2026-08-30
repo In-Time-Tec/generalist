@@ -7,8 +7,8 @@ import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { agent } from "./agent"
 import { layerOrDeterministic } from "./model"
-import { searchProviderLayer } from "./search-provider"
 import { toolkit, toolkitLayer, webSearchTool } from "./tools"
+import { layer as webSearchLayer } from "./web-search"
 
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
   model: Pins.makeModel({ provider: "openrouter", model: "openai/gpt-4o-mini" }),
@@ -138,7 +138,7 @@ const routesLayer = HttpRouter.use((router) =>
 )
 
 /** @experimental */
-export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provideMerge(searchProviderLayer))
+export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provideMerge(webSearchLayer))
 
 const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {

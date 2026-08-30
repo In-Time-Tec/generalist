@@ -8,10 +8,10 @@ import {
 import { Config, Layer, Redacted } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { isAvailabilityFailure } from "../model/failure.js"
+import { layerLanguageModel } from "./openai-model.js"
 import {
   decodeConfig,
   layerConfig as openAiLayerConfig,
-  openAiLanguageModelLayer,
   toolJsonSchemaCompiler,
   type Config as OpenAIConfig,
   type RegistrationOptions,
@@ -36,7 +36,7 @@ const registrationOptions = (input: ClientOptions) => {
   const required = {
     provider: input.provider ?? "openai-responses",
     model: input.model,
-    layer: openAiLanguageModelLayer(input),
+    layer: layerLanguageModel(input),
     toolJsonSchemaCompiler,
     isAvailabilityFailure,
   } as const

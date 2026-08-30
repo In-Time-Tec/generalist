@@ -1,5 +1,5 @@
 import setupSource from "virtual:source/src/snippets/research-agent/demo/setup.sh"
-import searchProviderSource from "virtual:source/src/snippets/research-agent/search-provider.ts"
+import webSearchSource from "virtual:source/src/snippets/research-agent/web-search.ts"
 import toolsSource from "virtual:source/src/snippets/research-agent/tools.ts"
 import modelSource from "virtual:source/src/snippets/research-agent/model.ts"
 import agentSource from "virtual:source/src/snippets/research-agent/agent.ts"
@@ -39,11 +39,11 @@ export const researchAgent = definePage({
     h2("part-1-the-server", "Part 1: The server"),
     h3("scaffold-the-server", "Scaffold the server"),
     codeBlock({ label: "Terminal", language: "bash", source: setupSource }),
-    h3("a-search-provider-service", "A search provider service"),
+    h3("a-web-search-service", "A web search service"),
     p(
       "Tools should not talk to the outside world directly; they resolve services you own. Ours answers every query with canned results so the tutorial runs offline; swapping in a real search API later means swapping this one layer.",
     ),
-    codeBlock({ label: "search-provider.ts", source: searchProviderSource }),
+    codeBlock({ label: "web-search.ts", source: webSearchSource }),
     h3("the-web-search-tool", "The web_search tool"),
     p(
       code("Tool.make"),

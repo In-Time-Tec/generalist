@@ -1,12 +1,15 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
 import { Connection } from "tenetkit/foldkit"
 
+const frames = Stream.make(Connection.ConnectionOpened())
+const send = () => Effect.void
+
 const connectionLayer = Connection.layerTest({
-  frames: () => Stream.make(Connection.ConnectionOpened()),
-  send: () => Effect.void,
+  session: ({ sessionId }) => Effect.succeed({ sessionId, frames, send }),
+  send,
 })
 
-const program = Connection.AgentConnection.use((connection) =>
+const program = Connection.Connection.use((connection) =>
   Effect.scoped(
     Effect.gen(function* () {
       const session = yield* connection.session({ sessionId: "guide-session" })

@@ -1,8 +1,8 @@
 import { describe, expect, it as standalone, layer as layerHost } from "@effect/vitest"
 import { ConfigProvider, Effect, Fiber, Layer, SchemaAST, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { cannedResultsFor, layer, testLayer } from "../src/search-provider"
 import { toolkit, toolkitLayer, webSearchTool } from "../src/tools"
+import { cannedResultsFor, layer, testLayer } from "../src/web-search"
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
@@ -28,8 +28,8 @@ describe("web_search tool", () => {
           Effect.succeed([{ title: "Injected", url: "https://example.test", snippet: "from fake provider" }]),
       }),
     ),
-  )("returns results from an injected SearchProvider", (it) => {
-    it.effect("returns results from an injected SearchProvider", () =>
+  )("returns results from an injected WebSearch", (it) => {
+    it.effect("returns results from an injected WebSearch", () =>
       Effect.gen(function* () {
         const output = yield* runWebSearch("anything")
 
