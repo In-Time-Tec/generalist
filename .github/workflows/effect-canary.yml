@@ -20,7 +20,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: tenetkit
-          POSTGRES_PASSWORD: [REDACTED:password]
+          POSTGRES_PASSWORD: tenetkit-canary
           POSTGRES_DB: tenetkit
         ports:
           - 55432:5432
@@ -32,20 +32,20 @@ jobs:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: [REDACTED:password]
+          MYSQL_ROOT_PASSWORD: tenetkit-canary
           MYSQL_DATABASE: tenetkit
           MYSQL_USER: tenetkit
-          MYSQL_PASSWORD: [REDACTED:password]
+          MYSQL_PASSWORD: tenetkit-canary
         ports:
           - 33306:3306
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -utenetkit -ptenetkit"
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -utenetkit -ptenetkit-canary"
           --health-interval 1s
           --health-timeout 3s
           --health-retries 60
     env:
-      TENETKIT_DATABASE_URL: postgres://tenetkit:tenetkit@127.0.0.1:55432/tenetkit
-      TENETKIT_MYSQL_URL: mysql://tenetkit:tenetkit@127.0.0.1:33306/tenetkit
+      TENETKIT_DATABASE_URL: postgres://tenetkit:tenetkit-canary@127.0.0.1:55432/tenetkit
+      TENETKIT_MYSQL_URL: mysql://tenetkit:tenetkit-canary@127.0.0.1:33306/tenetkit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -73,5 +73,5 @@ jobs:
       - run: find node_modules/.bun -path '*/@effect/tsgo-linux-*/lib/tsc' -exec chmod +x {} +
       - run: bun run check
       - name: Configure MySQL test databases
-        run: mysql -h 127.0.0.1 -P 33306 -uroot -ptenetkit -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT ALL PRIVILEGES ON \`tenetkit\_%\`.* TO 'tenetkit'@'%'; FLUSH PRIVILEGES;"
+        run: mysql -h 127.0.0.1 -P 33306 -uroot -ptenetkit-canary -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT ALL PRIVILEGES ON \`tenetkit\_%\`.* TO 'tenetkit'@'%'; FLUSH PRIVILEGES;"
       - run: bun run test
