@@ -11,6 +11,7 @@
 - Centralize SQL Runtime lifecycle policy behind `tenetkit/runtime/sql-driver`, shared by Bun SQLite, Cloudflare Durable Object SQLite, PostgreSQL, and MySQL. This release establishes clean schema baseline version 4 and refuses older or future layouts; existing SQL Runtime databases must be recreated because there is no migration or backfill shim.
 - Add bounded SQL lifecycle spans and metrics for transitions, claims, locks, replay, schema identity, subscriber lag, MySQL deadlock retries, and Cloudflare drain/recovery without recording Session content, tool payloads, checkpoints, or SQL parameters.
 - Add fail-closed permission rules, bound tool outcomes before durable interception, and define conformance contracts for sandbox executors and remotely owned REPL kernels, including exact resource, fencing, recovery, and lifecycle requirements.
+- Replace the stale `in-process-v8-wasm` sandbox identity with the honest `sidecar-process-v8-isolate` topology, and record why AgentOS 0.2.15 cannot satisfy typed terminal attribution or bound output before frame decoding and therefore has no TenetKit adapter.
 - Upgrade the Effect package cohort to `4.0.0-rc.112`, pin FoldKit to the tested `0.148.2`, isolate optional provider SDKs, and verify exact package exports through clean minimum-dependency Bun, npm/Node, and workerd consumers.
 
 ## 0.42.0
