@@ -6,7 +6,7 @@ import {
   CurrentInstrumentation,
   CurrentPurpose,
   CurrentSummaryCall,
-  DeliveryFailed,
+  SinkFailed,
 } from "../../model/telemetry/events.js"
 import { Error, type Decision, type TurnOverrides, type Policy } from "../../turn/policy.js"
 import type { LanguageModelNotRegistered } from "../../model/registry.js"
@@ -354,7 +354,7 @@ export const make = <
     Stream.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Stream.failCause<RunError>(cause)
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
-      if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DeliveryFailed)(reason.error)) {
+      if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(SinkFailed)(reason.error)) {
         return Stream.failCause<RunError>(cause)
       }
       return Stream.unwrap(

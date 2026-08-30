@@ -4,7 +4,6 @@ import { Prompt } from "effect/unstable/ai"
 import type { TreePolicy } from "./tree/policy.js"
 import type { Address } from "./address.js"
 import type { PinnedExecutable } from "./executable/manifest.js"
-import type { Service as ExecutableResolverService } from "./executable/resolver.js"
 import type { Cursor } from "./cursor.js"
 import type {
   AddressNotFound,
@@ -78,7 +77,6 @@ export interface AddressBinding {
 
 export interface LayerOptions {
   readonly addresses: ReadonlyArray<AddressBinding>
-  readonly resolver: ExecutableResolverService
   readonly subscriberQueueCapacity?: number
   /** Host policy for addressing beyond TenetKit's derived relationships. Absent means relationships only. */
   readonly messagingPolicy?: MessagingPolicyService

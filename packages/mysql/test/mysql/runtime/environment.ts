@@ -28,11 +28,11 @@ export const mysqlUrl = Effect.runSync(
 )
 export const mysqlAvailable = mysqlUrl !== undefined && mysqlUrl.length > 0
 
-const resolver = ExecutableResolver.makeStatic([
+const resolverLayer = ExecutableResolver.layerStatic([
   { executable: assistantRef, agent: closedTestAgent(assistant) },
   { executable: researcherRef, agent: closedTestAgent(researcher) },
   { executable: analystRef, agent: closedTestAgent(analyst) },
-])
+]).pipe(Layer.orDie)
 const addresses = [
   { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
   { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
@@ -44,12 +44,11 @@ export const mysqlLayer = (url: string) =>
   layer({
     url,
     source: "mysql-test",
-    resolver,
     addresses,
     subscriberQueueCapacity: 8,
     maxConnections: 4,
     pollInterval: "20 millis",
-  })
+  }).pipe(Layer.provide(resolverLayer))
 
 /**
  * A MySQL Runtime whose mailbox bounds and messaging policy the test chooses.
@@ -62,13 +61,12 @@ export const mysqlMessagingLayer = (database: MysqlDatabase) => (overrides: Mess
     layer({
       url: database.url,
       source: "mysql-test",
-      resolver,
       addresses,
       subscriberQueueCapacity: 8,
       maxConnections: 4,
       pollInterval: "20 millis",
       ...overrides,
-    }),
+    }).pipe(Layer.provide(resolverLayer)),
   )
 
 const RUNTIME_TABLES = [

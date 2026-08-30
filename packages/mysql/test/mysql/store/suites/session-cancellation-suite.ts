@@ -43,11 +43,16 @@ describeMysql("mysql worker cancellation", () => {
     const runtimeLayer = backendLayer({
       url,
       source: "mysql-worker-test",
-      resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+          Layer.orDie,
+        ),
+      ),
+    )
     layer(staleWorker.provision(runtimeLayer), { excludeTestServices: true })(
       "rejects a stale worker commit after a replacement worker claims the Run",
       (suite) => {
@@ -142,15 +147,17 @@ describeMysql("mysql worker cancellation", () => {
             const options = {
               url,
               source: "mysql-worker-test",
-              resolver,
               addresses: [{ address, executable, registrations: registrationsFor(executable) }],
             }
+            const runtimeLayer = backendLayer(options).pipe(
+              Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)),
+            )
             yield* provideScoped(
               RuntimeWorker.layer({
                 workerId: "mysql-model-worker",
                 cancellationInterval: "10 millis",
                 lease: "30 seconds",
-              }).pipe(Layer.provideMerge(backendLayer(options))),
+              }).pipe(Layer.provideMerge(runtimeLayer)),
               Effect.gen(function* () {
                 const runtime = yield* Runtime.Runtime
                 const worker = yield* RuntimeWorker.RuntimeWorker
@@ -165,7 +172,7 @@ describeMysql("mysql worker cancellation", () => {
                 yield* worker.poll
                 yield* Deferred.await(started)
                 yield* provideScoped(
-                  backendLayer(options),
+                  runtimeLayer,
                   Effect.gen(function* () {
                     const remote = yield* Runtime.Runtime
                     yield* remote.cancel({ runId: receipt.runId, reason: "cancel from another runtime" })
@@ -224,21 +231,23 @@ describeMysql("mysql worker cancellation", () => {
               ),
           })
           const handlers = Toolkit.make(tool).toLayer({ block: () => Effect.die("ToolExecutor owns tool execution") })
-          const resolver = ExecutableResolver.makeStatic([
+          const resolver = yield* ExecutableResolver.makeStatic([
             { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
           ])
           const options = {
             url,
             source: "mysql-worker-test",
-            resolver,
             addresses: [{ address, executable, registrations: registrationsFor(executable) }],
           }
+          const runtimeLayer = backendLayer(options).pipe(
+            Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)),
+          )
           yield* provideScoped(
             RuntimeWorker.layer({
               workerId: "mysql-tool-worker",
               cancellationInterval: "10 millis",
               lease: "30 seconds",
-            }).pipe(Layer.provideMerge(backendLayer(options))),
+            }).pipe(Layer.provideMerge(runtimeLayer)),
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
               const store = yield* RunStore.RunStore
@@ -252,7 +261,7 @@ describeMysql("mysql worker cancellation", () => {
               yield* worker.poll
               yield* Deferred.await(started)
               yield* provideScoped(
-                backendLayer(options),
+                runtimeLayer,
                 Effect.gen(function* () {
                   const remote = yield* Runtime.Runtime
                   yield* remote.cancel({ runId: receipt.runId, reason: "cancel from another runtime" })

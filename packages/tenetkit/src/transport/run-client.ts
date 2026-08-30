@@ -42,6 +42,14 @@ export interface ConnectOptions {
   readonly reconnect?: ReconnectPolicy
 }
 
+/** @experimental The connection options cannot create a bounded client. */
+export class InvalidConnectOptions extends Schema.TaggedError<InvalidConnectOptions>()(
+  "tenetkit/transport/InvalidConnectOptions",
+  {
+    message: Schema.String,
+  },
+) {}
+
 /** @experimental */
 export interface Connection {
   readonly events: Stream.Stream<ResolvedRunEvent, TransportError>
@@ -52,7 +60,7 @@ export interface Connection {
 
 /** @experimental */
 export interface Service {
-  readonly connect: (options: ConnectOptions) => Effect.Effect<Connection, never, Scope.Scope>
+  readonly connect: (options: ConnectOptions) => Effect.Effect<Connection, InvalidConnectOptions, Scope.Scope>
 }
 
 /** @experimental */
@@ -119,7 +127,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
         Effect.gen(function* () {
           const capacity = options.eventCapacity ?? 256
           if (!Number.isSafeInteger(capacity) || capacity <= 0) {
-            return yield* Effect.die(new TypeError("eventCapacity must be a positive safe integer"))
+            return yield* InvalidConnectOptions.make({ message: "eventCapacity must be a positive safe integer" })
           }
           const reconnect = options.reconnect ?? defaultReconnectPolicy
           const scope = yield* Effect.scope

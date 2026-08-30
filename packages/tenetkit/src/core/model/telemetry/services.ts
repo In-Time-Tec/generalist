@@ -8,27 +8,25 @@ import type {
 } from "./events.js"
 
 /** @experimental */
-export class InvocationCoordinationFailed extends Schema.TaggedError<InvocationCoordinationFailed>()(
-  "tenetkit/core/InvocationCoordinationFailed",
+export class InvocationLifecycleFailed extends Schema.TaggedError<InvocationLifecycleFailed>()(
+  "tenetkit/core/InvocationLifecycleFailed",
   { message: Schema.String },
 ) {}
 
 /** @experimental */
-export interface InvocationCoordinatorService {
-  readonly beforeAttempt: (input: ModelInvocationStarted) => Effect.Effect<void, InvocationCoordinationFailed>
-  readonly completeAttempt: (input: ModelInvocationCompleted) => Effect.Effect<void, InvocationCoordinationFailed>
-  readonly failAttempt: (input: ModelInvocationFailed) => Effect.Effect<void, InvocationCoordinationFailed>
-}
+export class InvocationLifecycle extends Context.Service<
+  InvocationLifecycle,
+  {
+    readonly beforeAttempt: (input: ModelInvocationStarted) => Effect.Effect<void, InvocationLifecycleFailed>
+    readonly completeAttempt: (input: ModelInvocationCompleted) => Effect.Effect<void, InvocationLifecycleFailed>
+    readonly failAttempt: (input: ModelInvocationFailed) => Effect.Effect<void, InvocationLifecycleFailed>
+  }
+>()("tenetkit/core/model/telemetry/services/InvocationLifecycle") {}
 
 /** @experimental */
-export class InvocationCoordinator extends Context.Service<InvocationCoordinator, InvocationCoordinatorService>()(
-  "tenetkit/core/model/telemetry/services/InvocationCoordinator",
-) {}
-
-/** @experimental */
-export const layerInvocationCoordinatorNoop: Layer.Layer<InvocationCoordinator> = Layer.succeed(
-  InvocationCoordinator,
-  InvocationCoordinator.of({
+export const layerInvocationLifecycleNoop: Layer.Layer<InvocationLifecycle> = Layer.succeed(
+  InvocationLifecycle,
+  InvocationLifecycle.of({
     beforeAttempt: () => Effect.void,
     completeAttempt: () => Effect.void,
     failAttempt: () => Effect.void,
@@ -36,26 +34,24 @@ export const layerInvocationCoordinatorNoop: Layer.Layer<InvocationCoordinator> 
 )
 
 /** @experimental */
-export const isInvocationCoordinationFailed = Schema.is(InvocationCoordinationFailed)
+export const isInvocationLifecycleFailed = Schema.is(InvocationLifecycleFailed)
 
 /** @experimental Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
-export class DeliveryFailed extends Schema.TaggedError<DeliveryFailed>()("tenetkit/core/DeliveryFailed", {
+export class SinkFailed extends Schema.TaggedError<SinkFailed>()("tenetkit/core/SinkFailed", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
 /** @experimental Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`. */
-export interface DeliveryService {
-  readonly deliver: (batch: DeliveryBatch) => Effect.Effect<void, DeliveryFailed>
-}
-
-/** @experimental */
-export class Delivery extends Context.Service<Delivery, DeliveryService>()(
-  "tenetkit/core/model/telemetry/services/Delivery",
-) {}
+export class Sink extends Context.Service<
+  Sink,
+  {
+    readonly deliver: (batch: DeliveryBatch) => Effect.Effect<void, SinkFailed>
+  }
+>()("tenetkit/core/model/telemetry/services/Sink") {}
 
 /** @experimental No-op host delivery sink. */
-export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery.of({ deliver: () => Effect.void }))
+export const layerSinkNoop: Layer.Layer<Sink> = Layer.succeed(Sink, Sink.of({ deliver: () => Effect.void }))
 
 /** @experimental Generate one telemetry identifier via `IdGenerator`, defaulting when absent. */
 export const generateId: Effect.Effect<string> = Effect.flatMap(

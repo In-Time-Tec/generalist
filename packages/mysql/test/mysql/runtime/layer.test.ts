@@ -1,7 +1,7 @@
 import { layer as backendLayer } from "@tenetkit/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/sql-driver"
 import { registrationsFor } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
@@ -20,7 +20,6 @@ describeMysql("mysql runtime layer Program registration", () => {
     const runtimeLayer = backendLayer({
       url: database.url,
       source: "mysql-test",
-      resolver: fixture.resolver,
       addresses: [
         {
           address: fixture.address,
@@ -28,7 +27,7 @@ describeMysql("mysql runtime layer Program registration", () => {
           registrations: registrationsFor(fixture.executable),
         },
       ],
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
       "persists a narrowed registration set for every Program fan-out child",
       (it) => {

@@ -136,7 +136,5 @@ export const markDirty = (source: string): Effect.Effect<void, SchemaMigrationFa
     ),
   )
 
-export const RunSchema = { plan, check, apply, markDirty } as const
-
 export const layerClient = (options: { readonly url: string; readonly maxConnections?: number }) =>
   postgresClient(options)

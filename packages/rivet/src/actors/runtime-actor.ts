@@ -11,7 +11,15 @@ import {
   type ScheduledFireInfo,
 } from "rivetkit"
 import { db } from "rivetkit/db"
-import { Address, Errors, Message, OperationResolution, Runtime, TreePolicy } from "tenetkit/runtime"
+import {
+  Address,
+  Errors,
+  ExecutableResolver,
+  Message,
+  OperationResolution,
+  Runtime,
+  TreePolicy,
+} from "tenetkit/runtime"
 import {
   layerSqliteRuntime,
   makeExclusiveExecutionRecovery,
@@ -126,6 +134,8 @@ export type RuntimeActorDefinition = ActorDefinition<
 
 /** @experimental */
 export interface RuntimeActorOptions extends Omit<SqliteStoreOptions, "activationProjection" | "source"> {
+  /** Application-owned executable reconstruction composed into each actor incarnation. */
+  readonly resolver: Layer.Layer<ExecutableResolver.ExecutableResolver>
   /** Bounded authoritative candidates processed per wake. */
   readonly drainFuel?: number
   /** Bounded stale claims recovered per startup transaction. */
@@ -215,7 +225,14 @@ const makeRuntimeOwner = (actorId: string) =>
  * Actor SQLite is the only mutable Runtime authority. Schedules and cron are lossy doorbells.
  */
 export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefinition => {
-  const { actorOptions, drainFuel, recoveryIntervalMillis, recoveryPageSize: pageSize, ...storeOptions } = options
+  const {
+    actorOptions,
+    drainFuel,
+    recoveryIntervalMillis,
+    recoveryPageSize: pageSize,
+    resolver,
+    ...storeOptions
+  } = options
   const fuel = Math.max(1, Math.floor(drainFuel ?? 64))
   const recoveryPageSize = Math.max(1, Math.min(1000, Math.floor(pageSize ?? 100)))
   const recoveryInterval = Math.max(5_000, Math.floor(recoveryIntervalMillis ?? 5_000))
@@ -251,7 +268,7 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
               schedulerMode: "external",
             })
           }),
-        ).pipe(Layer.provideMerge(ownerLayer), Layer.provideMerge(layerSqlClient(c.db))),
+        ).pipe(Layer.provide(resolver), Layer.provideMerge(ownerLayer), Layer.provideMerge(layerSqlClient(c.db))),
       )
       try {
         const { ownerId } = await runtime.runPromise(RuntimeOwner, { signal: c.abortSignal })
@@ -262,7 +279,7 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
         const result = await runtime.runPromise(
           Effect.gen(function* () {
             yield* Runtime.Runtime
-            yield* sql.withTransaction(SqliteRunActivation.migrateAndBackfill(Effect.void))
+            yield* sql.withTransaction(SqliteRunActivation.initialize(Effect.void))
             const recovery = makeExclusiveExecutionRecovery(sql, projection)
             let afterRunId: string | undefined
             do {

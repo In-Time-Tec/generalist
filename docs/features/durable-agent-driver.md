@@ -46,7 +46,7 @@ Inline runs interpret operations immediately through existing Effect services. T
 
 ## Runtime seam
 
-`DriverInterpreter` is the single interpreter service agents use at effect boundaries. Optional `DriverJournalService` merges a host journal (`onScheduled`, `onCompleted`) into the run layer so `tenetkit/runtime` can intercept or persist operations without importing runtime concepts into core. `DurableDriver.recorded` exposes the in-run operation log for tests.
+`DriverInterpreter` is the single interpreter service agents use at effect boundaries. Optional `DriverJournal` merges a host journal (`onScheduled`, `onCompleted`) into the run layer so `tenetkit/runtime` can intercept or persist operations without importing runtime concepts into core. `DurableDriver.recorded` exposes the in-run operation log for tests.
 
 `DurableDriver.guardUnknownNeverReplay` rejects `Unknown` outcomes for operations with `never` replay policy before re-execution, failing typed as `DriverUnknownReplay`.
 

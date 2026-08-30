@@ -23,11 +23,16 @@ const layer = database.provision(
   backendLayer({
     url: database.url,
     source,
-    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     subscriberQueueCapacity: 8,
     maxConnections: 4,
-  }),
+  }).pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+        Layer.orDie,
+      ),
+    ),
+  ),
 )
 
 const scopedWith =

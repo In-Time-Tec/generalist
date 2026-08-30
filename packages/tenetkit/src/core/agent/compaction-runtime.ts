@@ -42,7 +42,7 @@ type CompactionContext = {
   readonly state: AgentRunState
   readonly compactionService: Option.Option<typeof Compaction.Service>
   readonly tokenizerService: Option.Option<typeof Tokenizer.Tokenizer.Service>
-  readonly deliverPending: Effect.Effect<void, import("../model/telemetry/events.js").DeliveryFailed>
+  readonly deliverPending: Effect.Effect<void, import("../model/telemetry/events.js").SinkFailed>
   readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
   readonly emitTelemetry: (event: import("../model/telemetry/events.js").EventPayload) => Effect.Effect<void>
   readonly prepareTelemetry: (event: import("../model/telemetry/events.js").EventPayload) => ModelTelemetryEvent

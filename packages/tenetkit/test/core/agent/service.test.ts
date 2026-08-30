@@ -37,7 +37,7 @@ import {
   Steering,
   ToolContext,
   ToolExecutor,
-  Output,
+  ToolOutput,
   Policy,
 } from "../../../src/index"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
@@ -1597,7 +1597,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const journal: DurableDriver.DriverJournal = {
+        const journal: DurableDriver.Journal = {
           onScheduled: (operation) => {
             const input = Schema.decodeUnknownOption(Schema.Struct({ name: Schema.String }))(operation.input)
             return operation.kind === "tool" && Option.isSome(input) && input.value.name === "activate_skill"
@@ -1612,7 +1612,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events = yield* Agent.stream(agent, {
           prompt: "replay activation",
           logicalOperationId: "replayed-skill-run",
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, journal))
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, journal))
 
         expect(events.at(-1)?._tag).toBe("Completed")
         expect(bodyReads).toBe(1)
@@ -5385,7 +5385,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               return { _tag: "Success" as const, result: largeOutput, encodedResult: largeOutput }
             }),
         }),
-        Output.layerTest({
+        ToolOutput.layerTest({
           put: (toolCallId, content) => {
             order.push("spill")
             stored = { toolCallId, content }
@@ -5398,7 +5398,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "spill-agent", toolkit: Toolkit.make(echoTool) })
         const tracing = testTracer()
-        const journal: DurableDriver.DriverJournal = {
+        const journal: DurableDriver.Journal = {
           onScheduled: () => Effect.void,
           onCompleted: (operation, outcome) =>
             operation.kind !== "tool"
@@ -5419,7 +5419,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               : Effect.void,
           ),
           Stream.runCollect,
-          Effect.provideService(DurableDriver.DriverJournalService, journal),
+          Effect.provideService(DurableDriver.DriverJournal, journal),
           Effect.provideService(Tracer.Tracer, tracing.tracer),
         )
 
@@ -8482,7 +8482,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const executable = ExecutableManifest.makeTest("journal-restart-agent", undefined)
         const pendingKey = "journal-restart:model:12:52:conversation"
         let pending: DurableDriver.DriverCheckpoint | undefined
-        const crashingJournal: DurableDriver.DriverJournal = {
+        const crashingJournal: DurableDriver.Journal = {
           onScheduled: (operation, checkpoint) => {
             if (operation.key !== pendingKey) return Effect.void
             return Effect.sync(() => {
@@ -8498,11 +8498,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           executableRef: executable.ref,
           modelCallOrdinalStart: 40,
           sessionId: "journal-restart",
-        }).pipe(
-          Stream.runDrain,
-          Effect.provideService(DurableDriver.DriverJournalService, crashingJournal),
-          Effect.exit,
-        )
+        }).pipe(Stream.runDrain, Effect.provideService(DurableDriver.DriverJournal, crashingJournal), Effect.exit)
         expect(modelCalls).toBe(12)
         expect(pending).toBeDefined()
         expect(pending?.turn).toBe(12)
@@ -8513,7 +8509,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const scheduled: Array<string> = []
         let safeCheckpoint: DurableDriver.DriverCheckpoint | undefined
-        const resumedJournal: DurableDriver.DriverJournal = {
+        const resumedJournal: DurableDriver.Journal = {
           onScheduled: (operation) =>
             Effect.sync(() => {
               scheduled.push(operation.key)
@@ -8533,7 +8529,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           executableRef: executable.ref,
           driverCheckpoint: pending!,
           sessionId: "journal-restart",
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, resumedJournal))
         expect(scheduled.find((key) => key.includes(":model:"))).toBe(pendingKey)
         const turnStarted = events.find((event) => event._tag === "TurnStarted")
         const call = events.find((event) => event._tag === "ModelCallStarted")
@@ -8554,7 +8550,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(safeState.pending).toBeUndefined()
 
         const overrideScheduled: Array<{ readonly key: string; readonly turn: number }> = []
-        const overrideJournal: DurableDriver.DriverJournal = {
+        const overrideJournal: DurableDriver.Journal = {
           onScheduled: (operation, checkpoint) =>
             Effect.sync(() => {
               overrideScheduled.push({ key: operation.key, turn: checkpoint.turn })
@@ -8569,7 +8565,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           driverCheckpoint: safeCheckpoint!,
           sessionId: "journal-restart",
           turnStart: 13,
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, overrideJournal))
+        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, overrideJournal))
         expect(overrideScheduled.every(({ turn }) => turn >= 12)).toBe(true)
         expect(overrideScheduled.find(({ key }) => key.includes(":model:"))?.key).toBe(
           "journal-restart:model:13:53:conversation",
@@ -8639,9 +8635,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "delivers durable telemetry in ordered immutable batches matching live delivery IDs", () => {
     const batches: Array<ReadonlyArray<ModelTelemetry.Event>> = []
-    const delivery = Layer.succeed(
-      ModelTelemetry.Delivery,
-      ModelTelemetry.Delivery.of({
+    const sink = Layer.succeed(
+      ModelTelemetry.Sink,
+      ModelTelemetry.Sink.of({
         deliver: (batch) =>
           Effect.sync(() => {
             expect(batch.sessionId).toBe("delivery-session")
@@ -8655,7 +8651,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        delivery,
+        sink,
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
@@ -8677,12 +8673,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "fails typed when durable telemetry delivery rejects an exact stable batch", () => {
     const attempted: Array<ReadonlyArray<ModelTelemetry.Event>> = []
-    const delivery = Layer.succeed(
-      ModelTelemetry.Delivery,
-      ModelTelemetry.Delivery.of({
+    const sink = Layer.succeed(
+      ModelTelemetry.Sink,
+      ModelTelemetry.Sink.of({
         deliver: (batch) => {
           attempted.push(batch.events)
-          return Effect.fail(ModelTelemetry.DeliveryFailed.make({ message: "sink unavailable" }))
+          return Effect.fail(ModelTelemetry.SinkFailed.make({ message: "sink unavailable" }))
         },
       }),
     )
@@ -8692,7 +8688,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        delivery,
+        sink,
       ),
       Effect.gen(function* () {
         const seen: Array<AgentEvent.Event> = []
@@ -8704,7 +8700,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ),
         )
 
-        expect(failure._tag).toBe("tenetkit/core/DeliveryFailed")
+        expect(failure._tag).toBe("tenetkit/core/SinkFailed")
         expect(attempted).toHaveLength(1)
         expect(Object.isFrozen(attempted[0])).toBe(true)
         const attemptedIds = attempted[0]!.map((event) => event.deliveryId)
@@ -8717,9 +8713,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   ItLayer.make(it, "interrupts hanging durable telemetry delivery without emitting the in-flight batch", () => {
     const entered = Deferred.makeUnsafe<void>()
     const attempted: Array<ReadonlyArray<ModelTelemetry.Event>> = []
-    const delivery = Layer.succeed(
-      ModelTelemetry.Delivery,
-      ModelTelemetry.Delivery.of({
+    const sink = Layer.succeed(
+      ModelTelemetry.Sink,
+      ModelTelemetry.Sink.of({
         deliver: (batch) =>
           Effect.sync(() => attempted.push(batch.events)).pipe(
             Effect.andThen(Deferred.succeed(entered, undefined)),
@@ -8733,7 +8729,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        delivery,
+        sink,
       ),
       Effect.gen(function* () {
         const seen: Array<AgentEvent.Event> = []

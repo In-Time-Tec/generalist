@@ -75,19 +75,18 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     const handlers = toolkit.toLayer({
       external_write: () => Effect.die("ToolExecutor owns external_write"),
     })
-    const firstResolver = ExecutableResolver.makeStatic([
+    const firstResolverLayer = ExecutableResolver.layerStatic([
       {
         executable,
         agent: Agent.close(agent, Layer.mergeAll(firstModel, firstExecutor, handlers)),
       },
-    ])
+    ]).pipe(Layer.orDie)
     const first = yield* scopedWith(
       SqliteRuntime.layerSqlite({
         filename,
-        resolver: firstResolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }),
+      }).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -156,20 +155,19 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
           return { _tag: "Success" as const, result: "duplicate", encodedResult: "duplicate" }
         }),
     })
-    const recoveredResolver = ExecutableResolver.makeStatic([
+    const recoveredResolverLayer = ExecutableResolver.layerStatic([
       {
         executable,
         agent: Agent.close(agent, Layer.mergeAll(recoveredModel, recoveredExecutor, handlers)),
       },
-    ])
+    ]).pipe(Layer.orDie)
 
     yield* scopedWith(
       SqliteRuntime.layerSqlite({
         filename,
-        resolver: recoveredResolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }),
+      }).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -251,7 +249,7 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
         },
       }),
     )
-    const firstResolver = ExecutableResolver.makeStatic([
+    const firstResolverLayer = ExecutableResolver.layerStatic([
       {
         executable,
         agent: Agent.close(
@@ -264,15 +262,14 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
           ),
         ),
       },
-    ])
+    ]).pipe(Layer.orDie)
 
     const suspended = yield* scopedWith(
       SqliteRuntime.layerSqlite({
         filename,
-        resolver: firstResolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }),
+      }).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -337,20 +334,19 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
           return { _tag: "Success" as const, result: "written", encodedResult: "written" }
         }),
     })
-    const recoveredResolver = ExecutableResolver.makeStatic([
+    const recoveredResolverLayer = ExecutableResolver.layerStatic([
       {
         executable,
         agent: Agent.close(agent, Layer.mergeAll(recoveredModel, recoveredExecutor, handlers, Approvals.layerDenyAll)),
       },
-    ])
+    ]).pipe(Layer.orDie)
 
     yield* scopedWith(
       SqliteRuntime.layerSqlite({
         filename,
-        resolver: recoveredResolver,
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }),
+      }).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -404,16 +400,16 @@ it.effect("sqlite reconciles every running operation before execution", () => {
       streamText: () => Stream.empty,
     }),
   )
-  const resolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, model) }])
   const options = {
-    resolver,
     addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     scheduler: { pollInterval: "1 hour" as const },
   }
   const runtimeLayer = SqliteRuntime.layerSqlite({
     ...options,
     filename: tempDbPath(`retry-safe-recovery-${backend}`),
-  })
+  }).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, model) }]).pipe(Layer.orDie)),
+  )
   return scopedWith(runtimeLayer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime

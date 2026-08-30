@@ -5,7 +5,6 @@ import { Prompt } from "effect/unstable/ai"
 import { TestClock } from "effect/testing"
 import { Address, Message } from "../../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../../src/runtime/errors.js"
-import { makeStatic as makeExecutableResolver } from "../../../src/runtime/executable/resolver.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { makeRunStore } from "../../../src/runtime/memory/store.js"
 import { make } from "../../../src/runtime/sql/worker.js"
@@ -15,7 +14,7 @@ import { RunStore, type Service as StoreService } from "../../../src/runtime/run
 import type { RunInspection, RunStatus } from "../../../src/runtime/run.js"
 import { assistantRef } from "../execution/fixtures.js"
 
-workerWakeupSuite({ makeExecutableResolver, makeRunStore, make })
+workerWakeupSuite({ makeRunStore, make })
 
 const decodedRun: DecodedRun = {
   runId: "run:worker",
@@ -73,7 +72,7 @@ const claimsService = (refreshLease: ClaimsService["refreshLease"]): ClaimsServi
 /** These worker tests exercise claim renewal only; the watcher needs one status read. */
 const storeService = (status: RunStatus): StoreService =>
   RunStore.of({
-    ...Effect.runSync(Effect.scoped(makeRunStore({ resolver: makeExecutableResolver([]), addresses: [] }))),
+    ...Effect.runSync(Effect.scoped(makeRunStore({ addresses: [] }))),
     inspect: () =>
       Effect.succeed({
         runId: decodedRun.runId,

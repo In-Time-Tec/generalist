@@ -211,20 +211,19 @@ const makeFourChildFixture = (filename: string) => {
   const handlers = Toolkit.make(probe).toLayer({
     linear_storage_probe: () => Effect.die("ToolExecutor test layer owns execution"),
   })
-  const resolver = ExecutableResolver.makeStatic([
+  const resolverLayer = ExecutableResolver.layerStatic([
     { executable: parentRef, agent: Agent.close(parent, parentModel) },
     { executable: childRef, agent: Agent.close(child, Layer.mergeAll(childModel, executor, handlers)) },
-  ])
+  ]).pipe(Layer.orDie)
   return {
     address,
     expectedMarkers,
     runtimeLayer: () =>
       SqliteRuntime.layerSqlite({
         filename,
-        resolver,
         addresses: [{ address, executable: parentRef, registrations: registrationsFor(parentRef) }],
         scheduler: { pollInterval: "1 day" },
-      }),
+      }).pipe(Layer.provide(resolverLayer)),
     counts: () => ({
       parentCalls: parentCalls.length,
       childCalls: [...childCalls],

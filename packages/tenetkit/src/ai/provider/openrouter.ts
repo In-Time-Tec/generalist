@@ -41,10 +41,11 @@ export interface Options extends RegistrationOptions {
 }
 
 /** @experimental Decodes persisted provider options into OpenRouter request configuration. */
-const decodeConfigInput = Schema.decodeUnknownSync(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
+const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 type ConfigInput = typeof Schema.Unknown.Type
 
-export const decodeConfig = (options: ConfigInput): Config => decodeConfigInput(options ?? null) ?? {}
+export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema.SchemaError> =>
+  decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
 
 const ChatStreamChunk = Schema.Struct({
   ...Generated.ChatStreamChunk.fields,
@@ -188,7 +189,7 @@ const openRouterLanguageModelLayer = (input: Options) =>
       layerImageSources(
         OpenRouterLanguageModel.layer({
           model: input.model,
-          config: decodeConfig(input.config),
+          config: input.config ?? {},
         }),
       ),
       resolveOpenRouterFailure,

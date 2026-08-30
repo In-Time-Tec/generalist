@@ -201,16 +201,19 @@ it.effect("reopens and hydrates a model response without persisting provider tra
       },
     }),
   )
-  const resolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, model) }])
   const options = {
     filename,
-    resolver,
     addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     scheduler: { pollInterval: "1 day" as const },
   }
 
   return Effect.gen(function* () {
-    const runId = yield* scopedWith(SqliteRuntime.layerSqlite(options))(
+    const runtimeLayer = SqliteRuntime.layerSqlite(options).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, model) }]).pipe(Layer.orDie),
+      ),
+    )
+    const runId = yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor.RunExecutor
@@ -228,7 +231,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
       }),
     )
 
-    yield* scopedWith(SqliteRuntime.layerSqlite(options))(
+    yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const event = (yield* runtime.history({ runId, limit: 100 })).find(

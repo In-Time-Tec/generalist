@@ -407,7 +407,6 @@ it.live("rolls back reservation and projects settlement-driven cancellation in S
   const projected: Array<{ readonly runId: string; readonly intent: string }> = []
   const layer = SqliteRuntime.layerSqlite({
     filename: tempDbPath("external-child-rollback"),
-    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     subscriberQueueCapacity: 8,
     activationProjection: {
@@ -416,7 +415,13 @@ it.live("rolls back reservation and projects settlement-driven cancellation in S
           ? RuntimeUnavailable.make({ message: "forced projection rollback" })
           : Effect.sync(() => void projected.push(...changes)),
     },
-  })
+  }).pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+        Layer.orDie,
+      ),
+    ),
+  )
   return provideScoped(
     layer,
     Effect.gen(function* () {

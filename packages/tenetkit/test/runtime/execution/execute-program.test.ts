@@ -32,8 +32,7 @@ describe("durable Agent Programs", () => {
   it.effect("rejects Program replay divergence in memory and SQLite without changing the journal", () => {
     const memory = programFixture()
     const sqlite = programFixture()
-    const options = (resolver: typeof memory.resolver) => ({
-      resolver,
+    const options = {
       addresses: [
         {
           address: programAddress,
@@ -41,30 +40,32 @@ describe("durable Agent Programs", () => {
           registrations: registrationsFor(programExecutable),
         },
       ],
-    })
+    }
     return Effect.gen(function* () {
-      yield* scopedWith(Runtime.layerMemory(options(memory.resolver)))(programReplayDivergenceContract)
+      yield* scopedWith(Runtime.layerMemory(options).pipe(Layer.provide(memory.resolverLayer)))(
+        programReplayDivergenceContract,
+      )
       yield* scopedWith(
         SqliteRuntime.layerSqlite({
-          ...options(sqlite.resolver),
+          ...options,
           filename: tempDbPath("program-replay-divergence"),
-        }),
+        }).pipe(Layer.provide(sqlite.resolverLayer)),
       )(programReplayDivergenceContract)
     })
   })
 
-  it("rejects a live Program whose manifest differs from its claimed pin", () => {
-    const { resolver: _resolver, ...fixtureState } = programFixture()
-    const forged = {
-      ...program,
-      pinned: {
-        ...program.pinned,
-        manifest: { ...program.pinned.manifest, name: "forged-program" },
-      },
-    }
+  it.effect("rejects a live Program whose manifest differs from its claimed pin", () =>
+    Effect.gen(function* () {
+      const { resolverLayer: _resolverLayer, ...fixtureState } = programFixture()
+      const forged = {
+        ...program,
+        pinned: {
+          ...program.pinned,
+          manifest: { ...program.pinned.manifest, name: "forged-program" },
+        },
+      }
 
-    expect(() =>
-      ExecutableResolver.makeStatic([
+      const failure = yield* ExecutableResolver.makeStatic([
         {
           _tag: "Program",
           executable: programExecutable,
@@ -72,14 +73,14 @@ describe("durable Agent Programs", () => {
           executor: fixtureState.executor,
           handlers: fixtureState.handlers,
         },
-      ]),
-    ).toThrow(/does not match/)
-  })
+      ]).pipe(Effect.flip)
+      expect(failure.message).toMatch(/does not match/)
+    }),
+  )
 
   const dispatchFixture = programFixture()
   layer(
     Runtime.layerMemory({
-      resolver: dispatchFixture.resolver,
       addresses: [
         {
           address: programAddress,
@@ -87,7 +88,7 @@ describe("durable Agent Programs", () => {
           registrations: registrationsFor(programExecutable),
         },
       ],
-    }),
+    }).pipe(Layer.provide(dispatchFixture.resolverLayer)),
   )("dispatches Programs and replays named tool and log operations in memory", (suite) => {
     suite.effect("dispatches and replays named operations", () =>
       Effect.gen(function* () {
@@ -114,7 +115,6 @@ describe("durable Agent Programs", () => {
   const approvalFixture = approvalProgramFixture()
   layer(
     Runtime.layerMemory({
-      resolver: approvalFixture.resolver,
       addresses: [
         {
           address: programAddress,
@@ -122,7 +122,7 @@ describe("durable Agent Programs", () => {
           registrations: registrationsFor(programExecutable),
         },
       ],
-    }),
+    }).pipe(Layer.provide(approvalFixture.resolverLayer)),
   )("authorizes before dispatch and resumes the exact approved operation once", (suite) => {
     suite.effect("authorizes once and resumes exactly", () =>
       Effect.gen(function* () {
@@ -183,7 +183,6 @@ describe("durable Agent Programs", () => {
     let runId = ""
     const options = {
       filename,
-      resolver: fixture.resolver,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
@@ -231,8 +230,8 @@ describe("durable Agent Programs", () => {
       }),
     )
     return Effect.gen(function* () {
-      yield* scopedWith(SqliteRuntime.layerSqlite(options))(suspend)
-      yield* scopedWith(SqliteRuntime.layerSqlite(options))(resume)
+      yield* scopedWith(SqliteRuntime.layerSqlite(options).pipe(Layer.provide(fixture.resolverLayer)))(suspend)
+      yield* scopedWith(SqliteRuntime.layerSqlite(options).pipe(Layer.provide(fixture.resolverLayer)))(resume)
     })
   })
 
@@ -272,7 +271,6 @@ describe("durable Agent Programs", () => {
     const layerFor = (fixture: ReturnType<typeof approvalProgramFixture>, sqliteName?: string) =>
       sqliteName === undefined
         ? Runtime.layerMemory({
-            resolver: fixture.resolver,
             addresses: [
               {
                 address: programAddress,
@@ -280,10 +278,9 @@ describe("durable Agent Programs", () => {
                 registrations: registrationsFor(programExecutable),
               },
             ],
-          })
+          }).pipe(Layer.provide(fixture.resolverLayer))
         : SqliteRuntime.layerSqlite({
             filename: tempDbPath(sqliteName),
-            resolver: fixture.resolver,
             addresses: [
               {
                 address: programAddress,
@@ -291,7 +288,7 @@ describe("durable Agent Programs", () => {
                 registrations: registrationsFor(programExecutable),
               },
             ],
-          })
+          }).pipe(Layer.provide(fixture.resolverLayer))
     return Effect.gen(function* () {
       yield* scopedWith(layerFor(denied))(run(denied, "Denied"))
       yield* scopedWith(layerFor(cancelled))(run(cancelled, "Cancel"))
@@ -325,7 +322,6 @@ describe("durable Agent Programs", () => {
       yield* scopedWith(
         SqliteRuntime.layerSqlite({
           filename,
-          resolver: first.resolver,
           addresses: [
             {
               address: programAddress,
@@ -333,12 +329,12 @@ describe("durable Agent Programs", () => {
               registrations: registrationsFor(programExecutable),
             },
           ],
-        }),
+        }).pipe(Layer.provide(first.resolverLayer)),
       )(write)
+      const reopened = programFixture()
       yield* scopedWith(
         SqliteRuntime.layerSqlite({
           filename,
-          resolver: programFixture().resolver,
           addresses: [
             {
               address: programAddress,
@@ -346,7 +342,7 @@ describe("durable Agent Programs", () => {
               registrations: registrationsFor(programExecutable),
             },
           ],
-        }),
+        }).pipe(Layer.provide(reopened.resolverLayer)),
       )(reopen)
     })
   })
@@ -416,7 +412,6 @@ describe("durable Agent Programs", () => {
     return Effect.gen(function* () {
       yield* scopedWith(
         Runtime.layerMemory({
-          resolver: memory.resolver,
           addresses: [
             {
               address: programAddress,
@@ -424,12 +419,11 @@ describe("durable Agent Programs", () => {
               registrations: registrationsFor(programExecutable),
             },
           ],
-        }),
+        }).pipe(Layer.provide(memory.resolverLayer)),
       )(verify)
       yield* scopedWith(
         SqliteRuntime.layerSqlite({
           filename: tempDbPath("program-unknown"),
-          resolver: sqlite.resolver,
           addresses: [
             {
               address: programAddress,
@@ -437,7 +431,7 @@ describe("durable Agent Programs", () => {
               registrations: registrationsFor(programExecutable),
             },
           ],
-        }),
+        }).pipe(Layer.provide(sqlite.resolverLayer)),
       )(verify)
     })
   })
@@ -493,7 +487,6 @@ describe("durable Agent Programs", () => {
           expect(fixture.counts().childFinalizers).toBe(finalizersBefore + 3)
         })
       const options = {
-        resolver: fixture.resolver,
         addresses: [
           { address: mapAddress, executable: fixture.executable, registrations: registrationsFor(fixture.executable) },
         ],
@@ -533,15 +526,19 @@ describe("durable Agent Programs", () => {
         expect((yield* store.loadProgramState(receipt.runId))?.activeSlots).toBe(0)
       })
       return Effect.gen(function* () {
-        yield* scopedWith(Runtime.layerMemory(options))(memory)
-        yield* scopedWith(SqliteRuntime.layerSqlite({ ...options, filename }))(sqliteAdmit)
-        yield* scopedWith(SqliteRuntime.layerSqlite({ ...options, filename }))(sqliteReopen)
-        yield* scopedWith(Runtime.layerMemory(options))(cancelAdmitted)
+        yield* scopedWith(Runtime.layerMemory(options).pipe(Layer.provide(fixture.resolverLayer)))(memory)
+        yield* scopedWith(
+          SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(fixture.resolverLayer)),
+        )(sqliteAdmit)
+        yield* scopedWith(
+          SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(fixture.resolverLayer)),
+        )(sqliteReopen)
+        yield* scopedWith(Runtime.layerMemory(options).pipe(Layer.provide(fixture.resolverLayer)))(cancelAdmitted)
         yield* scopedWith(
           SqliteRuntime.layerSqlite({
             ...options,
             filename: tempDbPath("program-agent-map-cancel"),
-          }),
+          }).pipe(Layer.provide(fixture.resolverLayer)),
         )(cancelAdmitted)
       })
     },

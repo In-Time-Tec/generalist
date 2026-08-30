@@ -5,7 +5,7 @@ import { type AnyToolCall, domainFailureResult, successResult, type PendingToolR
 import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "../service.js"
 import type { AgentRunState } from "../run-state.js"
 import type { HandoffRunState } from "../handoff/state.js"
-import type { AuthorizationError, ToolAuthorizer } from "../../tools/tool-authorization.js"
+import type { AuthorizationError, Authorizer } from "../../tools/tool-authorization.js"
 import {
   FrameworkFailure,
   type Outcome,
@@ -41,7 +41,7 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, Polic
   readonly activeSession: Option.Option<import("../../context/session.js").Service>
   readonly sessionId: string
   readonly executor: Option.Option<typeof ToolExecutor.Service>
-  readonly authorizer: ToolAuthorizer<AuthorizationR>
+  readonly authorizer: Authorizer<AuthorizationR>
   readonly skillRuntime:
     | { readonly catalog: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined

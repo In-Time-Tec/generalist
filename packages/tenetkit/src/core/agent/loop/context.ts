@@ -7,7 +7,7 @@ import type { ModelTurnServices } from "../model-turn/context.js"
 import type { PendingToolResult, AnyToolCall } from "../tools/result.js"
 import type { Result as CompactionResult } from "../../turn/compaction.js"
 import type { LanguageModelNotRegistered } from "../../model/registry.js"
-import type { CallPurpose, DeliveryFailed } from "../../model/telemetry/events.js"
+import type { CallPurpose, SinkFailed } from "../../model/telemetry/events.js"
 import type { Decision, TurnOverrides } from "../../turn/policy.js"
 import type { Key, Memory } from "../../context/memory.js"
 import type { Middleware } from "../../model/middleware.js"
@@ -91,7 +91,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     parentId: string | null,
     applicationIdentity: string,
   ) => Effect.Effect<void, RunError, DriverInterpreter>
-  readonly deliverPending: Effect.Effect<void, DeliveryFailed>
+  readonly deliverPending: Effect.Effect<void, SinkFailed>
   readonly flushTelemetry: () => ReadonlyArray<Event>
   readonly telemetryIdentity: {
     readonly current:

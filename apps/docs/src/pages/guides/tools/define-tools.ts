@@ -77,7 +77,7 @@ export const defineTools = definePage({
     ),
     codeBlock({ label: "spill-large-outputs.ts", source: spillLargeOutputs }),
     p(
-      code("Output.layerMemory"),
+      code("ToolOutput.layerMemory"),
       " keeps spilled outputs in process memory; a host with real storage implements ",
       code("Store"),
       " with one ",

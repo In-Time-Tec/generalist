@@ -26,7 +26,7 @@ export interface RecordedOperation {
   readonly checkpoint: DriverCheckpoint
 }
 /** @experimental Host hook surface for durable operation journaling without runtime imports. */
-export interface DriverJournal {
+export interface Journal {
   readonly onScheduled: (
     operation: DriverOperation,
     checkpoint: DriverCheckpoint,
@@ -39,8 +39,8 @@ export interface DriverJournal {
   readonly onCheckpoint: (checkpoint: DriverCheckpoint) => Effect.Effect<void, DriverError>
 }
 /** @experimental Optional host journal service merged into Agent.stream driver layers. */
-export class DriverJournalService extends Context.Service<DriverJournalService, DriverJournal>()(
-  "tenetkit/core/durable/driver/interpreter/DriverJournalService",
+export class DriverJournal extends Context.Service<DriverJournal, Journal>()(
+  "tenetkit/core/durable/driver/interpreter/DriverJournal",
 ) {}
 /** @experimental Caller-owned successful stream result and replay codec. */
 export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServices = never> {
@@ -90,7 +90,7 @@ export class DriverUnknownReplay extends Schema.TaggedError<DriverUnknownReplay>
 export class DriverInterpreter extends Context.Service<DriverInterpreter, Service>()(
   "tenetkit/core/durable/driver/interpreter/DriverInterpreter",
 ) {}
-const noopJournal: DriverJournal = {
+const noopJournal: Journal = {
   onScheduled: () => Effect.void,
   onCompleted: () => Effect.void,
   onCheckpoint: () => Effect.void,
@@ -109,7 +109,7 @@ export const guardUnknownNeverReplay: {
 /** @experimental */
 export const make = (input: {
   readonly driver: DurableAgentDriver
-  readonly journal?: DriverJournal
+  readonly journal?: Journal
   readonly initial: DriverCheckpoint
 }): Effect.Effect<Service> =>
   Effect.gen(function* () {
@@ -367,13 +367,13 @@ export const make = (input: {
 /** @experimental */
 export const layerInline = (input: {
   readonly driver: DurableAgentDriver
-  readonly journal?: DriverJournal
+  readonly journal?: Journal
   readonly initial: DriverCheckpoint
 }): Layer.Layer<DriverInterpreter> =>
   Layer.effect(
     DriverInterpreter,
     Effect.gen(function* () {
-      const hostJournal = yield* Effect.serviceOption(DriverJournalService)
+      const hostJournal = yield* Effect.serviceOption(DriverJournal)
       const journal = input.journal ?? Option.getOrElse(hostJournal, () => noopJournal)
       return yield* make({ ...input, journal })
     }),
@@ -382,7 +382,7 @@ export const layerInline = (input: {
 export const layerTest = (input: {
   readonly driver: DurableAgentDriver
   readonly initial: DriverCheckpoint
-  readonly journal?: DriverJournal
+  readonly journal?: Journal
 }): Layer.Layer<DriverInterpreter> => layerInline(input)
 
 /** @experimental */

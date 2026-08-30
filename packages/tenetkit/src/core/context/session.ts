@@ -191,11 +191,11 @@ export interface Service {
   readonly leaf: Effect.Effect<EntryId | null>
 }
 /** @experimental Keyed Session storage and same-Session Run admission. */
-export interface DirectoryInterface {
+export interface Directory {
   readonly acquire: (sessionId: string) => Effect.Effect<Service, SessionStoreError, Scope.Scope>
 }
 /** @experimental */
-export class SessionDirectory extends Context.Service<SessionDirectory, DirectoryInterface>()(
+export class SessionDirectory extends Context.Service<SessionDirectory, Directory>()(
   "tenetkit/core/context/session/SessionDirectory",
 ) {}
 
@@ -234,5 +234,5 @@ export {
 } from "./session-projection.js"
 
 /** @experimental */
-export const layerTest = (implementation: DirectoryInterface): Layer.Layer<SessionDirectory> =>
+export const layerTest = (implementation: Directory): Layer.Layer<SessionDirectory> =>
   Layer.succeed(SessionDirectory, SessionDirectory.of(implementation))

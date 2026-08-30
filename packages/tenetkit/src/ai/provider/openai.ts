@@ -52,10 +52,11 @@ const ConfigSchema = Schema.Struct({
 })
 
 /** @experimental Decodes persisted provider options into OpenAI request configuration. */
-const decodeConfigInput = Schema.decodeUnknownSync(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
+const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 type ConfigInput = typeof Schema.Unknown.Type
 
-export const decodeConfig = (options: ConfigInput): Config => decodeConfigInput(options ?? null) ?? {}
+export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema.SchemaError> =>
+  decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
 
 const serverFailureCodes = new Set([
   "internal_server_error",

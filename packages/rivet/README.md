@@ -15,10 +15,14 @@ set of Runs that must share a Runtime transaction domain, then register the defi
 
 ```ts
 import { makeRuntimeActor } from "@tenetkit/rivet/actors"
+import { Layer } from "effect"
 import { setup } from "rivetkit"
+import { ExecutableResolver } from "tenetkit/runtime"
 
 declare const addresses: Parameters<typeof makeRuntimeActor>[0]["addresses"]
-declare const resolver: Parameters<typeof makeRuntimeActor>[0]["resolver"]
+declare const executables: Parameters<typeof ExecutableResolver.layerStatic>[0]
+
+const resolver = ExecutableResolver.layerStatic(executables).pipe(Layer.orDie)
 
 const registry = setup({
   use: {

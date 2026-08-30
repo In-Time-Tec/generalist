@@ -1,17 +1,13 @@
-import { ExecutableResolver } from "../../../src/runtime/index.js"
+import { Layer } from "effect"
 import type { MessagingOverrides } from "../messaging/scenario.js"
 import {
-  analyst,
-  analystRef,
-  assistant,
   assistantAddress,
   assistantRef,
-  researcher,
   researcherAddress,
   researcherRef,
   registrationsFor,
+  resolverLayer,
 } from "../execution/fixtures.js"
-import { closedTestAgent } from "../run/identity.js"
 
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 let tempPathCounter = 0
@@ -22,11 +18,6 @@ export const tempDbPath = (label = "tenetkit-runtime"): string => {
 }
 
 const options = {
-  resolver: ExecutableResolver.makeStatic([
-    { executable: assistantRef, agent: closedTestAgent(assistant) },
-    { executable: researcherRef, agent: closedTestAgent(researcher) },
-    { executable: analystRef, agent: closedTestAgent(analyst) },
-  ]),
   addresses: [
     { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
     { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
@@ -34,11 +25,14 @@ const options = {
   subscriberQueueCapacity: 8,
 } satisfies Omit<SqliteRuntime.Options, "filename">
 
-export const sqliteLayer = (filename: string) => SqliteRuntime.layerSqlite({ filename, ...options })
+export const sqliteLayer = (filename: string) =>
+  SqliteRuntime.layerSqlite({ filename, ...options }).pipe(Layer.provide(resolverLayer))
 
 /** A SQLite Runtime whose scheduler stays asleep while a test owns execution claims directly. */
 export const sqliteManualClaimLayer = (filename: string) =>
-  SqliteRuntime.layerSqlite({ filename, ...options, scheduler: { pollInterval: "1 hour" } })
+  SqliteRuntime.layerSqlite({ filename, ...options, scheduler: { pollInterval: "1 hour" } }).pipe(
+    Layer.provide(resolverLayer),
+  )
 
 /**
  * A SQLite Runtime whose mailbox bounds and messaging policy the test chooses.
@@ -47,4 +41,6 @@ export const sqliteManualClaimLayer = (filename: string) =>
  * own database file rather than a mutation of a shared one.
  */
 export const sqliteMessagingLayer = (label: string) => (overrides: MessagingOverrides) =>
-  SqliteRuntime.layerSqlite({ filename: tempDbPath(label), ...options, ...overrides })
+  SqliteRuntime.layerSqlite({ filename: tempDbPath(label), ...options, ...overrides }).pipe(
+    Layer.provide(resolverLayer),
+  )

@@ -39,9 +39,8 @@ describeMysql("mysql Program store contract", () => {
     const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
-      resolver: fixture.resolver,
       addresses: programAddresses,
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
       "enforces budgets, replay identity, and cancellation fences",
       (it) => {
@@ -66,9 +65,8 @@ describeMysql("mysql Program store contract", () => {
         backendLayer({
           url,
           source: "mysql-test",
-          resolver: fixture.resolver,
           addresses: [],
-        }),
+        }).pipe(Layer.provide(fixture.resolverLayer)),
       ),
     )
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
@@ -103,9 +101,8 @@ describeMysql("mysql Program store contract", () => {
     const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
-      resolver: fixture.resolver,
       addresses: programAddresses,
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
       "resolves a crashed non-idempotent Program operation without redispatch",
       (it) => {
@@ -125,9 +122,8 @@ describeMysql("mysql Program store contract", () => {
     const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
-      resolver: fixture.resolver,
       addresses: programAddresses,
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
       "atomically records and replays Program tool and log operations",
       (it) => {
@@ -172,78 +168,76 @@ describeMysql("mysql Program store contract", () => {
     const options = {
       url,
       source: "mysql-test",
-      resolver: fixture.resolver,
       addresses: programAddresses,
     }
     let runId = ""
-    layer(database.provision(backendLayer(options)), { excludeTestServices: true })(
-      "atomically reserves one approval response and resumes the Program operation",
-      (it) => {
-        it.effect("atomically reserves one approval response and resumes the Program operation", () =>
-          Effect.gen(function* () {
-            yield* database.truncated
-            const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const claims = yield* RunClaims
-            const host = yield* RunExecutor.RunExecutor
-            const receipt = yield* runtime.send({
-              to: programAddress,
-              sessionId: "mysql-program-approval",
-              idempotencyKey: "mysql-program-approval",
-              prompt: "run",
-            })
-            runId = receipt.runId
-            const [first] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
-            yield* host.execute({
-              runId: receipt.runId,
-              ownerId: first!.workerId,
-              attemptFence: first!.attemptFence,
-              session: first!.session,
-            })
-            yield* Effect.all(
-              [
-                runtime.respond({
-                  runId: receipt.runId,
-                  waitId: "approval:echo",
-                  resolution: { _tag: "Approved" },
-                }),
-                runtime.respond({
-                  runId: receipt.runId,
-                  waitId: "approval:echo",
-                  resolution: { _tag: "Approved" },
-                }),
-              ],
-              { concurrency: "unbounded" },
-            )
-            expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
-              status: "reserved",
-            })
-          }).pipe(
-            Effect.andThen(
-              Effect.suspend(() =>
-                Effect.gen(function* () {
-                  const runtime = yield* Runtime.Runtime
-                  const store = yield* RunStore.RunStore
-                  const claims = yield* RunClaims
-                  const host = yield* RunExecutor.RunExecutor
-                  const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program-resume", limit: 1 })
-                  yield* host.execute({
-                    runId,
-                    ownerId: claim!.workerId,
-                    attemptFence: claim!.attemptFence,
-                    session: claim!.session,
-                  })
-                  expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
-                    status: "succeeded",
-                  })
-                  expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
-                }),
-              ),
+    layer(database.provision(backendLayer(options).pipe(Layer.provide(fixture.resolverLayer))), {
+      excludeTestServices: true,
+    })("atomically reserves one approval response and resumes the Program operation", (it) => {
+      it.effect("atomically reserves one approval response and resumes the Program operation", () =>
+        Effect.gen(function* () {
+          yield* database.truncated
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const claims = yield* RunClaims
+          const host = yield* RunExecutor.RunExecutor
+          const receipt = yield* runtime.send({
+            to: programAddress,
+            sessionId: "mysql-program-approval",
+            idempotencyKey: "mysql-program-approval",
+            prompt: "run",
+          })
+          runId = receipt.runId
+          const [first] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
+          yield* host.execute({
+            runId: receipt.runId,
+            ownerId: first!.workerId,
+            attemptFence: first!.attemptFence,
+            session: first!.session,
+          })
+          yield* Effect.all(
+            [
+              runtime.respond({
+                runId: receipt.runId,
+                waitId: "approval:echo",
+                resolution: { _tag: "Approved" },
+              }),
+              runtime.respond({
+                runId: receipt.runId,
+                waitId: "approval:echo",
+                resolution: { _tag: "Approved" },
+              }),
+            ],
+            { concurrency: "unbounded" },
+          )
+          expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
+            status: "reserved",
+          })
+        }).pipe(
+          Effect.andThen(
+            Effect.suspend(() =>
+              Effect.gen(function* () {
+                const runtime = yield* Runtime.Runtime
+                const store = yield* RunStore.RunStore
+                const claims = yield* RunClaims
+                const host = yield* RunExecutor.RunExecutor
+                const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program-resume", limit: 1 })
+                yield* host.execute({
+                  runId,
+                  ownerId: claim!.workerId,
+                  attemptFence: claim!.attemptFence,
+                  session: claim!.session,
+                })
+                expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
+                  status: "succeeded",
+                })
+                expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
+              }),
             ),
           ),
-        )
-      },
-    )
+        ),
+      )
+    })
   }
 
   {
@@ -252,9 +246,8 @@ describeMysql("mysql Program store contract", () => {
     const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
-      resolver: fixture.resolver,
       addresses: programAddresses,
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
       "does not reopen a cancelled Program approval operation",
       (it) => {
@@ -303,7 +296,6 @@ describeMysql("mysql Program store contract", () => {
     const runtimeLayer = backendLayer({
       url,
       source: "mysql-test",
-      resolver: fixture.resolver,
       addresses: [
         {
           address: fixture.address,
@@ -311,7 +303,7 @@ describeMysql("mysql Program store contract", () => {
           registrations: registrationsFor(fixture.executable),
         },
       ],
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
       "claims Program children in order, wakes the parent, and settles cancellation",
       (it) => {

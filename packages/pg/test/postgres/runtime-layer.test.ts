@@ -14,7 +14,7 @@ import { closedTestAgent } from "../../../tenetkit/test/runtime/run/identity.js"
 import { NOTIFY_CHANNEL } from "../../src/postgres/schema.js"
 import { postgresAvailable, postgresClient, postgresDatabase, uniqueSession } from "./database.js"
 
-const resolver = ExecutableResolver.makeStatic([])
+const resolverLayer = ExecutableResolver.layerStatic([]).pipe(Layer.orDie)
 
 it.effect("rejects invalid PostgreSQL pool bounds before opening a client", () =>
   Effect.gen(function* () {
@@ -22,10 +22,9 @@ it.effect("rejects invalid PostgreSQL pool bounds before opening a client", () =
       const failure = yield* Layer.build(
         postgresLayer({
           url: "postgres://must-not-connect",
-          resolver,
           addresses: [],
           maxConnections,
-        }),
+        }).pipe(Layer.provide(resolverLayer)),
       ).pipe(Effect.flip, Effect.scoped)
       expect(failure).toMatchObject({
         _tag: "tenetkit/runtime/SchemaMigrationFailed",
@@ -38,13 +37,14 @@ it.effect("rejects invalid PostgreSQL pool bounds before opening a client", () =
 
 const describePostgres = postgresAvailable ? describe : describe.skip
 const database = postgresDatabase("host-transaction")
-const sharedResolver = ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }])
+const sharedResolverLayer = ExecutableResolver.layerStatic([
+  { executable: assistantRef, agent: closedTestAgent(assistant) },
+]).pipe(Layer.orDie)
 const sharedLayer = database.provision(
   postgresLayer({
     source: "postgres-host-transaction",
-    resolver: sharedResolver,
     addresses: [],
-  }).pipe(Layer.provideMerge(postgresClient(database.url))),
+  }).pipe(Layer.provideMerge(postgresClient(database.url)), Layer.provide(sharedResolverLayer)),
 )
 
 const admission = (label: string, runId: string): Runtime.AdmitInput & { readonly runId: string } => ({

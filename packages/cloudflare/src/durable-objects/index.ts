@@ -9,17 +9,9 @@ import {
   type SqliteStoreOptions,
 } from "tenetkit/runtime/sql-driver"
 
-export { drain, type DrainOptions, type DrainResult } from "./drain.js"
-export { makeProjection, migrateAndBackfill, nextDueAt, schema, type Rearm } from "./activations.js"
+export * as Activations from "./activations.js"
+export * as HibernatingWebSocket from "./hibernating-websocket.js"
 export { makeExclusiveExecutionRecovery }
-export {
-  makeHibernatingWebSocket,
-  type Attachment,
-  type FlushResult,
-  type HibernatingWebSocket,
-  type HibernatingWebSocketOptions,
-  type HibernatingWebSocketState,
-} from "./hibernating-websocket.js"
 
 /** @experimental */
 export type DurableObjectStorage = NonNullable<Parameters<typeof SqliteClient.make>[0]["storage"]>

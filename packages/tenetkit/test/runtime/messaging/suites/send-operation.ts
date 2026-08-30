@@ -21,7 +21,7 @@ const toolContext = (sessionId: string, runId: string) =>
  * The send operation is journaled through the same DriverInterpreter the agent loop uses, so the
  * test drives it exactly as an in-execution `rika.agents.send` would.
  */
-const interpreter = (sessionId: string, journal: DurableDriver.DriverJournal) =>
+const interpreter = (sessionId: string, journal: DurableDriver.Journal) =>
   DurableDriver.layerTest({
     driver: DurableDriver.makeLoopDriver({ logicalOperationId: "run:send-operation", sessionId }),
     initial: {
@@ -40,13 +40,13 @@ const interpreter = (sessionId: string, journal: DurableDriver.DriverJournal) =>
 
 /** Run one effect as if it were code inside that Run's execution: its identity plus its journal. */
 const inExecution =
-  (sessionId: string, runId: string, journal: DurableDriver.DriverJournal) =>
+  (sessionId: string, runId: string, journal: DurableDriver.Journal) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     provideScoped(Layer.merge(toolContext(sessionId, runId), interpreter(sessionId, journal)), effect).pipe(
       Effect.scoped,
     )
 
-const silent: DurableDriver.DriverJournal = {
+const silent: DurableDriver.Journal = {
   onScheduled: () => Effect.void,
   onCompleted: () => Effect.void,
   onCheckpoint: () => Effect.void,

@@ -58,17 +58,17 @@ export class OAuthProviderError extends Schema.TaggedError<OAuthProviderError>()
 }) {}
 
 /** @experimental */
-export interface TokenStoreService {
-  readonly load: (server: string) => Effect.Effect<Option.Option<Redacted.Redacted<string>>, OAuthProviderError>
-  readonly save: (server: string, tokens: Redacted.Redacted<string>) => Effect.Effect<void, OAuthProviderError>
-  readonly remove: (server: string) => Effect.Effect<void, OAuthProviderError>
-}
+export class TokenStore extends Context.Service<
+  TokenStore,
+  {
+    readonly load: (server: string) => Effect.Effect<Option.Option<Redacted.Redacted<string>>, OAuthProviderError>
+    readonly save: (server: string, tokens: Redacted.Redacted<string>) => Effect.Effect<void, OAuthProviderError>
+    readonly remove: (server: string) => Effect.Effect<void, OAuthProviderError>
+  }
+>()("tenetkit/mcp/oauth/TokenStore") {}
 
 /** @experimental */
-export class TokenStore extends Context.Service<TokenStore, TokenStoreService>()("tenetkit/mcp/oauth/TokenStore") {}
-
-/** @experimental */
-export const layerTokenStoreTest = (implementation: TokenStoreService): Layer.Layer<TokenStore> =>
+export const layerTokenStoreTest = (implementation: TokenStore["Service"]): Layer.Layer<TokenStore> =>
   Layer.succeed(TokenStore, TokenStore.of(implementation))
 
 /** @experimental */

@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Ref } from "effect"
+import { Effect, Layer, pipe, Ref } from "effect"
 import { Errors, ExecutableResolver, RunStore, Runtime } from "../../../../../src/runtime/index.js"
 import {
   alternateAssistant,
@@ -33,12 +33,18 @@ const staticResolver = (admissions: Ref.Ref<number>) =>
       ),
   })
 
+const resolverLayer = (resolver: ExecutableResolver.Service) =>
+  Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)
+
+const assistantResolverLayer = ExecutableResolver.layerStatic([
+  { executable: assistantRef, agent: closedTestAgent(assistant) },
+]).pipe(Layer.orDie)
+
 const memoryAdmissions = Ref.makeUnsafe(0)
 layer(
   Runtime.layerMemory({
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-    resolver: staticResolver(memoryAdmissions),
-  }),
+  }).pipe(Layer.provide(pipe(staticResolver(memoryAdmissions), resolverLayer))),
 )("attests an addressed binding before memory admission", (it) => {
   it.effect("attests before memory admission", () =>
     Effect.gen(function* () {
@@ -55,8 +61,7 @@ layer(
   SqliteRuntime.layerSqlite({
     filename: tempDbPath("send-attestation"),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-    resolver: staticResolver(sqliteAdmissions),
-  }),
+  }).pipe(Layer.provide(pipe(staticResolver(sqliteAdmissions), resolverLayer))),
 )("attests an addressed binding before SQLite admission", (it) => {
   it.effect("attests before SQLite admission", () =>
     Effect.gen(function* () {
@@ -77,8 +82,7 @@ layer(
         registrations: [{ pin: "capability:invalid", codec: "test", version: "1", payload: {} }],
       },
     ],
-    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-  }),
+  }).pipe(Layer.provide(assistantResolverLayer)),
 )("rejects invalid address registrations without admitting a Run", (it) => {
   it.effect("rejects invalid registrations", () =>
     Effect.gen(function* () {
@@ -94,8 +98,7 @@ layer(
 layer(
   Runtime.layerMemory({
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: [] }],
-    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-  }),
+  }).pipe(Layer.provide(assistantResolverLayer)),
 )("rejects missing address registrations without admitting a Run", (it) => {
   it.effect("rejects missing registrations", () =>
     Effect.gen(function* () {
@@ -111,11 +114,16 @@ layer(
 layer(
   Runtime.layerMemory({
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-    resolver: ExecutableResolver.ExecutableResolver.of({
-      resolve: (resolved) =>
-        Effect.fail(Errors.ExecutablePinMissing.make({ runId: resolved.runId, ref: resolved.ref })),
-    }),
-  }),
+  }).pipe(
+    Layer.provide(
+      resolverLayer(
+        ExecutableResolver.ExecutableResolver.of({
+          resolve: (resolved) =>
+            Effect.fail(Errors.ExecutablePinMissing.make({ runId: resolved.runId, ref: resolved.ref })),
+        }),
+      ),
+    ),
+  ),
 )("rejects an unsupported address binding without admitting a Run", (it) => {
   it.effect("rejects an unsupported binding", () =>
     Effect.gen(function* () {
@@ -131,15 +139,20 @@ layer(
 layer(
   Runtime.layerMemory({
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-    resolver: ExecutableResolver.ExecutableResolver.of({
-      resolve: () =>
-        Effect.succeed({
-          _tag: "Agent" as const,
-          agent: closedTestAgent(alternateAssistant),
-          attestation: { ref: alternateAssistantRef.ref, manifest: alternateAssistantRef.manifest },
+  }).pipe(
+    Layer.provide(
+      resolverLayer(
+        ExecutableResolver.ExecutableResolver.of({
+          resolve: () =>
+            Effect.succeed({
+              _tag: "Agent" as const,
+              agent: closedTestAgent(alternateAssistant),
+              attestation: { ref: alternateAssistantRef.ref, manifest: alternateAssistantRef.manifest },
+            }),
         }),
-    }),
-  }),
+      ),
+    ),
+  ),
 )("rejects an identity mismatch without admitting a Run", (it) => {
   it.effect("rejects an identity mismatch", () =>
     Effect.gen(function* () {

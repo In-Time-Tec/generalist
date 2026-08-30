@@ -1,13 +1,14 @@
 import { Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { ExternalChildStore } from "../../child/external/store.js"
+import { ExecutableResolver } from "../../executable/resolver.js"
 import { layer as activeExecutionsLayer } from "../../execution/active-executions.js"
 import { LocalScheduler } from "../../execution/local-scheduler.js"
 import { layer as localSchedulerLayer, make as makeLocalScheduler } from "../../execution/local-scheduler-internal.js"
 import { layer as modelPreviewLayer } from "../../execution/model-response/preview-internal.js"
 import { RunExecutor } from "../../execution/run-executor.js"
 import { make as makeRunExecutor } from "../../execution/run-executor-internal.js"
-import { serviceEffect as makeRuntime } from "../../memory/layer/service.js"
+import { layer as runtimeLayer } from "../../memory/layer/service.js"
 import { RunStore } from "../../run/store.js"
 import { Runtime } from "../../service.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "../store.js"
@@ -25,14 +26,11 @@ export interface SqliteRuntimeOptions {
 /** @experimental Assemble one exclusive SQLite host around Runtime's lifecycle kernel. */
 export const layerSqliteRuntime = (
   input: SqliteRuntimeOptions,
-): Layer.Layer<SqliteRuntimeServices, SqliteStoreError, SqlClient.SqlClient> => {
+): Layer.Layer<SqliteRuntimeServices, SqliteStoreError, SqlClient.SqlClient | ExecutableResolver> => {
   const store = layerSqliteStore(input.options)
   const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = Layer.effect(Runtime, makeRuntime(input.options)).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(
-    RunExecutor,
-    makeRunExecutor({ workerId: input.workerId, resolver: input.options.resolver }),
-  ).pipe(Layer.provide(dependencies))
+  const runtime = runtimeLayer(input.options).pipe(Layer.provide(dependencies))
+  const host = Layer.effect(RunExecutor, makeRunExecutor).pipe(Layer.provide(dependencies))
   const scheduler = (
     input.schedulerMode === "external"
       ? Layer.effect(LocalScheduler, makeLocalScheduler({ workerId: input.workerId, ...input.options.scheduler }))

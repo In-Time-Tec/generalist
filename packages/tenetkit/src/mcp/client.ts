@@ -231,16 +231,14 @@ export interface Options {
   readonly callTimeout?: Duration.Input
 }
 
-const makeInterface = (
-  options: Options,
-): Effect.Effect<Service, MCPConnectionFailed | OAuthProviderError, Scope.Scope> =>
+const makeClient = (options: Options): Effect.Effect<Service, MCPConnectionFailed | OAuthProviderError, Scope.Scope> =>
   options.callTimeout === undefined
     ? fromTransport(options.name, options.transport)
     : fromTransport(options.name, options.transport, { callTimeout: options.callTimeout })
 
 /** @experimental */
 export const layer = (options: Options): Layer.Layer<MCPClient, MCPConnectionFailed | OAuthProviderError> =>
-  Layer.effect(MCPClient, makeInterface(options))
+  Layer.effect(MCPClient, makeClient(options))
 
 /** @experimental */
 export const layerTagged: {
@@ -254,5 +252,5 @@ export const layerTagged: {
     options: Options,
   ): Layer.Layer<Identifier, MCPConnectionFailed | OAuthProviderError>
 } = Function.dual(2, <Identifier>(tag: Context.Key<Identifier, Service>, options: Options) =>
-  Layer.effect(tag, makeInterface(options)),
+  Layer.effect(tag, makeClient(options)),
 )

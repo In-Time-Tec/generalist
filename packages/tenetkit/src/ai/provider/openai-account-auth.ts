@@ -39,16 +39,15 @@ export interface AuthorizationResult {
   readonly state: Redacted.Redacted<string>
 }
 /** @experimental */
-export interface HostService {
-  readonly authorize: (
-    url: URL,
-    expectedState: Redacted.Redacted<string>,
-  ) => Effect.Effect<AuthorizationResult, AuthError>
-}
-/** @experimental */
-export class OpenAIAccountAuthHost extends Context.Service<OpenAIAccountAuthHost, HostService>()(
-  "tenetkit/ai/provider/openai-account-auth/OpenAIAccountAuthHost",
-) {}
+export class BrowserAuthorization extends Context.Service<
+  BrowserAuthorization,
+  {
+    readonly authorize: (
+      url: URL,
+      expectedState: Redacted.Redacted<string>,
+    ) => Effect.Effect<AuthorizationResult, AuthError>
+  }
+>()("tenetkit/ai/provider/openai-account-auth/BrowserAuthorization") {}
 
 /** @experimental */
 export interface DevicePrompt {
@@ -57,13 +56,12 @@ export interface DevicePrompt {
   readonly warning: string
 }
 /** @experimental */
-export interface PresenterService {
-  readonly device: (prompt: DevicePrompt) => Effect.Effect<void, AuthError>
-}
-/** @experimental */
-export class OpenAIAccountDevicePresenter extends Context.Service<OpenAIAccountDevicePresenter, PresenterService>()(
-  "tenetkit/ai/provider/openai-account-auth/OpenAIAccountDevicePresenter",
-) {}
+export class DeviceAuthorizationPresenter extends Context.Service<
+  DeviceAuthorizationPresenter,
+  {
+    readonly device: (prompt: DevicePrompt) => Effect.Effect<void, AuthError>
+  }
+>()("tenetkit/ai/provider/openai-account-auth/DeviceAuthorizationPresenter") {}
 
 /** @experimental */
 export const TokenResponse = Schema.Struct({
@@ -88,23 +86,22 @@ export const DevicePollResponse = Schema.Struct({
 })
 
 /** @experimental */
-export interface HttpService {
-  readonly exchange: (input: {
-    readonly code: Redacted.Redacted<string>
-    readonly verifier: Redacted.Redacted<string>
-    readonly redirectUri: string
-  }) => Effect.Effect<TokenResponse, AuthError>
-  readonly refresh: (refreshToken: Redacted.Redacted<string>) => Effect.Effect<TokenResponse, AuthError>
-  readonly deviceStart: Effect.Effect<typeof DeviceStartResponse.Type, AuthError>
-  readonly devicePoll: (
-    deviceAuthId: Redacted.Redacted<string>,
-    userCode: string,
-  ) => Effect.Effect<Option.Option<typeof DevicePollResponse.Type>, AuthError>
-}
-/** @experimental */
-export class OpenAIAccountAuthHttp extends Context.Service<OpenAIAccountAuthHttp, HttpService>()(
-  "tenetkit/ai/provider/openai-account-auth/OpenAIAccountAuthHttp",
-) {}
+export class OAuthClient extends Context.Service<
+  OAuthClient,
+  {
+    readonly exchange: (input: {
+      readonly code: Redacted.Redacted<string>
+      readonly verifier: Redacted.Redacted<string>
+      readonly redirectUri: string
+    }) => Effect.Effect<TokenResponse, AuthError>
+    readonly refresh: (refreshToken: Redacted.Redacted<string>) => Effect.Effect<TokenResponse, AuthError>
+    readonly deviceStart: Effect.Effect<typeof DeviceStartResponse.Type, AuthError>
+    readonly devicePoll: (
+      deviceAuthId: Redacted.Redacted<string>,
+      userCode: string,
+    ) => Effect.Effect<Option.Option<typeof DevicePollResponse.Type>, AuthError>
+  }
+>()("tenetkit/ai/provider/openai-account-auth/OAuthClient") {}
 
 /** @experimental */
 export const CredentialDisk = Schema.Struct({
@@ -142,16 +139,15 @@ const publicCredential = (value: CredentialDisk): Credential => ({
 })
 
 /** @experimental */
-export interface StoreService {
-  readonly load: Effect.Effect<Option.Option<CredentialDisk>, StoreError>
-  readonly save: (credential: CredentialDisk) => Effect.Effect<void, StoreError>
-  readonly remove: Effect.Effect<boolean, StoreError>
-  readonly serialized: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | StoreError, R>
-}
-/** @experimental */
-export class OpenAIAccountCredentialStore extends Context.Service<OpenAIAccountCredentialStore, StoreService>()(
-  "tenetkit/ai/provider/openai-account-auth/OpenAIAccountCredentialStore",
-) {}
+export class CredentialStore extends Context.Service<
+  CredentialStore,
+  {
+    readonly load: Effect.Effect<Option.Option<CredentialDisk>, StoreError>
+    readonly save: (credential: CredentialDisk) => Effect.Effect<void, StoreError>
+    readonly remove: Effect.Effect<boolean, StoreError>
+    readonly serialized: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | StoreError, R>
+  }
+>()("tenetkit/ai/provider/openai-account-auth/CredentialStore") {}
 
 const utf8 = (value: string) =>
   Result.match(Encoding.decodeBase64(Encoding.encodeBase64(value)), {
@@ -302,18 +298,17 @@ export type Status =
   | { readonly _tag: "RefreshRequired"; readonly fingerprint: string }
   | { readonly _tag: "Corrupt" }
 /** @experimental */
-export interface AuthService {
-  readonly loginBrowser: (redirect?: string) => Effect.Effect<Credential, Error>
-  readonly loginDevice: Effect.Effect<Credential, Error>
-  readonly status: Effect.Effect<Status, StoreError>
-  readonly logout: Effect.Effect<{ readonly removed: boolean; readonly revocationSupported: false }, StoreError>
-  readonly acquire: Effect.Effect<Credential, Error>
-  readonly refreshRejected: (generation: string) => Effect.Effect<Credential, Error>
-}
-/** @experimental */
-export class OpenAIAccountAuth extends Context.Service<OpenAIAccountAuth, AuthService>()(
-  "tenetkit/ai/provider/openai-account-auth/OpenAIAccountAuth",
-) {}
+export class OpenAIAccountAuth extends Context.Service<
+  OpenAIAccountAuth,
+  {
+    readonly loginBrowser: (redirect?: string) => Effect.Effect<Credential, Error>
+    readonly loginDevice: Effect.Effect<Credential, Error>
+    readonly status: Effect.Effect<Status, StoreError>
+    readonly logout: Effect.Effect<{ readonly removed: boolean; readonly revocationSupported: false }, StoreError>
+    readonly acquire: Effect.Effect<Credential, Error>
+    readonly refreshRejected: (generation: string) => Effect.Effect<Credential, Error>
+  }
+>()("tenetkit/ai/provider/openai-account-auth/OpenAIAccountAuth") {}
 
 /** @experimental */
 export interface TimingOptions {
@@ -325,10 +320,10 @@ export const layer = (options: TimingOptions = {}) =>
   Layer.effect(
     OpenAIAccountAuth,
     Effect.gen(function* () {
-      const host = yield* OpenAIAccountAuthHost
-      const presenter = yield* OpenAIAccountDevicePresenter
-      const http = yield* OpenAIAccountAuthHttp
-      const store = yield* OpenAIAccountCredentialStore
+      const host = yield* BrowserAuthorization
+      const presenter = yield* DeviceAuthorizationPresenter
+      const http = yield* OAuthClient
+      const store = yield* CredentialStore
       const crypto = yield* Crypto.Crypto
       const persist = (response: TokenResponse, previous?: CredentialDisk) =>
         Effect.gen(function* () {
@@ -363,7 +358,7 @@ export const layer = (options: TimingOptions = {}) =>
         Effect.uninterruptibleMask((restore) =>
           restore(exchange).pipe(Effect.flatMap((response) => store.serialized(persist(response)))),
         )
-      const service: AuthService = {
+      const service: OpenAIAccountAuth["Service"] = {
         loginBrowser: (redirect = redirectUri) =>
           Effect.gen(function* () {
             const pkce = yield* generatePkce.pipe(Effect.provideService(Crypto.Crypto, crypto))
@@ -458,17 +453,20 @@ export const layer = (options: TimingOptions = {}) =>
   )
 
 /** @experimental */
-export const layerHostTest = (implementation: HostService): Layer.Layer<OpenAIAccountAuthHost> =>
-  Layer.succeed(OpenAIAccountAuthHost, OpenAIAccountAuthHost.of(implementation))
+export const layerBrowserAuthorizationTest = (
+  implementation: BrowserAuthorization["Service"],
+): Layer.Layer<BrowserAuthorization> => Layer.succeed(BrowserAuthorization, BrowserAuthorization.of(implementation))
 
 /** @experimental */
-export const layerPresenterTest = (implementation: PresenterService): Layer.Layer<OpenAIAccountDevicePresenter> =>
-  Layer.succeed(OpenAIAccountDevicePresenter, OpenAIAccountDevicePresenter.of(implementation))
+export const layerDeviceAuthorizationPresenterTest = (
+  implementation: DeviceAuthorizationPresenter["Service"],
+): Layer.Layer<DeviceAuthorizationPresenter> =>
+  Layer.succeed(DeviceAuthorizationPresenter, DeviceAuthorizationPresenter.of(implementation))
 
 /** @experimental */
-export const layerHttpTest = (implementation: HttpService): Layer.Layer<OpenAIAccountAuthHttp> =>
-  Layer.succeed(OpenAIAccountAuthHttp, OpenAIAccountAuthHttp.of(implementation))
+export const layerOAuthClientTest = (implementation: OAuthClient["Service"]): Layer.Layer<OAuthClient> =>
+  Layer.succeed(OAuthClient, OAuthClient.of(implementation))
 
 /** @experimental */
-export const layerStoreTest = (implementation: StoreService): Layer.Layer<OpenAIAccountCredentialStore> =>
-  Layer.succeed(OpenAIAccountCredentialStore, OpenAIAccountCredentialStore.of(implementation))
+export const layerCredentialStoreTest = (implementation: CredentialStore["Service"]): Layer.Layer<CredentialStore> =>
+  Layer.succeed(CredentialStore, CredentialStore.of(implementation))

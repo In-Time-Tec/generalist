@@ -59,7 +59,7 @@ const registrations = [...ExecutableRegistration.requiredPins(executable)].map((
 const makeDefinition = (modelLayer: Layer.Layer<LanguageModel.LanguageModel>, sleepTimeout = 100) =>
   makeRuntimeActor({
     addresses: [{ address, executable, registrations }],
-    resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, modelLayer) }]),
+    resolver: ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, modelLayer) }]).pipe(Layer.orDie),
     actorOptions: { sleepTimeout },
     recoveryIntervalMillis: 60_000,
   })

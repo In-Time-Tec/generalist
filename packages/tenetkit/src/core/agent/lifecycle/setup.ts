@@ -9,8 +9,8 @@ import { ModelRegistry } from "../../model/registry.js"
 import { instrument, type IdentityCell } from "../../model/instrumentation.js"
 import { ModelResilience, defaultPolicy as defaultModelResilience } from "../../model/resilience.js"
 import {
-  Delivery,
-  InvocationCoordinator,
+  InvocationLifecycle,
+  Sink,
   type Event as ModelTelemetryEvent,
   type EventPayload as ModelTelemetryEventPayload,
   type ProviderUsage,
@@ -18,7 +18,7 @@ import {
 } from "../../model/telemetry/events.js"
 import { Permissions, RuleStore } from "../../policy/permissions.js"
 import { restoreCheckpointTelemetry } from "../session/history.js"
-import { ToolAuthorizerService, make as makeToolAuthorizer } from "../../tools/tool-authorization.js"
+import { ToolAuthorizer, make as makeToolAuthorizer } from "../../tools/tool-authorization.js"
 import { ToolExecutor } from "../../tools/tool-executor.js"
 import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../../durable/loop-driver-state.js"
 import type { Agent, RunOptions } from "../service.js"
@@ -33,7 +33,7 @@ import type { ModelSource } from "../model-turn/model-source.js"
 export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(agent: Agent<T, R, P, A>) =>
   Effect.gen(function* () {
     if (agent.authorization !== undefined) return agent.authorization
-    const configured = yield* Effect.serviceOption(ToolAuthorizerService)
+    const configured = yield* Effect.serviceOption(ToolAuthorizer)
     if (Option.isSome(configured)) return configured.value
     const permissions = yield* Effect.serviceOption(Permissions)
     const approvals = yield* Effect.serviceOption(Approvals)
@@ -71,7 +71,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const promptContext = yield* setupPromptContext({ agent, options, activeSession, resumeChat, staticCandidates })
     const {
       instructionsService,
-      skillSourceService,
+      skillCatalog,
       skillRuntime,
       selectedSkills,
       skillListings,
@@ -87,8 +87,8 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const resilienceService = Option.orElse(configuredResilience, () =>
       Option.some(ModelResilience.of(defaultModelResilience)),
     )
-    const deliveryService = yield* Effect.serviceOption(Delivery)
-    const invocationCoordinator = yield* Effect.serviceOption(InvocationCoordinator)
+    const sink = yield* Effect.serviceOption(Sink)
+    const invocationLifecycle = yield* Effect.serviceOption(InvocationLifecycle)
     const telemetryRunId = yield* generateId
     let telemetrySequence = 0
     const pendingTelemetry: Array<ModelTelemetryEvent> = []
@@ -112,11 +112,11 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
         publishTelemetry(prepareTelemetry(payload))
       })
     const flushTelemetry = (): ReadonlyArray<AgentEvent> => pendingTelemetry.splice(0, pendingTelemetry.length)
-    const deliverPending: Effect.Effect<void, import("../../model/telemetry/events.js").DeliveryFailed> =
-      Effect.suspend(() => {
-        if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
+    const deliverPending: Effect.Effect<void, import("../../model/telemetry/events.js").SinkFailed> = Effect.suspend(
+      () => {
+        if (Option.isNone(sink) || undeliveredTelemetry.length === 0) return Effect.void
         const snapshot = Object.freeze([...undeliveredTelemetry])
-        return deliveryService.value.deliver({ sessionId, events: snapshot }).pipe(
+        return sink.value.deliver({ sessionId, events: snapshot }).pipe(
           Effect.onError(() =>
             Effect.sync(() => {
               pendingTelemetry.splice(0, pendingTelemetry.length)
@@ -128,7 +128,8 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
             }),
           ),
         )
-      })
+      },
+    )
     const telemetryIdentity: IdentityCell = { current: undefined }
     const restoredModelCallOrdinal =
       options.driverCheckpoint === undefined
@@ -164,12 +165,12 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
         options.logicalOperationId === undefined
           ? baseInstrumentation
           : { ...baseInstrumentation, logicalOperationId: options.logicalOperationId }
-      const withCoordinator = Option.isNone(invocationCoordinator)
+      const withLifecycle = Option.isNone(invocationLifecycle)
         ? withLogicalId
-        : { ...withLogicalId, coordinator: invocationCoordinator.value }
+        : { ...withLogicalId, lifecycle: invocationLifecycle.value }
       const instrumentation = Option.isNone(resilienceService)
-        ? withCoordinator
-        : { ...withCoordinator, resilience: resilienceService.value }
+        ? withLifecycle
+        : { ...withLifecycle, resilience: resilienceService.value }
       return instrument(model, instrumentation)
     }
     const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
@@ -248,7 +249,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       sessionId,
       sessionAppendOptions,
       instructionsService,
-      skillSourceService,
+      skillCatalog,
       skillRuntime,
       selectedSkills,
       skillListings,
@@ -259,8 +260,8 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       system,
       supplemental,
       resilienceService,
-      deliveryService,
-      invocationCoordinator,
+      sink,
+      invocationLifecycle,
       telemetryRunId,
       telemetrySequence,
       pendingTelemetry,

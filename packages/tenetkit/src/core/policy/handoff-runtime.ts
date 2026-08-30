@@ -19,7 +19,7 @@ import { assemble, type Candidate } from "../tools/tool-registry.js"
 import { intercept, logicalOperationId } from "../durable/driver/run.js"
 import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
 import { defaultContextProjection, Input, type ContextProjection } from "./handoff-projection.js"
-import type { Target } from "./handoff-target.js"
+import type { Catalog, Target } from "./handoff-target.js"
 import { ModelRegistry } from "../model/registry.js"
 import { validateRef } from "../durable/manifest/executable-manifest.js"
 import type { Service as SessionStore } from "../context/session.js"
@@ -31,7 +31,7 @@ export class Rejected extends Schema.TaggedError<Rejected>()("tenetkit/core/Hand
 }) {}
 
 export interface ExecuteInput {
-  readonly catalog: import("./handoff-target.js").CatalogService
+  readonly catalog: Catalog["Service"]
   readonly turn: number
   readonly toolCallId: string
   readonly specialist: string

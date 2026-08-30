@@ -4,6 +4,25 @@ import type { CellFailure, CellResult } from "../../../../src/repl/cell.js"
 import { liveOptions, platform, runCell, withPool } from "../../bun-harness.js"
 
 layer(platform, liveOptions)("Bun kernel kill restart", (it) => {
+  it.effect("invalidates the process and lease before public interruption returns", () =>
+    withPool({
+      use: ({ pool }) =>
+        Effect.gen(function* () {
+          const first = yield* runCell({ pool, sessionId: "s", cellId: "c0", code: "process.pid" })
+          const running = yield* Effect.forkChild(
+            Effect.exit(runCell({ pool, sessionId: "s", cellId: "c1", code: "await new Promise(() => {})" })),
+          )
+          yield* Effect.sleep(100)
+          expect((yield* pool.interrupt("s", "c1"))._tag).toBe("Interrupted")
+          expect((yield* pool.interrupt("s", "c1"))._tag).toBe("NotRunning")
+          yield* Fiber.join(running)
+          const replacement = yield* runCell({ pool, sessionId: "s", cellId: "c2", code: "process.pid" })
+          expect(replacement.value).not.toBe(first.value)
+          expect(replacement.epoch).toBe(1)
+        }),
+    }),
+  )
+
   /**
    * The kernel runs in a child process rather than a thread precisely so that killing a wedged cell
    * cannot take the host down with it. `@effect/platform` BunWorker was rejected because terminating

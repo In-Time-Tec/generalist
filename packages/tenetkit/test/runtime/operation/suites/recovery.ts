@@ -16,7 +16,11 @@ export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
     options: Runtime.LayerOptions,
-  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor | Extra, StoreError>
+  ) => Layer.Layer<
+    Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor | Extra,
+    StoreError,
+    ExecutableResolver.ExecutableResolver
+  >
   readonly claim?: (
     runId: string,
     ownerId: string,
@@ -91,12 +95,12 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         model: "router-test",
         apiKey: Config.succeed(Redacted.make("test-key")),
       }).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))
-      const resolver = ExecutableResolver.makeStatic([
+      const resolverLayer = ExecutableResolver.layerStatic([
         { executable, agent: Agent.close(agent, model.pipe(Layer.orDie)) },
-      ])
+      ]).pipe(Layer.orDie)
 
       return provideScoped(
-        options.makeLayer({ resolver, addresses: [], scheduler: { pollInterval: "1 hour" } }),
+        options.makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(Layer.provide(resolverLayer)),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -188,16 +192,17 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
       const handlers = toolkit.toLayer({
         large_result: () => Effect.die("ToolExecutor test layer owns execution"),
       })
-      const resolver = ExecutableResolver.makeStatic([
+      const resolverLayer = ExecutableResolver.layerStatic([
         { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-      ])
+      ]).pipe(Layer.orDie)
 
       return provideScoped(
-        options.makeLayer({
-          resolver,
-          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-          scheduler: { pollInterval: "1 hour" },
-        }),
+        options
+          .makeLayer({
+            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+            scheduler: { pollInterval: "1 hour" },
+          })
+          .pipe(Layer.provide(resolverLayer)),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -272,11 +277,18 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
 
     it.live("reconciles every replay policy atomically and idempotently under the current claim", () =>
       provideScoped(
-        options.makeLayer({
-          resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-          addresses: [],
-          scheduler: { pollInterval: "1 hour" },
-        }),
+        options
+          .makeLayer({
+            addresses: [],
+            scheduler: { pollInterval: "1 hour" },
+          })
+          .pipe(
+            Layer.provide(
+              ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+                Layer.orDie,
+              ),
+            ),
+          ),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -399,16 +411,17 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         const handlers = Toolkit.make(tool).toLayer({
           crash_tool: () => Effect.die("ToolExecutor test layer owns execution"),
         })
-        const resolver = ExecutableResolver.makeStatic([
+        const resolverLayer = ExecutableResolver.layerStatic([
           { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-        ])
+        ]).pipe(Layer.orDie)
 
         yield* provideScoped(
-          options.makeLayer({
-            resolver,
-            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-            scheduler: { pollInterval: "1 hour" },
-          }),
+          options
+            .makeLayer({
+              addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+              scheduler: { pollInterval: "1 hour" },
+            })
+            .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
@@ -436,12 +449,16 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
 
             if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
             const recoveryClaim = yield* claim(receipt.runId, "process-after-crash")
-            const recoveryActive = yield* Layer.build(Layer.fresh(activeExecutionsLayer))
-            const recoveryHost = yield* makeRunExecutor({
-              workerId: "process-after-crash",
-              resolver,
-            }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(recoveryActive))
-            yield* recoveryHost.execute(recoveryClaim).pipe(Effect.timeout("5 seconds"))
+            yield* provideScoped(
+              Layer.mergeAll(
+                Layer.succeed(RunStore.RunStore, store),
+                Layer.fresh(activeExecutionsLayer),
+                resolverLayer,
+              ),
+              Effect.flatMap(makeRunExecutor, (recoveryHost) =>
+                recoveryHost.execute(recoveryClaim).pipe(Effect.timeout("5 seconds")),
+              ),
+            )
 
             const after = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
             const afterTags = after.map((event) => event._tag)
@@ -527,16 +544,17 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         const handlers = Toolkit.make(tool).toLayer({
           idempotent_write: () => Effect.die("ToolExecutor test layer owns execution"),
         })
-        const resolver = ExecutableResolver.makeStatic([
+        const resolverLayer = ExecutableResolver.layerStatic([
           { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-        ])
+        ]).pipe(Layer.orDie)
 
         yield* provideScoped(
-          options.makeLayer({
-            resolver,
-            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-            scheduler: { pollInterval: "1 hour" },
-          }),
+          options
+            .makeLayer({
+              addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+              scheduler: { pollInterval: "1 hour" },
+            })
+            .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
@@ -563,12 +581,16 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             ).toBe("requested")
             expect((yield* runtime.inspect(receipt.runId)).status).not.toBe("needs-resolution")
 
-            const recoveryActive = yield* Layer.build(Layer.fresh(activeExecutionsLayer))
-            const recoveryHost = yield* makeRunExecutor({
-              workerId: "process-after-crash",
-              resolver,
-            }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(recoveryActive))
-            yield* recoveryHost.execute(recoveryClaim).pipe(Effect.timeout("5 seconds"))
+            yield* provideScoped(
+              Layer.mergeAll(
+                Layer.succeed(RunStore.RunStore, store),
+                Layer.fresh(activeExecutionsLayer),
+                resolverLayer,
+              ),
+              Effect.flatMap(makeRunExecutor, (recoveryHost) =>
+                recoveryHost.execute(recoveryClaim).pipe(Effect.timeout("5 seconds")),
+              ),
+            )
 
             const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
             expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")

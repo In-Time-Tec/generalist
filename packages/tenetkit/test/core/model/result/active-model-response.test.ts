@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Schedule, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool } from "effect/unstable/ai"
 import { ActiveModelResponse, Agent, ModelResilience } from "../../../../src/index.js"
-import { controller } from "../../../../src/core/model/result/active-model-response-controller.js"
+import { writer } from "../../../../src/core/model/result/active-model-response-writer.js"
 import { make as makeResponseBuilder } from "../../../../src/core/model/response/builder.js"
 
 const usage = Response.Usage.make({
@@ -177,32 +177,32 @@ describe("ActiveModelResponse", () => {
   it.effect("prevents stale attempts from replacing or clearing a newer response", () =>
     Effect.gen(function* () {
       const handle = ActiveModelResponse.make()
-      const control = controller(handle)
+      const responseWriter = writer(handle)
       const firstBuilder = makeResponseBuilder<Record<string, Tool.Any>>()
       firstBuilder.accept(Response.makePart("text-delta", { id: "answer", delta: "stale" }))
-      const first = control.begin({
+      const first = responseWriter.begin({
         operationKey: "operation",
         turn: 0,
         modelCallId: "call",
         modelAttemptId: "attempt-0",
         attempt: 0,
       })
-      control.install(first, firstBuilder)
+      responseWriter.install(first, firstBuilder)
 
       const secondBuilder = makeResponseBuilder<Record<string, Tool.Any>>()
       secondBuilder.accept(Response.makePart("text-delta", { id: "answer", delta: "current" }))
-      const second = control.begin({
+      const second = responseWriter.begin({
         operationKey: "operation",
         turn: 0,
         modelCallId: "call",
         modelAttemptId: "attempt-1",
         attempt: 1,
       })
-      control.install(second, secondBuilder)
+      responseWriter.install(second, secondBuilder)
 
-      control.install(first, firstBuilder)
-      control.discard(first)
-      control.clearCommitted(first)
+      responseWriter.install(first, firstBuilder)
+      responseWriter.discard(first)
+      responseWriter.clearCommitted(first)
 
       const current = yield* handle.snapshot
       expect(Option.isSome(current) && current.value.modelAttemptId).toBe("attempt-1")
@@ -211,7 +211,7 @@ describe("ActiveModelResponse", () => {
           current.value.response.content.some((part) => part.type === "text" && part.text === "current"),
       ).toBe(true)
 
-      control.clearCommitted(second)
+      responseWriter.clearCommitted(second)
       expect(Option.isNone(yield* handle.snapshot)).toBe(true)
     }),
   )

@@ -118,15 +118,14 @@ const makeFixture = (scale: number, filename: string) => {
   const handlers = Toolkit.make(probe).toLayer({
     linear_storage_probe: () => Effect.die("ToolExecutor test layer owns execution"),
   })
-  const resolver = ExecutableResolver.makeStatic([
+  const resolverLayer = ExecutableResolver.layerStatic([
     { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-  ])
+  ]).pipe(Layer.orDie)
   const runtimeLayer = SqliteRuntime.layerSqlite({
     filename,
-    resolver,
     addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     scheduler: { pollInterval: "1 day" },
-  })
+  }).pipe(Layer.provide(resolverLayer))
   return {
     address,
     executable,

@@ -12,8 +12,8 @@ export type Rearm = Effect.Effect<void, RuntimeUnavailable>
 const unavailable = (cause: unknown) =>
   RuntimeUnavailable.make({ message: `activation projection failed: ${String(cause)}` })
 
-/** @experimental Durable candidate projection schema for an exclusive SQLite Runtime host. */
-export const schema = Effect.gen(function* () {
+/** @experimental Create the durable candidate projection schema for an exclusive SQLite Runtime host. */
+export const createSchema = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql`CREATE TABLE IF NOT EXISTS tenetkit_activations (
     run_id TEXT PRIMARY KEY,
@@ -57,11 +57,11 @@ export const makeProjection: {
 )
 
 /** @experimental Create, backfill, and rearm durable candidates in the caller's transaction. */
-export const migrateAndBackfill = (rearm: Rearm): Effect.Effect<void, RuntimeUnavailable, SqlClient.SqlClient> =>
+export const initialize = (rearm: Rearm): Effect.Effect<void, RuntimeUnavailable, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const now = yield* Clock.currentTimeMillis
-    yield* schema
+    yield* createSchema
     yield* sql`DELETE FROM tenetkit_activations`
     yield* sql`INSERT INTO tenetkit_activations
         (run_id, intent, due_at_millis, attempt_fence, run_status)

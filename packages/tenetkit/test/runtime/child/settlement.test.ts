@@ -14,8 +14,7 @@ import { tempDbPath } from "../sql/scenario.js"
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 const memory = programFixture()
 const sqlite = programFixture()
-const address = (resolver: typeof memory.resolver) => ({
-  resolver,
+const options = {
   addresses: [
     {
       address: programAddress,
@@ -23,28 +22,31 @@ const address = (resolver: typeof memory.resolver) => ({
       registrations: registrationsFor(programExecutable),
     },
   ],
-})
+}
 const contracts = programSettledReplayContract.pipe(
   Effect.andThen(programCancellationFinalizerContract),
   Effect.andThen(programCancellationFenceContract),
 )
 
-layer(Runtime.layerMemory(address(memory.resolver)))("fences stale Program settlement in memory and SQLite", (it) => {
-  it.effect("fences stale Program settlement in memory and SQLite", () =>
-    contracts.pipe(
-      Effect.andThen(
-        Effect.scoped(
-          Effect.flatMap(
-            Layer.build(
-              SqliteRuntime.layerSqlite({
-                ...address(sqlite.resolver),
-                filename: tempDbPath("program-settlement-contract"),
-              }),
+layer(Runtime.layerMemory(options).pipe(Layer.provide(memory.resolverLayer)))(
+  "fences stale Program settlement in memory and SQLite",
+  (it) => {
+    it.effect("fences stale Program settlement in memory and SQLite", () =>
+      contracts.pipe(
+        Effect.andThen(
+          Effect.scoped(
+            Effect.flatMap(
+              Layer.build(
+                SqliteRuntime.layerSqlite({
+                  ...options,
+                  filename: tempDbPath("program-settlement-contract"),
+                }).pipe(Layer.provide(sqlite.resolverLayer)),
+              ),
+              (context) => contracts.pipe(Effect.provideContext(context)),
             ),
-            (context) => contracts.pipe(Effect.provideContext(context)),
           ),
         ),
       ),
-    ),
-  )
-})
+    )
+  },
+)

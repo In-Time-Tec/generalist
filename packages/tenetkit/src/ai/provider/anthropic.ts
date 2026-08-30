@@ -46,9 +46,10 @@ export type Config = typeof ConfigSchema.Type
 
 /** @experimental Decodes persisted provider options into Anthropic request configuration. */
 type ConfigInput = typeof Schema.Unknown.Type
+const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 
-export const decodeConfig = (options: ConfigInput): Config =>
-  Schema.decodeSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {})
+export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema.SchemaError> =>
+  decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
 
 const FailureEventSchema = Schema.Struct({
   type: Schema.optionalKey(Schema.String),

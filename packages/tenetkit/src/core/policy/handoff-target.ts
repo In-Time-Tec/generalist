@@ -27,14 +27,13 @@ export const target: {
   },
 )
 
-export interface CatalogService {
-  readonly resolve: (name: string) => Target | undefined
-  readonly targets: ReadonlyMap<string, Target>
-}
-
-export class Catalog extends Context.Service<Catalog, CatalogService>()(
-  "tenetkit/core/policy/handoff-target/Catalog",
-) {}
+export class Catalog extends Context.Service<
+  Catalog,
+  {
+    readonly resolve: (name: string) => Target | undefined
+    readonly targets: ReadonlyMap<string, Target>
+  }
+>()("tenetkit/core/policy/handoff-target/Catalog") {}
 
 export const layerCatalog = (targets: ReadonlyArray<Target>): Layer.Layer<Catalog> => {
   const byName = new Map(targets.map((entry) => [entry.name, entry] as const))

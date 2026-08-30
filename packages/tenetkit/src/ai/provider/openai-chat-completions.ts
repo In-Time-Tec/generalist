@@ -34,7 +34,10 @@ const ConfigSchema = Schema.Record(Schema.String, Schema.Json).pipe(
 
 /** @experimental Decodes persisted OpenAI-compatible Chat Completions request configuration. */
 type ConfigInput = typeof Schema.Unknown.Type
-export const decodeConfig = (options: ConfigInput): Config => Schema.decodeUnknownSync(ConfigSchema)(options ?? {})
+const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema))
+
+export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema.SchemaError> =>
+  decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
 
 /** @experimental */
 export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
