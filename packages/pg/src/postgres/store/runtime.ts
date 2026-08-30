@@ -107,9 +107,13 @@ export const emitAgentEvent: {
       })
     }
     if (isTerminal(loaded.status)) return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
-    yield* appendEvent(hub, loaded, input.event)
+    const event = yield* appendEvent(hub, loaded, input.event)
     if (input.event._tag === "TurnCompleted") {
-      yield* sql`UPDATE tenetkit_runs SET continuation_json = NULL WHERE run_id = ${loaded.runId}`
+      yield* sql`
+        UPDATE tenetkit_runs
+        SET continuation_json = NULL, last_turn_completed_sequence = ${event.sequence}
+        WHERE run_id = ${loaded.runId}
+      `
     }
   }),
 )

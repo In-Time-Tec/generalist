@@ -423,10 +423,12 @@ export const emitAgentEvent: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    yield* appendEvent(hub, run, input.event)
+    const event = yield* appendEvent(hub, run, input.event)
     if (input.event._tag === "TurnCompleted") {
       yield* sql`
-        UPDATE tenetkit_runs SET continuation_json = NULL WHERE run_id = ${run.runId}
+        UPDATE tenetkit_runs
+        SET continuation_json = NULL, last_turn_completed_sequence = ${event.sequence}
+        WHERE run_id = ${run.runId}
       `
     }
   }),

@@ -176,6 +176,7 @@ const addMember = (
       childReadiness: readiness,
       invocationId: `${input.fanOutId}:${member.key}`,
       lastSequence: -1,
+      lastTurnCompletedSequence: -1,
       attempt: 0,
       attemptFence: 0,
       cancellationRequested: false,

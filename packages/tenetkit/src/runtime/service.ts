@@ -47,6 +47,8 @@ import type {
   StartInvalid,
   SessionEntryNotFound,
   SessionEntryCorrupt,
+  AckInvalid,
+  AckBeyondCommitted,
 } from "./errors.js"
 import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
@@ -69,6 +71,7 @@ import type { ExecutableRegistration } from "./executable/registration.js"
 import type { Notification as ChildSettlementNotification } from "./child/settlement.js"
 import type { ModelPreviewEvent } from "./execution/model-response/preview.js"
 import type { RunActivationProjection } from "./run/activation.js"
+import type { Point as AcknowledgementPoint } from "./acknowledgement.js"
 
 export type { InitialFanOutInput } from "./child/fan-out.js"
 
@@ -325,6 +328,8 @@ export type DirectoryError = RunNotFound | RuntimeUnavailable
 export type ChildSettlementError = RunNotFound | RuntimeUnavailable
 export type RegisterAgentNameError = RunNotFound | AgentNameConflict | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
+/** @experimental Durable host acknowledgement failures. */
+export type AckError = RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable
 export type TreeReplayError =
   | RunNotFound
   | TreeCursorInvalid
@@ -375,6 +380,10 @@ export interface Interface {
   readonly previews: (input: PreviewsInput) => Stream.Stream<ModelPreviewEvent>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, InspectError>
   readonly history: (input: HistoryInput) => Effect.Effect<ReadonlyArray<RunEvent>, EventsError>
+  /** @experimental Durably advance the host processed-through point to an exact committed model cycle. */
+  readonly acknowledge: (input: { readonly runId: string; readonly sequence: number }) => Effect.Effect<void, AckError>
+  /** @experimental Read the durable host processed-through point; -1 means no cycle is acknowledged. */
+  readonly acknowledged: (runId: string) => Effect.Effect<AcknowledgementPoint, InspectError>
   readonly sessionEntry: (input: SessionEntryInput) => Effect.Effect<Session.Entry, SessionEntryError>
   readonly resolveModelResponse: (
     event: ModelResponseEvent,

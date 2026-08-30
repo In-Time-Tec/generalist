@@ -93,6 +93,7 @@ import {
   externalChildSettlement,
 } from "./store/child/external.js"
 import { ExternalChildStore } from "../child/external/store.js"
+import { acknowledge, loadAcknowledged } from "./acknowledgement.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly source?: string
@@ -282,6 +283,8 @@ const makeSqliteStoreServices = (
           }),
         ),
       snapshot: (runId) => run(loadRunSnapshot(runId)),
+      acknowledge: (input) => run(acknowledge(input)),
+      acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
       treeCheckpoint: (rootRunId) => run(loadTreeCheckpoint(rootRunId)),
       sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
       history: (input) =>

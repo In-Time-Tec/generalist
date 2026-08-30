@@ -33,6 +33,8 @@ import type {
   ChildDepthExceeded,
   ChildLimitExceeded,
   TreePolicyInvalid,
+  AckInvalid,
+  AckBeyondCommitted,
 } from "../errors.js"
 import type { Message } from "../messaging/message.js"
 import type { AgentName, DirectoryEntry } from "../execution/agent/directory.js"
@@ -84,6 +86,7 @@ import type {
   StoreInfo,
   WorkerMutationError,
 } from "./store-types.js"
+import type { Point as AcknowledgementPoint } from "../acknowledgement.js"
 export type {
   AdmitMessageError,
   AdmitMessageInput,
@@ -261,6 +264,13 @@ export interface Interface {
   }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RunNotFound | RuntimeUnavailable>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable>
+  /** @experimental Durably advance the host processed-through point to an exact committed model cycle. */
+  readonly acknowledge: (input: {
+    readonly runId: string
+    readonly sequence: number
+  }) => Effect.Effect<void, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable>
+  /** @experimental Read the durable host processed-through point; -1 means no cycle is acknowledged. */
+  readonly acknowledged: (runId: string) => Effect.Effect<AcknowledgementPoint, RunNotFound | RuntimeUnavailable>
   readonly treeCheckpoint: (
     rootRunId: string,
   ) => Effect.Effect<import("../tree.js").Checkpoint, RunNotFound | RuntimeUnavailable>

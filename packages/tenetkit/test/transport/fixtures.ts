@@ -55,6 +55,8 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
         }),
       history: ({ cursor }) =>
         Effect.succeed([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
+      acknowledge: () => Effect.die("unused acknowledge"),
+      acknowledged: () => Effect.die("unused acknowledged"),
       sessionEntry: () => Effect.die("unused sessionEntry"),
       resolveModelResponse: () => Effect.die("unused resolveModelResponse"),
       treeReplay: () => Effect.die("unused treeReplay"),

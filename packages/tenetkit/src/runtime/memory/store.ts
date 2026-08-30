@@ -73,6 +73,7 @@ import {
 import { externalChildOperations } from "./store/child/external.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import type { RunActivation } from "../run/activation.js"
+import { acknowledge, loadAcknowledged } from "./store/acknowledgement.js"
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
@@ -238,6 +239,9 @@ const makeStoreServices = (options: LayerOptions) =>
             }),
           ),
         ),
+      acknowledge: (input) => update((state) => acknowledge(state, input)),
+      acknowledged: (runId) =>
+        SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadAcknowledged(state, runId))),
       sessionRoots: (sessionId) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.map((state) =>

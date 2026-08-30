@@ -33,6 +33,7 @@ const tables = [
   "tenetkit_run_links",
   "tenetkit_run_waits",
   "tenetkit_run_operations",
+  "tenetkit_run_acknowledgements",
   "tenetkit_run_events",
   "tenetkit_runs",
   "tenetkit_lanes",
@@ -71,6 +72,7 @@ const inspectSchema = Effect.gen(function* () {
       "executable_manifest_json",
       "continuation_json",
       "pending_outcome_json",
+      "last_turn_completed_sequence",
     ]),
   )
   expect(runColumns).not.toContain("transcript_json")
@@ -83,8 +85,13 @@ const inspectSchema = Effect.gen(function* () {
     SELECT TABLE_NAME AS table_name FROM information_schema.tables
     WHERE table_schema = DATABASE() AND table_name = 'tenetkit_external_child_placements'
   `
+  const acknowledgementTables = yield* sql<{ table_name: string }>`
+    SELECT TABLE_NAME AS table_name FROM information_schema.tables
+    WHERE table_schema = DATABASE() AND table_name = 'tenetkit_run_acknowledgements'
+  `
   expect(sessionTables.map((row) => row.table_name)).toEqual(["tenetkit_session_entries", "tenetkit_sessions"])
   expect(placementTables.map((row) => row.table_name)).toEqual(["tenetkit_external_child_placements"])
+  expect(acknowledgementTables.map((row) => row.table_name)).toEqual(["tenetkit_run_acknowledgements"])
   expect(migrations.map((row) => row.migration_id)).toEqual([1])
 })
 

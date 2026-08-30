@@ -180,6 +180,8 @@ const makeRuntime = (acceptedSequence = 0) => {
       const run = runs.get(runId)!
       return Effect.succeed(run.events.filter((event) => event.sequence > cursor).slice(0, limit))
     },
+    acknowledge: () => Effect.die("not used"),
+    acknowledged: () => Effect.die("not used"),
     treeReplay: () => Effect.die("not used"),
     treeChanges: () => Stream.empty,
     treeCheckpoint: () => Effect.die("not used"),

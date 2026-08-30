@@ -41,6 +41,8 @@ import {
   ChildDepthExceeded as Errors_ChildDepthExceeded,
   ChildLimitExceeded as Errors_ChildLimitExceeded,
   TreePolicyInvalid as Errors_TreePolicyInvalid,
+  AckInvalid as Errors_AckInvalid,
+  AckBeyondCommitted as Errors_AckBeyondCommitted,
 } from "./errors.js"
 import {
   SchemaDirty as Errors_SchemaDirty,
@@ -94,6 +96,8 @@ export const Errors = {
   ChildDepthExceeded: Errors_ChildDepthExceeded,
   ChildLimitExceeded: Errors_ChildLimitExceeded,
   TreePolicyInvalid: Errors_TreePolicyInvalid,
+  AckInvalid: Errors_AckInvalid,
+  AckBeyondCommitted: Errors_AckBeyondCommitted,
   SchemaDirty: Errors_SchemaDirty,
   SchemaChecksumMismatch: Errors_SchemaChecksumMismatch,
   SchemaVersionUnsupported: Errors_SchemaVersionUnsupported,
@@ -145,6 +149,8 @@ export namespace Errors {
   export type ChildDepthExceeded = import("./errors.js").ChildDepthExceeded
   export type ChildLimitExceeded = import("./errors.js").ChildLimitExceeded
   export type TreePolicyInvalid = import("./errors.js").TreePolicyInvalid
+  export type AckInvalid = import("./errors.js").AckInvalid
+  export type AckBeyondCommitted = import("./errors.js").AckBeyondCommitted
   export type SchemaDirty = import("./sql/errors.js").SchemaDirty
   export type SchemaChecksumMismatch = import("./sql/errors.js").SchemaChecksumMismatch
   export type SchemaVersionUnsupported = import("./sql/errors.js").SchemaVersionUnsupported

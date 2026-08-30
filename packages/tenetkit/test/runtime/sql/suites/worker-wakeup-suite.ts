@@ -37,6 +37,7 @@ const decodedRun: DecodedRun = {
   attempt: 1,
   attemptFence: 1,
   lastSequence: 0,
+  lastTurnCompletedSequence: -1,
   cancellationRequested: false,
   acceptedSequence: 0,
   admittedAt: "2026-08-29T00:00:00.000Z",

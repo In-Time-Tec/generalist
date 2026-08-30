@@ -389,6 +389,8 @@ export const serviceEffect = (
       snapshot: (runId) => store.snapshot(runId),
       history: (input) =>
         store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
+      acknowledge: store.acknowledge,
+      acknowledged: store.acknowledged,
       sessionEntry: readEntry(store),
       resolveModelResponse: resolveModelResponse(store),
       treeReplay: (input) =>
@@ -494,6 +496,5 @@ export const serviceEffect = (
       awaitFanOut,
     })
   })
-
 export const layer = (options: LayerOptions): Layer.Layer<Runtime, never, RunStore | ActiveExecutions> =>
   Layer.effect(Runtime, serviceEffect(options))

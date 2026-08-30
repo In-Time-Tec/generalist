@@ -1,6 +1,6 @@
 import { sha256Text } from "../../../core/durable/canonical-json.js"
 
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
 export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
 export const MIGRATION_NAME = "tenetkit_runtime"
@@ -38,6 +38,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   attempt INTEGER NOT NULL DEFAULT 0,
   attempt_fence INTEGER NOT NULL DEFAULT 0,
   last_sequence INTEGER NOT NULL DEFAULT -1,
+  last_turn_completed_sequence INTEGER NOT NULL DEFAULT -1,
   cancellation_requested INTEGER NOT NULL DEFAULT 0,
   cancel_reason TEXT,
   terminal_event_id TEXT,
@@ -57,6 +58,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   event_id TEXT NOT NULL UNIQUE,
   event_json TEXT NOT NULL,
   PRIMARY KEY (run_id, sequence),
+  FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
+)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_run_acknowledgements (
+  run_id TEXT PRIMARY KEY,
+  sequence INTEGER NOT NULL,
+  acknowledged_at TEXT NOT NULL,
   FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
 )`,
   `CREATE TABLE IF NOT EXISTS tenetkit_run_operations (

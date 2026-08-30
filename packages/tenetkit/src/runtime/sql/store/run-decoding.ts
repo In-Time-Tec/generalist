@@ -70,6 +70,7 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     attempt: row.attempt,
     attemptFence: row.attempt_fence,
     lastSequence: row.last_sequence,
+    lastTurnCompletedSequence: row.last_turn_completed_sequence,
     cancellationRequested: asBool(row.cancellation_requested),
     acceptedSequence: row.accepted_sequence,
   }

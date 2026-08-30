@@ -271,6 +271,8 @@ export namespace Runtime {
   export type SpawnInput = import("./service.js").SpawnInput
   export type EventsInput = import("./service.js").EventsInput
   export type HistoryInput = import("./service.js").HistoryInput
+  export type AckError = import("./service.js").AckError
+  export type AckPoint = import("./acknowledgement.js").Point
   export type SessionEntryInput = import("./service.js").SessionEntryInput
   export type SessionEntryError = import("./service.js").SessionEntryError
   export type ResolveModelResponseError = import("./service.js").ResolveModelResponseError

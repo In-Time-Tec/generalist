@@ -59,12 +59,172 @@ const finish = Response.makePart("finish", {
   response: undefined,
 })
 
+const acknowledgementAddress = Address.make("agent:acknowledgement")
+
+const acknowledgementLayer = (filename: string) => {
+  const tool = Tool.make("acknowledgement_tool", {
+    parameters: Schema.Struct({}),
+    success: Schema.String,
+  })
+  const toolkit = Toolkit.make(tool)
+  const agent = Agent.make({ name: "acknowledgement", toolkit })
+  const executable = testExecutable(agent, "1")
+  let modelCalls = 0
+  const model = Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      streamText: () => {
+        modelCalls += 1
+        return Stream.fromIterable<Response.StreamPartEncoded>(
+          modelCalls === 1
+            ? [
+                Response.makePart("tool-call", {
+                  id: "acknowledgement-call",
+                  name: "acknowledgement_tool",
+                  params: {},
+                  providerExecuted: false,
+                }),
+                finish,
+              ]
+            : [
+                Response.makePart("text-start", { id: "acknowledgement-result" }),
+                Response.makePart("text-delta", { id: "acknowledgement-result", delta: "done" }),
+                Response.makePart("text-end", { id: "acknowledgement-result" }),
+                finish,
+              ],
+        )
+      },
+    }),
+  )
+  const executor = ToolExecutor.layerTest({
+    execute: () => Effect.succeed({ _tag: "Success" as const, result: "ok", encodedResult: "ok" }),
+  })
+  const handlers = toolkit.toLayer({
+    acknowledgement_tool: () => Effect.die("ToolExecutor test layer owns execution"),
+  })
+  const resolver = ExecutableResolver.makeStatic([
+    { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+  ])
+  return () =>
+    SqliteRuntime.layerSqlite({
+      filename,
+      resolver,
+      addresses: [
+        {
+          address: acknowledgementAddress,
+          executable,
+          registrations: registrationsFor(executable),
+        },
+      ],
+    })
+}
+
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
   <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
 describe("ExecutionHost", () => {
+  it.live("resumes the exact unacknowledged event tail after a SQLite reopen", () => {
+    const filename = tempDbPath("host-acknowledgement-reopen")
+    const layerSqlite = acknowledgementLayer(filename)
+    let runId = ""
+    let acknowledgedSequence = -1
+    let full: ReadonlyArray<RunEvent.RunEvent> = []
+
+    const executeAndAcknowledge = scopedWith(layerSqlite())(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const host = yield* ExecutionHost.ExecutionHost
+        const receipt = yield* runtime.send({
+          to: acknowledgementAddress,
+          sessionId: "session:host-acknowledgement",
+          idempotencyKey: "host-acknowledgement",
+          prompt: "complete two model cycles",
+        })
+        runId = receipt.runId
+        yield* host.execute(yield* store.claimExecution({ runId, ownerId: "host-acknowledgement" }))
+        full = yield* runtime.history({ runId, limit: 100 })
+        const boundaries = full.filter((event) => event._tag === "TurnCompleted")
+        expect(boundaries).toHaveLength(2)
+        acknowledgedSequence = boundaries[0]!.sequence
+        yield* runtime.acknowledge({ runId, sequence: acknowledgedSequence })
+        const point = yield* runtime.acknowledged(runId)
+        expect(point.runId).toBe(runId)
+        expect(point.sequence).toBe(acknowledgedSequence)
+        expect(point.acknowledgedAt).toBeTypeOf("string")
+      }),
+    )
+
+    const reopenAndReplay = scopedWith(layerSqlite())(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const point = yield* runtime.acknowledged(runId)
+        expect(point.sequence).toBe(acknowledgedSequence)
+        const expected = full.filter((event) => event.sequence > point.sequence)
+        expect(expected.filter((event) => event._tag === "TurnCompleted")).toHaveLength(1)
+        const replay = yield* runtime.events({ runId, cursor: point.sequence }).pipe(
+          Stream.take(expected.length),
+          Stream.runCollect,
+          Effect.map((events) => [...events]),
+        )
+        expect(replay.map((event) => [event.sequence, event.eventId])).toEqual(
+          expected.map((event) => [event.sequence, event.eventId]),
+        )
+        expect(replay.map((event) => event.sequence)).toEqual(
+          Array.from({ length: replay.length }, (_, index) => point.sequence + index + 1),
+        )
+      }),
+    )
+
+    return executeAndAcknowledge.pipe(Effect.andThen(reopenAndReplay))
+  })
+
+  it.live("replays the full event stream after SQLite reopen when the host never acknowledges", () => {
+    const filename = tempDbPath("host-without-acknowledgement-reopen")
+    const layerSqlite = acknowledgementLayer(filename)
+    let runId = ""
+    let full: ReadonlyArray<RunEvent.RunEvent> = []
+
+    const executeWithoutAcknowledging = scopedWith(layerSqlite())(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const host = yield* ExecutionHost.ExecutionHost
+        const receipt = yield* runtime.send({
+          to: acknowledgementAddress,
+          sessionId: "session:host-without-acknowledgement",
+          idempotencyKey: "host-without-acknowledgement",
+          prompt: "complete two model cycles",
+        })
+        runId = receipt.runId
+        yield* host.execute(yield* store.claimExecution({ runId, ownerId: "host-without-acknowledgement" }))
+        full = yield* runtime.history({ runId, limit: 100 })
+        expect((yield* runtime.acknowledged(runId)).sequence).toBe(Cursor.origin)
+      }),
+    )
+
+    const reopenAndReplay = scopedWith(layerSqlite())(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const point = yield* runtime.acknowledged(runId)
+        expect(point).toEqual({ runId, sequence: Cursor.origin })
+        const replay = yield* runtime.events({ runId, cursor: point.sequence }).pipe(
+          Stream.take(full.length),
+          Stream.runCollect,
+          Effect.map((events) => [...events]),
+        )
+        expect(replay.map((event) => [event.sequence, event.eventId])).toEqual(
+          full.map((event) => [event.sequence, event.eventId]),
+        )
+      }),
+    )
+
+    return executeWithoutAcknowledging.pipe(Effect.andThen(reopenAndReplay))
+  })
+
   it.effect("passes the exact pinned context window and reserve to compaction", () =>
     Effect.gen(function* () {
       let observed: Compaction.Usage | undefined

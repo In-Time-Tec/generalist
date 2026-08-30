@@ -193,6 +193,8 @@ const replayRuntime: RuntimeInterface = {
   previews: unusedStream,
   snapshot: unusedEffect,
   history: ({ cursor }) => Effect.succeed(replayEvents.filter((event) => event.sequence > (cursor ?? -1))),
+  acknowledge: unusedEffect,
+  acknowledged: unusedEffect,
   sessionEntry: unusedEffect,
   resolveModelResponse: unusedEffect,
   treeReplay: unusedEffect,
@@ -285,6 +287,7 @@ export class SqlObject {
           const probeCount = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
           const cancellationRunId = `workerd-cancellation-${probeCount[0]?.requests ?? 0}`
           const pluralRunId = `workerd-plural-${probeCount[0]?.requests ?? 0}`
+          const acknowledgementRunId = `workerd-acknowledgement-${probeCount[0]?.requests ?? 0}`
           const cancellationExecutable = test("workerd-cancellation", "1")
           const cancellationMessage = makeMessage({
             id: cancellationRunId,
@@ -301,6 +304,14 @@ export class SqlObject {
             prompt: Prompt.make("wait for three responses"),
             idempotencyKey: pluralRunId,
             correlationId: pluralRunId,
+          })
+          const acknowledgementMessage = makeMessage({
+            id: acknowledgementRunId,
+            to: Address.make("agent:test"),
+            sessionId: `session:${acknowledgementRunId}`,
+            prompt: Prompt.make("acknowledge completed model cycles"),
+            idempotencyKey: acknowledgementRunId,
+            correlationId: acknowledgementRunId,
           })
           yield* activationSchema
           const committedAlarm = 4_000_000_000_000
@@ -447,6 +458,65 @@ export class SqlObject {
           `
           const pluralAuthoredHistory = suffixes(pluralRows.map(({ wait_id: waitId }) => ({ waitId })))
 
+          yield* store.admitStart({
+            runId: acknowledgementRunId,
+            message: acknowledgementMessage,
+            executableRef: cancellationExecutable.ref,
+            executableManifest: cancellationExecutable.manifest,
+            registrations: [],
+            treePolicy: { maxDepth: 4, maxSubagents: 4 },
+            initialChildren: [],
+            initialFanOuts: [],
+          })
+          const acknowledgementClaim = yield* store.claimExecution({
+            runId: acknowledgementRunId,
+            ownerId: "workerd",
+          })
+          const acknowledgementInitialSequence = (yield* store.acknowledged(acknowledgementRunId)).sequence
+          yield* store.emitAgentEvent({
+            ...acknowledgementClaim,
+            event: { _tag: "TurnCompleted", turn: 0 },
+          })
+          yield* store.emitAgentEvent({
+            ...acknowledgementClaim,
+            event: { _tag: "TurnStarted", turn: 1 },
+          })
+          yield* store.emitAgentEvent({
+            ...acknowledgementClaim,
+            event: { _tag: "TurnCompleted", turn: 1 },
+          })
+          yield* store.emitAgentEvent({
+            ...acknowledgementClaim,
+            event: { _tag: "TurnStarted", turn: 2 },
+          })
+          const acknowledgementHistory = yield* store.history({
+            runId: acknowledgementRunId,
+            cursor: -1,
+            limit: 100,
+          })
+          const acknowledgementBoundaries = acknowledgementHistory.filter((event) => event._tag === "TurnCompleted")
+          const firstAcknowledgementBoundary = acknowledgementBoundaries[0]!.sequence
+          const lastAcknowledgementBoundary = acknowledgementBoundaries[1]!.sequence
+          const nonBoundary = acknowledgementHistory.find(
+            (event) =>
+              event.sequence > firstAcknowledgementBoundary &&
+              event.sequence < lastAcknowledgementBoundary &&
+              event._tag !== "TurnCompleted",
+          )!.sequence
+          const acknowledgementInvalidTag = yield* store
+            .acknowledge({ runId: acknowledgementRunId, sequence: nonBoundary })
+            .pipe(Effect.match({ onFailure: (error) => error._tag, onSuccess: () => "success" }))
+          yield* store.acknowledge({ runId: acknowledgementRunId, sequence: firstAcknowledgementBoundary })
+          yield* store.acknowledge({ runId: acknowledgementRunId, sequence: lastAcknowledgementBoundary })
+          yield* store.acknowledge({ runId: acknowledgementRunId, sequence: firstAcknowledgementBoundary })
+          const acknowledgedSequence = (yield* store.acknowledged(acknowledgementRunId)).sequence
+          const acknowledgementBeyondTag = yield* store
+            .acknowledge({ runId: acknowledgementRunId, sequence: lastAcknowledgementBoundary + 1 })
+            .pipe(Effect.match({ onFailure: (error) => error._tag, onSuccess: () => "success" }))
+          const acknowledgementTailSequences = acknowledgementHistory
+            .filter((event) => event.sequence > acknowledgedSequence)
+            .map((event) => event.sequence)
+
           let transitionAffected: readonly [number, number] = [-1, -1]
           yield* Effect.exit(
             sql.withTransaction(
@@ -527,6 +597,11 @@ export class SqlObject {
             pluralFinalOpen,
             pluralResumeEvents,
             pluralAuthoredHistory,
+            acknowledgementInitialSequence,
+            acknowledgedSequence,
+            acknowledgementInvalidTag,
+            acknowledgementBeyondTag,
+            acknowledgementTailSequences,
           })
         }).pipe(Effect.provideContext(context)),
       ),

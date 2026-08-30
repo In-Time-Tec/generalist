@@ -16,7 +16,7 @@ const ConformanceResponse = Schema.Struct({
   cancellationStoredValue: Schema.Literal(1),
   cancellationTerminalStatus: Schema.Literal("cancelled"),
   alarm: Schema.Literal(4_000_000_000_000),
-  schemaVersion: Schema.Literal(3),
+  schemaVersion: Schema.Literal(4),
   migrations: Schema.Array(Schema.Struct({ id: Schema.Finite, name: Schema.String })),
   transitionAffected: Schema.Tuple([Schema.Literal(1), Schema.Literal(0)]),
   pluralInitialOrder: Schema.Tuple([Schema.Literal("a"), Schema.Literal("b"), Schema.Literal("c")]),
@@ -25,6 +25,11 @@ const ConformanceResponse = Schema.Struct({
   pluralFinalOpen: Schema.Literal(0),
   pluralResumeEvents: Schema.Literal(3),
   pluralAuthoredHistory: Schema.Tuple([Schema.Literal("a"), Schema.Literal("b"), Schema.Literal("c")]),
+  acknowledgementInitialSequence: Schema.Literal(-1),
+  acknowledgedSequence: Schema.Finite,
+  acknowledgementInvalidTag: Schema.Literal("tenetkit/runtime/AckInvalid"),
+  acknowledgementBeyondTag: Schema.Literal("tenetkit/runtime/AckBeyondCommitted"),
+  acknowledgementTailSequences: Schema.Tuple([Schema.Finite]),
 })
 
 const AgentConformanceResponse = Schema.Struct({
@@ -132,7 +137,7 @@ const worker :Workerd.Worker = (
               cancellationStoredValue: 1,
               cancellationTerminalStatus: "cancelled",
               alarm: 4_000_000_000_000,
-              schemaVersion: 3,
+              schemaVersion: 4,
               migrations: [{ id: 1, name: "tenetkit_runtime" }],
               transitionAffected: [1, 0],
               pluralInitialOrder: ["a", "b", "c"],
@@ -141,6 +146,11 @@ const worker :Workerd.Worker = (
               pluralFinalOpen: 0,
               pluralResumeEvents: 3,
               pluralAuthoredHistory: ["a", "b", "c"],
+              acknowledgementInitialSequence: -1,
+              acknowledgedSequence: responses[0]!.acknowledgedSequence,
+              acknowledgementInvalidTag: "tenetkit/runtime/AckInvalid",
+              acknowledgementBeyondTag: "tenetkit/runtime/AckBeyondCommitted",
+              acknowledgementTailSequences: [responses[0]!.acknowledgedSequence + 1],
             },
             {
               backend: "sqlite",
@@ -152,7 +162,7 @@ const worker :Workerd.Worker = (
               cancellationStoredValue: 1,
               cancellationTerminalStatus: "cancelled",
               alarm: 4_000_000_000_000,
-              schemaVersion: 3,
+              schemaVersion: 4,
               migrations: [{ id: 1, name: "tenetkit_runtime" }],
               transitionAffected: [1, 0],
               pluralInitialOrder: ["a", "b", "c"],
@@ -161,10 +171,17 @@ const worker :Workerd.Worker = (
               pluralFinalOpen: 0,
               pluralResumeEvents: 3,
               pluralAuthoredHistory: ["a", "b", "c"],
+              acknowledgementInitialSequence: -1,
+              acknowledgedSequence: responses[1]!.acknowledgedSequence,
+              acknowledgementInvalidTag: "tenetkit/runtime/AckInvalid",
+              acknowledgementBeyondTag: "tenetkit/runtime/AckBeyondCommitted",
+              acknowledgementTailSequences: [responses[1]!.acknowledgedSequence + 1],
             },
           ])
           for (const response of responses) {
-            expect(response.tables).toEqual(expect.arrayContaining(["tenetkit_runs", "tenetkit_schema_meta"]))
+            expect(response.tables).toEqual(
+              expect.arrayContaining(["tenetkit_runs", "tenetkit_run_acknowledgements", "tenetkit_schema_meta"]),
+            )
           }
 
           const agentResponse = yield* HttpClient.get(`http://127.0.0.1:${port}/agent`).pipe(

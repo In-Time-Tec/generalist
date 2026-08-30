@@ -85,6 +85,7 @@ import { reconcileCancellationRequested } from "tenetkit/runtime/driver/sql/sess
 import { cancelSessionRuns } from "../session/cancellation.js"
 import { mysqlModelResponseOperationsWithDefaults } from "./model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
+import { acknowledge, loadAcknowledged } from "tenetkit/runtime/driver/sql/acknowledgement"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -280,6 +281,8 @@ export const mysqlServices = (
         run(cancelSessionRuns({ hub: transactionHub, lockRun, lockParent, clearClaim, ...input })),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(transactionHub, input)))),
       readSteering: (input) => fenced(input, readSteering(input)),
+      acknowledge: (input) => run(lockRun(input.runId).pipe(Effect.andThen(acknowledge(input)))),
+      acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
       directory: (runId) => runNoTxn(directory(runId)),
       resolveAddress: (address) => runNoTxn(resolveAddress(address)),
       registerAgentName: (input) => run(lockRun(input.runId).pipe(Effect.andThen(registerAgentName(input)))),

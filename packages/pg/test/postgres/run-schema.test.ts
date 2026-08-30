@@ -23,7 +23,8 @@ const resetSchema = Effect.gen(function* () {
     tenetkit_tree_event_index, tenetkit_tree_roots, tenetkit_fan_out_members, tenetkit_fan_outs, tenetkit_run_steering,
     tenetkit_messages, tenetkit_agent_names,
     tenetkit_external_child_placements,
-    tenetkit_run_links, tenetkit_run_waits, tenetkit_run_operations, tenetkit_run_events, tenetkit_runs, tenetkit_lanes,
+    tenetkit_run_links, tenetkit_run_waits, tenetkit_run_operations, tenetkit_run_acknowledgements,
+    tenetkit_run_events, tenetkit_runs, tenetkit_lanes,
     tenetkit_runtime_locks, tenetkit_sql_migrations, tenetkit_schema_meta CASCADE`)
 })
 
@@ -41,6 +42,10 @@ const inspectSchema = Effect.gen(function* () {
   const placementTables = yield* sql<{ table_name: string }>`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = current_schema() AND table_name = 'tenetkit_external_child_placements'
+  `
+  const acknowledgementTables = yield* sql<{ table_name: string }>`
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = current_schema() AND table_name = 'tenetkit_run_acknowledgements'
   `
   const meta = yield* sql<{
     version: number
@@ -60,11 +65,13 @@ const inspectSchema = Effect.gen(function* () {
       "executable_manifest_json",
       "continuation_json",
       "pending_outcome_json",
+      "last_turn_completed_sequence",
     ]),
   )
   expect(columns.map((row) => row.column_name)).not.toContain("transcript_json")
   expect(sessionTables.map((row) => row.table_name)).toEqual(["tenetkit_session_entries", "tenetkit_sessions"])
   expect(placementTables.map((row) => row.table_name)).toEqual(["tenetkit_external_child_placements"])
+  expect(acknowledgementTables.map((row) => row.table_name)).toEqual(["tenetkit_run_acknowledgements"])
 })
 
 describePostgres("postgres schema baseline", () => {

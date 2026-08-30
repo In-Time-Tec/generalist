@@ -204,6 +204,24 @@ export class SubscriberLagged extends Schema.TaggedError<SubscriberLagged>()("te
   lastDeliveredSequence: Schema.Int,
 }) {}
 
+/** @experimental The acknowledged sequence is not a valid processed-through point for the Run. */
+export class AckInvalid extends Schema.TaggedError<AckInvalid>()("tenetkit/runtime/AckInvalid", {
+  runId: Schema.String,
+  // oxlint-disable-next-line effecttsgo/schema-number
+  sequence: Schema.Number,
+  message: Schema.String,
+}) {}
+
+/** @experimental The acknowledged sequence is beyond the last committed model cycle. */
+export class AckBeyondCommitted extends Schema.TaggedError<AckBeyondCommitted>()(
+  "tenetkit/runtime/AckBeyondCommitted",
+  {
+    runId: Schema.String,
+    sequence: Schema.Int,
+    lastCommittedSequence: Schema.Int,
+  },
+) {}
+
 export class RuntimeUnavailable extends Schema.TaggedError<RuntimeUnavailable>()(
   "tenetkit/runtime/RuntimeUnavailable",
   {

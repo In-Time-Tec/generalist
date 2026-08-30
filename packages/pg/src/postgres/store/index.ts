@@ -80,6 +80,7 @@ import {
   hasUnknownOperation,
 } from "tenetkit/runtime/driver/sql/store/child/settlement"
 import { revokeExecutionSessionWriteClaim } from "tenetkit/runtime/driver/sql/session/claim"
+import { acknowledge, loadAcknowledged } from "tenetkit/runtime/driver/sql/acknowledgement"
 
 export const postgresServices = (options: PostgresOptions) =>
   Effect.gen(function* () {
@@ -234,6 +235,8 @@ export const postgresServices = (options: PostgresOptions) =>
           ),
           loadAfter: (cursor) => runNoTxn(loadEventsAfter(input.runId, cursor)),
         }),
+      acknowledge: (input) => run(lockRun(input.runId).pipe(Effect.andThen(acknowledge(input)))),
+      acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
       respond: (input) =>
         run(
           Effect.gen(function* () {

@@ -24,6 +24,7 @@ export interface RunRow {
   readonly attempt: number
   readonly attempt_fence: number
   readonly last_sequence: number
+  readonly last_turn_completed_sequence: number
   readonly cancellation_requested: number | boolean | string
   readonly cancel_reason: string | null
   readonly terminal_event_id: string | null
@@ -96,6 +97,7 @@ export interface DecodedRun {
   readonly attempt: number
   readonly attemptFence: number
   readonly lastSequence: number
+  readonly lastTurnCompletedSequence: number
   readonly cancellationRequested: boolean
   readonly cancelReason?: string
   readonly terminalEventId?: string

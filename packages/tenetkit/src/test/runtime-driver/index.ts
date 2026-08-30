@@ -13,6 +13,7 @@ import { Runtime, type Interface as RuntimeInterface } from "../../runtime/servi
 import { StaleClaim } from "../../runtime/sql/errors.js"
 import { RunClaims, type Interface as RunClaimsInterface } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
+import { registerAcknowledgement } from "./acknowledgement.js"
 import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 
 /** @experimental A multi-worker claim without the driver's decoded persisted Run representation. */
@@ -40,7 +41,6 @@ export type ClaimExecution = (
 export interface RuntimeCapability {
   readonly claim: ClaimExecution
 }
-
 /** @experimental RunTree finite replay conformance capability. */
 export interface RunTreeCapability {
   readonly claim: ClaimExecution
@@ -214,6 +214,8 @@ const registerRuntime = <LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
   capability: RuntimeCapability,
 ) => {
+  registerAcknowledgement({ options, capability })
+
   it.effect("persists control transitions and strictly ordered durable events", () =>
     provide(options, (services) =>
       Effect.gen(function* () {

@@ -19,6 +19,7 @@ import type { ChildReadiness } from "../child/readiness.js"
 import type { MailboxEntry } from "../messaging/mailbox.js"
 import type { Session } from "../../core/index.js"
 import type { ExternalRoot, Placement as ExternalChildPlacement } from "../child/external/placement.js"
+import type { Point as AcknowledgementPoint } from "../acknowledgement.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -53,6 +54,7 @@ export interface StoredRun {
   readonly childReadiness?: ChildReadiness
   readonly invocationId?: string
   readonly lastSequence: number
+  readonly lastTurnCompletedSequence: number
   readonly attempt: number
   readonly attemptFence: number
   readonly ownerId?: string
@@ -113,6 +115,7 @@ export interface MemoryState {
   readonly agentNames: ReadonlyMap<string, string>
   readonly externalChildPlacements: ReadonlyMap<string, ExternalChildPlacement>
   readonly externalRoots: ReadonlyMap<string, ExternalRoot>
+  readonly acknowledgements: ReadonlyMap<string, AcknowledgementPoint>
   readonly subscriberQueueCapacity: number
   readonly publications: ReadonlyArray<MemoryPublication>
 }
@@ -169,6 +172,7 @@ export const emptyState = (input: {
   agentNames: new Map(),
   externalChildPlacements: new Map(),
   externalRoots: new Map(),
+  acknowledgements: new Map(),
   subscriberQueueCapacity: input.subscriberQueueCapacity,
   publications: [],
 })
