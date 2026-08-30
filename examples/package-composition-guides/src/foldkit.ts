@@ -1,11 +1,11 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
 import { Connection } from "tenetkit/foldkit"
 
-const frames = Stream.make(Connection.ConnectionOpened())
+const incomingFrames = Stream.make(Connection.ConnectionOpened())
 const send = () => Effect.void
 
 const connectionLayer = Connection.layerTest({
-  session: ({ sessionId }) => Effect.succeed({ sessionId, frames, send }),
+  session: ({ sessionId }) => Effect.succeed({ sessionId, frames: incomingFrames, send }),
   send,
 })
 

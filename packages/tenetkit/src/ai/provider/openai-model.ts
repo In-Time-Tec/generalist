@@ -55,10 +55,10 @@ export type ErrorPayload = typeof ErrorPayload.Type
 
 const decodeError = Schema.decodeUnknownOption(ErrorPayload)
 
-export const boundedDescription = (value: string | undefined, fallback: string): string =>
+const boundedDescription = (value: string | undefined, fallback: string): string =>
   value !== undefined && value.length > 0 ? value.slice(0, 2_048) : fallback
 
-export const boundedMetadata = (value: string | null | undefined): string | null => value?.slice(0, 256) ?? null
+const boundedMetadata = (value: string | null | undefined): string | null => value?.slice(0, 256) ?? null
 
 const requestIdFrom = (metadata: FailureInput["metadata"]): string | null => {
   const decoded = Schema.decodeUnknownOption(Schema.Struct({ requestId: Schema.optionalKey(Schema.String) }))(

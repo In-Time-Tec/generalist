@@ -16,8 +16,6 @@ import type { RegistrationOptions } from "../model/registration.js"
 import { registration as registerDeterministic } from "./deterministic.js"
 import {
   ErrorPayload as OpenAIErrorPayload,
-  boundedDescription,
-  boundedMetadata,
   layerLanguageModel,
   type Config as ModelConfig,
   type Options as ModelOptions,
@@ -124,6 +122,9 @@ const decodeSseErrorPayload = Schema.decodeUnknownOption(SseErrorPayload)
 const dataLinePrefix = /^data: ?/
 const frameSeparator = /(\r?\n\r?\n)/
 const lineSeparator = /(\r?\n)/
+const boundedDescription = (value: string | undefined, fallback: string): string =>
+  value !== undefined && value.length > 0 ? value.slice(0, 2_048) : fallback
+const boundedMetadata = (value: string | null | undefined): string | null => value?.slice(0, 256) ?? null
 
 const isResponsesUrl = (url: string) => url.split(/[?#]/)[0]!.replace(/\/+$/, "").endsWith("/responses")
 

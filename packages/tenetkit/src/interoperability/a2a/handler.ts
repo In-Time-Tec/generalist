@@ -110,18 +110,35 @@ function rejectedPromise<E>(error: E): Promise<never> {
   return Promise.reject(error)
 }
 
+class A2AStreamFailure extends Schema.TaggedError<A2AStreamFailure>()("tenetkit/a2a/A2AStreamFailure", {
+  cause: Schema.Unknown,
+}) {}
+
+const decodeStreamFailure = Schema.decodeUnknownOption(A2AStreamFailure)
+
+const unwrapStreamRejection = <A>(promise: Promise<A>): Promise<A> =>
+  promise.catch((error) => {
+    const failure = decodeStreamFailure(error)
+    return rejectedPromise(Option.isSome(failure) ? failure.value.cause : error)
+  })
+
 const toAsyncGenerator = <A>(iterable: AsyncIterable<A>): AsyncGenerator<A, void, undefined> => {
   const iterator = iterable[Symbol.asyncIterator]()
   return {
     [Symbol.asyncIterator]() {
       return this
     },
-    next: () => iterator.next(),
+    next: () => unwrapStreamRejection(iterator.next()),
     return: (value) =>
-      iterator.return === undefined ? Promise.resolve({ done: true, value }) : iterator.return(value),
-    throw: (error) => (iterator.throw === undefined ? rejectedPromise(error) : iterator.throw(error)),
+      iterator.return === undefined
+        ? Promise.resolve({ done: true, value })
+        : unwrapStreamRejection(iterator.return(value)),
+    throw: (error) =>
+      iterator.throw === undefined ? rejectedPromise(error) : unwrapStreamRejection(iterator.throw(error)),
     [Symbol.asyncDispose]: () =>
-      iterator.return === undefined ? Promise.resolve() : iterator.return(undefined).then(() => undefined),
+      iterator.return === undefined
+        ? Promise.resolve()
+        : unwrapStreamRejection(iterator.return(undefined)).then(() => undefined),
   }
 }
 
@@ -287,9 +304,9 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
         Stream.fromEffect(
           Effect.tryPromise({
             try: () => validateRequest(params),
-            catch: (error) => error,
+            catch: (cause) => A2AStreamFailure.make({ cause }),
           }),
-        ).pipe(Stream.flatMap(() => Stream.fromAsyncIterable(stream(), (error) => error))),
+        ).pipe(Stream.flatMap(() => Stream.fromAsyncIterable(stream(), (cause) => A2AStreamFailure.make({ cause })))),
       ),
     )
   }
