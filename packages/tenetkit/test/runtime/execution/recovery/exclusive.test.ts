@@ -1,9 +1,10 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, ToolContext, ToolExecutor } from "../../../../src/index.js"
+import { Agent, Approvals, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
+import { LoopDriverState } from "../../../../src/core/durable/loop-driver-state.js"
 import { registrationsFor } from "../fixtures.js"
 import { testExecutable } from "../../run/identity.js"
 import { operationRecoverySuite } from "../../operation/suites/recovery.js"
@@ -213,6 +214,179 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
         expect(recoveredPrompt).toContain("resolved external write")
         expect(completedHistory.map((event) => event._tag)).toContain("ToolExecutionCompleted")
         expect(completedHistory.map((event) => event._tag)).not.toContain("RunFailed")
+      }),
+    )
+  }),
+)
+
+it.live("keeps one tool operation key across approval suspension and SQLite restart", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("approval-operation-key-restart")
+    const tool = Tool.make("gated_write", {
+      parameters: Schema.Struct({ value: Schema.String }),
+      success: Schema.String,
+      needsApproval: true,
+    })
+    const toolkit = Toolkit.make(tool)
+    const agent = Agent.make({ name: "approval-operation-key-restart", toolkit })
+    const executable = testExecutable(agent, "approval-operation-key-restart-v1")
+    const address = Address.make("agent:approval-operation-key-restart")
+    const handlers = toolkit.toLayer({ gated_write: () => Effect.die("ToolExecutor owns gated_write") })
+    let firstModelCalls = 0
+    const firstModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          firstModelCalls += 1
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("tool-call", {
+              id: "gated-write-1",
+              name: "gated_write",
+              params: { value: "once" },
+              providerExecuted: false,
+            }),
+            finish,
+          ])
+        },
+      }),
+    )
+    const firstResolver = ExecutableResolver.makeStatic([
+      {
+        executable,
+        agent: Agent.close(
+          agent,
+          Layer.mergeAll(
+            firstModel,
+            handlers,
+            Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
+            ToolExecutor.layerTest({ execute: () => Effect.die("approval must precede execution") }),
+          ),
+        ),
+      },
+    ])
+
+    const suspended = yield* scopedWith(
+      SqliteRuntime.layerSqlite({
+        filename,
+        resolver: firstResolver,
+        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        scheduler: { pollInterval: "1 hour" },
+      }),
+    )(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        const receipt = yield* runtime.send({
+          to: address,
+          sessionId: "session:approval-operation-key-restart",
+          idempotencyKey: "approval-operation-key-restart",
+          prompt: "write once after approval",
+        })
+        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-restart" }))
+
+        const inspection = yield* runtime.inspect(receipt.runId)
+        expect(inspection.status).toBe("waiting")
+        expect(inspection.waits).toMatchObject([{ waitId: "approval:gated-write-1", reason: { _tag: "Approval" } }])
+        const execution = yield* store.loadExecution(receipt.runId)
+        if (execution.checkpoint === undefined || !("driverVersion" in execution.checkpoint)) {
+          return yield* Effect.die("durable checkpoint missing")
+        }
+        const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(execution.checkpoint.state).pipe(Effect.orDie)
+        const checkpointCall = state.toolBatch?.calls[0]
+        if (checkpointCall === undefined) return yield* Effect.die("tool checkpoint missing")
+        expect(checkpointCall.state).toMatchObject({
+          _tag: "Waiting",
+          reason: "approval",
+          waitId: "approval:gated-write-1",
+        })
+        expect(
+          yield* store.getOperationByKey({
+            runId: receipt.runId,
+            operationKey: checkpointCall.operationKey,
+          }),
+        ).toBeUndefined()
+        return { runId: receipt.runId, operationKey: checkpointCall.operationKey }
+      }),
+    )
+    expect(suspended.operationKey).toBe(`${suspended.runId}:tool:0:gated-write-1:gated_write`)
+    expect(firstModelCalls).toBe(1)
+
+    let recoveredModelCalls = 0
+    let toolExecutions = 0
+    let invocation: ToolContext.Service | undefined
+    const recoveredModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          recoveredModelCalls += 1
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "done", delta: "written once" }),
+            finish,
+          ])
+        },
+      }),
+    )
+    const recoveredExecutor = ToolExecutor.layerTest({
+      execute: () =>
+        Effect.gen(function* () {
+          invocation = yield* ToolContext.ToolContext
+          toolExecutions += 1
+          return { _tag: "Success" as const, result: "written", encodedResult: "written" }
+        }),
+    })
+    const recoveredResolver = ExecutableResolver.makeStatic([
+      {
+        executable,
+        agent: Agent.close(agent, Layer.mergeAll(recoveredModel, recoveredExecutor, handlers, Approvals.layerDenyAll)),
+      },
+    ])
+
+    yield* scopedWith(
+      SqliteRuntime.layerSqlite({
+        filename,
+        resolver: recoveredResolver,
+        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        scheduler: { pollInterval: "1 hour" },
+      }),
+    )(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        const reopened = yield* store.loadExecution(suspended.runId)
+        if (reopened.checkpoint === undefined || !("driverVersion" in reopened.checkpoint)) {
+          return yield* Effect.die("reopened checkpoint missing")
+        }
+        const reopenedState = yield* Schema.decodeUnknownEffect(LoopDriverState)(reopened.checkpoint.state).pipe(
+          Effect.orDie,
+        )
+        expect(reopenedState.toolBatch?.calls[0]?.operationKey).toBe(suspended.operationKey)
+
+        yield* runtime.respond({
+          runId: suspended.runId,
+          waitId: "approval:gated-write-1",
+          resolution: { _tag: "Approved" },
+        })
+        yield* host.execute(yield* store.claimExecution({ runId: suspended.runId, ownerId: "after-restart" }))
+
+        expect((yield* runtime.inspect(suspended.runId)).status).toBe("succeeded")
+        expect(invocation?.operationKey).toBe(suspended.operationKey)
+        expect(invocation?.idempotencyKey).toBe(suspended.operationKey)
+        expect(toolExecutions).toBe(1)
+        expect(recoveredModelCalls).toBe(1)
+        expect(
+          yield* store.getOperationByKey({
+            runId: suspended.runId,
+            operationKey: suspended.operationKey,
+          }),
+        ).toMatchObject({ status: "succeeded", replayPolicy: "never" })
+        const history = yield* runtime.history({ runId: suspended.runId, limit: 100 })
+        expect(history.filter((event) => event._tag === "ApprovalRequested")).toHaveLength(1)
+        expect(history.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
+        expect(history.filter((event) => event._tag === "ToolExecutionCompleted")).toHaveLength(1)
       }),
     )
   }),
