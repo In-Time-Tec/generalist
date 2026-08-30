@@ -39,7 +39,7 @@ bun add effect@4.0.0-rc.112 tenetkit@0.43.0
 bun add @effect/ai-openrouter@4.0.0-rc.112
 ```
 
-GitHub releases and npm contain the same four versioned package tarballs—`tenetkit`, `@tenetkit/pg`, `@tenetkit/mysql`, and `@tenetkit/cloudflare`—with compiled ESM and declarations. `tenetkit/*` names are import subpaths, not packages to pass to a package manager. The supported engines are Node 22+ and Bun 1.4+; Bun SQLite is Bun-only and Cloudflare adapters run in Workers.
+The next lockstep train packs five versioned packages—`tenetkit`, `@tenetkit/pg`, `@tenetkit/mysql`, `@tenetkit/cloudflare`, and `@tenetkit/rivet`—with compiled ESM and declarations. `tenetkit/*` names are import subpaths, not packages to pass to a package manager. The supported engines are Node 22+ and Bun 1.4+; Bun SQLite is Bun-only, Cloudflare adapters run in Workers, and the Rivet package exposes an ESM-only Actors host.
 
 ## Capability matrix
 
@@ -58,6 +58,7 @@ GitHub releases and npm contain the same four versioned package tarballs—`tene
 | FoldKit connection, subscription, commands, headless chat model     | `tenetkit/foldkit`        | experimental |
 | A2A v1 server projection over Runtime                               | `tenetkit/a2a`            | experimental |
 | AG-UI event projection over Runtime                                 | `tenetkit/ag-ui`          | experimental |
+| Rivet actor-local SQLite Runtime host                               | `@tenetkit/rivet/actors`  | experimental |
 
 ## A plugin is a Layer
 
@@ -119,6 +120,7 @@ External contributors can request repository access through the path in [CONTRIB
 | `packages/pg`         | `@tenetkit/pg` PostgreSQL durable Runtime adapter.                                    |
 | `packages/mysql`      | `@tenetkit/mysql` MySQL durable Runtime adapter.                                      |
 | `packages/cloudflare` | `@tenetkit/cloudflare` Durable Object and dynamic Worker adapters.                    |
+| `packages/rivet`      | `@tenetkit/rivet` actor-local SQLite Runtime host.                                    |
 | `docs/features`       | Current behavior and rules relied on by the code.                                     |
 | `docs/decisions`      | Important choices and why they were made.                                             |
 | `docs/tradeoffs`      | Useful notes about meaningful gains and costs.                                        |
@@ -133,7 +135,7 @@ bun run check
 bun run package
 ```
 
-`bun run package` builds once, verifies clean Bun and npm consumers, and writes four tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
+`bun run package` builds once, verifies clean Bun and npm consumers, and writes five tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
 
 ## Provenance
 

@@ -1046,6 +1046,48 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
   if (tenetkitManifest === undefined) return yield* smokeError("packed tenetkit manifest is missing")
   const optionalPeers = yield* validateMinimumConsumerProfiles({ tenetkitManifest, packageExports })
 
+  const verifyRivetDeclarationDependency = Effect.fn("PackageSmoke.verifyRivetDeclarationDependency")(function* (
+    profile: MinimumConsumerProfile,
+    runtime: ConsumerRuntime,
+    specifiers: ReadonlyArray<string>,
+    profileDirectory: string,
+  ) {
+    if (profile.name !== "rivet") return
+    if ((yield* installedPackages(profileDirectory, ["@standard-schema/spec"])).length === 0) {
+      return yield* smokeError(
+        `${profileContext(profile, runtime, specifiers)} missing package @standard-schema/spec required by Rivet declarations`,
+      )
+    }
+  })
+
+  const verifyRivetCommonJsBoundary = Effect.fn("PackageSmoke.verifyRivetCommonJsBoundary")(function* (
+    profile: MinimumConsumerProfile,
+    runtime: ConsumerRuntime,
+    specifiers: ReadonlyArray<string>,
+    profileDirectory: string,
+  ) {
+    if (profile.name !== "rivet" || runtime !== "node") return
+    yield* fileSystem.writeFileString(
+      path.join(profileDirectory, "require.cjs"),
+      `let blocked = false
+try {
+  require("@tenetkit/rivet/actors")
+} catch (error) {
+  blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
+}
+if (!blocked) throw new Error("@tenetkit/rivet/actors must remain ESM-only")
+`,
+    )
+    yield* runProfileCommand({
+      profile,
+      runtime,
+      specifiers,
+      command: "node",
+      args: ["require.cjs"],
+      cwd: profileDirectory,
+    })
+  })
+
   const runMinimumProfile = Effect.fn("PackageSmoke.runMinimumProfile")(function* (
     profile: MinimumConsumerProfile,
     runtime: ConsumerRuntime,
@@ -1107,6 +1149,7 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
         return yield* smokeError(`${profileContext(profile, runtime, specifiers)} missing package ${dependency}`)
       }
     }
+    yield* verifyRivetDeclarationDependency(profile, runtime, specifiers, profileDirectory)
     for (const dependency of optionalPeers) {
       if (profile.peers.includes(dependency)) continue
       const installed = yield* installedPackages(profileDirectory, [dependency])
@@ -1144,6 +1187,7 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
       })
       yield* Console.log(output.trim())
     }
+    yield* verifyRivetCommonJsBoundary(profile, runtime, specifiers, profileDirectory)
 
     const lockfile = path.join(profileDirectory, runtime === "node" ? "package-lock.json" : "bun.lock")
     if ((yield* fileSystem.readFileString(lockfile)).includes("npmjs.org/@tenetkit")) {

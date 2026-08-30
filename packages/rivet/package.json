@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "version": "0.44.0",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "peerDependencies": {
+    "effect": "catalog:"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.4.0"
+  },
+  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@tenetkit/rivet",
+  "description": "Rivet Actors Runtime host for TenetKit",
+  "exports": {
+    "./actors": {
+      "types": "./dist/actors/index.d.ts",
+      "import": "./dist/actors/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
+    "typecheck": "bun tsc --noEmit",
+    "test": "bun --bun --cwd ../.. vitest run packages/rivet/test --no-file-parallelism --maxWorkers=1"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "catalog:",
+    "rivetkit": "catalog:",
+    "tenetkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "effect": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "directory": "packages/rivet"
+  }
+}
