@@ -1,28 +1,28 @@
 import { Effect, Schedule, Stream, SynchronizedRef } from "effect"
 import type { PgClient } from "@effect/sql-pg"
-import type { Cursor } from "tenetkit/runtime/driver/cursor"
-import type { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from "tenetkit/runtime/driver/errors"
-import type { RunEvent } from "tenetkit/runtime/driver/run/event"
-import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
+import { Cursor, Errors, RunEvent } from "tenetkit/runtime"
+import type { EventHub } from "tenetkit/runtime/sql-driver"
 import { NOTIFY_CHANNEL } from "../schema.js"
 
-type EventsError = CursorExpired | RunNotFound | RuntimeUnavailable | SubscriberLagged
+type EventsError = Errors.CursorExpired | Errors.RunNotFound | Errors.RuntimeUnavailable | Errors.SubscriberLagged
 
 export const eventStream = (input: {
   readonly hub: EventHub
   readonly pg: PgClient.PgClient
   readonly runId: string
-  readonly cursor: Cursor
+  readonly cursor: Cursor.Cursor
   readonly capacity: number
   readonly loadReplay: Effect.Effect<
-    { readonly replay: ReadonlyArray<RunEvent>; readonly lastSequence: number },
-    RunNotFound | RuntimeUnavailable
+    { readonly replay: ReadonlyArray<RunEvent.RunEvent>; readonly lastSequence: number },
+    Errors.RunNotFound | Errors.RuntimeUnavailable
   >
-  readonly loadAfter: (cursor: Cursor) => Effect.Effect<ReadonlyArray<RunEvent>, RunNotFound | RuntimeUnavailable>
-}): Stream.Stream<RunEvent, EventsError> =>
+  readonly loadAfter: (
+    cursor: Cursor.Cursor,
+  ) => Effect.Effect<ReadonlyArray<RunEvent.RunEvent>, Errors.RunNotFound | Errors.RuntimeUnavailable>
+}): Stream.Stream<RunEvent.RunEvent, EventsError> =>
   Stream.unwrap(
     Effect.gen(function* () {
-      const cursor = yield* SynchronizedRef.make<Cursor>(input.cursor)
+      const cursor = yield* SynchronizedRef.make<Cursor.Cursor>(input.cursor)
       const catchUp = SynchronizedRef.modifyEffect(cursor, (current) =>
         input.loadAfter(current).pipe(
           Effect.flatMap((events) =>

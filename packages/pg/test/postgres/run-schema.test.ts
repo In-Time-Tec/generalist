@@ -6,9 +6,10 @@ import {
   SchemaDirty,
   SchemaMigrationFailed,
   SchemaVersionUnsupported,
-} from "tenetkit/runtime/driver/sql/errors"
+} from "tenetkit/runtime/sql-driver"
 import { RunSchema } from "../../src/postgres/run-schema.js"
-import { SCHEMA_VERSION, schemaChecksum } from "../../src/postgres/schema.js"
+import { SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "../../src/postgres/schema.js"
+import { inspectLogicalSqlSchema } from "../../../tenetkit/test/runtime/sql/schema-conformance.js"
 import { postgresAvailable, postgresDatabase } from "./database.js"
 
 const describePostgres = postgresAvailable ? describe : describe.skip
@@ -72,6 +73,7 @@ const inspectSchema = Effect.gen(function* () {
   expect(sessionTables.map((row) => row.table_name)).toEqual(["tenetkit_session_entries", "tenetkit_sessions"])
   expect(placementTables.map((row) => row.table_name)).toEqual(["tenetkit_external_child_placements"])
   expect(acknowledgementTables.map((row) => row.table_name)).toEqual(["tenetkit_run_acknowledgements"])
+  expect(yield* inspectLogicalSqlSchema).toEqual([])
 })
 
 describePostgres("postgres schema baseline", () => {
@@ -102,6 +104,29 @@ describePostgres("postgres schema baseline", () => {
         expect(
           yield* sql`SELECT table_name FROM information_schema.tables
           WHERE table_schema = current_schema() AND table_name = 'tenetkit_schema_meta'`,
+        ).toEqual([])
+      }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie))),
+    )
+  })
+
+  layer(database.provisionEmpty(client), { excludeTestServices: true })("rolls back partial physical DDL", (suite) => {
+    suite.effect("rolls transactional physical DDL back when bootstrap fails", () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* resetSchema
+        yield* Effect.exit(
+          sql.withTransaction(
+            Effect.gen(function* () {
+              for (const statement of SCHEMA_STATEMENTS.slice(0, 3)) yield* sql.unsafe(statement)
+              return yield* Effect.fail("forced PostgreSQL DDL failure")
+            }),
+          ),
+        )
+        expect(
+          yield* sql<{ table_name: string }>`
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = current_schema() AND table_name LIKE 'tenetkit_%'
+          `,
         ).toEqual([])
       }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie))),
     )

@@ -1,6 +1,6 @@
 import { Console, Effect, ManagedRuntime, Schema } from "effect"
 import { Runtime } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RunClaims } from "tenetkit/runtime/sql-driver"
 import { assistantAddress, completedResult, textPrompt } from "../../tenetkit/test/runtime/execution/fixtures.js"
 import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../test/postgres/database.js"
 

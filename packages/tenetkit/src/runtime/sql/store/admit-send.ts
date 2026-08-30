@@ -82,17 +82,39 @@ const appendLane = (
   return { acceptedSequence: lane.accepted_sequence + 1, queue: [...decodeQueue(lane.queue_json), runId] }
 }
 
+const decodeExecutable = (value: PinnedExecutable) =>
+  Effect.try({
+    try: () => decodePinned(value),
+    catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+  })
+
+const requireExecutableBinding = (addressBindings: ReadonlyMap<string, PinnedExecutable>, input: AdmitSendInput) =>
+  Effect.gen(function* () {
+    const bound = addressBindings.get(input.message.to)
+    if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
+    const admitted = yield* decodeExecutable({ ref: input.executableRef, manifest: input.executableManifest })
+    const binding = yield* decodeExecutable(bound)
+    if (!equals(binding, admitted)) return yield* AddressNotFound.make({ address: input.message.to })
+    return admitted
+  })
+
 export const admitSend: {
   (
     addressBindings: ReadonlyMap<string, PinnedExecutable>,
     input: AdmitSendInput,
-    options?: { readonly promote?: boolean },
+    options?: {
+      readonly lockRegistrations?: Effect.Effect<void, SqlError, SqlClient.SqlClient>
+      readonly promote?: boolean
+    },
   ): (hub: EventHub) => SendEffect
   (
     hub: EventHub,
     addressBindings: ReadonlyMap<string, PinnedExecutable>,
     input: AdmitSendInput,
-    options?: { readonly promote?: boolean },
+    options?: {
+      readonly lockRegistrations?: Effect.Effect<void, SqlError, SqlClient.SqlClient>
+      readonly promote?: boolean
+    },
   ): SendEffect
 } = Function.dual(
   (args) => args.length >= 3 && "publish" in args[0],
@@ -100,21 +122,14 @@ export const admitSend: {
     hub: EventHub,
     addressBindings: ReadonlyMap<string, PinnedExecutable>,
     input: AdmitSendInput,
-    options?: { readonly promote?: boolean },
+    options?: {
+      readonly lockRegistrations?: Effect.Effect<void, SqlError, SqlClient.SqlClient>
+      readonly promote?: boolean
+    },
   ): SendEffect =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const bound = addressBindings.get(input.message.to)
-      if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
-      const admitted = yield* Effect.try({
-        try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
-        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-      })
-      const binding = yield* Effect.try({
-        try: () => decodePinned(bound),
-        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-      })
-      if (!equals(binding, admitted)) return yield* AddressNotFound.make({ address: input.message.to })
+      const admitted = yield* requireExecutableBinding(addressBindings, input)
       const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
       const digest = rootDigest(input.message, treePolicy)
       const existing = yield* sql<RunRow>`
@@ -160,16 +175,30 @@ export const admitSend: {
       const lane = lanes[0]
       const { acceptedSequence, queue } = appendLane(lane, runId)
       if (lane === undefined) {
-        yield* sql`
-        INSERT INTO tenetkit_lanes (session_id, accepted_sequence, queue_json)
-        VALUES (${input.message.sessionId}, ${acceptedSequence}, ${encodeQueue(queue)})
-      `
+        yield* sql.onDialectOrElse({
+          pg: () => sql`
+            INSERT INTO tenetkit_lanes (session_id, accepted_sequence, queue_json, head_run_id)
+            VALUES (${input.message.sessionId}, ${acceptedSequence}, ${encodeQueue(queue)}, ${runId})
+          `,
+          orElse: () => sql`
+            INSERT INTO tenetkit_lanes (session_id, accepted_sequence, queue_json)
+            VALUES (${input.message.sessionId}, ${acceptedSequence}, ${encodeQueue(queue)})
+          `,
+        })
       } else {
-        yield* sql`
-        UPDATE tenetkit_lanes
-        SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)}
-        WHERE session_id = ${input.message.sessionId}
-      `
+        yield* sql.onDialectOrElse({
+          pg: () => sql`
+            UPDATE tenetkit_lanes
+            SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)},
+              head_run_id = COALESCE(head_run_id, ${queue[0]!})
+            WHERE session_id = ${input.message.sessionId}
+          `,
+          orElse: () => sql`
+            UPDATE tenetkit_lanes
+            SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)}
+            WHERE session_id = ${input.message.sessionId}
+          `,
+        })
       }
       yield* insertRun({
         runId,
@@ -183,6 +212,7 @@ export const admitSend: {
         treePolicy,
         acceptedSequence,
       })
+      if (options?.lockRegistrations !== undefined) yield* options.lockRegistrations
       yield* persistRegistrations(input.registrations)
       yield* associateRegistrations(runId, input.registrations)
       const run = (yield* loadRun(runId))!

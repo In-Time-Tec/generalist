@@ -16,6 +16,9 @@ import { checkpoint, replay } from "../../runtime/tree.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
 import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 
+export * from "./model-response-fault.js"
+export * from "./sql-transaction-fault.js"
+
 /** @experimental A multi-worker claim without the driver's decoded persisted Run representation. */
 export interface WorkerClaim {
   readonly runId: string
@@ -137,18 +140,6 @@ const completedResult = (sessionId: string, text: string): ExecutionResult => ({
   text,
   turns: 1,
   session: { sessionId, leafId: null },
-})
-
-const workerClaim = (claim: {
-  readonly run: { readonly runId: string }
-  readonly workerId: string
-  readonly attemptFence: number
-  readonly session: SessionWriteClaim
-}): WorkerClaim => ({
-  runId: claim.run.runId,
-  workerId: claim.workerId,
-  attemptFence: claim.attemptFence,
-  session: claim.session,
 })
 
 const registerAdmission = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>) => {
@@ -403,7 +394,12 @@ const registerMultiWorkerClaims = <LayerError, ClaimsLayerError>(
           })
           const [first] = yield* claims.claimReadyRuns({ workerId: "stale-a", limit: 1, lease: "10 seconds" })
           if (first === undefined) return yield* Effect.die("initial conformance claim is missing")
-          const stale = workerClaim(first)
+          const stale: WorkerClaim = {
+            runId: first.run.runId,
+            workerId: first.workerId,
+            attemptFence: first.attemptFence,
+            session: first.session,
+          }
           yield* capability.expire(stale)
           const [second] = yield* claims.claimReadyRuns({ workerId: "stale-b", limit: 1, lease: "10 seconds" })
           if (second === undefined) return yield* Effect.die("replacement conformance claim is missing")

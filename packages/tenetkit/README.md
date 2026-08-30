@@ -11,7 +11,7 @@ The packed-artifact smoke suite bundles and executes these public entrypoints un
 - `tenetkit/ai/openrouter`
 - `tenetkit/runtime`
 
-Construct MCP Streamable HTTP transports at `tenetkit/mcp/client/http`. `tenetkit/mcp/client/stdio` is the explicit Node/Bun-only transport. Bun SQLite stays at `tenetkit/runtime/sqlite-bun`; SQL claims and hosted worker loops stay at `tenetkit/runtime/driver/sql/run/claims` and `tenetkit/runtime/driver/sql/worker`. Optional model providers remain exact opt-in `tenetkit/ai/*` imports.
+Construct MCP Streamable HTTP transports at `tenetkit/mcp/client/http`. `tenetkit/mcp/client/stdio` is the explicit Node/Bun-only transport. Bun SQLite stays at `tenetkit/runtime/sqlite-bun`; SQL adapter claims and hosted worker loops use the exact `tenetkit/runtime/sql-driver` SPI. Optional model providers remain exact opt-in `tenetkit/ai/*` imports.
 
 ## TypeScript REPL kernels
 

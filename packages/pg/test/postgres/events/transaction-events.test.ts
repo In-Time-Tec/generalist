@@ -1,7 +1,7 @@
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RunClaims } from "tenetkit/runtime/sql-driver"
 import {
   assistantAddress,
   completedResult,

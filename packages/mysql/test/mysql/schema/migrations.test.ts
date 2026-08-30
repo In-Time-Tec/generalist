@@ -7,9 +7,10 @@ import {
   SchemaDirty,
   SchemaMigrationFailed,
   SchemaVersionUnsupported,
-} from "tenetkit/runtime/driver/sql/errors"
+} from "tenetkit/runtime/sql-driver"
 import { RunSchema } from "../../../src/mysql/schema/migrations.js"
-import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
+import { SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
+import { inspectLogicalSqlSchema } from "../../../../tenetkit/test/runtime/sql/schema-conformance.js"
 import { mysqlAvailable, mysqlDatabase } from "../runtime/environment.js"
 
 const describeMysql = describe.runIf(mysqlAvailable)
@@ -30,6 +31,7 @@ const tables = [
   "tenetkit_messages",
   "tenetkit_agent_names",
   "tenetkit_external_child_placements",
+  "tenetkit_external_roots",
   "tenetkit_run_links",
   "tenetkit_run_waits",
   "tenetkit_run_operations",
@@ -93,6 +95,7 @@ const inspectSchema = Effect.gen(function* () {
   expect(placementTables.map((row) => row.table_name)).toEqual(["tenetkit_external_child_placements"])
   expect(acknowledgementTables.map((row) => row.table_name)).toEqual(["tenetkit_run_acknowledgements"])
   expect(migrations.map((row) => row.migration_id)).toEqual([1])
+  expect(yield* inspectLogicalSqlSchema).toEqual([])
 })
 
 describeMysql("mysql schema baseline", () => {
@@ -124,6 +127,25 @@ describeMysql("mysql schema baseline", () => {
         ).toEqual([])
         yield* resetSchema
       }),
+    )
+  })
+
+  layer(client, { excludeTestServices: true })("detects partial physical DDL", (suite) => {
+    suite.effect("preserves implicit-commit DDL and refuses to pretend bootstrap rolled back", () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* resetSchema
+        for (const statement of SCHEMA_STATEMENTS.slice(0, 4)) yield* sql.unsafe(statement).unprepared
+
+        expect(yield* RunSchema.apply("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
+        expect(
+          (yield* sql<{ table_name: string }>`
+              SELECT TABLE_NAME AS table_name FROM information_schema.tables
+              WHERE table_schema = DATABASE() AND table_name LIKE 'tenetkit_%'
+              ORDER BY table_name
+            `).map((row) => row.table_name),
+        ).toEqual(["tenetkit_lanes", "tenetkit_runtime_locks", "tenetkit_schema_meta", "tenetkit_sql_migrations"])
+      }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie))),
     )
   })
 

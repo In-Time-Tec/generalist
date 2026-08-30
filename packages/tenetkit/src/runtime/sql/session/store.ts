@@ -146,9 +146,13 @@ export const verifyInterruptedSessionEntry = (
  */
 export const claimedStore = (options: {
   readonly claim: ExecutionClaim
+  readonly transaction?: <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | import("effect/unstable/sql/SqlError").SqlError, R>
 }): Effect.Effect<Session.Service, never, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const transaction: NonNullable<typeof options.transaction> = options.transaction ?? sql.withTransaction
     const sessionId = options.claim.session.sessionId
     const requireWriteClaim = requireSessionWriteClaim(options.claim.session).pipe(
       Effect.provideService(SqlClient.SqlClient, sql),
@@ -265,7 +269,7 @@ export const claimedStore = (options: {
       })
 
     const append = (entry: AppendInput, appendOptions: AppendOptions = {}) =>
-      sql.withTransaction(
+      transaction(
         Effect.gen(function* () {
           yield* requireWriteClaim
           const session = yield* requireSession
@@ -298,7 +302,7 @@ export const claimedStore = (options: {
       )
 
     const appendCheckpoint = (prepared: Session.PreparedCheckpoint) =>
-      sql.withTransaction(
+      transaction(
         Effect.gen(function* () {
           yield* requireWriteClaim
           const session = yield* requireSession
@@ -360,20 +364,16 @@ export const claimedStore = (options: {
       )
 
     return {
-      reserveEntryId: asReserveError(
-        sql.withTransaction(
-          Effect.gen(function* () {
-            yield* requireWriteClaim
-            const session = yield* requireSession
-            const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
-            let sequence = session.next_seq
-            while (ids.has(String(sequence))) sequence += 1
-            const created = yield* now
-            yield* advance(session.leaf_id, sequence + 1, created)
-            return String(sequence)
-          }),
-        ),
-      ),
+      reserveEntryId: Effect.gen(function* () {
+        yield* requireWriteClaim
+        const session = yield* requireSession
+        const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
+        let sequence = session.next_seq
+        while (ids.has(String(sequence))) sequence += 1
+        const created = yield* now
+        yield* advance(session.leaf_id, sequence + 1, created)
+        return String(sequence)
+      }).pipe(transaction, asReserveError),
       append: (entry, appendOptions) => asStoreError(append(entry, appendOptions)),
       appendCheckpoint: (prepared) => asStoreError(appendCheckpoint(prepared)),
       path: (leaf) =>
@@ -384,25 +384,23 @@ export const claimedStore = (options: {
           return yield* pathTo(leaf ?? session.leaf_id)
         }).pipe(asReadError),
       setLeaf: (id) =>
-        sql
-          .withTransaction(
-            Effect.gen(function* () {
-              yield* requireWriteClaim
-              yield* requireSession
-              if (id !== null) {
-                const rows = yield* sql<{ readonly entry_id: string }>`
+        transaction(
+          Effect.gen(function* () {
+            yield* requireWriteClaim
+            yield* requireSession
+            if (id !== null) {
+              const rows = yield* sql<{ readonly entry_id: string }>`
                   SELECT entry_id FROM tenetkit_session_entries
                   WHERE session_id = ${sessionId} AND entry_id = ${id}
                 `
-                if (rows[0] === undefined) return yield* storeError(`Session entry ${id} does not exist`)
-              }
-              const updated = yield* now
-              yield* sql`
+              if (rows[0] === undefined) return yield* storeError(`Session entry ${id} does not exist`)
+            }
+            const updated = yield* now
+            yield* sql`
                 UPDATE tenetkit_sessions SET leaf_id = ${id}, updated_at = ${updated} WHERE session_id = ${sessionId}
               `
-            }),
-          )
-          .pipe(asReserveError),
+          }),
+        ).pipe(asReserveError),
       leaf: sessionRow.pipe(
         Effect.map((session) => session?.leaf_id ?? null),
         Effect.orDie,

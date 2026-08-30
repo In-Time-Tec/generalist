@@ -4,7 +4,7 @@ import { expect, it } from "@effect/vitest"
 import { Clock, Context, Deferred, Effect, Fiber, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { SqlError } from "effect/unstable/sql/SqlError"
-import { migrate } from "../../../src/runtime/sql/migrate.js"
+import { apply } from "../../../src/runtime/sql/migrate.js"
 import { tempDbPath } from "./scenario.js"
 
 type Services = SqlClient.SqlClient | SqliteClient
@@ -61,7 +61,7 @@ it.live("keeps foreign-key enforcement under TenetKit migration ownership", () =
   const filename = tempDbPath("sqlite-upstream-foreign-keys")
   return withClient({ filename }, (sql) =>
     Effect.gen(function* () {
-      yield* migrate(filename)
+      yield* apply(filename)
       expect((yield* sql<{ foreign_keys: number }>`PRAGMA foreign_keys`)[0]?.foreign_keys).toBe(1)
       yield* sql`CREATE TABLE adoption_parent (id INTEGER PRIMARY KEY)`
       yield* sql`CREATE TABLE adoption_child (

@@ -116,10 +116,24 @@ const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints"
   const workerGroups = [
     {
       name: "neutral",
-      specifiers: workerSafePackageExports.filter((specifier) => specifier !== "tenetkit/ai/openrouter"),
+      specifiers: workerSafePackageExports.filter(
+        (specifier) => specifier !== "tenetkit/ai/openrouter" && specifier !== "tenetkit/runtime/sql-driver",
+      ),
       forbidProviders: true,
+      allowSqlRuntime: false,
     },
-    { name: "openrouter", specifiers: ["tenetkit/ai/openrouter"], forbidProviders: false },
+    {
+      name: "sql-driver",
+      specifiers: workerSafePackageExports.filter((specifier) => specifier === "tenetkit/runtime/sql-driver"),
+      forbidProviders: true,
+      allowSqlRuntime: true,
+    },
+    {
+      name: "openrouter",
+      specifiers: workerSafePackageExports.filter((specifier) => specifier === "tenetkit/ai/openrouter"),
+      forbidProviders: false,
+      allowSqlRuntime: false,
+    },
   ] as const
   const nodeBuiltins = new Set(builtinModules.map((specifier) => specifier.replace(/^node:/, "").split("/")[0]))
   yield* fileSystem.makeDirectory(workerDirectory)
@@ -183,7 +197,7 @@ export default { test: () => void loaded }
         ) {
           return true
         }
-        if (normalized.includes("/tenetkit/dist/runtime/sql/")) {
+        if (!group.allowSqlRuntime && normalized.includes("/tenetkit/dist/runtime/sql/")) {
           return (
             !normalized.endsWith("/errors.js") &&
             !normalized.endsWith("/operations.js") &&

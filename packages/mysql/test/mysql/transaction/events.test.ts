@@ -2,7 +2,7 @@ import { beforeAll } from "vitest"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Runtime } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RunClaims } from "tenetkit/runtime/sql-driver"
 import { assistantAddress, completedResult } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
 import { mysqlAvailable, mysqlDatabase, mysqlLayer, uniqueSession } from "../runtime/environment.js"
 

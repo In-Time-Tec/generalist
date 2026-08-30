@@ -29,6 +29,7 @@ export { inspectFanOut }
 import {
   afterTerminal as defaultAfterTerminal,
   appendEvent as defaultAppendEvent,
+  clearLeaseOnOwnerRelease,
   insertRun,
   loadRun,
   nowIso,
@@ -412,7 +413,10 @@ export const reconcileFanOutWith: {
           closedAt,
         })
         if (affected !== 1) return
-        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
+        yield* sql`
+          UPDATE tenetkit_runs SET owner_worker_id = NULL${clearLeaseOnOwnerRelease(sql)}
+          WHERE run_id = ${resumeParent.runId}
+        `
         yield* append(hub, (yield* loadRun(resumeParent.runId))!, { _tag: "RunResumed", waitId, resolution }, "running")
         resumeParent = yield* loadRun(resumeParent.runId)
       })
@@ -444,7 +448,10 @@ export const reconcileFanOutWith: {
         UPDATE tenetkit_program_operations SET status = 'running'
         WHERE run_id = ${operation.run_id} AND operation_name = ${operation.operation_name} AND status = 'waiting'
       `
-        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
+        yield* sql`
+          UPDATE tenetkit_runs SET owner_worker_id = NULL${clearLeaseOnOwnerRelease(sql)}
+          WHERE run_id = ${resumeParent.runId}
+        `
         yield* append(
           hub,
           (yield* loadRun(resumeParent.runId))!,

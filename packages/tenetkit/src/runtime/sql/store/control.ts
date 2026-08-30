@@ -21,6 +21,7 @@ import { encodeJson } from "../codec/codecs.js"
 import {
   afterTerminal,
   appendEvent,
+  clearLeaseOnOwnerRelease,
   loadRun,
   loadRunWait,
   loadRunWaitsByStatus,
@@ -286,6 +287,7 @@ export const complete: {
 } = Function.dual(2, (hub: EventHub, input: CompleteInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const clearLease = clearLeaseOnOwnerRelease(sql)
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     if (run.cancellationRequested) {
@@ -293,7 +295,7 @@ export const complete: {
         SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
       `
       if (running.length > 0 || (yield* hasPendingCancellationWork(run.runId))) {
-        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
+        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL${clearLease} WHERE run_id = ${run.runId}`
         yield* revokeExecutionSessionWriteClaim(input)
         return
       }
@@ -314,7 +316,7 @@ export const complete: {
     `
     if (running.length > 0) {
       yield* sql`
-        UPDATE tenetkit_runs SET status = 'waiting', owner_worker_id = NULL, suspension_json = NULL,
+        UPDATE tenetkit_runs SET status = 'waiting', owner_worker_id = NULL${clearLease}, suspension_json = NULL,
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result: input.result })}
         WHERE run_id = ${run.runId}
       `
@@ -334,6 +336,7 @@ export const fail: {
 } = Function.dual(2, (hub: EventHub, input: FailInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const clearLease = clearLeaseOnOwnerRelease(sql)
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     if (run.cancellationRequested) {
@@ -341,7 +344,7 @@ export const fail: {
         SELECT fan_out_id FROM tenetkit_fan_outs WHERE parent_run_id = ${run.runId} AND status = 'running' LIMIT 1
       `
       if (running.length > 0 || (yield* hasPendingCancellationWork(run.runId))) {
-        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
+        yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL${clearLease} WHERE run_id = ${run.runId}`
         yield* revokeExecutionSessionWriteClaim(input)
         return
       }
@@ -362,7 +365,7 @@ export const fail: {
     `
     if (running.length > 0) {
       yield* sql`
-        UPDATE tenetkit_runs SET status = 'waiting', owner_worker_id = NULL, suspension_json = NULL,
+        UPDATE tenetkit_runs SET status = 'waiting', owner_worker_id = NULL${clearLease}, suspension_json = NULL,
           pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
         WHERE run_id = ${run.runId}
       `

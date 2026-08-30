@@ -1,13 +1,13 @@
 import { Clock, Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import type { RunActivationProjection } from "tenetkit/runtime/driver/run/activation"
+import { Errors } from "tenetkit/runtime"
+import type { RunActivationProjection } from "tenetkit/runtime/sql-driver"
 
 /** @experimental Transaction-local callback which arms the shared host alarm. */
-export type Rearm = Effect.Effect<void, RuntimeUnavailable>
+export type Rearm = Effect.Effect<void, Errors.RuntimeUnavailable>
 
 const unavailable = (cause: unknown) =>
-  RuntimeUnavailable.make({ message: `activation projection failed: ${String(cause)}` })
+  Errors.RuntimeUnavailable.make({ message: `activation projection failed: ${String(cause)}` })
 
 /** @experimental Adapter-owned activation schema. */
 export const schema = Effect.gen(function* () {
@@ -54,7 +54,7 @@ export const makeProjection: {
 )
 
 /** @experimental Create, backfill, and arm adapter candidates in the caller's transaction. */
-export const migrateAndBackfill = (rearm: Rearm) =>
+export const migrateAndBackfill = (rearm: Rearm): Effect.Effect<void, Errors.RuntimeUnavailable, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const now = yield* Clock.currentTimeMillis
@@ -73,7 +73,7 @@ export const migrateAndBackfill = (rearm: Rearm) =>
           (r.status = 'running' OR
             (r.status = 'queued' AND r.parent_run_id IS NOT NULL AND l.readiness = 'ready')))`
     yield* rearm
-  })
+  }).pipe(Effect.mapError(unavailable))
 
 /** @experimental Earliest TenetKit-owned wake, for use by a host-owned coexistence rearm. */
 export const nextDueAt = Effect.gen(function* () {

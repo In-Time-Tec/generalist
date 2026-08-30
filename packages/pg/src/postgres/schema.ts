@@ -1,5 +1,8 @@
-export const SCHEMA_VERSION = 4
-export const MIGRATION_NAME = "tenetkit_runtime"
+export {
+  SQL_SCHEMA_NAME as MIGRATION_NAME,
+  SQL_SCHEMA_VERSION as SCHEMA_VERSION,
+  sqlSchemaChecksum as schemaChecksum,
+} from "tenetkit/runtime/sql-driver"
 export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
 export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
 export const NOTIFY_CHANNEL = "tenetkit_run_events"
@@ -274,6 +277,20 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS tenetkit_session_entries_seq_idx ON tenetkit_session_entries(session_id, seq)`,
   `CREATE INDEX IF NOT EXISTS tenetkit_session_entries_parent_idx ON tenetkit_session_entries(session_id, parent_id)`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_external_roots (
+  placement_id TEXT PRIMARY KEY,
+  parent_partition TEXT NOT NULL,
+  parent_run_id TEXT NOT NULL,
+  partition TEXT NOT NULL,
+  run_id TEXT NOT NULL UNIQUE REFERENCES tenetkit_runs(run_id),
+  session_id TEXT NOT NULL,
+  request_digest TEXT NOT NULL,
+  executable_digest TEXT NOT NULL,
+  admission_digest TEXT NOT NULL,
+  activated BOOLEAN NOT NULL DEFAULT FALSE,
+  settlement_acknowledged BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL
+)`,
   `CREATE TABLE IF NOT EXISTS tenetkit_external_child_placements (
   placement_id TEXT PRIMARY KEY,
   parent_run_id TEXT NOT NULL REFERENCES tenetkit_runs(run_id),
@@ -303,11 +320,3 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(
   (statement) => statement.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)?.slice(1, 2) ?? [],
 )
-
-export const schemaChecksum = (): string => {
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(SCHEMA_STATEMENTS.join("\n"))
-  hasher.update(`\nversion=${SCHEMA_VERSION}`)
-  hasher.update("\ndialect=postgres")
-  return hasher.digest("hex")
-}

@@ -1,50 +1,47 @@
-import { Context, Effect, Random } from "effect"
-import { PgClient } from "@effect/sql-pg"
+import { Context, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import type { RunEvent } from "tenetkit/runtime/driver/run/event"
-import { withSql } from "tenetkit/runtime/driver/sql/effect"
-import type { EventHub } from "tenetkit/runtime/driver/sql/subscribers"
+import { withSql, type EventHub, type SqlStoreRunner } from "tenetkit/runtime/sql-driver"
 import { NOTIFY_CHANNEL } from "../schema.js"
-import type { RunFn } from "../store/ops.js"
 
-const TransactionEvents = Context.Reference<Array<readonly [string, RunEvent]>>(
-  "tenetkit/runtime/driver/sql/postgres/TransactionEvents",
-  { defaultValue: () => [] },
-)
+interface TransactionState {
+  readonly runIds: Set<string>
+}
 
-/** @experimental Notify event followers through the active SQL connection. */
+const State = Context.Reference<TransactionState>("tenetkit/runtime/sql/postgres/TransactionState", {
+  defaultValue: () => ({ runIds: new Set() }),
+})
+
+/** @experimental Notify event followers through the active SQL transaction connection. */
 export const notifyRun = (runId: string): Effect.Effect<void, SqlError, SqlClient.SqlClient> =>
   SqlClient.SqlClient.pipe(
     Effect.flatMap((sql) => sql`SELECT pg_notify(${NOTIFY_CHANNEL}, ${runId})`),
     Effect.asVoid,
   )
 
+/** PostgreSQL transaction and post-commit-doorbell strategy for Runtime's SQL kernel. */
 export const transactionRunner = (input: {
   readonly sql: SqlClient.SqlClient
-  readonly pg: PgClient.PgClient
   readonly hub: EventHub
-}) => {
+}): SqlStoreRunner => {
   const transactionHub: EventHub = {
     ...input.hub,
-    publish: (runId, event) =>
-      Effect.flatMap(TransactionEvents, (events) => Effect.sync(() => void events.push([runId, event]))),
+    touchRun: (runId) => Effect.flatMap(State, ({ runIds }) => Effect.sync(() => void runIds.add(runId))),
+    publish: (runId) => Effect.flatMap(State, ({ runIds }) => Effect.sync(() => void runIds.add(runId))),
   }
-  const runRaw: RunFn = (effect) =>
-    withSql(input.sql, input.sql.withTransaction(effect.pipe(Effect.provideService(PgClient.PgClient, input.pg))))
-  const run: RunFn = (effect) =>
-    runRaw(
-      Effect.gen(function* () {
-        const events: Array<readonly [string, RunEvent]> = []
-        const result = yield* effect.pipe(Effect.provideService(TransactionEvents, events))
-        yield* Effect.forEach(new Set(events.map(([runId]) => runId)), notifyRun, { discard: true })
-        return result
-      }),
+  const transaction: SqlStoreRunner["transaction"] = (effect) => input.sql.withTransaction(effect)
+  const run: SqlStoreRunner["run"] = (effect) =>
+    withSql(
+      input.sql,
+      transaction(
+        Effect.gen(function* () {
+          const state: TransactionState = { runIds: new Set() }
+          const result = yield* effect.pipe(Effect.provideService(State, state))
+          yield* Effect.forEach(state.runIds, notifyRun, { discard: true })
+          return result
+        }),
+      ),
     )
-  const runNoTxn: RunFn = (effect) =>
-    withSql(input.sql, effect.pipe(Effect.provideService(PgClient.PgClient, input.pg)))
-  return { run, runNoTxn, transactionHub }
+  const runNoTransaction: SqlStoreRunner["runNoTransaction"] = (effect) => withSql(input.sql, effect)
+  return { run, runNoTransaction, runInspection: run, transaction, transactionHub }
 }
-
-export const nextId = (prefix: string): Effect.Effect<string> =>
-  Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER).pipe(Effect.map((random) => `${prefix}_${random.toString(36)}`))

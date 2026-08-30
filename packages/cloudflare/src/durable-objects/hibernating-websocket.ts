@@ -1,7 +1,6 @@
 /* oxlint-disable effecttsgo/async-function, no-await-in-loop */
 import { Effect, Option, Schema } from "effect"
-import { Cursor, origin } from "tenetkit/runtime/driver/cursor"
-import { Runtime, type Service } from "tenetkit/runtime/driver/service"
+import { Cursor, Runtime } from "tenetkit/runtime"
 import { page } from "tenetkit/transport/replay"
 import { decodeCommand } from "tenetkit/transport/wire"
 
@@ -11,7 +10,7 @@ const Attachment = Schema.Union([
     version: Schema.Literal(1),
     state: Schema.Literal("attached"),
     runId: Schema.String,
-    cursor: Cursor,
+    cursor: Cursor.Cursor,
   }),
 ])
 
@@ -35,7 +34,7 @@ export interface HibernatingWebSocketState {
 /** @experimental Bounded adapter configuration. */
 export interface HibernatingWebSocketOptions {
   readonly state: HibernatingWebSocketState
-  readonly runtime: Service
+  readonly runtime: Runtime.Service
   readonly pageSize?: number
   readonly fuel?: number
 }
@@ -67,8 +66,10 @@ const close = (socket: HibernatingWebSocket, code: number, reason: string): void
 export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) => {
   const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 64), 1), 1_000)
   const fuel = Math.min(Math.max(Math.trunc(options.fuel ?? 4), 1), 32)
-  const runPage = (runId: string, cursor: Cursor) =>
-    Effect.runPromise(page({ runId, cursor, limit: pageSize }).pipe(Effect.provideService(Runtime, options.runtime)))
+  const runPage = (runId: string, cursor: Cursor.Cursor) =>
+    Effect.runPromise(
+      page({ runId, cursor, limit: pageSize }).pipe(Effect.provideService(Runtime.Runtime, options.runtime)),
+    )
 
   const drainSocket = async (socket: HibernatingWebSocket): Promise<FlushResult> => {
     const decoded = decodeAttachment(socket)
@@ -152,7 +153,7 @@ export const makeHibernatingWebSocket = (options: HibernatingWebSocketOptions) =
           if (decodedAttachment.value.state === "attached" && decodedAttachment.value.runId !== command.value.runId) {
             return close(socket, 1008, "run-mismatch")
           }
-          const requestedCursor = command.value.cursor ?? origin
+          const requestedCursor = command.value.cursor ?? Cursor.origin
           const cursor =
             decodedAttachment.value.state === "attached"
               ? Math.max(decodedAttachment.value.cursor, requestedCursor)

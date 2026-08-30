@@ -4,13 +4,15 @@ import { Agent, AgentEvent, Approvals, Permissions, Tool, Toolkit } from "tenetk
 import { decodeConfig as decodeOpenRouterConfig } from "tenetkit/ai/openrouter"
 import { TestModel } from "tenetkit/test"
 import { SqlClient } from "effect/unstable/sql"
-import { test } from "tenetkit/runtime/driver/executable/manifest"
-import { make as makeMessage } from "tenetkit/runtime/driver/messaging/message"
-import { Address } from "tenetkit/runtime/driver/address"
-import type { Service as RuntimeInterface } from "tenetkit/runtime/driver/service"
-import { AgentExecutionFailure, RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import type { RunEvent } from "tenetkit/runtime/driver/run/event"
-import { RunStore } from "tenetkit/runtime/driver/run/store"
+import {
+  Address,
+  Errors,
+  ExecutableManifest,
+  Message,
+  RunEvent,
+  RunStore as RunStoreFacade,
+  type Runtime,
+} from "tenetkit/runtime"
 import {
   layerRunStore,
   layerSqlClient,
@@ -19,6 +21,13 @@ import {
   schema as activationSchema,
   type DurableObjectStorage,
 } from "@tenetkit/cloudflare/durable-objects"
+import { inspectLogicalSqlSchema } from "../../../tenetkit/test/runtime/sql/schema-conformance.js"
+
+const test = ExecutableManifest.makeTest
+const makeMessage = Message.make
+const AgentExecutionFailure = Errors.AgentExecutionFailure
+const RuntimeUnavailable = Errors.RuntimeUnavailable
+const RunStore = RunStoreFacade.RunStore
 
 declare global {
   var WebSocketPair: new () => SocketPair
@@ -167,8 +176,8 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
 })
 
 const replayExecutable = test("workerd-replay", "1")
-const replayEvents: ReadonlyArray<RunEvent> = [0, 1].map(
-  (sequence): RunEvent => ({
+const replayEvents: ReadonlyArray<RunEvent.RunEvent> = [0, 1].map(
+  (sequence): RunEvent.RunEvent => ({
     _tag: "RunAttemptStarted",
     specVersion: "1",
     eventId: `replay-run:${sequence}`,
@@ -183,7 +192,7 @@ const replayEvents: ReadonlyArray<RunEvent> = [0, 1].map(
 )
 const unusedEffect = () => Effect.die("unused Runtime operation")
 const unusedStream = () => Stream.die("unused Runtime operation")
-const replayRuntime: RuntimeInterface = {
+const replayRuntime: Runtime.Service = {
   start: unusedEffect,
   admit: unusedEffect,
   activate: unusedEffect,
@@ -579,6 +588,7 @@ export class SqlObject {
           const [terminalRow] = decodeTerminalRow(cancellationTerminal)
           const [schemaRow] = decodeSchemaRow(schemaMeta)
           const info = yield* store.info
+          const logicalSchemaViolations = yield* inspectLogicalSqlSchema
           return Response.json({
             backend: info.backend,
             probe: probeRow.requests,
@@ -590,6 +600,7 @@ export class SqlObject {
             cancellationTerminalStatus: terminalRow.status,
             alarm: yield* Effect.promise(() => storage.getAlarm()),
             schemaVersion: schemaRow.version,
+            logicalSchemaViolations,
             migrations,
             transitionAffected,
             pluralInitialOrder,

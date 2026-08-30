@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { ExecutableResolver, Runtime } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RunClaims } from "tenetkit/runtime/sql-driver"
 import {
   assistant,
   assistantAddress,

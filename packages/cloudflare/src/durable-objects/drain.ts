@@ -1,9 +1,6 @@
 import { Clock, Effect } from "effect"
 import { SqlClient, SqlError } from "effect/unstable/sql"
-import { RunExecutor } from "tenetkit/runtime/driver/execution/run-executor"
-import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import { LocalScheduler } from "tenetkit/runtime/driver/execution/local-scheduler"
-import { RunStore } from "tenetkit/runtime/driver/run/store"
+import { Errors, LocalScheduler, RunExecutor, RunStore } from "tenetkit/runtime"
 import type { Rearm } from "./activations.js"
 
 export interface DrainOptions {
@@ -34,14 +31,14 @@ export const drain = (
   options: DrainOptions,
 ): Effect.Effect<
   DrainResult,
-  RuntimeUnavailable | SqlError.SqlError,
-  SqlClient.SqlClient | RunStore | RunExecutor | LocalScheduler
+  Errors.RuntimeUnavailable | SqlError.SqlError,
+  SqlClient.SqlClient | RunStore.RunStore | RunExecutor.RunExecutor | LocalScheduler.LocalScheduler
 > =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const store = yield* RunStore
-    const executor = yield* RunExecutor
-    const scheduler = yield* LocalScheduler
+    const store = yield* RunStore.RunStore
+    const executor = yield* RunExecutor.RunExecutor
+    const scheduler = yield* LocalScheduler.LocalScheduler
     const now = yield* Clock.currentTimeMillis
     const fuel = Math.max(0, Math.floor(options.fuel))
     const candidates = yield* sql<Candidate>`

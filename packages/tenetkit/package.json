@@ -57,6 +57,10 @@
       "types": "./dist/runtime/sqlite-bun.d.ts",
       "import": "./dist/runtime/sqlite-bun.js"
     },
+    "./runtime/sql-driver": {
+      "types": "./dist/runtime/sql-driver.d.ts",
+      "import": "./dist/runtime/sql-driver.js"
+    },
     "./ai": {
       "types": "./dist/ai/index.d.ts",
       "import": "./dist/ai/index.js"
@@ -220,22 +224,6 @@
     "./runtime/external-child-store": {
       "types": "./dist/runtime/child/external/store.d.ts",
       "import": "./dist/runtime/child/external/store.js"
-    },
-    "./runtime/driver": {
-      "types": "./dist/runtime/driver/index.d.ts",
-      "import": "./dist/runtime/driver/index.js"
-    },
-    "./runtime/driver/sql": {
-      "types": "./dist/runtime/driver/sql.d.ts",
-      "import": "./dist/runtime/driver/sql.js"
-    },
-    "./runtime/driver/*": {
-      "types": "./dist/runtime/*.d.ts",
-      "import": "./dist/runtime/*.js"
-    },
-    "./runtime/driver/sql/*": {
-      "types": "./dist/runtime/sql/*.d.ts",
-      "import": "./dist/runtime/sql/*.js"
     }
   },
   "scripts": {

@@ -15,7 +15,14 @@ import { groupWaitsFromSuspension, resultFromInspection } from "../../../child/g
 import { inspectFanOut } from "../fan-out/service.js"
 import { loadTerminalEvent, reconcileChildWaitWith } from "../child/settlement.js"
 import { revokeExecutionSessionWriteClaim } from "../../session/claim.js"
-import { appendEvent, loadRun, loadRunWait, nowIso, transitionRunWait } from "../statements.js"
+import {
+  appendEvent,
+  clearLeaseOnOwnerRelease,
+  loadRun,
+  loadRunWait,
+  nowIso,
+  transitionRunWait,
+} from "../statements.js"
 
 type SuspendInput = Parameters<RunStoreService["suspend"]>[0]
 type SuspendEffect = Effect.Effect<
@@ -135,6 +142,7 @@ export const suspend: {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    if (run.cancellationRequested) return
     const executableRef = yield* Effect.try({
       try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
@@ -155,7 +163,9 @@ export const suspend: {
     yield* appendWaits(hub, run, inserted, opened)
     yield* reconcileChildren(hub, run.runId, suspensionTokens(input.suspension))
     yield* reconcileGroups(hub, run.runId, input.suspension)
-    yield* sql`UPDATE tenetkit_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
+    yield* sql`
+      UPDATE tenetkit_runs SET owner_worker_id = NULL${clearLeaseOnOwnerRelease(sql)} WHERE run_id = ${run.runId}
+    `
     yield* revokeExecutionSessionWriteClaim(input)
   })
 })

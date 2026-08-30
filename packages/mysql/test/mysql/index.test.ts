@@ -6,8 +6,15 @@ import { messagingPolicySuite } from "../../../tenetkit/test/runtime/messaging/s
 import { messagingSendOperationSuite } from "../../../tenetkit/test/runtime/messaging/suites/send-operation.js"
 import { claimReadyWorker } from "../../../tenetkit/test/runtime/run/queued-activation.js"
 import { assistantAddress } from "../../../tenetkit/test/runtime/execution/fixtures.js"
-import { driverConformance, type ClaimExecution } from "tenetkit/test/runtime-driver"
-import { Effect } from "effect"
+import {
+  driverConformance,
+  modelResponseFaultConformance,
+  sqlTransactionFaultConformance,
+  type ClaimExecution,
+  type ModelResponseFaultBoundary,
+} from "tenetkit/test/runtime-driver"
+import { Effect, Layer } from "effect"
+import { SqlClient } from "effect/unstable/sql"
 import { mysqlAvailable, mysqlDatabase, mysqlMessagingLayer, mysqlLayer } from "./runtime/environment.js"
 
 /**
@@ -55,10 +62,88 @@ const conformanceClaim: ClaimExecution = (services, { runId, workerId }) => {
   }).pipe(Effect.orDie)
 }
 
+const withConformanceClient = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+  Effect.scoped(
+    Effect.flatMap(Layer.build(conformanceDatabase.client), (context) => effect.pipe(Effect.provideContext(context))),
+  )
+
+const faultTarget = (boundary: ModelResponseFaultBoundary) => {
+  switch (boundary) {
+    case "after-claim-validation":
+      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_session_entries" }
+    case "after-session-entry":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_sessions" }
+    case "after-session-leaf":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_run_operations" }
+    case "after-operation":
+    case "after-tree-index":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_runs" }
+    case "after-checkpoint":
+      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_run_events" }
+    case "after-event":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_tree_roots" }
+    case "after-tree-position":
+      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_tree_event_index" }
+    case "before-commit":
+      return { timing: "AFTER", operation: "UPDATE", table: "tenetkit_runs" }
+  }
+}
+
+const installModelFault = (input: { readonly boundary: ModelResponseFaultBoundary }) =>
+  withConformanceClient(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const target = faultTarget(input.boundary)
+      const signal = `SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '${input.boundary}'`
+      const body =
+        input.boundary === "after-tree-index" || input.boundary === "before-commit"
+          ? `BEGIN IF NEW.last_sequence > OLD.last_sequence THEN ${signal}; END IF; END`
+          : signal
+      yield* sql.unsafe(`
+        CREATE TRIGGER tenetkit_model_response_fault
+        ${target.timing} ${target.operation} ON ${target.table}
+        FOR EACH ROW ${body}
+      `).unprepared
+    }),
+  ).pipe(Effect.orDie)
+
+const removeModelFault = () =>
+  withConformanceClient(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql.unsafe("DROP TRIGGER IF EXISTS tenetkit_model_response_fault").unprepared
+    }),
+  ).pipe(Effect.orDie)
+
 driverConformance({
   name: "MySQL",
   address: assistantAddress,
   layer: conformanceLayer,
   skip,
   capabilities: { runtime: { claim: conformanceClaim } },
+})
+
+modelResponseFaultConformance({
+  name: "MySQL",
+  address: assistantAddress,
+  layer: conformanceLayer,
+  skip,
+  claim: ({ claims, runId, workerId }) => {
+    if (claims === undefined) return Effect.die("MySQL fault conformance requires RunClaims")
+    return Effect.gen(function* () {
+      const batch = yield* claims.claimReadyRuns({ workerId, limit: 16, lease: "10 seconds" })
+      const claimed = batch.find((candidate) => candidate.run.runId === runId)
+      if (claimed === undefined) return yield* Effect.die(`MySQL did not claim fault Run ${runId}`)
+      return { runId, ownerId: claimed.workerId, attemptFence: claimed.attemptFence, session: claimed.session }
+    }).pipe(Effect.orDie)
+  },
+  install: installModelFault,
+  remove: removeModelFault,
+})
+
+const transactionFaultDatabase = mysqlDatabase("transaction-fault-conformance")
+sqlTransactionFaultConformance({
+  name: "MySQL",
+  layer: transactionFaultDatabase.provisionEmpty(transactionFaultDatabase.client),
+  skip,
 })

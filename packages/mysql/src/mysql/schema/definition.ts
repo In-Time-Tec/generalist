@@ -1,5 +1,8 @@
-export const SCHEMA_VERSION = 4
-export const MIGRATION_NAME = "tenetkit_runtime"
+export {
+  SQL_SCHEMA_NAME as MIGRATION_NAME,
+  SQL_SCHEMA_VERSION as SCHEMA_VERSION,
+  sqlSchemaChecksum as schemaChecksum,
+} from "tenetkit/runtime/sql-driver"
 export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
 export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
 export const MIGRATION_LOCK = "tenetkit_runtime_schema"
@@ -16,7 +19,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS tenetkit_sql_migrations (
   migration_id INT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  applied_at VARCHAR(30) NOT NULL
+  created_at VARCHAR(30) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS tenetkit_runtime_locks (
   lock_key VARCHAR(512) PRIMARY KEY
@@ -300,6 +303,22 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   KEY tenetkit_session_entries_parent_idx (session_id, parent_id),
   CONSTRAINT tenetkit_session_entries_session_fk FOREIGN KEY (session_id) REFERENCES tenetkit_sessions(session_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS tenetkit_external_roots (
+  placement_id VARCHAR(255) PRIMARY KEY,
+  parent_partition VARCHAR(255) NOT NULL,
+  parent_run_id VARCHAR(255) NOT NULL,
+  \`partition\` VARCHAR(255) NOT NULL,
+  run_id VARCHAR(255) NOT NULL,
+  session_id VARCHAR(255) NOT NULL,
+  request_digest VARCHAR(128) NOT NULL,
+  executable_digest VARCHAR(128) NOT NULL,
+  admission_digest VARCHAR(128) NOT NULL,
+  activated TINYINT(1) NOT NULL DEFAULT 0,
+  settlement_acknowledged TINYINT(1) NOT NULL DEFAULT 0,
+  created_at VARCHAR(30) NOT NULL,
+  UNIQUE KEY tenetkit_external_roots_run_key (run_id),
+  CONSTRAINT tenetkit_external_roots_run_fk FOREIGN KEY (run_id) REFERENCES tenetkit_runs(run_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS tenetkit_external_child_placements (
   placement_id VARCHAR(255) PRIMARY KEY,
   parent_run_id VARCHAR(255) NOT NULL,
@@ -330,11 +349,3 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(
   (statement) => statement.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)?.slice(1, 2) ?? [],
 )
-
-export const schemaChecksum = (): string => {
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(SCHEMA_STATEMENTS.join("\n"))
-  hasher.update(`\nversion=${SCHEMA_VERSION}`)
-  hasher.update("\ndialect=mysql")
-  return hasher.digest("hex")
-}

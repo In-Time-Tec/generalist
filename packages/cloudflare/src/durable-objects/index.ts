@@ -1,13 +1,17 @@
 import type { Layer } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
 import { SqliteClient } from "@effect/sql-sqlite-do"
-import type { RunStore } from "tenetkit/runtime/driver/run/store"
-import type { ExternalChildStore } from "tenetkit/runtime/driver/child/external/store"
-import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "tenetkit/runtime/driver/sql/store"
+import type { ExternalChildStore, RunStore } from "tenetkit/runtime"
+import {
+  layerSqliteStore,
+  makeExclusiveExecutionRecovery,
+  type SqliteStoreError,
+  type SqliteStoreOptions,
+} from "tenetkit/runtime/sql-driver"
 
 export { drain, type DrainOptions, type DrainResult } from "./drain.js"
 export { makeProjection, migrateAndBackfill, nextDueAt, schema, type Rearm } from "./activations.js"
-export { makeExclusiveExecutionRecovery } from "./recovery.js"
+export { makeExclusiveExecutionRecovery }
 export {
   makeHibernatingWebSocket,
   type Attachment,
@@ -31,5 +35,5 @@ export const layerSqlClient = (
 /** @experimental */
 export const layerRunStore = (
   options: SqliteStoreOptions,
-): Layer.Layer<RunStore | ExternalChildStore, SqliteStoreError, SqlClient.SqlClient> =>
+): Layer.Layer<RunStore.RunStore | ExternalChildStore.ExternalChildStore, SqliteStoreError, SqlClient.SqlClient> =>
   layerSqliteStore({ ...options, source: options.source ?? "durable-object" })

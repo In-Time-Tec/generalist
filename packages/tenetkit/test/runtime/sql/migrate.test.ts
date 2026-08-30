@@ -8,14 +8,22 @@ import {
   SchemaMigrationFailed,
   SchemaVersionUnsupported,
 } from "../../../src/runtime/sql/errors.js"
-import { migrate } from "../../../src/runtime/sql/migrate.js"
+import { apply as applySchema } from "../../../src/runtime/sql/migrate.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/runtime/sql/codec/schema.js"
 import { tempDbPath } from "./scenario.js"
+import { inspectLogicalSqlSchema } from "./schema-conformance.js"
 
 const apply = (filename: string) =>
   Effect.scoped(
     Effect.flatMap(Layer.build(layer({ filename })), (context) =>
-      migrate(filename).pipe(Effect.provideContext(context)),
+      applySchema(filename).pipe(Effect.provideContext(context)),
+    ),
+  )
+
+const inspectLogicalSchema = (filename: string) =>
+  Effect.scoped(
+    Effect.flatMap(Layer.build(layer({ filename })), (context) =>
+      inspectLogicalSqlSchema.pipe(Effect.provideContext(context)),
     ),
   )
 
@@ -118,6 +126,7 @@ it.live("creates the current SQLite baseline and applies idempotently", () =>
     yield* apply(filename)
     yield* apply(filename)
     inspect(filename)
+    expect(yield* inspectLogicalSchema(filename)).toEqual([])
   }),
 )
 

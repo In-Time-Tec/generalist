@@ -1,9 +1,10 @@
-import { sha256Text } from "../../../core/durable/canonical-json.js"
-
-export const SCHEMA_VERSION = 4
+export {
+  SQL_SCHEMA_NAME as MIGRATION_NAME,
+  SQL_SCHEMA_VERSION as SCHEMA_VERSION,
+  sqlSchemaChecksum as schemaChecksum,
+} from "../schema/contract.js"
 export const SCHEMA_META_TABLE = "tenetkit_schema_meta"
 export const MIGRATIONS_TABLE = "tenetkit_sql_migrations"
-export const MIGRATION_NAME = "tenetkit_runtime"
 
 export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS tenetkit_schema_meta (
@@ -326,5 +327,3 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(
   (statement) => statement.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)?.slice(1, 2) ?? [],
 )
-
-export const schemaChecksum = (): string => sha256Text(`${SCHEMA_STATEMENTS.join("\n")}\nversion=${SCHEMA_VERSION}`)

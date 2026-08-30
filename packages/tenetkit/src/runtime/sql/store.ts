@@ -1,17 +1,10 @@
 import { Context, Effect, Layer, Option, Semaphore, type Scope } from "effect"
 import { listRuns } from "./store/list.js"
 import { SqlClient } from "effect/unstable/sql"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import { CursorExpired, RunNotFound } from "../errors.js"
-import type { LayerOptions } from "../service.js"
 import { RunStore, type Service as RunStoreService } from "../run/store.js"
-import {
-  MultiWorkerUnsupported,
-  SchemaChecksumMismatch,
-  SchemaDirty,
-  SchemaMigrationFailed,
-  SchemaVersionUnsupported,
-} from "./errors.js"
-import { migrate } from "./migrate.js"
+import { SchemaMigrationFailed } from "./errors.js"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store/admit.js"
 import { activateRoot } from "./store/activate.js"
 import {
@@ -50,7 +43,6 @@ import {
   retryExecution,
   saveExecution,
 } from "./store/execution.js"
-import { withSql } from "./effect.js"
 import { claimedStore as sqliteClaimedSessionStore, reader as sqliteSessionReader } from "./session/store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store/steering/service.js"
 import {
@@ -79,9 +71,8 @@ import {
 } from "./store/program.js"
 import { ProgramCapabilities } from "../../core/index.js"
 import { settlementNotifications } from "./settlement-notifications.js"
-import { reconcileCancellationRequested, sessionRoots } from "./session/lifecycle.js"
+import { reconcileCancellationRequested, sessionRoots, sessionRuns } from "./session/lifecycle.js"
 import { loadChildReadiness } from "./store/child/capacity.js"
-import { readRunActivations } from "./run/activation.js"
 import {
   acknowledge as acknowledgeExternalChild,
   acknowledgeExternalRootSettlement,
@@ -94,171 +85,181 @@ import {
 } from "./store/child/external.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import { acknowledge, loadAcknowledged } from "./acknowledgement.js"
-
-export interface SqliteStoreOptions extends LayerOptions {
-  readonly source?: string
-  readonly multiWorker?: boolean
-  readonly workers?: number
-}
-
-export type SqliteStoreError =
-  | SchemaDirty
-  | SchemaChecksumMismatch
-  | SchemaVersionUnsupported
-  | SchemaMigrationFailed
-  | MultiWorkerUnsupported
-
-const makeSqliteStoreServices = (
-  options: SqliteStoreOptions,
-): Effect.Effect<
-  { readonly runStore: RunStoreService; readonly externalChildStore: ExternalChildStore["Service"] },
+import { RunClaims } from "./run/claims.js"
+import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
+import { layer as modelPreviewLayer } from "../execution/model-response/preview.js"
+import { RunExecutor, make as makeRunExecutor } from "../execution/run-executor.js"
+import { serviceEffect as makeRuntime } from "../memory/layer/service.js"
+import { Runtime } from "../service.js"
+import { sqlClaims } from "./store/kernel/claims.js"
+import { sqliteDriver } from "./store/driver/sqlite.js"
+import type {
+  SqlRuntimeDriver,
+  SqlDriverStoreError,
   SqliteStoreError,
-  SqlClient.SqlClient | Scope.Scope
-> =>
+  SqliteStoreOptions,
+  SqlStoreDriver,
+  SqlStoreOptions,
+  SqlStoreServices,
+} from "./store/driver/protocol.js"
+
+export type {
+  SqlClaimMechanics,
+  SqlDriverStoreError,
+  SqlRuntimeDriver,
+  SqliteStoreError,
+  SqliteStoreOptions,
+  SqlStoreDriver,
+  SqlStoreLocks,
+  SqlStoreOptions,
+  SqlStoreRun,
+  SqlStoreRunner,
+} from "./store/driver/protocol.js"
+
+const makeSqlStoreServices = <DriverError>(
+  options: SqlStoreOptions,
+  driver: SqlStoreDriver<DriverError>,
+): Effect.Effect<SqlStoreServices, DriverError | SchemaMigrationFailed, SqlClient.SqlClient | Scope.Scope> =>
   Effect.gen(function* () {
-    if (options.multiWorker === true || (options.workers !== undefined && options.workers > 1)) {
-      return yield* MultiWorkerUnsupported.make({
-        backend: "sqlite",
-        message: "SQLite RunStore is single-process only",
-      })
-    }
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
-    const source = options.source ?? "sqlite"
-    yield* migrate(source)
+    const source = options.source ?? driver.backend
+    yield* driver.migrate(source)
+    if (driver.initialize !== undefined) yield* driver.initialize(source)
     const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
-    yield* withSql(sql, reconcileCancellationRequested).pipe(
+    const eventCommit = yield* Semaphore.make(1)
+    const runner = driver.makeRunner({
+      sql,
+      hub,
+      eventCommit,
+      ...(options.activationProjection === undefined
+        ? undefined
+        : { activationProjection: options.activationProjection }),
+    })
+    const { run, runNoTransaction: runNoTxn, runInspection, transactionHub } = runner
+    yield* runNoTxn(reconcileCancellationRequested).pipe(
       Effect.mapError((error) => SchemaMigrationFailed.make({ source, message: error.message })),
     )
-    const eventCommit = yield* Semaphore.make(1)
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>, touched: ReadonlyArray<string> = []) =>
-      withSql(
-        sql,
-        sql.withTransaction(
-          Effect.gen(function* () {
-            const result = yield* effect
-            if (options.activationProjection !== undefined) {
-              const ids = [...new Set(touched)].toSorted()
-              const after = yield* readRunActivations(ids)
-              const changes = ids.map((runId) => after.get(runId) ?? { runId, intent: "inactive" as const })
-              if (changes.length > 0) yield* options.activationProjection.applyInTransaction(changes)
-            }
-            return result
-          }),
-        ),
-      )
-    const runProjected = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>, touched: () => Iterable<string>) =>
-      withSql(
-        sql,
-        sql.withTransaction(
-          Effect.gen(function* () {
-            const result = yield* effect
-            if (options.activationProjection !== undefined) {
-              const ids = [...new Set(touched())].toSorted()
-              const after = yield* readRunActivations(ids)
-              const changes = ids.map((runId) => after.get(runId) ?? { runId, intent: "inactive" as const })
-              if (changes.length > 0) yield* options.activationProjection.applyInTransaction(changes)
-            }
-            return result
-          }),
-        ),
-      )
-    const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
-    const runBuffered = <A, E>(
-      makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
-      touched: ReadonlyArray<string> = [],
-    ) =>
-      eventCommit.withPermits(1)(
-        Effect.uninterruptibleMask((restore) =>
-          Effect.gen(function* () {
-            const events: Array<readonly [string, import("../run/event.js").RunEvent]> = []
-            const touchedRuns = new Set(touched)
-            const transactionHub: typeof hub = {
-              ...hub,
-              touchRun: (runId) => Effect.sync(() => void touchedRuns.add(runId)),
-              publish: (runId, event) => Effect.sync(() => void events.push([runId, event])),
-            }
-            const result = yield* restore(
-              runProjected(makeEffect(transactionHub), () => [...touchedRuns, ...events.map(([runId]) => runId)]),
-            )
-            yield* Effect.forEach(events, ([runId, event]) => hub.publish(runId, event), { discard: true })
-            return result
-          }),
-        ),
-      )
+    const locked = <A, E>(
+      lock: Effect.Effect<void, SqlError, SqlClient.SqlClient>,
+      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
+    ) => run(lock.pipe(Effect.andThen(effect)))
+    const fencedWith = <A, E>(
+      lock: Effect.Effect<void, SqlError, SqlClient.SqlClient>,
+      input: import("../run/store.js").ExecutionClaim,
+      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
+    ) => run(lock.pipe(Effect.andThen(requireExecutionClaim(input)), Effect.andThen(effect)))
     const fenced = <A, E>(
       input: import("../run/store.js").ExecutionClaim,
-      makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
-    ) =>
-      runBuffered(
-        (transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(makeEffect(transactionHub))),
-        [input.runId],
-      )
+      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
+    ) => fencedWith(driver.locks.fence(input.runId), input, effect)
 
     const runStore = RunStore.of({
-      info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
+      info: Effect.succeed({ durability: "durable", backend: driver.backend, multiWorker: driver.multiWorker }),
       sessionReader: (sessionId: string) =>
-        withSql(sql, sqliteSessionReader(sessionId)).pipe(Effect.orDie, Effect.map(Option.some)),
+        runNoTxn(sqliteSessionReader(sessionId)).pipe(Effect.orDie, Effect.map(Option.some)),
       claimedSessionStore: (claim) =>
-        withSql(sql, sqliteClaimedSessionStore({ claim })).pipe(Effect.orDie, Effect.map(Option.some)),
+        runNoTxn(sqliteClaimedSessionStore({ claim, transaction: runner.transaction })).pipe(
+          Effect.orDie,
+          Effect.map(Option.some),
+        ),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
-      admitSend: (input) => runBuffered((transactionHub) => admitSend(transactionHub, addressBindings, input)),
+      admitSend: (input) =>
+        locked(
+          driver.locks.admission({
+            address: input.message.to,
+            sessionId: input.message.sessionId,
+            idempotencyKey: input.message.idempotencyKey,
+            ...(input.runId === undefined ? undefined : { runId: input.runId }),
+          }),
+          admitSend(transactionHub, addressBindings, input, {
+            lockRegistrations: driver.locks.admissionRegistrations,
+            promote: !driver.multiWorker,
+          }),
+        ),
       admitStart: (input, startOptions) =>
-        runBuffered((transactionHub) => admitStart(transactionHub, input, startOptions)),
-      activate: (input) => runBuffered((transactionHub) => activateRoot(transactionHub, input.runId), [input.runId]),
-      admitSpawn: (input) => runBuffered((transactionHub) => admitSpawn(transactionHub, input)),
-      admitProgramChild: (input) =>
-        runBuffered((transactionHub) =>
-          requireExecutionClaim(input).pipe(Effect.andThen(admitProgramChild(transactionHub, input))),
+        locked(
+          driver.locks.registrations,
+          admitStart(transactionHub, input, {
+            ...startOptions,
+            activate: startOptions?.activate ?? true,
+          }),
         ),
+      activate: (input) =>
+        locked(
+          driver.locks.run(input.runId),
+          transactionHub.touchRun(input.runId).pipe(Effect.andThen(activateRoot(transactionHub, input.runId))),
+        ),
+      admitSpawn: (input) => locked(driver.locks.spawn(input.parentRunId), admitSpawn(transactionHub, input)),
+      admitProgramChild: (input) => fenced(input, admitProgramChild(transactionHub, input)),
       admitProgramChildAndSuspend: (input) =>
-        runBuffered((transactionHub) =>
-          requireExecutionClaim(input).pipe(
-            Effect.andThen(
-              Effect.forEach(input.children, (child) =>
-                admitProgramChild(transactionHub, {
-                  runId: input.runId,
-                  ownerId: input.ownerId,
-                  attemptFence: input.attemptFence,
-                  session: input.session,
-                  ...child,
-                }),
-              ),
-            ),
-            Effect.tap(() => suspend(transactionHub, input)),
-          ),
+        fenced(
+          input,
+          Effect.forEach(input.children, (child) =>
+            admitProgramChild(transactionHub, {
+              runId: input.runId,
+              ownerId: input.ownerId,
+              attemptFence: input.attemptFence,
+              session: input.session,
+              ...child,
+            }),
+          ).pipe(Effect.tap(() => suspend(transactionHub, input))),
         ),
-      events: (input) =>
-        hub.subscribe({
+      events: (input) => {
+        const loadReplay = runNoTxn(
+          Effect.gen(function* () {
+            const loaded = yield* loadRun(input.runId)
+            if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+            const replay = yield* loadEventsAfter(input.runId, input.cursor)
+            return { replay, lastSequence: loaded.lastSequence }
+          }),
+        )
+        if (driver.events !== undefined) {
+          return driver.events(input, {
+            hub,
+            capacity,
+            runNoTransaction: runNoTxn,
+            loadReplay,
+            loadAfter: (cursor) => runNoTxn(loadEventsAfter(input.runId, cursor)),
+          })
+        }
+        return hub.subscribe({
           runId: input.runId,
           cursor: input.cursor,
-          loadReplay: runNoTxn(
-            Effect.gen(function* () {
-              const loaded = yield* loadRun(input.runId)
-              if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
-              const replay = yield* loadEventsAfter(input.runId, input.cursor)
-              return { replay, lastSequence: loaded.lastSequence }
-            }),
-          ),
+          loadReplay,
           capacity,
-        }),
-      respond: (input) => runBuffered((transactionHub) => respond(transactionHub, input)),
-      respondApproval: (input) => runBuffered((transactionHub) => respondApproval(transactionHub, input)),
-      signal: (input) => runBuffered((transactionHub) => signal(transactionHub, input)),
-      cancel: (input) => runBuffered((transactionHub) => cancel(transactionHub, input)),
-      cancelSession: (input) => runBuffered((transactionHub) => cancelSession(transactionHub, input)),
-      admitSteering: (input) => runBuffered((transactionHub) => admitSteering(transactionHub, input)),
-      readSteering: (input) => fenced(input, () => readSteering(input)),
+        })
+      },
+      respond: (input) => locked(driver.locks.run(input.runId), respond(transactionHub, input)),
+      respondApproval: (input) => locked(driver.locks.run(input.runId), respondApproval(transactionHub, input)),
+      signal: (input) => locked(driver.locks.run(input.runId), signal(transactionHub, input)),
+      cancel: (input) => locked(driver.locks.hierarchy(input.runId), cancel(transactionHub, input)),
+      cancelSession: (input) =>
+        run(
+          Effect.gen(function* () {
+            for (const runId of yield* sessionRuns(input.sessionId)) yield* driver.locks.hierarchy(runId)
+            return yield* cancelSession(transactionHub, input)
+          }),
+        ),
+      admitSteering: (input) => locked(driver.locks.run(input.runId), admitSteering(transactionHub, input)),
+      readSteering: (input) => fenced(input, readSteering(input)),
       directory: (runId) => runNoTxn(directory(runId)),
       resolveAddress: (address) => runNoTxn(resolveAddress(address)),
-      registerAgentName: (input) => run(registerAgentName(input)),
+      registerAgentName: (input) => locked(driver.locks.run(input.runId), registerAgentName(input)),
       listRelated: (runId) => runNoTxn(listRelated(runId)),
-      admitMessage: (input) => run(admitMessage(input)),
+      admitMessage: (input) => locked(driver.locks.mailbox(input.targetSessionId), admitMessage(input)),
       pendingMessages: (input) => runNoTxn(pendingMessages(input)),
       settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
-      deliverPendingMessages: (input) => runBuffered((transactionHub) => deliverPendingMessages(transactionHub, input)),
+      deliverPendingMessages: (input) =>
+        run(
+          driver.locks.run(input.runId).pipe(
+            Effect.andThen(directory(input.runId)),
+            Effect.flatMap((entry) => driver.locks.mailbox(entry.sessionId)),
+            Effect.andThen(deliverPendingMessages(transactionHub, input)),
+          ),
+        ),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {
@@ -282,10 +283,10 @@ const makeSqliteStoreServices = (
             return inspection
           }),
         ),
-      snapshot: (runId) => run(loadRunSnapshot(runId)),
-      acknowledge: (input) => run(acknowledge(input)),
+      snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
+      acknowledge: (input) => locked(driver.locks.run(input.runId), acknowledge(input)),
       acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
-      treeCheckpoint: (rootRunId) => run(loadTreeCheckpoint(rootRunId)),
+      treeCheckpoint: (rootRunId) => runInspection(loadTreeCheckpoint(rootRunId)),
       sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
       history: (input) =>
         runNoTxn(
@@ -299,82 +300,80 @@ const makeSqliteStoreServices = (
           }),
         ),
       treeReplay: (input) => runNoTxn(loadTreeReplay(input)),
-      treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
+      treeChanges: (rootRunId) =>
+        driver.treeChanges?.(rootRunId, {
+          hub,
+          rootForRun: (runId) => runNoTxn(loadRun(runId)).pipe(Effect.map((storedRun) => storedRun?.rootRunId)),
+        }) ?? hub.subscribeTree({ rootRunId }),
       list: (input) => runNoTxn(listRuns(input)),
       complete: (input) =>
-        runBuffered(
-          (transactionHub) =>
-            requireExecutionClaim(input).pipe(
-              Effect.andThen(saveCompletionContinuation(input.runId, input.result)),
-              Effect.flatMap((continuation) =>
-                continuation === undefined
-                  ? complete(transactionHub, input).pipe(
-                      Effect.as<import("../run/store.js").CompletionOutcome>({ _tag: "Completed" }),
-                    )
-                  : Effect.succeed({
-                      _tag: "SteeringPending",
-                      continuation,
-                    }),
-              ),
+        fencedWith(
+          driver.locks.hierarchy(input.runId),
+          input,
+          transactionHub.touchRun(input.runId).pipe(
+            Effect.andThen(saveCompletionContinuation(input.runId, input.result)),
+            Effect.flatMap((continuation) =>
+              continuation === undefined
+                ? complete(transactionHub, input).pipe(
+                    Effect.as<import("../run/store.js").CompletionOutcome>({ _tag: "Completed" }),
+                  )
+                : Effect.succeed({ _tag: "SteeringPending" as const, continuation }),
             ),
-          [input.runId],
+          ),
         ),
       fail: (input) =>
-        runBuffered(
-          (transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(fail(transactionHub, input))),
-          [input.runId],
+        fencedWith(
+          driver.locks.hierarchy(input.runId),
+          input,
+          transactionHub.touchRun(input.runId).pipe(Effect.andThen(fail(transactionHub, input))),
         ),
-      suspend: (input) => fenced(input, (transactionHub) => suspend(transactionHub, input)),
-      resume: (input) => runBuffered((transactionHub) => resume(transactionHub, input)),
-      emitAgentEvent: (input) => fenced(input, (transactionHub) => emitAgentEvent(transactionHub, input)),
-      recordOperation: (input) => fenced(input, (transactionHub) => recordOperation(transactionHub, input)),
-      startOperation: (input) => fenced(input, () => startOperation(input)),
-      completeOperation: (input) => fenced(input, (transactionHub) => completeOperation(transactionHub, input)),
-      commitModelResponse: (input) => fenced(input, (transactionHub) => commitModelResponse(transactionHub, input)),
-      commitInterruptedModelResponse: (input) =>
-        fenced(input, (transactionHub) => commitInterruptedModelResponse(transactionHub, input)),
-      expireRunningOperation: (input) =>
-        fenced(input, (transactionHub) => expireRunningOperation(transactionHub, input)),
-      recoverRunningOperations: (input) =>
-        fenced(input, (transactionHub) => recoverRunningOperations(transactionHub, input)),
+      suspend: (input) => fencedWith(driver.locks.run(input.runId), input, suspend(transactionHub, input)),
+      resume: (input) => locked(driver.locks.run(input.runId), resume(transactionHub, input)),
+      emitAgentEvent: (input) => fenced(input, emitAgentEvent(transactionHub, input)),
+      recordOperation: (input) => fenced(input, recordOperation(transactionHub, input)),
+      startOperation: (input) => fenced(input, startOperation(input)),
+      completeOperation: (input) => fenced(input, completeOperation(transactionHub, input)),
+      commitModelResponse: (input) => fenced(input, commitModelResponse(transactionHub, input)),
+      commitInterruptedModelResponse: (input) => fenced(input, commitInterruptedModelResponse(transactionHub, input)),
+      expireRunningOperation: (input) => fenced(input, expireRunningOperation(transactionHub, input)),
+      recoverRunningOperations: (input) => fenced(input, recoverRunningOperations(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
-      operationCancellations: (input) => fenced(input, () => operationCancellations(input)),
-      acknowledgeOperationCancellation: (input) => fenced(input, () => acknowledgeOperationCancellation(input)),
+      operationCancellations: (input) => fenced(input, operationCancellations(input)),
+      acknowledgeOperationCancellation: (input) => fenced(input, acknowledgeOperationCancellation(input)),
       resolveOperation: (input) =>
-        runBuffered(
-          (transactionHub) =>
-            getProgramOperation({ runId: input.runId, operation: input.operationId }).pipe(
-              Effect.flatMap((program) =>
-                program === undefined ? resolveOperation(input, "running") : resolveProgramOperation(input, "running"),
-              ),
-              Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
+        locked(
+          driver.locks.hierarchy(input.runId),
+          getProgramOperation({ runId: input.runId, operation: input.operationId }).pipe(
+            Effect.flatMap((program) =>
+              program === undefined
+                ? resolveOperation(input, driver.multiWorker ? "queued" : "running", driver.multiWorker)
+                : resolveProgramOperation(input, driver.multiWorker ? "queued" : "running", driver.multiWorker),
             ),
-          [input.runId],
+            Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
+          ),
         ),
-      claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input), [input.runId]),
+      claimExecution: (input) =>
+        locked(
+          driver.locks.run(input.runId),
+          transactionHub.touchRun(input.runId).pipe(Effect.andThen(claimExecution(transactionHub, input))),
+        ),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
-      releaseExecution: (input) => run(releaseExecution(input), [input.runId]),
-      saveExecution: (input) => run(saveExecution(input)),
-      retryExecution: (input) => runBuffered((transactionHub) => retryExecution(transactionHub, input)),
-      admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),
+      releaseExecution: (input) =>
+        locked(
+          driver.locks.run(input.runId),
+          releaseExecution(input).pipe(Effect.andThen(transactionHub.touchRun(input.runId))),
+        ),
+      saveExecution: (input) => fenced(input, saveExecution(input)),
+      retryExecution: (input) =>
+        fencedWith(driver.locks.run(input.runId), input, retryExecution(transactionHub, input)),
+      admitFanOut: (input) => locked(driver.locks.fanOut(input), admitFanOut(transactionHub, input)),
       inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
-      reserveProgramOperation: (input) => fenced(input, () => reserveProgramOperation(input)),
-      admitProgramAgents: (input) =>
-        runBuffered((transactionHub) =>
-          requireExecutionClaim(input).pipe(Effect.andThen(admitProgramAgents(transactionHub, input, suspend))),
-        ),
-      suspendProgramOperation: (input) =>
-        runBuffered((transactionHub) =>
-          requireExecutionClaim(input).pipe(Effect.andThen(suspendProgramOperation(transactionHub, input, suspend))),
-        ),
-      settleProgramOperation: (input) =>
-        runBuffered(
-          (transactionHub) =>
-            requireExecutionClaim(input).pipe(Effect.andThen(settleProgramOperation(transactionHub, input))),
-          [input.runId],
-        ),
-      startProgramOperation: (input) => fenced(input, () => startProgramOperation(input)),
+      reserveProgramOperation: (input) => fenced(input, reserveProgramOperation(input)),
+      admitProgramAgents: (input) => fenced(input, admitProgramAgents(transactionHub, input, suspend)),
+      suspendProgramOperation: (input) => fenced(input, suspendProgramOperation(transactionHub, input, suspend)),
+      settleProgramOperation: (input) => fenced(input, settleProgramOperation(transactionHub, input)),
+      startProgramOperation: (input) => fenced(input, startProgramOperation(input)),
       loadProgramState: (runId) =>
         runNoTxn(
           Effect.gen(function* () {
@@ -392,9 +391,10 @@ const makeSqliteStoreServices = (
           }),
         ),
       completeProgram: (input) =>
-        runBuffered((transactionHub) =>
+        fencedWith(
+          driver.locks.hierarchy(input.runId),
+          input,
           Effect.gen(function* () {
-            yield* requireExecutionClaim(input)
             if (input.outputBytes > input.outputLimit)
               return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
                 dimension: "outputBytes",
@@ -407,38 +407,73 @@ const makeSqliteStoreServices = (
             return { _tag: "Completed" as const }
           }),
         ),
-      commitProgramLog: (input) =>
-        runBuffered((transactionHub) =>
-          requireExecutionClaim(input).pipe(Effect.andThen(commitProgramLog(transactionHub, input))),
-        ),
+      commitProgramLog: (input) => fenced(input, commitProgramLog(transactionHub, input)),
     })
     const externalChildStore = ExternalChildStore.of({
-      reserve: (input) => runBuffered((transactionHub) => reserveExternalChild(transactionHub, input)),
+      reserve: (input) => run(reserveExternalChild(transactionHub, input)),
       acknowledge: (placementId) => run(acknowledgeExternalChild(placementId)),
-      settle: (input) => runBuffered((transactionHub) => externalChildSettlement.settle(transactionHub, input)),
+      settle: (input) => run(externalChildSettlement.settle(transactionHub, input)),
       cancel: (placementId) => run(cancelExternalChild(placementId)),
-      admitRoot: (input) => runBuffered((transactionHub) => externalRootOperations.admit(transactionHub, input)),
-      activateRoot: (placementId) =>
-        runBuffered((transactionHub) => externalRootOperations.activate(transactionHub, placementId)),
+      admitRoot: (input) => run(externalRootOperations.admit(transactionHub, input)),
+      activateRoot: (placementId) => run(externalRootOperations.activate(transactionHub, placementId)),
       inspectRoot: (placementId) => runNoTxn(inspectExternalRoot(placementId)),
-      cancelRoot: (placementId, reason) =>
-        runBuffered((transactionHub) => externalRootOperations.cancel(transactionHub, placementId, reason)),
+      cancelRoot: (placementId, reason) => run(externalRootOperations.cancel(transactionHub, placementId, reason)),
       rootSettlement: (placementId) => runNoTxn(externalRootSettlement(placementId)),
       acknowledgeRootSettlement: (input) => run(acknowledgeExternalRootSettlement(input)),
     })
-    return { runStore, externalChildStore }
+    const claimMechanics = driver.claims?.({ sql, hub, transactionHub })
+    const claims =
+      claimMechanics === undefined
+        ? undefined
+        : sqlClaims({
+            mechanics: claimMechanics,
+            run,
+            transactionHub,
+            locks: driver.locks,
+          })
+    return { runStore, externalChildStore, ...(claims === undefined ? undefined : { claims }) }
   })
+
+/** @experimental Services constructed by a multi-worker SQL Runtime adapter. */
+export type SqlRuntimeServices = Runtime | RunStore | RunClaims | RunExecutor
+
+/** @experimental Assemble one server SQL driver around Runtime's lifecycle kernel. */
+export const layerSqlRuntime = (input: {
+  readonly options: SqlStoreOptions
+  readonly workerId: string
+  readonly driver: SqlRuntimeDriver<SqlDriverStoreError>
+}): Layer.Layer<SqlRuntimeServices, SqlDriverStoreError, SqlClient.SqlClient> => {
+  const services = Layer.effectContext(
+    makeSqlStoreServices(input.options, input.driver).pipe(
+      Effect.flatMap(({ claims, runStore }) =>
+        claims === undefined
+          ? SchemaMigrationFailed.make({
+              source: input.options.source ?? input.driver.backend,
+              message: `${input.driver.backend} SQL driver did not provide claims`,
+            })
+          : Effect.succeed(Context.make(RunStore, runStore).pipe(Context.add(RunClaims, claims))),
+      ),
+    ),
+  )
+  const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
+  const runtime = Layer.effect(Runtime, makeRuntime(input.options)).pipe(Layer.provide(dependencies))
+  const host = Layer.effect(
+    RunExecutor,
+    makeRunExecutor({ workerId: input.workerId, resolver: input.options.resolver }),
+  ).pipe(Layer.provide(dependencies))
+  return Layer.mergeAll(runtime, host, services)
+}
 
 export const makeSqliteRunStore = (
   options: SqliteStoreOptions,
 ): Effect.Effect<RunStoreService, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
-  makeSqliteStoreServices(options).pipe(Effect.map(({ runStore }) => runStore))
+  makeSqlStoreServices(options, sqliteDriver(options)).pipe(Effect.map(({ runStore }) => runStore))
 
 export const layerSqliteStore = (
   options: SqliteStoreOptions,
 ): Layer.Layer<RunStore | ExternalChildStore, SqliteStoreError, SqlClient.SqlClient> =>
   Layer.effectContext(
-    makeSqliteStoreServices(options).pipe(
+    makeSqlStoreServices(options, sqliteDriver(options)).pipe(
       Effect.map(({ runStore, externalChildStore }) =>
         Context.make(RunStore, runStore).pipe(Context.add(ExternalChildStore, externalChildStore)),
       ),

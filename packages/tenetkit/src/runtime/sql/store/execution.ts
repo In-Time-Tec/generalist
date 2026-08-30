@@ -237,18 +237,38 @@ export const saveExecution = (
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
     })
     const updated = yield* nowIso
-    const rows = yield* sql<{ run_id: string }>`
-      UPDATE tenetkit_runs SET
-        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
-        executable_ref_json = ${encodeExecutableRef(executableRef)},
-        suspension_json = COALESCE(${input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)}, suspension_json),
-        updated_at = ${updated}
-      WHERE run_id = ${input.runId}
-        AND owner_worker_id = ${input.ownerId}
-        AND attempt_fence = ${input.attemptFence}
-      RETURNING run_id
-    `
-    if (rows.length === 0) {
+    const checkpoint = input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)
+    const suspension = input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)
+    const updatedRows = yield* sql.onDialectOrElse({
+      mysql: () =>
+        Effect.gen(function* () {
+          yield* sql`
+            UPDATE tenetkit_runs SET
+              driver_checkpoint_json = COALESCE(${checkpoint}, driver_checkpoint_json),
+              executable_ref_json = ${encodeExecutableRef(executableRef)},
+              suspension_json = COALESCE(${suspension}, suspension_json),
+              updated_at = ${updated}
+            WHERE run_id = ${input.runId}
+              AND owner_worker_id = ${input.ownerId}
+              AND attempt_fence = ${input.attemptFence}
+          `
+          const rows = yield* sql<{ readonly affected: number | string }>`SELECT ROW_COUNT() AS affected`
+          return Number(rows[0]?.affected ?? 0)
+        }),
+      orElse: () =>
+        sql<{ run_id: string }>`
+          UPDATE tenetkit_runs SET
+            driver_checkpoint_json = COALESCE(${checkpoint}, driver_checkpoint_json),
+            executable_ref_json = ${encodeExecutableRef(executableRef)},
+            suspension_json = COALESCE(${suspension}, suspension_json),
+            updated_at = ${updated}
+          WHERE run_id = ${input.runId}
+            AND owner_worker_id = ${input.ownerId}
+            AND attempt_fence = ${input.attemptFence}
+          RETURNING run_id
+        `.pipe(Effect.map((rows) => rows.length)),
+    })
+    if (updatedRows === 0) {
       return yield* StaleClaim.make({
         runId: input.runId,
         workerId: input.ownerId,

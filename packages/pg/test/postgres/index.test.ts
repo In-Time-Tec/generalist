@@ -1,6 +1,9 @@
 import {
   driverConformance,
+  modelResponseFaultConformance,
+  sqlTransactionFaultConformance,
   type ClaimExecution,
+  type ModelResponseFaultBoundary,
   type MultiWorkerClaimCapability,
   type SqlTransactionCapability,
 } from "tenetkit/test/runtime-driver"
@@ -67,6 +70,85 @@ const forceRollback: SqlTransactionCapability["forceRollback"] = (effect) =>
     () => removeRollback.pipe(Effect.orDie),
   )
 
+const faultTarget = (boundary: ModelResponseFaultBoundary) => {
+  switch (boundary) {
+    case "after-claim-validation":
+      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_session_entries" }
+    case "after-session-entry":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_sessions" }
+    case "after-session-leaf":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_run_operations" }
+    case "after-operation":
+    case "after-tree-index":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_runs" }
+    case "after-checkpoint":
+      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_run_events" }
+    case "after-event":
+      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_tree_roots" }
+    case "after-tree-position":
+      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_tree_event_index" }
+    case "before-commit":
+      return { timing: "AFTER", operation: "UPDATE", table: "tenetkit_runs" }
+  }
+}
+
+const quote = (value: string): string => value.replaceAll("'", "''")
+const faultCondition = (boundary: ModelResponseFaultBoundary, runId: string, sessionId: string): string => {
+  switch (boundary) {
+    case "after-claim-validation":
+      return `NEW.session_id = '${quote(sessionId)}' AND NEW.tag = 'ModelResponse'`
+    case "after-session-entry":
+      return `NEW.session_id = '${quote(sessionId)}' AND NEW.leaf_id IS DISTINCT FROM OLD.leaf_id`
+    case "after-session-leaf":
+      return `NEW.run_id = '${quote(runId)}' AND NEW.status = 'succeeded'`
+    case "after-operation":
+      return `NEW.run_id = '${quote(runId)}' AND NEW.driver_checkpoint_json IS DISTINCT FROM OLD.driver_checkpoint_json`
+    case "after-checkpoint":
+      return `NEW.run_id = '${quote(runId)}' AND NEW.event_json LIKE '%ModelResponseCommitted%'`
+    case "after-event":
+      return `NEW.root_run_id = '${quote(runId)}'`
+    case "after-tree-position":
+      return `NEW.run_id = '${quote(runId)}'`
+    case "after-tree-index":
+    case "before-commit":
+      return `NEW.run_id = '${quote(runId)}' AND NEW.last_sequence > OLD.last_sequence`
+  }
+}
+
+const installModelFault = (input: {
+  readonly boundary: ModelResponseFaultBoundary
+  readonly runId: string
+  readonly sessionId: string
+}) =>
+  withClient(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const target = faultTarget(input.boundary)
+      yield* sql.unsafe(`
+        CREATE OR REPLACE FUNCTION tenetkit_model_response_fault() RETURNS trigger AS $$
+        BEGIN
+          RAISE EXCEPTION '${input.boundary}';
+        END;
+        $$ LANGUAGE plpgsql
+      `)
+      yield* sql.unsafe(`
+        CREATE TRIGGER tenetkit_model_response_fault
+        ${target.timing} ${target.operation} ON ${target.table}
+        FOR EACH ROW WHEN (${faultCondition(input.boundary, input.runId, input.sessionId)})
+        EXECUTE FUNCTION tenetkit_model_response_fault()
+      `)
+    }),
+  ).pipe(Effect.orDie)
+
+const removeModelFault = (boundary: ModelResponseFaultBoundary) =>
+  withClient(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql.unsafe(`DROP TRIGGER IF EXISTS tenetkit_model_response_fault ON ${faultTarget(boundary).table}`)
+      yield* sql.unsafe(`DROP FUNCTION IF EXISTS tenetkit_model_response_fault()`)
+    }),
+  ).pipe(Effect.orDie)
+
 const expire: MultiWorkerClaimCapability["expire"] = (stale) =>
   withClient(
     Effect.gen(function* () {
@@ -95,4 +177,29 @@ driverConformance({
     multiWorkerClaims: { layer, expire },
     notificationRecovery: { claim },
   },
+})
+
+modelResponseFaultConformance({
+  name: "PostgreSQL",
+  address: assistantAddress,
+  layer,
+  skip: !postgresAvailable,
+  claim: ({ claims, runId, workerId }) => {
+    if (claims === undefined) return Effect.die("PostgreSQL fault conformance requires RunClaims")
+    return Effect.gen(function* () {
+      const batch = yield* claims.claimReadyRuns({ workerId, limit: 1, lease: "10 seconds" })
+      const claimed = batch.find((candidate) => candidate.run.runId === runId)
+      if (claimed === undefined) return yield* Effect.die(`PostgreSQL did not claim fault Run ${runId}`)
+      return { runId, ownerId: claimed.workerId, attemptFence: claimed.attemptFence, session: claimed.session }
+    }).pipe(Effect.orDie)
+  },
+  install: installModelFault,
+  remove: removeModelFault,
+})
+
+const transactionFaultDatabase = postgresDatabase("transaction-fault-conformance")
+sqlTransactionFaultConformance({
+  name: "PostgreSQL",
+  layer: transactionFaultDatabase.provisionEmpty(transactionFaultDatabase.client),
+  skip: !postgresAvailable,
 })

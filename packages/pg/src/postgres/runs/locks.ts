@@ -1,8 +1,5 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RunNotFound, RunTerminal } from "tenetkit/runtime/driver/errors"
-import { isTerminal } from "tenetkit/runtime/driver/run"
-import { loadRun } from "../store/runtime.js"
 
 /**
  * One Run-level lock serializing admission, steering, response, resume, timeout,
@@ -13,6 +10,13 @@ export const lockRun = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`run:${runId}`}))`
+    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
+  })
+
+/** Preserve row-only fencing for claimed operation and program transitions. */
+export const lockRunRow = (runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
     yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
   })
 
@@ -44,12 +48,31 @@ export const lockMailbox = (targetSessionId: string) =>
     yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`mailbox:${targetSessionId}`}))`
   }).pipe(Effect.asVoid)
 
-export const lockSpawnParent = (runId: string) =>
+/** Preserve PostgreSQL's exact addressed-admission advisory lock order. */
+export const lockAdmission = (input: {
+  readonly address: string
+  readonly sessionId: string
+  readonly idempotencyKey: string
+  readonly runId?: string
+}) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
-    const parent = yield* loadRun(runId)
-    if (parent === undefined) return yield* RunNotFound.make({ runId })
-    if (isTerminal(parent.status)) return yield* RunTerminal.make({ runId, status: parent.status })
-    return parent
+    yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`admit:${input.address}:${input.sessionId}:${input.idempotencyKey}`}))`
+    if (input.runId !== undefined) {
+      yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`run:${input.runId}`}))`
+    }
+  })
+
+/** Serialize the global executable registration inventory. */
+export const lockRegistrations = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  yield* sql`SELECT pg_advisory_xact_lock(hashtext('tenetkit:executable-registrations'))`
+})
+
+/** Preserve the PostgreSQL fan-out row-then-advisory lock order. */
+export const lockFanOut = (input: { readonly parentRunId: string; readonly idempotencyKey: string }) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${input.parentRunId} FOR UPDATE`
+    yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`fanout:${input.parentRunId}:${input.idempotencyKey}`}))`
   })

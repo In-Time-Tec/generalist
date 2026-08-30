@@ -4,7 +4,7 @@ import { provideScoped } from "../../../tenetkit/test/runtime/execution/scoped-p
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { ExecutableResolver } from "tenetkit/runtime"
-import { layerWorker } from "tenetkit/runtime/driver/sql/worker"
+import { layerWorker } from "tenetkit/runtime/sql-driver"
 import type { StoreError } from "../../src/postgres/runtime-layer.js"
 import {
   analyst,
@@ -33,11 +33,11 @@ export const postgresTestMaxConnections = 8
 export const postgresClient = (url: string) => RunSchema.layerClient({ url, maxConnections: 2 })
 
 type PostgresWorkerLayer = Layer.Layer<
-  | import("tenetkit/runtime/driver/execution/run-executor").RunExecutor
-  | import("tenetkit/runtime/driver/sql/run/claims").RunClaims
-  | import("tenetkit/runtime/driver/run/store").RunStore
-  | import("tenetkit/runtime/driver/service").Runtime
-  | import("tenetkit/runtime/driver/sql/worker").RuntimeWorker,
+  | import("tenetkit/runtime").RunExecutor.RunExecutor
+  | import("tenetkit/runtime/sql-driver").RunClaims
+  | import("tenetkit/runtime").RunStore.RunStore
+  | import("tenetkit/runtime").Runtime.Runtime
+  | import("tenetkit/runtime/sql-driver").RuntimeWorker,
   SqlError | StoreError,
   never
 >

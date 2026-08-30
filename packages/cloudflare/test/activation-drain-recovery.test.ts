@@ -2,15 +2,17 @@ import { expect, it } from "@effect/vitest"
 import { layer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { Clock, Effect, Exit, Layer, Option } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RunExecutor } from "tenetkit/runtime/driver/execution/run-executor"
-import { LocalScheduler } from "tenetkit/runtime/driver/execution/local-scheduler"
-import { RunStore } from "tenetkit/runtime/driver/run/store"
-import type { RunActivation, RunActivationProjection } from "tenetkit/runtime/driver/run/activation"
-import { RuntimeUnavailable } from "tenetkit/runtime/driver/errors"
-import { StaleClaim } from "tenetkit/runtime/driver/sql/errors"
-import { make as makeMessage } from "tenetkit/runtime/driver/messaging/message"
-import { defaultTreePolicy } from "tenetkit/runtime/driver/tree/policy"
-import { ExecutableResolver, Runtime } from "../../tenetkit/src/runtime/index.js"
+import {
+  Errors,
+  ExecutableResolver,
+  LocalScheduler as LocalSchedulerFacade,
+  Message,
+  RunExecutor as RunExecutorFacade,
+  RunStore as RunStoreFacade,
+  Runtime,
+  TreePolicy,
+} from "tenetkit/runtime"
+import type { RunActivation, RunActivationProjection } from "tenetkit/runtime/sql-driver"
 import {
   drain,
   makeExclusiveExecutionRecovery,
@@ -33,6 +35,14 @@ import { makeRuntime } from "../../tenetkit/src/runtime/memory/layer.js"
 import { layer as activeExecutionsLayer } from "../../tenetkit/src/runtime/execution/active-executions.js"
 
 import { Runtime as SqliteRuntime } from "../../tenetkit/src/runtime/sqlite-bun.js"
+const LocalScheduler = LocalSchedulerFacade.LocalScheduler
+const RunExecutor = RunExecutorFacade.RunExecutor
+const RunStore = RunStoreFacade.RunStore
+const RuntimeUnavailable = Errors.RuntimeUnavailable
+const StaleClaim = Errors.StaleClaim
+const makeMessage = Message.make
+const defaultTreePolicy = TreePolicy.defaultTreePolicy
+
 const options = (filename: string, projection?: RunActivationProjection) => {
   const value = {
     filename,
@@ -51,7 +61,7 @@ const runtimeLayer = (projection?: RunActivationProjection) => {
   return Layer.merge(SqliteRuntime.layerSqlite(options(filename, projection)), layer({ filename }))
 }
 
-const projectedRuntimeLayer = (rearm: Effect.Effect<void, RuntimeUnavailable>) => {
+const projectedRuntimeLayer = (rearm: Effect.Effect<void, Errors.RuntimeUnavailable>) => {
   const filename = tempDbPath("cloudflare-promotion-activation")
   const runtimeOptions = options(filename)
   const client = layer({ filename })

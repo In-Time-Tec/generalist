@@ -2,12 +2,16 @@ import { Effect, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import {
+  checkSqlMigrationIdentity,
+  checkSqlSchemaMeta,
   SchemaChecksumMismatch,
   SchemaDirty,
   SchemaMigrationFailed,
   SchemaUpgradeRequired,
   SchemaVersionUnsupported,
-} from "tenetkit/runtime/driver/sql/errors"
+  planSqlSchema,
+  type SqlSchemaPlan,
+} from "tenetkit/runtime/sql-driver"
 import {
   MIGRATION_LOCK,
   MIGRATION_NAME,
@@ -19,13 +23,7 @@ import {
   schemaChecksum,
 } from "./definition.js"
 
-export interface SchemaPlan {
-  readonly current: number
-  readonly required: number
-  readonly checksum: string
-  readonly statements: ReadonlyArray<string>
-  readonly upgradeRequired: boolean
-}
+export type SchemaPlan = SqlSchemaPlan
 
 const migrationFailure = (source: string, fallback: string) => (error: SqlError) =>
   SchemaMigrationFailed.make({
@@ -35,14 +33,6 @@ const migrationFailure = (source: string, fallback: string) => (error: SqlError)
 
 const AcquiredRows = Schema.Array(Schema.Tuple([Schema.NullOr(Schema.Finite)]))
 const PresentRows = Schema.Array(Schema.Tuple([Schema.Finite]))
-
-const verifyMigrationIdentity = (
-  source: string,
-  migrations: ReadonlyArray<{ readonly migration_id: number; readonly name: string }>,
-) =>
-  migrations.length === 1 && migrations[0]?.migration_id === 1 && migrations[0]?.name === MIGRATION_NAME
-    ? Effect.void
-    : SchemaMigrationFailed.make({ source, message: "migration identity mismatch" })
 
 const readMeta = (source: string) =>
   Effect.gen(function* () {
@@ -68,31 +58,17 @@ const readMeta = (source: string) =>
   }).pipe(Effect.mapError(migrationFailure(source, "schema meta read failed")))
 
 export const plan = (source: string): Effect.Effect<SchemaPlan, SchemaMigrationFailed, SqlClient.SqlClient> =>
-  Effect.map(readMeta(source), (meta) => ({
-    current: meta.version,
-    required: SCHEMA_VERSION,
-    checksum: schemaChecksum(),
-    statements: meta.present ? [] : SCHEMA_STATEMENTS,
-    upgradeRequired: meta.version < SCHEMA_VERSION,
-  }))
+  Effect.map(readMeta(source), (meta) => planSqlSchema(meta, SCHEMA_STATEMENTS))
 
 export const check = (source: string) =>
   Effect.gen(function* () {
     const meta = yield* readMeta(source)
-    if (!meta.present) return yield* SchemaUpgradeRequired.make({ source, current: 0, required: SCHEMA_VERSION })
-    if (meta.dirty) return yield* SchemaDirty.make({ source, version: meta.version })
-    if (meta.version !== SCHEMA_VERSION) {
-      return yield* SchemaVersionUnsupported.make({ source, version: meta.version, supported: SCHEMA_VERSION })
-    }
-    const expected = schemaChecksum()
-    if (meta.checksum !== expected) {
-      return yield* SchemaChecksumMismatch.make({ source, expected, actual: meta.checksum })
-    }
+    yield* checkSqlSchemaMeta(meta, source)
     const sql = yield* SqlClient.SqlClient
     const migrations = yield* sql<{ migration_id: number; name: string }>`
       SELECT migration_id, name FROM ${sql(MIGRATIONS_TABLE)} ORDER BY migration_id
     `.pipe(Effect.mapError(migrationFailure(source, "migration identity read failed")))
-    yield* verifyMigrationIdentity(source, migrations)
+    yield* checkSqlMigrationIdentity(migrations, source)
   })
 
 export const apply = (source: string) =>
@@ -133,7 +109,7 @@ export const apply = (source: string) =>
         `INSERT INTO ${SCHEMA_META_TABLE} (id, version, checksum, dirty, applied_at) VALUES (1, ?, ?, 0, NOW(3))`,
         [SCHEMA_VERSION, schemaChecksum()],
       )
-      yield* query(`INSERT INTO ${MIGRATIONS_TABLE} (migration_id, name, applied_at) VALUES (1, ?, NOW(3))`, [
+      yield* query(`INSERT INTO ${MIGRATIONS_TABLE} (migration_id, name, created_at) VALUES (1, ?, NOW(3))`, [
         MIGRATION_NAME,
       ])
       yield* check(source)

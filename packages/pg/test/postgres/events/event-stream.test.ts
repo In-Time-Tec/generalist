@@ -2,7 +2,7 @@ import { layer as backendLayer } from "@tenetkit/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { ExecutableResolver, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/driver/sql/run/claims"
+import { RunClaims } from "tenetkit/runtime/sql-driver"
 import {
   assistant,
   assistantAddress,

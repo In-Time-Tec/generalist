@@ -38,12 +38,10 @@ export const workerSafePackageExports = [
   "tenetkit/mcp/tools",
   "tenetkit/ai/openrouter",
   "tenetkit/runtime",
+  "tenetkit/runtime/sql-driver",
 ] as const
 
-export const wildcardExportExamples = [
-  "tenetkit/runtime/driver/run/store",
-  "tenetkit/runtime/driver/sql/store",
-] as const
+export const wildcardExportExamples = [] as const
 export const forbiddenPackageExports = ["@tenetkit/cloudflare"] as const
 const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
   Array.from(values).reduce<Array<A>>((result, value) => {

@@ -41,6 +41,13 @@ const sqlBool = (sql: SqlClient.SqlClient, value: boolean): boolean | 0 | 1 =>
     orElse: () => (value ? 1 : 0),
   })
 
+export const clearLeaseOnOwnerRelease = (sql: SqlClient.SqlClient) =>
+  sql.onDialectOrElse({
+    pg: () => sql`, lease_expires_at = NULL`,
+    mysql: () => sql`, lease_expires_at = NULL`,
+    orElse: () => sql``,
+  })
+
 export const lockRun = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -248,6 +255,7 @@ export const appendEvent: {
       const updated = yield* nowIso
       const terminalPartial = isTerminalEvent(event)
       if (terminalPartial) {
+        const clearLease = clearLeaseOnOwnerRelease(sql)
         yield* sql`
         UPDATE tenetkit_runs SET
           status = ${status},
@@ -259,7 +267,7 @@ export const appendEvent: {
            continuation_json = NULL,
            pending_outcome_json = NULL,
            suspension_json = NULL,
-          owner_worker_id = NULL,
+          owner_worker_id = NULL${clearLease},
            updated_at = ${updated}
         WHERE run_id = ${run.runId}
           AND last_sequence = ${run.lastSequence}
@@ -323,10 +331,16 @@ export function removeFromLane(...args: [string, string] | [string]) {
     if (queue.length === 0) {
       yield* sql`DELETE FROM tenetkit_lanes WHERE session_id = ${sessionId}`
     } else {
-      yield* sql`
-        UPDATE tenetkit_lanes SET queue_json = ${encodeQueue(queue)}
-        WHERE session_id = ${sessionId}
-      `
+      yield* sql.onDialectOrElse({
+        pg: () => sql`
+          UPDATE tenetkit_lanes SET queue_json = ${encodeQueue(queue)}, head_run_id = ${queue[0]!}
+          WHERE session_id = ${sessionId}
+        `,
+        orElse: () => sql`
+          UPDATE tenetkit_lanes SET queue_json = ${encodeQueue(queue)}
+          WHERE session_id = ${sessionId}
+        `,
+      })
     }
   })
 }
