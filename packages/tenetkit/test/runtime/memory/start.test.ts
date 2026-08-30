@@ -1,6 +1,6 @@
 import { expect, it as standalone, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
-import { Effect, Ref, Schema } from "effect"
+import { Effect, Layer, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Database } from "bun:sqlite"
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "../../../src/index.js"
@@ -12,6 +12,7 @@ import {
   assistantRef,
   completedResult,
   parentRelativeOptions,
+  resolverLayer,
   researcherRef,
   textPrompt,
 } from "../execution/fixtures.js"
@@ -51,11 +52,14 @@ const registrationsFor = (executable: ExecutableManifest.PinnedExecutable, suffi
 
 const runtimeLayer = Runtime.layerMemory({
   addresses: [],
-  resolver: ExecutableResolver.makeStatic([
-    { executable: assistantRef, agent: closedTestAgent(assistant) },
-    { executable: alternateAssistantRef, agent: closedTestAgent(alternateAssistant) },
-  ]),
-})
+}).pipe(
+  Layer.provide(
+    ExecutableResolver.layerStatic([
+      { executable: assistantRef, agent: closedTestAgent(assistant) },
+      { executable: alternateAssistantRef, agent: closedTestAgent(alternateAssistant) },
+    ]).pipe(Layer.orDie),
+  ),
+)
 
 layer(runtimeLayer)("Runtime exact root admission", (it) => {
   it.effect("starts an unseen exact executable and returns one stable duplicate Run ID", () =>
@@ -168,7 +172,9 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
   )
 })
 
-const initialChildrenLayer = Runtime.layerMemory({ ...parentRelativeOptions, addresses: [] })
+const initialChildrenLayer = Runtime.layerMemory({ ...parentRelativeOptions, addresses: [] }).pipe(
+  Layer.provide(resolverLayer),
+)
 
 layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
   const base = {
@@ -396,7 +402,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
       ],
     }
     const first = yield* provideScoped(
-      SqliteRuntime.layerSqlite(options),
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         expect(
@@ -429,7 +435,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
       }),
     )
     const duplicate = yield* provideScoped(
-      SqliteRuntime.layerSqlite(options),
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.start(input)
@@ -476,7 +482,7 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
     }
 
     const runId = yield* provideScoped(
-      SqliteRuntime.layerSqlite(options),
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.start(input)
@@ -486,7 +492,7 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
       }),
     )
     yield* provideScoped(
-      SqliteRuntime.layerSqlite(options),
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const store = yield* RunStore.RunStore
         assertFileBytes((yield* store.loadExecution(runId)).message.prompt)
@@ -507,8 +513,13 @@ standalone.effect("reloads SQLite registrations without address binding and clos
     const firstLayer = SqliteRuntime.layerSqlite({
       filename,
       addresses: [],
-      resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+          Layer.orDie,
+        ),
+      ),
+    )
     const receipt = yield* provideScoped(
       firstLayer,
       Effect.gen(function* () {
@@ -540,7 +551,9 @@ standalone.effect("reloads SQLite registrations without address binding and clos
           () => Ref.update(finalizers, (count) => count + 1),
         ),
     })
-    const reopened = SqliteRuntime.layerSqlite({ filename, addresses: [], resolver })
+    const reopened = SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(
+      Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)),
+    )
     yield* provideScoped(
       reopened,
       Effect.gen(function* () {
@@ -582,8 +595,13 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
       SqliteRuntime.layerSqlite({
         filename,
         addresses: [{ address, executable: assistantRef, registrations }],
-        resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-      }),
+      }).pipe(
+        Layer.provide(
+          ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+            Layer.orDie,
+          ),
+        ),
+      ),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         return yield* runtime.send({
@@ -598,8 +616,13 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
     const reopened = SqliteRuntime.layerSqlite({
       filename,
       addresses: [],
-      resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+          Layer.orDie,
+        ),
+      ),
+    )
     yield* provideScoped(
       reopened,
       Effect.gen(function* () {
@@ -645,16 +668,19 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
   }))
   const compactionRuntimeLayer = Runtime.layerMemory({
     addresses: [],
-    resolver: ExecutableResolver.makeStatic([
-      {
-        executable,
-        agent: closedTestAgent(assistant),
-        runOptions: {
-          compaction: { contextWindow: compaction.contextWindow, reserveTokens: compaction.reserveTokens },
+  }).pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([
+        {
+          executable,
+          agent: closedTestAgent(assistant),
+          runOptions: {
+            compaction: { contextWindow: compaction.contextWindow, reserveTokens: compaction.reserveTokens },
+          },
         },
-      },
-    ]),
-  })
+      ]).pipe(Layer.orDie),
+    ),
+  )
 
   layer(compactionRuntimeLayer)(
     "requires both pinned compaction registrations and conflicts on changed policy",

@@ -9,8 +9,7 @@ import { tempDbPath } from "../sql/scenario.js"
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 const memory = programFixture()
 const sqlite = programFixture()
-const address = (resolver: typeof memory.resolver) => ({
-  resolver,
+const options = {
   addresses: [
     {
       address: programAddress,
@@ -18,9 +17,9 @@ const address = (resolver: typeof memory.resolver) => ({
       registrations: registrationsFor(programExecutable),
     },
   ],
-})
+}
 
-layer(Runtime.layerMemory(address(memory.resolver)))(
+layer(Runtime.layerMemory(options).pipe(Layer.provide(memory.resolverLayer)))(
   "enforces every durable Program budget dimension in memory and SQLite",
   (it) => {
     it.effect("enforces every durable Program budget dimension in memory and SQLite", () =>
@@ -30,9 +29,9 @@ layer(Runtime.layerMemory(address(memory.resolver)))(
             Effect.flatMap(
               Layer.build(
                 SqliteRuntime.layerSqlite({
-                  ...address(sqlite.resolver),
+                  ...options,
                   filename: tempDbPath("program-budget-contract"),
-                }),
+                }).pipe(Layer.provide(sqlite.resolverLayer)),
               ),
               (context) => programBudgetContract.pipe(Effect.provideContext(context)),
             ),

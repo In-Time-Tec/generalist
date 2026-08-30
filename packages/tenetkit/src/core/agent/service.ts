@@ -16,7 +16,7 @@ import {
   TurnLimitExceeded,
   PolicyStopped,
 } from "./event.js"
-import type { DeliveryFailed, InvocationCoordinationFailed } from "../model/telemetry/events.js"
+import type { InvocationLifecycleFailed, SinkFailed } from "../model/telemetry/events.js"
 import { type BudgetLimits, type RunBudget, Exhausted } from "../durable/run-budget.js"
 import type { DriverCheckpoint } from "../durable/driver/contract.js"
 import type { DriverError, DriverStateInvalid } from "../durable/service.js"
@@ -339,8 +339,8 @@ export interface RunOptions {
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
 /** @experimental The error channel of `stream` and `generate`. */
 export type RunError =
-  | DeliveryFailed
-  | InvocationCoordinationFailed
+  | SinkFailed
+  | InvocationLifecycleFailed
   | AgentError
   | AgentSuspended
   | ResumeMismatch

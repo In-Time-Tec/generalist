@@ -8,7 +8,7 @@ import { externalRunInbox } from "../../core/turn/steering-inbox.js"
 import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../errors-internal.js"
-import { matchesActiveRunOptions } from "../executable/resolver.js"
+import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
@@ -41,14 +41,15 @@ import {
   type RunOptionsInput,
 } from "./completion/operations.js"
 import { suspend as suspendAgent } from "./agent/suspend.js"
-import type { Options, Service } from "./run-executor.js"
+import type { Service } from "./run-executor.js"
 
-export const make = (options: Options): Effect.Effect<Service, never, RunStore | ActiveExecutions> =>
-  Effect.gen(function* () {
+export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> = Effect.gen(
+  function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
+    const resolver = yield* ExecutableResolver
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
-    const reconcileCancellation = yield* makeToolCancellation({ store, resolver: options.resolver })
+    const reconcileCancellation = yield* makeToolCancellation({ store, resolver })
     const executeClaim = (claim: ExecutionClaim, afterExit: Ref.Ref<Effect.Effect<void>>): Effect.Effect<void> =>
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
@@ -81,7 +82,7 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
         })
         const scopedExecution = Effect.scoped(
           Effect.gen(function* () {
-            const resolved = yield* ExecutionResolution.resolve(options.resolver, claimed, deferProgramChildFailure)
+            const resolved = yield* ExecutionResolution.resolve(resolver, claimed, deferProgramChildFailure)
             if (resolved === undefined) return
             if (resolved._tag === "Program") {
               yield* executeProgram({ claim, claimed, store, resolution: resolved })
@@ -457,4 +458,5 @@ export const make = (options: Options): Effect.Effect<Service, never, RunStore |
         yield* active.run(claim.runId, executeClaim(claim, afterExit), settleAndRelease)
       })
     return { execute, interrupt: (runId) => active.interrupt(runId) }
-  })
+  },
+)

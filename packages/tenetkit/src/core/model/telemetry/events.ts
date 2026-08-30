@@ -7,16 +7,14 @@ import {
 import { isTimeout, isTerminationFailure } from "../stream-termination.js"
 import { isInvalidToolCallParameters } from "../tool-call-validation.js"
 export {
-  Delivery,
-  DeliveryFailed,
-  InvocationCoordinationFailed,
-  InvocationCoordinator,
+  InvocationLifecycle,
+  InvocationLifecycleFailed,
+  Sink,
+  SinkFailed,
   generateId,
-  isInvocationCoordinationFailed,
-  layerInvocationCoordinatorNoop,
-  layerNoop,
-  type DeliveryService,
-  type InvocationCoordinatorService,
+  isInvocationLifecycleFailed,
+  layerInvocationLifecycleNoop,
+  layerSinkNoop,
 } from "./services.js"
 export {
   CurrentCompactionId,

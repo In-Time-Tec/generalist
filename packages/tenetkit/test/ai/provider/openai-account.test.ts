@@ -13,7 +13,7 @@ import {
   layerClient,
 } from "../../../src/ai/provider/openai-account.js"
 import { classifyFailure, layer as openAiLayer } from "../../../src/ai/provider/openai.js"
-import type { AuthService } from "../../../src/ai/provider/openai-account-auth.js"
+import type { OpenAIAccountAuth } from "../../../src/ai/provider/openai-account-auth.js"
 
 const endpoint = "https://chatgpt.com/backend-api/codex/responses"
 const credential = (generation: string, suffix = generation): OpenAIAccountCredential => ({
@@ -295,7 +295,7 @@ describe("OpenAI account Responses registration", () => {
       expiresAt: 1,
       refreshedAt: 1,
     })
-    const auth: AuthService = {
+    const auth: OpenAIAccountAuth["Service"] = {
       loginBrowser: () => Effect.succeed(authCredential("profile-a", "old")),
       loginDevice: Effect.succeed(authCredential("profile-a", "old")),
       status: Effect.succeed({ _tag: "Present", fingerprint: "profile-a" }),

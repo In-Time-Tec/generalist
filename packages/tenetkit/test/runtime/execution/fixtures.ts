@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentEvent, AgentManifest } from "../../../src/index.js"
 import {
@@ -100,13 +100,15 @@ const alternateResearcherExecutable = ExecutableManifest.make({
 export const alternateResearcherRef = alternateResearcherExecutable
 export const alternateAssistantAddress = Address.make("agent:alternate-assistant")
 
+export const resolverLayer = ExecutableResolver.layerStatic([
+  { executable: assistantRef, agent: closedTestAgent(assistant) },
+  { executable: researcherRef, agent: closedTestAgent(researcher) },
+  { executable: analystRef, agent: closedTestAgent(analyst) },
+  { executable: alternateAssistantRef, agent: closedTestAgent(alternateAssistant) },
+  { executable: alternateResearcherRef, agent: closedTestAgent(alternateResearcher) },
+])
+
 export const parentRelativeOptions: Runtime.LayerOptions = {
-  resolver: ExecutableResolver.makeStatic([
-    { executable: assistantRef, agent: closedTestAgent(assistant) },
-    { executable: researcherRef, agent: closedTestAgent(researcher) },
-    { executable: alternateAssistantRef, agent: closedTestAgent(alternateAssistant) },
-    { executable: alternateResearcherRef, agent: closedTestAgent(alternateResearcher) },
-  ]),
   addresses: [
     { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
     {
@@ -117,26 +119,20 @@ export const parentRelativeOptions: Runtime.LayerOptions = {
   ],
 }
 
-export const parentRelativeLayer = Runtime.layerMemory(parentRelativeOptions)
+export const parentRelativeLayer = Runtime.layerMemory(parentRelativeOptions).pipe(Layer.provide(resolverLayer))
 
 export const memoryLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([
-    { executable: assistantRef, agent: closedTestAgent(assistant) },
-    { executable: researcherRef, agent: closedTestAgent(researcher) },
-    { executable: analystRef, agent: closedTestAgent(analyst) },
-  ]),
   addresses: [
     { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
     { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
   ],
   subscriberQueueCapacity: 8,
-})
+}).pipe(Layer.provide(resolverLayer))
 
 export const lagLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
   addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
   subscriberQueueCapacity: 1,
-})
+}).pipe(Layer.provide(resolverLayer))
 
 export const textPrompt = (text: string) => Prompt.make(text)
 

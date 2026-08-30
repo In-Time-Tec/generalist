@@ -73,10 +73,10 @@ export const programFixture = () => {
       return `${firstText}|${replayedText}`
     }),
   )
-  const resolver = ExecutableResolver.makeStatic([
+  const resolverLayer = ExecutableResolver.layerStatic([
     { _tag: "Program", executable: programExecutable, program, executor, handlers },
-  ])
-  return { resolver, executor, handlers, counts: () => ({ toolCalls, logs }) }
+  ]).pipe(Layer.orDie)
+  return { resolverLayer, executor, handlers, counts: () => ({ toolCalls, logs }) }
 }
 
 export const approvalProgramFixture = () => {
@@ -117,9 +117,9 @@ export const approvalProgramFixture = () => {
     ),
   )
   return {
-    resolver: ExecutableResolver.makeStatic([
+    resolverLayer: ExecutableResolver.layerStatic([
       { _tag: "Program", executable: programExecutable, program, executor, handlers },
-    ]),
+    ]).pipe(Layer.orDie),
     counts: () => ({ authorizations, executions, sandboxes }),
   }
 }
@@ -220,10 +220,10 @@ export const agentMapProgramFixture = () => {
   return {
     address: Address.make("program:agent-map"),
     executable,
-    resolver: ExecutableResolver.makeStatic([
+    resolverLayer: ExecutableResolver.layerStatic([
       { _tag: "Program", executable, program: mapProgram, executor, handlers },
       { _tag: "Agent", executable: childExecutable, agent: Agent.close(child, model) },
-    ]),
+    ]).pipe(Layer.orDie),
     counts: () => ({ bindingDispatches, childFinalizers }),
   }
 }

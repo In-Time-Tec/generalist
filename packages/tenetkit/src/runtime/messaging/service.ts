@@ -160,25 +160,6 @@ export const reachable = (input: {
     return entries
   })
 
-/** @experimental Runtime-owned addressed messaging for code running inside an execution. */
-export interface AgentMessagingService {
-  readonly send: (input: {
-    readonly to: Address
-    readonly idempotencyKey: string
-    readonly prompt: Prompt.Prompt | Prompt.RawInput
-    readonly inReplyTo?: string
-    readonly metadata?: Metadata
-  }) => Effect.Effect<
-    MessageReceipt,
-    SendMessageError | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
-    DriverInterpreter | ToolContext
-  >
-  readonly inbox: (input: {
-    readonly limit: number
-  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError, ToolContext>
-  readonly directory: Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError, ToolContext>
-}
-
 /**
  * @experimental
  *
@@ -187,9 +168,26 @@ export interface AgentMessagingService {
  * creation would bind one Run into the service and let a caller send under another Run's identity,
  * which is exactly the forgery this contract exists to prevent.
  */
-export class AgentMessaging extends Context.Service<AgentMessaging, AgentMessagingService>()(
-  "tenetkit/runtime/messaging/service/AgentMessaging",
-) {}
+export class AgentMessaging extends Context.Service<
+  AgentMessaging,
+  {
+    readonly send: (input: {
+      readonly to: Address
+      readonly idempotencyKey: string
+      readonly prompt: Prompt.Prompt | Prompt.RawInput
+      readonly inReplyTo?: string
+      readonly metadata?: Metadata
+    }) => Effect.Effect<
+      MessageReceipt,
+      SendMessageError | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+      DriverInterpreter | ToolContext
+    >
+    readonly inbox: (input: {
+      readonly limit: number
+    }) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError, ToolContext>
+    readonly directory: Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError, ToolContext>
+  }
+>()("tenetkit/runtime/messaging/service/AgentMessaging") {}
 
 const currentRunId = Effect.flatMap(ToolContext, (context) =>
   context.runId === undefined
@@ -208,7 +206,7 @@ export const make = (input: {
   readonly store: RunStoreService
   readonly policy: Service
   readonly sendMessage: (request: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
-}): AgentMessagingService => ({
+}): AgentMessaging["Service"] => ({
   send: (request) =>
     Effect.gen(function* () {
       const runId = yield* currentRunId

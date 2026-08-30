@@ -15,13 +15,13 @@ export interface BoundedSuccess extends Success {
   readonly outputPaths: ReadonlyArray<string>
 }
 
-/** @experimental Stores tool-output overflow out of context. */
-export interface StoreService {
-  readonly put: (toolCallId: string, content: OutputContent) => Effect.Effect<Option.Option<string>, Error>
-}
-
 /** @experimental */
-export class Store extends Context.Service<Store, StoreService>()("tenetkit/core/tools/tool-output/Store") {}
+export class Store extends Context.Service<
+  Store,
+  {
+    readonly put: (toolCallId: string, content: OutputContent) => Effect.Effect<Option.Option<string>, Error>
+  }
+>()("tenetkit/core/tools/tool-output/Store") {}
 
 /** @experimental */
 export class Error extends Schema.TaggedError<Error>()("tenetkit/core/ToolOutputError", {
@@ -51,7 +51,7 @@ export const layerMemory: Layer.Layer<Store> = Layer.effect(
 )
 
 /** @experimental */
-export const layerTest = (implementation: StoreService): Layer.Layer<Store> =>
+export const layerTest = (implementation: Store["Service"]): Layer.Layer<Store> =>
   Layer.succeed(Store, Store.of(implementation))
 
 const encoder = new TextEncoder()
@@ -109,7 +109,7 @@ const boundedInlineFromOriginal = (encoded: string, bytes: number, maxBytes: num
 })
 
 const optionalStore = (
-  store: StoreService,
+  store: Store["Service"],
   toolCallId: string,
   result: Success,
 ): Effect.Effect<

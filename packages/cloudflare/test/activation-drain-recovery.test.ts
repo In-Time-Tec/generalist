@@ -37,10 +37,13 @@ const StaleClaim = Errors.StaleClaim
 const makeMessage = Message.make
 const defaultTreePolicy = TreePolicy.defaultTreePolicy
 
+const resolverLayer = ExecutableResolver.layerStatic([
+  { executable: assistantRef, agent: closedTestAgent(assistant) },
+]).pipe(Layer.orDie)
+
 const options = (filename: string, projection?: RunActivationProjection) => {
   const value = {
     filename,
-    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     scheduler: { pollInterval: "1 day" as const },
   }
@@ -52,7 +55,9 @@ const withLayer = <A, E, R, E2, R2>(provided: Layer.Layer<R, E, R2>, effect: Eff
 
 const runtimeLayer = (projection?: RunActivationProjection) => {
   const filename = tempDbPath("cloudflare-activation")
-  return Layer.merge(SqliteRuntime.layerSqlite(options(filename, projection)), layer({ filename }))
+  return Layer.merge(SqliteRuntime.layerSqlite(options(filename, projection)), layer({ filename })).pipe(
+    Layer.provide(resolverLayer),
+  )
 }
 
 const projectedRuntimeLayer = (rearm: Effect.Effect<void, Errors.RuntimeUnavailable>) => {
@@ -71,7 +76,10 @@ const projectedRuntimeLayer = (rearm: Effect.Effect<void, Errors.RuntimeUnavaila
     }),
   ).pipe(Layer.provide(client))
   const dependencies = Layer.merge(store, activeExecutionsLayer)
-  const runtime = Layer.effect(Runtime.Runtime, makeRuntime(runtimeOptions)).pipe(Layer.provide(dependencies))
+  const runtime = Layer.effect(Runtime.Runtime, makeRuntime(runtimeOptions)).pipe(
+    Layer.provide(dependencies),
+    Layer.provide(resolverLayer),
+  )
   return Layer.mergeAll(runtime, store, client)
 }
 

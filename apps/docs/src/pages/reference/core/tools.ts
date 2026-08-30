@@ -4,10 +4,10 @@ export const coreToolsReference = definePage({
   title: "Tools and execution",
   navTitle: "Tools",
   group: "Reference",
-  description: "ToolExecutor, ToolContext, Output and its store, and AgentTool for agents-as-tools.",
+  description: "ToolExecutor, ToolContext, ToolOutput and its store, and AgentTool for agents-as-tools.",
   content: [
     lead(
-      "Four namespaces of tenetkit cover tool execution: ToolExecutor optionally overrides where calls run, ToolContext is the ambient per-call context, Output bounds large results, and AgentTool wraps an agent as a tool.",
+      "Four namespaces of tenetkit cover tool execution: ToolExecutor optionally overrides where calls run, ToolContext is the ambient per-call context, ToolOutput bounds large results, and AgentTool wraps an agent as a tool.",
     ),
     command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.43.0"),
     h2("tool-executor", "ToolExecutor"),
@@ -155,7 +155,7 @@ export const coreToolsReference = definePage({
       code("ToolContext.layerTest(implementation)"),
       " provides an explicit one.",
     ),
-    h2("tool-output", "Output and Store"),
+    h2("tool-output", "ToolOutput and Store"),
     p(
       "A bounded tool result is ",
       code("Output = { inline: unknown; outputPaths?: ReadonlyArray<string> }"),
@@ -169,7 +169,7 @@ export const coreToolsReference = definePage({
       ["Export", "Notes"],
       [
         [
-          [code("Output.bound(result, { toolCallId, maxBytes })")],
+          [code("ToolOutput.bound(result, { toolCallId, maxBytes })")],
           [
             "Returns the result unchanged when it fits, no store is present, or the store declines; otherwise replaces it with a truncated preview ",
             code("{ truncated, bytes, maxBytes, preview }"),
@@ -177,9 +177,9 @@ export const coreToolsReference = definePage({
             code("outputPaths"),
           ],
         ],
-        [[code("Output.layerNoop")], ["Store that always declines (", code("Option.none"), ")"]],
-        [[code("Output.layerMemory")], ["In-memory store issuing ", code("mem:tool-output-<n>"), " paths"]],
-        [[code("Output.layerTest(implementation)")], "Layer from an explicit store interface"],
+        [[code("ToolOutput.layerNoop")], ["Store that always declines (", code("Option.none"), ")"]],
+        [[code("ToolOutput.layerMemory")], ["In-memory store issuing ", code("mem:tool-output-<n>"), " paths"]],
+        [[code("ToolOutput.layerTest(implementation)")], "Layer from an explicit store interface"],
         [[code("Error")], ["Tagged error with ", code("message")]],
       ],
     ),

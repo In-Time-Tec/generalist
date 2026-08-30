@@ -156,6 +156,7 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
     prompt: "This model call is outside the budget.",
   }).pipe(Effect.provideContext(exhaustedServices), Effect.exit)
   const exhaustedRequests = yield* exhaustedFixture.requests
+  const openRouterConfig = yield* decodeOpenRouterConfig({})
 
   return Response.json({
     objective: planned.value.objective,
@@ -165,7 +166,7 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
     deniedExecutions,
     budgetExhausted: Exit.isFailure(exhausted),
     budgetModelRequests: exhaustedRequests.length,
-    openRouterBundled: Object.keys(decodeOpenRouterConfig({})).length === 0,
+    openRouterBundled: Object.keys(openRouterConfig).length === 0,
   })
 })
 
@@ -271,7 +272,6 @@ export class SqlObject {
     const sqlLayer = layerSqlClient(storage)
     const storeLayer = layerRunStore({
       addresses: [],
-      resolver: { resolve: () => Effect.die("resolver must not run during conformance") },
     }).pipe(Layer.provide(sqlLayer))
     const live = Layer.merge(sqlLayer, storeLayer)
     const program = Effect.scoped(

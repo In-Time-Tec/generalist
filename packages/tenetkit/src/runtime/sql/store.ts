@@ -89,6 +89,7 @@ import { RunClaims } from "./run/claims.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
 import { RunExecutor } from "../execution/run-executor.js"
+import { ExecutableResolver } from "../executable/resolver.js"
 import { make as makeRunExecutor } from "../execution/run-executor-internal.js"
 import { layer as runtimeLayer } from "../memory/layer/service.js"
 import { Runtime } from "../service.js"
@@ -453,9 +454,8 @@ export type SqlRuntimeServices = Runtime | RunStore | RunClaims | RunExecutor
 /** @experimental Assemble one server SQL driver around Runtime's lifecycle kernel. */
 export const layerSqlRuntime = (input: {
   readonly options: SqlStoreOptions
-  readonly workerId: string
   readonly driver: SqlRuntimeDriver<SqlDriverStoreError>
-}): Layer.Layer<SqlRuntimeServices, SqlDriverStoreError, SqlClient.SqlClient> => {
+}): Layer.Layer<SqlRuntimeServices, SqlDriverStoreError, SqlClient.SqlClient | ExecutableResolver> => {
   const services = Layer.effectContext(
     makeSqlStoreServices(input.options, input.driver).pipe(
       Effect.flatMap(({ claims, runStore }) =>
@@ -470,10 +470,7 @@ export const layerSqlRuntime = (input: {
   )
   const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
   const runtime = runtimeLayer(input.options).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(
-    RunExecutor,
-    makeRunExecutor({ workerId: input.workerId, resolver: input.options.resolver }),
-  ).pipe(Layer.provide(dependencies))
+  const host = Layer.effect(RunExecutor, makeRunExecutor).pipe(Layer.provide(dependencies))
   return Layer.mergeAll(runtime, host, services)
 }
 

@@ -1,7 +1,7 @@
 import { Cause, Context, Effect, Layer, Schema } from "effect"
 import type { Prompt, Response, Tool } from "effect/unstable/ai"
 import type { ApprovalRequest } from "../agent/event.js"
-import { PermissionError, evaluateWithRules, type RuleStoreService } from "../policy/permissions.js"
+import { PermissionError, RuleStore, evaluateWithRules } from "../policy/permissions.js"
 
 type Approvals = import("../policy/approvals.js").Service
 type PendingApproval = import("../policy/approvals.js").Pending
@@ -67,7 +67,7 @@ export class ToolAuthorizer extends Context.Service<ToolAuthorizer, Authorizer<n
 export interface Options {
   readonly permissions: Permissions
   readonly approvals: Approvals
-  readonly ruleStore: RuleStoreService
+  readonly ruleStore: RuleStore["Service"]
 }
 
 const deny = (message: string): Deny => ({ _tag: "Deny", error: PermissionDenied.make({ message }) })

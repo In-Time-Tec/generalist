@@ -1,6 +1,7 @@
-/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/global-date, effecttsgo/global-date-in-effect, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, no-new-func */
+/* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, no-new-func */
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
+import { adjust as adjustTestClock } from "effect/testing/TestClock"
 import { CodeExecutor, ProgramCapabilities } from "tenetkit"
 import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "@tenetkit/cloudflare/dynamic-workers"
 import { runner } from "../src/dynamic-workers/source.js"
@@ -32,7 +33,7 @@ const request = (signal = new AbortController().signal): CodeExecutor.Request =>
     ...identity,
     input: { value: 1 },
     signal,
-    deadlineMillis: Date.now() + 10_000,
+    deadlineMillis: 10_000,
     limits: { cpuMillis: 50, subrequests: 3, outputBytes: 1_024 },
     capabilities: [{ operation: "callTool", names: ["echo"] }],
   }
@@ -147,7 +148,7 @@ it.effect("rejects an unsupported admission limit before source normalization or
       .execute({
         ...request(),
         modules: [{ name: "program.js", source: "export default (" }],
-        deadlineMillis: Date.now() + 2_147_493_647,
+        deadlineMillis: 2_147_493_647,
       })
       .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
     expect(failure).toMatchObject({
@@ -643,6 +644,39 @@ it.effect("fences a late Worker response after cancellation", () =>
   }),
 )
 
+it.effect("returns cancellation when Worker fetch ignores abort forever", () =>
+  Effect.gen(function* () {
+    const controller = yield* Effect.sync(() => new AbortController())
+    let started!: () => void
+    const fetchStarted = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const executor = make({
+      compatibilityDate: "2026-08-19",
+      capabilityBinding: (rpc) => rpc,
+      loader: {
+        load: () => ({
+          getEntrypoint: () => ({
+            fetch: () => {
+              started()
+              return new Promise<Response>(() => {
+                // The Worker deliberately ignores cancellation.
+              })
+            },
+          }),
+        }),
+      },
+    })
+    const fiber = yield* executor
+      .execute(request(controller.signal))
+      .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.forkChild)
+    yield* Effect.promise(() => fetchStarted)
+    controller.abort()
+    const failure = yield* Fiber.join(fiber).pipe(Effect.flip)
+    expect(failure).toBeInstanceOf(CodeExecutor.SandboxCancelled)
+  }),
+)
+
 it.effect("stops the Worker and closes host callbacks before Effect interruption returns", () =>
   Effect.gen(function* () {
     let rpc: CapabilityRpc | undefined
@@ -827,10 +861,11 @@ it.effect("fences cancellation and deadline while reading a delayed response bod
       deadlineReading = resolve
     })
     let deadlineBodyCancelled = false
-    const deadline = yield* execute({ ...request(), deadlineMillis: Date.now() + 50 }, deadlineReading, () => {
+    const deadline = yield* execute({ ...request(), deadlineMillis: 50 }, deadlineReading, () => {
       deadlineBodyCancelled = true
     }).pipe(Effect.forkChild)
     yield* Effect.promise(() => deadlineBodyStarted)
+    yield* adjustTestClock(50)
     expect(yield* Fiber.join(deadline).pipe(Effect.flip)).toBeInstanceOf(CodeExecutor.SandboxDeadlineExceeded)
     expect(deadlineBodyCancelled).toBe(true)
   }),

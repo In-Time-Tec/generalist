@@ -14,11 +14,11 @@ import {
   CurrentCompactionId,
   CurrentPurpose,
   CurrentSummaryCall,
-  InvocationCoordinationFailed,
+  InvocationLifecycleFailed,
   type FailureCategory,
   classifyFailureCategory,
   generateId,
-  isInvocationCoordinationFailed,
+  isInvocationLifecycleFailed,
 } from "./telemetry/events.js"
 
 export { type Identity, type IdentityCell, makeIdentityCell } from "./attempt/identity.js"
@@ -36,16 +36,13 @@ interface AnyResponse {
 const beginCall = (
   model: LanguageModel.Service,
   options: InstrumentOptions,
-): Effect.Effect<
-  { readonly context: CallContext; readonly stack: LanguageModel.Service },
-  InvocationCoordinationFailed
-> =>
+): Effect.Effect<{ readonly context: CallContext; readonly stack: LanguageModel.Service }, InvocationLifecycleFailed> =>
   Effect.gen(function* () {
     const purpose = yield* CurrentPurpose
     const persistedOrdinal = yield* CurrentModelCallOrdinal
     const callOrdinal = options.nextCallOrdinal?.(persistedOrdinal) ?? persistedOrdinal ?? 0
     if (!Number.isSafeInteger(callOrdinal) || callOrdinal < 0) {
-      return yield* InvocationCoordinationFailed.make({
+      return yield* InvocationLifecycleFailed.make({
         message: "model call ordinal is outside the safe integer range",
       })
     }
@@ -94,7 +91,7 @@ const beginCall = (
       ),
       classify: memoized((error) => {
         if (
-          isInvocationCoordinationFailed(error) ||
+          isInvocationLifecycleFailed(error) ||
           providerClassification(error) === "context-overflow" ||
           isInvalidToolCallParameters(error) ||
           options.resilience === undefined
@@ -261,7 +258,7 @@ const callEffect = <A extends AnyResponse, E, R>(
   model: LanguageModel.Service,
   options: InstrumentOptions,
   invoke: (stack: LanguageModel.Service) => Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | InvocationCoordinationFailed | Misconfigured, R> =>
+): Effect.Effect<A, E | InvocationLifecycleFailed | Misconfigured, R> =>
   Effect.flatMap(validateOptions(options).pipe(Effect.andThen(beginCall(model, options))), ({ context, stack }) =>
     invoke(stack).pipe(
       Effect.tap((response) =>
@@ -281,7 +278,7 @@ const callStream = (
   StreamTextPart,
   | AiError.AiError
   | InvalidToolCallParameters
-  | InvocationCoordinationFailed
+  | InvocationLifecycleFailed
   | TerminationFailure
   | import("./resilience.js").Misconfigured,
   ToolContext | Tool.Handler<string>

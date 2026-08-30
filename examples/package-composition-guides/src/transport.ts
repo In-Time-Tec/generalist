@@ -1,4 +1,4 @@
-import { Console, Effect, ManagedRuntime, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, AgentManifest, Pins } from "tenetkit"
 import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "tenetkit/runtime"
 import { TestModel } from "tenetkit/test"
@@ -27,10 +27,13 @@ const registrations = executable.manifest.entries.flatMap((entry) =>
 const agentServices = TestModel.layer([TestModel.text("Hello from transport.")])
 
 const runtimeLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
   addresses: [],
   subscriberQueueCapacity: 16,
-})
+}).pipe(
+  Layer.provide(
+    ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(Layer.orDie),
+  ),
+)
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime

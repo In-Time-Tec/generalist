@@ -1,12 +1,6 @@
 import { Context, Effect, Layer } from "effect"
-import type { Service as ExecutableResolverService } from "../executable/resolver.js"
 import type { ExecutionClaim } from "../run/store.js"
 import { make } from "./run-executor-internal.js"
-
-export interface Options {
-  readonly workerId: string
-  readonly resolver: ExecutableResolverService
-}
 
 export interface Service {
   readonly execute: (claim: ExecutionClaim) => Effect.Effect<void>
@@ -17,4 +11,4 @@ export class RunExecutor extends Context.Service<RunExecutor, Service>()(
   "tenetkit/runtime/execution/run-executor/RunExecutor",
 ) {}
 
-export const layer = (options: Options) => Layer.effect(RunExecutor, make(options))
+export const layer = Layer.effect(RunExecutor, make)

@@ -8,9 +8,9 @@ import type { Classification, Policy as Resilience } from "../resilience.js"
 import type { CandidateIdentity, FailureDisposition } from "../registry.js"
 import { type TerminationFailure, requireTerminal } from "../stream-termination.js"
 import {
-  InvocationCoordinationFailed,
+  InvocationLifecycle,
+  InvocationLifecycleFailed,
   type EventPayload,
-  type InvocationCoordinatorService,
   type CallPurpose,
   type FailureCategory,
   type FirstOutputKind,
@@ -33,7 +33,7 @@ export interface InstrumentOptions {
   readonly resilience?: Resilience
   readonly logicalOperationId?: string
   readonly nextCallOrdinal?: (persisted?: number) => number
-  readonly coordinator?: InvocationCoordinatorService
+  readonly lifecycle?: InvocationLifecycle["Service"]
 }
 
 export interface CallState {
@@ -107,11 +107,11 @@ const coordinateCompleted = (
   context: CallContext,
   attempt: AttemptContext,
   finished: Finished,
-): Effect.Effect<void, InvocationCoordinationFailed> =>
+): Effect.Effect<void, InvocationLifecycleFailed> =>
   Effect.gen(function* () {
     if (attempt.state.coordinated) return
     const completedAt = yield* context.options.clock.currentTimeMillis
-    if (context.options.coordinator !== undefined && context.logicalOperationId !== undefined) {
+    if (context.options.lifecycle !== undefined && context.logicalOperationId !== undefined) {
       const completion = {
         logicalOperationId: context.logicalOperationId,
         modelCallId: context.modelCallId,
@@ -127,7 +127,7 @@ const coordinateCompleted = (
       if (attempt.state.requestId !== undefined) Object.assign(completion, { requestId: attempt.state.requestId })
       if (attempt.state.responseModel !== undefined)
         Object.assign(completion, { responseModel: attempt.state.responseModel })
-      yield* context.options.coordinator.completeAttempt(completion)
+      yield* context.options.lifecycle.completeAttempt(completion)
     }
     attempt.state.coordinated = true
   })
@@ -136,7 +136,7 @@ const attemptCompleted = (
   context: CallContext,
   attempt: AttemptContext,
   finished: Finished,
-): Effect.Effect<void, InvocationCoordinationFailed> =>
+): Effect.Effect<void, InvocationLifecycleFailed> =>
   Effect.gen(function* () {
     yield* coordinateCompleted(context, attempt, finished)
     const completedAt = yield* context.options.clock.currentTimeMillis
@@ -173,11 +173,11 @@ const attemptFailed = (
 }
 
 export const settleFailure: {
-  (disposition: FailureDisposition): (context: CallContext) => Effect.Effect<void, InvocationCoordinationFailed>
-  (context: CallContext, disposition: FailureDisposition): Effect.Effect<void, InvocationCoordinationFailed>
+  (disposition: FailureDisposition): (context: CallContext) => Effect.Effect<void, InvocationLifecycleFailed>
+  (context: CallContext, disposition: FailureDisposition): Effect.Effect<void, InvocationLifecycleFailed>
 } = Function.dual(
   2,
-  (context: CallContext, disposition: FailureDisposition): Effect.Effect<void, InvocationCoordinationFailed> =>
+  (context: CallContext, disposition: FailureDisposition): Effect.Effect<void, InvocationLifecycleFailed> =>
     Effect.suspend(() => {
       const pending = context.state.pendingFailure
       if (pending === undefined) return Effect.void
@@ -185,8 +185,8 @@ export const settleFailure: {
       const { attempt, category, classification, usage } = pending
       return Effect.gen(function* () {
         const failedAt = yield* context.options.clock.currentTimeMillis
-        if (context.options.coordinator !== undefined && context.logicalOperationId !== undefined) {
-          yield* context.options.coordinator.failAttempt({
+        if (context.options.lifecycle !== undefined && context.logicalOperationId !== undefined) {
+          yield* context.options.lifecycle.failAttempt({
             logicalOperationId: context.logicalOperationId,
             modelCallId: context.modelCallId,
             modelAttemptId: attempt.modelAttemptId,
@@ -220,7 +220,7 @@ const attemptExit = (
   context: CallContext,
   attempt: AttemptContext,
   exit: Exit.Exit<unknown, unknown>,
-): Effect.Effect<void, InvocationCoordinationFailed> =>
+): Effect.Effect<void, InvocationLifecycleFailed> =>
   Effect.suspend(() => {
     if (attempt.state.settled) return Effect.void
     attempt.state.settled = true
@@ -247,7 +247,7 @@ const observeStreamPart = (
   context: CallContext,
   attempt: AttemptContext,
   part: Response.AnyPart,
-): Effect.Effect<void, InvocationCoordinationFailed> =>
+): Effect.Effect<void, InvocationLifecycleFailed> =>
   Effect.gen(function* () {
     if (part.type === "response-metadata") {
       attempt.state.requestId = part.id
@@ -287,7 +287,7 @@ const beginAttempt = (
   context: CallContext,
   method: ModelInvocationMethod,
   identity?: CandidateIdentity,
-): Effect.Effect<AttemptContext, InvocationCoordinationFailed> =>
+): Effect.Effect<AttemptContext, InvocationLifecycleFailed> =>
   Effect.gen(function* () {
     const attempt = context.state.attempts
     context.state.attempts += 1
@@ -297,13 +297,13 @@ const beginAttempt = (
       context.options.identity.current = { modelCallId: context.modelCallId, modelAttemptId, attempt }
     }
     const startedAt = yield* context.options.clock.currentTimeMillis
-    if (context.options.coordinator !== undefined) {
+    if (context.options.lifecycle !== undefined) {
       if (context.logicalOperationId === undefined) {
-        return yield* InvocationCoordinationFailed.make({
-          message: "logicalOperationId is required when an invocation coordinator is configured",
+        return yield* InvocationLifecycleFailed.make({
+          message: "logicalOperationId is required when invocation lifecycle hooks are configured",
         })
       }
-      const coordination = {
+      const invocation = {
         logicalOperationId: context.logicalOperationId,
         modelCallId: context.modelCallId,
         modelAttemptId,
@@ -315,9 +315,9 @@ const beginAttempt = (
         ...identityFields(identity),
         startedAt,
       }
-      if (context.provider !== undefined) Object.assign(coordination, { provider: context.provider })
-      if (context.model !== undefined) Object.assign(coordination, { model: context.model })
-      yield* context.options.coordinator.beforeAttempt(coordination)
+      if (context.provider !== undefined) Object.assign(invocation, { provider: context.provider })
+      if (context.model !== undefined) Object.assign(invocation, { model: context.model })
+      yield* context.options.lifecycle.beforeAttempt(invocation)
     }
     yield* context.options.emit({
       _tag: "ModelAttemptStarted",
@@ -353,7 +353,7 @@ const attemptEffect = <A extends AnyResponse, E, R>(
   method: "generateText" | "generateObject",
   run: () => Effect.Effect<A, E, R>,
   identity?: CandidateIdentity,
-): Effect.Effect<A, E | AiError.AiError | InvocationCoordinationFailed, R> =>
+): Effect.Effect<A, E | AiError.AiError | InvocationLifecycleFailed, R> =>
   Effect.flatMap(beginAttempt(context, method, identity), (attempt) =>
     run().pipe(
       Effect.flatMap((response) =>
@@ -370,7 +370,7 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
   context: CallContext,
   run: () => Stream.Stream<A, E, R>,
   identity?: CandidateIdentity,
-): Stream.Stream<A, E | AiError.AiError | InvocationCoordinationFailed | TerminationFailure, R> =>
+): Stream.Stream<A, E | AiError.AiError | InvocationLifecycleFailed | TerminationFailure, R> =>
   Stream.unwrap(
     Effect.map(beginAttempt(context, "streamText", identity), (attempt) => {
       const stream = promoteStreamFailures(run(), context.options.resilience?.resolve ?? defaultResolveFailure)
@@ -409,9 +409,9 @@ export const attemptModel: {
   (args) => args.length === 3 || !("modelCallId" in args[0]),
   (model: LanguageModel.Service, context: CallContext, identity?: CandidateIdentity): LanguageModel.Service =>
     adapt<
-      AiError.AiError | InvocationCoordinationFailed,
-      AiError.AiError | InvocationCoordinationFailed,
-      AiError.AiError | InvocationCoordinationFailed | TerminationFailure
+      AiError.AiError | InvocationLifecycleFailed,
+      AiError.AiError | InvocationLifecycleFailed,
+      AiError.AiError | InvocationLifecycleFailed | TerminationFailure
     >(model, {
       generateText: (_options, invoke) =>
         attemptEffect(

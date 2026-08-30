@@ -1,6 +1,6 @@
 import { layer as backendLayer } from "@tenetkit/pg"
 import { describe, expect, layer } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
 import { RunClaims } from "tenetkit/runtime/sql-driver"
 import { registrationsFor } from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
@@ -17,7 +17,6 @@ describePostgres("PostgreSQL Program registration parity", () => {
     const runtimeLayer = backendLayer({
       url: database.url,
       maxConnections: postgresTestMaxConnections,
-      resolver: fixture.resolver,
       addresses: [
         {
           address: fixture.address,
@@ -25,7 +24,7 @@ describePostgres("PostgreSQL Program registration parity", () => {
           registrations: registrationsFor(fixture.executable),
         },
       ],
-    })
+    }).pipe(Layer.provide(fixture.resolverLayer))
     layer(database.provision(runtimeLayer), { excludeTestServices: true })(
       "persists a narrowed registration set for every Program fan-out child",
       (it) => {

@@ -31,7 +31,7 @@ import { fanOutIdFor, MAX_FAN_OUT_MEMBERS } from "../../child/fan-out-internal.j
 import { parseCursor } from "../../tree/cursor.js"
 import { decodePinned, equals, resolveChild } from "../../executable/manifest-internal.js"
 import type { PinnedExecutable } from "../../executable/manifest.js"
-import type { Input as ResolverInput } from "../../executable/resolver.js"
+import { ExecutableResolver, type Input as ResolverInput } from "../../executable/resolver.js"
 import { validate as validateRegistrations, type ExecutableRegistration } from "../../executable/registration.js"
 import { ModelPreviewLane, previews as modelPreviews } from "../../execution/model-response/preview-internal.js"
 import { readEntry, resolveModelResponse } from "../../session/service.js"
@@ -50,10 +50,13 @@ type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitSt
 type MutableSendAdmission = { -readonly [Key in keyof AdmitSendInput]: AdmitSendInput[Key] }
 type MutableMessageAdmission = { -readonly [Key in keyof AdmitMessageInput]: AdmitMessageInput[Key] }
 
-export const makeRuntime = (options: LayerOptions): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions> =>
+export const makeRuntime = (
+  options: LayerOptions,
+): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions | ExecutableResolver> =>
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
+    const resolver = yield* ExecutableResolver
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
     const policy = MessagingPolicy.make(options.messagingPolicy ?? {})
     const bounds = { ...defaultBounds, ...options.mailboxBounds }
@@ -81,7 +84,7 @@ export const makeRuntime = (options: LayerOptions): Effect.Effect<RuntimeService
       Effect.gen(function* () {
         const registrations = yield* validateRegistrations(input.executable, input.registrations)
         const attestation = yield* Effect.scoped(
-          options.resolver
+          resolver
             .resolve({
               runId: input.runId,
               ref: input.executable.ref,
@@ -201,7 +204,6 @@ export const makeRuntime = (options: LayerOptions): Effect.Effect<RuntimeService
           fanOutId,
         }
       })
-
     const validateInitialChildren = (
       input: StartInput,
       executable: PinnedExecutable,

@@ -37,7 +37,7 @@ import {
   Steering,
   ToolContext,
   ToolExecutor,
-  Output,
+  ToolOutput,
   Policy,
 } from "../../../src/index"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
@@ -5385,7 +5385,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               return { _tag: "Success" as const, result: largeOutput, encodedResult: largeOutput }
             }),
         }),
-        Output.layerTest({
+        ToolOutput.layerTest({
           put: (toolCallId, content) => {
             order.push("spill")
             stored = { toolCallId, content }
@@ -8635,9 +8635,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "delivers durable telemetry in ordered immutable batches matching live delivery IDs", () => {
     const batches: Array<ReadonlyArray<ModelTelemetry.Event>> = []
-    const delivery = Layer.succeed(
-      ModelTelemetry.Delivery,
-      ModelTelemetry.Delivery.of({
+    const sink = Layer.succeed(
+      ModelTelemetry.Sink,
+      ModelTelemetry.Sink.of({
         deliver: (batch) =>
           Effect.sync(() => {
             expect(batch.sessionId).toBe("delivery-session")
@@ -8651,7 +8651,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        delivery,
+        sink,
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
@@ -8673,12 +8673,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "fails typed when durable telemetry delivery rejects an exact stable batch", () => {
     const attempted: Array<ReadonlyArray<ModelTelemetry.Event>> = []
-    const delivery = Layer.succeed(
-      ModelTelemetry.Delivery,
-      ModelTelemetry.Delivery.of({
+    const sink = Layer.succeed(
+      ModelTelemetry.Sink,
+      ModelTelemetry.Sink.of({
         deliver: (batch) => {
           attempted.push(batch.events)
-          return Effect.fail(ModelTelemetry.DeliveryFailed.make({ message: "sink unavailable" }))
+          return Effect.fail(ModelTelemetry.SinkFailed.make({ message: "sink unavailable" }))
         },
       }),
     )
@@ -8688,7 +8688,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        delivery,
+        sink,
       ),
       Effect.gen(function* () {
         const seen: Array<AgentEvent.Event> = []
@@ -8700,7 +8700,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ),
         )
 
-        expect(failure._tag).toBe("tenetkit/core/DeliveryFailed")
+        expect(failure._tag).toBe("tenetkit/core/SinkFailed")
         expect(attempted).toHaveLength(1)
         expect(Object.isFrozen(attempted[0])).toBe(true)
         const attemptedIds = attempted[0]!.map((event) => event.deliveryId)
@@ -8713,9 +8713,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   ItLayer.make(it, "interrupts hanging durable telemetry delivery without emitting the in-flight batch", () => {
     const entered = Deferred.makeUnsafe<void>()
     const attempted: Array<ReadonlyArray<ModelTelemetry.Event>> = []
-    const delivery = Layer.succeed(
-      ModelTelemetry.Delivery,
-      ModelTelemetry.Delivery.of({
+    const sink = Layer.succeed(
+      ModelTelemetry.Sink,
+      ModelTelemetry.Sink.of({
         deliver: (batch) =>
           Effect.sync(() => attempted.push(batch.events)).pipe(
             Effect.andThen(Deferred.succeed(entered, undefined)),
@@ -8729,7 +8729,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        delivery,
+        sink,
       ),
       Effect.gen(function* () {
         const seen: Array<AgentEvent.Event> = []

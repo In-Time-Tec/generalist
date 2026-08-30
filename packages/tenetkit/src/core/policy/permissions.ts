@@ -51,16 +51,14 @@ export interface Service {
 /** @experimental */
 export class Permissions extends Context.Service<Permissions, Service>()("tenetkit/core/policy/permissions") {}
 
-/** @experimental Remembered-rule store. */
-export interface RuleStoreService {
-  readonly remember: (rule: Rule) => Effect.Effect<void, PermissionError>
-  readonly rules: Effect.Effect<ReadonlyArray<Rule>, PermissionError>
-}
-
 /** @experimental */
-export class RuleStore extends Context.Service<RuleStore, RuleStoreService>()(
-  "tenetkit/core/policy/permissions/RuleStore",
-) {}
+export class RuleStore extends Context.Service<
+  RuleStore,
+  {
+    readonly remember: (rule: Rule) => Effect.Effect<void, PermissionError>
+    readonly rules: Effect.Effect<ReadonlyArray<Rule>, PermissionError>
+  }
+>()("tenetkit/core/policy/permissions/RuleStore") {}
 
 const escapeRegExp = (value: string): string => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
 
@@ -195,11 +193,11 @@ const decisionFor = (ruleset: Ruleset, request: AccessRequest): Decision => {
 
 /** @experimental Evaluate a base policy with remembered rules as a last-match overlay. */
 export const evaluateWithRules: {
-  (store: RuleStoreService, request: AccessRequest): (base: Service) => Effect.Effect<Decision, PermissionError>
-  (base: Service, store: RuleStoreService, request: AccessRequest): Effect.Effect<Decision, PermissionError>
+  (store: RuleStore["Service"], request: AccessRequest): (base: Service) => Effect.Effect<Decision, PermissionError>
+  (base: Service, store: RuleStore["Service"], request: AccessRequest): Effect.Effect<Decision, PermissionError>
 } = dual(
   3,
-  (base: Service, store: RuleStoreService, request: AccessRequest): Effect.Effect<Decision, PermissionError> =>
+  (base: Service, store: RuleStore["Service"], request: AccessRequest): Effect.Effect<Decision, PermissionError> =>
     Effect.gen(function* () {
       const baseDecision = yield* base.evaluate(request)
       if (baseDecision._tag === "Deny") return baseDecision
@@ -254,7 +252,7 @@ export const layerRuleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): La
   )
 
 /** @experimental */
-export const layerRuleStoreTest = (implementation: RuleStoreService): Layer.Layer<RuleStore> =>
+export const layerRuleStoreTest = (implementation: RuleStore["Service"]): Layer.Layer<RuleStore> =>
   Layer.succeed(RuleStore, RuleStore.of(implementation))
 
 /** @experimental */

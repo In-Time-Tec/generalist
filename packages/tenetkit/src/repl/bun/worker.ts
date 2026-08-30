@@ -7,6 +7,7 @@ import { actionable as actionableTextResult, type PendingHostRequest } from "./t
 import { commandLines } from "./command-lines.js"
 import { formatValue as format, resultValue } from "./value.js"
 import { details as errorDetails } from "./worker-error.js"
+import { HostFrame } from "./protocol.js"
 
 const RuntimeValueSchema = Schema.Unknown
 type RuntimeValue = typeof RuntimeValueSchema.Type
@@ -419,42 +420,31 @@ const sequence = (task: () => void | Promise<void>): void => {
   tail = tail.then(task, task)
 }
 
-const Command = Schema.Union([
-  Schema.TaggedStruct("Execute", { cellId: Schema.String, code: Schema.String, deadlineMillis: Schema.Finite }),
-  Schema.TaggedStruct("Interrupt", { cellId: Schema.optional(Schema.String) }),
-  Schema.TaggedStruct("HostResponse", {
-    requestId: Schema.String,
-    outcome: Schema.Struct({
-      _tag: Schema.String,
-      output: Schema.optional(Schema.Unknown),
-      failure: Schema.optional(Schema.Unknown),
-      message: Schema.optional(Schema.String),
-    }),
-  }),
-  Schema.TaggedStruct("Mount", {
-    modules: Schema.Array(Schema.Struct({ module: Schema.String, operations: Schema.Array(Schema.String) })),
-  }),
-  Schema.TaggedStruct("Restore", { requestId: Schema.String, payload: Schema.String }),
-  Schema.TaggedStruct("Capture", { requestId: Schema.String }),
-  Schema.TaggedStruct("Inspect", { requestId: Schema.String }),
-  Schema.TaggedStruct("Shutdown", {}),
-])
+const decodeCommand = Schema.decodeUnknownEffect(Schema.fromJsonString(HostFrame))
 
 for await (const line of commands) {
   if (line.trim().length === 0) continue
-  const frame = Schema.decodeUnknownSync(Command)(JSON.parse(line))
-  if (frame._tag === "Execute") {
-    const { cellId, code, deadlineMillis } = frame
+  const hostFrame = await Effect.runPromise(
+    decodeCommand(line).pipe(
+      Effect.match({
+        onFailure: () => undefined,
+        onSuccess: (decoded) => decoded,
+      }),
+    ),
+  )
+  if (hostFrame === undefined) continue
+  if (hostFrame._tag === "Execute") {
+    const { cellId, code, deadlineMillis } = hostFrame
     sequence(() => execute(cellId, code, deadlineMillis))
     continue
   }
-  if (frame._tag === "Interrupt") {
-    const target = frame.cellId
+  if (hostFrame._tag === "Interrupt") {
+    const target = hostFrame.cellId
     if (cell !== undefined && (target === undefined || cell.cellId === target)) cell.controller.abort()
     continue
   }
-  if (frame._tag === "HostResponse") {
-    const { requestId, outcome } = frame
+  if (hostFrame._tag === "HostResponse") {
+    const { requestId, outcome } = hostFrame
     const settler = pending.get(requestId)
     pending.delete(requestId)
     if (settler === undefined) continue
@@ -466,27 +456,27 @@ for await (const line of commands) {
     else settler.reject(new Error(outcome.message ?? "the host rejected the request"))
     continue
   }
-  if (frame._tag === "Mount") {
-    mount(frame.modules)
+  if (hostFrame._tag === "Mount") {
+    mount(hostFrame.modules)
     continue
   }
-  if (frame._tag === "Restore") {
-    const { requestId, payload } = frame
+  if (hostFrame._tag === "Restore") {
+    const { requestId, payload } = hostFrame
     sequence(() => restore(requestId, payload))
     continue
   }
-  if (frame._tag === "Capture") {
-    const { requestId } = frame
+  if (hostFrame._tag === "Capture") {
+    const { requestId } = hostFrame
     sequence(() => {
       capture(requestId)
     })
     continue
   }
-  if (frame._tag === "Inspect") {
-    inspect(frame.requestId)
+  if (hostFrame._tag === "Inspect") {
+    inspect(hostFrame.requestId)
     continue
   }
-  if (frame._tag === "Shutdown") break
+  if (hostFrame._tag === "Shutdown") break
 }
 
 process.exit(0)

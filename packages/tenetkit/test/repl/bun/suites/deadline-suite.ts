@@ -62,6 +62,9 @@ layer(platform, liveOptions)("Bun kernel deadline", (it) => {
           )
           const result = yield* runCell({ pool, sessionId: "s", cellId: "c3", code: "kept + 1" })
           expect(result.value).toBe("9")
+          expect(result.epoch).toBe(1)
+          expect((yield* pool.interrupt("s", "c2"))._tag).toBe("NotRunning")
+          expect((yield* pool.inspect({ sessionId: "s" })).recovery).toBe("namespace")
         }),
     }),
   )

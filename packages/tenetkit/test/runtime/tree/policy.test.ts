@@ -102,13 +102,16 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
   })
   const handlers = Toolkit.make(noop).toLayer({ noop: () => Effect.die("ToolExecutor test layer owns execution") })
   const runtimeLayer = Runtime.layerMemory({
-    resolver: ExecutableResolver.makeStatic([
-      { executable: parentRef, agent: closedTestAgent(parentAgent) },
-      { executable: childRef, agent: Agent.close(childAgent, Layer.mergeAll(model, executor, handlers)) },
-    ]),
     addresses: [{ address, executable: parentRef, registrations: registrationsFor(parentRef) }],
     scheduler: { pollInterval: "1 day" },
-  })
+  }).pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([
+        { executable: parentRef, agent: closedTestAgent(parentAgent) },
+        { executable: childRef, agent: Agent.close(childAgent, Layer.mergeAll(model, executor, handlers)) },
+      ]).pipe(Layer.orDie),
+    ),
+  )
 
   return Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime

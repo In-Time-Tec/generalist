@@ -8,7 +8,13 @@ import {
   Runtime,
   RunStore,
 } from "../../../../src/runtime/index.js"
-import { assistantAddress, completedResult, parentRelativeOptions, textPrompt } from "../../execution/fixtures.js"
+import {
+  assistantAddress,
+  completedResult,
+  parentRelativeOptions,
+  resolverLayer,
+  textPrompt,
+} from "../../execution/fixtures.js"
 import { tempDbPath } from "../../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
@@ -19,8 +25,13 @@ const options = {
 }
 
 const layers = [
-  ["memory", Runtime.layerMemory(options)],
-  ["sqlite", SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("child-settlements") })],
+  ["memory", Runtime.layerMemory(options).pipe(Layer.provide(resolverLayer))],
+  [
+    "sqlite",
+    SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("child-settlements") }).pipe(
+      Layer.provide(resolverLayer),
+    ),
+  ],
 ] as const
 
 it("separates cancelled settlement observation from model delivery", () => {
@@ -316,7 +327,7 @@ const scopedWith =
 
 it.effect("SQLite preserves exactly one notification across close and reopen", () => {
   const filename = tempDbPath("child-settlement-reopen")
-  const sqlite = SqliteRuntime.layerSqlite({ ...options, filename })
+  const sqlite = SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(resolverLayer))
   let parentRunId = ""
   let childRunId = ""
   return Effect.gen(function* () {

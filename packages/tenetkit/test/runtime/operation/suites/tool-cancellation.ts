@@ -21,7 +21,11 @@ export interface ToolCancellationSuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
     options: Runtime.LayerOptions,
-  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor | Extra, StoreError>
+  ) => Layer.Layer<
+    Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor | Extra,
+    StoreError,
+    ExecutableResolver.ExecutableResolver
+  >
   readonly claim?: (
     runId: string,
     ownerId: string,
@@ -122,7 +126,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               return { _tag: "Cancelled" as const }
             }),
         })
-        const resolver = ExecutableResolver.makeStatic([
+        const resolverLayer = ExecutableResolver.layerStatic([
           {
             executable,
             agent: Agent.close(
@@ -134,10 +138,12 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               ),
             ),
           },
-        ])
+        ]).pipe(Layer.orDie)
 
         yield* provideScoped(
-          options.makeLayer({ resolver, addresses: [], scheduler: { pollInterval: "1 hour" } }),
+          options
+            .makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } })
+            .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
@@ -186,12 +192,12 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
 
             const replacementClaim = yield* claim(receipt.runId, "tool-cancellation-redelivery")
             yield* Deferred.succeed(allowAcknowledgement, undefined)
-            const replacementActive = yield* Layer.build(activeExecutionsLayer)
-            const replacementHost = yield* makeRunExecutor({
-              workerId: "tool-cancellation-redelivery",
-              resolver,
-            }).pipe(Effect.provideService(RunStore.RunStore, store), Effect.provideContext(replacementActive))
-            yield* replacementHost.execute(replacementClaim).pipe(Effect.timeout("5 seconds"))
+            yield* provideScoped(
+              Layer.mergeAll(Layer.succeed(RunStore.RunStore, store), activeExecutionsLayer, resolverLayer),
+              Effect.flatMap(makeRunExecutor, (replacementHost) =>
+                replacementHost.execute(replacementClaim).pipe(Effect.timeout("5 seconds")),
+              ),
+            )
 
             expect(cancellationRequests).toHaveLength(2)
             expect(cancellationRequests[1]).toEqual(cancellationRequests[0])
@@ -252,7 +258,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               return { _tag: "Cancelled" as const }
             }),
         })
-        const resolver = ExecutableResolver.makeStatic([
+        const resolverLayer = ExecutableResolver.layerStatic([
           {
             executable,
             agent: Agent.close(
@@ -264,10 +270,12 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               ),
             ),
           },
-        ])
+        ]).pipe(Layer.orDie)
 
         yield* provideScoped(
-          options.makeLayer({ resolver, addresses: [], scheduler: { pollInterval: "1 hour" } }),
+          options
+            .makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } })
+            .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
@@ -324,13 +332,15 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             }),
         })
         const environment = Layer.merge(unusedModel, executor)
-        const resolver = ExecutableResolver.makeStatic([
+        const resolverLayer = ExecutableResolver.layerStatic([
           { executable: assistantRef, agent: Agent.close(assistant, environment) },
           { executable: researcherRef, agent: Agent.close(researcher, environment) },
-        ])
+        ]).pipe(Layer.orDie)
 
         yield* provideScoped(
-          options.makeLayer({ resolver, addresses: [], scheduler: { pollInterval: "1 hour" } }),
+          options
+            .makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } })
+            .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore

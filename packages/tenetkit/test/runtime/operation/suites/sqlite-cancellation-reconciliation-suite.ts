@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { LocalScheduler, Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { assistantAddress, parentRelativeOptions, textPrompt } from "../../execution/fixtures.js"
+import { assistantAddress, parentRelativeOptions, resolverLayer, textPrompt } from "../../execution/fixtures.js"
 import { tempDbPath } from "../../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
@@ -17,7 +17,7 @@ it.effect("SQLite startup reconciles a poisoned running cancellation and stale c
     ...parentRelativeOptions,
     filename,
     scheduler: { pollInterval: "1 day" },
-  })
+  }).pipe(Layer.provide(resolverLayer))
   let runId = ""
   let childRunId = ""
   let grandchildRunId = ""

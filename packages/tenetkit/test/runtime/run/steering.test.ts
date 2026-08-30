@@ -188,14 +188,20 @@ layer(memoryLayer)("Runtime durable steering memory contract", (test) => {
 
 for (const backend of ["memory", "sqlite"] as const) {
   const options = {
-    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     scheduler: { pollInterval: "1 day" as const },
   }
-  const runtimeLayer =
+  const baseLayer =
     backend === "memory"
       ? Runtime.layerMemory(options)
       : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("steering-cancel-completion") })
+  const runtimeLayer = baseLayer.pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+        Layer.orDie,
+      ),
+    ),
+  )
   layer(runtimeLayer, { excludeTestServices: true })(
     `${backend} completion cannot resurrect cancellation through pending steering`,
     (test) => {
@@ -565,9 +571,12 @@ it.live("atomically persists steering consumption and model scheduling before SQ
     ),
   )
   const runtimeLayer = Runtime.layerMemory({
-    resolver: ExecutableResolver.makeStatic([{ executable: ref, agent: Agent.close(agent, model) }]),
     addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-  })
+  }).pipe(
+    Layer.provide(
+      ExecutableResolver.layerStatic([{ executable: ref, agent: Agent.close(agent, model) }]).pipe(Layer.orDie),
+    ),
+  )
   layer(runtimeLayer)("RunExecutor delivers durable steering in the next model operation", (test) => {
     test.effect("RunExecutor delivers durable steering in the next model operation", () =>
       Effect.gen(function* () {
@@ -642,9 +651,12 @@ it.effect("steering admitted during model streaming does not interrupt it and re
       }),
     )
     const runtimeLayer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([{ executable: ref, agent: Agent.close(agent, model) }]),
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable: ref, agent: Agent.close(agent, model) }]).pipe(Layer.orDie),
+      ),
+    )
 
     yield* provideScoped(
       runtimeLayer,
@@ -737,11 +749,14 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
     })
     const handlers = toolkit.toLayer({ batch_tool: () => Effect.die("ToolExecutor test layer owns execution") })
     const runtimeLayer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([
-        { executable: ref, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-      ]),
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable: ref, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
 
     yield* provideScoped(
       runtimeLayer,

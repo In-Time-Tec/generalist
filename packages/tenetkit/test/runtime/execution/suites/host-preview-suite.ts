@@ -53,16 +53,19 @@ const execute = (input: {
         },
       }),
     )
-    const resolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, model) }])
     const options = {
-      resolver,
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const layer =
+    const baseLayer =
       input.backend === "memory"
         ? Runtime.layerMemory(options)
         : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(`model-preview-${input.observer}`) })
+    const layer = baseLayer.pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, model) }]).pipe(Layer.orDie),
+      ),
+    )
 
     return yield* scopedWith(layer)(
       Effect.gen(function* () {
@@ -171,12 +174,15 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
     })
     const handlers = toolkit.toLayer({ continue: () => Effect.die("ToolExecutor test layer owns execution") })
     const layer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([
-        { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-      ]),
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       scheduler: { pollInterval: "1 day" },
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
 
     yield* scopedWith(layer)(
       Effect.gen(function* () {
@@ -269,12 +275,15 @@ it.effect("retires the published frame when a response commits while keeping the
     })
     const handlers = toolkit.toLayer({ continue: () => Effect.die("ToolExecutor test layer owns execution") })
     const layer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([
-        { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-      ]),
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       scheduler: { pollInterval: "1 day" },
-    })
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
 
     yield* scopedWith(layer)(
       Effect.gen(function* () {

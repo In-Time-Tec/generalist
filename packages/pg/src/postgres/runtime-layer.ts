@@ -2,6 +2,7 @@ import { Effect, Layer } from "effect"
 import { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
+import { ExecutableResolver } from "tenetkit/runtime"
 import {
   SchemaMigrationFailed,
   layerSqlRuntime,
@@ -32,11 +33,13 @@ export type StoreError = SqlDriverStoreError
  * Host transactions must use the `SqlClient` exposed by the same client Layer. Runtime operations
  * then nest through that exact transaction service and therefore use PostgreSQL savepoints.
  */
-const layerWithClient = (options: Options): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient> =>
+const layerWithClient = (
+  options: Options,
+): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver> =>
   Layer.unwrap(
     PgClient.PgClient.pipe(
       Effect.map((pg) =>
-        layerSqlRuntime({ options, workerId: "postgres", driver: postgresDriver({ options, pg }) }).pipe(
+        layerSqlRuntime({ options, driver: postgresDriver({ options, pg }) }).pipe(
           Layer.provide(Layer.succeed(SqlClient.SqlClient, pg)),
         ),
       ),
@@ -44,11 +47,15 @@ const layerWithClient = (options: Options): Layer.Layer<SqlRuntimeServices, Stor
   )
 
 /** @experimental Build the PostgreSQL Runtime, optionally acquiring its client from a URL. */
-export function layer(options: UrlOptions): Layer.Layer<SqlRuntimeServices, StoreError | SqlError>
-export function layer(options: Options): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient>
+export function layer(
+  options: UrlOptions,
+): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, ExecutableResolver.ExecutableResolver>
+export function layer(
+  options: Options,
+): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver>
 export function layer(
   options: Options | UrlOptions,
-): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient> {
+): Layer.Layer<SqlRuntimeServices, StoreError | SqlError, PgClient.PgClient | ExecutableResolver.ExecutableResolver> {
   if (!("url" in options)) return layerWithClient(options)
   const maxConnections = options.maxConnections ?? 10
   const client = Layer.unwrap(

@@ -274,18 +274,19 @@ const hostLayer = (input: {
     input.resilience === undefined
       ? Layer.merge(model, compaction)
       : Layer.mergeAll(model, compaction, input.resilience.pipe(Layer.orDie))
-  const resolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, environment) }])
   const options = {
-    resolver,
     addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     scheduler: { pollInterval: "1 day" as const },
   }
+  const resolverLayer = ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, environment) }]).pipe(
+    Layer.orDie,
+  )
   return {
     address,
-    layer:
-      input.backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(input.label) }),
+    layer: (input.backend === "memory"
+      ? Runtime.layerMemory(options)
+      : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(input.label) })
+    ).pipe(Layer.provide(resolverLayer)),
   }
 }
 

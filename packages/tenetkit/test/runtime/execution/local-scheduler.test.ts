@@ -2,7 +2,14 @@ import "./suites/fifo-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { ChildRuns, RunExecutor, LocalScheduler, Runtime, RunStore } from "../../../src/runtime/index.js"
+import {
+  ChildRuns,
+  ExecutableResolver,
+  RunExecutor,
+  LocalScheduler,
+  Runtime,
+  RunStore,
+} from "../../../src/runtime/index.js"
 import {
   assistant,
   assistantAddress,
@@ -16,7 +23,6 @@ import {
 } from "./fixtures.js"
 import { Agent } from "../../../src/index.js"
 import { closedTestAgent } from "../run/identity.js"
-import { makeStatic } from "../../../src/runtime/executable/resolver.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
 import { make as makeLocalScheduler } from "../../../src/runtime/execution/local-scheduler-internal.js"
 import { tempDbPath } from "../sql/scenario.js"
@@ -48,10 +54,10 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([
+      resolverLayer: ExecutableResolver.layerStatic([
         { executable: assistantRef, agent: Agent.close(assistant, model) },
         { executable: researcherRef, agent: Agent.close(researcher, model) },
-      ]),
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -59,8 +65,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} local scheduler executes admitted roots and children`, (it) => {
       it.effect("executes admitted roots and children", () =>
@@ -130,7 +138,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      resolverLayer: ExecutableResolver.layerStatic([
+        { executable: assistantRef, agent: Agent.close(assistant, model) },
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -138,8 +148,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-external-claim") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-external-claim") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} local scheduler preserves an external execution claim`, (it) => {
       it.effect("does not fence an external execution claim", () =>
@@ -184,10 +196,10 @@ for (const backend of ["memory", "sqlite"] as const) {
 
   {
     const options = {
-      resolver: makeStatic([
+      resolverLayer: ExecutableResolver.layerStatic([
         { executable: assistantRef, agent: closedTestAgent(assistant) },
         { executable: researcherRef, agent: closedTestAgent(researcher) },
-      ]),
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -195,8 +207,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-cancel") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-cancel") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} local scheduler reconciles an orphaned cancelling tree root last`, (it) => {
       it.effect("reconciles an orphaned cancelling tree root last", () =>
@@ -301,7 +315,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      resolverLayer: ExecutableResolver.layerStatic([
+        { executable: assistantRef, agent: Agent.close(assistant, model) },
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -309,8 +325,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-active") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-active") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} overlapping scheduler ticks do not reclaim an active local Run`, (it) => {
       it.effect("does not reclaim an active local Run", () =>
@@ -341,10 +359,10 @@ for (const backend of ["memory", "sqlite"] as const) {
 
   {
     const options = {
-      resolver: makeStatic([
+      resolverLayer: ExecutableResolver.layerStatic([
         { executable: assistantRef, agent: closedTestAgent(assistant) },
         { executable: researcherRef, agent: closedTestAgent(researcher) },
-      ]),
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -352,8 +370,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-claim-window") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-claim-window") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(
       `${backend} the cancelling sweep fences an owner absent from this process incarnation`,
@@ -400,7 +420,9 @@ for (const backend of ["memory", "sqlite"] as const) {
 
   {
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+      resolverLayer: ExecutableResolver.layerStatic([
+        { executable: assistantRef, agent: closedTestAgent(assistant) },
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -408,8 +430,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-fifo") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-fifo") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} scheduler selection claims the oldest ready Runs beyond the window`, (it) => {
       it.effect("claims the oldest ready Runs beyond the window", () =>
@@ -464,10 +488,10 @@ for (const backend of ["memory", "sqlite"] as const) {
 
   {
     const options = {
-      resolver: makeStatic([
+      resolverLayer: ExecutableResolver.layerStatic([
         { executable: assistantRef, agent: closedTestAgent(assistant) },
         { executable: researcherRef, agent: closedTestAgent(researcher) },
-      ]),
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -475,8 +499,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} scheduler never scans terminal or waiting Runs for child settlement`, (it) => {
       it.effect(
@@ -778,10 +804,10 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([
+      resolverLayer: ExecutableResolver.layerStatic([
         { executable: assistantRef, agent: Agent.close(assistant, model) },
         { executable: researcherRef, agent: Agent.close(researcher, model) },
-      ]),
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -789,8 +815,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-resume") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-resume") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} scheduler resumes a waiting parent once its child settles`, (it) => {
       it.effect("resumes a waiting parent once its child settles", () =>
@@ -847,10 +875,10 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([
+      resolverLayer: ExecutableResolver.layerStatic([
         { executable: assistantRef, agent: Agent.close(assistant, model) },
         { executable: researcherRef, agent: closedTestAgent(researcher) },
-      ]),
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -858,8 +886,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-nonblocking") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-nonblocking") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(`${backend} a tick admits a long-running Run without blocking on it`, (it) => {
       it.effect("admits a long-running Run without blocking on it", () =>
@@ -929,7 +959,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      resolverLayer: ExecutableResolver.layerStatic([
+        { executable: assistantRef, agent: Agent.close(assistant, model) },
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -937,8 +969,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-sweep-interrupt") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-sweep-interrupt") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer)(
       `${backend} the sweep interrupts an executing Run that a durable cancellation marked cancelling`,
@@ -995,7 +1029,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      resolverLayer: ExecutableResolver.layerStatic([
+        { executable: assistantRef, agent: Agent.close(assistant, model) },
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -1003,8 +1039,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded-concurrency") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded-concurrency") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer, { excludeTestServices: true })(
       `${backend} concurrency still bounds simultaneously executing Runs across ticks`,
@@ -1056,7 +1094,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       }),
     )
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      resolverLayer: ExecutableResolver.layerStatic([
+        { executable: assistantRef, agent: Agent.close(assistant, model) },
+      ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -1064,8 +1104,10 @@ for (const backend of ["memory", "sqlite"] as const) {
     }
     const runtimeLayer =
       backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-unbounded-concurrency") })
+        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
+        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-unbounded-concurrency") }).pipe(
+            Layer.provide(options.resolverLayer),
+          )
 
     layer(runtimeLayer, { excludeTestServices: true })(
       `${backend} default concurrency starts every selected Run without a bound`,

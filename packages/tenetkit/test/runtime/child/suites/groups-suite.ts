@@ -3,15 +3,21 @@ import { Effect, Layer, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
 import { ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { ChildRuns, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { assistantAddress, completedResult, parentRelativeOptions, suspension } from "../../execution/fixtures.js"
+import {
+  assistantAddress,
+  completedResult,
+  parentRelativeOptions,
+  resolverLayer,
+  suspension,
+} from "../../execution/fixtures.js"
 import { tempDbPath } from "../../sql/scenario.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 
 import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 const scheduler = { pollInterval: "1 day" as const }
-const memoryGroupLayer = Runtime.layerMemory({ ...parentRelativeOptions, scheduler })
+const memoryGroupLayer = Runtime.layerMemory({ ...parentRelativeOptions, scheduler }).pipe(Layer.provide(resolverLayer))
 const sqliteGroupLayer = (filename: string) =>
-  SqliteRuntime.layerSqlite({ ...parentRelativeOptions, scheduler, filename })
+  SqliteRuntime.layerSqlite({ ...parentRelativeOptions, scheduler, filename }).pipe(Layer.provide(resolverLayer))
 
 const ToolParams = Schema.Record(Schema.String, Schema.Unknown)
 const toolRequest = (name: string, params: typeof ToolParams.Type): ToolExecutor.Request => {

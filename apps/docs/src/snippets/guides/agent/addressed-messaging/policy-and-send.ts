@@ -22,11 +22,10 @@ const messagingPolicy = Messaging.Policy.make({
 
 export const runtimeLayer = (resolver: ExecutableResolver.Service): Layer.Layer<Runtime.Runtime> =>
   Runtime.layerMemory({
-    resolver,
     addresses: [],
     messagingPolicy,
     mailboxBounds: { maxPending: 64, maxPendingBytes: 262_144, maxPerWindow: 16, windowMillis: 60_000 },
-  })
+  }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)))
 
 const text = (value: string) =>
   Prompt.fromMessages([Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: value })] })])
