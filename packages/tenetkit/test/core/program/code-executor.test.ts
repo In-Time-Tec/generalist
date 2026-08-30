@@ -107,6 +107,15 @@ it("persists immutable bounded identity facts without free-form fields", () => {
   const identity = enforcedIdentity()
   const encoded = Schema.encodeSync(CodeExecutor.Identity)(identity)
   expect(Schema.decodeSync(CodeExecutor.Identity, { onExcessProperty: "error" })(encoded)).toEqual(identity)
+  expect(enforcedIdentity({ physicalIsolation: "sidecar-process-v8-isolate" }).physicalIsolation).toBe(
+    "sidecar-process-v8-isolate",
+  )
+  expect(() =>
+    Schema.decodeUnknownSync(CodeExecutor.Identity, { onExcessProperty: "error" })({
+      ...encoded,
+      physicalIsolation: "in-process-v8-wasm",
+    }),
+  ).toThrow()
   expect(Object.isFrozen(identity)).toBe(true)
   expect(Object.isFrozen(identity.limits)).toBe(true)
   expect(Object.isFrozen(identity.knownLimitations)).toBe(true)
@@ -121,6 +130,7 @@ it("persists immutable bounded identity facts without free-form fields", () => {
 it.effect("admits only fresh isolated requests whose exact guarantees are enforced", () =>
   Effect.gen(function* () {
     yield* CodeExecutor.admit(enforcedIdentity(), request(), 1_000)
+    yield* CodeExecutor.admit(enforcedIdentity({ physicalIsolation: "sidecar-process-v8-isolate" }), request(), 1_000)
 
     const trusted = yield* CodeExecutor.admit(CodeExecutor.testIdentity, request(), 1_000).pipe(Effect.flip)
     expect(trusted).toMatchObject({

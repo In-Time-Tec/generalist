@@ -169,7 +169,13 @@ export const Identity = Schema.Struct({
   implementation: Schema.Struct({ name: identityText, version: identityText }),
   runtime: Schema.Struct({ name: identityText, version: identityText }),
   template: Schema.Struct({ name: identityText, version: identityText }),
-  physicalIsolation: Schema.Literals(["worker-isolate", "microvm", "in-process-v8-wasm", "trusted-test", "none"]),
+  physicalIsolation: Schema.Literals([
+    "worker-isolate",
+    "microvm",
+    "sidecar-process-v8-isolate",
+    "trusted-test",
+    "none",
+  ]),
   persistence: Schema.Literals(["fresh-per-execution", "trusted-fixture", "none"]),
   network: Schema.Struct({
     posture: Schema.Literals(["default-deny", "unrestricted", "host", "none"]),

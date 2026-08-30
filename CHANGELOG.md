@@ -16,6 +16,7 @@
 - Add the ESM-only `@tenetkit/rivet/actors` Runtime host over raw `rivetkit@2.3.10`. One actor owns each Runtime partition and its SQLite authority; durable activation rows plus startup and periodic drains make Rivet schedules lossy doorbells, while pinned-engine generation fencing and TenetKit operation recovery prevent stale writes and unknown non-idempotent redispatch.
 - Add bounded SQL lifecycle spans and metrics for transitions, claims, locks, replay, schema identity, subscriber lag, MySQL deadlock retries, and Cloudflare drain/recovery without recording Session content, tool payloads, checkpoints, or SQL parameters.
 - Add fail-closed permission rules, bound tool outcomes before durable interception, and define conformance contracts for sandbox executors and remotely owned REPL kernels, including exact resource, fencing, recovery, and lifecycle requirements.
+- Replace the stale `in-process-v8-wasm` sandbox identity with the honest `sidecar-process-v8-isolate` topology, and record why AgentOS 0.2.15 cannot satisfy typed terminal attribution or bound output before frame decoding and therefore has no TenetKit adapter.
 - Upgrade the Effect package cohort to `4.0.0-rc.112`, pin FoldKit to the tested `0.148.2`, isolate optional provider SDKs, and verify exact package exports through clean minimum-dependency Bun, npm/Node, and workerd consumers.
 
 ## 0.42.0
