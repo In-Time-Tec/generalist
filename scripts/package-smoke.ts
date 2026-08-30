@@ -786,8 +786,8 @@ console.log(Runtime.layerMemory)
   )
   yield* fileSystem.writeFileString(
     path.join(openRouterConsumerDirectory, "proof.ts"),
-    `import { layer, type LayerOptions } from "tenetkit/ai/openrouter"
-const options = null as unknown as LayerOptions
+    `import { layer, type ClientOptions } from "tenetkit/ai/openrouter"
+const options = null as unknown as ClientOptions
 void [layer, options]
 `,
   )
