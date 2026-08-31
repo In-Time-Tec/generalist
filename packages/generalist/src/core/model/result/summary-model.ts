@@ -7,7 +7,7 @@ export const make = (model: Layer.Layer<LanguageModel.LanguageModel>) => {
     Scope.Scope,
     Deferred.Deferred<Fiber.Fiber<Context.Context<LanguageModel.LanguageModel>>>
   >()
-  return <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  return <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, LanguageModel.LanguageModel>> =>
     Effect.contextWith((context: Context.Context<never>) => {
       const memoMap = Context.getOrUndefined(context, Layer.CurrentMemoMap)
       const scope = Context.getOrUndefined(context, Scope.Scope)

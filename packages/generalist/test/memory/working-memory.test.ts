@@ -57,11 +57,15 @@ const summaryModel = Layer.effect(
 
 const widenedSummaryOptions: WorkingMemory.Options = { summarize: {} }
 expectTypeOf(WorkingMemory.layer(widenedSummaryOptions)).toEqualTypeOf<
-  Layer.Layer<Memory.Memory, never, WorkingMemory.SummaryModel>
+  Layer.Layer<Memory.Memory, never, LanguageModel.LanguageModel>
 >()
 expectTypeOf(WorkingMemory.make(widenedSummaryOptions)).toEqualTypeOf<
-  Effect.Effect<Memory.Service, never, WorkingMemory.SummaryModel>
+  Effect.Effect<Memory.Service, never, LanguageModel.LanguageModel>
 >()
+expectTypeOf(WorkingMemory.layer({ summarize: { model: summaryModel } })).toEqualTypeOf<
+  Layer.Layer<Memory.Memory, never, never>
+>()
+expectTypeOf(WorkingMemory.layer({ maxMessages: 2 })).toEqualTypeOf<Layer.Layer<Memory.Memory, never, never>>()
 
 layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
   it.effect("does not recursively remember recalled context while retaining identical authored text", () =>
@@ -193,12 +197,7 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
   )
 })
 
-layer(
-  WorkingMemory.layer({ maxMessages: 2, summarize: {} }).pipe(
-    Layer.provide(WorkingMemory.layerSummaryModel),
-    Layer.provide(summaryModel),
-  ),
-)((it) => {
+layer(WorkingMemory.layer({ maxMessages: 2, summarize: { model: summaryModel } }))((it) => {
   it.effect("keeps repeated Agent runs bounded and excludes recalled context from summary overflow", () =>
     Effect.gen(function* () {
       summaryCalls = 0
@@ -300,9 +299,7 @@ layer(Layer.empty)((it) => {
           Ref.update(releases, (count) => count + 1),
         ),
       )
-      const memoryLayer = WorkingMemory.layer({ maxMessages: 2, summarize: {} }).pipe(
-        Layer.provide(WorkingMemory.layerSummaryModel.pipe(Layer.provide(model))),
-      )
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 2, summarize: {} }).pipe(Layer.provide(model))
 
       yield* Effect.scoped(
         Layer.build(memoryLayer).pipe(
@@ -333,9 +330,7 @@ layer(Layer.empty)((it) => {
         LanguageModel.LanguageModel,
         Effect.acquireRelease(Effect.succeed(service), () => Ref.update(releases, (count) => count + 1)),
       )
-      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
-        Layer.provide(WorkingMemory.layerSummaryModel.pipe(Layer.provide(model))),
-      )
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(Layer.provide(model))
 
       const failure = yield* Effect.flip(
         Effect.scoped(
@@ -355,9 +350,7 @@ layer(Layer.empty)((it) => {
   it.effect("keeps summary model acquisition failures visible at the layer boundary", () =>
     Effect.gen(function* () {
       const model = Layer.effect(LanguageModel.LanguageModel, Effect.fail(modelFailure))
-      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
-        Layer.provide(WorkingMemory.layerSummaryModel.pipe(Layer.provide(model))),
-      )
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(Layer.provide(model))
 
       const failure = yield* Effect.flip(Effect.scoped(Layer.build(memoryLayer)))
 
@@ -377,9 +370,7 @@ layer(Layer.empty)((it) => {
         LanguageModel.LanguageModel,
         Effect.acquireRelease(Effect.succeed(service), () => Ref.update(releases, (count) => count + 1)),
       )
-      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
-        Layer.provide(WorkingMemory.layerSummaryModel.pipe(Layer.provide(model))),
-      )
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(Layer.provide(model))
       const run = Effect.scoped(
         Layer.build(memoryLayer).pipe(
           Effect.flatMap((context) =>
@@ -416,7 +407,6 @@ layer(Layer.empty)((it) => {
         streamText: () => Stream.empty,
       })
       const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
-        Layer.provide(WorkingMemory.layerSummaryModel),
         Layer.provide(Layer.succeed(LanguageModel.LanguageModel, service)),
       )
 
@@ -464,7 +454,6 @@ layer(Layer.empty)((it) => {
         streamText: () => Stream.empty,
       })
       const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
-        Layer.provide(WorkingMemory.layerSummaryModel),
         Layer.provide(Layer.succeed(LanguageModel.LanguageModel, service)),
       )
 
@@ -515,7 +504,6 @@ layer(Layer.empty)((it) => {
         streamText: () => Stream.empty,
       })
       const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
-        Layer.provide(WorkingMemory.layerSummaryModel),
         Layer.provide(Layer.succeed(LanguageModel.LanguageModel, service)),
       )
 

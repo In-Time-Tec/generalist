@@ -46,11 +46,11 @@ expectTypeOf(layerMemory(widenedOptions)).toEqualTypeOf<
   Layer.Layer<
     Memory.Memory,
     never,
-    VectorStore.VectorStore | EmbeddingModel.EmbeddingModel | WorkingMemory.SummaryModel
+    VectorStore.VectorStore | EmbeddingModel.EmbeddingModel | LanguageModel.LanguageModel
   >
 >()
 const memoryLayer: Layer.Layer<Memory.Memory, never, VectorStore.VectorStore | EmbeddingModel.EmbeddingModel> =
-  layerMemory(combinedOptions).pipe(Layer.provide(WorkingMemory.layerSummaryModel), Layer.provide(summaryModel))
+  layerMemory(combinedOptions).pipe(Layer.provide(summaryModel))
 
 layer(memoryLayer.pipe(Layer.provideMerge(VectorStore.layerMemory), Layer.provideMerge(embeddingLayer)))(
   "generalist/memory",

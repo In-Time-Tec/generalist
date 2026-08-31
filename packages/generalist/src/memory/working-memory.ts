@@ -1,10 +1,13 @@
-import { Context, Effect, HashMap, Layer, SynchronizedRef } from "effect"
+import { Effect, HashMap, Layer, SynchronizedRef } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { type Item, type Key, Memory, MemoryError, type Service as MemoryService } from "../core/context/memory.js"
+import { make as makeSummaryModelProvider } from "../core/model/result/summary-model.js"
 
 /** @experimental */
 export interface SummarizeOptions {
   readonly prompt?: string
+  /** Model layer for summary calls; omit to use the model provided where this layer is built. */
+  readonly model?: Layer.Layer<LanguageModel.LanguageModel>
 }
 
 /** @experimental */
@@ -13,16 +16,16 @@ export interface Options {
   readonly summarize?: SummarizeOptions
 }
 
-/** @experimental */
-export class SummaryModel extends Context.Service<SummaryModel, LanguageModel.Service>()(
-  "generalist/memory/working-memory/SummaryModel",
-) {}
-
-/** @experimental */
-export const layerSummaryModel: Layer.Layer<SummaryModel, never, LanguageModel.LanguageModel> = Layer.effect(
-  SummaryModel,
-  LanguageModel.LanguageModel,
-)
+/** @internal The ambient LanguageModel is required only when summarizing without an explicit model layer. */
+export type SummaryRequirement<O> = O extends {
+  readonly summarize: { readonly model: Layer.Layer<LanguageModel.LanguageModel> }
+}
+  ? never
+  : O extends { readonly summarize?: infer S }
+    ? [Extract<S, SummarizeOptions>] extends [never]
+      ? never
+      : LanguageModel.LanguageModel
+    : never
 
 type StoredRole = "user" | "assistant"
 
@@ -138,10 +141,29 @@ const summarizeOverflow = (
       Effect.mapError((error) => memoryError(String(error))),
     )
 
-const resolveSummaryModel = (options: Options): Effect.Effect<LanguageModel.Service | void, never, SummaryModel> =>
-  options.summarize === undefined ? Effect.void : SummaryModel
+type SummarizeCall = (
+  overflow: ReadonlyArray<StoredItem>,
+  summary: string | undefined,
+) => Effect.Effect<string | undefined, MemoryError>
 
-type WithoutSummaryOptions = Options & { readonly summarize?: undefined }
+const resolveSummarize = (
+  options: Options,
+): Effect.Effect<SummarizeCall | undefined, never, LanguageModel.LanguageModel> =>
+  Effect.gen(function* () {
+    if (options.summarize === undefined) return undefined
+    const summarize = options.summarize
+    const work = (overflow: ReadonlyArray<StoredItem>, summary: string | undefined) =>
+      Effect.flatMap(LanguageModel.LanguageModel, (model) =>
+        summarizeOverflow(model, summarize.prompt, summary, overflow),
+      )
+    if (summarize.model !== undefined) {
+      const provideSummaryModel = makeSummaryModelProvider(summarize.model)
+      return (overflow: ReadonlyArray<StoredItem>, summary: string | undefined) => provideSummaryModel(work(overflow, summary))
+    }
+    const ambient = yield* LanguageModel.LanguageModel
+    return (overflow: ReadonlyArray<StoredItem>, summary: string | undefined) =>
+      work(overflow, summary).pipe(Effect.provideService(LanguageModel.LanguageModel, ambient))
+  })
 
 const recallItems = (state: KeyState): ReadonlyArray<Item> => [
   ...(state.summary === undefined
@@ -155,17 +177,9 @@ const recallItems = (state: KeyState): ReadonlyArray<Item> => [
   ...state.recent.map((item) => ({ id: item.id, content: [textPart(formatItem(item))] })),
 ]
 
-/** @experimental */
-export function make(
-  options: Options & { readonly summarize: SummarizeOptions },
-): Effect.Effect<MemoryService, never, SummaryModel>
-/** @experimental */
-export function make(options?: WithoutSummaryOptions): Effect.Effect<MemoryService>
-/** @experimental */
-export function make(options: Options): Effect.Effect<MemoryService, never, SummaryModel>
-export function make(options: Options = {}): Effect.Effect<MemoryService, never, SummaryModel> {
-  return Effect.gen(function* () {
-    const summaryModel = yield* resolveSummaryModel(options)
+const makeImpl = (options: Options): Effect.Effect<MemoryService, never, LanguageModel.LanguageModel> =>
+  Effect.gen(function* () {
+    const summarize = yield* resolveSummarize(options)
     const states = yield* SynchronizedRef.make(HashMap.empty<string, KeyState>())
     const maxMessages = Math.max(0, Math.floor(options.maxMessages ?? 20))
     return {
@@ -194,13 +208,8 @@ export function make(options: Options = {}): Effect.Effect<MemoryService, never,
             const combined = [...existing.recent, ...stored]
             const trimmed = trimToWindow(combined, maxMessages)
             let summary = existing.summary
-            if (trimmed.overflow.length > 0 && summaryModel !== undefined) {
-              summary = yield* summarizeOverflow(
-                summaryModel,
-                options.summarize?.prompt,
-                existing.summary,
-                trimmed.overflow,
-              )
+            if (trimmed.overflow.length > 0 && summarize !== undefined) {
+              summary = yield* summarize(trimmed.overflow, existing.summary)
             }
             const nextState: KeyState =
               summary === undefined ? { recent: trimmed.recent, counter } : { recent: trimmed.recent, counter, summary }
@@ -225,16 +234,19 @@ export function make(options: Options = {}): Effect.Effect<MemoryService, never,
         }),
     }
   })
+
+/** @experimental */
+export function make(): Effect.Effect<MemoryService>
+/** @experimental */
+export function make<O extends Options>(options: O): Effect.Effect<MemoryService, never, SummaryRequirement<O>>
+export function make(options: Options = {}): Effect.Effect<MemoryService, never, LanguageModel.LanguageModel> {
+  return makeImpl(options)
 }
 
 /** @experimental */
-export function layer(
-  options: Options & { readonly summarize: SummarizeOptions },
-): Layer.Layer<Memory, never, SummaryModel>
+export function layer(): Layer.Layer<Memory>
 /** @experimental */
-export function layer(options?: WithoutSummaryOptions): Layer.Layer<Memory>
-/** @experimental */
-export function layer(options: Options): Layer.Layer<Memory, never, SummaryModel>
-export function layer(options: Options = {}): Layer.Layer<Memory, never, SummaryModel> {
-  return Layer.effect(Memory, make(options).pipe(Effect.map(Memory.of)))
+export function layer<O extends Options>(options: O): Layer.Layer<Memory, never, SummaryRequirement<O>>
+export function layer(options: Options = {}): Layer.Layer<Memory, never, LanguageModel.LanguageModel> {
+  return Layer.effect(Memory, makeImpl(options).pipe(Effect.map(Memory.of)))
 }
