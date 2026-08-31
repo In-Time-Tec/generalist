@@ -18,7 +18,12 @@ import {
 } from "../../model/telemetry/events.js"
 import { Permissions, RuleStore } from "../../policy/permissions.js"
 import { restoreCheckpointTelemetry } from "../session/history.js"
-import { ToolAuthorizer, make as makeToolAuthorizer } from "../../tools/tool-authorization.js"
+import {
+  AuthorizationError,
+  type Authorizer,
+  ToolAuthorizer,
+  make as makeToolAuthorizer,
+} from "../../tools/tool-authorization.js"
 import { ToolExecutor } from "../../tools/tool-executor.js"
 import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../../durable/loop-driver-state.js"
 import type { Agent, RunOptions } from "../service.js"
@@ -29,7 +34,7 @@ import { setupChat, setupSession } from "./session.js"
 import { setupPromptContext } from "./resume.js"
 import type { ModelSource } from "../model-turn/model-source.js"
 
-/** @internal Resolve the same configured or default authorization policy for every Agent tool execution surface. */
+/** @internal Resolve the configured authorization policy; absent policy is a typed error, never an implicit allow-all. */
 export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(agent: Agent<T, R, P, A>) =>
   Effect.gen(function* () {
     if (agent.authorization !== undefined) return agent.authorization
@@ -37,13 +42,19 @@ export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>
     if (Option.isSome(configured)) return configured.value
     const permissions = yield* Effect.serviceOption(Permissions)
     const approvals = yield* Effect.serviceOption(Approvals)
+    if (Option.isNone(permissions) || Option.isNone(approvals)) {
+      return yield* AgentError.make({
+        message:
+          `Agent '${agent.name}' has no tool authorization policy: provide Permissions (e.g. Permissions.layerAllowAll) ` +
+          "and Approvals (e.g. Approvals.layerAutoApprove), a ToolAuthorizer layer, or set Agent.authorization",
+        turn: 0,
+      })
+    }
     const ruleStore = yield* Effect.serviceOption(RuleStore)
     const defaultRules = yield* Ref.make<ReadonlyArray<import("../../policy/permissions.js").Rule>>([])
     return makeToolAuthorizer({
-      permissions: Option.getOrElse(permissions, () =>
-        Permissions.of({ evaluate: () => Effect.succeed({ _tag: "Allow" }) }),
-      ),
-      approvals: Option.getOrElse(approvals, () => Approvals.of({ resolve: (pending) => Effect.succeed(pending) })),
+      permissions: permissions.value,
+      approvals: approvals.value,
       ruleStore: Option.getOrElse(ruleStore, () =>
         RuleStore.of({
           rules: Ref.get(defaultRules),
@@ -176,7 +187,16 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
     const memoryService = yield* Effect.serviceOption(Memory)
     const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
-    const authorizer = yield* setupToolAuthorizer(agent)
+    // Tool-less runs never authorize: resolve lazily. Agents exposing tools fail fast at setup.
+    const resolveAuthorizer = yield* Effect.cached(setupToolAuthorizer(agent))
+    const authorizer: Authorizer<R> = {
+      authorize: (request) =>
+        resolveAuthorizer.pipe(
+          Effect.mapError((error) => AuthorizationError.make({ message: error.message, cause: error })),
+          Effect.flatMap((resolved) => resolved.authorize(request)),
+        ),
+    }
+    if (staticCandidates.length > 0 || hasActivatableSkills) yield* resolveAuthorizer
     const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
     const modelSource: ModelSource =
       agent.model === undefined
