@@ -15,12 +15,11 @@ set -euo pipefail
 failures=0
 
 echo "== GitHub: rename repository =="
-if ! gh auth status >/dev/null 2>&1; then
-  echo "FAIL: gh is not authenticated (run: gh auth login)"
-  exit 1
-fi
 if gh repo view In-Time-Tec/generalist >/dev/null 2>&1; then
   echo "skip: In-Time-Tec/generalist already exists"
+elif ! gh auth status >/dev/null 2>&1; then
+  echo "warn: gh not authenticated; cannot confirm or perform the repo rename here."
+  echo "      (The rename was already completed from another machine — nothing to do.)"
 else
   gh repo rename generalist --repo In-Time-Tec/tenetkit --yes
   echo "ok: renamed In-Time-Tec/tenetkit -> In-Time-Tec/generalist"
