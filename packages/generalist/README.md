@@ -7,41 +7,66 @@ Use `generalist` for process-local agents and chat streaming. Add `generalist/ru
 ## Install
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist@0.45.1
-# plus the peer for the provider you select, for example:
-bun add @effect/ai-openrouter@4.0.0-rc.112
+bun add generalist @effect/ai-openai # or the provider you use
 ```
 
-Requires Node 22+ or Bun 1.4+. Everything ships as this single package: names like `generalist/runtime`, `generalist/pg`, or `generalist/ai/openrouter` are import subpaths, not separate packages. Each adapter's host dependencies are optional peers, so you install only what you import.
+`effect` is a peer dependency — install it only if your project does not have it already. Requires `effect@4.0.0-rc.112`, Node 22+ or Bun 1.4+. Everything ships as this single package: names like `generalist/runtime`, `generalist/pg`, or `generalist/ai/openai` are import subpaths, not separate packages. Each adapter's host dependencies are optional peers, so you install only what you import.
 
 ## Example
 
 ```ts
-import { Effect, Layer, Schema } from "effect"
-import { Agent, ModelRegistry, Tool, Toolkit } from "generalist"
-import { layer as deterministicLayer } from "generalist/ai/deterministic"
+import { Config, Effect, Layer, Schema } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
+import { Agent, Compaction, ModelRegistry, Tool, Toolkit } from "generalist"
+import { layer as openai } from "generalist/ai/openai"
+import { WorkingMemory } from "generalist/memory"
 
-const searchTool = Tool.make("search_docs", {
-  description: "Search local docs",
-  parameters: { query: Schema.String },
+const searchDocs = Tool.make("search_docs", {
+  description: "Search the product docs",
+  parameters: Schema.Struct({ query: Schema.String }),
   success: Schema.Array(Schema.String),
 })
+const toolkit = Toolkit.make(searchDocs)
 
-const toolkit = Toolkit.make(searchTool)
-const agent = Agent.make({ name: "assistant", instructions: "Be concise.", toolkit })
+const support = Agent.make({
+  name: "support",
+  instructions: "Answer from the docs. Be brief.",
+  toolkit,
+})
 
 const program = ModelRegistry.withModel(
-  { provider: "deterministic", model: "local" },
-  Agent.generate(agent, { prompt: "Explain Generalist in one sentence." }),
-).pipe(
+  { provider: "openai", model: "gpt-5.6-sol" }, // any OpenAI model id
+  Agent.generate(support, {
+    prompt: "How do I rotate my API key?",
+    memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
+    compaction: { contextWindow: 200_000 }, // old turns compress, never drop
+  }),
+)
+
+await program.pipe(
   Effect.provide(
     Layer.mergeAll(
-      deterministicLayer({ model: "local" }),
-      toolkit.toLayer({ search_docs: () => Effect.succeed(["Getting started"]) }),
+      openai({ model: "gpt-5.6-sol", apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(
+        Layer.provide(FetchHttpClient.layer),
+      ),
+      toolkit.toLayer({ search_docs: () => Effect.succeed(["Settings → API keys → Rotate"]) }),
+      WorkingMemory.layer({ maxMessages: 50 }),
+      Compaction.layer({
+        contextWindow: 200_000,
+        reserveTokens: 16_384,
+        strategy: Compaction.strategy([
+          Compaction.toolOutputBound({ maxBytes: 16_384 }),
+          Compaction.structuredSummary({ objectName: "AgentSummary" }),
+          Compaction.keepRecent({ tokens: 20_000 }),
+        ]),
+      }),
     ),
   ),
+  Effect.runPromise,
 )
 ```
+
+Tools, per-user memory, and compaction — all layers you can swap for tests. Durable runs (`generalist/runtime`) add stop, inspect, and resume across restarts; any agent can also be exposed as a tool another agent calls.
 
 ## Documentation
 

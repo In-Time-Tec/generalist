@@ -3,43 +3,89 @@
 Generalist is a TypeScript framework for building AI agents on [Effect](https://effect.website). An agent is a plain value — a name, instructions, tools, and a turn policy — and running one produces a typed event stream. Models, approvals, permissions, memory, skills, and every other capability are Effect services you can swap, each with a deterministic test layer, so agents run in CI with no API keys.
 
 ```ts
-import { Effect, Layer, Schema } from "effect"
-import { Agent, ModelRegistry, Tool, Toolkit } from "generalist"
-import { layer as deterministicLayer } from "generalist/ai/deterministic"
+import { Config, Effect, Layer, Schema } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
+import { Agent, Compaction, ModelRegistry, Tool, Toolkit } from "generalist"
+import { layer as openai } from "generalist/ai/openai"
+import { WorkingMemory } from "generalist/memory"
 
-const searchTool = Tool.make("search_docs", {
-  description: "Search local docs",
-  parameters: { query: Schema.String },
+const searchDocs = Tool.make("search_docs", {
+  description: "Search the product docs",
+  parameters: Schema.Struct({ query: Schema.String }),
   success: Schema.Array(Schema.String),
 })
+const toolkit = Toolkit.make(searchDocs)
 
-const toolkit = Toolkit.make(searchTool)
-const agent = Agent.make({ name: "assistant", instructions: "Be concise.", toolkit })
+const support = Agent.make({
+  name: "support",
+  instructions: "Answer from the docs. Be brief.",
+  toolkit,
+})
 
 const program = ModelRegistry.withModel(
-  { provider: "deterministic", model: "local" },
-  Agent.generate(agent, { prompt: "Explain Generalist in one sentence." }),
-).pipe(
+  { provider: "openai", model: "gpt-5.6-sol" }, // any OpenAI model id
+  Agent.generate(support, {
+    prompt: "How do I rotate my API key?",
+    memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
+    compaction: { contextWindow: 200_000 }, // old turns compress, never drop
+  }),
+)
+
+await program.pipe(
   Effect.provide(
     Layer.mergeAll(
-      deterministicLayer({ model: "local" }),
-      toolkit.toLayer({ search_docs: () => Effect.succeed(["Getting started"]) }),
+      openai({ model: "gpt-5.6-sol", apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(
+        Layer.provide(FetchHttpClient.layer),
+      ),
+      toolkit.toLayer({ search_docs: () => Effect.succeed(["Settings → API keys → Rotate"]) }),
+      WorkingMemory.layer({ maxMessages: 50 }),
+      Compaction.layer({
+        contextWindow: 200_000,
+        reserveTokens: 16_384,
+        strategy: Compaction.strategy([
+          Compaction.toolOutputBound({ maxBytes: 16_384 }),
+          Compaction.structuredSummary({ objectName: "AgentSummary" }),
+          Compaction.keepRecent({ tokens: 20_000 }),
+        ]),
+      }),
     ),
   ),
+  Effect.runPromise,
 )
 ```
 
-Use `generalist` for process-local agents and chat streaming. Add `generalist/runtime` when runs need stable addresses, replayable events, durable waits, cancellation, or restart recovery.
+One agent, typed tools, per-user memory, and compaction against the context window — all layers you can swap for tests. Need [Anthropic](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [OpenRouter](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [Bedrock](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), or a deterministic model? Swap the provider layer.
+
+The same agent runs durably. Pin it once (the [durable runtime guide](https://generalist-docs-production.up.railway.app/docs/guides/runtime/serve-transport) shows how), then runs survive restarts, and you can stop, inspect, and resume them from any process:
+
+```ts
+import { Effect } from "effect"
+import { Runtime } from "generalist/runtime"
+
+const program = Effect.gen(function* () {
+  const runtime = yield* Runtime.Runtime
+  const receipt = yield* runtime.start({
+    executable,
+    registrations,
+    sessionId: "user:42",
+    idempotencyKey: "q:1",
+    prompt: "…",
+  })
+  yield* runtime.cancel({ runId: receipt.runId }) // stop
+  yield* runtime.inspect(receipt.runId) // authoritative status + journal cursor
+  yield* runtime.respond({ runId: receipt.runId, waitId, resolution: { _tag: "Approved" } }) // approve a suspended run
+})
+```
+
+Agents also compose: any agent can be exposed as a tool another agent calls, or coordinated by a supervisor. See the [multi-agent guide](https://generalist-docs-production.up.railway.app/docs/guides/agent/multi-agent).
 
 ## Install
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist@0.45.1
-# plus the peer for the provider you select, for example:
-bun add @effect/ai-openrouter@4.0.0-rc.112
+bun add generalist @effect/ai-openai # or the provider you use
 ```
 
-Requires Node 22+ or Bun 1.4+. Everything ships as the single `generalist` package: names like `generalist/runtime` or `generalist/pg` are import subpaths, not separate packages, and each adapter's host dependencies are optional peers, so you install only what you import. Every export is `@experimental` while `effect/unstable/ai` is unstable.
+`effect` is a peer dependency — install it only if your project does not have it already. Requires `effect@4.0.0-rc.112`, Node 22+ or Bun 1.4+. Everything ships as the single `generalist` package: names like `generalist/runtime` or `generalist/pg` are import subpaths, not separate packages, and each adapter's host dependencies are optional peers, so you install only what you import. Every export is `@experimental` while `effect/unstable/ai` is unstable.
 
 ## Documentation
 
