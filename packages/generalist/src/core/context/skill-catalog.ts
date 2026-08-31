@@ -21,8 +21,6 @@ export interface Skill {
   readonly disableModelInvocation?: boolean
   readonly userInvocable?: boolean
   readonly contextFork?: boolean
-  readonly agent?: string
-  readonly model?: string
   readonly paths?: ReadonlyArray<string>
   readonly instructions: Effect.Effect<string, SkillCatalogError>
   readonly tools: ReadonlyArray<Tool.Any>

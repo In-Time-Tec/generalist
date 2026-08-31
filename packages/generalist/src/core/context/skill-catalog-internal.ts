@@ -12,8 +12,6 @@ export const Frontmatter = Schema.Struct({
   disableModelInvocation: Schema.optionalKey(Schema.Boolean),
   userInvocable: Schema.optionalKey(Schema.Boolean),
   contextFork: Schema.optionalKey(Schema.Boolean),
-  agent: Schema.optionalKey(Schema.String),
-  model: Schema.optionalKey(Schema.String),
   paths: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 

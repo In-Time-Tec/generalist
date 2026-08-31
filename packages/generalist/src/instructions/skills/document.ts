@@ -15,8 +15,6 @@ interface ParsedHeader {
   disableModelInvocation?: boolean
   userInvocable?: boolean
   contextFork?: boolean
-  agent?: string
-  model?: string
   paths?: ReadonlyArray<string>
 }
 
@@ -68,12 +66,6 @@ const setStringValue = (target: Partial<ParsedHeader>, key: string, value: strin
       break
     case "allowedtools":
       target.allowedTools = value.split(/\s+/).filter((item) => item.length > 0)
-      break
-    case "agent":
-      target.agent = value
-      break
-    case "model":
-      target.model = value
       break
   }
 }

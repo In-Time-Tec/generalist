@@ -79,8 +79,6 @@ allowed-tools: read grep
 disableModelInvocation: false
 userInvocable: true
 contextFork: true
-agent: reviewer
-model: fast
 paths: ["packages/core/**", "docs/features/**"]
 ---
 # Review body
@@ -103,8 +101,6 @@ Use the checklist.
         disableModelInvocation: false,
         userInvocable: true,
         contextFork: true,
-        agent: "reviewer",
-        model: "fast",
         paths: ["packages/core/**", "docs/features/**"],
       })
       expect(reads.streamed[path]).toBe(1)
