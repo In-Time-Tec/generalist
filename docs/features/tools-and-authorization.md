@@ -1,16 +1,109 @@
 # Tools and authorization
 
-Effect AI tools and toolkits own parameter, success, and declared-failure schemas. Generalist adds execution placement, progress, output spill, and one authorization path without adding another tool format.
+Effect AI `Tool` and `Toolkit` values remain the schema and handler authority. Generalist adds one registry, authorization pass, execution-placement seam, durable cancellation, progress context, and bounded output.
 
-- An immutable per-turn registry owns advertisement, lookup, authorization, and dispatch. Name collisions fail before model or tool work.
-- `Agent.streamToolCalls` admits one non-empty, authored-order batch already completed by an external model loop without invoking a `LanguageModel`. Fresh admission requires the exact active static-tool snapshot, Session and logical-operation identities, turn, immutable authorization messages, and optional budget, invocation, and executable identity. Recovery accepts only the persisted driver checkpoint, matching executable identity, the same authorization-message digest, and an exact suspension resolution when a wait is being resolved. The checkpoint remains the authority for calls, indexes, keys, active tools, turn, and remaining budget. Hosts cannot supply a scheduler, authorizer, executor, toolkit, call index, or provider-specific payload through this boundary.
-- Authorization is one linear pass: active-tool membership, `Permissions.evaluate` with remembered `RuleStore` rules overlaid using last-match semantics, then one `Approvals.resolve(Pending)` for either `Ask` or `needsApproval`. `Approved` executes and remembers only an explicit `remember` rule; `Denied` fails; `Pending` suspends once. `ApprovalRequested` carries the canonical `{ approvalId, operation, capability, input }` request before resolution; the approval ID is the exact permission-ask token or deterministic `approval:<tool-call-id>` identity and cannot be replaced by an approval adapter. `Permissions.layerFailClosed(rules)` is the production posture: unmatched tools ask for approval. `Permissions.layerRuleset` also defaults unmatched tools to `ask` unless its `fallback` says otherwise. `Permissions.layerAllowAll` is the explicit trusted-job, development, and test posture. When no `Approvals` layer is installed, the default resolver returns `Pending` (fail closed); trusted jobs and tests opt in explicitly with `Approvals.layerAutoApprove`.
-- Approval suspension is a coordination mechanism, not the host's business authorization record. The host application owns durable approval records and domain policy; it must not encode that policy into Generalist suspension or Runtime state.
-- `ToolContext` supplies the run session id, scoped abort signal, progress emission, and one stable `operationKey` / `idempotencyKey` for an Agent tool operation. Recovery re-entry receives the same keys.
-- Tool and authorization producers belong to the Agent stream scope. Stream interruption requests their interruption and waits for their actual exit, including supervised children and finalizers; no teardown timeout abandons owned work. The abort signal remains cooperative and does not prove that an external side effect stopped. `ToolContext.emit` returns whether the progress update was accepted; a blocked offer released by cancellation and any later offer return `false`.
-- Successful tool output is limited to 50 KiB by default at the common post-codec outcome boundary, before durable interception. Oversized output retains a bounded preview, byte count, and SHA-256 digest; `Store` may retain the full value behind immutable paths. The durable operation, replay value, completion event, Session result, terminal fallback, and provider prompt preserve that same bounded outcome. A committed replay does not execute the tool or spill the output again. Without a store, only the bounded value enters model context and durable operations. The tool span reports byte limit, truncation, spill outcome, digest, and path count without recording raw output.
-- `activate_skill` follows the same output bound. Live execution, durable replay, and Session resume rebuild its run-local registry from the original successful call; a bounded activation result may reload the body from `SkillCatalog` instead of persisting an unbounded exception.
-- `ToolExecutor.replayPolicy?(request)` synchronously selects `never` or `provider-idempotent` for the concrete request before durable scheduling; omission means `never`. A provider-idempotent executor must deduplicate or reattach by the stable context key. Router policy and execution use the same first matching route. Only an idempotent remote route opts in automatically; local toolkit, client, MCP, sandbox, child, code-mode, skill-activation, and handoff paths remain `never`.
-- `ToolExecutor.cancel?(request)` opts one concrete executor into durable semantic cancellation. A direct executor may narrow admission with `cancellable?(request)`; a router admits cancellation only when its first matching execute route also defines `cancel`. The cancellation request carries the persisted execute request plus stable operation key, attempt, Session, Run, root Run, tool-call, and tool-name identity. The callback must be idempotent for that identity and return `Cancelled` or `AlreadyTerminal` with the terminal success/domain-failure outcome. Failure or interruption is not an acknowledgement and Runtime redelivers the same request after reclaim. Generic Effect interruption, host shutdown, and lease loss never call this capability.
-- Placement retries apply only to expected infrastructure failures. Domain failures are not retried. An idempotent remote route also marks its durable Agent operation `provider-idempotent`; non-idempotent remote routes remain `never`.
-- Calls are submitted as one authored-order batch. Tools not named in `Agent.toolScheduling.parallelSafe` are exclusive barriers; adjacent parallel-safe calls share the configured positive `maxConcurrency` bound. A one-call batch is the singular form.
+## Usage
+
+```ts
+import { Effect, Layer, Schema } from "effect"
+import { Agent, Approvals, Permissions, Tool, Toolkit } from "generalist"
+const search = Tool.make("search_docs", {
+  description: "Search documentation",
+  parameters: Schema.Struct({ query: Schema.String }),
+  success: Schema.Array(Schema.String),
+  failure: Schema.String,
+  failureMode: "return",
+  needsApproval: true,
+})
+const toolkit = Toolkit.make(search)
+const handlers = toolkit.toLayer({
+  search_docs: ({ query }) => Effect.succeed([`Result for ${query}`]),
+})
+const agent = Agent.make({ name: "docs", toolkit })
+const policy = Layer.mergeAll(
+  Permissions.layerFailClosed([{ pattern: "search_docs:*", level: "ask" }]),
+  Permissions.layerRuleStoreMemory(),
+  Approvals.layerAutoApprove,
+)
+const runnable = agent.run({ prompt: "Find authorization docs" }).pipe(Effect.provide(Layer.merge(handlers, policy)))
+```
+
+## What runs
+
+```text
+agent.run({ prompt: "Find authorization docs" })
+├── assemble registry: "search_docs" -> Tool + handler
+├── LanguageModel generates ToolCall
+│   └── { id: "call-1", name: "search_docs",
+│        params: { query: "authorization" } }
+├── ToolAuthorizer.authorize()
+│   ├── active-registry membership
+│   ├── Permissions.evaluate() -> Ask
+│   └── Approvals.resolve(Pending) -> Approved
+├── toolkit handler -> ["Result for authorization"]
+├── ToolOutput.bound(maxBytes: 51200) -> Success
+└── LanguageModel receives schema-valid tool result
+```
+
+## Execution routes and recovery
+
+```text
+ToolExecutor.layerRouter([routeA, routeB])
+└── firstMatchingRoute(request)
+    ├── replayPolicy(request) -> "never" | "provider-idempotent"
+    ├── execute(request) -> Success | DomainFailure | Suspend
+    └── cancel(CancellationRequest) -> Cancelled | AlreadyTerminal
+Placement helpers
+├── client()   user, browser, or desktop
+├── remote()   worker or service
+├── mcp()      MCP adapter
+└── sandbox()  workspace or sandbox runtime
+```
+
+Only an idempotent `remote` placement helper opts in automatically to bounded infrastructure retries and `provider-idempotent` replay. It requires a stable non-empty operation key, non-negative finite integer `maxRetries`, a schedule, and endpoint deduplication or reattachment; domain failures are never retried.
+
+## Failure paths
+
+```text
+tool call
+├── declared handler failure -> DomainFailure -> model
+├── decode/handler/route/placement/authorization fault
+│   └── FrameworkFailure (typed Effect error channel)
+├── permission Deny / approval Denied -> PermissionDenied
+└── approval Pending -> Suspend(token) -> durable wait
+```
+
+Successful output is JSON-sized at the common post-codec boundary before durable interception. Over 50 KiB by default becomes `{ inline: { truncated, bytes, maxBytes, digest, preview }, outputPaths }`; an optional `ToolOutput.Store.put` preserves the full value at immutable paths.
+
+## Invariants
+
+- The immutable per-turn registry owns advertisement, lookup, authorization, and dispatch; duplicate names fail before model or tool work.
+- `Agent.streamToolCalls` admits one non-empty authored-order batch from an external model loop and never invokes a `LanguageModel`.
+- Fresh admission requires the exact active static-tool snapshot, Session and logical-operation identities, turn, immutable authorization messages, and optional budget, invocation, and executable identity.
+- Recovery accepts only the persisted driver checkpoint, matching executable identity and authorization-message digest, plus an exact suspension resolution when resolving a wait.
+- The checkpoint is authoritative for calls, indexes, keys, active tools, turn, and remaining budget; hosts cannot inject a scheduler, authorizer, executor, toolkit, call index, or provider payload at recovery.
+- Authorization checks active membership, evaluates base permissions with remembered `RuleStore` rules as a last-match overlay, then calls `Approvals.resolve(Pending)` once for `Ask` or `needsApproval`.
+- `Approved` executes and remembers only an explicit `remember` rule; `Denied` fails; `Pending` suspends once.
+- `ApprovalRequested` contains canonical `{ approvalId, operation, capability, input }`; its ID is the permission token or `approval:<tool-call-id>`, never an adapter replacement.
+- `Permissions.layerFailClosed` asks on unmatched calls; `layerRuleset` also defaults to `ask` unless `fallback` says otherwise; `layerAllowAll` is the explicit trusted-job, development, or test posture.
+- Without an `Approvals` layer, Agent leaves approval pending; trusted jobs and tests can install `Approvals.layerAutoApprove`.
+- Approval suspension coordinates execution, not business authorization; hosts own durable approval records and domain policy outside Generalist suspension and Runtime state.
+- `ToolContext` carries Session/run identities, scoped `AbortSignal`, progress emission, attempt metadata, and stable `operationKey`/`idempotencyKey`; provider-idempotent recovery reuses the keys.
+- `ToolExecutor.replayPolicy` is synchronous and defaults to `never`; routing policy, execution, and cancellation use the same first matching route.
+- Local toolkit, client, MCP, sandbox, child, code-mode, skill-activation, handoff, and non-idempotent remote paths remain `never` unless their exact executor route selects otherwise.
+- Direct cancellation requires `cancel` and may be narrowed by `cancellable`; router cancellation requires `cancel` on the first execution route.
+- `CancellationRequest` preserves execution plus operation key, attempt, Session, Run, root Run, tool-call, and tool-name identities; cancellation callbacks must be idempotent for that identity.
+- Cancellation acknowledges only `Cancelled` or `AlreadyTerminal` with terminal success/domain failure; failure or interruption is redelivered after reclaim.
+- Generic Effect interruption, host shutdown, and lease loss never invoke semantic cancellation; an abort signal is cooperative and does not prove an external side effect stopped.
+- The bounded outcome is identical in durable operation, replay, completion event, Session result, terminal fallback, and provider prompt; committed replay neither executes nor spills again.
+- Without a `ToolOutput.Store`, only the bounded preview enters model context and durable state; spans record limits, truncation, spill status, digest, and path count, never raw output.
+- `activate_skill` uses the same bound; live execution, replay, and resume rebuild its run-local registry from the original success, and may reload a bounded body from `SkillCatalog`.
+- Tool and authorization producers belong to the Agent stream scope; interruption requests producer interruption and waits for children, finalizers, and actual exit without an abandoning teardown timeout.
+- `ToolContext.emit` returns whether progress was accepted; cancellation releases a blocked offer with `false`, and later offers remain `false`.
+- Calls form one authored-order batch; absent `parallelSafe` calls are exclusive barriers, adjacent safe calls use positive `maxConcurrency`, and one call is the singular form.
+
+## Related
+
+- Source: `packages/generalist/src/core/tools/`, `packages/generalist/src/core/policy/permissions.ts`, `packages/generalist/src/core/policy/approvals.ts`
+- Site: `/docs/guides/define-tools`, `/docs/guides/permissions`, `/docs/guides/approvals`, `/docs/guides/durable-composite-tools`, `/docs/reference/core-tools`
+- Decisions/tradeoffs: [Typed tool boundaries](../decisions/typed-tool-boundaries.md), [Strict tool registry](../tradeoffs/strict-tool-registry.md)

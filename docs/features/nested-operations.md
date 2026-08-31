@@ -1,18 +1,80 @@
-# Nested durable operations
+# Nested operations
 
-A nested operation is one durable operation that runs inside another. A composite tool call — a cell, an agent program step — crosses many authoritative boundaries, and each crossing is journaled under the outer operation's identity before the handler runs. `generalist` owns the contract and the process-local implementation; `generalist/runtime` owns the durable one.
+`NestedOperation.run` turns one boundary crossing inside a composite tool into a host-ordered operation. A durable host journals and replays it; `layerDirect` keeps the same ordering process-locally.
 
-- `NestedOperation.run(request, effect)` executes one crossing. A `Request` carries `kind`, `payload`, a `replayPolicy`, an optional `approval`, and an optional `render`.
-- Identity is derived, never supplied. The ambient `ToolContext` names the outer operation through `operationKey`, and the host assigns the ordinal, so tool or cell code cannot forge, reorder, or collide with another call's journal. The persisted key is `<operationKey>#<ordinal>`.
-- The operation is recorded as `running` before the handler crosses its boundary, so a crash mid-boundary still leaves a record that the side effect was attempted.
-- A duplicate identity returns the recorded outcome instead of repeating the effect. A reused identity carrying different content fails `NestedOperation.Divergence` with both the recorded and requested kind and digest. A crossing whose outcome was never observed under `replayPolicy: "never"` settles `unknown` and fails `NestedOperation.Unknown` for explicit resolution rather than silently repeating.
-- `approval` routes the crossing through the ambient `Approvals` service before it runs. `Denied` fails `NestedOperation.Denied` and records a failed operation; `Pending` fails `NestedOperation.Suspended`, which `NestedOperation.catchSuspension` translates into the tool executor's `Suspend` outcome. A durable host opens the matching wait through `waitFor`. Without an `Approvals` service the crossing auto-approves.
-- `NestedOperation.layerDirect` is the process-local implementation for hosts with no durable storage: identity, duplicate return, and divergence hold for the life of the run, and approvals auto-approve because a process-local host owns no resolution seam.
+## Usage
 
-## Render
+```ts
+import { Effect, Schema } from "effect"
+import { NestedOperation } from "generalist"
 
-`Render` is a host-side projection of one nested operation's own outcome, for a host that draws more than a status line. It is the closed union of `Artifact` (path, mime type, byte size, optional width and height) and `Diff` (path, patch).
+interface Written {
+  readonly path: string
+  readonly patch: string
+}
 
-The value is produced by the handler's `render` function from the operation's **real result**, never read from the request payload. A cell that plants a `render` field — or a whole `nestedOperation` object — in its input does not dictate what the host displays.
+declare const writeToDisk: (path: string, text: string) => Effect.Effect<Written>
 
-One `ToolContext.Progress` record is emitted per status transition under the `nestedOperation` data key, carrying `kind`, `ordinal`, `status`, and the projection. `running` never carries a projection because there is no outcome yet, and a failed operation carries none either. A projection larger than `NestedOperation.maxRenderBytes` (64 KiB) is withheld whole and reported as `renderWithheldBytes` while the operation still succeeds: a partial diff or a truncated artifact descriptor would render as a smaller correct change rather than as a missing one.
+const applyPatch = (path: string, text: string) =>
+  NestedOperation.run(
+    {
+      kind: "replace",
+      payload: { path },
+      replayPolicy: "never",
+      success: Schema.Struct({ path: Schema.String, patch: Schema.String }),
+      approval: { capability: "workspace-write" },
+      render: (value: Written) => ({ _tag: "Diff", path: value.path, patch: value.patch }) as const,
+    },
+    writeToDisk(path, text),
+  )
+```
+
+## What runs
+
+```text
+applyPatch("/w/a.ts", "next")
+└─ NestedOperation.run(kind="replace", ordinal=0)
+   ├─ journal "tool:edit#0"
+   ├─ Approvals.resolve("workspace-write")
+   ├─ mark status=running
+   ├─ writeToDisk("/w/a.ts", "next")
+   ├─ persist status=succeeded and encoded Written
+   └─ emit nestedOperation { ordinal: 0, status: "succeeded",
+      render: { _tag: "Diff", path: "/w/a.ts", patch: "..." } }
+```
+
+On a retry, a fresh run-attempt executor assigns ordinal `0` again. Matching journaled content returns the decoded `Written` without calling `writeToDisk`.
+
+## Failure paths
+
+```text
+matching "tool:edit#0" ──> replay recorded outcome
+different kind/payload ──> NestedOperation.Divergence
+denied approval ─────────> record failed; NestedOperation.Denied
+pending approval ────────> NestedOperation.Suspended ──> host wait
+unobserved + "never" ───> status=unknown ──> NestedOperation.Unknown
+```
+
+`NestedOperation.catchSuspension` converts only `Suspended` into the tool executor's `{ _tag: "Suspend", token }` outcome. Without an `Approvals` service, the durable host auto-approves.
+
+## Invariants
+
+- Callers provide `kind`, payload, replay policy, optional result codecs, approval, and render declarations; they never provide identity or ordinal.
+- `ToolContext.operationKey` identifies the outer operation; hosts assign independent ordinal sequences per outer operation.
+- The persisted identity is `<operationKey>#<ordinal>`; host assignment prevents forging, reordering, and collisions.
+- The durable record is `running` before the handler crosses the boundary, preserving evidence that a side effect was attempted.
+- Canonical `kind` plus payload digest determines a replay match; object key order does not change that digest.
+- Replaying a recorded success or failure requires its matching `success` or `failure` codec; an absent or invalid codec produces `Unknown` rather than an unsafe value.
+- A duplicate identity with different content fails with `Divergence`, including recorded and requested kinds and digests.
+- An unobserved `replayPolicy: "never"` outcome settles as `unknown`; replay does not repeat the effect.
+- A denial never runs the handler and is persisted as failure; pending approval suspends, and `waitFor` opens the matching approval wait.
+- `layerDirect` auto-approves and keeps ordinals, encoded duplicate outcomes, and divergence checks only for the Layer's lifetime.
+- `Render` is either `Artifact` (path, MIME type, byte size, optional dimensions) or `Diff` (path and patch).
+- Render comes only from the handler's real success; payload fields named `render` or `nestedOperation` cannot control it, and render does not affect identity.
+- Durable hosts emit `ToolContext.Progress` under `nestedOperation` for status transitions; only successful progress may contain render.
+- Render over `maxRenderBytes` (64 KiB) is withheld whole as `renderWithheldBytes`; the operation still succeeds.
+
+## Related
+
+- Source: `packages/generalist/src/core/tools/nested-operation.ts`, `packages/generalist/src/runtime/operation/nested-operations.ts`
+- Site: `/docs/guides/durable-composite-tools`

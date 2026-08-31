@@ -1,23 +1,94 @@
-# Agent Programs
+# Agent programs
 
-An Agent Program is exact JavaScript source with a pinned sandbox, pinned input and output schemas, an allowlisted tool, named-step, and exact-Agent capability closure, and explicit resource budgets. Source bytes, sandbox identity, schema identities, capability identities, budgets, and every reachable Agent are covered by the one current version-2 Program manifest and executable pin. Program operation and fan-out member keys are bounded nonblank identifiers without path or punctuation ambiguity.
+An Agent Program pins model-authored JavaScript to exact schemas, sandbox identity, capabilities, and budgets. `AgentProgram.run` crosses only encoded boundaries; `ProgramRunner` owns admission and host policy.
 
-`AgentProgram.run` schema-encodes input, delegates encoded execution to `ProgramRunner`, and schema-decodes the encoded result. `ProgramRunner.layerDirect({ executor, handlers })` is the process-local path. It rejects handlers outside the manifest closure and missing or mismatched pins, schema-decodes and encodes every tool, step, and Agent boundary, runs host-owned authorization, and enforces tool-call, Agent-run, concurrency, token, log-byte, wall-clock, and output-byte budgets. Tool and step handler failures retain their causes; unknown capabilities, authorization denial, schema failure, replay divergence, suspension, cancellation, and budget exhaustion remain distinct typed failures.
+## Usage
 
-`ProgramHandlers` owns live tool and named-step codecs and handlers plus exact Agent executors whose pinned input codecs decode directly to Generalist prompt input. Handlers also own replay policy and authorization; program source cannot select either. Agent executors report text, turns, and input/output token usage. Map and fan-out members are canonicalized by member key, returned in that order, and run through bounded structured concurrency.
+Given host-owned `toolPin`, `budget`, `executor`, and matching `handlers`:
 
-Program effects cross only encoded `ProgramCapabilities`: manifest-scoped tool discovery and focused schema description, `callTool`, `callStep`, `runAgent`, `mapAgents`, `fanOutAgents`, and `log`. The sandbox request contains source, source digest, encoded input, explicit limits, and an interruption signal. It contains no credentials, stores, Runtime services, Layers, handlers, Agent values, or ambient host objects. Encoded results cross the runner seam before direct schema decoding or durable persistence.
+```ts
+const program = AgentProgram.make({
+  name: "increment-program",
+  source: `export default (input, capabilities) => capabilities.call("callTool",
+    { operation: "add", tool: "increment", input: input.value })`,
+  sandbox: Pins.makeCapability({ sandbox: "worker-loader-v1" }),
+  input: Schema.Struct({ value: Schema.Finite }),
+  inputPin: Pins.makeCapability({ codec: "input-v1" }),
+  output: Schema.Finite,
+  outputPin: Pins.makeCapability({ codec: "number-v1" }),
+  tools: [{ name: "increment", pin: toolPin }],
+  agents: [],
+  steps: [],
+  budget,
+})
+const layer = ProgramRunner.layerDirect({ executor, handlers })
+const result = AgentProgram.run(program, { value: 41 }).pipe(Effect.provide(layer))
+```
 
-Generalist does not ship a production JavaScript sandbox. A `CodeExecutor` publishes one schema-backed immutable identity: provider; implementation, runtime, and template versions; physical isolation boundary; fresh-per-execution persistence; network posture and enforcement; exact enforced deadline, CPU, subrequest, output, filesystem, and process limits; and bounded known limitations. The identity is persistable and contains no credentials or mutable provider IDs. Before source evaluation, executor admission rejects trusted or non-fresh execution, non-default-deny network posture, every unenforced requested guarantee, and limits above a declared maximum. The executor evaluates only the normalized request; `ProgramRunner` remains the sole authority for manifest, capability, codec, and budget closure. Result decoding binds protocol, request, source digest, and both codec identities exactly.
+`executor` is a production `CodeExecutor`; Generalist's shipped implementation is Cloudflare Worker Loader at `generalist/cloudflare/dynamic-workers`. Test-only examples may use `CodeExecutor.makeTest`.
 
-The `sidecar-process-v8-isolate` physical-isolation identity means that a native child-process sidecar owns the V8 isolate. It does not claim in-process execution, Wasm isolation, a container, or a microVM.
+## What runs
 
-`CodeExecutor.makeTest` and `CodeExecutor.layerTest` remain explicitly trusted fixtures. Their identity declares inherited host network, filesystem, process, and persistence behavior as unenforced, so they cannot pass production admission or the exported `generalist/test` provider conformance suite. That suite proves protocol semantics and isolation behavior observable through the executor boundary; it cannot prove a vendor's isolate, microVM, or hypervisor implementation. Provider adapters must document fixture, local-runtime, and credentialed external evidence separately and must not present local fixtures as physical-isolation proof.
+```text
+AgentProgram.run(program, { value: 41 })
+├── input codec encode -> { value: 41 }
+└── ProgramRunner.execute()
+    ├── verify Program pin and exact handler closure
+    ├── build grants and budget counters
+    └── CodeExecutor.execute(request)
+        └── isolated program.js
+            └── callTool({ operation: "add", input: 41 })
+                ├── decode -> authorize -> execute(41)
+                └── encode -> 42
+        └── result envelope -> 42
+    ├── validate output-byte budget
+    └── output codec decode -> 42
+```
 
-An Agent manifest may carry `ProgramAuthority`: one sandbox pin, input and output codec pins, maximum source bytes, bounded allowlisted tool, named-step, and exact-Agent selection catalogs, and maximum Program budgets. Runtime then constructs the Effect AI `code_mode` tool for only that hosted Agent. Its model-visible schema exposes the exact canonical selection IDs and budget maxima from that authority rather than open strings or ambient registrations. Each call must choose a subset of the authority and budgets no greater than its maxima. Authority selection failures identify the requested catalog dimension and selection and return the complete bounded allowed-ID catalog. Runtime constructs and validates the exact Program manifest, derives a stable child Run ID from the parent Run and tool-call ID, filters the parent's immutable registrations to the exact child closure, and admits the Program child internally. `Runtime` exposes no general dynamic-executable admission operation.
+The sandbox receives normalized source, its digest, encoded input, explicit limits, capability grants, and an interruption signal. It never receives credentials, stores, Runtime services, Layers, handlers, Agent values, or ambient host objects.
 
-The child retains the existing root Run ID, has its own child Run stream, and suspends the parent tool call until terminal reconciliation supplies the encoded Program result. Terminal reconciliation is repeatable, so child completion before parent suspension and completion after restart converge on the same resume. Root cancellation propagates to the Program child and interrupts its sandbox through the normal RunExecutor scope. Memory and SQL stores implement the same fenced, idempotent admission contract; SQLite close/reopen reconstructs the child only from its manifest and persisted registrations. The application resolver owns registration codecs and supplies the matching code executor and handlers. Missing, conflicting, or unsupported registrations and authority, source, capability, budget, and admission violations remain typed failures.
+## Runtime code mode
 
-Runtime resolves and attests tagged Agent and Program definitions through fresh resolver scopes on every host attempt and persists executable-neutral results and checkpoints. Program Agent runs, maps, and fan-outs atomically reserve their operation identity and budget with one immutable ordered Runtime fan-out and its durable child Runs. Replay joins the persisted child Run IDs without binding dispatch; bounded map concurrency is enforced by fan-out admission, and child terminal results or failures become the encoded Program Agent boundary result. A child commits terminal state only after its resolver and service scopes finalize. That transaction settles its fan-out member, promotes queued members, closes the exact Program wait when the join completes, releases the parent claim, and makes the parent scheduler-claimable without an application resume call. These facts survive a store close after admission and reopen before child execution. Cancelling the Program parent settles its owned running and queued children, closes the wait, fails unsettled Program operations, and releases active slots before the parent becomes terminal. Program tool calls and logs require stable source-owned operation names; Runtime records each operation before dispatch, replays matching completed outcomes, rejects changed inputs as divergence, and leaves unknown non-idempotent outcomes in `needs-resolution` unless cancellation is already requested; cancellation may settle the Run while preserving the operation as `unknown`. Structured Program logs are canonical Run events committed with their operation outcome. Memory, SQLite, PostgreSQL, and MySQL implement the same Program store contract, and durable stores preserve Program budgets, results, operations, fan-outs, and child ownership across reopen.
+An Agent with `ProgramAuthority` gets the Runtime-owned `code_mode` Effect AI tool. Its schema advertises only the authority's exact tool, step, and Agent selection IDs and budget maxima; a call may select a unique subset and smaller budgets.
 
-Durable operation recording, replay, waits, recovery, and cancellation remain Runtime-owned. Core's encoded ProgramRunner contract and typed replay-divergence, unknown-operation, suspension, and cancellation failures support that durable implementation without placing replay decisions or process-local durable budget state in Core.
+```text
+Agent tool call: code_mode({ tools: ["search"], ... })
+└── validate source, selections, and budgets
+    └── build exact Program manifest and child executable
+        └── child Run ID = hash(parent Run ID, tool-call ID)
+            └── suspend parent until terminal reconciliation
+```
+
+## Invariants
+
+- The Program manifest protocol is version `1`; its pin covers source bytes, sandbox, input/output schemas, capability identities, budgets, and every reachable Agent.
+- `ProgramRunner.layerDirect` rejects a changed Program pin, missing or mismatched handler pins, and handlers outside the manifest closure.
+- `ProgramHandlers` owns live tool/step codecs and handlers, exact Agent executors, authorization, and replay policy; Program source owns none of those policies.
+- Agent handlers decode to `Prompt.RawInput` and report text, turns, and input/output token usage; every Program, tool, step, and Agent boundary applies its pinned codec.
+- Sandboxed source can use only manifest-scoped discovery/schema description, `callTool`, `callStep`, `runAgent`, `mapAgents`, `fanOutAgents`, and `log`; results cross the runner seam before decoding or persistence.
+- Budgets cover tool calls, Agent runs, concurrency, tokens, log bytes, wall clock, and output bytes; maps and fan-outs use bounded structured concurrency.
+- Operation names and fan-out member keys start with a letter, contain only letters, digits, `_`, or `-`, and are at most 64 characters.
+- Map/fan-out member keys are unique, canonically sorted, and results use that order.
+- A `CodeExecutor` has one schema-backed immutable, credential-free identity describing provider/runtime/template versions, isolation, persistence, network posture, enforced limits, and bounded known limitations.
+- Executor admission fails before evaluation for absent/trusted isolation, non-fresh persistence, non-default-deny network, unenforced guarantees, or requested limits above an executor maximum.
+- Result validation binds protocol version, request ID, source digest, and both codec identities; the executor evaluates only the normalized request while `ProgramRunner` remains authoritative for closure, codecs, and budgets.
+- `sidecar-process-v8-isolate` means a native child-process sidecar owns the V8 isolate; it does not mean in-process execution, Wasm, a container, or a microVM.
+- Generalist ships a production Cloudflare Worker Loader executor, but no AgentOS or E2B executor.
+- `CodeExecutor.makeTest` and `layerTest` are trusted, unenforced fixtures rejected by production admission and provider conformance; conformance observes the boundary but cannot prove vendor physical isolation, and evidence must distinguish fixtures, local runtimes, and credentialed providers.
+- `ProgramAuthority` pins one sandbox and input/output codecs, bounds source bytes/catalogs/budgets, and exposes no general dynamic-executable admission operation.
+- Selection failures identify the catalog dimension, requested ID, and complete bounded allowed-ID catalog.
+- A code-mode child retains the root Run ID, owns a child stream, and uses registrations narrowed to its executable closure; terminal reconciliation is repeatable across early completion and restart.
+- Root cancellation reaches the child and sandbox interruption signal.
+- Runtime resolves and attests tagged definitions in fresh scopes per host attempt, persists executable-neutral results/checkpoints, and commits child terminal state only after resolver/service finalization.
+- Durable Agent runs/maps/fan-outs atomically reserve identity and budget, admit ordered child Runs, replay by joining persisted child IDs without redispatch, and enforce map concurrency.
+- The terminal transaction settles fan-out membership, promotes queued members, closes the wait, releases the parent claim, and makes the parent schedulable; cancellation settles owned children, waits, operations, and slots before terminal state.
+- Memory and SQL stores share fenced idempotent admission; Memory, SQLite, PostgreSQL, and MySQL preserve Program budgets, results, operations, fan-outs, and child ownership across reopen.
+- SQLite reconstructs a reopened child only from its manifest and persisted registrations; the application resolver supplies matching codecs, executor, and handlers.
+- Runtime records stable source-owned operation names before dispatch, replays matching results, rejects changed input as divergence, and leaves unknown non-idempotent outcomes `needs-resolution` unless cancelled; cancellation may settle the Run while preserving `unknown`.
+- Structured logs are canonical Run events committed atomically with their operation result.
+- Durable recording, replay, waits, recovery, cancellation, and durable budget state belong to Runtime, not Core; missing registrations and authority/source/capability/budget/admission violations remain typed failures.
+
+## Related
+
+- Source: `packages/generalist/src/core/program/`, `packages/generalist/src/runtime/code-mode.ts`, `packages/generalist/src/runtime/program/`, `packages/generalist/src/cloudflare/dynamic-workers/`
+- Decisions/tradeoffs: [`agentos-code-executor-rejected.md`](../decisions/agentos-code-executor-rejected.md), [`e2b-program-executor-rejected.md`](../decisions/e2b-program-executor-rejected.md)

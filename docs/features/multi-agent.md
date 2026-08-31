@@ -1,52 +1,108 @@
 # Multi-agent
 
-Core distinguishes **inline delegation** from **same-run handoff**.
+An agent can call another agent as an isolated child Run, or hand the current Run to another active agent. Delegation isolates identity; handoff preserves it.
 
-## Inline delegation (`AgentTool` / `Handoff.delegateTool`)
+## Usage
 
-`AgentTool.asTool` and `Handoff.delegateTool` expose a child agent as a tool with its own child invocation identity. The parent run schedules a nested `generate`/`Registration.run` through `reserveChildBudget` / `refundChildBudget`. Effect services such as `SessionDirectory` remain inherited, but an exact active Session does not: omitted child `sessionId` means no Session, and explicitly requesting the active parent's ID fails before the child model call instead of waiting on the parent's lane. Child failures and suspension collapse to the tool's declared domain failure unless the host configures otherwise. This path does not switch the active agent for subsequent turns in the parent stream.
+```ts
+import { Layer } from "effect"
+import { Toolkit } from "effect/unstable/ai"
+import { Agent, AgentTool, Handoff, ToolExecutor } from "generalist"
 
-Every inline child and fan-out member allocates a fresh process-local Run ID and inbox. Inherited Effect services never imply inbox identity, so parent, child, and sibling control inputs cannot be consumed across Run boundaries.
+const billingAgent = Agent.make({
+  name: "billing",
+  instructions: "Resolve billing requests.",
+})
 
-## Same-run handoff (`Handoff.supervisor`, `Handoff.transferTool`)
+// Isolated child Run: fresh Run ID, inbox, and model telemetry.
+const askBilling = AgentTool.asTool(billingAgent, { name: "ask_billing" })
+const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(askBilling.tool) })
 
-Same-run handoff switches the **active agent** for subsequent turns inside one `Agent.stream` invocation. The run keeps one session identity, one `DriverInterpreter`, one tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event ordering.
+// Same Run: the billing agent becomes active on the next turn.
+const supervisor = Handoff.supervisor({
+  name: "front-desk",
+  specialists: [Handoff.target(billingAgent)],
+})
+const handoffLayer = Layer.mergeAll(ToolExecutor.layerToolkit(supervisor.toolkit), supervisor.catalog)
+const run = Agent.generate(supervisor.agent, { prompt: "Refund order 42" })
+```
 
-It also keeps the original Run ID and inbox. A producer holding the original `RunHandle` continues to steer the same Run after the active agent changes.
+Provide `handoffLayer` with the model, approvals, middleware, and target requirements. The model calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`.
 
-`Handoff.supervisor` builds a supervisor agent plus:
+## What runs
 
-- `toolkit` — same-run handoff tools (`handoff_to_<specialist>`)
-- `catalog` — `Handoff.Catalog` layer resolving `Target` entries
+```text
+Agent.generate(front-desk)                 Run ID: run-1
+└── model turn: front-desk
+    └── tool call handoff_to_billing
+        ├── resolve Catalog["billing"]
+        ├── validate limits, target, and projected history
+        └── record "handoff"; commit active = "billing"
+            └── model turn: billing           Run ID: run-1
 
-Provide `supervisor.catalog` in the run layer alongside the supervisor agent.
+Agent.generate(parent)                     Run ID: run-2
+└── tool call ask_billing
+    ├── DriverInterpreter.reserveChild(...)
+    ├── Agent.generate(billing)             Run ID: run-3
+    └── DriverInterpreter.refundChild(...)
+```
 
-### Handoff input and context projection
+`Handoff.delegateTool(registration)` follows the second path, names the tool `delegate_to_<agent>`, and runs `Registration.run`.
 
-Handoff tools accept schema-backed `Handoff.Input` (`prompt`, `reason`, `context`). On success they return `HandoffAccepted` with stable `handoffId`, `source`, and `target` agent IDs.
+## Handoff data flow
 
-`defaultContextProjection` preserves valid prompt history and rejects unresolved tool-call/tool-result pairs. `filterContextProjection` applies a message predicate then runs the same validation. Custom projections must never emit malformed tool history.
+```text
+Handoff.Input { prompt: "Refund 42", reason: "billing" }
+        │ defaultContextProjection(history, input)
+        ▼
+{ history: Prompt, prompt: "Refund 42" }
+        │ executeSameRunHandoff()
+        ▼
+HandoffAccepted { source: "front-desk", target: "billing",
+                  handoffId: "<deterministic key>" }
+```
 
-### Limits and durable operations
+`defaultContextProjection` retains valid history and rejects unresolved tool-call/tool-result pairs. `filterContextProjection(predicate)` filters first, then validates. The commit removes system messages.
 
-Each scheduled handoff charges the tree budget (`RunBudget.handoffs`). Repeated edges (`source:target`) are bounded via `handoffOptions.maxRepeatedEdge` (default `1`). Total handoffs honor `RunBudget.handoffs` from agent defaults and per-run narrowing.
+## Failure and suspension paths
 
-The durable driver records `handoff` operations with deterministic keys:
+```text
+handoff_to_billing
+├── no catalog target ─────────── generalist/core/TargetMissing
+├── target model unavailable ─── generalist/core/HandoffRequirementsMissing
+├── total/edge limit reached ──── generalist/core/HandoffLimitExceeded
+└── invalid input/projection/pin ─ generalist/core/HandoffRejected
 
-- `…/handoff/requested/…`
-- `…/handoff/completed/…`
-- `…/handoff/rejected/…`
+target tool suspends
+├── suspensionPropagation: "propagate" (default)
+│   └── AgentSuspended with invocation_path
+└── "collapse-to-domain-failure"
+    └── tool domain failure: { reason: "suspended", ... }
+```
 
-Each records `handoffId`, source/target `ExecutableRef` IDs, reason, and turn.
+An isolated `AgentTool` converts child failures and suspensions to its declared string domain failure; it never changes the parent's active agent.
 
-After handoff, the target agent's tool registry, permissions, and model selection apply without widening parent authority or budget. Missing catalog entries, projection failures, and missing target requirements fail typed (`TargetMissing`, `Handoff.Rejected`, `HandoffRequirementsMissing`, `Handoff.ProjectionInvalid`, `HandoffLimitExceeded`).
+## Invariants
 
-### Suspension propagation
+- Every inline child and fan-out member gets a fresh process-local Run ID, inbox, invocation identity, and its own telemetry.
+- Inherited Effect services, including `SessionDirectory`, do not confer inbox or active Session identity.
+- An inline child without `sessionId` has no Session.
+- Reusing the active parent's Session ID fails before the child model call; it does not wait on the parent's lane.
+- Parent, child, and sibling control inputs never cross Run boundaries.
+- Same-run handoff retains the Run ID, inbox, Session identity, `DriverInterpreter`, tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event order.
+- A producer holding the original `RunHandle` can keep steering after handoff.
+- Same-run handoff tools execute through the agent loop, never direct toolkit invocation.
+- The catalog resolves targets but does not provide target requirements.
+- A projection may not leave unresolved tool calls in projected history.
+- Each handoff charges `RunBudget.handoffs`; run options can only narrow the active agent's default budget.
+- A repeated `source:target` edge defaults to limit `1`; configure `handoffOptions.maxRepeatedEdge`.
+- Handoff operation IDs are deterministic; model-requirement rejection uses a separate deterministic `handoff:rejected` key.
+- State records source, target, optional reason, turn, edge and handoff counts, and the exact target pin when pinned.
+- The target's tools, permissions, model, and budget apply after handoff but cannot widen parent authority or budget.
+- `Handoff.register`, `Registration.run`, and `Handoff.fanOut` create isolated child Runs; fan-out has explicit concurrency and shares neither the parent driver seam nor same-run handoff state.
+- Durable or cross-process delegation belongs to a host Runtime.
 
-`RunOptions.suspensionPropagation` defaults to `"propagate"`. Tool and approval suspensions during an active handoff path include `invocation_path` on `AgentSuspended`. Set `"collapse-to-domain-failure"` explicitly to convert suspensions into tool domain failures instead.
+## Related
 
-## Isolated registration runs
-
-`Handoff.register` + `Registration.run` and `Handoff.fanOut` remain isolated child runs with explicit concurrency. They do not share the parent driver seam or same-run handoff state.
-
-Durable or cross-process delegation belongs to a host runtime.
+- Source: `packages/generalist/src/core/agent/handoff/`, `packages/generalist/src/core/agent/tool.ts`, `packages/generalist/src/core/policy/handoff.ts`, `packages/generalist/src/core/policy/handoff-*.ts`
+- Site: `/docs/guides/multi-agent`, `/docs/guides/addressed-messaging`

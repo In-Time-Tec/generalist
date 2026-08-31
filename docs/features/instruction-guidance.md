@@ -1,27 +1,99 @@
 # Instruction guidance
 
-Instruction guidance is the versioned store of prompt notes, memories, skills, and subagent specs that a running agent may refine and a host may pin into a later Execution. `generalist/instructions` owns the generic engine; every store location, scope policy, and refine flow stays host-owned.
+Instruction guidance turns scoped prompt notes, memories, skills, and subagent specifications into atomic, versioned state. A host can overlay scopes, bound model-facing overviews, and pin an exact state into later Executions.
 
-- An entry carries `id`, `kind`, `scope`, `title`, `content`, optional `path`, `reference`, `arguments`, `metadata`, `source`, plus `createdAt`, `updatedAt`, and a monotonic `version`.
-- `Refinement.apply` is pure and atomic: it applies every edit or none, and rejects create-existing, update-missing, delete-missing, duplicate targets, a stale `baseVersion`, a drifted `baseSnapshot`, per-kind capacity overflow, and a pinned `revision`. It accepts only the authored proposal `Authorship.author` mints; `Refinement.applyTrusted` is the separately named route for a proposal that may pin a revision.
-- Each applied edit records exact before and after entries, so `Refinement.makeRollback` produces the inverse proposal that restores the earlier snapshot exactly. It derives its baseline from the supplied current state and marks the refinement it reverses; applying it rejects any target other than the newest refinement with `rollback-not-newest` before evaluating inverse edits.
-- `State.merge(outer, inner)` overlays scopes: an inner entry wins over an outer entry of the same kind and id, and every surviving entry keeps its authoring scope.
-- `Overview.format` renders a bounded prompt overview whose size depends only on the supplied bounds, never on how many entries or refinements the state holds, and whose ordering is deterministic.
-- `Snapshot` pins one exact state as `guidance-snapshot:v1:sha256:<digest>` with the closed-JSON payload a durable host records in an executable registration under codec `generalist/instructions/snapshot`, version `1`. Refinement history is audit data and stays outside the pinned identity.
+## Usage
 
-## Trusted and untrusted authorship
+```ts
+import { Effect, Result } from "effect"
+import { Authorship, Overview, Refinement, Registration, State } from "generalist/instructions"
 
-An edit's `revision` pins an entry's exact `createdAt`, `updatedAt`, and `version`. Rollback needs it; untrusted authors must never have it. The engine makes that a contract rather than host advice.
+const program = Effect.gen(function* () {
+  const initial = State.empty("agent:reviewer")
+  const proposal = yield* Authorship.author({
+    id: "model-1",
+    at: "2026-08-31T12:00:00.000Z",
+    edits: [
+      {
+        _tag: "Create",
+        kind: "memory",
+        id: "typescript",
+        value: { title: "TypeScript", content: "Prefer exact types." },
+      },
+    ],
+  })
+  const changed = Result.getOrThrow(Refinement.apply(initial, proposal))
+  const overview = Overview.format(changed.state)
+  const pinned = Registration.make(changed.state, "guidance")
+  return { changed, overview, pinned }
+})
+```
 
-- `Authorship.author(input)` is the only entry point for model-originated or otherwise untrusted proposals. It decodes against `AuthoredProposal`, whose `AuthoredCreateEdit` and `AuthoredUpdateEdit` have no `revision` field, and refuses input carrying one with `AuthorshipRejected { reason: "pinned-revision" }`. It refuses rather than silently stripping, so a caller learns its proposal was rejected instead of quietly getting different semantics.
-- An accepted authored proposal always leaves revision to the engine: a create lands at version 1 with the proposal instant, and an update bumps to `version + 1` while preserving the original `createdAt`.
-- `Refinement.makeRollback` is the trusted path and does set `revision`, which is how a rollback restores the exact earlier entry instead of a bumped one. Its result is applied with `Refinement.applyTrusted`.
-- The brand is a compile-time discriminator, not a runtime one. `Authorship.author` returns an opaque `AuthoredRefinementProposal` that nothing else mints, and `Refinement.apply` accepts only that type, so decoding untrusted input as a `RefinementProposal` and applying it no longer type-checks. `Brand.nominal` erases at compile time, so a cast defeats the type alone.
-- The runtime authorization boundary is the check inside `Refinement.apply`: a proposal whose edits pin a `revision` is rejected with `RefinementRejected { reason: "pinned-revision" }` even when a cast erased the brand. A host mounting this behind an `unknown` boundary gets that check without re-deriving it.
-- `Refinement.isAuthored(proposal)` reports whether a proposal leaves every revision to the engine, so a host can assert the distinction at its own boundary. `Authorship.isAuthored` re-exports it.
+## What runs
 
-## Stores
+```text
+program
+├── Authorship.author(unknown)
+│   ├── reject any revision key
+│   └── decode + brand AuthoredRefinementProposal
+├── Refinement.apply(state, proposal)
+│   └── validate; create memory/typescript v1; record before/after
+├── Overview.format(changed.state)
+└── Registration.make(changed.state, "guidance")
+    └── encode payload + create content-addressed capability
+```
 
-- `Store` is the load/save-by-scope seam. `StoreError` carries a typed `reason`: `corrupt`, `encode`, `unreadable`, or `unwritable`.
-- `Store.layerMemory` is the in-process implementation.
-- `FileSystemStore.layer({ path })` is the durable implementation over Effect's `FileSystem` and `Path`. The host owns every location decision through `path(scope)`; the package owns encoding and atomicity. A save writes a uniquely named temporary file in the destination directory with mode `0o600`, creating the directory with mode `0o700` when missing, then renames it over the target, so a reader never observes a partial state and a failed write leaves the previous state intact. Saves of one scope are serialized by a per-file semaphore. A corrupt or out-of-contract file fails with `reason: "corrupt"` and is left on disk rather than silently reset.
+## Data flow
+
+```text
+Authored edit { kind: "memory", id: "typescript", revision: absent }
+        │ Refinement.apply() at 2026-08-31T12:00:00.000Z
+        ▼
+{ kind: "memory", id: "typescript", scope: "agent:reviewer",
+  version: 1, createdAt: "2026-08-31T12:00:00.000Z",
+  updatedAt: "2026-08-31T12:00:00.000Z" }
+```
+
+## Rollback and scope overlay
+
+```text
+RefinementResult for "model-1"
+└── Refinement.makeRollback(result, { id: "rollback-1", at: ... })
+    └── Refinement.applyTrusted(current, inverse with prior revisions)
+        ├── newest event is "model-1" → restore
+        └── newer event exists → rollback-not-newest
+
+outer memory/typescript { scope: "team", version: 3 }
+inner memory/typescript { scope: "agent:reviewer", version: 1 }
+  └── State.merge → inner memory/typescript, scope "agent:reviewer"
+```
+
+## Invariants
+
+- Entry identity is `(kind, id)` within a state; kinds are `prompt`, `memory`, `skill`, and `subagent`.
+- Entries carry `scope`, title, content, timestamps, and a monotonic version; optional fields are `path`, `reference`, `arguments`, `metadata`, and `source`.
+- Entries remain in canonical kind then id order.
+- `State.merge` lets the inner scope win only for equal `(kind, id)` and preserves every surviving entry's authoring scope.
+- `Overview.format` is deterministic; output size depends only on supplied bounds, never total entries or refinement history.
+- Ordinary untrusted input passes through `Authorship.author`, then `Refinement.apply`.
+- `Authorship.author` rejects, rather than strips, any `revision` key with `AuthorshipRejected { reason: "pinned-revision" }`.
+- Its opaque brand is compile-time only; `Refinement.apply` also rejects pinned revisions at runtime, even after a cast.
+- `Authorship.isAuthored` and `Refinement.isAuthored` report whether every revision is engine-owned.
+- Authored creates start at version 1; updates increment it, preserve `createdAt`, and set `updatedAt` to the proposal instant.
+- Every applied edit records its exact `before` and `after` entry.
+- A proposal is atomic: existing creates, missing updates/deletes, duplicate targets, stale `baseVersion`, drifted `baseSnapshot`, per-kind overflow, or pinned revisions reject without changing input state.
+- `Refinement.makeRollback` reverses edits in reverse order, identifies the refinement, and derives its baseline from current state.
+- Only the newest refinement may be rolled back; exact revision restoration uses the separately named trusted route, `Refinement.applyTrusted`.
+- Snapshot ids include schema version, scope, and encoded entries, but exclude refinement history.
+- Registrations carry closed, secret-free JSON under codec `generalist/instructions/snapshot`, version `1`; payload drift fails decoding.
+- `Store` loads and saves by scope; `Store.layerMemory` is process-local.
+- `StoreError.reason` is `corrupt`, `encode`, `unreadable`, or `unwritable`.
+- `FileSystemStore.layer({ path })` leaves locations to the host and uses Effect `FileSystem` and `Path`.
+- Filesystem saves create directories with mode `0o700`, write unique same-directory temporary files with mode `0o600`, then rename atomically.
+- Saves to one target file are semaphore-serialized; failed writes preserve the previous state and clean up their temporary file.
+- Missing files load empty; corrupt or out-of-contract files remain on disk and fail as `corrupt` instead of resetting state.
+
+## Related
+
+- Source: `packages/generalist/src/instructions/`
+- Site: `/docs/guides/instruction-guidance`, `/docs/reference/instruction-guidance`, `/docs/reference/versioning`

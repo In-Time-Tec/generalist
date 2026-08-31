@@ -1,13 +1,98 @@
 # Suspension and resume
 
-Approval and tool-wait suspension fail the run with `AgentSuspended`. One suspension may expose several exact open waits in model-authored order. The host resumes with the exact suspension value plus resolutions targeted by wait ID; it may resolve any subset and may resolve siblings out of order.
+A tool outcome `{ _tag: "Suspend", token }`, or an approval resolved as `Pending`, stops the run with typed `AgentSuspended`. Resume returns that exact suspension through `RunOptions.resume`; its checkpoint proves which authored calls may advance.
 
-The schema-backed tool-batch checkpoint is the sole reconstruction authority for one model-authored framework call batch. It retains canonical calls in authored order and exactly one state per call: `Ready`, `Scheduled`, `Waiting`, `Completed`, `Unknown`, or `Cancelled`. `Scheduled` is the durable admission marker carrying the exact operation digest and replay policy; it is not a live fiber or a claim that the tool is still running. Each call is charged once when it advances from `Ready` to `Scheduled`, and recovery reconciles that same operation without charging or authorizing it again. Stable operation keys remain per call; there is no batch ID, separate scheduler ledger, queue, or persisted fiber. Concurrent siblings that complete or suspend in the admitted scheduling stage settle to checkpoint states before suspension commits. `Scheduled`, `Waiting`, and `Completed` calls never re-enter authorization. `Waiting` and `Completed` calls never re-enter tool execution. Completed results extend the model transcript and Session projection exactly once in authored order, even when execution or responses finish out of order. Generalist does not call the model while any authored call remains unresolved.
+## Usage
 
-The checkpoint's replayable call identity includes id, name, parameters, the provider-executed flag, and provider metadata. Effect Prompt history retains response metadata as tool-call options; resume validates those options as provider metadata and converts them back before comparison. Resume rebuilds the model transcript from Session (or supplied standalone history), then verifies that transcript against the checkpoint and verifies each supplied wait ID, token, reason, call index, canonical call, resolution kind, active-tool set, activated skills, and invocation path before side effects. Missing, stale, changed, fabricated, duplicated, malformed, or mismatched identities fail with `ResumeMismatch` before skill loading, authorization, execution, model work, or Session mutation. Session remains a model-transcript projection; it is not execution authority.
+```ts
+import { Effect, Stream } from "effect"
+import * as Agent from "generalist"
 
-An approval resolution advances only its targeted `Waiting` call to execution. A denial, tool result, or signal completes only its targeted call. Unresolved siblings remain waiting, and a later exclusive authored call remains behind the current scheduling-stage barrier.
+Effect.gen(function* () {
+  const suspended = yield* Agent.stream(agent, { prompt: "deploy" }).pipe(Stream.runDrain, Effect.flip)
+  if (suspended._tag !== "generalist/core/AgentSuspended") return yield* Effect.fail(suspended)
 
-This is process-local checkpoint validation. Cross-process locking and durable exactly-once execution belong to a durable host.
+  // Persist this exact value and the transcript captured from TurnCompleted.
+  const wait = suspended.waits[0]!
+  yield* Agent.stream(agent, {
+    prompt: "ignored",
+    history: transcript,
+    resume: {
+      suspension: suspended,
+      resolutions: [{ waitId: wait.waitId, resolution: { _tag: "Approved" } }],
+    },
+  }).pipe(Stream.runDrain)
+})
+```
 
-Runtime persists one immutable keyed wait row `(runId, waitId)` for reason and identity, open or terminal status, the schema-decoded resolution, and timestamps. Every response, approval, signal, timer, child, external-child, fan-out, or cancellation close proves one exact `open -> terminal` transition before appending its durable event. Resolving one wait leaves its siblings open. An identical duplicate response is read-only success, a conflicting duplicate is typed failure, and terminal history cannot reopen. Runtime retains the batch checkpoint and suspension while responses accumulate; hosted and standalone resume consume the same semantic checkpoint. Suspension is removed only in the same durable transition that commits terminal completion, failure, cancellation, pending steering, or another pending terminal outcome.
+`Approved` is valid for an `approval` wait. A `tool-wait` instead accepts `ToolResult` or a `Signal` whose `name` equals its wait ID.
+
+## What runs
+
+```text
+Agent.stream(agent, { prompt: "deploy" })
+└── model authors tool calls
+    └── approval returns Pending / executor returns Suspend
+        ├── settle admitted sibling calls into checkpoint states
+        └── fail with AgentSuspended { reason: "approval" | "tool-wait" }
+
+Agent.stream(agent, { history, resume })
+├── rebuild transcript from Session or supplied history
+├── validate suspension + resolutions against checkpoint
+├── advance only the resolved waits
+└── continue tools; call model only when all calls resolve
+```
+
+## State machine
+
+```text
+Ready ──admit once──> Scheduled ──Suspend/Pending──> Waiting
+                         │                              │
+                         │ result                       │ resolution
+                         ▼                              ▼
+                      Completed <────────────────── Completed
+Waiting ──Approved──> Ready(stage: "execution") ──execute──> Completed
+Waiting ──Denied/ToolResult/Signal─────────> Completed
+```
+
+Resolving one wait leaves sibling waits open. Siblings may resolve in any order; a later exclusive authored call remains behind the current scheduling-stage barrier.
+
+## Failure paths
+
+```text
+RunOptions.resume
+└── validate before side effects
+    ├── checkpoint absent from transcript
+    │   └── ResumeMismatch { reason: "checkpoint-not-found" }
+    └── stale/changed/fabricated/duplicate/malformed identity
+        └── ResumeMismatch { reason: "identity-mismatch" }
+            └── no skill load, authorization, tool, model, or Session write
+```
+
+Identity covers wait ID, token, reason, call index, canonical call, resolution kind, active tools, activated skill, invocation path, and provider-executed metadata. Canonical calls include ID, name, parameters, provider-executed status, and provider metadata decoded from Effect Prompt tool-call options.
+
+## Durable runtime
+
+Runtime maps every `approval` wait to `Approval` and every `tool-wait` to `ToolWait`, then persists one immutable row keyed by `(runId, waitId)`. The row stores identity, reason, `open` or terminal status, schema-decoded resolution, and timestamps while Runtime retains the checkpoint and suspension.
+
+Every response, approval, signal, timer, child, external child, fan-out, or cancellation close must prove one `open -> terminal` transition before appending its durable event. An identical duplicate is read-only success; a conflicting duplicate is typed failure; terminal history cannot reopen. Runtime removes suspension only in the durable transition that commits completion, failure, cancellation, pending steering, or another pending terminal outcome.
+
+## Invariants
+
+- Waits and checkpoint calls remain in model-authored order; every call has exactly one state: `Ready`, `Scheduled`, `Waiting`, `Completed`, `Unknown`, or `Cancelled`.
+- The schema-backed batch checkpoint is the sole reconstruction authority; Session is only a model-transcript projection.
+- `Scheduled` records admission, operation digest, and replay policy—not a live fiber—and charges a call exactly once; recovery neither charges nor authorizes it again.
+- `Scheduled`, `Waiting`, and `Completed` never re-enter authorization; `Waiting` and `Completed` never re-enter tool execution.
+- Stable operation keys belong to calls; there is no batch ID, scheduler ledger, queue, or persisted fiber.
+- Admitted concurrent siblings settle before suspension commits; completed results enter transcript and Session exactly once in authored order.
+- Resume may resolve any subset, but each resolution changes only its wait and call; unresolved siblings remain waiting.
+- Resume validation precedes every resume side effect; hosted and standalone resume use the same semantic checkpoint.
+- Process-local resume validates checkpoints; cross-process locking and durable exactly-once execution belong to a durable host.
+- A durable wait makes at most one `open -> terminal` transition.
+
+## Related
+
+- Source: `packages/generalist/src/core/agent/suspension.ts`
+- Source: `packages/generalist/src/core/agent/service.ts`
+- Site: `/docs/learn/suspension`
+- Site: `/docs/guides/approvals`

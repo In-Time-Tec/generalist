@@ -1,68 +1,100 @@
 # Addressed messaging
 
-`generalist/runtime` owns durable agent-to-agent messaging: a directory of addressable Runs, a per-target durable inbox, safe-boundary delivery, and one durable `send` operation. Applications supply only the policy for addressing beyond Generalist's derived relationships.
+Runtime resolves a Run, session, or scoped name to a durable Run, authorizes the sender, and admits a `Message` to the target session's ordered mailbox. Delivery becomes ordinary user content at a turn boundary and is acknowledged only with the next committed model operation.
 
-## Directory
-
-Every Run is addressable. `AgentDirectory` builds three address shapes:
-
-- `runAddress(runId)` names one exact execution.
-- `sessionAddress(sessionId)` names one agent identity across its successive Runs, so a message can cross Sessions. It resolves to that session's **newest** Run, ordered by `(created_at, run_id)` descending. This is the defined contract, not an implementation detail: a session address means "whoever currently speaks for this agent", so a sender that holds one keeps reaching the agent as its Runs turn over, and it resolves even when the Run that was current at send time has since gone terminal. Two consequences follow. If a host keeps several Runs alive in one session concurrently, the newest wins and the others are unaddressable by session address — address those exactly with `runAddress`. And because resolution happens at send time, two sends moments apart can land on different Runs if a new Run started in between; both still land in the one durable inbox for that session, which is keyed by session rather than by Run, so no message is lost across the handover. Ordering is per target session, so a handover never reorders or splits an inbox.
-- `nameAddress({ scope, name })` names a host-assigned friendly name. `AgentName` is a bounded lowercase identifier, and a name is unique inside its scope: the Run's parent, or its own root when it has no parent.
-
-An Address states which directory table to read. It never carries authority. `RunStore.directory`, `resolveAddress`, and `listRelated` read identity, parentage, and session membership from the durable Run record; nothing is derived by parsing an id.
-
-## Authorization
-
-`relationship` derives `self`, `parent`, `child`, and `sibling` from durable parent links only. Those four are always allowed. Everything else — including addressing another Session — is refused unless the host's `MessagingPolicy` allows that exact sender/target pair. `Messaging.makePolicy()` with no overrides is the relationship-only default. Refusals are typed `MessagingUnauthorized` carrying `unrelated`, `cross-session`, or `policy`.
-
-### Enabling cross-session addressing
-
-Cross-session messaging is off by default and is enabled by one host-supplied policy, passed as `messagingPolicy` in the Runtime layer options. `allow` receives both resolved directory entries plus the derived `relationship` and a `crossSession` flag, and returns whether that one direction is permitted; `discover` returns addresses the host wants to advertise to a sender, and each one is still put through `allow` before it is listed. Generalist's four relationships are checked first, so a policy only ever widens.
+## Usage
 
 ```ts
-import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
+import { Effect } from "effect"
+import { AgentDirectory, Runtime } from "generalist/runtime"
 
-SqliteRuntime.layerSqlite({
-  // ...
-  messagingPolicy: {
-    allow: (input) => Effect.succeed(linkedThreads(input.sender.sessionId, input.target.sessionId)),
-    discover: (sender) => Effect.succeed(addressesOfThreadsLinkedTo(sender.sessionId)),
-  },
+const send = Effect.gen(function* () {
+  const runtime = yield* Runtime.Runtime
+  return yield* runtime.sendMessage({
+    fromRunId: "run:planner-7",
+    to: AgentDirectory.sessionAddress("session:reviewer"),
+    idempotencyKey: "review-plan-v1",
+    messageId: "msg:review-plan",
+    correlationId: "job:42",
+    prompt: "Review plan 42 for race conditions.",
+    metadata: { priority: "high" },
+  })
 })
 ```
 
-Policy is directional: allowing A→B does not allow B→A. Both callbacks are Effects, so a host may consult its own store. The pair passed to `allow` is authoritative — it is read from durable Run records, never from caller-supplied text — so a policy can trust `sessionId` and `parentRunId` when deciding.
+## What runs
 
-`Runtime.directory(runId)` lists the addresses a Run may reach: its durable relations plus any policy-announced address that also passes authorization. The sender itself is never listed.
+```text
+runtime.sendMessage({ fromRunId: "run:planner-7", ... })
+├── resolve sender from durable Run record
+├── resolve "session:session%3Areviewer"
+│   └── newest Run by (created_at, run_id) descending
+├── authorize(sender, target)
+│   ├── derive self / parent / child / sibling
+│   └── otherwise call MessagingPolicy.allow(...)
+├── reject a terminal target unless address is session-scoped
+└── admit Message to target session mailbox
+    ├── check identity, bounds, and rate window
+    ├── allocate next target sequence
+    └── at a turn boundary, bind entry to steering
+        └── commit model operation + consume batch atomically
+```
 
-## Durable mailbox
+## Data flow
 
-`Runtime.sendMessage` takes `fromRunId`, not a sender Address: Generalist resolves the sender from its Run record, so cell code cannot forge `from`. Admission is idempotent on `(target session, messageId, idempotencyKey)`; a replay returns the original receipt with `duplicate: true`, and the same identity carrying a different payload fails `MessageConflict`.
+```text
+SendMessageInput
+{ fromRunId: "run:planner-7", messageId: "msg:review-plan",
+  to: "session:session%3Areviewer", prompt: "Review plan 42..." }
+        │ resolve + normalize + derive authoritative `from`
+        ▼
+Message admission
+{ from: "run:run%3Aplanner-7", targetSessionId: "session:reviewer",
+  idempotencyKey: "review-plan-v1", correlationId: "job:42" }
+        │ admitMessage(): digest, bytes, sequence
+        ▼
+MailboxEntry { sequence: 0, deliveredRunId: undefined }
+```
 
-Each target has one total order (`sequence`), which preserves per-sender FIFO within it. Bounds are enforced at admission so a sender learns immediately rather than discovering silent loss: `MailboxFull` for the pending-count and pending-byte limits, `MailboxRateLimited` for the per-window limit. Bounds are configured with `mailboxBounds`. A message to a terminal target fails `RunTerminal`.
+## Failure paths
 
-## Delivery
+```text
+authorize(sender, target)
+├── related directly ─────────────────────────────── allow
+└── unrelated
+    └── MessagingPolicy.allow(...) === false
+        └── MessagingUnauthorized
+            ├── same session:  reason = "unrelated"
+            └── other session: reason = "cross-session"
+```
 
-Delivery reuses steering rather than adding a second mechanism. `deliverPendingMessages` binds each pending entry to the target Run's steering inbox, and the agent loop drains steering only at a turn boundary, consuming the observed batch atomically with the next model operation checkpoint. So a message admitted while a model turn is streaming never interrupts that turn; it lands in the next one. An explicit Session-addressed message for an idle or terminal target stays pending and is taken by that Session's next Run; an exact Run-addressed message is never carried forward. Delivery is exactly-once from the consumer's view, and pending messages survive a Server restart.
+## Invariants
 
-Run addresses are exact: an unconsumed entry addressed to `run:<id>` never migrates to another Run sharing the Session. Only an explicit `session:<id>` address may be rebound to a later Run. Child settlement observations use the exact parent Run address, are read only through the child-settlement operations, and are excluded from the generic inbox. A settlement observation never becomes user or steering content and never migrates to a later Run: the parent already receives a child's outcome as the tool result of the call that started it, so delivering the settlement as well repeated that outcome to the model as a message from the user. A host that wants a settled child's outcome reads it through `childSettlements`, `childSettlementChanges`, or `awaitChildSettlement`.
+- `runAddress(runId)` names one exact Run; `sessionAddress(sessionId)` identifies one session and resolves at send time to its newest Run, including a terminal Run.
+- Concurrent Runs in one session require Run addresses to avoid newest-Run selection; handover sends may resolve differently, but the session's single inbox and sequence do not split or reorder.
+- `nameAddress({ scope, name })` is unique within the parent Run's scope, or the root Run's own scope; names are 1–64 lowercase letters, digits, dots, underscores, or hyphens and begin alphanumerically.
+- Address parsing selects a lookup only; durable Run records establish identity, parentage, session membership, and authority.
+- `Runtime.directory(runId)` excludes the sender, de-duplicates Runs, and returns durable relations plus policy-discovered targets that pass authorization.
+- Durable direct `self`, `parent`, `child`, and `sibling` relationships are always allowed; policy can only widen access, and `Messaging.Policy.make()` defaults to relationships only.
+- `MessagingPolicy.allow` receives authoritative entries, relationship, and `crossSession`; policy is directional, both callbacks are Effects, `discover` results are reauthorized, and the Runtime layer receives the policy as `messagingPolicy`.
+- Current denials emit `unrelated` or `cross-session`; `policy` is reserved by the error schema but is not currently emitted.
+- `fromRunId` is resolved and `from` is derived, so callers cannot forge sender identity; knowing an address grants no authority.
+- Admission identity is target session + `messageId` + `idempotencyKey`; an exact replay returns the original receipt with `duplicate: true`, while changed payload fails with `MessageConflict`.
+- Admission assigns the target's next sequence, preserves per-sender FIFO, and serializes concurrent senders on that inbox.
+- `mailboxBounds` limits pending count, pending bytes, and sends per window; overflow fails with `MailboxFull` or `MailboxRateLimited` and never drops data.
+- A terminal exact Run or name target fails with `RunTerminal`; a session address may wait for and bind to a later Run, while an exact Run-addressed message never migrates.
+- Pending entries and inbox order survive server restart; a message remains pending until consumption.
+- Delivery binds pending entries to steering only at a turn boundary, never interrupting an active model stream; the observed batch is consumed atomically with the next model-operation checkpoint.
+- Binding is at least once and journal consumption is exactly once; there is no separate acknowledgement call, and a crash after model visibility but before commit may expose the text again.
+- If a holder succeeds, fails, or is cancelled before consumption, only a session-addressed message returns to pending for a later Run; `deliveredRunId` is attribution, not pending state.
+- Delivery is ordinary user content carrying authoritative sender and message ID, not a second model payload format.
+- Child settlement observations are exact-parent-Run entries: generic inbox reads exclude them, they never become model content or migrate, and hosts read them through `childSettlements`, `childSettlementChanges`, or `awaitChildSettlement`; the initiating call already returns the child outcome.
+- `Messaging.make` records in-execution sends as durable `send` driver operations with `never` replay: recorded success reuses its receipt, while a crash between journal record and mailbox insertion becomes `Unknown` rather than retrying blindly.
+- Memory, SQLite, PostgreSQL, and MySQL share the contract; SQL uses `generalist_messages` and `generalist_agent_names`, baseline migrations create both, and identities compare byte-for-byte (MySQL uses `utf8mb4_bin`).
+- PostgreSQL advisory locks and MySQL named locks allocate each target session's sequence.
 
-Binding is not delivery. The contract is **consumption-acked: at-least-once bind, exactly-once consume.** A message is pending until it is consumed, not until it is bound, so a Run that takes a message and then reaches a terminal state — `succeeded`, `failed`, or `cancelled` — without consuming it returns that message to pending for the session's next Run. Consumption is what marks a steering entry against a model operation, and that happens in the same commit as the operation itself. Exactly-once therefore describes the journal: a turn folds its steering into the prompt before that operation commits, so a Run that dies in between leaves the entry pending and the next Run delivers text a model may already have seen. Repetition across a crash is the deliberate cost of one commit point instead of two. There is no separate ack call, and adding one would introduce a second commit point whose own failure window could lose or duplicate a message.
+## Related
 
-`deliveredRunId` records which Run currently holds an entry. It is attribution and diagnostics only, never the authority for pending-ness: a filter on `deliveredRunId` alone would strand a message on a Run that died holding it.
-
-A delivered message enters the model as ordinary user content carrying its authoritative sender, so messaging adds no competing payload vocabulary.
-
-## Durable send
-
-Messaging inside an execution goes through `Messaging.make`, which schedules each send as a `send` driver operation with `never` replay policy. A send that crashed between the journal record and the mailbox insert is `Unknown` and is never blindly replayed; a recorded success is returned without crossing the boundary again.
-
-## Backends
-
-Memory, SQLite, PostgreSQL, and MySQL all carry the same contract, and every rule above is proven against all four rather than asserted from one. The SQL backends store the inbox in `generalist_messages` and names in `generalist_agent_names`; both are part of the replaced baseline schema, so they are created by the normal migration rather than added alongside it.
-
-Two backend facts the contract depends on:
-
-- **Identity is compared byte for byte.** `messageId` and `idempotencyKey` are wire identities, so the MySQL schema declares `utf8mb4_bin` rather than inheriting the server's case-insensitive default; otherwise two distinct messages differing only in case would collide as a `MessageConflict`.
-- **Admission serializes on the target.** A mailbox entry takes the next `sequence` for its target session, so concurrent senders into one inbox are serialized on that inbox — a PostgreSQL advisory lock, a MySQL named lock — rather than on any one sender's Run.
+- Source: `packages/generalist/src/runtime/messaging/`, `packages/generalist/src/runtime/address.ts`, `packages/generalist/src/runtime/execution/agent/directory.ts`
+- Site: `/docs/guides/addressed-messaging`
+- Decisions/tradeoffs: [`steering-consumption-is-the-ack`](../decisions/steering-consumption-is-the-ack.md)

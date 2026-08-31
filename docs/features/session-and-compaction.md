@@ -1,33 +1,110 @@
 # Session and compaction
 
-Core `Session` is an append-only conversation-entry log with a current leaf. Context is projected from a root-to-leaf path.
+`Session` is the authoritative append-only conversation log; its current root-to-leaf path projects the next model prompt. Optional compaction replaces only that projection with a self-contained checkpoint while preserving the lossless log.
 
-Session is the authority for model-facing history. `RunOptions.sessionId` is the sole caller-supplied Session identity. When that ID and a `SessionDirectory` are present, setup acquires one exact store and same-ID lane for the full Run scope before reading history, then passes that exact value through synchronization, compaction, resume, and same-run handoff. Omitting the ID means no Session, even when a directory is inherited. `Session.layerMemory` retains independent per-ID stores for the directory Layer lifetime, serializes ordinary Runs for one ID, and allows different IDs to execute concurrently. A second Run on one ID therefore continues the first; different IDs never share entries, leaves, or checkpoints. `SqliteRuntime.layerSqlite` from `generalist/runtime/sqlite-bun`, `layer` from `generalist/pg`, and `layer` from `generalist/mysql` provide durable keyed Sessions, so history survives a process restart.
+## Usage
 
-Every framework tool call admitted into reusable model context has exactly one matching terminal tool result. Core rejects duplicate, mismatched, or unresolved framework tool history before provider invocation. Runtime appends proven tool outcomes, explicit unknown outcomes, or terminal cancellation and failure results in the same state transition or SQL transaction that settles the owning Run; successful Run settlement is rejected while one of its tool calls remains unresolved.
+```ts
+import { Effect, Layer } from "effect"
+import { Agent, Compaction, Session } from "generalist"
+import { TestModel } from "generalist/test"
 
-Conversation and execution are separate logs. Session entries are conversation; Run rows, events, and operations are the crash-recovery journal. Records never enter model context, and dropping every execution record must leave a complete, valid conversation. Memory, SQLite, PostgreSQL, and MySQL Runs do not store a transcript cache. Continuation, retry, and checkpoint recovery rebuild conversation from the exact Session path.
+const agent = Agent.make({ name: "assistant", instructions: "Be concise." })
+const services = Layer.mergeAll(
+  TestModel.layer([TestModel.text("I will remember that."), TestModel.text("Your name is Ada.")]),
+  Session.layerMemory,
+  Compaction.layer({ contextWindow: 64_000, keepRecentTokens: 8_000 }),
+)
 
-Before any conversation provider call, Core synchronizes the complete non-system request prefix, including the current user or steering prompt, into Session with stable entry identities. A completed or terminally interrupted model operation then commits one normalized `ModelResponse` Session entry atomically with a compact operation reference and exactly one compact semantic event. Operation results and `ModelResponseCommitted` / `ModelResponseInterrupted` events retain the Session identity, entry identity, input-prefix parent, attempt facts, usage, finish reason, and digest, never another response-content copy. The public `Runtime.resolveModelResponse` verifies and hydrates that exact entry for consumers and replay. Identity, parent, semantic payload, and digest must all match on retry. Core's later live synchronization sees that exact entry and does not append it again. Internal provider retries remain tentative and only the completed authoritative response reaches Session. Provider HTTP request and response envelopes are excluded before snapshots or completion, so URLs, query parameters, headers, and transport credentials never enter canonical Session state.
+const program = Effect.gen(function* () {
+  yield* Agent.generate(agent, { prompt: "My name is Ada.", sessionId: "user-42" })
+  return yield* Agent.generate(agent, { prompt: "What is my name?", sessionId: "user-42" })
+}).pipe(Effect.provide(services))
+```
 
-The same hosted model transition stores the post-usage driver checkpoint. Its deterministic token charge includes terminal reported usage plus each reported failed-attempt usage exactly once; a context estimate is used only when terminal usage is absent. Exact replay does not charge again. If the charge exceeds the remaining budget, Runtime still commits the paid response, compact operation reference, zero-remaining checkpoint, and semantic event together, then stops the run typed before any tool in that response executes.
+The shared `sessionId` makes the second run continue the first. Removing it disables Session even if `SessionDirectory` is available.
 
-The system message is not conversation. It is derived from current instructions on every Run and is never stored as a Session entry, so a Session resumed days later renders current guidance instead of the instructions captured on its first Run. Compaction checkpoints likewise store conversation only, and restoring a projection into Chat re-prepends the derived system message. Instruction sources should be cache-stable: content that changes on every render invalidates the provider prompt cache for the whole prefix.
+## What runs
 
-A same-run handoff is also a conversation projection boundary. Its durable outcome carries one deterministic, conversation-only `projectedHistory`, the exact source Session parent, stable handoff entry identity, and target. Memory, SQLite, PostgreSQL, and MySQL import or verify that self-contained `Handoff` entry in the same state transition or SQL transaction that succeeds the handoff operation, advances its driver checkpoint, and switches the active executable. Exact retries require the same identity, parent, full projection payload, checkpoint, and active path; divergent retries fail without changing any of them. `buildContext` starts at the latest Compaction or Handoff boundary and appends later entries, while `buildMemoryContext` remains lossless and ignores both projection markers. Runtime recovery reads that Session projection and never restores a handoff transcript from a Run record.
+```text
+Agent.generate(..., sessionId: "user-42")
+├── SessionDirectory.acquire("user-42")
+├── SessionStore.path()
+│   └── Session.buildContext(root-to-leaf path)
+├── prepend current derived system message
+├── sync non-system request prefix into Session
+├── Compaction.maybeCompact()
+│   ├── microcompact successful tool results
+│   └── maybe cut → summarize → appendCheckpoint()
+├── model.generateText(projected Prompt)
+└── commit ModelResponse + operation/event/checkpoint
+```
 
-A spawned child never shares its parent's session identity. Each child and each fan-out member derives its own session from the invocation that created it, so a subagent works in isolation and a replayed spawn reattaches to the same child Session instead of stranding the first attempt's work.
+## Data flow
 
-Durable storage belongs to hosts; Generalist ships SQLite, PostgreSQL, and MySQL implementations. Every durable dialect stores Session entries independently from Runs and commits conversation projections atomically with their owning execution transition.
+```text
+Message(id: "m1", user: "My name is Ada.")
+ModelResponse(id: "r1", assistant: "I will remember that.")
+Compaction(id: "c1", projectedHistory: [checkpoint, recent])
+Message(id: "m2", user: "What is my name?")
+        │ buildContext()
+        ▼
+Prompt [checkpoint, recent, user: "What is my name?"]
+        │ withDerivedSystem()
+        ▼
+Prompt [system: current instructions, checkpoint, recent, user]
+```
 
-Compaction is optional. With Session enabled, every changed projection commits through one checkpoint containing a stable id, expected parent leaf, exact projected Chat history, and the ordered telemetry outbox. A changed compaction also records a commit joining its compaction, optional summary model call, and checkpoint identities with before/after message and token measurements. Without a Tokenizer these counts are Generalist estimates, not provider-known exact tokenization; fields therefore mean known-or-estimated by Generalist. The store persists projection, telemetry, and commit atomically and handles only exact retries idempotently. This atomic outbox closes the state-transition crash window: the checkpoint is committed before Chat and path persistence advance, and its telemetry IDs are the same IDs observed live. An interrupted or failed remote append is ambiguous and remains unacknowledged locally. Process-loss recovery replays the outbox of an existing committed checkpoint; Generalist cannot recreate a lost prepared checkpoint. Exact replay is accepted even below an active descendant, while any changed telemetry order, payload, delivery ID, commit, projection, summary, parent, or checkpoint identity conflicts. A compaction entry is self-contained: it stores its projected history, so building context reads the newest checkpoint and never reads entries before it. The checkpoint owns recovery and telemetry replay; delivery consumers own idempotent acknowledgment by `(sessionId, deliveryId)`. A custom Compaction implementation that decides not to run returns `None` without opening a lifecycle. Once it starts work with `Compaction.withLifecycle(request)`, a successful `None` or unchanged result emits `CompactionSkipped`.
+`buildContext` starts at the latest `Compaction` or `Handoff` and appends descendants. `buildMemoryContext` ignores both boundaries and projects the lossless conversation path.
 
-When Compaction is enabled without a Tokenizer, fallback estimates preserve JSON-based text accounting but count each image file part as a bounded 1,600 tokens instead of counting its encoded data. Provider-reported input usage becomes the baseline only for append-only descendants of the exact prompt it measured; context rewrites and replacement finishes without valid input usage invalidate it. An unchanged threshold pass is suppressed only when usage and the conservative revision of plain JSON context values remain unchanged. Non-plain values, lossy JSON values, and values that throw during identity inspection have no revision and fail open toward another pass. Overflow bypasses suppression and clears it whether the pass succeeds, fails, or is interrupted.
+## Checkpoint lifecycle
 
-A dedicated summary-model layer is built through the owning scope's memo map and reused across compaction calls in that scope. Durable hosts reconstruct that layer from the exact summary-model registration and compose it with the pinned compaction service; they do not consult current model or compaction configuration on recovery.
+```text
+idle
+ ├─ threshold false / custom None ───────────────▶ idle
+ └─ threshold or overflow ─▶ Started
+       ├─ unchanged / successful None ─▶ Skipped
+       ├─ work or pre-commit failure ──▶ Failed
+       └─ changed ─▶ checkpoint committed ─▶ Applied
+```
 
-A compaction pass emits `CompactionStarted` before microcompaction or summary work, with its trigger and known pre-application measurements. A pass that finds no projection change emits `CompactionSkipped`; otherwise Session-backed `CompactionApplied` is committed inside the deterministic checkpoint telemetry and that exact event is published live after commit. `CompactionApplied` identifies the `microcompact` or `summarize` result and carries the authoritative checkpoint-backed commit. Work or pre-commit application failure and interruption after `Started` emit `CompactionFailed` and never `Applied`. Summary model work runs through the ordinary model-call lifecycle with purpose `compaction-summary`: its `CallStarted` carries the pass's `compactionId`, and the applied commit carries `summaryModelCallId` when a summary call ran.
+The default strategy first bounds successful tool outputs, then keeps a safe recent suffix and summarizes the older head. Cut points never separate a tool call from its result.
 
-Session entry identity, not projected message count, tracks sync progress. A normal append may carry `AppendOptions.id` with its exact `expectedLeafId`; the store accepts an identical identity, parent, and payload retry without advancing its sequence or leaf, and rejects changed parent or payload reuse as `SessionConflict` reason `entry-id-reused`. Exact retries remain valid below an active descendant but not after the entry's branch is abandoned. Agent Session sync derives each id from the logical model turn, the owning projection root (the latest compaction checkpoint or the initial root), and the message's absolute conversation position and role. Recovery after an ambiguous append therefore retries the committed entry, while a rewritten projection cannot reuse an earlier projection's position identity. Divergence or ambiguous alignment fails typed rather than guessing, and the failure carries bounded `SessionSync.Diagnostics`: identifiers, entry and message counts, alignment count, longest common prefix, and the first divergent roles, part types, and digests — never raw prompt, message, or tool payload text. Session remains authoritative when Compaction is absent; Compaction only changes how an already active Session projection is shortened.
+## Invariants
 
-Standalone Core preserves Session branch and idempotency checks but does not claim distributed write fencing. Hosted Runtime storage issues a Session-global monotonic epoch when it claims a Run and binds every Session mutation to that epoch plus the exact Run, worker, and Run attempt fence. Readers receive a read-only Session capability; a stale writer is rejected before mutation or exact-idempotent success.
+- `RunOptions.sessionId` is the only caller-supplied Session identity; setup acquires one exact store and same-ID lane for the Run scope and uses it for sync, compaction, resume, and same-run handoff.
+- `Session.layerMemory` keeps per-ID stores for its Layer lifetime, serializes ordinary Runs for one ID, and permits different IDs concurrently; IDs never share entries, leaves, or checkpoints.
+- SQLite (`generalist/runtime/sqlite-bun`), PostgreSQL (`generalist/pg`), and MySQL (`generalist/mysql`) provide durable keyed Sessions that survive restart; hosts own durable storage and atomically join conversation projections to execution transitions.
+- Session is the only model-history authority. Run rows, events, records, and operations are a separate crash-recovery journal, never model context or a transcript cache; deleting execution records cannot erase conversation.
+- Before a provider call, Core syncs the complete non-system request prefix, including user or steering input, with stable IDs derived from logical turn, projection root, absolute conversation position, and role.
+- The projection root is the latest compaction checkpoint or initial root. A rewritten projection cannot reuse an earlier projection's position identity.
+- Sync progress uses Session entry identity, not message count. Adjacent equivalent text parts are coalesced; ambiguous alignment or divergence fails typed instead of guessing.
+- Sync diagnostics contain only session ID, bounded counts, alignment/common-prefix facts, final entry tag, and first-divergence roles, part types, and digests—never raw prompt, message, or tool payload text.
+- A normal append may use an exact `id` and `expectedLeafId`; an identical identity, parent, and payload retry does not advance sequence or leaf.
+- Reusing an entry ID with changed parent or payload fails `SessionConflict` with `entry-id-reused`. Exact retries remain valid below an active descendant, but not after abandoning that branch; ambiguous appends are retried exactly.
+- Every admitted framework tool call has exactly one matching terminal result. Duplicate, mismatched, and unresolved histories are rejected before provider invocation, and successful Run settlement is rejected while calls remain unresolved.
+- Tool settlement appends proven, unknown, cancelled, or failed outcomes in the same transition or SQL transaction that settles the Run.
+- A terminal model operation atomically commits one normalized `ModelResponse`, compact operation reference, exactly one semantic event, and post-usage driver checkpoint. Operation results and response events retain Session/entry identity, input parent, attempt facts, usage, finish reason, and digest—not response content; `Runtime.resolveModelResponse` verifies and hydrates the exact entry. Retries must match identity, parent, payload, and digest; later sync does not duplicate it.
+- Internal provider retries remain tentative. Provider HTTP envelopes—including URLs, query parameters, headers, and credentials—never enter Session snapshots or completion state.
+- Token charge counts terminal reported usage plus every failed-attempt usage once, falling back to a context estimate only without terminal usage. Replay does not recharge; exhaustion still commits the paid response and zero budget, then stops before its tools execute.
+- System instructions are derived on every Run, never stored in Session or checkpoints, and are re-prepended after projection. Frequently changing instructions invalidate provider prompt-cache prefixes.
+- A `Handoff` stores deterministic conversation-only `projectedHistory`, source parent, stable identity, and target. Durable stores atomically import/verify it with handoff success, checkpoint advance, and executable switch; divergent retries change nothing.
+- Runtime recovery rebuilds handoff context from Session, not Run records. Spawned children and fan-out members use invocation-derived isolated Sessions; replay reattaches to the same child Session.
+- Compaction is optional and only shortens an active Session projection; Session remains authoritative without it.
+- Every changed Session-backed projection is one self-contained checkpoint: stable ID, expected parent, exact conversation-only projection, ordered telemetry outbox, optional summary, and optional commit linking compaction, summary call, and checkpoint with before/after measurements.
+- Checkpoint projection, telemetry, and commit persist atomically before Chat/path advance. Only exact retries are idempotent—even below descendants; changed identity, parent, projection, summary, telemetry order/payload/delivery ID, or commit conflicts.
+- A failed or interrupted remote checkpoint append is ambiguous and stays locally unacknowledged. Recovery can replay an existing checkpoint's outbox but cannot recreate a lost prepared checkpoint; consumers acknowledge idempotently by `(sessionId, deliveryId)`.
+- Without `Tokenizer`, counts are Generalist estimates and image file parts cost a bounded 1,600 tokens rather than encoded-data size.
+- Reported input usage is a baseline only for append-only descendants of that exact prompt; rewrites or replacement finishes without valid input usage invalidate it.
+- An unchanged threshold pass is suppressed only while usage and conservative plain-JSON context revision match. Non-plain, lossy, or throwing values fail open; overflow bypasses and clears suppression on success, failure, or interruption.
+- A custom strategy returning `None` before `Compaction.withLifecycle(request)` opens no lifecycle; after lifecycle start, successful `None` or unchanged work emits `CompactionSkipped`.
+- `CompactionStarted` precedes work with trigger and known pre-application measurements. Changed Session-backed work commits the exact `CompactionApplied` event before live publication; it identifies `microcompact` or `summarize` and carries the checkpoint-backed commit. Failure or interruption emits `CompactionFailed`, never `Applied`.
+- Summary calls use the normal model lifecycle with purpose `compaction-summary`; `ModelCallStarted` carries `compactionId`, and the applied commit carries `summaryModelCallId` when used.
+- The dedicated summary-model Layer is memoized per owning scope. Durable recovery reconstructs the pinned compaction service and exact summary-model registration, never current configuration.
+- Standalone Core enforces branches and idempotency but not distributed fencing. Hosted Runtime claims a Session-global monotonic epoch and binds every mutation to epoch, Run, worker, and attempt; readers are read-only and stale writers fail before mutation or idempotent success.
+
+## Related
+
+- Source: `packages/generalist/src/core/context/session.ts`, `packages/generalist/src/core/context/session-projection.ts`, `packages/generalist/src/core/context/session-sync.ts`, `packages/generalist/src/core/agent/session/`, `packages/generalist/src/core/agent/compaction-runtime.ts`, `packages/generalist/src/core/turn/compaction.ts`
+- Site: `/docs/learn/sessions-and-history`, `/docs/guides/compaction`
+- Decisions/tradeoffs: [Authoritative session history](../decisions/authoritative-session-history.md)

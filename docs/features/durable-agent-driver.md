@@ -1,61 +1,109 @@
 # Durable agent driver
 
-Core exposes a versioned durable agent driver contract, pinned `ExecutableRef` identity, and portable `RunBudget` limits shared by `generalist/runtime` and inline `Agent.stream` without importing SQL or runtime types into `generalist`.
+The driver pins executable identity and checkpoints each nondeterministic Agent operation around dispatch. A Runtime host journals those checkpoints and replays recorded outcomes instead of repeating unsafe work.
 
-## Executable identity
+## Usage
 
-Core uses opaque, schema-backed `AgentPin`, `ProgramPin`, `ModelPin`, `CapabilityPin`, and `ExecutablePin` strings. Every pin includes its kind, contract version, algorithm, and digest. A pin of the wrong kind or with a malformed SHA-256 digest fails schema decoding.
+```ts
+import { Effect } from "effect"
+import { Prompt } from "effect/unstable/ai"
+import { DurableDriver, RunBudget } from "generalist"
 
-Version-2 `AgentManifest` is the closed identity contract for one Agent. It covers exact instructions, one required opaque model pin, named tool, skill, and service capability pins, a closed portable policy or opaque policy pin, the bounded tool scheduling policy and its parallel-safe tool set, budget defaults, and a child-selection allowlist. The allowlist contains names only; it does not bind another Agent pin or encode a recursive graph. `AgentManifest.make` rejects duplicate names, capability pins, scheduling names, and child selections, sorts semantically unordered arrays, and owns the resulting `AgentPin`. `AgentManifest.fromLiveAgent` derives the scheduling policy from the live Agent and additionally verifies that caller-supplied tool pins exactly cover the live toolkit, portable policy data exactly matches the live policy snapshot, and budget data exactly matches the live Agent budget. A policy pin is accepted only when the live policy is opaque. Models, services, skills, and opaque policies remain explicit caller inputs because Agent introspection cannot prove their implementation identity.
+const program = Effect.gen(function* () {
+  const driver = DurableDriver.makeTracer([{ text: "done" }])
+  const checkpoint = yield* driver.initial({
+    prompt: Prompt.make("hello"),
+    budget: RunBudget.make({ modelCalls: 3, toolCalls: 2 }),
+  })
+  const decision = yield* driver.decide(checkpoint)
+  if (decision._tag !== "Execute") return decision
+  const applied = yield* DurableDriver.applyOperation(driver, checkpoint, { _tag: "Succeeded", value: {} })
+  return yield* driver.decide(applied) // Complete("done")
+})
+```
 
-Version-2 `ExecutableManifest` owns one canonical `profiles: [{ selection, agent }]` registry plus the finite tagged Agent and Program entry closure. Every Agent allowlist name must resolve through that registry, every registry mapping must be declared by an Agent and target an included Agent entry, and every entry and registry value participates in the executable digest. Profile resolution is not a graph edge: multiple profiles may allow one another or themselves without cyclic digests, and each profile Agent is defined once regardless of Runtime tree depth. Direct Program Agent-capability edges remain closed and acyclic. The constructor verifies every entry digest, canonical ordering and uniqueness, root and active membership, registry completeness, and exact entry closure before owning the `ExecutablePin`. `ExecutableRef { executable, active }` is the only durable Runtime reference. The public decoder accepts the pinned `{ ref, manifest }` pair and reruns every constructor invariant and digest check; manifests and refs cannot be decoded separately as executable authority. Callers cannot supply a digest to any manifest constructor.
+`makeTracer` is the in-memory conformance driver: it covers deterministic model/tool/wait keys, budget charging, and rejection of unknown outcomes without entering the live Agent loop.
 
-Pinned same-run handoff targets carry their exact Agent pin. The completed handoff operation persists the new active pin in the same driver checkpoint commit, and restart requires that exact executable and active identity. Direct standalone Agent execution remains viable without pins, but a supplied durable checkpoint is never accepted without an explicit executable identity.
+## What runs
 
-Canonical identity uses synchronous pure TypeScript SHA-256 over canonical UTF-8 JSON. Effect's Crypto service and Web Crypto digest are asynchronous and environment-provided, while these constructors are synchronous and used by Core in browsers, Bun, and Node without adding a platform layer. Known empty-string and `abc` vectors protect the cross-runtime implementation; there is no weak fallback.
+```text
+Agent.generate() / Agent.stream()
+└── DurableDriver.layerForRun()          one interpreter per Run
+    ├── model/tool/memory/... boundary
+    │   ├── driver.decide(checkpoint)    -> Execute(operation)
+    │   ├── journal.onScheduled(op, checkpoint)
+    │   │   ├── recorded outcome         -> replay, no dispatch
+    │   │   └── void                     -> dispatch Effect
+    │   ├── driver.apply(checkpoint, outcome)
+    │   └── journal.onCompleted(op, outcome, checkpoint)
+    └── checkpoint-only mutation
+        └── journal.onCheckpoint(checkpoint)
+```
 
-## RunBudget
+The Agent loop still chooses control flow. `DriverInterpreter` validates pending operations, charges budget, records outcomes, and mutates checkpoints; `decide` does not yet drive the whole loop. Inline interpretation preserves Effect failures, interruption, retry barriers, authorization, Prompt/Response behavior, and `AgentEvent` order. `DurableDriver.recorded` exposes the in-Run log to tests.
 
-`RunBudget` tracks allocation, remaining capacity, and tree depth separately from `Policy`. Limits cover model calls, tool calls, total tokens, child runs, same-run handoffs, max depth, and an ISO deadline. Authoring sets an agent default via `Agent.make({ budget })`; each run may narrow with `RunOptions.budget`. `RunBudget.resolve(agentDefault, runOverride)` merges those layers into one portable value.
+## Data flow
 
-`reserve` / `make` construct a root budget; `reserveChild` deducts an explicit child grant and consumes one child-run slot; `narrowChild` reduces a fresh child grant and returns the difference to the parent; `charge` deducts usage; `refundUnused` merges a completed child's remaining grant back into the parent. Grants cannot widen parent remaining on any dimension. Exhaustion fails typed as `RunBudget.Exhausted` at schedule boundaries (before execution begins), never mid-provider-stream; widening fails as `RunBudget.GrantWidened`.
+```text
+OperationSpec
+{ key: "turn:0:model", kind: "model", input: { turn: 0 },
+  replayPolicy: "never" }
+        │ makeOperation() + canonical JSON SHA-256
+        ▼
+DriverOperation
+{ key: "turn:0:model", kind: "model", input: { turn: 0 },
+  inputDigest: "<64 lowercase hex>", replayPolicy: "never" }
+        │ apply({ _tag: "Succeeded", value: ... })
+        ▼
+DriverCheckpoint
+{ driverVersion: "1", turn: 0, executable: { executable, active },
+  budget: { allocation, remaining, depth }, state: ... }
+```
 
-Inline process-local `AgentTool` children call `reserveChildBudget` before the nested run and `refundChildBudget` after, passing the reserved grant through `RunOptions.inheritedBudget`; `BudgetLimits.childRuns` and `BudgetLimits.depth` apply only to that inline nesting contract. Runtime-hosted `run_child`, `run_child_group`, `spawn`, and fan-out do not reserve or inspect those dimensions. Their sole recursive admission authority is the root-pinned Runtime `TreePolicy`. The Runtime fallback `agentBudget` therefore has no `childRuns` or `depth` defaults; it keeps model-call, tool-call, total-token, and same-run handoff safety caps without silently limiting a durable Run tree.
+Intercepted boundaries are model attempts (`never`), tools (executor-selected `provider-idempotent`, otherwise `never`), same-Run handoffs, proactive compaction, memory recall/remember and Session sync, structured output, and suspension checkpoints. Reactive overflow compaction stays inside its active model operation. Runtime messaging intercepts `send` separately as `never`.
 
-## Driver contract
+## Failure and recovery
 
-`DurableAgentDriver` exposes `initial`, `decide`, and `apply` over schema-backed `DriverCheckpoint`, `DriverOperation`, `DriverDecision`, and `OperationOutcome` values. Durable checkpoints carry `driverVersion`, the active `ExecutableRef`, a nonnegative safe-integer semantic turn, `RunBudget`, and opaque driver state; process-local standalone runs omit the durable reference. The checkpoint does not duplicate manifests, model coordinates, tool digests, or policy projections. Operations carry a deterministic `key`, bounded `kind` (`model`, `tool`, `memory`, `compaction`, `send`, `wait`, `handoff`, `structured-output`), serializable `input`, `inputDigest`, and `replayPolicy` (`pure`, `provider-idempotent`, `never`). Scheduling an operation advances the checkpoint to that operation's semantic turn and rejects turn regression; turnless setup work retains the restored checkpoint turn. Outcomes are `Succeeded`, `Failed`, or `Unknown`. Decisions are `Execute`, `Wait`, `Continue`, or `Complete`.
+```text
+restart from last fenced checkpoint
+├── persisted Succeeded / Failed -> decode and apply; no redispatch
+├── pure / provider-idempotent   -> host may redispatch same identity
+└── never + Unknown
+    └── DriverUnknownReplay / Runtime needs-resolution
+        └── explicit host resolution required
+```
 
-`DurableDriver.makeTracer(script)` is the canonical in-memory driver used by core tests. It exercises model, tool, wait, budget charging, deterministic operation keys, and unknown-outcome rejection without touching the live agent loop.
+For model work, call count is charged before dispatch; terminal and failed-attempt token usage settles with the completed response before `onCompleted`. A paid token overrun commits that response and zero budget, then fails typed before any authored tool starts.
 
-## Production integration
+Explicit `Runtime.cancel` first closes admission for the Run tree and marks admitted cancellable tool operations `cancelling`; return acknowledges durable admission plus local interrupt request, not terminal cancellation. After the owned execution exits, the same concrete executor may answer `Cancelled` or `AlreadyTerminal`; the Run stays cancelling until marked operations and descendants settle, while loss before acknowledgement leaves same-identity cancellation claimable. Non-cancellable ambiguous `never` work remains `unknown`/`needs-resolution`; ordinary interruption follows replay policy and is not semantic cancellation. Cancellation is the only preemptive Runtime control. Steering admitted during active model/tool work remains durable input for the next safe model boundary without interrupting or reclassifying current work; budgets also act only at safe boundaries.
 
-`Agent.stream` and `Agent.generate` construct one production `DriverInterpreter` layer per run via `DurableDriver.layerForRun`. The interpreter wraps `makeLoopDriver` and schedules every nondeterministic effect boundary through `decide` → execute → `apply`:
+## Invariants
 
-- **Model turns** — `interceptStream` per attempt in `model-turn-driver.ts` with `never` replay policy. The Runtime must settle the persisted outcome before recovery because an interrupted provider call is never re-dispatched automatically. Model calls charge at schedule time. The completed model outcome carries terminal usage plus reported failed-attempt usage, and driver application settles that deterministic token charge before `onCompleted`, so Runtime commits the Session response and post-usage checkpoint together.
-- **Tool execution** — `intercept` in `tool-execution.ts` with the concrete `ToolExecutor.replayPolicy?(request)` selection, defaulting to `never`. The selector is synchronous and runs before scheduling. Its only opt-in value is `provider-idempotent`; recovery then re-enters execution with the same `ToolContext.operationKey` / `idempotencyKey`. A concrete executor with `cancel` also places the exact request in that same durable operation record before dispatch. Static tools, handoffs, skill activation, and executor routes without an explicit selection remain non-replayable and non-cancellable.
-- **Same-run handoff** — `intercept` around requested/completed/rejected `handoff` operations in `handoff-runtime.ts`; handoff tools dispatch through the agent loop rather than nested child runs.
-- **Compaction** — `intercept` around proactive `maybeCompact` and `applyCompactionResult`; reactive overflow compaction runs inline inside an active model operation without a separate driver record.
-- **Memory / session** — `intercept` for recall, remember, and `syncSession` in `compaction-runtime.ts`.
-- **Structured output** — `intercept` in `run-loop.ts`.
-- **Suspension** — one schema-backed authored-order tool-batch checkpoint carries each call's exact `Ready`, `Scheduled`, `Waiting`, `Completed`, `Unknown`, or `Cancelled` state. `Scheduled` durably binds the admitted operation digest and replay policy so parallel calls charge once and recovery reconciles without repeating authorization. Driver checkpoint mutations persist the batch; resume validation checks targeted resolutions and updates only those calls when `RunOptions.resume` is set.
+- `AgentPin`, `ProgramPin`, `ModelPin`, `CapabilityPin`, and `ExecutablePin` encode kind, version, SHA-256 algorithm, and a 64-lowercase-hex digest; wrong kinds and malformed digests fail decoding.
+- Canonical identity uses synchronous pure-TypeScript SHA-256 over canonical UTF-8 JSON, with empty-string and `abc` vectors and no weak fallback; constructors remain synchronous and platform-independent.
+- Version-2 `AgentManifest` pins exact instructions, model, named tools/skills/services, portable-or-opaque policy, tool scheduling and parallel-safe names, compaction/program authority when present, budget defaults, and child-selection names.
+- `AgentManifest.make` rejects duplicate names, pins, scheduling names, and child selections, sorts unordered arrays, and owns the digest; callers never provide manifest digests.
+- `fromLiveAgent` requires tool pins to exactly cover the toolkit, portable policy and budget to equal live snapshots, and a pinned policy only for an opaque live policy; model, service, skill, and opaque-policy identity stays caller-supplied.
+- Version-2 `ExecutableManifest` has one canonical profile registry and finite Agent/Program entry closure. Every declared selection resolves to an included Agent, every profile is declared, and every entry/profile affects the digest.
+- Profiles are selection lookup, not digest graph edges, so profiles may self- or mutually select. Direct Program-to-Agent capability edges remain closed and acyclic.
+- Executable construction verifies entry digests, sorted uniqueness, root/active membership, profile completeness, and exact connected closure. Public decode accepts only `{ ref, manifest }` and reruns all checks.
+- `ExecutableRef { executable, active }` is the durable Runtime reference. A persisted checkpoint requires exact executable pin, active pin, and driver version; standalone execution may omit pins, but a supplied durable checkpoint may not.
+- A successful pinned handoff commits its exact target Agent pin as `active` in the same checkpoint commit; restart requires that identity.
+- `RunBudget` separately tracks allocation, remaining capacity, and depth for model calls, tool calls, tokens, child runs, handoffs, depth, and ISO deadline; a Run override can only narrow the Agent default.
+- `make` creates a root budget; `reserveChild` consumes one child slot and a grant, `narrowChild` refunds the reduction, `charge` deducts use, and `refundUnused` returns remaining child capacity. Widening is `GrantWidened`; schedule-boundary exhaustion is `Exhausted`, never mid-provider-stream.
+- `childRuns` and `depth` govern only inline `AgentTool`/`delegateTool` nesting via reserve, inherited budget, and refund. Runtime child/group/spawn/fan-out admission uses only root-pinned `TreePolicy`; Runtime fallback budgets omit those dimensions.
+- A checkpoint contains driver version, optional active executable ref, nonnegative finite integer turn, budget, and opaque state—not manifests, model coordinates, tool digests, or policy projections. Operation scheduling separately requires a nonnegative safe-integer turn and rejects regression; turnless setup retains the restored turn.
+- Operation kinds are `model`, `tool`, `memory`, `compaction`, `handoff`, `send`, `wait`, and `structured-output`; outcomes are `Succeeded`, `Failed`, or `Unknown`; decisions are `Execute`, `Wait`, `Continue`, or `Complete`.
+- Operation input alone determines `inputDigest`. A tool replay selector runs synchronously before scheduling; only explicit `provider-idempotent` opt-in may redispatch with the same `ToolContext.operationKey`/`idempotencyKey`.
+- Only a concrete executor exposing `cancel` is cancellable, and its exact request is persisted with the operation. Static tools, handoffs, skill activation, and routes without opt-in remain non-replayable and non-cancellable.
+- One authored-order batch checkpoint owns each sibling call's `Ready`, `Scheduled`, `Waiting`, `Completed`, `Unknown`, or `Cancelled` state. `Scheduled` binds digest and replay policy, charges once, and prevents repeated authorization; resume updates only validated targets.
+- Runtime operation rows remain dispatch and ambiguity authority; the batch checkpoint remains reconstruction authority. Restored semantic turn and next model ordinal keep operation/call/attempt identity stable and skip settled or waiting siblings.
+- Session is only the model-transcript projection. Durable persistence, events, keyed waits, same-Run resume, and worker orchestration belong to `generalist/runtime`.
+- A `send` crash between journal admission and mailbox insertion becomes `Unknown`; replayed success returns its recorded receipt without crossing messaging again.
+- Isolated `Handoff.register` and `fanOut` children do not inherit the parent interpreter; inline tree-budget reservation covers only `AgentTool`/`delegateTool` children.
 
-Control flow still lives in `run-loop.ts`, `model-turn.ts`, and related modules. The driver validates pending operations, charges `RunBudget`, records outcomes, and maintains checkpoint state; it does not yet choose the next loop step (that remains pending-operation-driven rather than fully decide-driven).
+## Related
 
-Inline runs interpret operations immediately through existing Effect services. Typed failures, interruption, retry barriers, authorization, and Prompt/Response behavior are unchanged; `AgentEvent` ordering is unchanged.
-
-## Runtime seam
-
-`DriverInterpreter` is the single interpreter service agents use at effect boundaries. Optional `DriverJournal` merges a host journal (`onScheduled`, `onCompleted`) into the run layer so `generalist/runtime` can intercept or persist operations without importing runtime concepts into core. `DurableDriver.recorded` exposes the in-run operation log for tests.
-
-`DurableDriver.guardUnknownNeverReplay` rejects `Unknown` outcomes for operations with `never` replay policy before re-execution, failing typed as `DriverUnknownReplay`.
-
-Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. Hosted operation rows remain dispatch and ambiguity authority; the authored-order batch checkpoint owns reconstruction. Core restores both the semantic turn and instrumentation's next model-call ordinal from that checkpoint's durable loop state, so partial sibling resumes do not replay settled or waiting calls, a completed batch's following model call advances to the next turn, and operation, call, and attempt identities remain stable across restart. An explicit `turnStart` may advance a safe checkpoint but turnless setup work cannot reset it. Model usage is part of its operation completion checkpoint; other checkpoint-only mutations still pass through the journal. Durable persistence, Agent event projection, keyed waits, same-Run resume, and worker orchestration live in `generalist/runtime`, not core. Session remains only the model-transcript projection.
-
-An explicit Runtime cancellation transaction first closes operation admission for the target Run and descendants and marks every admitted cancellable tool operation `cancelling`. Returning from `Runtime.cancel` acknowledges that durable admission and a process-local interrupt request, not terminal cancellation. The hosted execution remains process-locally owned until its actual exit. Only then may a RunExecutor invoke the selected concrete executor's `cancel` capability. `Cancelled` records the operation as cancelled; `AlreadyTerminal` records its supplied terminal outcome. The Run remains cancelling until every marked operation and active descendant reaches that definitive point. A host loss before acknowledgement persistence leaves the operation claimable for same-identity redelivery. An ambiguous non-cancellable `never` operation instead remains `unknown` with the Run in `needs-resolution` until explicit resolution. Ordinary execution interruption uses the operation's existing replay policy and never enters this semantic cancellation path. `Runtime.cancel` is the only preemptive Runtime control: an interruptible active model or tool observes its interruption immediately. Budgets and steering are safe-boundary controls instead. A paid model-token overrun commits that response before failing typed and before any authored tool starts. Steering admitted during a model or tool batch remains durable input for the next safe model boundary and does not interrupt, discard, or reclassify current work.
-
-`send` is intercepted by `generalist/runtime`'s addressed messaging (`Messaging.make`) rather than by the core loop: one send from inside an execution is scheduled as a `send` operation with `never` replay policy, so a crash between the journal record and the mailbox insert settles as `Unknown` for explicit resolution instead of duplicating or losing a delivered message. A replayed success returns the recorded receipt without crossing the boundary again. See `docs/features/addressed-messaging.md`.
-
-## Not yet intercepted
-
-- **Isolated `Handoff.register` / `fanOut` children** — still run without the parent interpreter; tree budget reservation for nested runs applies to inline `AgentTool` / `delegateTool` children only.
+- Source: `packages/generalist/src/core/durable/driver.ts`, `packages/generalist/src/core/durable/driver/`, `packages/generalist/src/core/durable/manifest/`, `packages/generalist/src/core/durable/run-budget.ts`
+- Site: `/docs/learn/native-runtime`, `/docs/learn/sessions-and-history`
+- Decisions/tradeoffs: [`runtime-outside-core`](../decisions/runtime-outside-core.md), [`authoritative-session-history`](../decisions/authoritative-session-history.md)

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.45.0",
+  "version": "0.45.1",
   "private": false,
   "license": "MIT",
   "type": "module",

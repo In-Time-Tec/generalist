@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.45.1
+
+- Rework the documentation. The repository and package READMEs are shorter and plainer, `docs/README.md` maps the Diátaxis-structured documentation, and every feature now has a dedicated code-first document under `docs/features/` — including new pages for middleware, structured output, durable stores, Cloudflare, Rivet, A2A, and AG-UI. The docs site model catalog reference now names the current `find`/`get`/`list` API. No runtime behavior changes.
+
 ## 0.45.0
 
 - Rename the project from TenetKit to **Generalist** and consolidate to one package: `tenetkit` → `generalist`, and the adapter packages `@tenetkit/pg`, `@tenetkit/mysql`, `@tenetkit/cloudflare`, and `@tenetkit/rivet` fold into the same `generalist` package as subpath exports — `generalist/pg`, `generalist/mysql`, `generalist/cloudflare/{workers,durable-objects,dynamic-workers}`, and `generalist/rivet/actors`. One tarball, one version, one install; each adapter's host dependencies (`pg`, `@effect/sql-pg`, `@effect/sql-mysql2`, `@effect/sql-sqlite-do`, `es-module-lexer`, `rivetkit`, `@standard-schema/spec`) are optional peers, so consumers install only what their imported subpaths need. `TENETKIT_*` environment variables → `GENERALIST_*`. Boundary error tags, service keys, and the snapshot codec move from `tenetkit/...` to `generalist/...`; durable registrations pinned under an old codec must be re-pinned. Versions up to 0.44.0 remain published under the old names.

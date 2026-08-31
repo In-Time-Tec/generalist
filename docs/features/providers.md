@@ -1,29 +1,120 @@
 # Providers
 
-Core selects models through provider-agnostic `ModelRegistry` registrations. Registrations use one canonical provider, model, and optional registration-key identity in an immutable hash map. A missing registration fails typed.
+Provider leaves register concrete Effect AI model layers in `ModelRegistry`; callers select one exact `{ provider, model, registrationKey? }` for each run. Missing identities fail with typed `LanguageModelNotRegistered`; per-run model layers bypass selection, and core never imports provider SDKs.
 
-The registry builds each selected model layer once in its own scope and reuses it for the registry lifetime. `withModel` retains an optional semaphore permit for the whole Effect. `stream` retains its permit through stream consumption, including failure, interruption, and early downstream termination. Per-run model layers bypass registry selection.
+## Usage
 
-There is no executable `generalist/ai` aggregate. Provider-neutral catalog, deterministic model, and route owners live at `generalist/ai/model-catalog`, `generalist/ai/deterministic`, and `generalist/ai/model-route`. Provider adapters and embeddings are available only from exact leaves, whose runtime and declaration closures require only `effect` and that leaf's documented optional peer. OpenAI owns `layerOrDeterministic`; the provider-free deterministic entry never imports OpenAI. OpenAI and OpenAI-compatible embeddings live at `generalist/ai/openai-embedding` and `generalist/ai/openai-compatible-embedding`. Amazon Bedrock is Node-only because its exact entry owns the AWS default credential chain. Core never imports provider SDKs.
+```ts
+import { Config, Console, Effect } from "effect"
+import { LanguageModel, ModelRegistry } from "generalist"
+import { layer as openAiLayer } from "generalist/ai/openai"
+import { FetchHttpClient } from "effect/unstable/http"
 
-OpenRouter persisted request configuration is decoded against the pinned adapter's generated chat-request schema, excluding model and transport-owned message, response-format, tool, and streaming fields. Routing, provider preferences, plugins, and trace settings therefore retain their public typed shapes and reject excess or cross-provider fields. Each registration selects the same Anthropic, OpenAI, or default structured-output schema codec as the upstream adapter from its own model id.
+const models = openAiLayer({
+  model: "gpt-4o-mini",
+  apiKey: Config.redacted("OPENAI_API_KEY"),
+})
 
-`ModelRoute.make` constructs one exact registry selection for an immutable ordered candidate route. Retries remain on the active candidate; after bounded retries, only provider-approved availability failures advance once to the next candidate. Cancellation and unknown durable outcomes never advance. Authentication, invalid requests, schema and tool-input failures, context overflow, token budgets, and other terminal failures remain on the active candidate. Streaming never advances after reasoning, text, or a validated tool call escapes. Attempt ordinals remain global across retries and candidates, telemetry identifies the candidate registration on every attempt, and failed-attempt usage remains separate from successful terminal usage.
+const program = ModelRegistry.withModel(
+  { provider: "openai", model: "gpt-4o-mini" },
+  LanguageModel.generateText({ prompt: "Summarize the incident." }),
+).pipe(Effect.flatMap((result) => Console.log(result.text)))
 
-Released provider registrations accept user-message image file parts with `image/png`, `image/jpeg`, `image/gif`, or `image/webp`. Image data may be a `Uint8Array`, canonical bare base64, a canonical `data:<MIME>;base64,<data>` string whose MIME type matches the part, or a `URL` object. Generalist normalizes both string forms to bytes before the provider adapter runs and rejects malformed data, MIME mismatches, unsupported image MIME types, and assistant-message images before transport. OpenAI Responses, OpenAI-compatible Responses and Chat Completions, Anthropic, and OpenRouter preserve remote URL sources; Amazon Bedrock rejects them explicitly because Converse requires bytes.
+Effect.runPromise(program.pipe(Effect.provide(models), Effect.provide(FetchHttpClient.layer)))
+```
 
-Amazon Bedrock registrations use Converse and ConverseStream and accept arbitrary foundation-model, inference-profile, and ARN identifiers. They map Effect prompts, images, documents, tools, structured output, cache points, and signed or redacted reasoning directly to Converse. Stream finish waits for Bedrock's metadata event so request identity, stop reason, final token/cache usage, metrics, trace, and additional response fields are retained; Bedrock output usage is not split into fabricated reasoning tokens. Request and stream failures map to typed authentication, throttling, invalid-request, or transient-provider semantics. Known events obey a strict message and content-block lifecycle, truncation fails typed, and unknown future AWS union members are ignored without allowing malformed known sequences.
+## What runs
 
-The client supports SigV4 through the refreshable AWS SDK v3 Node default credential chain and Bedrock bearer authentication through `AWS_BEARER_TOKEN_BEDROCK` or an explicitly redacted token. The chain supports environment credentials, shared profiles and roles, SSO and AWS CLI login caches, credential processes, web identity, ECS, and IMDS. Region, endpoint, profile, and authentication mode are configuration; credentials are never registration metadata. An optional host recovery effect is coalesced by rejected credential generation and followed by one forced refresh and replay only for explicit expired-token rejection before stream output. Tests and local development inject credentials and transport and do not consult ambient AWS state.
+```text
+ModelRegistry.withModel({ provider: "openai",
+                          model: "gpt-4o-mini" })
+├── resolve ["openai", "gpt-4o-mini", null]
+├── build the registered LanguageModel layer once per registry scope
+├── provide provider/model identity and registration metadata
+└── LanguageModel.generateText("Summarize the incident.")
+    └── @effect/ai-openai Responses client
+        └── host-provided HttpClient
+```
 
-The first-class `OpenAI` registration and configurable `OpenAIResponses` adapter use the Responses API. `OpenAIChatCompletions` uses the Chat Completions API; OpenAI-compatible presets use this adapter. Both compatible adapters accept arbitrary provider and model identities plus a configurable base URL. Their persisted-option decoders keep the selected model authoritative: Responses options follow the OpenAI schema, while Chat Completions accepts arbitrary JSON provider extensions but rejects a nested model override. Responses registrations normalize nested SSE `error` frames and `response.failed` payloads into the flat shape the Effect AI stream schema expects. OpenAI, Anthropic, and OpenRouter registrations then promote decoded provider error parts to typed `AiError` failures before they reach core. Known server overload, timeout, and rate-limit failures are retryable; request, authentication, permission, content-policy, and quota failures are terminal; unknown codes stay terminal. Provider code and bounded messages are retained, while provider type and request identity are included when the upstream adapter exposes them; arbitrary payloads are never copied. `normalizeResponsesSSE` remains exported for callers that build their own OpenAI clients.
+## Provider leaves
 
-OpenAI, Anthropic, and OpenRouter registrations classify context-window rejection from provider-specific structured metadata and narrow provider messages. The agent loop consults only the selected registration before reactive compaction, and context overflow stays outside ordinary provider retry. Unknown OpenAI-compatible endpoints classify no failures by default; callers can opt into a known `FailureClassifier` through `OpenAIResponses.Options.classifyFailure` or `OpenAIChatCompletions.Options.classifyFailure`.
+There is no executable `generalist/ai` aggregate. Each exact leaf closes over only `effect` and its optional upstream peer.
 
-The OpenAI account registration resolves host-owned credentials for each Responses request. Generalist fixes the account endpoint, adds bearer and account headers, preserves Responses request and stream conversion, and permits one refresh callback and replay only for a pre-emission 401. The rejected credential generation is passed to the host callback for refresh serialization. Generalist does not follow account-response redirects, retry a second 401 or another failure, or place account credentials in registration identity and metadata.
+| Import                                                                                                           | Upstream peer                                                                           |
+| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `generalist/ai/openai`, `openai-responses`, `openai-embedding`                                                   | `@effect/ai-openai`                                                                     |
+| `generalist/ai/anthropic`                                                                                        | `@effect/ai-anthropic`                                                                  |
+| `generalist/ai/openrouter`                                                                                       | `@effect/ai-openrouter`                                                                 |
+| `generalist/ai/openai-chat-completions`, `openai-compatible`, `openai-compatible-embedding`                      | `@effect/ai-openai-compat`                                                              |
+| `generalist/ai/amazon-bedrock`                                                                                   | `@aws-sdk/client-bedrock-runtime`, `@aws-sdk/credential-provider-node`, `@smithy/types` |
+| `generalist/ai/deterministic`, `model-catalog`, `model-route`, `openai-account-auth`, `openai-account-auth-http` | none                                                                                    |
 
-The account endpoint is streaming-only and rejects any request body that does not set `stream`. The account client therefore issues every Responses request as a stream and satisfies the non-streaming `createResponse` contract by folding the terminal `response.completed` or `response.incomplete` event, whose payload is schema-identical to a non-streaming response. `generateText` and `generateObject` — and therefore compaction summaries, working-memory summaries, and structured output — behave the same on account routes as on API-key routes. A stream that ends without a terminal event fails typed rather than returning an empty response. The account endpoint exposes no embeddings route, so account `createEmbedding` fails typed instead of posting to Responses.
+OpenAI and configurable OpenAI Responses use `/responses`; Chat Completions and all seven compatible presets use `/chat/completions`. Compatible adapters accept arbitrary provider/model identities and base URLs. Responses config rejects excess and transport-owned fields; Chat Completions accepts JSON extensions but rejects `model` overrides. OpenRouter applies its generated request schema, preserves routing/preferences/plugins/trace shapes, and chooses Anthropic, OpenAI, or default structured-output codecs from the model id.
 
-Generalist owns the reusable OpenAI account OAuth protocol, including PKCE and authorization URL construction, device polling, token exchange and refresh status handling, token-document construction and rotation, expiry, account fingerprint validation, and generation-aware acquire and rejected-refresh behavior. The standard HTTP layer uses the host-provided Effect `HttpClient` and rejects redirects.
+Amazon Bedrock is Node-only and accepts foundation-model IDs, inference-profile IDs, and ARNs. It maps prompts, supported files, tools, structured output, cache points, and signed/redacted reasoning to Converse; ConverseStream waits for metadata before finishing so identity, stop reason, usage/cache, metrics, trace, and additional fields survive without fabricated reasoning usage.
 
-The host owns browser launch and callback UX, device instructions, credential-to-profile fingerprint mapping, and the repository implementation. `CredentialStore.serialized` delegates coordination to that host implementation, including durable cross-process coordination when needed. These boundaries are `BrowserAuthorization`, `DeviceAuthorizationPresenter`, and `CredentialStore` services; Generalist does not select a filesystem, database, or process UX. The auth service maps to account Responses credentials only when the current credential matches the product-provided profile fingerprint, without exposing secrets or account identifiers in adapter errors.
+## Model catalog
+
+```text
+{ provider: "openai", model: "gpt-4o-mini" }
+    │ ModelCatalog.get()
+    ▼
+{ contextWindow: 128000, maxOutput: 16384,
+  pricing: { inputPerMTok: 0.15, outputPerMTok: 0.6 },
+  modalities: ["text", "image"] }
+```
+
+`bundled` is a hand-maintained six-model snapshot. `layer(overrides)` replaces matching provider/model entries while preserving order; `layerTest(entries)` uses exactly its input. `find` returns `undefined`; `get` fails with typed `NotFound`; `list` returns all entries.
+
+## Model routes
+
+```text
+candidate 0: openai/gpt-4o-mini
+├── retryable failure → retry candidate 0
+├── approved availability failure → candidate 1 once
+└── text/reasoning/tool call escaped → never advance stream
+candidate 1: anthropic/claude-3-5-haiku-latest
+```
+
+`ModelRoute.make` requires a non-empty immutable ordered registration tuple and provider-owned availability semantics for every candidate. It returns one exact synthetic selection plus registration. Cancellation, unknown outcomes, auth/request/schema/tool/context/token failures stay terminal; attempt ordinals span retries and candidates, telemetry identifies each candidate, and failed usage stays separate from terminal success usage.
+
+## Deterministic model and embeddings
+
+- `Deterministic.layer()` registers `deterministic/deterministic` and always emits `"deterministic response"`; it imports no provider.
+- OpenAI's `layerOrDeterministic` always registers the requested fallback and adds OpenAI only when API-key config is present; invalid or failing config remains typed.
+- `openai-embedding.layer({ model, apiKey, clientConfig?, config? })` provides `EmbeddingModel` through `@effect/ai-openai`.
+- `openai-compatible-embedding.layer({ model, baseUrl, apiKey?, clientConfig?, config? })` targets an arbitrary compatible endpoint.
+- Both embedding layers require a host `HttpClient`; the OpenAI account endpoint has no embedding route and fails typed.
+
+## OpenAI account auth
+
+```text
+request → acquire credential generation G1 → fixed account endpoint
+  ├── success → Responses stream
+  └── pre-emission 401 → refreshRejected(G1) → replay once
+      └── second 401/other failure → typed failure
+```
+
+Generalist owns PKCE, authorization/device flows, polling, token exchange/refresh, token documents, rotation, expiry, fingerprint validation, and generation-aware acquire/refresh. The host owns browser/callback UX, device instructions, profile fingerprints, and `CredentialStore`, whose `serialized` operation supplies any required durable cross-process coordination; the standard HTTP layer uses the host `HttpClient` and rejects redirects.
+
+The account client fixes the endpoint and bearer/account headers without putting credentials in registration identity or metadata. Every request streams; non-streaming generation folds `response.completed` or `response.incomplete`, and a stream without either fails typed. Credentials map to Responses only when their fingerprint matches the product profile, and adapter errors expose neither secrets nor account IDs.
+
+## Invariants
+
+- Registration identity is canonical `(provider, model, registrationKey?)` in an immutable hash map; later writes of the same identity replace the entry.
+- A selected layer is built once in the registry scope and reused for that registry lifetime.
+- `withModel` holds an optional semaphore permit for the whole Effect; `stream` holds it through failure, interruption, consumption, and early termination.
+- Provider layers provide `ModelRegistry`, not `LanguageModel`; combine independent provider registries with `ModelRegistry.layerMerged`, not `Layer.mergeAll`.
+- All provider config decoders fail through typed `Schema.SchemaError`; the selected model remains authoritative.
+- Released providers accept user image parts only as PNG, JPEG, GIF, or WebP bytes, canonical bare base64, matching canonical data URLs, or `URL` objects; malformed data, MIME mismatch, unsupported MIME, and assistant images fail before transport.
+- OpenAI Responses, both compatible protocols, Anthropic, and OpenRouter preserve remote image URLs; Bedrock rejects URLs because Converse requires bytes.
+- OpenAI, Anthropic, and OpenRouter promote decoded provider error parts to typed `AiError`: overload, timeout, and rate limit are retryable; request, auth, permission, content-policy, quota, and unknown codes are terminal. Messages/codes are bounded, known identity metadata is retained, and arbitrary payloads are discarded.
+- OpenAI, Anthropic, and OpenRouter classify context overflow from narrow structured evidence; reactive compaction consults only the selected registration and does not treat overflow as ordinary retry.
+- Unknown compatible endpoints classify no failures unless given `classifyFailure`; `normalizeResponsesSSE` remains public for custom OpenAI clients.
+- Bedrock uses strict known-event lifecycle validation, typed truncation/request/stream failures, and ignores unknown future AWS union members. Tests inject credentials/transport and do not read ambient AWS state.
+- Bedrock auth uses a refreshable AWS Node default chain or redacted bearer token; configuration owns region/endpoint/profile/mode, never registration metadata. Expired-token recovery is coalesced by rejected generation, then forced-refreshes and replays once only before output.
+
+## Related
+
+- Source: `packages/generalist/src/ai/...`
+- Site: `/docs/guides/providers`, `/docs/reference/providers`

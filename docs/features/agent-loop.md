@@ -1,30 +1,119 @@
 # Agent loop
 
-Model lifecycle events receive one stable delivery identifier from the run and retain it through checkpoint persistence and replay; IDs are never recomputed. An optional `ModelTelemetry.Sink` receives immutable ordered `{ sessionId, events }` batches with backpressure before live stream emission. A successful callback acknowledges exactly that batch; typed failure does not acknowledge or emit it live, and interruption remains interruption. Delivery failure is ambiguous and is reconciled with the sink; Session is reconciled only when the exact batch was checkpointed. Hosts deduplicate within `(sessionId, deliveryId)`. Without Session, callback durability is only as strong as the host's sink implementation.
+An `Agent` is a plain definition; `Agent.stream` runs model turns, schedules framework tools, and emits the authoritative event stream. `Agent.generate` consumes that same stream into a final text or structured result.
 
-`generalist` runs a non-durable model-turn loop over Effect AI `Prompt`, `Response`, `Chat`, tools, and language models. Turn zero always runs. Later turns run only while the turn policy continues with pending tool results. The default policy is `Policy.forever`: the loop continues until a turn leaves no pending tool results, and a follow-up cap is an explicit author choice via `Policy.recurs(n)`.
+## Usage
 
-- Middleware-transformed response parts are authoritative for events, history, tools, memory, sessions, and compaction.
-- Transformed tool-call ids must be unique within one model response. A duplicate fails before that call starts work.
-- Framework tool results enter Chat once, in call order, before Session sync, memory retention, policy evaluation, and `TurnCompleted`.
-- Framework tool calls use one Agent-owned `toolScheduling` policy. The safe default makes every call exclusive. `parallelSafe` opts named tools into bounded concurrency up to `maxConcurrency`; every unlisted call is an authored-order barrier, so earlier work settles before it starts and later work cannot pass it. Every admitted sibling in the current stage settles to `Waiting`, `Completed`, `Unknown`, or `Cancelled` before the stage suspends. Waiting and completed siblings are checkpointed and never re-executed on a partial resume. Lifecycle and progress events stream as concurrent calls produce them, while tool results, Session projection, and follow-up model input remain in provider call order; a follow-up model call waits for every authored framework call to resolve. Provider-executed calls are never run locally.
-- Declared tool failures remain schema-valid domain results. Routing, schema, handler-boundary, placement, and authorization failures terminate through typed `FrameworkFailure` values.
-- A policy stop with pending results is typed. It never silently drops results.
-- `Agent.allocateRun` allocates one scoped process-local Run ID, lazy event stream, and producer-only `steer` / `followUp` handle. `Agent.stream` and `Agent.generate` are scoped convenience projections over the same path; `output` selects structured output. `history` is a process-local seed, while `sessionId` selects the authoritative Session when a `SessionDirectory` is present and never selects an inbox.
-- Each process Run owns separate steering and follow-up lanes. Steering defaults to draining all pending inputs at the next safe post-tool boundary; follow-up defaults to one input whenever the Run would otherwise complete. Each lane defaults to 64 entries, both share a 1 MiB canonical encoded-prompt bound, and overload fails typed unless process-local backpressure is requested. Offer, drain, completion, and close share one transactional state: an offer that commits first causes another turn, completion that commits first closes admission, and failure, interruption, or scope close discards remaining process-local input and wakes blocked producers. Core retains no Run registry or terminal tombstone; process loss is lossy.
-- An agent's only default model is its visible `model` selection, resolved through `ModelRegistry` at run time. A registry-free agent retains `LanguageModel` in its requirements and receives a concrete model layer at the run boundary.
-- Agent requirements remain visible through model selection, the direct-model requirement channel, memory, tool handlers, policies, handoffs, and transport composition.
-- Every loop-owned model call emits `ModelTelemetry` lifecycle events into Core's process-local `AgentEvent` stream: call started/completed/failed, attempt started/first-output/completed/failed, and retry scheduled. A stable `modelCallId` joins one prepared input across every provider attempt; `modelAttemptId` plus a 0-based `attempt` ordinal name each provider invocation; each live `ModelPart` carries all three. `ModelPart` is never a durable Runtime event: Runtime stores one normalized semantic completion or terminal interruption instead. Purposes are bounded (`conversation`, `structured-output`, `compaction-summary`).
-- Telemetry timestamps are sampled from the Effect Clock at real operation boundaries (call/attempt start, first reasoning/text/tool-call output, usage receipt, completion, failure, retry acceptance), never derived from sequence offsets. Events are delivered in causal order, flushed into the stream at the next event boundary or stream end; external interruption does not deliver in-flight telemetry to the interrupted consumer.
-- A completed attempt always carries the provider's terminal `finish` part, so `AttemptCompleted` requires usage, `usageAt`, and finish reason. Non-empty Effect AI `FinishPart.metadata` is emitted unchanged as `providerMetadata`: Generalist neither invents a common billing shape nor discards provider fields such as OpenRouter's native usage and cost details. Request id, returned model, service tier, and provider metadata stay optional; absent means unknown, never zero. Failures map onto bounded provider-neutral categories. The agent loop defaults to two retries for provider rate limits, internal failures, and transport failures with 2s and 4s backoff inside the same turn, bounded by a 30s schedule window; a supplied `ModelResilience` replaces that policy and `ModelResilience.none` disables it. Every accepted retry emits `RetryScheduled` with classification, category, and backoff delay. Telemetry never carries prompts, model bodies, credentials, or HTTP headers.
-- A completed model operation carries one deterministic token charge: terminal reported input plus output usage, or the existing context estimate when terminal usage is absent, plus every reported failed-attempt provider usage. The driver settles that charge before its completion journal callback. An overrun commits the paid response with zero remaining tokens, then fails typed before tool execution or another model call.
-- A provider `error` part is resolved to a typed `AiError` and promoted to a failed attempt before telemetry and replay accounting. Released OpenAI, Anthropic, and OpenRouter registrations preserve their known provider semantics. Unknown custom payloads become bounded terminal `UnknownError` values; a custom `ModelResilience.resolve` can map a known payload before classification.
-- A provider part stream that reaches a clean end without its terminal `finish` part fails the attempt with `Truncated` and category `truncated-stream`. `ModelResilience.streamIdleTimeout` optionally fails an idle pull with `Timeout` and category `timeout`; Generalist has no hidden deadline. Retrying is decided solely by what already escaped downstream: response metadata is withheld and does not block retry, while reasoning, text, or tool-call output is an absolute retry barrier. A discarded attempt's metadata and error never escape.
-- `ModelResilience.invalidToolCallCorrectionLimit` accepts only safe integers from zero through two and bounds corrections of Generalist's schema-backed `InvalidToolCallParameters` signal. Before model output escapes, Generalist gives a supported provider a permissive projection with its exact tool JSON Schema, validates returned parameters against the original Effect schemas, and releases only decoded calls. Initial response metadata and `tool-params-*` staging parts are discarded when validation fails; Generalist continues withholding the invalid attempt through its bounded terminal outcome so provider-reported usage remains visible. A correction appends bounded feedback containing only the tool name, starts a new instrumented attempt under the same model call, and emits `RetryScheduled` with reason `invalid-tool-call-correction`. Generic `AiError.InvalidOutputError` never triggers correction. Raw JSON Schema dynamic tools remain unvalidated. A direct or custom registered model enabling correction for schema-backed tools must attach `ModelRegistry.withToolJsonSchemaCompiler`. Released provider registrations attach their exact compiler; OpenRouter selects Anthropic, OpenAI, or default schema compilation from the registered model using the upstream adapter's prefix rules. Middleware-transformed calls are always validated again and invalid transformations fail as `MiddlewareViolation`.
-- Generalist does not expose Effect's `ResponseIdTracker` and masks it inside every instrumented attempt. The SDK's automatic incremental-request fallback would otherwise issue a second raw provider request without a second Generalist attempt or retry event. Hosts may optimize requests only through a future path owned by the same attempt state machine.
-- Failure telemetry reports the same category and classification at call level as at attempt level, so retryability is never inferred from an absent field. The two differ only when resilience refuses to replay a retryable failure because output already escaped: the attempt reports the failure's own classification while the call reports `terminal`.
-- `Completed.text` is the final turn's assistant text. Turn state, including the accumulated text, resets at each turn boundary, so intermediate narration is never concatenated into the final answer.
-- A run completes only when that text is non-empty. A last turn that leaves no assistant text emits its `TurnCompleted` and then fails with `RunEndedWithoutOutput`, carrying the provider's finish reason for that turn — `"unknown"` when the provider never said why it stopped, absent when no terminal event was observed — plus the text and reasoning characters the provider streamed across every attempt of that turn, before middleware ran. Zero provider text with reasoning is a provider that stopped after thinking, zero of both is a provider that produced nothing, and non-zero provider text means text was streamed but never committed, either because middleware removed it or because the attempt that streamed it was discarded before release. Only earlier turns may leave no text; the verdict is taken from the turn that ends the run. Structured-output runs are judged by their schema value, so their terminal turn may leave no text.
-- A nested `AgentTool` run allocates a fresh Run ID and inbox and re-instruments the underlying model with its own telemetry, so one provider invocation never emits into two runs. Same-run handoff retains the original Run ID, inbox, and event stream.
+```ts
+import { Effect, Stream } from "effect"
+import { Agent } from "generalist"
 
-Optional seams are discovered only when their behavior is truly optional. Every behavior-bearing seam has a test or memory layer.
+const agent = Agent.make({
+  name: "docs-assistant",
+  toolkit,
+  toolScheduling: { maxConcurrency: 4, parallelSafe: ["search_docs"] },
+})
+
+const program = Effect.gen(function* () {
+  const events = yield* Agent.stream(agent, { prompt: "Find toolkit docs" }).pipe(Stream.runCollect)
+  const result = yield* Agent.generate(agent, { prompt: "Summarize them" })
+  return { tags: events.map((event) => event._tag), answer: result.text }
+})
+```
+
+## What runs
+
+```text
+Agent.stream(agent, { prompt: "Find toolkit docs" })
+└── allocateRun()                         scoped Run ID + inbox
+    └── TurnStarted { turn: 0 }
+        └── instrumented model call
+            ├── ModelCallStarted
+            ├── ModelAttemptStarted { attempt: 0 }
+            ├── ModelPart { part: tool-call "search_docs" }
+            └── ModelResponseCommitted
+        └── schedule framework tool batch
+            ├── ToolExecutionStarted
+            └── ToolExecutionCompleted
+        └── TurnCompleted { turn: 0 }
+            └── policy.decide() → Continue
+                └── TurnStarted { turn: 1 }
+                    └── model call → final text
+                        └── TurnCompleted → Completed
+```
+
+## Failure paths
+
+```text
+model attempt fails
+├── no replay-sensitive output escaped
+│   ├── transient → ModelRetryScheduled → next attempt
+│   └── invalid schema-backed call → correction attempt
+└── text/reasoning/tool-call escaped → terminal failure
+
+terminal unstructured turn
+├── assistant text → Completed
+└── no assistant text → TurnCompleted → RunEndedWithoutOutput
+```
+
+## Invariants
+
+- Turn zero always runs; turn numbers and attempt ordinals are zero-based.
+- A later turn requires pending tool results accepted by policy, or steering/follow-up input committed at its boundary.
+- `Policy.forever` is the default and adds no follow-up cap; natural completion still occurs when no tool results or queued input remain.
+- `Policy.recurs(n)` caps follow-up turns; stopping with pending results fails as `TurnLimitExceeded` or `PolicyStopped` and never drops them.
+- `Agent.allocateRun` allocates one scoped process-local Run ID, lazy event stream, and producer-only `steer`/`followUp` handle; `stream` and `generate` are scoped projections of it.
+- `output` selects structured output; `history` seeds the process-local transcript verbatim; `sessionId` selects an authoritative Session, not an inbox.
+- Optional seams are discovered only for optional behavior; each behavior-bearing seam has a test or memory Layer.
+- Each Run has separate steering and follow-up lanes: steering drains all pending inputs after tools, while follow-up drains one when completion is otherwise possible.
+- Each lane defaults to 64 entries; together they allow 1 MiB of canonical encoded prompts.
+- Overload is typed unless backpressure is requested; offer, drain, completion, and close share one transactional state.
+- An offer committed before completion causes another turn; completion committed first closes admission.
+- Failure, interruption, or scope close discards queued process-local input and wakes blocked producers; core keeps no Run registry or terminal tombstone, so process loss loses both lanes.
+- Middleware-transformed response parts are authoritative for events, history, tools, memory, Sessions, and compaction.
+- Transformed tool-call IDs must be unique within one response; duplicates fail before execution; transformed calls are schema-validated again and invalid transformations fail as `MiddlewareViolation`.
+- The visible `model` selection is the only agent default and is resolved at run time by `ModelRegistry`; without a registry selection, `LanguageModel` remains a visible requirement supplied at the run boundary.
+- Requirements remain visible through model selection, direct model provision, memory, tools, policy, handoffs, and transport composition.
+- Every instrumented attempt masks Effect's `ResponseIdTracker`, preventing an untracked incremental-request fallback; any future optimization must use the same attempt state machine.
+- Framework tool results enter `Chat` exactly once, in provider order, before Session sync, memory retention, policy evaluation, and `TurnCompleted`.
+- One agent-owned scheduling policy governs framework calls; default scheduling makes every call an exclusive authored-order barrier.
+- `parallelSafe` names bounded concurrent tools; unlisted calls block earlier and later work from crossing their barrier.
+- Every admitted stage sibling settles as `Waiting`, `Completed`, `Unknown`, or `Cancelled`; waiting/completed siblings are checkpointed and not rerun on partial resume.
+- Concurrent lifecycle/progress events retain production order, while results, Session projection, and follow-up input retain provider order; the next model call waits for every authored framework call.
+- Provider-executed calls are not run locally; declared tool failures remain schema-valid results; routing, schema, handler-boundary, placement, and authorization failures are typed `FrameworkFailure` values.
+- Provider `error` parts become typed `AiError` failed attempts before telemetry/replay accounting; released OpenAI, Anthropic, and OpenRouter registrations preserve known semantics.
+- Unknown custom payloads become bounded terminal `UnknownError`; custom `ModelResilience.resolve` may map known payloads before classification.
+- Default resilience retries rate-limit, internal, and transport failures twice, after 2 and 4 seconds, within 30 seconds.
+- A supplied `ModelResilience` replaces defaults; `ModelResilience.none` disables retries; every accepted retry emits `ModelRetryScheduled` with category and delay.
+- A clean stream end without `finish` is `ModelStreamTruncated` with category `truncated-stream`; an idle deadline may produce `ModelStreamTimeout` with category `timeout`.
+- `streamIdleTimeout` is opt-in; there is no hidden deadline; metadata is withheld and cannot block retry, but reasoning, text, or tool-call output does because replay would duplicate output.
+- Metadata and errors from discarded attempts never escape.
+- `invalidToolCallCorrectionLimit` is a safe integer from 0 through 2 and applies only to Generalist's pre-output, schema-backed `InvalidToolCallParameters`; generic `AiError.InvalidOutputError` and raw JSON Schema dynamic tools are excluded.
+- Correction exposes the exact permissive provider JSON Schema, validates with original Effect schemas, and releases only decoded calls; invalid attempts discard metadata and `tool-params-*` staging parts but retain terminal usage.
+- Correction feedback is bounded to the tool name, starts another instrumented attempt in the same call, and emits `ModelRetryScheduled` with `invalid-tool-call-correction`.
+- Direct/custom registrations need `ModelRegistry.withToolJsonSchemaCompiler`; released providers attach exact compilers, and OpenRouter selects Anthropic, OpenAI, or default compilation by upstream adapter prefix.
+- Every loop model call emits call, attempt, retry, and compaction lifecycle events; one `modelCallId` spans attempts, while `modelAttemptId` and zero-based `attempt` identify each invocation and `ModelPart`.
+- Purposes are `conversation`, `structured-output`, or `compaction-summary`; `ModelPart` is process-local, while Runtime stores normalized completion or terminal interruption.
+- Effect Clock timestamps mark actual lifecycle boundaries; events stay causal and flush at the next boundary or stream end; external interruption withholds in-flight telemetry from that consumer.
+- Completed attempts require `finish`, usage, `usageAt`, and finish reason; non-empty provider metadata is unchanged, provider-specific usage/cost is preserved, and absent IDs/model/tier/metadata mean unknown, not zero.
+- Failure categories are bounded and provider-neutral; attempt/call failures include classification, and output-blocked retries preserve attempt classification while the call reports `terminal`.
+- Delivery IDs are stable through checkpoint/replay; an optional sink receives immutable ordered `{ sessionId, events }` batches with backpressure before live emission.
+- Successful sink delivery acknowledges exactly its batch; typed failure neither acknowledges nor emits it, interruption stays interruption, ambiguous failure requires sink reconciliation, and Session reconciles only an exact checkpointed batch.
+- Hosts deduplicate by `(sessionId, deliveryId)`; without Session, callback durability is only the sink host's durability.
+- A completed model operation has one deterministic token charge: terminal input plus output usage, or the context estimate when terminal usage is absent, plus reported failed-attempt usage.
+- The driver settles charge before completion journaling; overrun commits the paid response with zero tokens remaining, then fails typed before tools or another model call.
+- `Completed.text` is final-turn assistant text; turn text/state reset at each boundary, so intermediate narration is excluded.
+- An unstructured terminal turn requires non-empty text; otherwise it emits `TurnCompleted`, then `RunEndedWithoutOutput`; earlier turns may be textless.
+- That failure carries provider finish reason (`"unknown"` means no reason; absence means no terminal event) and pre-middleware provider text/reasoning character totals across all attempts.
+- Zero text with reasoning means reasoning-only; both zero means no output; nonzero uncommitted text means middleware removed it or its attempt was discarded.
+- Structured runs complete by schema value and may have no terminal text.
+- Nested `AgentTool` runs get fresh Run IDs, inboxes, and telemetry, so one provider invocation never emits to two Runs; same-run handoffs retain all three.
+
+## Related
+
+- Source: `packages/generalist/src/core/agent/`, `packages/generalist/src/core/model/`, `packages/generalist/src/core/turn/policy.ts`
+- Site: `/docs/learn/agent-loop`
+- Site: `/docs/reference/core-agent`
+- Site: `/docs/reference/core-events`
+- Site: `/docs/reference/core-models`
+- Site: `/docs/reference/core-policies`
