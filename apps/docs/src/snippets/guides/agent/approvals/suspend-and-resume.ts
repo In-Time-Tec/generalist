@@ -5,6 +5,7 @@ import {
   Approvals,
   LanguageModel,
   ModelMiddleware,
+  Permissions,
   Prompt,
   Response,
   Tool,
@@ -50,6 +51,7 @@ const toolkitLayer = toolkit.toLayer({
 const pendingLayers = Layer.mergeAll(
   modelLayer,
   toolkitLayer,
+  Permissions.layerAllowAll,
   Approvals.layerTest({
     resolve: (request) => Effect.succeed({ ...request, token: `approval:${request.call.id}` }),
   }),
@@ -59,6 +61,7 @@ const pendingLayers = Layer.mergeAll(
 const approvedLayers = Layer.mergeAll(
   modelLayer,
   toolkitLayer,
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

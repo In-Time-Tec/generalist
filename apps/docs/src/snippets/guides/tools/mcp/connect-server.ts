@@ -1,5 +1,5 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "generalist"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, Permissions } from "generalist"
 import { connect } from "generalist/mcp/tools"
 import { make as makeStdioTransport } from "generalist/mcp/client/stdio"
 import { layer as openRouterLayer } from "generalist/ai/openrouter"
@@ -28,6 +28,7 @@ const program = Effect.gen(function* () {
             apiKey: Config.redacted("OPENROUTER_API_KEY"),
           }),
           tools.executorLayer,
+          Permissions.layerAllowAll,
           Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
         ),

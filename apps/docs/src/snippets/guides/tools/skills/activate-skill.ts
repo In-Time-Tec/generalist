@@ -1,5 +1,14 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillCatalog, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Permissions,
+  Response,
+  SkillCatalog,
+  ToolExecutor,
+} from "generalist"
 
 const releaseNotesSkill: SkillCatalog.Skill = {
   name: "release-notes",
@@ -48,6 +57,7 @@ const program = Effect.gen(function* () {
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("activate_skill is handled by the loop, not the executor") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
   SkillCatalog.layerSkills([releaseNotesSkill]),

@@ -5,6 +5,7 @@ import {
   Approvals,
   LanguageModel,
   ModelMiddleware,
+  Permissions,
   Pins,
   Response,
   ToolExecutor,
@@ -51,6 +52,7 @@ const modelLayer = Layer.effect(
 const agentServices = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

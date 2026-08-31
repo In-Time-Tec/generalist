@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "generalist"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool } from "generalist"
 import { MCPClient } from "generalist/mcp"
 import { layerToolkit, toolkit } from "generalist/mcp/tools"
 const client: MCPClient.Service = {
@@ -50,6 +50,7 @@ const modelLayer = Layer.effect(
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   layerToolkit(client),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

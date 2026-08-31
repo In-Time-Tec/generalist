@@ -1,6 +1,15 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  Handoff,
+  LanguageModel,
+  ModelMiddleware,
+  Permissions,
+  Response,
+  ToolExecutor,
+} from "generalist"
 
 let supervisorCalls = 0
 
@@ -56,6 +65,7 @@ const runtimeLayer = Layer.mergeAll(
   ToolExecutor.layerToolkit(supervisor.toolkit),
   handlerLayer,
   supervisor.catalog,
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

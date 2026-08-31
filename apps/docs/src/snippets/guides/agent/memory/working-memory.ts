@@ -1,5 +1,14 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  LanguageModel,
+  Memory,
+  ModelMiddleware,
+  Permissions,
+  Response,
+  ToolExecutor,
+} from "generalist"
 import { WorkingMemory } from "generalist/memory"
 
 const key: Memory.Key = { agent: "support-agent", subject: "user-ada" }
@@ -27,6 +36,7 @@ const program = Effect.gen(function* () {
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
   WorkingMemory.layer({ maxMessages: 8 }),

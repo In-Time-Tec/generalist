@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "generalist"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "generalist"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",
@@ -52,6 +52,7 @@ const modelLayer = Layer.effect(
 const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ get_weather: ({ city }) => Effect.succeed(`sunny and 72°F in ${city}`) }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

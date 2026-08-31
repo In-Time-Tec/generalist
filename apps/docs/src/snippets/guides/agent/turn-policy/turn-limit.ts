@@ -5,10 +5,11 @@ import {
   Approvals,
   LanguageModel,
   ModelMiddleware,
+  Permissions,
+  Policy,
   Response,
   Tool,
   Toolkit,
-  Policy,
 } from "generalist"
 
 const lookupTool = Tool.make("lookup", {
@@ -57,6 +58,7 @@ const program = Effect.gen(function* () {
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ lookup: ({ topic }) => Effect.succeed(`found ${topic}`) }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

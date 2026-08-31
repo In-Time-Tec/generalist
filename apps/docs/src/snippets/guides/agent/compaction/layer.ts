@@ -1,5 +1,14 @@
 import { Effect, Layer } from "effect"
-import { Agent, Approvals, Compaction, LanguageModel, ModelMiddleware, ToolExecutor, ToolOutput } from "generalist"
+import {
+  Agent,
+  Approvals,
+  Compaction,
+  LanguageModel,
+  ModelMiddleware,
+  Permissions,
+  ToolExecutor,
+  ToolOutput,
+} from "generalist"
 
 const agent = Agent.make({ name: "long-running-assistant" })
 
@@ -18,6 +27,7 @@ export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.Lang
     Layer.build(
       Layer.mergeAll(
         ToolExecutor.layerTest({ execute: () => Effect.die("no tools in this example") }),
+        Permissions.layerAllowAll,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         compactionLayer,

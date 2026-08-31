@@ -5,9 +5,10 @@ import {
   Approvals,
   LanguageModel,
   ModelMiddleware,
+  Permissions,
   Response,
-  ToolExecutor,
   Tool,
+  ToolExecutor,
   Toolkit,
 } from "generalist"
 
@@ -81,6 +82,7 @@ const runtimeLayer = Layer.mergeAll(
   modelLayer,
   parentToolkit.toLayer({ summarize: () => Effect.die("agent tool bridge handles summarize") }),
   ToolExecutor.layerToolkit(summarizeToolkit).pipe(Layer.provide(modelLayer)),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

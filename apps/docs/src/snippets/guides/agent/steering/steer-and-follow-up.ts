@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "generalist"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "generalist"
 
 const statusTool = Tool.make("check_status", {
   description: "Check the deploy status of a service",
@@ -54,6 +54,7 @@ const modelLayer = Layer.effect(
 const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ check_status: ({ service }) => Effect.succeed(`${service} is healthy`) }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

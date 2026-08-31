@@ -1,5 +1,14 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
-import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  Instructions,
+  LanguageModel,
+  ModelMiddleware,
+  Permissions,
+  Response,
+  ToolExecutor,
+} from "generalist"
 
 const persona = Instructions.fromText("persona", "You are the release-notes assistant.")
 
@@ -32,6 +41,7 @@ const program = Effect.gen(function* () {
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
   instructionsLayer,

@@ -1,5 +1,5 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "generalist"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, Permissions, ToolExecutor } from "generalist"
 import { layerGoogleAIStudio } from "generalist/ai/openai-compatible"
 import { FetchHttpClient } from "effect/unstable/http"
 
@@ -18,6 +18,7 @@ const program = ModelRegistry.withModel(
 const runtimeLayer = Layer.mergeAll(
   providerLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 ).pipe(Layer.provideMerge(FetchHttpClient.layer))

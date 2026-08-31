@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "generalist"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, ToolExecutor } from "generalist"
 
 const dropReasoning: ModelMiddleware.Middleware = {
   transformPart: (part) => Effect.succeed(part.type === "reasoning-delta" ? Option.none() : Option.some(part)),
@@ -36,6 +36,7 @@ const program = Effect.gen(function* () {
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layer([dropReasoning]),
 )

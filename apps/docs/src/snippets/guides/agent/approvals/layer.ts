@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { Approvals } from "generalist"
+import { Approvals, Permissions } from "generalist"
 
 export const suspendForHumans: Layer.Layer<Approvals.Approvals> = Approvals.layerTest({
   resolve: (request) =>

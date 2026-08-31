@@ -1,5 +1,15 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, Guardrail, LanguageModel, ModelMiddleware, Prompt, Response, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  Guardrail,
+  LanguageModel,
+  ModelMiddleware,
+  Permissions,
+  Prompt,
+  Response,
+  ToolExecutor,
+} from "generalist"
 
 const lastUserText = (prompt: Prompt.Prompt): string => {
   const userMessages = prompt.content.filter((message) => message.role === "user")
@@ -39,6 +49,7 @@ const program = Agent.generate(agent, { prompt: "My SSN is 123-45-6789, please u
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   middlewareLayer,
 )

@@ -1,5 +1,15 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit, type AgentEvent } from "generalist"
+import {
+  Agent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Permissions,
+  Response,
+  Tool,
+  Toolkit,
+  type AgentEvent,
+} from "generalist"
 
 const searchTool = Tool.make("search_docs", {
   description: "Search the project docs",
@@ -49,6 +59,7 @@ const modelLayer = Layer.effect(
 const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ search_docs: () => Effect.succeed("Policy is a plain value with a default of forever.") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

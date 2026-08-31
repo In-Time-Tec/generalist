@@ -1,5 +1,13 @@
 import { Config, Console, Effect, Layer, ManagedRuntime, Schedule } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ModelResilience, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  ModelMiddleware,
+  ModelRegistry,
+  ModelResilience,
+  Permissions,
+  ToolExecutor,
+} from "generalist"
 import { layer as openRouterLayer } from "generalist/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
@@ -23,6 +31,7 @@ const runtimeLayer = Layer.mergeAll(
     apiKey: Config.redacted("OPENROUTER_API_KEY"),
   }),
   ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
   resilienceLayer,

@@ -5,6 +5,7 @@ import {
   Approvals,
   LanguageModel,
   ModelMiddleware,
+  Permissions,
   Prompt,
   Response,
   Tool,
@@ -53,6 +54,7 @@ let approvalChecks = 0
 const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ deploy: () => Effect.succeed("deployed api") }),
+  Permissions.layerAllowAll,
   Approvals.layerTest({
     resolve: (pending) => {
       approvalChecks += 1

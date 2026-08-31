@@ -5,6 +5,7 @@ import {
   Approvals,
   LanguageModel,
   ModelMiddleware,
+  Permissions,
   Pins,
   Response,
   Tool,
@@ -85,6 +86,7 @@ const agentServices = Layer.mergeAll(
   toolkitLayer,
   modelLayer,
   toolExecutorLayer,
+  Permissions.layerAllowAll,
   Approvals.layerTest({
     resolve: (pending) => Effect.succeed({ ...pending, token: "deploy-token-1" }),
   }),

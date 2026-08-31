@@ -6,6 +6,7 @@ import {
   Approvals,
   LanguageModel,
   ModelMiddleware,
+  Permissions,
   Pins,
   Response,
   Tool,
@@ -159,6 +160,7 @@ const agentServices = Layer.mergeAll(
   ToolExecutor.layerTest({
     execute: () => Effect.succeed({ _tag: "Success", result: "results", encodedResult: "results" }),
   }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )
