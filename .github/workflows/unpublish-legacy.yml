@@ -1,0 +1,73 @@
+name: Unpublish legacy packages
+
+# One-shot registry cleanup for the pre-Generalist package generation. Delete this workflow once the
+# legacy names are gone from npm.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type the exact package list, space-separated, to confirm deletion
+        required: true
+        type: string
+        default: "@tenetkit/cloudflare @tenetkit/mysql @tenetkit/pg tenetkit"
+
+permissions: {}
+
+concurrency:
+  group: unpublish-legacy
+  cancel-in-progress: false
+
+jobs:
+  unpublish:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.4.1
+          registry-url: https://registry.npmjs.org
+      - name: Unpublish the @tenetkit adapter packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          CONFIRM: ${{ inputs.confirm }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Adapters first: each depends on the tenetkit root package, so removing them clears the
+          # registry dependents that would otherwise block every other unpublish.
+          adapters=(@tenetkit/cloudflare @tenetkit/mysql @tenetkit/pg)
+          expected="@tenetkit/cloudflare @tenetkit/mysql @tenetkit/pg tenetkit"
+          [[ "$CONFIRM" == "$expected" ]] || { echo "confirmation input does not match the package list" >&2; exit 1; }
+          for name in "${adapters[@]}"; do
+            echo "=== npm unpublish $name --force"
+            npm unpublish "$name" --force --loglevel notice
+          done
+      - name: Attempt to unpublish the tenetkit root package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "=== npm unpublish tenetkit --force"
+          # Expected to be refused: tenetkit exceeded 300 downloads last week, which is over npm's
+          # self-service unpublish threshold. The refusal message is captured for the record.
+          npm unpublish tenetkit --force --loglevel notice || echo "REFUSED: tenetkit"
+      - name: Verify registry state
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          for name in @tenetkit/cloudflare @tenetkit/mysql @tenetkit/pg; do
+            if npm view "$name" version >/dev/null 2>&1; then
+              echo "STILL PRESENT: $name" >&2
+              failed=1
+            else
+              echo "gone: $name"
+            fi
+          done
+          if npm view tenetkit version >/dev/null 2>&1; then
+            echo "note: tenetkit remains on the registry ($(npm view tenetkit version))"
+          else
+            echo "gone: tenetkit"
+          fi
+          exit "$failed"
