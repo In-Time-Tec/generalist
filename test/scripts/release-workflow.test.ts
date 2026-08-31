@@ -68,7 +68,7 @@ layer(bunLayer)("release workflows", (it) => {
       expect(source).toContain("persist-credentials: false")
       expect(source).toContain('"$(git rev-list -n1 "refs/tags/$tag^{commit}")" == "$source_commit"')
       expect(source).toContain('git merge-base --is-ancestor "$source_commit" origin/main')
-      expect(source).toContain('git merge-base --is-ancestor "$source_commit" origin/release')
+      expect(source).not.toContain("origin/release")
       expect(source).toContain("gh auth setup-git")
       expect(source.indexOf("Validate immutable release identity")).toBeLessThan(
         source.indexOf("bun install --frozen-lockfile"),
