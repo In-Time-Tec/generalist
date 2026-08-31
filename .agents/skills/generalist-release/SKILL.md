@@ -89,6 +89,6 @@ Keep the three verified files together and unchanged. If source, tools, or versi
 
 ## Publication facts
 
-`.github/workflows/publish.yml` is the only publisher. A `v<version>` tag push starts it automatically. Manual dispatch is only recovery for an existing immutable tag and requires both the tag and its full expected commit SHA. The workflow verifies the tag, commit, lockstep versions, ancestry on `origin/main` and `origin/release`, checksums, evidence, GitHub assets, and npm tarball integrity; downstream jobs never rebuild.
+`.github/workflows/publish.yml` is the only publisher. A `v<version>` tag push starts it automatically. Manual dispatch is only recovery for an existing immutable tag and requires both the tag and its full expected commit SHA. The workflow verifies the tag, commit, lockstep versions, ancestry on `origin/main`, checksums, evidence, GitHub assets, and npm tarball integrity; downstream jobs never rebuild.
 
 When reporting local proof, include the full commit, version, artifact directory, `sha256sum --check` result, package-smoke result, full-check result, and any skipped database suite. After an explicitly requested publication, also report the workflow run and registry integrity verification.

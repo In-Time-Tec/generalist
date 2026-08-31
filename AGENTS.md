@@ -88,7 +88,7 @@ A release change must:
 2. Set one lockstep semantic version in the root manifest and `packages/generalist/package.json`.
 3. Pass `bun run check`, `bun run test` with PostgreSQL and MySQL available, and `bun run package`.
 4. Use the `generalist-release` skill to produce and verify artifacts from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
-5. Land the exact release commit on both `main` and `release`, then create the immutable `v<version>` tag at that commit.
+5. Land the exact release commit on `main`, then create the immutable `v<version>` tag at that commit.
 6. Push the tag to start `.github/workflows/publish.yml`. The workflow builds once, passes the same checksummed assets to GitHub and npm, and checks registry integrity. Manual dispatch only reconciles an existing tag and requires the tag plus its full 40-character commit SHA.
 
 Pushing branches or tags, merging, publishing, and deploying change shared state; do them only when the user explicitly asks.

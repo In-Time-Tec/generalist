@@ -48,6 +48,7 @@ import {
   uniqueSession,
 } from "../database.js"
 import { testExecutable } from "../../../../generalist/test/runtime/run/identity.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -1587,7 +1588,7 @@ describePostgres("PostgreSQL run store", () => {
           block: () => Effect.die("ToolExecutor test layer owns execution"),
         })
         const resolver = yield* ExecutableResolver.makeStatic([
-          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
         ])
         const options = {
           url,
