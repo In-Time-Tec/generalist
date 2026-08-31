@@ -16,6 +16,7 @@ import {
 } from "../../execution/fixtures.js"
 import { testExecutable, unusedModel } from "../../run/identity.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
+import { allowAllAuthorization } from "../../../authorization.js"
 
 export interface ToolCancellationSuiteOptions<StoreError, Extra = never> {
   readonly name: string
@@ -132,6 +133,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             agent: Agent.close(
               agent,
               Layer.mergeAll(
+                allowAllAuthorization,
                 model,
                 executor,
                 toolkit.toLayer({ durable_write: () => Effect.die("ToolExecutor owns durable_write") }),
@@ -193,7 +195,12 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             const replacementClaim = yield* claim(receipt.runId, "tool-cancellation-redelivery")
             yield* Deferred.succeed(allowAcknowledgement, undefined)
             yield* provideScoped(
-              Layer.mergeAll(Layer.succeed(RunStore.RunStore, store), activeExecutionsLayer, resolverLayer),
+              Layer.mergeAll(
+                allowAllAuthorization,
+                Layer.succeed(RunStore.RunStore, store),
+                activeExecutionsLayer,
+                resolverLayer,
+              ),
               Effect.flatMap(makeRunExecutor, (replacementHost) =>
                 replacementHost.execute(replacementClaim).pipe(Effect.timeout("5 seconds")),
               ),
@@ -264,6 +271,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             agent: Agent.close(
               agent,
               Layer.mergeAll(
+                allowAllAuthorization,
                 model,
                 executor,
                 toolkit.toLayer({ interrupted_write: () => Effect.die("ToolExecutor owns interrupted_write") }),
@@ -331,10 +339,16 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
                 : ({ _tag: "Cancelled" as const } as const)
             }),
         })
-        const environment = Layer.merge(unusedModel, executor)
+        const environment = Layer.mergeAll(allowAllAuthorization, unusedModel, executor)
         const resolverLayer = ExecutableResolver.layerStatic([
-          { executable: assistantRef, agent: Agent.close(assistant, environment) },
-          { executable: researcherRef, agent: Agent.close(researcher, environment) },
+          {
+            executable: assistantRef,
+            agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, environment)),
+          },
+          {
+            executable: researcherRef,
+            agent: Agent.close(researcher, Layer.mergeAll(allowAllAuthorization, environment)),
+          },
         ]).pipe(Layer.orDie)
 
         yield* provideScoped(

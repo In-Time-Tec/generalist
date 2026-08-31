@@ -5,6 +5,7 @@ import { Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Agent, ModelResilience } from "generalist"
 import { decodeConfig, layer } from "../../../src/ai/provider/openrouter.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 type Assert<T extends true> = T
@@ -257,6 +258,7 @@ describe("OpenRouter public flow", () => {
       const events = yield* Agent.stream(agent, { prompt: "use lookup" }).pipe(
         Stream.provide(
           Layer.mergeAll(
+            allowAllAuthorization,
             layer({
               model: "requested/model",
               apiKey,

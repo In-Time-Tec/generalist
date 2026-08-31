@@ -6,6 +6,7 @@ import { Agent, AgentEvent, Approvals, Guardrail, ModelMiddleware, ToolExecutor 
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { withProviderFinish } from "../provider-finish"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -48,6 +49,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     let seenContext: ModelMiddleware.TurnContext | undefined
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalled = true
           return Stream.make(textDelta("ok"))
@@ -77,6 +79,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     let modelCalled = false
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalled = true
           return Stream.make(textDelta("should not run"))
@@ -104,6 +107,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     let seenPrompt = ""
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((options) => {
           seenPrompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("ok"))
@@ -204,6 +208,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     () =>
       [
         Layer.mergeAll(
+          allowAllAuthorization,
           modelLayer(() => Stream.make(textDelta("token secret"))),
           unusedExecutor,
           Approvals.layerAutoApprove,
@@ -228,6 +233,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     const contexts: Array<ModelMiddleware.TurnContext> = []
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => Stream.fromIterable([textDelta("keep"), textDelta("drop")])),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -260,6 +266,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -297,6 +304,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     let modelCalled = false
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalled = true
           return Stream.make(textDelta("ok"))

@@ -11,6 +11,7 @@ import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtim
 import { assistant, assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
 import { closedTestAgent, testExecutable } from "../../run/identity.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
+import { allowAllAuthorization } from "../../../authorization.js"
 
 export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
   readonly name: string
@@ -96,7 +97,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         apiKey: Config.succeed(Redacted.make("test-key")),
       }).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))
       const resolverLayer = ExecutableResolver.layerStatic([
-        { executable, agent: Agent.close(agent, model.pipe(Layer.orDie)) },
+        { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model.pipe(Layer.orDie))) },
       ]).pipe(Layer.orDie)
 
       return provideScoped(
@@ -193,7 +194,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         large_result: () => Effect.die("ToolExecutor test layer owns execution"),
       })
       const resolverLayer = ExecutableResolver.layerStatic([
-        { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
       ]).pipe(Layer.orDie)
 
       return provideScoped(
@@ -412,7 +413,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           crash_tool: () => Effect.die("ToolExecutor test layer owns execution"),
         })
         const resolverLayer = ExecutableResolver.layerStatic([
-          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
         ]).pipe(Layer.orDie)
 
         yield* provideScoped(
@@ -451,6 +452,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             const recoveryClaim = yield* claim(receipt.runId, "process-after-crash")
             yield* provideScoped(
               Layer.mergeAll(
+                allowAllAuthorization,
                 Layer.succeed(RunStore.RunStore, store),
                 Layer.fresh(activeExecutionsLayer),
                 resolverLayer,
@@ -545,7 +547,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           idempotent_write: () => Effect.die("ToolExecutor test layer owns execution"),
         })
         const resolverLayer = ExecutableResolver.layerStatic([
-          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
         ]).pipe(Layer.orDie)
 
         yield* provideScoped(
@@ -583,6 +585,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
 
             yield* provideScoped(
               Layer.mergeAll(
+                allowAllAuthorization,
                 Layer.succeed(RunStore.RunStore, store),
                 Layer.fresh(activeExecutionsLayer),
                 resolverLayer,

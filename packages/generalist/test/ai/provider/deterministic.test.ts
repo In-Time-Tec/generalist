@@ -46,6 +46,7 @@ import {
   layerXAI,
 } from "generalist/ai/openai-compatible"
 import { layer as deterministicLayer } from "../../../src/ai/provider/deterministic.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const unexpectedTool = Tool.make("unexpected", { parameters: Schema.Unknown, success: Schema.Unknown })
@@ -408,6 +409,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.mergeAll(
+      allowAllAuthorization,
       deterministicLayer({ model: "local" }),
       ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.layerAutoApprove,
@@ -538,6 +540,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.mergeAll(
+      allowAllAuthorization,
       ModelRegistry.layerMerged([
         deterministicLayer({ provider: "det-a", model: "model-a" }),
         deterministicLayer({ provider: "det-b", model: "model-b" }),

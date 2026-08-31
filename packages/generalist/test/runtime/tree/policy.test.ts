@@ -6,6 +6,7 @@ import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../
 import { defaultTreePolicy, TREE_POLICY_MAX } from "../../../src/runtime/tree/policy.js"
 import { closedTestAgent, pinnedTestAgent } from "../run/identity.js"
 import { registrationsFor } from "../execution/fixtures.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -108,7 +109,10 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
     Layer.provide(
       ExecutableResolver.layerStatic([
         { executable: parentRef, agent: closedTestAgent(parentAgent) },
-        { executable: childRef, agent: Agent.close(childAgent, Layer.mergeAll(model, executor, handlers)) },
+        {
+          executable: childRef,
+          agent: Agent.close(childAgent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),
+        },
       ]).pipe(Layer.orDie),
     ),
   )

@@ -47,6 +47,7 @@ import { ActiveExecutions, layer as activeExecutionsLayer } from "../../../src/r
 const testExecutable = pinnedTestExecutable
 
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
+import { allowAllAuthorization } from "../../authorization.js"
 const waitTool = Tool.make("wait_for_human", {
   parameters: Schema.Struct({ question: Schema.String }),
   success: Schema.String,
@@ -113,7 +114,7 @@ const acknowledgementLayer = (filename: string) => {
     acknowledgement_tool: () => Effect.die("ToolExecutor test layer owns execution"),
   })
   const resolverLayer = ExecutableResolver.layerStatic([
-    { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+    { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
   ]).pipe(Layer.orDie)
   return () =>
     SqliteRuntime.layerSqlite({
@@ -291,6 +292,7 @@ describe("RunExecutor", () => {
               agent: Agent.close(
                 agent,
                 Layer.mergeAll(
+                  allowAllAuthorization,
                   Layer.effect(
                     LanguageModel.LanguageModel,
                     LanguageModel.make({
@@ -709,6 +711,7 @@ describe("RunExecutor", () => {
               agent: Agent.close(
                 agent,
                 Layer.mergeAll(
+                  allowAllAuthorization,
                   Layer.effect(
                     LanguageModel.LanguageModel,
                     LanguageModel.make({
@@ -822,7 +825,11 @@ describe("RunExecutor", () => {
             yield* Effect.addFinalizer(() =>
               Ref.update(lifecycle, (events) => [...events, `${scope} resolver finalized`]),
             )
-            return { _tag: "Agent" as const, agent: Agent.close(agent, model), attestation: executable }
+            return {
+              _tag: "Agent" as const,
+              agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)),
+              attestation: executable,
+            }
           }),
       })
       const runtimeLayer = Runtime.layerMemory({
@@ -890,7 +897,11 @@ describe("RunExecutor", () => {
             ),
         }),
       )
-      const resolution = { _tag: "Agent" as const, agent: Agent.close(agent, model), attestation: executable }
+      const resolution = {
+        _tag: "Agent" as const,
+        agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)),
+        attestation: executable,
+      }
       const resolver = ExecutableResolver.ExecutableResolver.of({
         resolve: (input) =>
           Effect.gen(function* () {
@@ -989,7 +1000,11 @@ describe("RunExecutor", () => {
             const scope = isAdmission(input) ? "admission" : "execution"
             lifecycle.push(`${scope} resolver acquired`)
             yield* Effect.addFinalizer(() => Effect.sync(() => lifecycle.push(`${scope} resolver finalized`)))
-            return { _tag: "Agent" as const, agent: Agent.close(agent, model), attestation: executable }
+            return {
+              _tag: "Agent" as const,
+              agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)),
+              attestation: executable,
+            }
           }),
       })
 
@@ -1170,7 +1185,7 @@ describe("RunExecutor", () => {
           yield* Effect.addFinalizer(() => Effect.sync(() => lifecycle.push(`${scope} resolver finalized`)))
           return {
             _tag: "Agent" as const,
-            agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers, resources)),
+            agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers, resources)),
             attestation: ref,
           }
         }),
@@ -1378,7 +1393,7 @@ describe("RunExecutor", () => {
       }),
     )
     const resolverLayer = ExecutableResolver.layerStatic([
-      { executable: assistantRef, agent: Agent.close(assistant, model) },
+      { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
     ]).pipe(Layer.orDie)
     const layerSqlite = () =>
       SqliteRuntime.layerSqlite({
@@ -1499,7 +1514,9 @@ describe("RunExecutor", () => {
       scheduler: { pollInterval: "1 day" },
     }).pipe(
       Layer.provide(
-        ExecutableResolver.layerStatic([{ executable, agent: Agent.close(profile, environment) }]).pipe(Layer.orDie),
+        ExecutableResolver.layerStatic([
+          { executable, agent: Agent.close(profile, Layer.mergeAll(allowAllAuthorization, environment)) },
+        ]).pipe(Layer.orDie),
       ),
     )
     return Effect.gen(function* () {
@@ -1629,7 +1646,7 @@ describe("RunExecutor", () => {
       resolve: () =>
         Effect.succeed({
           _tag: "Agent" as const,
-          agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)),
+          agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),
           attestation: ref,
         }),
     })
@@ -1767,7 +1784,7 @@ describe("RunExecutor", () => {
       resolve: () =>
         Effect.succeed({
           _tag: "Agent" as const,
-          agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)),
+          agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),
           attestation: ref,
         }),
     })
@@ -1874,7 +1891,7 @@ describe("RunExecutor", () => {
             yield* Effect.addFinalizer(() => Effect.sync(() => lifecycle.push(`${scope} resolver finalized`)))
             return {
               _tag: "Agent" as const,
-              agent: Agent.close(agent, Layer.merge(model, resources)),
+              agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, resources)),
               attestation: ref,
             }
           }),
@@ -1950,9 +1967,9 @@ describe("RunExecutor", () => {
           scheduler: { pollInterval: "1 hour" },
         }).pipe(
           Layer.provide(
-            ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, blockingModel) }]).pipe(
-              Layer.orDie,
-            ),
+            ExecutableResolver.layerStatic([
+              { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, blockingModel)) },
+            ]).pipe(Layer.orDie),
           ),
         ),
       )(
@@ -1991,9 +2008,9 @@ describe("RunExecutor", () => {
           scheduler: { pollInterval: "1 hour" },
         }).pipe(
           Layer.provide(
-            ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, recoveredModel) }]).pipe(
-              Layer.orDie,
-            ),
+            ExecutableResolver.layerStatic([
+              { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, recoveredModel)) },
+            ]).pipe(Layer.orDie),
           ),
         ),
       )(
@@ -2048,7 +2065,10 @@ describe("RunExecutor", () => {
       }).pipe(
         Layer.provide(
           ExecutableResolver.layerStatic([
-            { executable: ref, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+            {
+              executable: ref,
+              agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),
+            },
           ]).pipe(Layer.orDie),
         ),
       )
@@ -2140,7 +2160,7 @@ describe("RunExecutor", () => {
         Layer.merge(activeExecutionsLayer),
         Layer.provide(
           ExecutableResolver.layerStatic([
-            { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+            { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
           ]).pipe(Layer.orDie),
         ),
       )
@@ -2237,14 +2257,20 @@ describe("RunExecutor", () => {
               ? Effect.addFinalizer(() => Effect.sync(() => lifecycle.push("admission resolver finalized"))).pipe(
                   Effect.as({
                     _tag: "Agent" as const,
-                    agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers, resources)),
+                    agent: Agent.close(
+                      agent,
+                      Layer.mergeAll(allowAllAuthorization, model, executor, handlers, resources),
+                    ),
                     attestation: executable,
                   }),
                 )
               : Effect.addFinalizer(() => Effect.sync(() => lifecycle.push("execution resolver finalized"))).pipe(
                   Effect.as({
                     _tag: "Agent" as const,
-                    agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers, resources)),
+                    agent: Agent.close(
+                      agent,
+                      Layer.mergeAll(allowAllAuthorization, model, executor, handlers, resources),
+                    ),
                     attestation: executable,
                   }),
                 ),
@@ -2730,7 +2756,7 @@ describe("RunExecutor", () => {
           () => observeFinalizer("service"),
         ),
       )
-      const closedChild = Agent.close(child, model)
+      const closedChild = Agent.close(child, Layer.mergeAll(allowAllAuthorization, model))
       const program = AgentProgram.make({
         name: `early-failure-map:${earlyFailure.name}`,
         source: "return await agent.map('workers')",
@@ -2991,7 +3017,7 @@ describe("RunExecutor", () => {
           }),
       })
       const toolLayer = toolkit.toLayer({ child_work: () => Effect.die("ToolExecutor owns child work") })
-      const closedChild = Agent.close(child, Layer.mergeAll(model, executor, toolLayer))
+      const closedChild = Agent.close(child, Layer.mergeAll(allowAllAuthorization, model, executor, toolLayer))
 
       const program = AgentProgram.make({
         name: "failed-agent-map",

@@ -19,12 +19,14 @@ import {
   layerModel as responsesModel,
 } from "../../../src/ai/provider/openai-responses.js"
 import { layerConfig as openRouterClient, layerModel as openRouterModel } from "../../../src/ai/provider/openrouter.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 
 // Compile-time channel check: every provider's model layer closes over its own
 // client layer, leaving no requirements. Never run — the values prove the wiring.
 const _closed = Layer.mergeAll(
+  allowAllAuthorization,
   openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAiClient({ apiKey }))),
   responsesModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(responsesClient({ apiKey }))),
   chatCompletionsModel({ model: "any" }).pipe(Layer.provide(chatCompletionsClient({ apiKey }))),
@@ -44,6 +46,7 @@ const toolkit = Toolkit.make(echoTool)
 const agent = Agent.make({ name: "assistant", instructions: "Be brief.", toolkit })
 
 const testLayers = Layer.mergeAll(
+  allowAllAuthorization,
   toolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }),
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
   Approvals.layerAutoApprove,

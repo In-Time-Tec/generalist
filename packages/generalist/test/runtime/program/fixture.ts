@@ -11,6 +11,7 @@ import {
 } from "../../../src/index.js"
 import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
 import { pinnedTestAgent } from "../run/identity.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 export const program: ReturnType<typeof AgentProgram.make> = AgentProgram.make({
   name: "durable-program",
@@ -222,7 +223,11 @@ export const agentMapProgramFixture = () => {
     executable,
     resolverLayer: ExecutableResolver.layerStatic([
       { _tag: "Program", executable, program: mapProgram, executor, handlers },
-      { _tag: "Agent", executable: childExecutable, agent: Agent.close(child, model) },
+      {
+        _tag: "Agent",
+        executable: childExecutable,
+        agent: Agent.close(child, Layer.mergeAll(allowAllAuthorization, model)),
+      },
     ]).pipe(Layer.orDie),
     counts: () => ({ bindingDispatches, childFinalizers }),
   }

@@ -15,6 +15,7 @@ import {
 import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { ItLayer } from "../it-layer.js"
 import { withProviderFinish } from "../provider-finish.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -140,6 +141,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", instructions: "system instructions" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((options) => {
           modelPrompt = options.prompt
           return Stream.make(textDelta("done"))
@@ -194,6 +196,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((options) => {
           modelPrompt = options.prompt
           return Stream.make(textDelta("done"))
@@ -222,6 +225,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.sync(() => {
             modelCalls += 1
@@ -267,6 +271,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.sync(() => {
             modelCalls += 1
@@ -320,6 +325,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.sync(() => {
             modelCalls += 1
@@ -364,6 +370,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((params) => {
           modelPrompt = params.prompt
           return Stream.make(textDelta("done"))
@@ -397,6 +404,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           const call = calls
           calls += 1
@@ -439,6 +447,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -513,6 +522,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(waitTool) })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => Stream.make(toolCallPart("call-1", "wait", {}))),
         ToolExecutor.layerTest({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
         Approvals.layerAutoApprove,
@@ -540,6 +550,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(waitTool) })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1 ? Stream.make(toolCallPart("call-wait", "wait", {})) : Stream.make(textDelta("done"))
@@ -612,6 +623,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -674,6 +686,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.sync(() => {
             modelCalls += 1
@@ -722,6 +735,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.sync(() => {
             modelCalls += 1
@@ -774,6 +788,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((params) => {
           modelPrompt = params.prompt
           return Stream.make(textDelta("done"))
@@ -828,6 +843,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -920,6 +936,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((request) => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -1007,6 +1024,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -1101,6 +1119,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const repeated = Prompt.makeMessage("user", { content: [textPart("same authored content")] })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => Stream.make(textDelta("done"))),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -1148,6 +1167,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.sync(() => {
             modelCalls += 1
@@ -1183,6 +1203,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => Stream.make(textDelta("done"))),
         unusedExecutor,
         Approvals.layerAutoApprove,

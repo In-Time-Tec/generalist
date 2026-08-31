@@ -11,6 +11,7 @@ import {
   ModelToolCallValidation,
 } from "../../../../src/index"
 import { withProviderFinish } from "../../provider-finish"
+import { allowAllAuthorization } from "../../../authorization.js"
 
 const rateLimit = AiError.make({
   module: "NoReplayTestLanguageModel",
@@ -121,7 +122,7 @@ const runAgent = (
 ) =>
   Stream.runCollect(
     Agent.stream(agent, { prompt: "no replay" }).pipe(
-      Stream.provide(Layer.mergeAll(model, policy.pipe(Layer.orDie), middleware, toolLayer)),
+      Stream.provide(Layer.mergeAll(allowAllAuthorization, model, policy.pipe(Layer.orDie), middleware, toolLayer)),
     ),
   )
 
@@ -188,6 +189,7 @@ describe("agent model stream replay safety", () => {
       const failure = yield* Agent.stream(noToolAgent, { prompt: "malformed" }).pipe(
         Stream.provide(
           Layer.mergeAll(
+            allowAllAuthorization,
             model.layer,
             ModelResilience.layer({
               retrySchedule: Schedule.recurs(0),

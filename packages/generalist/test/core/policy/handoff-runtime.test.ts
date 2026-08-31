@@ -17,6 +17,7 @@ import { close } from "../../../src/core/agent/closure.js"
 import { layer as deterministicLayer } from "../../../src/ai/provider/deterministic.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -86,6 +87,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer(() => {
           calls += 1
@@ -131,6 +133,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     let supervisorCalls = 0
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer((options) => {
           const content = promptText(options.prompt)
@@ -162,6 +165,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const completedKeys: Array<string> = []
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer((options) =>
           promptText(options.prompt).includes("continue stable")
@@ -219,6 +223,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         parentModel,
         ToolExecutor.layerToolkit(delegate).pipe(Layer.provide(parentModel)),
@@ -244,6 +249,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
         ToolExecutor.layerToolkit(supervisorSetup.toolkit),
@@ -270,6 +276,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     let modelCalls = 0
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer(() => {
           modelCalls += 1
@@ -317,6 +324,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer(() => {
           ambientCalls += 1
@@ -345,6 +353,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
         deterministicLayer(),
@@ -368,6 +377,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
         ToolExecutor.layerToolkit(supervisorSetup.toolkit),

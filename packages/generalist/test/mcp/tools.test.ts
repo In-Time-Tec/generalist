@@ -6,6 +6,7 @@ import { connect, layerToolkit, toolkit } from "../../src/mcp/tools.js"
 import { MCPClient } from "../../src/mcp/index"
 import { layer as layerHttp } from "../../src/mcp/client/http.js"
 import { makeFixture, makeTransportFixture } from "./fixture"
+import { allowAllAuthorization } from "../authorization.js"
 
 describe("mcp tools adapter", () => {
   it("exports the complete scoped connect", () => {
@@ -63,7 +64,13 @@ describe("mcp tools adapter", () => {
           ])
           const agent = Agent.make({ name: "mcp-agent", toolkit: tools.toolkit })
           const services = yield* Layer.build(
-            Layer.mergeAll(model.layer, tools.executorLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+            Layer.mergeAll(
+              allowAllAuthorization,
+              model.layer,
+              tools.executorLayer,
+              Approvals.layerAutoApprove,
+              ModelMiddleware.layerIdentity,
+            ),
           )
           const result = yield* Agent.generate(agent, { prompt: "add the numbers" }).pipe(Effect.provide(services))
           const prompts = yield* model.prompts
@@ -89,7 +96,13 @@ describe("mcp tools adapter", () => {
         ])
         const agent = Agent.make({ name: "mcp-agent", toolkit: tools.toolkit })
         const services = yield* Layer.build(
-          Layer.mergeAll(model.layer, tools.executorLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+          Layer.mergeAll(
+            allowAllAuthorization,
+            model.layer,
+            tools.executorLayer,
+            Approvals.layerAutoApprove,
+            ModelMiddleware.layerIdentity,
+          ),
         )
         const events = yield* Agent.stream(agent, { prompt: "call boom" }).pipe(
           Stream.runCollect,
@@ -119,7 +132,9 @@ describe("mcp tools adapter", () => {
       Effect.gen(function* () {
         const fixture = yield* makeTransportFixture()
         const tools = yield* connect({ name: "calc", transport: fixture.transport })
-        const services = yield* Layer.build(Layer.mergeAll(tools.executorLayer, ToolContext.layerDefault))
+        const services = yield* Layer.build(
+          Layer.mergeAll(allowAllAuthorization, tools.executorLayer, ToolContext.layerDefault),
+        )
         const executor = Context.get(services, ToolExecutor.ToolExecutor)
         const call1 = yield* Schema.decodeEffect(
           Response.ToolCallPart("calc_barrier_add", Schema.Struct({ a: Schema.Finite, b: Schema.Finite })),

@@ -11,6 +11,7 @@ import { provideScoped } from "../../execution/scoped-provide.js"
 import { tempDbPath } from "../scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
+import { allowAllAuthorization } from "../../../authorization.js"
 const scalePoints = [1, 5, 10, 20] as const
 const probe = Tool.make("linear_storage_probe", {
   parameters: Schema.Struct({ marker: Schema.String }),
@@ -119,7 +120,7 @@ const makeFixture = (scale: number, filename: string) => {
     linear_storage_probe: () => Effect.die("ToolExecutor test layer owns execution"),
   })
   const resolverLayer = ExecutableResolver.layerStatic([
-    { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+    { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
   ]).pipe(Layer.orDie)
   const runtimeLayer = SqliteRuntime.layerSqlite({
     filename,

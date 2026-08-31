@@ -17,6 +17,7 @@ import {
 import { provideScoped } from "../../../../../generalist/test/runtime/execution/scoped-provide.js"
 import { mysqlAvailable, mysqlClient, mysqlDatabase, uniqueSession } from "../../runtime/environment.js"
 import { SqlClient } from "effect/unstable/sql"
+import { allowAllAuthorization } from "../../../authorization.js"
 
 const describeMysql = describe.runIf(mysqlAvailable)
 
@@ -139,7 +140,7 @@ describeMysql("mysql worker cancellation", () => {
                   yield* Effect.addFinalizer(() => Effect.sync(() => lifecycle.push("resolver finalized")))
                   return {
                     _tag: "Agent" as const,
-                    agent: Agent.close(agent, Layer.merge(model, resources)),
+                    agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, resources)),
                     attestation: executable,
                   }
                 }),
@@ -232,7 +233,7 @@ describeMysql("mysql worker cancellation", () => {
           })
           const handlers = Toolkit.make(tool).toLayer({ block: () => Effect.die("ToolExecutor owns tool execution") })
           const resolver = yield* ExecutableResolver.makeStatic([
-            { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+            { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
           ])
           const options = {
             url,

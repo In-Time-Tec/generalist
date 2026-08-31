@@ -6,6 +6,7 @@ import { Address, ExecutableResolver, RunExecutor, Runtime, RunStore } from "../
 import { registrationsFor, textPrompt } from "../../../execution/fixtures.js"
 import { closedTestAgent, pinnedTestAgent } from "../../../run/identity.js"
 import { provideScoped } from "../../../execution/scoped-provide.js"
+import { allowAllAuthorization } from "../../../../authorization.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -80,7 +81,7 @@ it.effect("delivers an addressed message at the next turn boundary without inter
     }).pipe(
       Layer.provide(
         ExecutableResolver.layerStatic([
-          { executable: ref, agent: Agent.close(agent, model) },
+          { executable: ref, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
           { executable: childRef, agent: closedTestAgent(childAgent) },
         ]).pipe(Layer.orDie),
       ),
@@ -157,7 +158,7 @@ it.effect("carries the authoritative sender into the delivered prompt", () =>
     }).pipe(
       Layer.provide(
         ExecutableResolver.layerStatic([
-          { executable: ref, agent: Agent.close(agent, model) },
+          { executable: ref, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
           { executable: childRef, agent: closedTestAgent(childAgent) },
         ]).pipe(Layer.orDie),
       ),
@@ -222,7 +223,7 @@ it.effect("holds a message for an idle target until its next Run drains it", () 
     }).pipe(
       Layer.provide(
         ExecutableResolver.layerStatic([
-          { executable: ref, agent: Agent.close(agent, model) },
+          { executable: ref, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
           { executable: childRef, agent: closedTestAgent(childAgent) },
         ]).pipe(Layer.orDie),
       ),

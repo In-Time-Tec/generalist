@@ -11,6 +11,7 @@ import {
   ToolContext,
   ToolExecutor,
 } from "../../../src/index.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 const messages = Prompt.make("authorize the completed external calls").content
 const executableRef = Schema.decodeSync(ExecutableManifest.ExecutableRef)({
@@ -78,7 +79,7 @@ it.effect("executes a strict completed call without invoking a LanguageModel", (
       rootRunId: "run-1",
       attempt: 2,
     })
-  }).pipe(Effect.provide(Layer.merge(handlers, executor)))
+  }).pipe(Effect.provide(Layer.mergeAll(allowAllAuthorization, handlers, executor)))
 })
 
 it.effect("rejects malformed and inactive calls before any handler runs", () => {
@@ -158,7 +159,7 @@ it.effect("applies the ordinary bounded-output outcome before completion", () =>
         },
       },
     })
-  }).pipe(Effect.provide(Layer.merge(handlers, executor)))
+  }).pipe(Effect.provide(Layer.mergeAll(allowAllAuthorization, handlers, executor)))
 })
 
 it.effect("enforces authorization, deadline, and tool-call budget before handler entry", () => {
@@ -204,7 +205,13 @@ it.effect("enforces authorization, deadline, and tool-call budget before handler
     expect(expired).toMatchObject({ _tag: "generalist/core/RunBudgetExhausted", dimension: "deadline" })
     expect(handlerCalls).toBe(0)
   }).pipe(
-    Effect.provide(Layer.mergeAll(handlers, Permissions.layerRuleset({ rules: [{ pattern: "echo", level: "deny" }] }))),
+    Effect.provide(
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        Permissions.layerRuleset({ rules: [{ pattern: "echo", level: "deny" }] }),
+      ),
+    ),
   )
 })
 
@@ -260,7 +267,7 @@ it.effect("applies configured authored-order scheduling across the whole batch",
       sessionId: "scheduled-session",
       logicalOperationId: "scheduled-operation",
       turn: 0,
-    }).pipe(Stream.runCollect, Effect.provide(handlers))
+    }).pipe(Stream.runCollect, Effect.provide(Layer.mergeAll(allowAllAuthorization, handlers)))
     const fiber = yield* Effect.forkScoped(execution)
     yield* Deferred.await(bothEntered)
     expect(maxActive).toBe(2)
@@ -296,7 +303,7 @@ it.effect("interrupts configured ToolExecutor work with the request-scoped cance
       sessionId: "cancelled-session",
       logicalOperationId: "cancelled-operation",
       turn: 0,
-    }).pipe(Stream.runDrain, Effect.provide(Layer.merge(handlers, executor)))
+    }).pipe(Stream.runDrain, Effect.provide(Layer.mergeAll(allowAllAuthorization, handlers, executor)))
     const fiber = yield* Effect.forkScoped(execution)
     yield* Deferred.await(started)
     yield* Fiber.interrupt(fiber)
@@ -348,7 +355,7 @@ it.effect("resumes exact approval identity and completed replay without duplicat
     executableRef,
   }
   const pendingApprovals = Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) })
-  const base = Layer.merge(handlers, Permissions.layerAllowAll)
+  const base = Layer.mergeAll(allowAllAuthorization, handlers, Permissions.layerAllowAll)
 
   return Effect.gen(function* () {
     const suspension = yield* Effect.flip(Stream.runDrain(Agent.streamToolCalls(agent, start))).pipe(

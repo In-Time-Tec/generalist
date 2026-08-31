@@ -8,6 +8,7 @@ import { registrationsFor } from "../fixtures.js"
 import { tempDbPath } from "../../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
+import { allowAllAuthorization } from "../../../authorization.js"
 const finish = Response.makePart("finish", {
   reason: "stop",
   usage: Response.Usage.make({
@@ -63,7 +64,9 @@ const execute = (input: {
         : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(`model-preview-${input.observer}`) })
     const layer = baseLayer.pipe(
       Layer.provide(
-        ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, model) }]).pipe(Layer.orDie),
+        ExecutableResolver.layerStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
+        ]).pipe(Layer.orDie),
       ),
     )
 
@@ -179,7 +182,7 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
     }).pipe(
       Layer.provide(
         ExecutableResolver.layerStatic([
-          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
         ]).pipe(Layer.orDie),
       ),
     )
@@ -280,7 +283,7 @@ it.effect("retires the published frame when a response commits while keeping the
     }).pipe(
       Layer.provide(
         ExecutableResolver.layerStatic([
-          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
         ]).pipe(Layer.orDie),
       ),
     )

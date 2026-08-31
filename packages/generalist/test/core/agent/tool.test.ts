@@ -17,6 +17,7 @@ import {
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { withProviderFinish } from "../provider-finish"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 type Equal<Left, Right> =
@@ -124,7 +125,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       },
     }
     return [
-      Layer.mergeAll(ToolExecutor.layerToolkit(toolkit), ToolContext.layerDefault),
+      Layer.mergeAll(allowAllAuthorization, ToolExecutor.layerToolkit(toolkit), ToolContext.layerDefault),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const result = yield* executor.execute(request("numeric", "42"))
@@ -151,7 +152,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ToolContext.ToolContext | PlacementPrefix
     > = route.execute(request("service-placement", { value: "value" }))
     return [
-      Layer.mergeAll(Layer.succeed(PlacementPrefix, PlacementPrefix.of("!"))).pipe(
+      Layer.mergeAll(allowAllAuthorization, Layer.succeed(PlacementPrefix, PlacementPrefix.of("!"))).pipe(
         Layer.provideMerge(ToolContext.layerDefault),
       ),
       needsPrefix.pipe(
@@ -170,9 +171,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const toolkit = Toolkit.make(failingTool)
     const handlers = toolkit.toLayer({ failing: () => Effect.fail({ code: 409, detail: "child failed" }) })
     return [
-      Layer.mergeAll(handlers, ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers))).pipe(
-        Layer.provideMerge(ToolContext.layerDefault),
-      ),
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const outcome = yield* ToolExecutor.ToolExecutor.use((executor) => executor.execute(request("failing", {})))
 
@@ -195,9 +198,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const toolkit = Toolkit.make(overlappingTool)
     const handlers = toolkit.toLayer({ overlapping_failure: () => Effect.fail(409) })
     return [
-      Layer.mergeAll(handlers, ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers))).pipe(
-        Layer.provideMerge(ToolContext.layerDefault),
-      ),
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const outcome = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("overlapping_failure", {})),
@@ -217,9 +222,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const toolkit = Toolkit.make(failingTool)
     const handlers = toolkit.toLayer({ failing_error_mode: () => Effect.fail({ code: 503 }) })
     return [
-      Layer.mergeAll(handlers, ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers))).pipe(
-        Layer.provideMerge(ToolContext.layerDefault),
-      ),
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const outcome = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("failing_error_mode", {})),
@@ -248,9 +255,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       },
     })
     return [
-      Layer.mergeAll(handlers, ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers))).pipe(
-        Layer.provideMerge(ToolContext.layerDefault),
-      ),
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const decode = yield* Effect.flip(executor.execute(request("lookup_stages", { id: 1 })))
@@ -284,9 +293,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         ),
     })
     return [
-      Layer.mergeAll(handlers, ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers))).pipe(
-        Layer.provideMerge(ToolContext.layerDefault),
-      ),
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const failure = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("undeclared_failure", {})),
@@ -305,9 +316,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const toolkit = Toolkit.make(interruptingTool)
     const handlers = toolkit.toLayer({ interrupting: () => Effect.interrupt })
     return [
-      Layer.mergeAll(handlers, ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers))).pipe(
-        Layer.provideMerge(ToolContext.layerDefault),
-      ),
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const exit = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("interrupting", {})),
@@ -326,9 +339,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const toolkit = Toolkit.make(defectiveTool)
     const handlers = toolkit.toLayer({ defective: () => Effect.die("handler defect") })
     return [
-      Layer.mergeAll(handlers, ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers))).pipe(
-        Layer.provideMerge(ToolContext.layerDefault),
-      ),
+      Layer.mergeAll(
+        allowAllAuthorization,
+        handlers,
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const exit = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("defective", {})),
@@ -348,6 +363,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.routeToolkit(toolkit),
           ToolExecutor.route({
@@ -396,6 +412,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.routeToolkit(toolkit),
           ToolExecutor.route({
@@ -459,6 +476,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.client({
             toolkit,
@@ -500,6 +518,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.client({
             toolkit: Toolkit.make(deploy),
@@ -525,6 +544,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.client({
             toolkit: Toolkit.make(deploy),
@@ -561,6 +581,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.remote({
             toolkit,
@@ -621,6 +642,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.remote({
             toolkit,
@@ -655,6 +677,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.remote({
             toolkit,
@@ -888,6 +911,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([
           ToolExecutor.mcp({
             toolkit: Toolkit.make(githubSearch),
@@ -920,6 +944,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     () =>
       [
         Layer.mergeAll(
+          allowAllAuthorization,
           ToolExecutor.layerTest({
             execute: (input) =>
               Effect.succeed(
@@ -959,6 +984,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     let followUp = ""
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         handlers,
         modelLayer((options) => {
           calls += 1
@@ -1003,6 +1029,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         parentModel,
         ToolExecutor.layerToolkit(AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child" })).pipe(
           Layer.provide(parentModel),
@@ -1051,6 +1078,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const childTool = AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child", model: childModel })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         parentModel,
         ToolExecutor.layerToolkit(childTool).pipe(Layer.provide(parentModel)),
         Approvals.layerAutoApprove,
@@ -1089,6 +1117,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const childTool = AgentTool.asTool(child, { name: "ask_authorized_child" })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         ToolExecutor.layerRouter([ToolExecutor.routeToolkit(childTool), ToolExecutor.routeToolkit(toolkit)]).pipe(
           Layer.provide(toolkit.toLayer({ gated: ({ text }) => Effect.succeed(text) })),
         ),
@@ -1133,6 +1162,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         parentModel,
         ToolExecutor.layerToolkit(
@@ -1176,6 +1206,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         parentModel,
         ToolExecutor.layerToolkit(
           AgentTool.asTool(Agent.make({ name: "callback-child" }), {
@@ -1215,6 +1246,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         parentModel,
         ToolExecutor.layerToolkit(
           AgentTool.asTool(Agent.make({ name: "custom-child" }), {

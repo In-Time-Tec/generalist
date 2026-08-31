@@ -10,6 +10,7 @@ import { testExecutable } from "../../run/identity.js"
 import { operationRecoverySuite } from "../../operation/suites/recovery.js"
 import { tempDbPath } from "../../sql/scenario.js"
 import { toolCancellationSuite } from "../../operation/suites/tool-cancellation.js"
+import { allowAllAuthorization } from "../../../authorization.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -78,7 +79,7 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     const firstResolverLayer = ExecutableResolver.layerStatic([
       {
         executable,
-        agent: Agent.close(agent, Layer.mergeAll(firstModel, firstExecutor, handlers)),
+        agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, firstModel, firstExecutor, handlers)),
       },
     ]).pipe(Layer.orDie)
     const first = yield* scopedWith(
@@ -158,7 +159,7 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     const recoveredResolverLayer = ExecutableResolver.layerStatic([
       {
         executable,
-        agent: Agent.close(agent, Layer.mergeAll(recoveredModel, recoveredExecutor, handlers)),
+        agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, recoveredModel, recoveredExecutor, handlers)),
       },
     ]).pipe(Layer.orDie)
 
@@ -255,6 +256,7 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
         agent: Agent.close(
           agent,
           Layer.mergeAll(
+            allowAllAuthorization,
             firstModel,
             handlers,
             Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
@@ -337,7 +339,10 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
     const recoveredResolverLayer = ExecutableResolver.layerStatic([
       {
         executable,
-        agent: Agent.close(agent, Layer.mergeAll(recoveredModel, recoveredExecutor, handlers, Approvals.layerDenyAll)),
+        agent: Agent.close(
+          agent,
+          Layer.mergeAll(allowAllAuthorization, recoveredModel, recoveredExecutor, handlers, Approvals.layerDenyAll),
+        ),
       },
     ]).pipe(Layer.orDie)
 
@@ -408,7 +413,11 @@ it.effect("sqlite reconciles every running operation before execution", () => {
     ...options,
     filename: tempDbPath(`retry-safe-recovery-${backend}`),
   }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, model) }]).pipe(Layer.orDie)),
+    Layer.provide(
+      ExecutableResolver.layerStatic([
+        { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
+      ]).pipe(Layer.orDie),
+    ),
   )
   return scopedWith(runtimeLayer)(
     Effect.gen(function* () {

@@ -19,6 +19,7 @@ import {
 import { withProviderFinish } from "../provider-finish.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { suspension } from "../../runtime/execution/fixtures.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 const echoTool = Tool.make("echo", {
   parameters: Schema.Struct({ text: Schema.String }),
@@ -103,6 +104,7 @@ const makeToolCallModelLayer = () => {
 
 const baseLayers = (journalLayer: Layer.Layer<DurableDriver.DriverJournal>) =>
   Layer.mergeAll(
+    allowAllAuthorization,
     makeToolCallModelLayer(),
     ToolExecutor.layerTest({
       execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
@@ -139,6 +141,7 @@ describe("RunBudget Agent.stream integration", () => {
     })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -191,6 +194,7 @@ describe("RunBudget Agent.stream integration", () => {
     })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -237,6 +241,7 @@ describe("RunBudget Agent.stream integration", () => {
     })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -280,6 +285,7 @@ describe("RunBudget Agent.stream integration", () => {
     })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -339,6 +345,7 @@ describe("RunBudget Agent.stream integration", () => {
     })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -372,6 +379,7 @@ describe("RunBudget Agent.stream integration", () => {
     })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -430,6 +438,7 @@ describe("RunBudget Agent.stream integration", () => {
     )
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         budgetModelLayer,
         Layer.effectContext(
           Effect.gen(function* () {
@@ -471,6 +480,7 @@ describe("RunBudget Agent.stream integration", () => {
     const agent = Agent.make({ name: "auto-approve-agent", toolkit: Toolkit.make(gatedTool) })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({
@@ -521,6 +531,7 @@ describe("RunBudget Agent.stream integration", () => {
     })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         makeToolCallModelLayer(),
         ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
@@ -575,6 +586,7 @@ describe("RunBudget Agent.stream integration", () => {
     const agent = Agent.make({ name: "stale-approval-agent", toolkit: Toolkit.make(gatedTool) })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         Layer.effect(
           LanguageModel.LanguageModel,
           LanguageModel.make({

@@ -15,6 +15,7 @@ import {
 import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { ItLayer } from "../it-layer.js"
 import { withProviderFinish } from "../provider-finish.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -104,6 +105,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     () =>
       [
         Layer.mergeAll(
+          allowAllAuthorization,
           modelLayer(() => Stream.make(textDelta("plain output"))),
           unusedExecutor,
           Approvals.layerAutoApprove,
@@ -124,6 +126,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((options) => {
           calls += 1
           prompts.push(Json.stringify(options.prompt.content))
@@ -154,6 +157,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     () =>
       [
         Layer.mergeAll(
+          allowAllAuthorization,
           modelLayer(() => Stream.make(textDelta("hello world"))),
           unusedExecutor,
           Approvals.layerAutoApprove,
@@ -206,6 +210,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     }
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           calls += 1
           if (calls === 1) {
@@ -295,6 +300,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     }
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -379,6 +385,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     const dispatched: Array<string> = []
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.make(
             toolCallPart("duplicate", "gated-echo", { text: "first" }),
@@ -437,6 +444,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     const toolkit = Toolkit.make(gatedEchoTool)
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -490,6 +498,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     }
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -561,6 +570,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     }
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() =>
           Stream.make(safeToolCall).pipe(
             Stream.concat(exitMode === "early" ? Stream.never : Stream.make(textDelta("stop"))),
@@ -619,6 +629,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     () =>
       [
         Layer.mergeAll(
+          allowAllAuthorization,
           modelLayer(() => Stream.concat(assistantText("first", "."), assistantText("second", "answer"))),
           unusedExecutor,
           Approvals.layerAutoApprove,
@@ -647,6 +658,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     () =>
       [
         Layer.mergeAll(
+          allowAllAuthorization,
           modelLayer(() => Stream.make(textDelta("hidden"))),
           unusedExecutor,
           Approvals.layerAutoApprove,
@@ -678,6 +690,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     let seen = ""
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer((options) => {
           seen = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("ok"))
@@ -705,6 +718,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     () =>
       [
         Layer.mergeAll(
+          allowAllAuthorization,
           modelLayer(() => Stream.make(toolCallPart("tool-call-guard", "echo", { text: "hi" }))),
           unusedExecutor,
           Approvals.layerAutoApprove,
@@ -728,6 +742,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
     let modelCalled = false
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         modelLayer(() => {
           modelCalled = true
           return Stream.make(textDelta("should not run"))

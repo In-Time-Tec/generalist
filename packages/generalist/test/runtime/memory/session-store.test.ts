@@ -10,6 +10,7 @@ import { provideScoped } from "../execution/scoped-provide.js"
 import { tempDbPath } from "../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
+import { allowAllAuthorization } from "../../authorization.js"
 const probe = Tool.make("linear_storage_probe", {
   parameters: Schema.Struct({ marker: Schema.String }),
   success: Schema.String,
@@ -212,8 +213,11 @@ const makeFourChildFixture = (filename: string) => {
     linear_storage_probe: () => Effect.die("ToolExecutor test layer owns execution"),
   })
   const resolverLayer = ExecutableResolver.layerStatic([
-    { executable: parentRef, agent: Agent.close(parent, parentModel) },
-    { executable: childRef, agent: Agent.close(child, Layer.mergeAll(childModel, executor, handlers)) },
+    { executable: parentRef, agent: Agent.close(parent, Layer.mergeAll(allowAllAuthorization, parentModel)) },
+    {
+      executable: childRef,
+      agent: Agent.close(child, Layer.mergeAll(allowAllAuthorization, childModel, executor, handlers)),
+    },
   ]).pipe(Layer.orDie)
   return {
     address,

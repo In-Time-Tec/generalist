@@ -16,6 +16,7 @@ import {
 } from "../execution/fixtures.js"
 import { sqliteLayer, tempDbPath } from "../sql/scenario.js"
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
+import { allowAllAuthorization } from "../../authorization.js"
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const admitRun = Effect.gen(function* () {
@@ -574,7 +575,9 @@ it.live("atomically persists steering consumption and model scheduling before SQ
     addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
   }).pipe(
     Layer.provide(
-      ExecutableResolver.layerStatic([{ executable: ref, agent: Agent.close(agent, model) }]).pipe(Layer.orDie),
+      ExecutableResolver.layerStatic([
+        { executable: ref, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
+      ]).pipe(Layer.orDie),
     ),
   )
   layer(runtimeLayer)("RunExecutor delivers durable steering in the next model operation", (test) => {
@@ -654,7 +657,9 @@ it.effect("steering admitted during model streaming does not interrupt it and re
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     }).pipe(
       Layer.provide(
-        ExecutableResolver.layerStatic([{ executable: ref, agent: Agent.close(agent, model) }]).pipe(Layer.orDie),
+        ExecutableResolver.layerStatic([
+          { executable: ref, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
+        ]).pipe(Layer.orDie),
       ),
     )
 
@@ -753,7 +758,10 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
     }).pipe(
       Layer.provide(
         ExecutableResolver.layerStatic([
-          { executable: ref, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+          {
+            executable: ref,
+            agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),
+          },
         ]).pipe(Layer.orDie),
       ),
     )

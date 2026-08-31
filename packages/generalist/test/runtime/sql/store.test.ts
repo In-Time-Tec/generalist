@@ -40,6 +40,7 @@ import { sqliteLayer, tempDbPath } from "./scenario.js"
 import { closedTestAgent, pinnedTestAgent } from "../run/identity.js"
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 import { ControlState } from "../../../src/core/agent/handoff/state.js"
+import { allowAllAuthorization } from "../../authorization.js"
 const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
 const CheckpointState = Schema.Struct({ handoff: Schema.optionalKey(ControlState) })
 
@@ -686,6 +687,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
       }),
     )
     const firstServices = Layer.mergeAll(
+      allowAllAuthorization,
       firstModel,
       ToolExecutor.layerToolkit(supervisor.toolkit),
       supervisor.catalog,
@@ -699,7 +701,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
       resolve: () =>
         Effect.succeed({
           _tag: "Agent" as const,
-          agent: Agent.close(supervisor.agent, firstServices),
+          agent: Agent.close(supervisor.agent, Layer.mergeAll(allowAllAuthorization, firstServices)),
           attestation: admittedExecutable,
         }),
     })
@@ -810,7 +812,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
           resolvedActive = input.ref.active
           return {
             _tag: "Agent" as const,
-            agent: Agent.close(childAgent, childModel),
+            agent: Agent.close(childAgent, Layer.mergeAll(allowAllAuthorization, childModel)),
             attestation: activeExecutable,
           }
         }),

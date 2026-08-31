@@ -6,6 +6,7 @@ import { lookupHandoffToolMeta } from "../../../src/core/policy/handoff-tool-met
 import { ItLayer } from "../it-layer"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -126,6 +127,7 @@ layer(Layer.empty)("Handoff", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer((options) => {
           const content = promptText(options.prompt)
@@ -175,6 +177,7 @@ layer(Layer.empty)("Handoff", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [first, second] })
     return [
       Layer.mergeAll(
+        allowAllAuthorization,
         unusedToolHandlerLayer,
         modelLayer(() => {
           modelCalls += 1
@@ -224,7 +227,7 @@ layer(Layer.empty)("Handoff", (it) => {
       prompt: `task ${index}`,
     }))
     return [
-      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+      Layer.mergeAll(allowAllAuthorization, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
         for (const concurrency of [1, 3, 6]) {
           active = 0
@@ -261,7 +264,7 @@ layer(Layer.empty)("Handoff", (it) => {
       modelLayer(() => Stream.fail(modelFailure("child failed"))),
     )
     return [
-      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+      Layer.mergeAll(allowAllAuthorization, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
         const failure = yield* Effect.flip(Handoff.fanOut([{ registration: child, prompt: "fail" }]))
         expect(failure._tag).toBe("generalist/core/AgentError")
@@ -294,7 +297,7 @@ layer(Layer.empty)("Handoff", (it) => {
       },
     ]
     return [
-      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+      Layer.mergeAll(allowAllAuthorization, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
         for (const join of [{ _tag: "AllSettled" }, { _tag: "BestEffort" }] as const) {
           const outcomes = yield* Handoff.fanOut(children, { join })
@@ -306,7 +309,7 @@ layer(Layer.empty)("Handoff", (it) => {
   })
 
   ItLayer.make(it, "returns first success and interrupts unnecessary members", () => [
-    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+    Layer.mergeAll(allowAllAuthorization, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     Effect.gen(function* () {
       for (const remainder of ["request-cancel", "terminate"] as const) {
         const firstStarted = yield* Deferred.make<void>()
@@ -342,7 +345,7 @@ layer(Layer.empty)("Handoff", (it) => {
   ])
 
   ItLayer.make(it, "awaits the remainder after first-success satisfaction", () => [
-    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+    Layer.mergeAll(allowAllAuthorization, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     Effect.gen(function* () {
       const release = yield* Deferred.make<void>()
       const completed = yield* Deferred.make<void>()
@@ -433,7 +436,7 @@ layer(Layer.empty)("Handoff", (it) => {
   ])
 
   ItLayer.make(it, "completes quorum and fails as soon as quorum is impossible", () => [
-    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+    Layer.mergeAll(allowAllAuthorization, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     Effect.gen(function* () {
       const success = (name: string) => ({
         registration: directRegistration(name, Effect.succeed(directResult(name))),

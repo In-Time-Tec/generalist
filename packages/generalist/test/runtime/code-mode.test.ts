@@ -17,6 +17,7 @@ import { layer as activeExecutionsLayer } from "../../src/runtime/execution/acti
 import { tempDbPath } from "./sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
+import { allowAllAuthorization } from "../authorization.js"
 const sandboxPin = Pins.makeCapability({ sandbox: "code-mode-test-v1" })
 const inputPin = Pins.makeCapability({ codec: "prompt-v1" })
 const outputPin = Pins.makeCapability({ codec: "unknown-v1" })
@@ -116,7 +117,9 @@ const fixture = (options: { readonly calls?: number } = {}) => {
   )
   const resolverLayer = Layer.effect(
     ExecutableResolver.ExecutableResolver,
-    ExecutableResolver.makeStatic([{ executable, agent: Agent.close(rootAgent, model) }]).pipe(
+    ExecutableResolver.makeStatic([
+      { executable, agent: Agent.close(rootAgent, Layer.mergeAll(allowAllAuthorization, model)) },
+    ]).pipe(
       Effect.map((staticRoot) =>
         ExecutableResolver.ExecutableResolver.of({
           resolve: (input) => {
@@ -369,7 +372,12 @@ describe("Runtime code_mode Program children", () => {
             },
           })
           yield* withLayer(
-            Layer.mergeAll(Layer.succeed(RunStore.RunStore, crashStore), activeExecutionsLayer, resolverLayer),
+            Layer.mergeAll(
+              allowAllAuthorization,
+              Layer.succeed(RunStore.RunStore, crashStore),
+              activeExecutionsLayer,
+              resolverLayer,
+            ),
           )(
             Effect.gen(function* () {
               const host = yield* makeRunExecutor

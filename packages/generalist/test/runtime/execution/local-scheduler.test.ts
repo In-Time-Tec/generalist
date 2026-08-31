@@ -28,6 +28,7 @@ import { make as makeLocalScheduler } from "../../../src/runtime/execution/local
 import { tempDbPath } from "../sql/scenario.js"
 
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
+import { allowAllAuthorization } from "../../authorization.js"
 const finish = Response.makePart("finish", {
   reason: "stop",
   usage: Response.Usage.make({
@@ -55,8 +56,8 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
-        { executable: researcherRef, agent: Agent.close(researcher, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
+        { executable: researcherRef, agent: Agent.close(researcher, Layer.mergeAll(allowAllAuthorization, model)) },
       ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
@@ -139,7 +140,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
       ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
@@ -316,7 +317,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
       ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
@@ -805,8 +806,8 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
-        { executable: researcherRef, agent: Agent.close(researcher, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
+        { executable: researcherRef, agent: Agent.close(researcher, Layer.mergeAll(allowAllAuthorization, model)) },
       ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
@@ -876,7 +877,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
         { executable: researcherRef, agent: closedTestAgent(researcher) },
       ]).pipe(Layer.orDie),
       addresses: [
@@ -960,7 +961,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
       ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
@@ -1030,7 +1031,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
       ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
@@ -1095,7 +1096,7 @@ for (const backend of ["memory", "sqlite"] as const) {
     )
     const options = {
       resolverLayer: ExecutableResolver.layerStatic([
-        { executable: assistantRef, agent: Agent.close(assistant, model) },
+        { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
       ]).pipe(Layer.orDie),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },

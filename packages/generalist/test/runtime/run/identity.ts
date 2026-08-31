@@ -1,6 +1,7 @@
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "../../../src/index.js"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, type Tool } from "effect/unstable/ai"
+import { allowAllAuthorization } from "../../authorization.js"
 
 /** Model Layer for test Agents that are admitted and inspected but never reach a model call. */
 export const unusedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
@@ -12,7 +13,8 @@ export const unusedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effec
 )
 
 /** Close one test Agent over a model it never calls. */
-export const closedTestAgent = (agent: Agent.Agent): Agent.Closed => Agent.close(agent, unusedModel)
+export const closedTestAgent = (agent: Agent.Agent): Agent.Closed =>
+  Agent.close(agent, Layer.mergeAll(allowAllAuthorization, unusedModel))
 
 export function testExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
   agent: Agent.Agent<Tools, R, P, A>,

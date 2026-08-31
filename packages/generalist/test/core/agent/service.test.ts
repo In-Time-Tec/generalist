@@ -228,6 +228,10 @@ const modelLayer = (
 
 const unusedModelLayer = modelLayer(() => Stream.make(textDelta("unused")))
 
+// Tooled runs declare an explicit allow-all policy; tests that exercise a
+// specific Permissions/Approvals behavior provide their own instead.
+const authorizationLayer = Layer.mergeAll(Permissions.layerAllowAll, Approvals.layerAutoApprove)
+
 class Budget extends Context.Service<Budget, { readonly remaining: (turn: number) => number }>()(
   "generalist/test/core/agent/service.test/Budget",
 ) {}
@@ -702,7 +706,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       success: Schema.Unknown,
     })
     return [
-      Layer.merge(
+      Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           modelCalls += 1
           advertisedTools = modelToolNames(options.tools)
@@ -1208,6 +1213,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const toolkit = Toolkit.make(echoTool)
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           return calls === 1
@@ -1251,6 +1257,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const toolkit = Toolkit.make(original)
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -1289,6 +1296,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const toolkit = Toolkit.make(echoTool)
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           return calls === 1
@@ -1328,7 +1336,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "suspends when approval policy is absent and tool needs approval", () => {
+  ItLayer.make(it, "fails fast when a tooled agent has no authorization policy", () => {
     let calls = 0
     let handled = false
     return [
@@ -1352,12 +1360,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const error = yield* Stream.runDrain(Agent.stream(agent, { prompt: "use gated" })).pipe(Effect.flip)
 
+        expect(calls).toBe(0)
         expect(handled).toBe(false)
-        expect(Schema.is(AgentEvent.AgentSuspended)(error)).toBe(true)
-        if (Schema.is(AgentEvent.AgentSuspended)(error)) {
-          expect(error.waits[0]?.reason).toBe("approval")
-          expect(error.waits[0]?.call.name).toBe("gated")
-        }
+        expect(Schema.is(AgentEvent.AgentError)(error)).toBe(true)
+        expect(String(error)).toContain("no tool authorization policy")
       }),
     ] as const
   })
@@ -1496,6 +1502,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     }
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           const content = Json.stringify(options.prompt.content)
@@ -1575,6 +1582,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     }
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -1635,6 +1643,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     }
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return Stream.make(toolCallPart("activate-collision", "activate_skill", { name: "collision" }))
@@ -1686,6 +1695,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     }
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return Stream.make(
@@ -1725,6 +1735,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const plainRunTools: Array<ReadonlyArray<string>> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           const content = Json.stringify(options.prompt.content)
           const names = modelToolNames(options.tools)
@@ -1766,6 +1777,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     }
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -1812,6 +1824,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     }
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -1977,6 +1990,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let secondCallSawToolResult = false
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           if (calls === 1) {
@@ -2015,6 +2029,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -2049,6 +2064,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -2090,6 +2106,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -2122,6 +2139,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -2270,6 +2288,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let requestSessionId = ""
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -2330,6 +2349,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           thirdOfferStarted = yield* Deferred.make<void>()
           thirdOfferCompleted = yield* Deferred.make<void>()
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() => {
               calls += 1
               return calls === 1
@@ -2393,6 +2413,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           overflowOfferStarted = yield* Deferred.make<void>()
           overflowOfferCompleted = yield* Deferred.make<void>()
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() => {
               calls += 1
               return calls === 1
@@ -2447,6 +2468,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let releaseConsumer!: Deferred.Deferred<void>
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls % 2 === 1
@@ -2517,6 +2539,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           consumerStarted = yield* Deferred.make<void>()
           releaseConsumer = yield* Deferred.make<void>()
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() => {
               calls += 1
               return calls === 1
@@ -2584,6 +2607,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -2634,6 +2658,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           executionFinalized = yield* Deferred.make<void>()
           consumerStarted = yield* Deferred.make<void>()
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() => {
               calls += 1
               return Stream.make(toolCallPart("tool-call-abandoned-progress", "echo", { text: "from model" }))
@@ -2709,6 +2734,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         modelLayer(() => {
@@ -2739,6 +2765,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let approvalSessionId = ""
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -2772,6 +2799,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let approval: Deferred.Deferred<Approvals.Resolution> | undefined
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -3108,6 +3136,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     )
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) return Stream.make(toolCallPart("active-seed", "echo", { text: "seed" }))
@@ -3175,6 +3204,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const policy = Policy.make(() => Effect.succeed(Policy.decision.continue({ activeTools: ["activate_skill"] })))
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -3547,6 +3577,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const measuredTokens: Array<number> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           streamCalls += 1
           if (streamCalls === 1) {
@@ -3603,6 +3634,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const measuredTokens: Array<number> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           streamCalls += 1
           return streamCalls === 1
@@ -3646,6 +3678,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const measuredTokens: Array<number> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           streamCalls += 1
           return streamCalls === 1
@@ -3688,6 +3721,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const estimatedTokens: Array<number> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           streamCalls += 1
           switch (streamCalls) {
@@ -3742,6 +3776,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const thresholdUsages: Array<number> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           streamCalls += 1
           switch (streamCalls) {
@@ -3809,6 +3844,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let secondPrompt = ""
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(
           (options) => {
             streamCalls += 1
@@ -3856,6 +3892,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let secondPrompt = ""
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(
           (options) => {
             streamCalls += 1
@@ -3906,6 +3943,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let compactions = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls < 5
@@ -4241,6 +4279,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let secondPrompt = ""
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(
           (options) => {
             streamCalls += 1
@@ -4502,6 +4541,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let executions = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         overflowModelLayer(() => {
           calls += 1
           return Stream.fromIterable([
@@ -4652,6 +4692,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const prompts: Array<string> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           prompts.push(Json.stringify(options.prompt.content))
@@ -4709,6 +4750,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let secondMessages: ReadonlyArray<Prompt.Message> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           if (calls === 1) {
@@ -4758,6 +4800,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const prompts: Array<string> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           if (calls === 1) {
@@ -4992,6 +5035,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => Stream.make(toolCallPart("tool-call-waiting-approval", "waiting-approval", { text: "wait" }))),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -5028,6 +5072,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           finalized = yield* Deferred.make<void>()
           ticks = yield* Ref.make(0)
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() => Stream.make(toolCallPart("tool-call-orphan", "echo", { text: "run" }))),
             ToolExecutor.layerTest({
               execute: () =>
@@ -5070,6 +5115,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           started = yield* Deferred.make<void>()
           cleanupDone = yield* Deferred.make<void>()
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() => Stream.make(toolCallPart("tool-call-prompt", "echo", { text: "run" }))),
             ToolExecutor.layerTest({
               execute: () =>
@@ -5120,6 +5166,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           childExited = yield* Deferred.make<void>()
           finalized = yield* Deferred.make<void>()
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() => Stream.make(toolCallPart("tool-call-wedge", "echo", { text: "run" }))),
             ToolExecutor.layerTest({
               execute: () =>
@@ -5186,6 +5233,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           release = yield* Deferred.make<void>()
           finalized = yield* Deferred.make<void>()
           return Layer.mergeAll(
+            authorizationLayer,
             modelLayer(() =>
               Stream.make(toolCallPart("tool-call-orphan-approval", "waiting-approval", { text: "wait" })),
             ),
@@ -5261,6 +5309,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() =>
           Stream.make(toolCallPart("tool-call-interrupt-approval", "interruptible-approval", { text: "wait" })),
         ),
@@ -5326,6 +5375,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Effect.map((ready) => {
             started = ready
             return Layer.mergeAll(
+              authorizationLayer,
               modelLayer(() => {
                 calls += 1
                 return Stream.make(toolCallPart("tool-call-abort", "echo", { text: "from model" }))
@@ -5369,6 +5419,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const largeOutput = "x".repeat(60 * 1024)
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           if (calls === 1) {
@@ -5477,6 +5528,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -5549,6 +5601,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let modelCalls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -5598,6 +5651,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const releases = new Map<string, Deferred.Deferred<void>>()
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -5712,6 +5766,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let releaseFollowing: Deferred.Deferred<void> | undefined
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -5805,6 +5860,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const expectedUsage = AgentEvent.addUsage(firstUsage, secondUsage)
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -6052,6 +6108,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const { spans, tracer } = testTracer()
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(
           () => {
             streamCalls += 1
@@ -6254,6 +6311,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const { spans, tracer } = testTracer()
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(
           (options) => {
             calls += 1
@@ -6676,6 +6734,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         overflowModelLayer(() => {
           ambientCalls += 1
           return Stream.make(toolCallPart("tool-call-override-model", "echo", { text: "from model" }))
@@ -6718,6 +6777,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: `call ${calls}` }))
@@ -6748,6 +6808,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "keeps every pending call in order when a configured limit stops", () => [
     Layer.mergeAll(
+      authorizationLayer,
       modelLayer(() =>
         Stream.make(
           toolCallPart("tool-call-first", "echo", { text: "first" }),
@@ -6780,6 +6841,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls <= 12
@@ -6840,6 +6902,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return Stream.fromEffect(
@@ -6874,6 +6937,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const budgetLayer = Layer.succeed(Budget, { remaining: () => 0 })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: `call ${calls}` }))
@@ -6913,6 +6977,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return Stream.make(toolCallPart(`tool-call-stop-${calls}`, "echo", { text: `call ${calls}` }))
@@ -6949,6 +7014,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const policyFailure = Policy.PolicyError.make({ message: "budget unavailable", cause: policyCause })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => Stream.make(toolCallPart("tool-call-policy-failure", "echo", { text: "call" }))),
         echoExecutor,
         Approvals.layerAutoApprove,
@@ -6974,6 +7040,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     Reflect.set(policy, "decide", () => Effect.succeed({ _tag: "Stop" }))
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => Stream.make(toolCallPart("tool-call-stale-policy", "echo", { text: "call" }))),
         echoExecutor,
         Approvals.layerAutoApprove,
@@ -6995,6 +7062,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let secondCallSawInjectedSystem = false
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           calls += 1
           if (calls === 1) {
@@ -7030,6 +7098,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let secondTurnTools: ReadonlyArray<string> = []
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           modelCalls += 1
           if (modelCalls === 2) secondTurnTools = modelToolNames(options.tools)
@@ -7067,6 +7136,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     () =>
       [
         Layer.mergeAll(
+          authorizationLayer,
           modelLayer(() => Stream.make(toolCallPart("tool-call-wait", "echo", { text: "hold" }))),
           ToolExecutor.layerTest({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
           Approvals.layerAutoApprove,
@@ -7099,6 +7169,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let resumedMetadata: unknown
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -7176,6 +7247,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let modelCalls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return Stream.make(toolCallPart("tool-wait-denial", "echo", { text: "wait" }))
@@ -7278,6 +7350,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -7357,6 +7430,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let modelCalls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
@@ -7513,6 +7587,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const execute = (id: string) => executions.set(id, (executions.get(id) ?? 0) + 1)
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer((options) => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -7645,6 +7720,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => Stream.make(toolCallPart("bound-resume", "echo", { text: "original" }))),
         executor,
         Approvals.layerAutoApprove,
@@ -7754,6 +7830,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let checkpoint: Prompt.Prompt | undefined
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           return Stream.make(toolCallPart("authoritative-call", "echo", { text: "original" }))
@@ -7945,6 +8022,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     )
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -8007,6 +8085,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     () =>
       [
         Layer.mergeAll(
+          authorizationLayer,
           modelLayer(() =>
             Stream.make(
               providerToolCallPart("provider-call", "gated", { text: "done upstream" }),
@@ -8056,6 +8135,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let executions = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -8155,6 +8235,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -8197,6 +8278,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -8253,6 +8335,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     })
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -8297,6 +8380,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -8326,6 +8410,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           if (calls === 1) {
@@ -8365,6 +8450,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     () =>
       [
         Layer.mergeAll(
+          authorizationLayer,
           modelLayer(() => Stream.make(toolCallPart("tool-call-pending", "gated", { text: "please" }))),
           unusedExecutor,
           Approvals.layerTest({
@@ -8394,6 +8480,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -8462,6 +8549,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let modelCalls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           const turn = modelCalls++
           return turn < 12
@@ -8582,6 +8670,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -8934,6 +9023,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let streamCalls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(
           () => {
             streamCalls += 1
@@ -9017,6 +9107,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ).pipe(Layer.provide(Session.layerMemory))
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(
           () => {
             streamCalls += 1
@@ -9123,6 +9214,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ).pipe(Layer.provide(Session.layerMemory))
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -9214,6 +9306,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ).pipe(Layer.provide(Session.layerMemory))
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -9253,6 +9346,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
+        authorizationLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1

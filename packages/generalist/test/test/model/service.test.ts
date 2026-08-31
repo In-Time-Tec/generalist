@@ -15,6 +15,7 @@ import {
   Toolkit,
 } from "generalist"
 import { TestModel } from "generalist/test"
+import { allowAllAuthorization } from "../../authorization.js"
 
 const echoTool = Tool.make("echo", {
   description: "Echo test input",
@@ -34,7 +35,9 @@ const fixtureLayer = (
 ): Layer.Layer<Fixture | LanguageModel.LanguageModel | ModelRegistry.ModelRegistry> =>
   Layer.unwrap(
     TestModel.make(script, options).pipe(
-      Effect.map((fixture) => Layer.mergeAll(Layer.succeed(Fixture, fixture), fixture.layer, fixture.registryLayer)),
+      Effect.map((fixture) =>
+        Layer.mergeAll(allowAllAuthorization, Layer.succeed(Fixture, fixture), fixture.layer, fixture.registryLayer),
+      ),
     ),
   )
 
@@ -223,7 +226,11 @@ layer(Layer.empty)("Agent runs over a truncated provider stream", (it) => {
     Effect.gen(function* () {
       const fixture = yield* TestModel.make([step])
       const services = yield* Layer.build(
-        Layer.mergeAll(fixture.layer, echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) })),
+        Layer.mergeAll(
+          allowAllAuthorization,
+          fixture.layer,
+          echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }),
+        ),
       )
       const events: Array<unknown> = []
       const exit = yield* Agent.stream(Agent.make({ name: "truncated-agent", toolkit: echoToolkit }), {
@@ -313,6 +320,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
       ])
       const services = yield* Layer.build(
         Layer.mergeAll(
+          allowAllAuthorization,
           fixture.layer,
           fixture.registryLayer,
           echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }),
@@ -477,6 +485,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
       ])
       const services = yield* Layer.build(
         Layer.mergeAll(
+          allowAllAuthorization,
           fixture.layer,
           fixture.registryLayer,
           echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }),

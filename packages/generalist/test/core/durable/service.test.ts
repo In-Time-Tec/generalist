@@ -26,6 +26,7 @@ import { withDerivedSystem } from "../../../src/core/agent/session/history.js"
 import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
 import { make as makeToolBatch, updateCall } from "../../../src/core/agent/tools/checkpoint.js"
 import { applyToolOutcome } from "../../../src/core/agent/tools/checkpoint-operation.js"
+import { allowAllAuthorization } from "../../authorization.js"
 
 type JsonRoundTripValue = typeof Schema.Unknown.Type
 const roundTrip = (value: JsonRoundTripValue): JsonRoundTripValue => Json.parse(Json.stringify(value))
@@ -1014,6 +1015,7 @@ describe("DurableDriver Agent.stream integration", () => {
     const agent = Agent.make({ name: "driver-seam-agent", toolkit: Toolkit.make(echoTool) })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         makeToolCallModelLayer(),
         ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
@@ -1038,6 +1040,7 @@ describe("DurableDriver Agent.stream integration", () => {
     const agent = Agent.make({ name: "replay-safe-tool-agent", toolkit: Toolkit.make(echoTool) })
     layer(
       Layer.mergeAll(
+        allowAllAuthorization,
         makeToolCallModelLayer(),
         ToolExecutor.layerTest({
           replayPolicy: (request) => (request.call.name === "echo" ? "provider-idempotent" : "never"),
@@ -1067,6 +1070,7 @@ describe("DurableDriver Agent.stream integration", () => {
           const agent = Agent.make({ name: "key-stable-agent", toolkit: Toolkit.make(echoTool) })
           yield* provideScoped(
             Layer.mergeAll(
+              allowAllAuthorization,
               makeToolCallModelLayer(),
               ToolExecutor.layerTest({
                 execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
@@ -1110,7 +1114,7 @@ describe("DurableDriver Agent.stream integration", () => {
     const agent = Agent.make({ name: "bounded-session-sync-agent" })
 
     return provideScoped(
-      Layer.mergeAll(Session.layerMemory, modelLayer, journalLayer),
+      Layer.mergeAll(allowAllAuthorization, Session.layerMemory, modelLayer, journalLayer),
       Effect.gen(function* () {
         const before = yield* Effect.scoped(
           Effect.gen(function* () {
@@ -1185,7 +1189,7 @@ describe("DurableDriver Agent.stream integration", () => {
     const agent = Agent.make({ name: "sync-key-collision-agent" })
     const run = (prompt: string) =>
       provideScoped(
-        Layer.mergeAll(Session.layerMemory, modelLayer, journalLayer),
+        Layer.mergeAll(allowAllAuthorization, Session.layerMemory, modelLayer, journalLayer),
         Agent.stream(agent, {
           prompt,
           history: Prompt.empty,
@@ -1280,7 +1284,7 @@ describe("DurableDriver Agent.stream integration", () => {
       }).pipe(Stream.runDrain)
 
     return provideScoped(
-      Layer.mergeAll(countedSessionLayer, memoryLayer, modelLayer, journalLayer),
+      Layer.mergeAll(allowAllAuthorization, countedSessionLayer, memoryLayer, modelLayer, journalLayer),
       Effect.gen(function* () {
         yield* Effect.scoped(
           Effect.gen(function* () {
@@ -1387,7 +1391,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const agent = Agent.make({ name: "semantic-replay-agent" })
       const run = (prompt: string) =>
         provideScoped(
-          Layer.mergeAll(modelLayer, journalLayer),
+          Layer.mergeAll(allowAllAuthorization, modelLayer, journalLayer),
           Agent.stream(agent, {
             prompt,
             logicalOperationId: "semantic-replay",
@@ -1441,7 +1445,7 @@ describe("DurableDriver Agent.stream integration", () => {
       )
 
       const failure = yield* provideScoped(
-        Layer.mergeAll(modelLayer, journalLayer, unusedToolHandlerLayer),
+        Layer.mergeAll(allowAllAuthorization, modelLayer, journalLayer, unusedToolHandlerLayer),
         Agent.stream(Agent.make({ name: "model-completion-failure", toolkit: Toolkit.make(echoTool) }), {
           prompt: "reply",
           sessionId: "model-completion-failure",
@@ -1540,6 +1544,7 @@ describe("DurableDriver Agent.stream integration", () => {
 
       yield* provideScoped(
         Layer.mergeAll(
+          allowAllAuthorization,
           modelLayer,
           compactionLayer,
           ToolExecutor.layerTest({
@@ -1669,6 +1674,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const run = (ids: ReadonlyArray<string>) =>
         provideScoped(
           Layer.mergeAll(
+            allowAllAuthorization,
             modelLayer(ids),
             ToolExecutor.layerTest({
               execute: (request) =>
@@ -2145,6 +2151,7 @@ describe("DurableDriver Agent.stream integration", () => {
       }),
     )
     const services = Layer.mergeAll(
+      allowAllAuthorization,
       suspendResumeModelLayer,
       ToolExecutor.layerTest({
         execute: () =>
