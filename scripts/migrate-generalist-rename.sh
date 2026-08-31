@@ -15,7 +15,9 @@ set -euo pipefail
 failures=0
 
 echo "== GitHub: rename repository =="
-if gh repo view In-Time-Tec/generalist >/dev/null 2>&1; then
+if [ "${SKIP_GITHUB:-0}" = "1" ]; then
+  echo "skip: SKIP_GITHUB=1"
+elif gh repo view In-Time-Tec/generalist >/dev/null 2>&1; then
   echo "skip: In-Time-Tec/generalist already exists"
 elif ! gh auth status >/dev/null 2>&1; then
   echo "warn: gh not authenticated; cannot confirm or perform the repo rename here."
