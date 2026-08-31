@@ -61,7 +61,7 @@ export interface Kernel {
 
 /** @experimental Everything a kernel needs to boot and to answer an executing cell. */
 export interface KernelOptions extends WorkerOptions {
-  readonly registry: HostBindingsService | undefined
+  readonly bindings: HostBindingsService | undefined
   readonly controlTimeoutMillis: number
 }
 
@@ -161,7 +161,7 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
           if (frame._tag === "HostRequest") {
             const running = yield* Ref.get(active)
             const input: MutableHostRequestInput = {
-              registry: options.registry,
+              bindings: options.bindings,
               worker,
               sessionId: options.sessionId,
             }
@@ -313,11 +313,11 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
       epoch: options.epoch,
       worker,
       mount:
-        options.registry === undefined
+        options.bindings === undefined
           ? Effect.void
           : worker.send({
               _tag: "Mount",
-              modules: options.registry.descriptors.map((descriptor) => ({
+              modules: options.bindings.descriptors.map((descriptor) => ({
                 module: descriptor.module,
                 operations: descriptor.operations,
               })),

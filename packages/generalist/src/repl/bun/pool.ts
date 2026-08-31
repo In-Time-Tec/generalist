@@ -82,7 +82,7 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
             workerModule: options.workerModule,
             startTimeoutMillis: options.startTimeoutMillis,
             environment: options.environment,
-            registry: bindings,
+            bindings,
             controlTimeoutMillis: captureTimeoutMillis,
           })
           yield* kernel.mount

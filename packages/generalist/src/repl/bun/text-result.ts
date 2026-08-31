@@ -7,7 +7,6 @@ export interface PendingHostRequest {
   readonly reject: (error: typeof Schema.Unknown.Type) => void
 }
 
-const prototypes = new Map<string, object>()
 const TextResult = Schema.Struct({ text: Schema.String })
 const isTextResult = Schema.is(TextResult)
 
@@ -19,19 +18,14 @@ export const actionable = <Output>(input: {
   const { module, operation, output } = input
   if (!isTextResult(output) || Array.isArray(output) || !Object.hasOwn(output, "text")) return output
   const binding = `${module}.${operation}`
-  let prototype = prototypes.get(binding)
-  if (prototype === undefined) {
-    const misuse = (): never => {
-      throw new TypeError(`${binding} returns an object; did you mean \`.text\`?`)
-    }
-    const guardedPrototype = {}
-    Object.defineProperties(guardedPrototype, {
-      slice: { value: misuse },
-      [Symbol.toPrimitive]: { value: misuse },
-    })
-    prototype = guardedPrototype
-    prototypes.set(binding, prototype)
+  const misuse = (): never => {
+    throw new TypeError(`${binding} returns an object; did you mean \`.text\`?`)
   }
+  const prototype = {}
+  Object.defineProperties(prototype, {
+    slice: { value: misuse },
+    [Symbol.toPrimitive]: { value: misuse },
+  })
   Object.setPrototypeOf(output, prototype)
   return output
 }

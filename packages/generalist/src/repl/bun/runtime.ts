@@ -21,7 +21,7 @@ export interface CellOutcome {
 
 /** @experimental Everything a session needs to answer host requests raised by a running cell. */
 export interface HostAnswerOptions {
-  readonly registry: HostBindingsService | undefined
+  readonly bindings: HostBindingsService | undefined
   readonly worker: Worker
   readonly sessionId?: string
   readonly cellId?: string
@@ -97,7 +97,7 @@ export const answerHostRequest: {
           ...update,
         }) ?? Effect.void
       yield* emit({ status: "started" })
-      if (options.registry === undefined) {
+      if (options.bindings === undefined) {
         const message = `no host module named ${request.module} is mounted`
         yield* emit({ status: "failed", durationMillis: (yield* Clock.currentTimeMillis) - startedAt, message })
         return yield* options.worker.send({
@@ -106,7 +106,7 @@ export const answerHostRequest: {
           outcome: { _tag: "Rejected", message },
         })
       }
-      return yield* options.registry.invoke(hostRequest(options, request)).pipe(
+      return yield* options.bindings.invoke(hostRequest(options, request)).pipe(
         Effect.matchEffect({
           onSuccess: (response) =>
             Effect.gen(function* () {
