@@ -1037,6 +1037,36 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "runs the child on the model layer given to asTool instead of the ambient model", () => {
+    let parentCalls = 0
+    const parentModel = modelLayer((options) => {
+      const content = Json.stringify(options.prompt.content)
+      if (content.includes("child task")) return Stream.make(textDelta("inherited-parent-model"))
+      parentCalls += 1
+      return parentCalls === 1
+        ? Stream.make(toolCallPart("call-child", "ask_child", { prompt: "child task" }))
+        : Stream.make(textDelta("parent done"))
+    })
+    const childModel = modelLayer(() => Stream.make(textDelta("child-on-own-model")))
+    const childTool = AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child", model: childModel })
+    return [
+      Layer.mergeAll(
+        parentModel,
+        ToolExecutor.layerToolkit(childTool).pipe(Layer.provide(parentModel)),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_child!) })
+        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+        const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
+        expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe(
+          "child-on-own-model",
+        )
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "preserves child authorization requirements", () => {
     let calls = 0
     let authorized = false

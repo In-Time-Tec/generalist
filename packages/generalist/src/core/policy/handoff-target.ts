@@ -1,4 +1,5 @@
 import { Context, Function, Layer, Schema } from "effect"
+import type { LanguageModel } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../agent/closure.js"
 import type { AgentPin } from "../durable/pin.js"
 
@@ -7,22 +8,33 @@ export interface Target {
   readonly name: string
   readonly agent: AnyAgent
   readonly pin?: AgentPin
+  /** Model layer the specialist runs on after the handoff. Wins over the active registry selection. */
+  readonly model?: Layer.Layer<LanguageModel.LanguageModel>
+}
+
+/** @experimental */
+export interface TargetOptions {
+  readonly pin?: AgentPin
+  /** Model layer the specialist runs on after the handoff. Wins over the active registry selection. */
+  readonly model?: Layer.Layer<LanguageModel.LanguageModel>
 }
 
 interface MutableTarget {
   name: string
   agent: AnyAgent
   pin?: AgentPin
+  model?: Layer.Layer<LanguageModel.LanguageModel>
 }
 
 export const target: {
-  (pin?: AgentPin): (agent: AnyAgent) => Target
-  (agent: AnyAgent, pin?: AgentPin): Target
+  (options?: TargetOptions): (agent: AnyAgent) => Target
+  (agent: AnyAgent, options?: TargetOptions): Target
 } = Function.dual(
   (args) => args.length > 1 || Schema.is(Schema.Struct({ name: Schema.String }))(args[0]),
-  (agent: AnyAgent, pin?: AgentPin): Target => {
+  (agent: AnyAgent, options: TargetOptions = {}): Target => {
     const entry: MutableTarget = { name: agent.name, agent }
-    if (pin !== undefined) entry.pin = pin
+    if (options.pin !== undefined) entry.pin = options.pin
+    if (options.model !== undefined) entry.model = options.model
     return entry
   },
 )

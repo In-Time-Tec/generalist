@@ -177,6 +177,7 @@ describe("Amazon Bedrock", () => {
         "layer",
         "layerClient",
         "layerLanguageModel",
+        "layerModel",
         "make",
         "toolJsonSchemaCompiler",
       ])

@@ -1,4 +1,5 @@
-import { Effect, Ref } from "effect"
+import { Effect, type Layer, Ref } from "effect"
+import type { LanguageModel } from "effect/unstable/ai"
 import { make as makeSendClock } from "../../model/send-clock.js"
 import type { ModelSelection } from "../../model/registry.js"
 import type { ToolSchedulingPolicy } from "../service.js"
@@ -28,6 +29,13 @@ export const make = (input: {
       : Ref.get(input.handoffStateRef).pipe(
           Effect.map((handoffRun) => handoffRun.active.agent.model ?? input.agentModel),
           Effect.orElseSucceed(() => input.agentModel),
+        ),
+  activeModelOverride: (): Effect.Effect<Layer.Layer<LanguageModel.LanguageModel> | undefined> =>
+    input.handoffStateRef === undefined
+      ? Effect.succeed(undefined)
+      : Ref.get(input.handoffStateRef).pipe(
+          Effect.map((handoffRun) => handoffRun.active.model),
+          Effect.orElseSucceed(() => undefined),
         ),
   activeToolScheduling: (): Effect.Effect<ToolSchedulingPolicy> =>
     input.handoffStateRef === undefined

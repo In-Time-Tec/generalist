@@ -88,6 +88,7 @@ const withResolvingToolCalls = (decoded: Input, resolvingToolCallIds: ReadonlyAr
 }
 
 const verifyTargetModel = (target: Target, turn: number, logicalId: string, handoffId: string) => {
+  if (target.model !== undefined) return Effect.void
   const model = target.agent.model
   return model === undefined
     ? Effect.void

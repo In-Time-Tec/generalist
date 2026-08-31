@@ -14,6 +14,7 @@ import {
 } from "../../../src/index"
 import { ItLayer } from "../it-layer"
 import { close } from "../../../src/core/agent/closure.js"
+import { layer as deterministicLayer } from "../../../src/ai/provider/deterministic.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"
 
@@ -46,7 +47,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       budget: {},
       children: [],
     })
-    const target = Handoff.target(childAgent, child.pin)
+    const target = Handoff.target(childAgent, { pin: child.pin })
     const supervisorSetup = Handoff.supervisor({ name: "pinned-supervisor", specialists: [target] })
     const root = AgentManifest.fromLiveAgent(supervisorSetup.agent, {
       model,
@@ -304,6 +305,79 @@ layer(Layer.empty)("Handoff same-run", (it) => {
           message: "Invalid framework tool history",
         })
         expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "runs the specialist on its target model layer after handoff", () => {
+    let ambientCalls = 0
+    const mathTarget = Handoff.target(Agent.make({ name: "math" }), {
+      model: modelLayer(() => Stream.make(textDelta("specialist-model-answer"))),
+    })
+    const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
+    return [
+      Layer.mergeAll(
+        unusedToolHandlerLayer,
+        modelLayer(() => {
+          ambientCalls += 1
+          return ambientCalls === 1
+            ? Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))
+            : Stream.make(textDelta("ambient-answer"))
+        }),
+        ToolExecutor.layerToolkit(supervisorSetup.toolkit),
+        supervisorSetup.catalog,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, { prompt: "start" }))
+        const completed = events.at(-1)
+        expect(completed?._tag === "Completed" && completed.text).toBe("specialist-model-answer")
+        expect(ambientCalls).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "applies a specialist's declared selection through the ambient run's registry", () => {
+    const mathTarget = Handoff.target(
+      Agent.make({ name: "math", model: { provider: "deterministic", model: "deterministic" } }),
+    )
+    const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
+    return [
+      Layer.mergeAll(
+        unusedToolHandlerLayer,
+        modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
+        deterministicLayer(),
+        ToolExecutor.layerToolkit(supervisorSetup.toolkit),
+        supervisorSetup.catalog,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, { prompt: "start" }))
+        const completed = events.at(-1)
+        expect(completed?._tag === "Completed" && completed.text).toBe("deterministic response")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails loudly when a specialist declares a selection but no registry is provided", () => {
+    const mathTarget = Handoff.target(
+      Agent.make({ name: "math", model: { provider: "deterministic", model: "deterministic" } }),
+    )
+    const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
+    return [
+      Layer.mergeAll(
+        unusedToolHandlerLayer,
+        modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
+        ToolExecutor.layerToolkit(supervisorSetup.toolkit),
+        supervisorSetup.catalog,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, { prompt: "start" })))
+        expect(failure).toMatchObject({ _tag: "generalist/core/HandoffRequirementsMissing" })
       }),
     ] as const
   })

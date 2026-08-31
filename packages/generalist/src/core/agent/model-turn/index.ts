@@ -59,7 +59,8 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     agentModel,
   }
   if (handoffStateRef !== undefined) Object.assign(activeTurnInput, { handoffStateRef })
-  const { activeAgentName, activeModelSelection, activeToolScheduling, sendClock } = makeActiveTurn(activeTurnInput)
+  const { activeAgentName, activeModelSelection, activeModelOverride, activeToolScheduling, sendClock } =
+    makeActiveTurn(activeTurnInput)
   const withModelTelemetry =
     (turn: number, purpose: CallPurpose) =>
     <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
@@ -180,11 +181,23 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
       Effect.gen(function* () {
         const agentName = yield* activeAgentName()
         const selection = yield* activeModelSelection()
+        const targetModel = yield* activeModelOverride()
         const toolScheduling = yield* activeToolScheduling()
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
         const parts = modelTurnBody(turn, prompt, activeRegistry, overrides, agentName, toolScheduling)
-        return ModelSource.scope(modelSource, parts, selection, overrides?.model, (error) =>
-          AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error }),
+        return ModelSource.scope(
+          modelSource,
+          parts,
+          selection,
+          overrides?.model ?? targetModel,
+          (error) => AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error }),
+          (requested) =>
+            AgentError.make({
+              message:
+                `Handoff target declares model selection '${requested.provider}/${requested.model}' but this run has no ModelRegistry in context; ` +
+                "provide a registry or set the model with Handoff.target(agent, { model })",
+              turn: state.turn,
+            }),
         )
       }),
     )

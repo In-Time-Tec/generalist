@@ -628,7 +628,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
     const filename = tempDbPath("execution-host-handoff-reopen")
     const childAgent = Agent.make({ name: "durable-specialist" })
     const child = pinnedTestAgent(childAgent, "handoff-b")
-    const specialist = Handoff.target(childAgent, child.pin)
+    const specialist = Handoff.target(childAgent, { pin: child.pin })
     const supervisor = Handoff.supervisor({
       name: "durable-supervisor",
       specialists: [specialist],

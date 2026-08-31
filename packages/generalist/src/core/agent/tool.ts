@@ -1,5 +1,5 @@
 import { Cause, Effect, Function, Layer, Option, Schema } from "effect"
-import { Prompt, Tool } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { type Agent, type Result, type RunError, type RunRequirements, generate } from "./service.js"
 import {
   AgentError,
@@ -71,6 +71,7 @@ export interface AsToolOptions<
   Name extends string = string,
   Parameters extends Schema.Top = DefaultParameters,
   Success extends Schema.Top = DefaultSuccess,
+  ModelR = never,
 > {
   readonly name?: Name
   readonly description?: string
@@ -78,6 +79,8 @@ export interface AsToolOptions<
   readonly success?: Success
   readonly toPrompt?: (params: Parameters["Type"]) => Prompt.RawInput
   readonly fromResult?: (result: Result) => Success["Type"]
+  /** Model layer for the child run. Omit to inherit the model provided to the parent run. */
+  readonly model?: Layer.Layer<LanguageModel.LanguageModel, never, ModelR>
 }
 
 /** @experimental A schema-backed tool with a stable name and closed invocation. */
@@ -222,15 +225,16 @@ export const asTool: {
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
+    ModelR = never,
   >(
-    options?: AsToolOptions<Name, Parameters, Success>,
+    options?: AsToolOptions<Name, Parameters, Success, ModelR>,
   ): <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R> | Registration<Tools, R>,
   ) => AgentToolToolkit<
     Name,
     Parameters,
     Success,
-    RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"]
+    RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"] | ModelR
   >
   <
     Tools extends Record<string, Tool.Any>,
@@ -238,14 +242,15 @@ export const asTool: {
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
+    ModelR = never,
   >(
     agent: Agent<Tools, R> | Registration<Tools, R>,
-    options?: AsToolOptions<Name, Parameters, Success>,
+    options?: AsToolOptions<Name, Parameters, Success, ModelR>,
   ): AgentToolToolkit<
     Name,
     Parameters,
     Success,
-    RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"]
+    RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"] | ModelR
   >
 } = Function.dual(
   (args) => args.length !== 1 || "name" in args[0],
@@ -255,14 +260,15 @@ export const asTool: {
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
+    ModelR = never,
   >(
     agent: Agent<Tools, R> | Registration<Tools, R>,
-    options: AsToolOptions<Name, Parameters, Success> = {},
+    options: AsToolOptions<Name, Parameters, Success, ModelR> = {},
   ): AgentToolToolkit<
     Name,
     Parameters,
     Success,
-    RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"]
+    RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"] | ModelR
   > => {
     const name = options.name ?? agent.name
     const parameters = options.parameters ?? defaultParameters
@@ -272,16 +278,20 @@ export const asTool: {
     ): Effect.Effect<
       ToolInput,
       string,
-      RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"]
+      RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"] | ModelR
     > =>
       Effect.gen(function* () {
         const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
         const runChild = (runOptions: AgentToolRunOptions) => {
-          const execution: Effect.Effect<
+          const base: Effect.Effect<
             Result,
             RunError | RegistrationError,
             RunRequirements<Tools, R, AgentToolRunOptions>
           > = "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
+          const execution =
+            options.model === undefined
+              ? base
+              : base.pipe(Effect.provide(options.model as Layer.Layer<LanguageModel.LanguageModel>))
           const handled: Effect.Effect<Result, string, RunRequirements<Tools, R, AgentToolRunOptions>> = execution.pipe(
             Effect.catchCause((cause) => {
               if (Cause.hasInterrupts(cause)) return Effect.interrupt

@@ -190,6 +190,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
                 }),
               ),
             ),
+            ...(Option.isSome(modelRegistryService) ? { registry: modelRegistryService.value } : {}),
           }
         : {
             _tag: "Registry",
