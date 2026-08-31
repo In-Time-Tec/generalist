@@ -32,7 +32,7 @@ export const make = (input: {
         ),
   activeModelOverride: (): Effect.Effect<Layer.Layer<LanguageModel.LanguageModel> | undefined> =>
     input.handoffStateRef === undefined
-      ? Effect.succeed(undefined)
+      ? Effect.void.pipe(Effect.as(undefined))
       : Ref.get(input.handoffStateRef).pipe(
           Effect.map((handoffRun) => handoffRun.active.model),
           Effect.orElseSucceed(() => undefined),

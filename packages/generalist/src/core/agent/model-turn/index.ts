@@ -54,10 +54,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     toolCallEvents,
   } = context
   const agentModel = modelSource._tag === "Registry" ? modelSource.selection : undefined
-  const activeTurnInput: Parameters<typeof makeActiveTurn>[0] = {
-    agent,
-    agentModel,
-  }
+  const activeTurnInput: Parameters<typeof makeActiveTurn>[0] = { agent, agentModel }
   if (handoffStateRef !== undefined) Object.assign(activeTurnInput, { handoffStateRef })
   const { activeAgentName, activeModelSelection, activeModelOverride, activeToolScheduling, sendClock } =
     makeActiveTurn(activeTurnInput)
@@ -181,7 +178,6 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
       Effect.gen(function* () {
         const agentName = yield* activeAgentName()
         const selection = yield* activeModelSelection()
-        const targetModel = yield* activeModelOverride()
         const toolScheduling = yield* activeToolScheduling()
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
         const parts = modelTurnBody(turn, prompt, activeRegistry, overrides, agentName, toolScheduling)
@@ -189,15 +185,9 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
           modelSource,
           parts,
           selection,
-          overrides?.model ?? targetModel,
-          (error) => AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error }),
-          (requested) =>
-            AgentError.make({
-              message:
-                `Handoff target declares model selection '${requested.provider}/${requested.model}' but this run has no ModelRegistry in context; ` +
-                "provide a registry or set the model with Handoff.target(agent, { model })",
-              turn: state.turn,
-            }),
+          overrides?.model ?? (yield* activeModelOverride()),
+          state.turn,
+          errorMessage,
         )
       }),
     )

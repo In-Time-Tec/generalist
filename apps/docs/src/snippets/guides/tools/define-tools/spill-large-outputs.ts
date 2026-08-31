@@ -8,7 +8,13 @@ const agent = Agent.make({ name: "docs-assistant", toolkit })
 export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.LanguageModel> = Effect.scoped(
   Effect.flatMap(
     Layer.build(
-      Layer.mergeAll(docsToolLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, ToolOutput.layerMemory),
+      Layer.mergeAll(
+        docsToolLayer,
+        Permissions.layerAllowAll,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        ToolOutput.layerMemory,
+      ),
     ),
     (services) =>
       Agent.generate(agent, {

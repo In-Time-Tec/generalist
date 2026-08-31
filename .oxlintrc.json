@@ -22,7 +22,13 @@
   "rules": {
     "accessor-pairs": "error",
     "complexity": ["error", 15],
-    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
     "no-case-declarations": "error",
     "no-constructor-return": "error",
     "no-duplicate-imports": "error",
@@ -61,7 +67,12 @@
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
     "anti-slop-effect/no-service-constructor-imports": "error",
-    "import/no-cycle": ["error", { "ignoreTypes": true }],
+    "import/no-cycle": [
+      "error",
+      {
+        "ignoreTypes": true
+      }
+    ],
     "import/no-unassigned-import": "off",
     "oxc/no-const-enum": "error",
     "oxc/no-map-spread": "off",
@@ -208,6 +219,12 @@
       "files": ["**/test/**"],
       "rules": {
         "no-await-in-loop": "off"
+      }
+    },
+    {
+      "files": ["apps/docs/src/snippets/**/*.ts"],
+      "rules": {
+        "effecttsgo/strict-effect-provide": "off"
       }
     }
   ],

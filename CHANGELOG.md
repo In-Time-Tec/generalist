@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.46.0
+
+- Provide models as layers. Every provider now exports `layerModel` — a `Model.Model` layer pinned to one model id over the provider client — so a run receives its model with plain `Effect.provide`: change the model by editing one value, change the provider for that model by swapping one layer. OpenAI, OpenAI Responses, OpenAI Chat Completions, Anthropic, OpenRouter, Amazon Bedrock, and the deterministic test provider all follow the same shape. `ModelRegistry` remains for genuinely dynamic selection by string id.
+- Children inherit or choose models per call site. `AgentTool.asTool(child, { model })` and `Handoff.target(child, { model })` accept a model layer, so a supervisor on one model can run a specialist on another; without the option, children inherit the ambient model. `Handoff.target` now takes an options object (`{ pin?, model? }`) instead of a positional pin. A specialist's declared model selection resolves at handoff commit and fails loudly when its registry is missing instead of silently falling back.
+- Tool authorization fails fast. A run whose agent has tools or activatable skills now fails at setup with a typed `AgentError` when no `Permissions` or `Approvals` policy is provided, instead of guessing intent. Tool-less runs still require no policy. Provide `Permissions.layerAllowAll` and `Approvals.layerAutoApprove` (or stricter layers) explicitly.
+- `WorkingMemory` summarization takes an explicit model layer: `summarize: { model: someModelLayer }` replaces the bespoke `SummaryModel` service and `layerSummaryModel`, which are removed.
+- Compaction truncate is layered: `Compaction.layerTruncate(maxTokens)` (requires `Tokenizer`) and `Compaction.layerTruncateEstimated(maxTokens)` replace the `Compaction.truncate` strategy helper, and threshold caching keys on run identity.
+- Skill metadata drops the `agent` and `model` string fields; select models with layers, not strings.
+- Documentation goes layer-first: the READMEs, providers guide, quickstart, and feature pages lead with `Effect.provide` examples, and the repository documentation records the values/layers/local-provide pattern as a decision.
+
 ## 0.45.1
 
 - Rework the documentation. The repository and package READMEs are shorter and plainer, `docs/README.md` maps the Diátaxis-structured documentation, and every feature now has a dedicated code-first document under `docs/features/` — including new pages for middleware, structured output, durable stores, Cloudflare, Rivet, A2A, and AG-UI. The docs site model catalog reference now names the current `find`/`get`/`list` API. No runtime behavior changes.

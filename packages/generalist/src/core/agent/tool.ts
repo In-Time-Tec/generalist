@@ -288,16 +288,25 @@ export const asTool: {
             RunError | RegistrationError,
             RunRequirements<Tools, R, AgentToolRunOptions>
           > = "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
-          const execution =
+          const execution: Effect.Effect<
+            Result,
+            RunError | RegistrationError,
+            RunRequirements<Tools, R, AgentToolRunOptions> | ModelR
+          > =
             options.model === undefined
               ? base
-              : base.pipe(Effect.provide(options.model as Layer.Layer<LanguageModel.LanguageModel>))
-          const handled: Effect.Effect<Result, string, RunRequirements<Tools, R, AgentToolRunOptions>> = execution.pipe(
-            Effect.catchCause((cause) => {
-              if (Cause.hasInterrupts(cause)) return Effect.interrupt
-              return Effect.fail(causeMessage(agent.name, cause))
-            }),
-          )
+              : Effect.scoped(
+                  Layer.build(options.model).pipe(
+                    Effect.flatMap((modelContext) => base.pipe(Effect.provide(modelContext))),
+                  ),
+                )
+          const handled: Effect.Effect<Result, string, RunRequirements<Tools, R, AgentToolRunOptions> | ModelR> =
+            execution.pipe(
+              Effect.catchCause((cause) => {
+                if (Cause.hasInterrupts(cause)) return Effect.interrupt
+                return Effect.fail(causeMessage(agent.name, cause))
+              }),
+            )
           return handled
         }
         const interpreter = yield* Effect.serviceOption(DriverInterpreter)

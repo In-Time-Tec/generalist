@@ -1,0 +1,9 @@
+# Values, layers, and local provide
+
+Features follow one composition pattern: configuration is a plain value, capabilities are Layers, and selection happens by local `Effect.provide` at the site that owns the choice. Strings name things only when identity is genuinely dynamic — a model id read from an environment variable, a tenant, a user session.
+
+Providers and models are separate layers. A provider layer (`openAiClient`, `anthropicClient`, `deterministicClient`) supplies the client; a model layer (`layerModel`) pins one model id over that client and yields `LanguageModel`. A run receives its model with `Effect.provide(sol)`, where `sol = openAiModel({ model: "gpt-5.6-sol" })`. Changing the model edits one value; changing the provider for that model edits one layer; swapping provider and model swaps two layers. Child agents inherit the ambient model by default and choose another through `AgentTool.asTool(child, { model })` or `Handoff.target(child, { model })`, so a supervisor on one model can run a specialist on another without registries or rebinding.
+
+Capabilities that were previously ambient or optional-with-silent-defaults become explicit layers that fail fast when required and absent. A tooled agent with no `Permissions`/`Approvals` policy fails at setup with an `AgentError` naming the fix instead of guessing an intent. `WorkingMemory` summarization takes a model layer on the option instead of a bespoke service. Compaction truncate is a layer (`layerTruncate`, `layerTruncateEstimated`) so its `Tokenizer` requirement is visible in the type.
+
+The rejected alternative is a registry of named capabilities with string selection at use sites: it hides requirements from the type, defers misconfiguration from layer construction to run time, and forces every caller to agree on global names. Local provide keeps the dependency graph in the type signature and the choice at the call site that owns it.

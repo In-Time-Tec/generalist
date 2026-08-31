@@ -158,7 +158,8 @@ const resolveSummarize = (
       )
     if (summarize.model !== undefined) {
       const provideSummaryModel = makeSummaryModelProvider(summarize.model)
-      return (overflow: ReadonlyArray<StoredItem>, summary: string | undefined) => provideSummaryModel(work(overflow, summary))
+      return (overflow: ReadonlyArray<StoredItem>, summary: string | undefined) =>
+        provideSummaryModel(work(overflow, summary))
     }
     const ambient = yield* LanguageModel.LanguageModel
     return (overflow: ReadonlyArray<StoredItem>, summary: string | undefined) =>

@@ -3,7 +3,7 @@ import { Effect, Layer, Stream } from "effect"
 import { EmbeddingModel, LanguageModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "../../src/index.js"
 import { expectTypeOf } from "vitest"
-import { layer as layerMemory, VectorStore, WorkingMemory, type Options } from "../../src/memory/index"
+import { layer as layerMemory, VectorStore, type Options } from "../../src/memory/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 

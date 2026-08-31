@@ -1,3 +1,4 @@
+/* oxlint-disable effecttsgo/strict-effect-provide -- each test is a test-host Layer composition root. */
 import { describe, expect, it } from "@effect/vitest"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { Model, Tool, Toolkit } from "effect/unstable/ai"

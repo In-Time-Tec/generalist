@@ -38,6 +38,8 @@ rules:
         - "packages/*/test/**/*.proc.test.ts"
         # Cross-module Cloudflare harnesses (live workerd, conformance, export graphs) test no single src module
         - "packages/*/test/cloudflare/*.test.ts"
+        # Cross-provider layerModel conformance exercises every provider's own module
+        - "packages/*/test/ai/provider/layer-model.test.ts"
     - source: "packages/*/test/**/*.tui.test.ts"
       target: "packages/*/src/**/*.ts"
       pattern: "*.tui.test.ts -> *.ts"

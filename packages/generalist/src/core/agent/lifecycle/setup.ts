@@ -198,34 +198,35 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     }
     if (staticCandidates.length > 0 || hasActivatableSkills) yield* resolveAuthorizer
     const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
-    const modelSource: ModelSource =
-      agent.model === undefined
-        ? {
-            _tag: "Ambient",
-            model: yield* Effect.serviceOption(LanguageModel.LanguageModel).pipe(
-              Effect.flatMap(
-                Option.match({
-                  onNone: () => AgentError.make({ message: "Agent requires LanguageModel in context", turn: 0 }),
-                  onSome: Effect.succeed,
-                }),
-              ),
+    let modelSource: ModelSource
+    if (agent.model === undefined) {
+      const model = yield* Effect.serviceOption(LanguageModel.LanguageModel).pipe(
+        Effect.flatMap(
+          Option.match({
+            onNone: () => AgentError.make({ message: "Agent requires LanguageModel in context", turn: 0 }),
+            onSome: Effect.succeed,
+          }),
+        ),
+      )
+      modelSource = Option.isSome(modelRegistryService)
+        ? { _tag: "Ambient", model, registry: modelRegistryService.value }
+        : { _tag: "Ambient", model }
+    } else {
+      modelSource = {
+        _tag: "Registry",
+        selection: agent.model,
+        registry: yield* Option.match(modelRegistryService, {
+          onNone: () =>
+            Effect.fail(
+              AgentError.make({
+                message: "Agent.model requires ModelRegistry in context",
+                turn: 0,
+              }),
             ),
-            ...(Option.isSome(modelRegistryService) ? { registry: modelRegistryService.value } : {}),
-          }
-        : {
-            _tag: "Registry",
-            selection: agent.model,
-            registry: yield* Option.match(modelRegistryService, {
-              onNone: () =>
-                Effect.fail(
-                  AgentError.make({
-                    message: "Agent.model requires ModelRegistry in context",
-                    turn: 0,
-                  }),
-                ),
-              onSome: Effect.succeed,
-            }),
-          }
+          onSome: Effect.succeed,
+        }),
+      }
+    }
     const memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined =
       memoryOptions === undefined
         ? undefined

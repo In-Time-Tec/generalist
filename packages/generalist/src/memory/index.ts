@@ -37,9 +37,8 @@ export function layer(
 ): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | LanguageModel.LanguageModel> {
   return Layer.effect(
     Memory,
-    Effect.all([
-      makeWorkingMemory((options.working ?? {}) as WorkingMemoryOptions),
-      makeSemanticRecall(options.semantic),
-    ]).pipe(Effect.map(([working, semantic]) => Memory.of(merge(working, semantic)))),
+    Effect.all([makeWorkingMemory(options.working ?? {}), makeSemanticRecall(options.semantic)]).pipe(
+      Effect.map(([working, semantic]) => Memory.of(merge(working, semantic))),
+    ),
   )
 }

@@ -1,5 +1,5 @@
-import { Context, Effect, Function, Layer, Option, Schema } from "effect"
-import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
+import { Effect, Function, Layer, Option, Schema } from "effect"
+import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { ContextRevision } from "./compaction-context-revision.js"
 import { safeCutIndex } from "./compaction-cut.js"
 import { summaryLanguageModel, withCompactionLifecycle } from "./compaction-telemetry.js"
@@ -9,6 +9,20 @@ import { type Entry, buildContext } from "../context/session.js"
 import { make as makeSummaryModelProvider } from "../model/result/summary-model.js"
 import type { Success } from "../tools/tool-executor.js"
 import { bound } from "../tools/tool-output.js"
+import {
+  Compaction,
+  CompactionError,
+  microcompactResult,
+  type Plan,
+  type Request,
+  Result,
+  type Service,
+  type Usage,
+} from "./compaction-service.js"
+
+export { Compaction, CompactionError, Result, withLifecycle } from "./compaction-service.js"
+export type { MicrocompactResult, Plan, Request, Service, SummarizeResult, Usage } from "./compaction-service.js"
+export { layerTruncate, layerTruncateEstimated } from "./compaction-truncate.js"
 
 /** @experimental Default headroom kept for the next model response. */
 export const defaultReserveTokens = 16_384
@@ -43,51 +57,6 @@ export const AgentSummary = Schema.Struct({
 /** @experimental */
 export type AgentSummary = typeof AgentSummary.Type
 
-/** @experimental Token accounting for a compaction decision. */
-export interface Usage {
-  readonly contextTokens: number
-  readonly contextWindow: number
-  readonly reserveTokens: number
-}
-
-/** @experimental What to keep verbatim and what the summary replaces. */
-export interface Plan {
-  readonly head: ReadonlyArray<Entry>
-  readonly recent: ReadonlyArray<Entry>
-}
-
-/** @experimental Request passed to a compaction implementation. */
-export interface Request {
-  readonly compactionId: string
-  readonly agentName: string
-  readonly sessionId: string
-  /** Durable run identity. Keys the unchanged-threshold cache so concurrent runs never share an entry. */
-  readonly runId?: string
-  readonly turn: number
-  readonly history: Prompt.Prompt
-  readonly prompt: Prompt.Prompt
-  readonly path?: ReadonlyArray<Entry>
-  readonly usage: Usage
-  readonly overflow: boolean
-  readonly toolOutputMaxBytes?: number
-}
-
-/** @experimental Wrap custom work after deciding to run; changed results must use this to join their lifecycle. */
-export const withLifecycle =
-  (request: Request) =>
-  <A extends Result, E, R>(work: Effect.Effect<Option.Option<A>, E, R>): Effect.Effect<Option.Option<Result>, E, R> =>
-    withCompactionLifecycle(work, request, request.usage)
-/** @experimental Compaction result applied by the agent loop. */
-export const Result = Schema.Union([
-  Schema.TaggedStruct("Microcompact", { history: Prompt.Prompt, prompt: Prompt.Prompt }),
-  Schema.TaggedStruct("Summarize", { history: Prompt.Prompt, prompt: Prompt.Prompt, summary: Schema.String }),
-])
-/** @experimental */
-export type Result = typeof Result.Type
-/** @experimental Result from tool-output microcompaction. */
-export type MicrocompactResult = Extract<Result, { readonly _tag: "Microcompact" }>
-/** @experimental Result from summary checkpointing. */
-export type SummarizeResult = Extract<Result, { readonly _tag: "Summarize" }>
 /** @experimental Compaction strategy: decide, cut, summarize. */
 export interface Strategy {
   readonly shouldCompact: (usage: Usage) => boolean
@@ -108,23 +77,6 @@ export interface StrategyPart {
   readonly toolOutputMaxBytes?: number
   readonly keepRecentTokens?: number
 }
-
-/** @experimental Compaction service boundary consulted by the loop. */
-export interface Service {
-  readonly willCompact?: (input: { readonly usage: Usage; readonly overflow: boolean }) => boolean
-  readonly maybeCompact: (
-    request: Request,
-  ) => Effect.Effect<Option.Option<Result>, CompactionError, LanguageModel.LanguageModel>
-}
-
-/** @experimental Compaction service failure. */
-export class CompactionError extends Schema.TaggedError<CompactionError>()("generalist/core/CompactionError", {
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
-
-/** @experimental */
-export class Compaction extends Context.Service<Compaction, Service>()("generalist/core/turn/compaction") {}
 
 /** @experimental Options for the default compaction implementation. */
 export interface DefaultOptions {
@@ -266,12 +218,6 @@ const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
     : (options.contextWindow ?? Number.POSITIVE_INFINITY),
   reserveTokens:
     options.reserveTokens ?? (Number.isFinite(usage.reserveTokens) ? usage.reserveTokens : defaultReserveTokens),
-})
-
-const makeMicrocompact = (history: Prompt.Prompt, prompt: Prompt.Prompt): MicrocompactResult => ({
-  _tag: "Microcompact",
-  history,
-  prompt,
 })
 
 /** @experimental The default two-stage compaction strategy. */
@@ -429,14 +375,15 @@ const compact = (
       history = compactedHistoryPrompt
       prompt = compactedPrompt
       changed = historyChanged || promptChanged
-      if (changed && fits(history, prompt, usage)) return Option.some(makeMicrocompact(history, prompt))
+      if (changed && fits(history, prompt, usage)) return Option.some(microcompactResult({ history, prompt }))
     }
 
     const plan = compactionStrategy.cut(
       input.path ?? [],
       compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? defaultKeepRecentTokens,
     )
-    if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
+    if (Option.isNone(plan))
+      return changed ? Option.some(microcompactResult({ history, prompt })) : Option.none<Result>()
 
     const summaryRequest: Request = {
       ...input,
@@ -472,56 +419,6 @@ export const layer: {
     providedStrategy: Strategy = options.strategy ?? defaultStrategy(options),
   ): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options))),
 )
-
-const truncateService = (tokenizer: typeof Tokenizer.Tokenizer.Service, maxTokens: number): Service => ({
-  maybeCompact: (input) =>
-    Effect.gen(function* () {
-      const usage = input.usage
-      if (
-        !input.overflow &&
-        !(Number.isFinite(usage.contextWindow) && usage.contextTokens > usage.contextWindow - usage.reserveTokens)
-      ) {
-        return Option.none<Result>()
-      }
-      return yield* tokenizer.truncate(Prompt.concat(input.history, input.prompt), maxTokens).pipe(
-        Effect.map((prompt) => Option.some<Result>(makeMicrocompact(Prompt.empty, prompt))),
-        Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
-        withCompactionLifecycle(input, usage),
-      )
-    }),
-})
-
-/** @experimental Exact truncate-only compaction. The layer declares the `Tokenizer` requirement. */
-export const layerTruncate = (maxTokens: number): Layer.Layer<Compaction, never, Tokenizer.Tokenizer> =>
-  Layer.effect(
-    Compaction,
-    Effect.map(Tokenizer.Tokenizer, (tokenizer) => Compaction.of(truncateService(tokenizer, maxTokens))),
-  )
-
-/** @experimental Approximate truncate-only compaction over the prompt token estimator; no `Tokenizer` required. */
-export const layerTruncateEstimated = (maxTokens: number): Layer.Layer<Compaction> =>
-  Layer.succeed(
-    Compaction,
-    Compaction.of({
-      maybeCompact: (input) =>
-        Effect.suspend(() => {
-          const usage = input.usage
-          if (
-            !input.overflow &&
-            !(Number.isFinite(usage.contextWindow) && usage.contextTokens > usage.contextWindow - usage.reserveTokens)
-          ) {
-            return Effect.succeed(Option.none<Result>())
-          }
-          let kept = Prompt.concat(input.history, input.prompt).content
-          while (kept.length > 1 && estimatePromptTokens(Prompt.fromMessages(kept)) > maxTokens) {
-            kept = kept.slice(1)
-          }
-          return Effect.succeed(Option.some<Result>(makeMicrocompact(Prompt.empty, Prompt.fromMessages(kept)))).pipe(
-            withCompactionLifecycle(input, usage),
-          )
-        }),
-    }),
-  )
 
 /** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Compaction> =>

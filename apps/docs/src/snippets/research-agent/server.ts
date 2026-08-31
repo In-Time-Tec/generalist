@@ -135,6 +135,7 @@ const agentServices = Layer.mergeAll(
   modelLayer,
   toolExecutorLayer,
   toolkitLayer.pipe(Layer.provideMerge(cannedLayer)),
+  Permissions.layerAllowAll,
   approvalsLayer,
   ModelMiddleware.layerIdentity,
 )
