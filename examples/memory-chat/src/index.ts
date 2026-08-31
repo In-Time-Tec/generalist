@@ -1,5 +1,14 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  LanguageModel,
+  Memory,
+  ModelMiddleware,
+  Permissions,
+  Response,
+  ToolExecutor,
+} from "generalist"
 import { WorkingMemory } from "generalist/memory"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -29,6 +38,7 @@ const runtimeLayer = Layer.mergeAll(
     return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
   }),
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
   WorkingMemory.layer({ maxMessages: 4 }),

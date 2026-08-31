@@ -1,5 +1,14 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "generalist"
+import {
+  Agent,
+  Approvals,
+  Handoff,
+  LanguageModel,
+  ModelMiddleware,
+  Permissions,
+  Response,
+  ToolExecutor,
+} from "generalist"
 
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
@@ -26,6 +35,7 @@ const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(
 
 const runtimeLayer = Layer.mergeAll(
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

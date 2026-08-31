@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "generalist"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool } from "generalist"
 import { MCPClient } from "generalist/mcp"
 import { layerToolkit, toolkit } from "generalist/mcp/tools"
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -53,6 +53,7 @@ const runtimeLayer = Layer.mergeAll(
       : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Found local setup docs." }))
   }),
   layerToolkit(client),
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

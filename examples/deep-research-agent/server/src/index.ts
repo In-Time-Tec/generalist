@@ -1,6 +1,6 @@
 import { layer } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
-import { Agent, AgentManifest, Approvals, ModelMiddleware, Pins, ToolExecutor } from "generalist"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
 import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
 import { SSE, WebSocket } from "generalist/transport"
 import { Config, Effect, Layer, Schema } from "effect"
@@ -158,6 +158,7 @@ const agentServices = Layer.mergeAll(
   modelLayer,
   toolExecutorLayer,
   toolkitHandlersLayer,
+  Permissions.layerAllowAll,
   Approvals.layerTest({
     resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
   }),

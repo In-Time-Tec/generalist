@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "generalist"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "generalist"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -50,6 +50,7 @@ const runtimeLayer = Layer.mergeAll(
       : Stream.make(textDelta("Boise is sunny and 72°F; no jacket needed."))
   }),
   toolkitLayer,
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )

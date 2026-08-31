@@ -6,6 +6,7 @@ import {
   Memory,
   ModelMiddleware,
   ModelRegistry,
+  Permissions,
   Response,
   SkillCatalog,
   Tool,
@@ -115,6 +116,7 @@ const program = Effect.gen(function* () {
 const runtimeLayer = Layer.mergeAll(
   deterministicLayer({ model: "capstone" }),
   toolkitLayer,
+  Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
   SkillCatalog.layerSkills([researchSkill]),
