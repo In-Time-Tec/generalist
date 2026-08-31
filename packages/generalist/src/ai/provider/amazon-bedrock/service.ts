@@ -7,7 +7,7 @@ import {
   registration,
 } from "../../../core/model/registry.js"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Tool } from "effect/unstable/ai"
+import { AiError, LanguageModel, Model, Tool } from "effect/unstable/ai"
 import type { RegistrationOptions } from "../../model/registration.js"
 import { Client, layerClient, type ClientOptions } from "./client.js"
 import { conformImageSourceModel } from "../../model/image-source.js"
@@ -201,6 +201,10 @@ export const make = Effect.fnUntraced(function* (input: Options) {
 
 /** @experimental */
 export const layerLanguageModel = (input: Options) => Layer.effect(LanguageModel.LanguageModel, make(input))
+
+/** @experimental Model layer over the Bedrock `Client`; provide it to a run with `Effect.provide`. */
+export const layerModel = (input: Options): Model.Model<"amazon-bedrock", LanguageModel.LanguageModel, Client> =>
+  Model.make("amazon-bedrock", input.model, layerLanguageModel(input))
 /** @experimental */
 export const classifyFailure: FailureClassifier = classify
 /** @experimental */

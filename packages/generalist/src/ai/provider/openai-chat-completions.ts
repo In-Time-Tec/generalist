@@ -9,7 +9,13 @@ import {
 import { isAvailabilityFailure } from "../model/failure.js"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { AiError, OpenAiStructuredOutput as OpenAIStructuredOutput, Tool } from "effect/unstable/ai"
+import {
+  AiError,
+  LanguageModel,
+  Model,
+  OpenAiStructuredOutput as OpenAIStructuredOutput,
+  Tool,
+} from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import type { RegistrationOptions } from "../model/registration.js"
 
@@ -60,12 +66,18 @@ export interface ClientOptions extends Options {
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAIClient.layerConfig>[0]>, "apiKey" | "apiUrl">
 }
 
-const modelLayer = (input: ClientOptions) =>
+const modelLayer = (input: Options) =>
   layerImageSources(
     input.config === undefined
       ? OpenAILanguageModel.layer({ model: input.model })
       : OpenAILanguageModel.layer({ model: input.model, config: input.config }),
   )
+
+/** @experimental Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
+export const layerModel = (
+  input: Options,
+): Model.Model<string, LanguageModel.LanguageModel, OpenAIClient.OpenAiClient> =>
+  Model.make(input.provider ?? "openai-chat-completions", input.model, modelLayer(input))
 
 const registrationOptions = (input: ClientOptions) => {
   const required = {

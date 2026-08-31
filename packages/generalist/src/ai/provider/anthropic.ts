@@ -9,7 +9,7 @@ import {
 } from "../../core/model/registry.js"
 import { Config as EffectConfig, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { AiError, AnthropicStructuredOutput, Tool } from "effect/unstable/ai"
+import { AiError, AnthropicStructuredOutput, LanguageModel, Model, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
 import type { RegistrationOptions } from "../model/registration.js"
@@ -122,6 +122,12 @@ const anthropicLanguageModelLayer = (input: Options) => {
     input.config === undefined ? { model: input.model } : { model: input.model, config: providerConfig(input.config) }
   return layerModelFailures(layerImageSources(AnthropicLanguageModel.layer(options)), resolveAnthropicFailure)
 }
+
+/** @experimental Model layer over `AnthropicClient`; provide it to a run with `Effect.provide`. */
+export const layerModel = (
+  input: Options,
+): Model.Model<"anthropic", LanguageModel.LanguageModel, AnthropicClient.AnthropicClient> =>
+  Model.make("anthropic", input.model, anthropicLanguageModelLayer(input))
 
 const registrationOptions = (input: Options) => {
   const required = {

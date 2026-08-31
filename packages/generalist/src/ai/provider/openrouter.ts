@@ -8,7 +8,14 @@ import {
   registration,
 } from "../../core/model/registry.js"
 import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
-import { AiError, AnthropicStructuredOutput, LanguageModel, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
+import {
+  AiError,
+  AnthropicStructuredOutput,
+  LanguageModel,
+  Model,
+  OpenAiStructuredOutput,
+  Tool,
+} from "effect/unstable/ai"
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientError } from "effect/unstable/http"
 import { layerImageSources } from "../model/image-source.js"
@@ -195,6 +202,12 @@ const openRouterLanguageModelLayer = (input: Options) =>
       resolveOpenRouterFailure,
     ),
   )
+
+/** @experimental Model layer over `OpenRouterClient`; provide it to a run with `Effect.provide`. */
+export const layerModel = (
+  input: Options,
+): Model.Model<"openrouter", LanguageModel.LanguageModel, OpenRouterClient.OpenRouterClient> =>
+  Model.make("openrouter", input.model, openRouterLanguageModelLayer(input))
 
 /** @experimental */
 export const classifyFailure: FailureClassifier = classify

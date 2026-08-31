@@ -9,7 +9,13 @@ import {
   registration as modelRegistration,
 } from "../../core/model/registry.js"
 import { Config, Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
-import { AiError, OpenAiStructuredOutput as OpenAIStructuredOutput, Tool } from "effect/unstable/ai"
+import {
+  AiError,
+  LanguageModel,
+  Model,
+  OpenAiStructuredOutput as OpenAIStructuredOutput,
+  Tool,
+} from "effect/unstable/ai"
 import { isAvailabilityFailure } from "../model/failure.js"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import type { RegistrationOptions } from "../model/registration.js"
@@ -86,6 +92,12 @@ export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.C
   modelRegistryLayer([modelRegistration(registrationOptions(input))]).pipe(
     Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
+
+/** @experimental Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
+export const layerModel = (
+  input: Options,
+): Model.Model<"openai", LanguageModel.LanguageModel, OpenAIClient.OpenAiClient> =>
+  Model.make("openai", input.model, layerLanguageModel(input))
 
 /** @experimental Bare registration effect; the consumer provides the OpenAI client (see layerConfig). */
 export const registration = (input: Options): Effect.Effect<Registration, never, OpenAIClient.OpenAiClient> =>

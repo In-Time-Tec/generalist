@@ -6,6 +6,7 @@ import {
   registration,
 } from "../../core/model/registry.js"
 import { Config, Layer, Redacted } from "effect"
+import { LanguageModel, Model } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 import { isAvailabilityFailure } from "../model/failure.js"
 import { layerLanguageModel } from "./openai-model.js"
@@ -57,6 +58,12 @@ export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.C
   modelRegistryLayer([registration(registrationOptions(input))]).pipe(
     Layer.provide(openAiLayerConfig(clientOptions(input))),
   )
+
+/** @experimental Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
+export const layerModel = (
+  input: Options,
+): Model.Model<string, LanguageModel.LanguageModel, OpenAIClient.OpenAiClient> =>
+  Model.make(input.provider ?? "openai-responses", input.model, layerLanguageModel(input))
 
 /** @experimental */
 export { decodeConfig, openAiLayerConfig as layerConfig, toolJsonSchemaCompiler }
