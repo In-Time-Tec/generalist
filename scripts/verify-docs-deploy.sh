@@ -2,7 +2,7 @@
 set -uo pipefail
 
 staging_url="https://generalist-docs-staging.up.railway.app"
-production_url="https://tenetkit-docs.up.railway.app"
+production_url="https://generalist-docs-production.up.railway.app"
 deep_link="/docs/start/quickstart"
 failures=0
 

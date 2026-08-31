@@ -100,7 +100,7 @@ const durableTools = ToolExecutor.layerRouter([
 ## Start here
 
 - Consumer docs: [`docs/site/README.md`](docs/site/README.md)
-- 5-minute guide: [Introduction](https://tenetkit-docs.up.railway.app/docs/start/introduction)
+- 5-minute guide: [Introduction](https://generalist-docs-production.up.railway.app/docs/start/introduction)
 - Runnable examples: [`examples/`](examples/)
 - Product direction: [`PRODUCT.md`](PRODUCT.md)
 - Current behavior: [`docs/features/`](docs/features/)

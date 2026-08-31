@@ -3,7 +3,7 @@
 The docs site (`apps/docs`) deploys through Railway project `generalist` with two GitHub-triggered environments, both gated on green CI:
 
 - Staging https://generalist-docs-staging.up.railway.app — auto-deploys every push to `main`.
-- Production https://tenetkit-docs.up.railway.app — auto-deploys every push to `release`.
+- Production https://generalist-docs-production.up.railway.app — auto-deploys every push to `release`.
 
 Promote staging to production:
 
