@@ -1,5 +1,5 @@
 {
-  "name": "@tenetkit/example-deep-research-agent",
+  "name": "@generalist/example-deep-research-agent",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.0",
@@ -11,6 +11,6 @@
     "typecheck": "bun run --cwd server typecheck && bun run --cwd web typecheck"
   },
   "devDependencies": {
-    "tenetkit": "workspace:*"
+    "generalist": "workspace:*"
   }
 }

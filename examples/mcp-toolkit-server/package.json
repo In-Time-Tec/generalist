@@ -1,5 +1,5 @@
 {
-  "name": "@tenetkit/example-mcp-toolkit-server",
+  "name": "@generalist/example-mcp-toolkit-server",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
   "dependencies": {
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:",
-    "tenetkit": "workspace:*"
+    "generalist": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { Agent, Approvals, Compaction, LanguageModel, ModelMiddleware, ToolExecutor, ToolOutput } from "tenetkit"
+import { Agent, Approvals, Compaction, LanguageModel, ModelMiddleware, ToolExecutor, ToolOutput } from "generalist"
 
 const agent = Agent.make({ name: "long-running-assistant" })
 

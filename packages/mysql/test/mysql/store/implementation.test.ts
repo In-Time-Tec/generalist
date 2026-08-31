@@ -9,11 +9,11 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
-import { RuntimeSchema } from "@tenetkit/mysql"
-import { Steering } from "tenetkit"
-import { Errors, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
-import { transitionRunWait } from "../../../../tenetkit/src/runtime/sql/store/wait-transition.js"
+import { RuntimeSchema } from "@generalist/mysql"
+import { Steering } from "generalist"
+import { Errors, Runtime, RunStore } from "generalist/runtime"
+import { RunClaims, RuntimeWorker } from "generalist/runtime/sql-driver"
+import { transitionRunWait } from "../../../../generalist/src/runtime/sql/store/wait-transition.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
   alternateAssistantRef,
@@ -25,7 +25,7 @@ import {
   researcherAddress,
   researcherRef,
   textPrompt,
-} from "../../../../tenetkit/test/runtime/execution/fixtures.js"
+} from "../../../../generalist/test/runtime/execution/fixtures.js"
 import { mysqlAvailable, mysqlClient, mysqlDatabase, mysqlLayer, uniqueSession } from "../runtime/environment.js"
 
 const scopedWith =
@@ -300,8 +300,8 @@ describeMysql("mysql run store", () => {
         )
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = 1 WHERE run_id = ${cancelledRunId}`
-          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = 0 WHERE run_id = ${activeRunId}`
+          yield* sql`UPDATE generalist_runs SET status = 'running', cancellation_requested = 1 WHERE run_id = ${cancelledRunId}`
+          yield* sql`UPDATE generalist_runs SET status = 'running', cancellation_requested = 0 WHERE run_id = ${activeRunId}`
         }).pipe(scopedWith(mysqlClient(url)))
         yield* scopedWith(mysqlLayer(url))(
           Effect.gen(function* () {
@@ -360,7 +360,7 @@ describeMysql("mysql run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
-            UPDATE tenetkit_runs SET
+            UPDATE generalist_runs SET
               executable_ref_json = ${encodeJson(alternateAssistantRef.ref)},
               executable_manifest_json = ${encodeJson(alternateAssistantRef.manifest)}
             WHERE run_id = ${runId}
@@ -592,7 +592,7 @@ describeMysql("mysql run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
-            UPDATE tenetkit_runs SET updated_at = '2000-01-01 00:00:00.000'
+            UPDATE generalist_runs SET updated_at = '2000-01-01 00:00:00.000'
             WHERE run_id = ${receipt.runId}
           `
         }).pipe(scopedWith(mysqlClient(url)))
@@ -606,7 +606,7 @@ describeMysql("mysql run store", () => {
               readonly updated_at: string
             }>`
               SELECT owner_worker_id, lease_expires_at, attempt_fence, updated_at
-              FROM tenetkit_runs WHERE run_id = ${receipt.runId}
+              FROM generalist_runs WHERE run_id = ${receipt.runId}
             `
             return row!
           }).pipe(scopedWith(mysqlClient(url)))
@@ -686,7 +686,7 @@ describeMysql("mysql run store", () => {
         expect((yield* runtime.inspect(next.runId)).status).toBe("queued")
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`UPDATE tenetkit_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${head.runId}`
+          yield* sql`UPDATE generalist_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${head.runId}`
         }).pipe(scopedWith(mysqlClient(url)))
         const second = yield* claims.claimReadyRuns({ workerId: "owner-b", limit: 1, lease: "10 seconds" })
         expect(second[0]!.attemptFence).toBeGreaterThan(first[0]!.attemptFence)
@@ -712,7 +712,7 @@ describeMysql("mysql run store", () => {
         const ownership = yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           return yield* sql<{ owner_worker_id: string | null; lease_expires_at: string | null }>`
-            SELECT owner_worker_id, lease_expires_at FROM tenetkit_runs WHERE run_id = ${head.runId}
+            SELECT owner_worker_id, lease_expires_at FROM generalist_runs WHERE run_id = ${head.runId}
           `
         }).pipe(scopedWith(mysqlClient(url)))
         expect(ownership[0]).toEqual({ owner_worker_id: null, lease_expires_at: null })
@@ -1238,33 +1238,33 @@ describeMysql("mysql run store", () => {
         expect(plan.statements).toEqual([])
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`UPDATE tenetkit_schema_meta SET version = 0 WHERE id = 1`
+          yield* sql`UPDATE generalist_schema_meta SET version = 0 WHERE id = 1`
         }).pipe(scopedWith(mysqlClient(url)))
         const upgrade = yield* Effect.exit(scopedWith(mysqlLayer(url))(Effect.void))
         expect(Exit.isFailure(upgrade)).toBe(true)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION} WHERE id = 1`
+          yield* sql`UPDATE generalist_schema_meta SET version = ${SCHEMA_VERSION} WHERE id = 1`
         }).pipe(scopedWith(mysqlClient(url)))
         yield* RuntimeSchema.markDirty("mysql-test").pipe(scopedWith(mysqlClient(url)))
         const dirty = yield* Effect.exit(scopedWith(mysqlLayer(url))(Effect.void))
         expect(Exit.isFailure(dirty)).toBe(true)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`UPDATE tenetkit_schema_meta SET dirty = 0, checksum = ${schemaChecksum()} WHERE id = 1`
+          yield* sql`UPDATE generalist_schema_meta SET dirty = 0, checksum = ${schemaChecksum()} WHERE id = 1`
         }).pipe(scopedWith(MysqlClient.layer({ url: Redacted.make(url) })))
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`
+          yield* sql`UPDATE generalist_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`
         }).pipe(scopedWith(mysqlClient(url)))
         const future = yield* RuntimeSchema.apply("mysql-test").pipe(scopedWith(mysqlClient(url)), Effect.flip)
         expect(future).toBeInstanceOf(Errors.SchemaVersionUnsupported)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          const rows = yield* sql<{ version: number }>`SELECT version FROM tenetkit_schema_meta WHERE id = 1`
+          const rows = yield* sql<{ version: number }>`SELECT version FROM generalist_schema_meta WHERE id = 1`
           expect(Number(rows[0]?.version)).toBe(SCHEMA_VERSION + 1)
           yield* sql`
-            UPDATE tenetkit_schema_meta
+            UPDATE generalist_schema_meta
             SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0
             WHERE id = 1
           `
@@ -1274,4 +1274,4 @@ describeMysql("mysql run store", () => {
   )
 })
 
-if (!mysqlAvailable) it.skip("mysql suite skipped: set TENETKIT_MYSQL_URL or MYSQL_URL", () => undefined)
+if (!mysqlAvailable) it.skip("mysql suite skipped: set GENERALIST_MYSQL_URL or MYSQL_URL", () => undefined)

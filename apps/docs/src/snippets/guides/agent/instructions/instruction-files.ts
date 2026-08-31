@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Path, PlatformError } from "effect"
-import { Instructions } from "tenetkit"
-import { load } from "tenetkit/instructions"
+import { Instructions } from "generalist"
+import { load } from "generalist/instructions"
 
 export const repoProviders: Effect.Effect<
   ReadonlyArray<Instructions.Provider>,

@@ -17,15 +17,15 @@
     "node": ">=22",
     "bun": ">=1.4.0"
   },
-  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "homepage": "https://github.com/In-Time-Tec/generalist#readme",
   "bugs": {
-    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+    "url": "https://github.com/In-Time-Tec/generalist/issues"
   },
   "publishConfig": {
     "access": "public"
   },
-  "name": "@tenetkit/mysql",
-  "description": "MySQL runtime driver for TenetKit",
+  "name": "@generalist/mysql",
+  "description": "MySQL runtime driver for Generalist",
   "exports": {
     ".": {
       "types": "./dist/mysql/index.d.ts",
@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@effect/sql-mysql2": "catalog:",
-    "tenetkit": "workspace:*"
+    "generalist": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
@@ -50,7 +50,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "url": "git+https://github.com/In-Time-Tec/generalist.git",
     "directory": "packages/mysql"
   }
 }

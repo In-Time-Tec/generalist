@@ -1,5 +1,0 @@
-snapshot: guidance-snapshot:v1:sha256:a2ea3f9a8a67667791480dbfb770dbeb3840d9718d0c2910ffe465126d7e18bb
-capability: guidance
-codec: tenetkit/agent-guidance/snapshot version: 1
-restored entries: prefers-bun, review
-drifted payload: tenetkit/agent-guidance/SnapshotMismatch

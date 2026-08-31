@@ -18,7 +18,7 @@ rule:
         - has:
             all:
               - kind: string
-              - regex: ^["']tenetkit/ai(?:/(?:anthropic|openai|openai-compat|openrouter|deterministic|embedding|presets))?["']$
+              - regex: ^["']generalist/ai(?:/(?:anthropic|openai|openai-compat|openrouter|deterministic|embedding|presets))?["']$
             stopBy: end
     - all:
         - kind: export_statement
@@ -34,79 +34,79 @@ rule:
         - has:
             all:
               - kind: string
-              - regex: ^["']tenetkit/ai(?:/(?:anthropic|openai|openai-compat|openrouter|deterministic|embedding|presets))?["']$
+              - regex: ^["']generalist/ai(?:/(?:anthropic|openai|openai-compat|openrouter|deterministic|embedding|presets))?["']$
             stopBy: end
-    - pattern: import type { $VALUE as $API } from "tenetkit/ai"
-    - pattern: import { type $VALUE as $API } from "tenetkit/ai"
+    - pattern: import type { $VALUE as $API } from "generalist/ai"
+    - pattern: import { type $VALUE as $API } from "generalist/ai"
     - pattern:
-        context: export type { $VALUE as $API } from "tenetkit/ai"
+        context: export type { $VALUE as $API } from "generalist/ai"
         selector: export_statement
     - pattern:
-        context: export { type $VALUE as $API } from "tenetkit/ai"
+        context: export { type $VALUE as $API } from "generalist/ai"
         selector: export_statement
-    - pattern: import * as $API from "tenetkit/ai"
-    - pattern: import * as $API from "tenetkit/ai/anthropic"
-    - pattern: import * as $API from "tenetkit/ai/openai"
-    - pattern: import * as $API from "tenetkit/ai/openai-compat"
-    - pattern: import * as $API from "tenetkit/ai/openrouter"
-    - pattern: import * as $API from "tenetkit/ai/deterministic"
-    - pattern: import * as $API from "tenetkit/ai/embedding"
-    - pattern: import * as $API from "tenetkit/ai/presets"
+    - pattern: import * as $API from "generalist/ai"
+    - pattern: import * as $API from "generalist/ai/anthropic"
+    - pattern: import * as $API from "generalist/ai/openai"
+    - pattern: import * as $API from "generalist/ai/openai-compat"
+    - pattern: import * as $API from "generalist/ai/openrouter"
+    - pattern: import * as $API from "generalist/ai/deterministic"
+    - pattern: import * as $API from "generalist/ai/embedding"
+    - pattern: import * as $API from "generalist/ai/presets"
     - pattern:
-        context: export * as $API from "tenetkit/ai"
-        selector: export_statement
-    - pattern:
-        context: export * as $API from "tenetkit/ai/anthropic"
+        context: export * as $API from "generalist/ai"
         selector: export_statement
     - pattern:
-        context: export * as $API from "tenetkit/ai/openai"
+        context: export * as $API from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export * as $API from "tenetkit/ai/openai-compat"
+        context: export * as $API from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: export * as $API from "tenetkit/ai/openrouter"
+        context: export * as $API from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export * as $API from "tenetkit/ai/deterministic"
+        context: export * as $API from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export * as $API from "tenetkit/ai/embedding"
+        context: export * as $API from "generalist/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: export * as $API from "tenetkit/ai/presets"
-        selector: export_statement
-    - pattern: import { $VALUE as $API } from "tenetkit/ai"
-    - pattern: import { $VALUE as $API } from "tenetkit/ai/anthropic"
-    - pattern: import { $VALUE as $API } from "tenetkit/ai/openai"
-    - pattern: import { $VALUE as $API } from "tenetkit/ai/openai-compat"
-    - pattern: import { $VALUE as $API } from "tenetkit/ai/openrouter"
-    - pattern: import { $VALUE as $API } from "tenetkit/ai/deterministic"
-    - pattern: import { $VALUE as $API } from "tenetkit/ai/embedding"
-    - pattern: import { $VALUE as $API } from "tenetkit/ai/presets"
-    - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai"
+        context: export * as $API from "generalist/ai/embedding"
         selector: export_statement
     - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai/anthropic"
+        context: export * as $API from "generalist/ai/presets"
+        selector: export_statement
+    - pattern: import { $VALUE as $API } from "generalist/ai"
+    - pattern: import { $VALUE as $API } from "generalist/ai/anthropic"
+    - pattern: import { $VALUE as $API } from "generalist/ai/openai"
+    - pattern: import { $VALUE as $API } from "generalist/ai/openai-compat"
+    - pattern: import { $VALUE as $API } from "generalist/ai/openrouter"
+    - pattern: import { $VALUE as $API } from "generalist/ai/deterministic"
+    - pattern: import { $VALUE as $API } from "generalist/ai/embedding"
+    - pattern: import { $VALUE as $API } from "generalist/ai/presets"
+    - pattern:
+        context: export { $VALUE as $API } from "generalist/ai"
         selector: export_statement
     - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai/openai"
+        context: export { $VALUE as $API } from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai/openai-compat"
+        context: export { $VALUE as $API } from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai/openrouter"
+        context: export { $VALUE as $API } from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai/deterministic"
+        context: export { $VALUE as $API } from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai/embedding"
+        context: export { $VALUE as $API } from "generalist/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: export { $VALUE as $API } from "tenetkit/ai/presets"
+        context: export { $VALUE as $API } from "generalist/ai/embedding"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "generalist/ai/presets"
         selector: export_statement
 constraints:
   API:

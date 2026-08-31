@@ -1,11 +1,11 @@
 import { Context, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import type { RunEvent } from "tenetkit/runtime"
-import type { EventHub, SqlStoreRunner } from "tenetkit/runtime/sql-driver"
+import type { RunEvent } from "generalist/runtime"
+import type { EventHub, SqlStoreRunner } from "generalist/runtime/sql-driver"
 import { sqlRunner } from "./scope.js"
 
 const TransactionEvents = Context.Reference<Array<readonly [string, RunEvent.RunEvent]>>(
-  "tenetkit/runtime/sql/mysql/TransactionEvents",
+  "generalist/runtime/sql/mysql/TransactionEvents",
   { defaultValue: () => [] },
 )
 

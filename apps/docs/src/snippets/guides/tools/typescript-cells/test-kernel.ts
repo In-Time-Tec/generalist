@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema } from "effect"
-import { ToolContext, ToolExecutor } from "tenetkit"
+import { ToolContext, ToolExecutor } from "generalist"
 import { Response } from "effect/unstable/ai"
-import { Cell, CellTool, KernelProfile, TestKernel } from "tenetkit/repl"
+import { Cell, CellTool, KernelProfile, TestKernel } from "generalist/repl"
 
 const profile = KernelProfile.make({
   provider: "bun-local",
@@ -10,7 +10,7 @@ const profile = KernelProfile.make({
   isolation: "host-process",
   checkpoints: { liveProcess: false, filesystem: true, namespace: true },
   bindingsDigest: KernelProfile.bindingsDigest([]),
-  workspace: { root: "/workspace", dataRoot: "/tmp/tenetkit" },
+  workspace: { root: "/workspace", dataRoot: "/tmp/generalist" },
   limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
 })
 

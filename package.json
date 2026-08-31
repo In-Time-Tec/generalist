@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "tenetkit-workspace",
+  "name": "generalist-workspace",
   "version": "0.44.0",
   "description": "Effect-native agent framework with an optional durable Runtime",
   "license": "MIT",
@@ -82,9 +82,9 @@
     }
   },
   "dependencies": {
-    "@tenetkit/mysql": "workspace:*",
-    "@tenetkit/pg": "workspace:*",
-    "tenetkit": "workspace:*",
+    "@generalist/mysql": "workspace:*",
+    "@generalist/pg": "workspace:*",
+    "generalist": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

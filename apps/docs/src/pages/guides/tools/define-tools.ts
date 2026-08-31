@@ -14,7 +14,7 @@ export const defineTools = definePage({
     "Define tools with Tool.make, implement handlers behind your own services, and provide the Effect AI toolkit handler layer.",
   content: [
     p(
-      "TenetKit uses Effect AI tools directly: the model sees the toolkit attached to the agent, and ordinary in-process execution comes from ",
+      "Generalist uses Effect AI tools directly: the model sees the toolkit attached to the agent, and ordinary in-process execution comes from ",
       code("toolkit.toLayer"),
       ". This guide defines a tool, implements its handler behind a service you own, provides the handler layer, and proves the loop calls it. ",
       link("/docs/learn/agent-loop", "The agent loop"),

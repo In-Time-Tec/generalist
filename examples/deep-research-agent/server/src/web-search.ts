@@ -44,17 +44,17 @@ const cannedTopics: ReadonlyArray<CannedTopic> = [
     ],
   },
   {
-    keywords: ["tenetkit", "agent sdk", "agent framework"],
+    keywords: ["generalist", "agent sdk", "agent framework"],
     results: [
       {
-        title: "TenetKit: an Effect-native agent framework",
-        url: "https://github.com/tenetkit/tenetkit",
-        snippet: "TenetKit combines the process-local tenetkit agent loop with an optional native durable Runtime.",
+        title: "Generalist: an Effect-native agent framework",
+        url: "https://github.com/generalist/generalist",
+        snippet: "Generalist combines the process-local generalist agent loop with an optional native durable Runtime.",
       },
       {
-        title: "TenetKit docs - the agent loop",
-        url: "https://tenetkit.dev/docs/concepts/agent-loop",
-        snippet: "TenetKit's agent loop plans, calls tools over configurable turns, and synthesizes a final answer.",
+        title: "Generalist docs - the agent loop",
+        url: "https://generalist.dev/docs/concepts/agent-loop",
+        snippet: "Generalist's agent loop plans, calls tools over configurable turns, and synthesizes a final answer.",
       },
     ],
   },
@@ -78,12 +78,12 @@ const cannedTopics: ReadonlyArray<CannedTopic> = [
 const defaultResults: ReadonlyArray<SearchResult> = [
   {
     title: "Deep research agent demo corpus",
-    url: "https://github.com/tenetkit/tenetkit/tree/main/examples/deep-research-agent",
+    url: "https://github.com/generalist/generalist/tree/main/examples/deep-research-agent",
     snippet: "No EXA_API_KEY was configured, so this canned result stands in for a live web search over this question.",
   },
   {
-    title: "TenetKit - Runtime transport",
-    url: "https://github.com/tenetkit/tenetkit/blob/main/docs/features/transport.md",
+    title: "Generalist - Runtime transport",
+    url: "https://github.com/generalist/generalist/blob/main/docs/features/transport.md",
     snippet: "SSE and WebSocket adapters project the Runtime-owned RunEvent stream to the browser.",
   },
 ]
@@ -116,7 +116,7 @@ export interface Service {
 
 /** @experimental */
 export class WebSearch extends Context.Service<WebSearch, Service>()(
-  "@tenetkit/example-deep-research-agent-server/web-search/WebSearch",
+  "@generalist/example-deep-research-agent-server/web-search/WebSearch",
 ) {}
 
 const exaSearchBody = (query: string) => ({

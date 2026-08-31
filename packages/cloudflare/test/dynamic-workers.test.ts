@@ -2,8 +2,8 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { adjust as adjustTestClock } from "effect/testing/TestClock"
-import { CodeExecutor, ProgramCapabilities } from "tenetkit"
-import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "@tenetkit/cloudflare/dynamic-workers"
+import { CodeExecutor, ProgramCapabilities } from "generalist"
+import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "@generalist/cloudflare/dynamic-workers"
 import { runner } from "../src/dynamic-workers/source.js"
 
 const capabilities = ProgramCapabilities.ProgramCapabilities.of({
@@ -19,8 +19,8 @@ const capabilities = ProgramCapabilities.ProgramCapabilities.of({
 
 const capabilityFailureId = (reason: Error): string => {
   const message = reason.message
-  expect(message).toMatch(/^tenetkit-capability-failure:failure-\d+$/)
-  return message.slice("tenetkit-capability-failure:".length)
+  expect(message).toMatch(/^generalist-capability-failure:failure-\d+$/)
+  return message.slice("generalist-capability-failure:".length)
 }
 
 const request = (signal = new AbortController().signal): CodeExecutor.Request => {
@@ -76,7 +76,7 @@ it.effect("loads exact cold WorkerCode with only the capability binding and pinn
     expect(loaded).toHaveLength(2)
     expect(loaded[0]).toMatchObject({
       compatibilityDate: "2026-08-19",
-      mainModule: "__tenetkit_runner.js",
+      mainModule: "__generalist_runner.js",
       globalOutbound: null,
       limits: { cpuMs: 50, subRequests: 3 },
     })
@@ -88,7 +88,7 @@ it.effect("loads exact cold WorkerCode with only the capability binding and pinn
       "TENET_REQUEST_ID",
       "TENET_SOURCE_DIGEST",
     ])
-    expect(loaded[0]!.modules["__tenetkit_runner.js"]).toContain("capabilityFailureId")
+    expect(loaded[0]!.modules["__generalist_runner.js"]).toContain("capabilityFailureId")
     expect(second.requestId).toBe(first.requestId)
   }),
 )
@@ -152,7 +152,7 @@ it.effect("rejects an unsupported admission limit before source normalization or
       })
       .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
     expect(failure).toMatchObject({
-      _tag: "tenetkit/core/SandboxGuaranteeUnavailable",
+      _tag: "generalist/core/SandboxGuaranteeUnavailable",
       guarantee: "deadlineMillis",
     })
     expect(loads).toBe(0)
@@ -179,7 +179,7 @@ it.effect("maps provider CPU and subrequest enforcement failures to exact reques
           .execute(request())
           .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip),
       ).toMatchObject({
-        _tag: "tenetkit/core/SandboxResourceExceeded",
+        _tag: "generalist/core/SandboxResourceExceeded",
         resource,
         limit,
       })
@@ -231,11 +231,11 @@ it.effect("normalizes the exact module graph and rejects unsupported imports bef
         { name: "Program.js", source: "export default 1" },
       ],
       [{ name: "../program.js", source: "export default () => null" }],
-      [{ name: "__tenetkit_runner.js", source: "export default () => null" }],
-      [{ name: "__TENETKIT_RUNNER.JS", source: "export default () => null" }],
+      [{ name: "__generalist_runner.js", source: "export default () => null" }],
+      [{ name: "__GENERALIST_RUNNER.JS", source: "export default () => null" }],
       [
-        { name: "program.js", source: 'import "./__tenetkit_runner.js"; export default () => null' },
-        { name: "__tenetkit_runner.js", source: "export default 1" },
+        { name: "program.js", source: 'import "./__generalist_runner.js"; export default () => null' },
+        { name: "__generalist_runner.js", source: "export default 1" },
       ],
     ]
     for (const modules of invalidModules) {
@@ -287,7 +287,7 @@ it.effect("strict-decodes, authorizes, and bounds every capability RPC call", ()
                   operation: "describeTool",
                   input: "echo",
                 }),
-              ).rejects.toThrow(/^tenetkit-capability-failure:failure-\d+$/)
+              ).rejects.toThrow(/^generalist-capability-failure:failure-\d+$/)
               const invalidCall = {
                 protocolVersion: "1" as const,
                 requestId: "run-1:attempt-1",
@@ -606,7 +606,7 @@ it.effect("streams output through the byte bound before decoding", () =>
     const failure = yield* executor
       .execute({ ...request(), limits: { cpuMillis: 50, subrequests: 3, outputBytes: 128 } })
       .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities), Effect.flip)
-    expect(failure).toMatchObject({ _tag: "tenetkit/core/SandboxResourceExceeded", resource: "output", limit: 128 })
+    expect(failure).toMatchObject({ _tag: "generalist/core/SandboxResourceExceeded", resource: "output", limit: 128 })
     expect(cancelled).toBe(true)
     expect(pulls).toBeLessThanOrEqual(4)
   }),
@@ -880,7 +880,7 @@ it.effect("provides an explicit typed unavailable executor", () =>
         .execute(request())
         .pipe(Effect.flip, Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities)),
     ).toMatchObject({
-      _tag: "tenetkit/core/SandboxUnavailable",
+      _tag: "generalist/core/SandboxUnavailable",
       message: "feature disabled",
     })
   }),

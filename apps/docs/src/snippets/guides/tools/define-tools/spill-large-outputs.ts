@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, ToolOutput } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, ToolOutput } from "generalist"
 import { docsToolLayer } from "./executor"
 import { toolkit } from "./search-tool"
 

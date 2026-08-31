@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit, type AgentEvent } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit, type AgentEvent } from "generalist"
 
 const searchTool = Tool.make("search_docs", {
   description: "Search the project docs",

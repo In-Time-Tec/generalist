@@ -1,6 +1,6 @@
 # Run the cell kernel in a child process
 
-`tenetkit/repl/bun` spawns each kernel as a child process rather than a `Worker` thread.
+`generalist/repl/bun` spawns each kernel as a child process rather than a `Worker` thread.
 
 `@effect/platform-bun`'s `BunWorker` is thread-backed. Terminating a thread while a `vm` script is spinning takes the host process down with it: on Bun 1.3.14, `while (true) {}` inside a `BunWorker` followed by `terminate()` exits the **host** with `SIGTRAP`, code 133, in five runs out of five. Killing a wedged kernel is a required operation — a synchronous busy loop that escapes the `vm` watchdog is exactly what the last tier of the escalation ladder exists for — so a transport that cannot survive it is not a lifecycle boundary.
 

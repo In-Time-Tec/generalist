@@ -1,11 +1,11 @@
-import { layer as backendLayer } from "@tenetkit/mysql"
+import { layer as backendLayer } from "@generalist/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
-import { registrationsFor } from "../../../../tenetkit/test/runtime/execution/fixtures.js"
-import { agentMapProgramFixture } from "../../../../tenetkit/test/runtime/program/fixture.js"
+import { RunExecutor, Runtime, RunStore } from "generalist/runtime"
+import { RunClaims } from "generalist/runtime/sql-driver"
+import { registrationsFor } from "../../../../generalist/test/runtime/execution/fixtures.js"
+import { agentMapProgramFixture } from "../../../../generalist/test/runtime/program/fixture.js"
 import { mysqlAvailable, mysqlDatabase } from "./environment.js"
 
 const describeMysql = describe.runIf(mysqlAvailable)

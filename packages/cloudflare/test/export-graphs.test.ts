@@ -6,10 +6,10 @@ const entries = [
   ["workers", "packages/cloudflare/src/workers/index.ts"],
   ["durable-objects", "packages/cloudflare/src/durable-objects/index.ts"],
   ["dynamic-workers", "packages/cloudflare/src/dynamic-workers/index.ts"],
-  ["core", "packages/tenetkit/src/index.ts"],
-  ["foldkit", "packages/tenetkit/src/foldkit/index.ts"],
-  ["transport client", "packages/tenetkit/src/transport/run-client.ts"],
-  ["injected SQL store", "packages/tenetkit/src/runtime/sql/store.ts"],
+  ["core", "packages/generalist/src/index.ts"],
+  ["foldkit", "packages/generalist/src/foldkit/index.ts"],
+  ["transport client", "packages/generalist/src/transport/run-client.ts"],
+  ["injected SQL store", "packages/generalist/src/runtime/sql/store.ts"],
 ] as const
 const forbidden = [
   "bun:sqlite",

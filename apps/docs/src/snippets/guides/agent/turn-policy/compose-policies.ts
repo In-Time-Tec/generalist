@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { Agent, Tool, Toolkit, Policy } from "tenetkit"
+import { Agent, Tool, Toolkit, Policy } from "generalist"
 
 const submitAnswerTool = Tool.make("submit_answer", {
   description: "Submit the final answer",

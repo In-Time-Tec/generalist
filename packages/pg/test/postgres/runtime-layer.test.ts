@@ -1,16 +1,16 @@
-import { layer as postgresLayer } from "@tenetkit/pg"
+import { layer as postgresLayer } from "@generalist/pg"
 import { PgClient } from "@effect/sql-pg"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schedule, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { ExecutableResolver, Run, Runtime } from "tenetkit/runtime"
+import { ExecutableResolver, Run, Runtime } from "generalist/runtime"
 import {
   assistant,
   assistantRef,
   registrationsFor,
   textPrompt,
-} from "../../../tenetkit/test/runtime/execution/fixtures.js"
-import { closedTestAgent } from "../../../tenetkit/test/runtime/run/identity.js"
+} from "../../../generalist/test/runtime/execution/fixtures.js"
+import { closedTestAgent } from "../../../generalist/test/runtime/run/identity.js"
 import { NOTIFY_CHANNEL } from "../../src/postgres/schema.js"
 import { postgresAvailable, postgresClient, postgresDatabase, uniqueSession } from "./database.js"
 
@@ -27,7 +27,7 @@ it.effect("rejects invalid PostgreSQL pool bounds before opening a client", () =
         }).pipe(Layer.provide(resolverLayer)),
       ).pipe(Effect.flip, Effect.scoped)
       expect(failure).toMatchObject({
-        _tag: "tenetkit/runtime/SchemaMigrationFailed",
+        _tag: "generalist/runtime/SchemaMigrationFailed",
         source: "postgres",
         message: "PostgreSQL maxConnections must be a positive integer",
       })
@@ -136,7 +136,7 @@ describePostgres("PostgreSQL host transactions", () => {
 
         expect(yield* Deferred.isDone(notification)).toBe(false)
         expect(yield* sql`SELECT row_id FROM host_transaction_rows WHERE row_id = 'host-rollback'`).toEqual([])
-        expect((yield* runtime.inspect(input.runId).pipe(Effect.flip))._tag).toBe("tenetkit/runtime/RunNotFound")
+        expect((yield* runtime.inspect(input.runId).pipe(Effect.flip))._tag).toBe("generalist/runtime/RunNotFound")
       }),
     )
 
@@ -175,7 +175,7 @@ describePostgres("PostgreSQL host transactions", () => {
         `,
         ).toEqual([{ row_id: "nested-kept" }])
         expect((yield* runtime.inspect(kept.runId)).status).toBe("queued")
-        expect((yield* runtime.inspect(rolledBack.runId).pipe(Effect.flip))._tag).toBe("tenetkit/runtime/RunNotFound")
+        expect((yield* runtime.inspect(rolledBack.runId).pipe(Effect.flip))._tag).toBe("generalist/runtime/RunNotFound")
       }),
     )
 
@@ -250,5 +250,5 @@ describePostgres("PostgreSQL host transactions", () => {
 })
 
 if (!postgresAvailable) {
-  it.skip("postgres host transactions skipped: set TENETKIT_DATABASE_URL or DATABASE_URL", () => undefined)
+  it.skip("postgres host transactions skipped: set GENERALIST_DATABASE_URL or DATABASE_URL", () => undefined)
 }

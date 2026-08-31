@@ -87,15 +87,15 @@ it.effect("landing renders the shell", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
-    expect(document.body.textContent).toContain("TenetKit")
+    expect(document.body.textContent).toContain("Generalist")
   }),
 )
 
-it.effect("landing h1 is exactly TenetKit", () =>
+it.effect("landing h1 is exactly Generalist", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
-    expect(document.querySelector("h1")?.textContent).toBe("TenetKit")
+    expect(document.querySelector("h1")?.textContent).toBe("Generalist")
   }),
 )
 
@@ -108,20 +108,20 @@ it.effect("no rendered string says the retired brand", () =>
 )
 
 test("index.html declares the brand shell", () => {
-  expect(indexHtml).toContain("<title>TenetKit</title>")
+  expect(indexHtml).toContain("<title>Generalist</title>")
   expect(indexHtml).not.toContain(retiredBrand)
   expect(indexHtml).toContain('href="/favicon.svg"')
   expect(indexHtml.indexOf("theme-init.js")).toBeGreaterThan(-1)
   expect(indexHtml.indexOf("theme-init.js")).toBeLessThan(indexHtml.indexOf("styles.css"))
 })
 
-it.effect("github links point at In-Time-Tec/tenetkit", () =>
+it.effect("github links point at In-Time-Tec/generalist", () =>
   Effect.gen(function* () {
     bootAt("/")
     yield* settle
     const links = Array.from(document.querySelectorAll('a[href*="github.com"]'))
     expect(links.length).toBeGreaterThan(0)
-    for (const link of links) expect(link.getAttribute("href")).toContain("In-Time-Tec/tenetkit")
+    for (const link of links) expect(link.getAttribute("href")).toContain("In-Time-Tec/generalist")
   }),
 )
 

@@ -1,14 +1,14 @@
 import { Context, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { withSql, type EventHub, type SqlStoreRunner } from "tenetkit/runtime/sql-driver"
+import { withSql, type EventHub, type SqlStoreRunner } from "generalist/runtime/sql-driver"
 import { NOTIFY_CHANNEL } from "../schema.js"
 
 interface TransactionState {
   readonly runIds: Set<string>
 }
 
-const State = Context.Reference<TransactionState>("tenetkit/runtime/sql/postgres/TransactionState", {
+const State = Context.Reference<TransactionState>("generalist/runtime/sql/postgres/TransactionState", {
   defaultValue: () => ({ runIds: new Set() }),
 })
 

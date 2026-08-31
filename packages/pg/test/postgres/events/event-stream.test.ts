@@ -1,16 +1,16 @@
-import { layer as backendLayer } from "@tenetkit/pg"
+import { layer as backendLayer } from "@generalist/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
-import { ExecutableResolver, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
+import { ExecutableResolver, Runtime, RunStore } from "generalist/runtime"
+import { RunClaims } from "generalist/runtime/sql-driver"
 import {
   assistant,
   assistantAddress,
   assistantRef,
   registrationsFor,
   textPrompt,
-} from "../../../../tenetkit/test/runtime/execution/fixtures.js"
-import { closedTestAgent } from "../../../../tenetkit/test/runtime/run/identity.js"
+} from "../../../../generalist/test/runtime/execution/fixtures.js"
+import { closedTestAgent } from "../../../../generalist/test/runtime/run/identity.js"
 import { postgresAvailable, postgresDatabase, uniqueSession } from "../database.js"
 
 const describePostgres = postgresAvailable ? describe : describe.skip

@@ -1,6 +1,6 @@
 # HITL over SSE
 
-Run an in-memory `tenetkit/runtime` example that produces an approval suspension as canonical `RunEvent` values and encodes them for SSE. A real server provides the same Runtime layer to `SSE.respond` for downstream UI streaming.
+Run an in-memory `generalist/runtime` example that produces an approval suspension as canonical `RunEvent` values and encodes them for SSE. A real server provides the same Runtime layer to `SSE.respond` for downstream UI streaming.
 
 ```bash
 bun --cwd examples/hitl-over-sse start

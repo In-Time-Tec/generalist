@@ -1,11 +1,11 @@
 import { Console, Effect, ManagedRuntime, Schema } from "effect"
-import { Runtime } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
-import { assistantAddress, completedResult, textPrompt } from "../../tenetkit/test/runtime/execution/fixtures.js"
+import { Runtime } from "generalist/runtime"
+import { RunClaims } from "generalist/runtime/sql-driver"
+import { assistantAddress, completedResult, textPrompt } from "../../generalist/test/runtime/execution/fixtures.js"
 import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../test/postgres/database.js"
 
 if (!postgresAvailable) {
-  throw new Error("Set TENETKIT_DATABASE_URL or DATABASE_URL to run the postgres tracer")
+  throw new Error("Set GENERALIST_DATABASE_URL or DATABASE_URL to run the postgres tracer")
 }
 
 const database = postgresDatabase("cli-tracer")

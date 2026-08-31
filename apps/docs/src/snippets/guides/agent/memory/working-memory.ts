@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
-import { WorkingMemory } from "tenetkit/memory"
+import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "generalist"
+import { WorkingMemory } from "generalist/memory"
 
 const key: Memory.Key = { agent: "support-agent", subject: "user-ada" }
 

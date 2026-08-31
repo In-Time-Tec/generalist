@@ -28,7 +28,7 @@ export const cellAgent = definePage({
     ),
     h2("step-1-create-the-project", "Step 1: Create the project"),
     codeBlock({ label: "Terminal", language: "bash", source: step1 }),
-    p(code("tenetkit/repl"), "'s root export is contracts only, so nothing so far touches a process."),
+    p(code("generalist/repl"), "'s root export is contracts only, so nothing so far touches a process."),
     h2("step-2-pin-an-epoch", "Step 2: Pin an epoch"),
     p(
       "A ",
@@ -94,7 +94,7 @@ export const cellAgent = definePage({
     h2("step-5-use-the-real-kernel", "Step 5: Swap in the real Bun kernel"),
     p(
       "Everything so far ran without a process. ",
-      code("tenetkit/repl/bun"),
+      code("generalist/repl/bun"),
       " is the only module that changes that. The contract is identical, so only the layer changes:",
     ),
     codeBlock({ label: "kernel.ts", source: step5 }),
@@ -121,7 +121,7 @@ export const cellAgent = definePage({
       " for the task-shaped version of these steps, ",
       link("/docs/learn/kernel-boundaries", "Why the kernel is a process boundary"),
       " for the isolation and authenticity decisions, and ",
-      link("/docs/reference/repl", "the tenetkit/repl reference"),
+      link("/docs/reference/repl", "the generalist/repl reference"),
       " for the exact schemas and ports.",
     ),
   ],

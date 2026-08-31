@@ -2,8 +2,8 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Prompt, Response } from "effect/unstable/ai"
-import { Handoff, Pins, Session } from "tenetkit"
-import { Errors, RunEvent, Runtime, RunStore } from "tenetkit/runtime"
+import { Handoff, Pins, Session } from "generalist"
+import { Errors, RunEvent, Runtime, RunStore } from "generalist/runtime"
 import {
   assistant,
   assistantAddress,
@@ -11,7 +11,7 @@ import {
   researcherPin,
   researcherRef,
   textPrompt,
-} from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
+} from "../../../../../generalist/test/runtime/execution/fixtures.js"
 import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../../database.js"
 
 const describePostgres = postgresAvailable ? describe : describe.skip
@@ -117,7 +117,7 @@ const installFailureTrigger = (name: string, eventTag: string) =>
         CREATE OR REPLACE FUNCTION ${name}() RETURNS trigger AS $$
         BEGIN
           IF EXISTS (
-            SELECT 1 FROM tenetkit_run_events
+            SELECT 1 FROM generalist_run_events
             WHERE event_id = NEW.event_id AND event_json LIKE '%"_tag":"${eventTag}"%'
           ) THEN
             RAISE EXCEPTION 'forced ${eventTag} rollback';
@@ -130,7 +130,7 @@ const installFailureTrigger = (name: string, eventTag: string) =>
       // PostgreSQL must discard that already-issued notification with the rest of the transaction.
       yield* sql.unsafe(`
         CREATE CONSTRAINT TRIGGER ${name}
-        AFTER INSERT ON tenetkit_tree_event_index
+        AFTER INSERT ON generalist_tree_event_index
         DEFERRABLE INITIALLY DEFERRED
         FOR EACH ROW EXECUTE FUNCTION ${name}()
       `)
@@ -141,7 +141,7 @@ const removeFailureTrigger = (name: string) =>
   scopedWith(database.client)(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* sql.unsafe(`DROP TRIGGER IF EXISTS ${name} ON tenetkit_tree_event_index`)
+      yield* sql.unsafe(`DROP TRIGGER IF EXISTS ${name} ON generalist_tree_event_index`)
       yield* sql.unsafe(`DROP FUNCTION IF EXISTS ${name}()`)
     }),
   )
@@ -239,19 +239,19 @@ describePostgres("PostgreSQL Session authority", () => {
       yield* scopedWith(database.client)(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`DELETE FROM tenetkit_tree_event_index WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_run_events WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_run_registrations WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_tree_roots WHERE root_run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_runs WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_tree_event_index WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_run_events WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_run_registrations WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_tree_roots WHERE root_run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_runs WHERE run_id = ${runId}`
           const foreignKeys = yield* sql<{ count: string }>`
             SELECT COUNT(*) AS count
             FROM information_schema.table_constraints tc
             JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name
             WHERE tc.table_schema = current_schema()
-              AND tc.table_name IN ('tenetkit_sessions', 'tenetkit_session_entries')
+              AND tc.table_name IN ('generalist_sessions', 'generalist_session_entries')
               AND tc.constraint_type = 'FOREIGN KEY'
-              AND ccu.table_name = 'tenetkit_runs'
+              AND ccu.table_name = 'generalist_runs'
           `
           expect(Number(foreignKeys[0]!.count)).toBe(0)
         }),

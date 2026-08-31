@@ -6,13 +6,13 @@ export const nativeRuntime = definePage({
   navTitle: "Core and Runtime",
   group: "Learn",
   description:
-    "How the process-local tenetkit agent loop composes with the native tenetkit/runtime for durable, addressable runs.",
+    "How the process-local generalist agent loop composes with the native generalist/runtime for durable, addressable runs.",
   content: [
     p(
-      code("tenetkit"),
+      code("generalist"),
       " owns the agent loop: model turns, tool execution, policies, approvals, and typed AgentEvents. It can run by itself and keeps no durable execution state. ",
-      code("tenetkit/runtime"),
-      " is TenetKit's optional native durable host. It persists a constructor-verified executable manifest and exact active reference with each finite, addressable Run, alongside one canonical RunEvent stream.",
+      code("generalist/runtime"),
+      " is Generalist's optional native durable host. It persists a constructor-verified executable manifest and exact active reference with each finite, addressable Run, alongside one canonical RunEvent stream.",
     ),
     h2("runtime-owns", "What Runtime owns"),
     bullets(
@@ -48,24 +48,24 @@ export const nativeRuntime = definePage({
       [
         [[code("Runtime.layerMemory")], "Local development and tests; all state is lost with the process"],
         [[code("SqliteRuntime.layerSqlite")], "Durable single-process execution with automatic schema migration"],
-        [[code("layer from @tenetkit/pg")], "Durable multi-worker execution on PostgreSQL"],
-        [[code("layer from @tenetkit/mysql")], "Durable multi-worker execution on MySQL 8+"],
+        [[code("layer from @generalist/pg")], "Durable multi-worker execution on PostgreSQL"],
+        [[code("layer from @generalist/mysql")], "Durable multi-worker execution on MySQL 8+"],
       ],
     ),
     p(
       "PostgreSQL and MySQL startup verifies an already-applied schema rather than running DDL. Use ",
-      code("RuntimeSchema from @tenetkit/pg"),
+      code("RuntimeSchema from @generalist/pg"),
       " for PostgreSQL or ",
-      code("RuntimeSchema from @tenetkit/mysql"),
+      code("RuntimeSchema from @generalist/mysql"),
       " for MySQL in a predeploy migration step.",
     ),
     p(
       "Import ",
       code("Runtime as SqliteRuntime"),
       " from ",
-      code("tenetkit/runtime/sqlite-bun"),
+      code("generalist/runtime/sqlite-bun"),
       ". The generic ",
-      code("tenetkit/runtime"),
+      code("generalist/runtime"),
       " entrypoint does not load or require the SQLite peer.",
     ),
     h2("package-boundary", "The package boundary"),
@@ -74,7 +74,7 @@ export const nativeRuntime = definePage({
     ),
     p(
       "See ",
-      link("/docs/reference/runtime", "the tenetkit/runtime reference"),
+      link("/docs/reference/runtime", "the generalist/runtime reference"),
       " for the public namespaces and ",
       link("/docs/guides/serve-transport", "Serve over SSE and WebSocket"),
       " for a complete projection flow.",

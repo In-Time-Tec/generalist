@@ -1,7 +1,7 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { layer as anthropicLayer } from "tenetkit/ai/anthropic"
-import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "generalist"
+import { layer as anthropicLayer } from "generalist/ai/anthropic"
+import { layer as openRouterLayer } from "generalist/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "router" })

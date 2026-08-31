@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Permissions } from "tenetkit"
+import { Permissions } from "generalist"
 
 const ruleset: Permissions.Ruleset = {
   rules: [

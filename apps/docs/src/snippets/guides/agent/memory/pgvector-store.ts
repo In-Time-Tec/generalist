@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect"
-import { VectorStore } from "tenetkit/memory"
+import { VectorStore } from "generalist/memory"
 
 interface PgClientService {
   readonly run: (sql: string, params: ReadonlyArray<unknown>) => Effect.Effect<ReadonlyArray<PgRow>, Error>
@@ -12,7 +12,7 @@ interface PgRow {
 }
 
 class PgClient extends Context.Service<PgClient, PgClientService>()(
-  "@tenetkit/docs/snippets/guides/agent/memory/pgvector-store/PgClient",
+  "@generalist/docs/snippets/guides/agent/memory/pgvector-store/PgClient",
 ) {}
 
 const storeError = (error: Error) => VectorStore.VectorStoreError.make({ message: error.message })

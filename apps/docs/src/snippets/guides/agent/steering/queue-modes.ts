@@ -1,5 +1,5 @@
 import { Console, Effect, Schema } from "effect"
-import { Agent, Steering } from "tenetkit"
+import { Agent, Steering } from "generalist"
 
 const agent = Agent.make({ name: "bounded-inbox" })
 

@@ -11,7 +11,7 @@ export const foldkitChat = definePage({
     "Embed the headless Chat submodel in a FoldKit application, observe semantic RunEvents, and render committed entries, run state, and approvals.",
   content: [
     p(
-      code("tenetkit/foldkit"),
+      code("generalist/foldkit"),
       " adapts transport frames into FoldKit's Elm architecture. ",
       code("Connection.Connection"),
       " is a long-lived resource that observes decoded durable RunEvent frames and connection facts; ",
@@ -20,7 +20,7 @@ export const foldkitChat = definePage({
       code("update"),
       " that projects those frames into display state. It ships no styled components; rendering stays yours.",
     ),
-    command("Terminal", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0 foldkit@0.148.2"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 generalist@0.44.0 foldkit@0.148.2"),
     h2("embed-the-chat-model", "1. Open a session and embed the chat model"),
     p(
       "Embed ",
@@ -87,7 +87,7 @@ export const foldkitChat = definePage({
       code("Chat.toolStatusOf"),
       " map the model to foldcn-aligned view data; that is what ",
       link(
-        "https://github.com/In-Time-Tec/tenetkit/blob/main/examples/deep-research-agent/web/src/main.ts",
+        "https://github.com/In-Time-Tec/generalist/blob/main/examples/deep-research-agent/web/src/main.ts",
         "the deep-research web app",
       ),
       " renders with styled components. A generic waiting item may indicate that the run is active, but it must not fabricate assistant text before a semantic response event arrives.",
@@ -132,7 +132,7 @@ export const foldkitChat = definePage({
     ),
     p(
       "The full model, action, output, and helper tables are in ",
-      link("/docs/reference/foldkit", "the tenetkit/foldkit reference"),
+      link("/docs/reference/foldkit", "the generalist/foldkit reference"),
       ". To build the server side of this page, start at ",
       link("/docs/start/research-agent", "the research-agent tutorial"),
       ".",

@@ -1,11 +1,11 @@
-import { layer } from "@tenetkit/pg"
+import { layer } from "@generalist/pg"
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
-import { provideScoped } from "../../../../../tenetkit/test/runtime/execution/scoped-provide.js"
-import { cancellationConvergenceSuite } from "../../../../../tenetkit/test/runtime/operation/suites/cancellation-convergence-suite.js"
-import { operationRecoverySuite } from "../../../../../tenetkit/test/runtime/operation/suites/recovery.js"
-import { toolCancellationSuite } from "../../../../../tenetkit/test/runtime/operation/suites/tool-cancellation.js"
+import { RunClaims } from "generalist/runtime/sql-driver"
+import { provideScoped } from "../../../../../generalist/test/runtime/execution/scoped-provide.js"
+import { cancellationConvergenceSuite } from "../../../../../generalist/test/runtime/operation/suites/cancellation-convergence-suite.js"
+import { operationRecoverySuite } from "../../../../../generalist/test/runtime/operation/suites/recovery.js"
+import { toolCancellationSuite } from "../../../../../generalist/test/runtime/operation/suites/tool-cancellation.js"
 import { postgresAvailable, postgresDatabase, postgresLayer, postgresTestMaxConnections } from "../../database.js"
 
 const database = postgresDatabase("operation-recovery")
@@ -47,7 +47,7 @@ operationRecoverySuite({
       database.client,
       Effect.flatMap(
         SqlClient.SqlClient,
-        (sql) => sql`UPDATE tenetkit_runs SET lease_expires_at = NOW() - INTERVAL '1 second' WHERE run_id = ${runId}`,
+        (sql) => sql`UPDATE generalist_runs SET lease_expires_at = NOW() - INTERVAL '1 second' WHERE run_id = ${runId}`,
       ),
     ).pipe(Effect.scoped, Effect.asVoid),
 })
@@ -88,7 +88,7 @@ toolCancellationSuite({
       database.client,
       Effect.flatMap(
         SqlClient.SqlClient,
-        (sql) => sql`UPDATE tenetkit_runs SET lease_expires_at = NOW() - INTERVAL '1 second' WHERE run_id = ${runId}`,
+        (sql) => sql`UPDATE generalist_runs SET lease_expires_at = NOW() - INTERVAL '1 second' WHERE run_id = ${runId}`,
       ),
     ).pipe(Effect.scoped, Effect.asVoid),
 })

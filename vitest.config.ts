@@ -2,33 +2,33 @@ import { availableParallelism } from "node:os"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 import { sourceTextPlugin } from "./apps/docs/scripts/source-text-plugin"
-import tenetkitManifest from "./packages/tenetkit/package.json" with { type: "json" }
+import generalistManifest from "./packages/generalist/package.json" with { type: "json" }
 
 const repositoryRoot = fileURLToPath(new URL(".", import.meta.url))
-const tenetkitRoot = new URL("./packages/tenetkit/", import.meta.url)
-const tenetkitExports: Readonly<Record<string, { readonly import: string }>> = tenetkitManifest.exports
+const generalistRoot = new URL("./packages/generalist/", import.meta.url)
+const generalistExports: Readonly<Record<string, { readonly import: string }>> = generalistManifest.exports
 
 /**
- * `@tenetkit/pg` and `@tenetkit/mysql` import the published `tenetkit` entrypoints while the shared
- * test helpers import `packages/tenetkit/src`. Left alone the suite loads two copies of every
+ * `@generalist/pg` and `@generalist/mysql` import the published `generalist` entrypoints while the shared
+ * test helpers import `packages/generalist/src`. Left alone the suite loads two copies of every
  * service and error class, so `instanceof` assertions fail against structurally identical values.
  * The `exports` map is the only place that knows how a specifier maps onto a file, so the alias
  * table is derived from it rather than restated.
  */
-const tenetkitSourceAliases: Array<{ readonly find: RegExp; readonly replacement: string }> = []
-for (const specifier in tenetkitExports) {
-  const source = tenetkitExports[specifier].import.replace(/^\.\/dist\//, "src/").replace(/\.js$/, ".ts")
-  const pattern = `tenetkit${specifier === "." ? "" : specifier.slice(1)}`
-  tenetkitSourceAliases.push(
+const generalistSourceAliases: Array<{ readonly find: RegExp; readonly replacement: string }> = []
+for (const specifier in generalistExports) {
+  const source = generalistExports[specifier].import.replace(/^\.\/dist\//, "src/").replace(/\.js$/, ".ts")
+  const pattern = `generalist${specifier === "." ? "" : specifier.slice(1)}`
+  generalistSourceAliases.push(
     specifier.includes("*")
       ? {
           find: new RegExp(`^${pattern.replace("*", "(.*)")}$`),
-          replacement: fileURLToPath(new URL(source.replace("*", "$1"), tenetkitRoot)),
+          replacement: fileURLToPath(new URL(source.replace("*", "$1"), generalistRoot)),
         }
-      : { find: new RegExp(`^${pattern}$`), replacement: fileURLToPath(new URL(source, tenetkitRoot)) },
+      : { find: new RegExp(`^${pattern}$`), replacement: fileURLToPath(new URL(source, generalistRoot)) },
   )
 }
-tenetkitSourceAliases.sort(
+generalistSourceAliases.sort(
   (left, right) => Number(left.find.source.includes("(")) - Number(right.find.source.includes("(")),
 )
 
@@ -43,11 +43,11 @@ const workers = Math.max(2, Math.min(6, availableParallelism()))
 export default defineConfig({
   resolve: {
     /**
-     * `@tenetkit/pg` and `@tenetkit/mysql` import the published `tenetkit` entrypoints, while the
-     * shared test helpers import `packages/tenetkit/src`. Without this the suite loads two copies
+     * `@generalist/pg` and `@generalist/mysql` import the published `generalist` entrypoints, while the
+     * shared test helpers import `packages/generalist/src`. Without this the suite loads two copies
      * of every service and error class, and `instanceof` assertions fail against identical values.
      */
-    alias: tenetkitSourceAliases,
+    alias: generalistSourceAliases,
   },
   plugins: [
     sourceTextPlugin,

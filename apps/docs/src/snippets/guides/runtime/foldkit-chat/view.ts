@@ -1,4 +1,4 @@
-import { Chat } from "tenetkit/foldkit"
+import { Chat } from "generalist/foldkit"
 import type { Document, Html } from "foldkit/html"
 import { html } from "@/lib/html"
 import { GotChatAction, type Message, type Model } from "./model"
@@ -61,7 +61,7 @@ const promptView = (model: Model): Html => {
 export const view = (model: Model): Document => {
   const h = html<Message>()
   return {
-    title: "TenetKit chat",
+    title: "Generalist chat",
     body: h.main(
       [h.Class("chat")],
       [

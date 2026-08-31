@@ -2,15 +2,15 @@ import { code, command, definePage, h2, lead, link, p, table } from "../../../pr
 
 export const transportReference = definePage({
   path: "/docs/reference/transport",
-  title: "tenetkit/transport",
+  title: "generalist/transport",
   navTitle: "transport",
   group: "Reference",
   description: "Runtime RunEvent wire codecs, SSE and WebSocket handlers, snapshots, and reconnecting clients.",
   content: [
     lead(
-      "tenetkit/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
+      "generalist/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -55,9 +55,9 @@ export const transportReference = definePage({
     ),
     p(
       "See ",
-      link("/docs/reference/runtime", "tenetkit/runtime"),
+      link("/docs/reference/runtime", "generalist/runtime"),
       " for Run ownership and ",
-      link("/docs/reference/foldkit", "tenetkit/foldkit"),
+      link("/docs/reference/foldkit", "generalist/foldkit"),
       " for the UI projection.",
     ),
   ],

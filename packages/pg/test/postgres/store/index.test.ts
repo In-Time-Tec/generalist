@@ -7,15 +7,24 @@ import "./suites/program-suite.js"
 import "./suites/runtime-suite.js"
 import "./suites/session-store-suite.js"
 import "./suites/suspend-suite.js"
-import { layer, RuntimeSchema } from "@tenetkit/pg"
+import { layer, RuntimeSchema } from "@generalist/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Steering, ToolExecutor } from "tenetkit"
-import { Address, Cursor, Errors, RunExecutor, ExecutableResolver, Runtime, RunStore, RunTree } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
-import { transitionRunWait } from "../../../../tenetkit/src/runtime/sql/store/wait-transition.js"
+import { Agent, Steering, ToolExecutor } from "generalist"
+import {
+  Address,
+  Cursor,
+  Errors,
+  RunExecutor,
+  ExecutableResolver,
+  Runtime,
+  RunStore,
+  RunTree,
+} from "generalist/runtime"
+import { RunClaims, RuntimeWorker } from "generalist/runtime/sql-driver"
+import { transitionRunWait } from "../../../../generalist/src/runtime/sql/store/wait-transition.js"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../../src/postgres/schema.js"
 import {
   alternateAssistantRef,
@@ -28,7 +37,7 @@ import {
   researcherRef,
   registrationsFor,
   textPrompt,
-} from "../../../../tenetkit/test/runtime/execution/fixtures.js"
+} from "../../../../generalist/test/runtime/execution/fixtures.js"
 import {
   postgresAvailable,
   postgresClient,
@@ -38,7 +47,7 @@ import {
   postgresWithWorker,
   uniqueSession,
 } from "../database.js"
-import { testExecutable } from "../../../../tenetkit/test/runtime/run/identity.js"
+import { testExecutable } from "../../../../generalist/test/runtime/run/identity.js"
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -85,7 +94,7 @@ const admitWaitForCancellation = (waitId: string) =>
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       yield* sql`
-        UPDATE tenetkit_runs
+        UPDATE generalist_runs
         SET status = 'running', owner_worker_id = NULL, lease_expires_at = NULL
         WHERE run_id = ${receipt.runId}
       `
@@ -120,7 +129,7 @@ const expireLease = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      UPDATE tenetkit_runs
+      UPDATE generalist_runs
       SET lease_expires_at = NOW() - INTERVAL '1 second'
       WHERE run_id = ${runId}
     `
@@ -142,12 +151,12 @@ const corruptEventExecutableRef = (runId: string, executableRef: Schema.Json) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const row = (yield* sql<{ event_json: string }>`
-      SELECT event_json FROM tenetkit_run_events WHERE run_id = ${runId} ORDER BY sequence LIMIT 1
+      SELECT event_json FROM generalist_run_events WHERE run_id = ${runId} ORDER BY sequence LIMIT 1
     `)[0]!
     const event = decodeJson(row.event_json)
     event.executableRef = executableRef
     yield* sql`
-      UPDATE tenetkit_run_events SET event_json = ${encodeJson(event)}
+      UPDATE generalist_run_events SET event_json = ${encodeJson(event)}
       WHERE run_id = ${runId} AND sequence = 0
     `
   }).pipe(scopedWith(postgresClient(url)))
@@ -268,19 +277,19 @@ describePostgres("PostgreSQL run store", () => {
         expect(
           (yield* runtime.treeReplay({ rootRunId: other.runId, cursor: checkpoint.cursor, limit: 1 }).pipe(Effect.flip))
             ._tag,
-        ).toBe("tenetkit/runtime/TreeCursorRootMismatch")
+        ).toBe("generalist/runtime/TreeCursorRootMismatch")
         const cursor = (position: number) =>
           RunTree.TreeCursor.make(
-            `tenetkit-tree:${encodeURIComponent(JSON.stringify({ version: 1, projection: "run-tree", rootRunId: root.runId, position }))}`,
+            `generalist-tree:${encodeURIComponent(JSON.stringify({ version: 1, projection: "run-tree", rootRunId: root.runId, position }))}`,
           )
         expect(
           (yield* runtime.treeReplay({ rootRunId: root.runId, cursor: cursor(99), limit: 1 }).pipe(Effect.flip))._tag,
-        ).toBe("tenetkit/runtime/TreeCursorFuture")
+        ).toBe("generalist/runtime/TreeCursorFuture")
         const expired = yield* runtime
           .treeReplay({ rootRunId: root.runId, cursor: cursor(-2), limit: 1 })
           .pipe(Effect.flip)
-        expect(expired._tag).toBe("tenetkit/runtime/TreeCursorExpired")
-        if (expired._tag === "tenetkit/runtime/TreeCursorExpired") expect(expired.earliestCursor).toBe(cursor(-1))
+        expect(expired._tag).toBe("generalist/runtime/TreeCursorExpired")
+        if (expired._tag === "generalist/runtime/TreeCursorExpired") expect(expired.earliestCursor).toBe(cursor(-1))
 
         const liveCheckpoint = yield* runtime.treeCheckpoint(root.runId)
         const following = yield* RunTree.events({ rootRunId: root.runId, cursor: liveCheckpoint.cursor }).pipe(
@@ -483,8 +492,8 @@ describePostgres("PostgreSQL run store", () => {
         )
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = TRUE WHERE run_id = ${cancelledRunId}`
-          yield* sql`UPDATE tenetkit_runs SET status = 'running', cancellation_requested = FALSE WHERE run_id = ${activeRunId}`
+          yield* sql`UPDATE generalist_runs SET status = 'running', cancellation_requested = TRUE WHERE run_id = ${cancelledRunId}`
+          yield* sql`UPDATE generalist_runs SET status = 'running', cancellation_requested = FALSE WHERE run_id = ${activeRunId}`
         }).pipe(scopedWith(postgresClient(url)))
         yield* scopedWith(postgresLayer(url))(
           Effect.gen(function* () {
@@ -709,7 +718,7 @@ describePostgres("PostgreSQL run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
-            UPDATE tenetkit_runs SET
+            UPDATE generalist_runs SET
               executable_ref_json = ${encodeJson(alternateAssistantRef.ref)},
               executable_manifest_json = ${encodeJson(alternateAssistantRef.manifest)}
             WHERE run_id = ${runId}
@@ -902,7 +911,7 @@ describePostgres("PostgreSQL run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
-            UPDATE tenetkit_runs SET updated_at = TIMESTAMPTZ '2000-01-01 00:00:00+00'
+            UPDATE generalist_runs SET updated_at = TIMESTAMPTZ '2000-01-01 00:00:00+00'
             WHERE run_id = ${receipt.runId}
           `
         }).pipe(scopedWith(postgresClient(url)))
@@ -917,7 +926,7 @@ describePostgres("PostgreSQL run store", () => {
             }>`
               SELECT owner_worker_id, lease_expires_at::text AS lease_expires_at,
                 attempt_fence, updated_at::text AS updated_at
-              FROM tenetkit_runs WHERE run_id = ${receipt.runId}
+              FROM generalist_runs WHERE run_id = ${receipt.runId}
             `
             return row!
           }).pipe(scopedWith(postgresClient(url)))
@@ -1032,7 +1041,7 @@ describePostgres("PostgreSQL run store", () => {
           yield* sql.withTransaction(
             Effect.gen(function* () {
               const pid = (yield* sql<{ readonly pid: number }>`SELECT pg_backend_pid() AS pid`)[0]!.pid
-              yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
+              yield* sql`SELECT run_id FROM generalist_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
               yield* Deferred.succeed(locked, undefined)
               let blocked = false
               for (let attempt = 0; attempt < 200 && !blocked; attempt++) {
@@ -1047,7 +1056,7 @@ describePostgres("PostgreSQL run store", () => {
               }
               expect(blocked).toBe(true)
               yield* sql`
-                UPDATE tenetkit_runs
+                UPDATE generalist_runs
                 SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
                   lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
                 WHERE run_id = ${receipt.runId}
@@ -1082,10 +1091,10 @@ describePostgres("PostgreSQL run store", () => {
             readonly attempt_fence: number
           }>`
             SELECT owner_worker_id, attempt_fence
-            FROM tenetkit_runs WHERE run_id = ${receipt.runId}
+            FROM generalist_runs WHERE run_id = ${receipt.runId}
           `
           const [events] = yield* sql<{ readonly count: string }>`
-            SELECT COUNT(*) AS count FROM tenetkit_run_events
+            SELECT COUNT(*) AS count FROM generalist_run_events
             WHERE run_id = ${receipt.runId} AND event_json LIKE '%"TurnCompleted"%'
           `
           return { run, eventCount: Number(events!.count) }
@@ -1170,7 +1179,7 @@ describePostgres("PostgreSQL run store", () => {
         expect(yield* claims.claimReadyRuns({ workerId: "blocked", limit: 1, lease: "10 seconds" })).toEqual([])
         expect(
           (yield* driver.claimExecution({ runId: receipt.runId, ownerId: "blocked" }).pipe(Effect.flip))._tag,
-        ).toBe("tenetkit/runtime/RuntimeUnavailable")
+        ).toBe("generalist/runtime/RuntimeUnavailable")
         yield* runtime.resolveOperation({
           runId: receipt.runId,
           operationId: recorded.operationId,
@@ -1240,9 +1249,9 @@ describePostgres("PostgreSQL run store", () => {
           yield* sql.withTransaction(
             Effect.gen(function* () {
               const pid = (yield* sql<{ readonly pid: number }>`SELECT pg_backend_pid() AS pid`)[0]!.pid
-              yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
+              yield* sql`SELECT run_id FROM generalist_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
               yield* sql`
-                SELECT operation_id FROM tenetkit_run_operations
+                SELECT operation_id FROM generalist_run_operations
                 WHERE run_id = ${receipt.runId} AND operation_id = ${operation.operationId}
                 FOR UPDATE
               `
@@ -1260,7 +1269,7 @@ describePostgres("PostgreSQL run store", () => {
               }
               expect(blocked).toBe(true)
               yield* sql`
-                UPDATE tenetkit_runs
+                UPDATE generalist_runs
                 SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
                   lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
                 WHERE run_id = ${receipt.runId}
@@ -2034,5 +2043,5 @@ describePostgres("PostgreSQL run store", () => {
 })
 
 if (!postgresAvailable) {
-  it.skip("postgres suite skipped: set TENETKIT_DATABASE_URL or DATABASE_URL", () => undefined)
+  it.skip("postgres suite skipped: set GENERALIST_DATABASE_URL or DATABASE_URL", () => undefined)
 }

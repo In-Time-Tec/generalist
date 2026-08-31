@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Option, Redacted, Schema } from "effect"
 import { WorkerContext, make, makeConfigProvider, type ExecutionContext } from "../src/workers/index.js"
 
-class PromiseRejected extends Schema.TaggedError<PromiseRejected>()("@tenetkit/cloudflare/test/PromiseRejected", {
+class PromiseRejected extends Schema.TaggedError<PromiseRejected>()("@generalist/cloudflare/test/PromiseRejected", {
   cause: Schema.Defect(),
 }) {}
 

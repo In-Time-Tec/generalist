@@ -1,20 +1,20 @@
-import { layer as backendLayer } from "@tenetkit/mysql"
+import { layer as backendLayer } from "@generalist/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, ToolExecutor } from "tenetkit"
-import { Address, Errors, ExecutableResolver, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
-import { closedTestAgent, testExecutable } from "../../../../../tenetkit/test/runtime/run/identity.js"
+import { Agent, ToolExecutor } from "generalist"
+import { Address, Errors, ExecutableResolver, Runtime, RunStore } from "generalist/runtime"
+import { RunClaims, RuntimeWorker } from "generalist/runtime/sql-driver"
+import { closedTestAgent, testExecutable } from "../../../../../generalist/test/runtime/run/identity.js"
 import {
   assistant,
   assistantAddress,
   assistantRef,
   completedResult,
   registrationsFor,
-} from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
-import { provideScoped } from "../../../../../tenetkit/test/runtime/execution/scoped-provide.js"
+} from "../../../../../generalist/test/runtime/execution/fixtures.js"
+import { provideScoped } from "../../../../../generalist/test/runtime/execution/scoped-provide.js"
 import { mysqlAvailable, mysqlClient, mysqlDatabase, uniqueSession } from "../../runtime/environment.js"
 import { SqlClient } from "effect/unstable/sql"
 
@@ -75,7 +75,7 @@ describeMysql("mysql worker cancellation", () => {
               mysqlClient(url),
               Effect.gen(function* () {
                 const sql = yield* SqlClient.SqlClient
-                yield* sql`UPDATE tenetkit_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${receipt.runId}`
+                yield* sql`UPDATE generalist_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${receipt.runId}`
               }),
             )
             const [replacementClaim] = yield* claims.claimReadyRuns({
@@ -284,4 +284,4 @@ describeMysql("mysql worker cancellation", () => {
     )
   })
 })
-if (!mysqlAvailable) it.skip("mysql suite skipped: set TENETKIT_MYSQL_URL or MYSQL_URL", () => undefined)
+if (!mysqlAvailable) it.skip("mysql suite skipped: set GENERALIST_MYSQL_URL or MYSQL_URL", () => undefined)

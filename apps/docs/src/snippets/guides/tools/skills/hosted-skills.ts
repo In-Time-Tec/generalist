@@ -1,7 +1,7 @@
 import { Crypto, FileSystem, Layer, Path } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { SkillCatalog } from "tenetkit"
-import { GitHubCatalog, HttpCatalog, S3Catalog, FileSystemCatalog } from "tenetkit/skills"
+import { SkillCatalog } from "generalist"
+import { GitHubCatalog, HttpCatalog, S3Catalog, FileSystemCatalog } from "generalist/instructions/skills"
 
 export const skills: Layer.Layer<
   SkillCatalog.SkillCatalog,

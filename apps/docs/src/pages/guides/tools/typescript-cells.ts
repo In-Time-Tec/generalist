@@ -5,8 +5,8 @@ import testKernelExpected from "virtual:source/src/snippets/guides/tools/typescr
 import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../../prose"
 
 const composeBunPool = `import { Duration, Effect } from "effect"
-import { KernelSnapshotStore } from "tenetkit/repl"
-import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "tenetkit/repl/bun"
+import { KernelSnapshotStore } from "generalist/repl"
+import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "generalist/repl/bun"
 
 const pool = Effect.gen(function* () {
   const store = yield* BunKernelSnapshotStore.make({ dataRoot })
@@ -32,13 +32,13 @@ export const typescriptCells = definePage({
   content: [
     p(
       "A cell is one model-authored TypeScript source executed in the persistent kernel a Session owns. ",
-      code("tenetkit/repl"),
+      code("generalist/repl"),
       " gives an agent exactly one tool for it, named ",
       code("typescript"),
       ", whose parameters are exactly one bounded string field named ",
       code("code"),
       ". The root export is contracts only; ",
-      code("tenetkit/repl/bun"),
+      code("generalist/repl/bun"),
       " is the only module with process dependencies.",
     ),
     h2("advertise-the-tool", "1. Advertise the one tool"),
@@ -131,7 +131,7 @@ export const typescriptCells = definePage({
     ),
     p(
       "See ",
-      link("/docs/reference/repl", "the tenetkit/repl reference"),
+      link("/docs/reference/repl", "the generalist/repl reference"),
       " for the exact schemas and ports, and ",
       link("/docs/learn/kernel-boundaries", "Why the kernel is a process boundary"),
       " for the isolation and authenticity decisions behind them.",

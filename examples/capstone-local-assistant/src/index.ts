@@ -10,12 +10,12 @@ import {
   SkillCatalog,
   Tool,
   Toolkit,
-} from "tenetkit"
-import { Chat, Connection } from "tenetkit/foldkit"
-import { WorkingMemory } from "tenetkit/memory"
-import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
-import { FileSystemCatalog } from "tenetkit/skills"
-import { ExecutableManifest } from "tenetkit/runtime"
+} from "generalist"
+import { Chat, Connection } from "generalist/foldkit"
+import { WorkingMemory } from "generalist/memory"
+import { layer as deterministicLayer } from "generalist/ai/deterministic"
+import { FileSystemCatalog } from "generalist/instructions/skills"
+import { ExecutableManifest } from "generalist/runtime"
 
 const researchSkill: SkillCatalog.Skill = {
   name: "research",

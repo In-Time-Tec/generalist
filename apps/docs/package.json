@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@tenetkit/docs",
+  "name": "@generalist/docs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "tenetkit": "workspace:*",
+    "generalist": "workspace:*",
     "@foldkit/ui": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",

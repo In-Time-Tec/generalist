@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { Chat } from "tenetkit/foldkit"
+import { Chat } from "generalist/foldkit"
 import { Option, Schema } from "effect"
 import { Scene } from "foldkit"
 import type { Html } from "foldkit/html"
@@ -53,7 +53,7 @@ describe("deep-research-agent web view", () => {
       Scene.expect(Scene.text("Ask a research question")).toExist(),
       Scene.expect(Scene.placeholder("Ask a research question…")).toExist(),
       Scene.expect(Scene.role("button", { name: "Submit" })).toBeDisabled(),
-      Scene.type(Scene.placeholder("Ask a research question…"), "tenetkit agents"),
+      Scene.type(Scene.placeholder("Ask a research question…"), "generalist agents"),
       Scene.expect(Scene.role("button", { name: "Submit" })).toBeEnabled(),
     )
   })
@@ -66,11 +66,11 @@ describe("deep-research-agent web view", () => {
         chat: Object.assign({}, baseModel().chat, {
           run: Chat.Running({ turn: 0 }),
           entries: [
-            Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
+            Chat.UserEntry({ text: "What makes Generalist standalone?" }),
             Chat.ToolEntry({
               callId: "search-1",
               name: "web_search",
-              params: { query: "tenetkit standalone" },
+              params: { query: "generalist standalone" },
               phase: "executing",
               outcome: { _tag: "Pending" },
               progress: [],
@@ -86,7 +86,7 @@ describe("deep-research-agent web view", () => {
       Scene.expect(Scene.text("Running")).toExist(),
       Scene.expect(Scene.text("Parameters")).toExist(),
       Scene.tap(({ html }) => {
-        expect(renderedText(html)).toContain('"query": "tenetkit standalone"')
+        expect(renderedText(html)).toContain('"query": "generalist standalone"')
       }),
       Scene.expect(Scene.text("Thinking…")).toExist(),
     )
@@ -99,7 +99,7 @@ describe("deep-research-agent web view", () => {
         ...baseModel(),
         chat: Object.assign({}, baseModel().chat, {
           run: Chat.Running({ turn: 0 }),
-          entries: [Chat.UserEntry({ text: "What makes TenetKit standalone?" })],
+          entries: [Chat.UserEntry({ text: "What makes Generalist standalone?" })],
         }),
       }),
       resolveViewportMount,
@@ -120,11 +120,11 @@ describe("deep-research-agent web view", () => {
         chat: Object.assign({}, baseModel().chat, {
           run: Chat.Idle(),
           entries: [
-            Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
+            Chat.UserEntry({ text: "What makes Generalist standalone?" }),
             Chat.ToolEntry({
               callId: "search-1",
               name: "web_search",
-              params: { query: "tenetkit standalone" },
+              params: { query: "generalist standalone" },
               phase: "executing",
               outcome: {
                 _tag: "Completed",
@@ -132,9 +132,9 @@ describe("deep-research-agent web view", () => {
                 result: {
                   results: [
                     {
-                      title: "TenetKit docs",
-                      url: "https://tenetkit.test/docs",
-                      snippet: "TenetKit streams transport frames.",
+                      title: "Generalist docs",
+                      url: "https://generalist.test/docs",
+                      snippet: "Generalist streams transport frames.",
                     },
                     {
                       title: "Effect runtime",
@@ -146,7 +146,7 @@ describe("deep-research-agent web view", () => {
               },
               progress: [],
             }),
-            Chat.AssistantEntry({ text: "Final cited answer\n\nSources:\n[1] TenetKit docs", reasoning: null }),
+            Chat.AssistantEntry({ text: "Final cited answer\n\nSources:\n[1] Generalist docs", reasoning: null }),
           ],
         }),
         expandedToolCallIds: ["search-1-sources"],
@@ -157,10 +157,10 @@ describe("deep-research-agent web view", () => {
       Scene.tap(({ html }) => {
         expect(renderedText(html)).toContain("Final cited answer")
       }),
-      Scene.expect(Scene.role("link", { name: "[1] TenetKit docs" })).toExist(),
+      Scene.expect(Scene.role("link", { name: "[1] Generalist docs" })).toExist(),
       Scene.expect(Scene.role("link", { name: "[2] Effect runtime" })).toExist(),
       Scene.expect(Scene.text("Used 2 sources")).toExist(),
-      Scene.expect(Scene.role("link", { name: /TenetKit docs/ })).toExist(),
+      Scene.expect(Scene.role("link", { name: /Generalist docs/ })).toExist(),
       Scene.expect(Scene.role("link", { name: /Effect runtime/ })).toExist(),
     )
   })
@@ -173,9 +173,9 @@ describe("deep-research-agent web view", () => {
         chat: Object.assign({}, baseModel().chat, {
           run: Chat.Idle(),
           entries: [
-            Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
+            Chat.UserEntry({ text: "What makes Generalist standalone?" }),
             Chat.AssistantEntry({
-              text: "TenetKit runs a non-durable Effect agent loop.",
+              text: "Generalist runs a non-durable Effect agent loop.",
               reasoning: "Compare transport frames. Check the loop state.",
             }),
           ],
@@ -201,13 +201,15 @@ describe("deep-research-agent web view", () => {
             Chat.ToolEntry({
               callId: "search-1",
               name: "web_search",
-              params: { query: "tenetkit standalone" },
+              params: { query: "generalist standalone" },
               phase: "executing",
               outcome: {
                 _tag: "Completed",
                 isFailure: false,
                 result: {
-                  results: [{ title: "TenetKit docs", url: "https://tenetkit.test/docs", snippet: "x".repeat(400) }],
+                  results: [
+                    { title: "Generalist docs", url: "https://generalist.test/docs", snippet: "x".repeat(400) },
+                  ],
                 },
               },
               progress: [],

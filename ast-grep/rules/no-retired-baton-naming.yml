@@ -1,7 +1,7 @@
 id: no-retired-baton-naming
 language: TypeScript
 severity: error
-message: The retired project name is removed from TenetKit. Use tenetkit naming for identifiers, SQL tables, and string literals.
+message: The retired project name is removed from Generalist. Use generalist naming for identifiers, SQL tables, and string literals.
 rule:
   any:
     - kind: identifier

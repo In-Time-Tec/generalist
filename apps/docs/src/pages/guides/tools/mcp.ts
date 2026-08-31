@@ -8,24 +8,24 @@ export const mcp = definePage({
   navTitle: "Connect MCP servers",
   group: "Guides",
   description:
-    "Connect to an MCP server with MCPClient, expose its discovered tools as a TenetKit toolkit, and proxy tool calls through the MCP executor.",
+    "Connect to an MCP server with MCPClient, expose its discovered tools as a Generalist toolkit, and proxy tool calls through the MCP executor.",
   content: [
     p(
-      code("tenetkit/mcp"),
+      code("generalist/mcp"),
       " connects to an MCP server, discovers its tools, and exposes one scoped ",
       code("connect"),
       " containing the toolkit the model sees and the executor layer that proxies calls to the same connection. The bridge keeps MCP SDK dependencies out of ",
-      code("tenetkit"),
+      code("generalist"),
       ".",
     ),
-    command("Terminal", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @modelcontextprotocol/sdk@1.29.0"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 generalist@0.44.0 @modelcontextprotocol/sdk@1.29.0"),
     h2("connect-to-a-server", "1. Connect to a server"),
     p(
       code("MCPClient.layer"),
       " remains the lower-level client API for a raw MCP SDK transport. Construct Streamable HTTP transports with ",
-      code("tenetkit/mcp/client/http"),
+      code("generalist/mcp/client/http"),
       " in browsers and Workers, or opt into the Node/Bun-only ",
-      code("tenetkit/mcp/client/stdio"),
+      code("generalist/mcp/client/stdio"),
       ". The usual ",
       code("connect"),
       " API opens the connection, lists the tools once, and closes the client when its Effect scope ends. Discovered tool names are prefixed with the client name: a ",
@@ -40,8 +40,8 @@ export const mcp = definePage({
     table(
       ["Transport", "Fields"],
       [
-        [[code("tenetkit/mcp/client/http")], [code("make({ url, requestInit?, oauth? })"), "; Worker-safe"]],
-        [[code("tenetkit/mcp/client/stdio")], [code("make({ command, args?, env? })"), "; Node/Bun only"]],
+        [[code("generalist/mcp/client/http")], [code("make({ url, requestInit?, oauth? })"), "; Worker-safe"]],
+        [[code("generalist/mcp/client/stdio")], [code("make({ command, args?, env? })"), "; Node/Bun only"]],
       ],
     ),
     p(
@@ -55,7 +55,7 @@ export const mcp = definePage({
     h2("how-calls-behave", "2. How calls behave"),
     bullets(
       [
-        "MCP tool failures become TenetKit tool ",
+        "MCP tool failures become Generalist tool ",
         code("Failure"),
         " outcomes, so the model sees a failed tool result and can react. MCP tools never ",
         code("Suspend"),
@@ -66,7 +66,7 @@ export const mcp = definePage({
         code("tools/call"),
         " passes the running fiber's ",
         code("AbortSignal"),
-        " to the SDK, so interrupting a TenetKit run cancels the in-flight MCP request on the server.",
+        " to the SDK, so interrupting a Generalist run cancels the in-flight MCP request on the server.",
       ],
       [
         "An optional ",
@@ -80,7 +80,7 @@ export const mcp = definePage({
     p(
       code("MCPClient.Service"),
       " is plain data plus effects, so tests hand the adapter an in-memory client instead of a connection. This is the ",
-      link("https://github.com/In-Time-Tec/tenetkit/tree/main/examples/mcp-agent", "examples/mcp-agent"),
+      link("https://github.com/In-Time-Tec/generalist/tree/main/examples/mcp-agent", "examples/mcp-agent"),
       " program, runnable with zero credentials.",
     ),
     codeBlock({ label: "scripted-client.ts", source: scriptedClient, expectedOutput: scriptedClientExpected }),
@@ -88,7 +88,7 @@ export const mcp = definePage({
       "Local tools and MCP tools use the same executor seam, so start with ",
       link("/docs/guides/define-tools", "How to define tools and toolkits"),
       " if you have not built a toolkit before. The full interface is in ",
-      link("/docs/reference/mcp", "the tenetkit/mcp reference"),
+      link("/docs/reference/mcp", "the generalist/mcp reference"),
       ".",
     ),
   ],

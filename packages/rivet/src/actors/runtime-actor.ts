@@ -19,7 +19,7 @@ import {
   OperationResolution,
   Runtime,
   TreePolicy,
-} from "tenetkit/runtime"
+} from "generalist/runtime"
 import {
   layerSqliteRuntime,
   makeExclusiveExecutionRecovery,
@@ -27,7 +27,7 @@ import {
   type SqliteRuntimeServices,
   type SqliteStoreError,
   type SqliteStoreOptions,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import { layerSqlClient } from "./raw-sql.js"
 
 const SendInput = Schema.Struct({
@@ -78,7 +78,7 @@ const actionInputSchemas = {
 }
 
 class RuntimeOwner extends EffectContext.Service<RuntimeOwner, { readonly ownerId: string }>()(
-  "@tenetkit/rivet/actors/runtime-actor/RuntimeOwner",
+  "@generalist/rivet/actors/runtime-actor/RuntimeOwner",
 ) {}
 
 type RuntimeHost = ManagedRuntime.ManagedRuntime<
@@ -151,7 +151,7 @@ interface ConfiguredActorOptions {
 }
 
 const requireHost = (c: Context): Host => {
-  if (c.vars.host === undefined) throw new Error("TenetKit Runtime host is not awake")
+  if (c.vars.host === undefined) throw new Error("Generalist Runtime host is not awake")
   return c.vars.host
 }
 
@@ -161,7 +161,7 @@ const arm = async (c: Context, delayMillis = 0): Promise<void> => {
   } catch (cause) {
     // Rivet's logger is intentionally untyped at this raw SDK boundary.
     // oxlint-disable-next-line typescript/no-unsafe-call
-    c.log.warn({ msg: "TenetKit Runtime doorbell failed; periodic recovery remains armed", cause })
+    c.log.warn({ msg: "Generalist Runtime doorbell failed; periodic recovery remains armed", cause })
   }
 }
 
@@ -202,11 +202,11 @@ const makeRuntimeOwner = (actorId: string) =>
     const sqlClient = yield* SqlClient.SqlClient
     const rows = yield* sqlClient.withTransaction(
       Effect.gen(function* () {
-        yield* sqlClient`CREATE TABLE IF NOT EXISTS tenetkit_rivet_host (
+        yield* sqlClient`CREATE TABLE IF NOT EXISTS generalist_rivet_host (
           singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
           incarnation INTEGER NOT NULL
         )`
-        return yield* sqlClient<{ incarnation: number }>`INSERT INTO tenetkit_rivet_host (singleton, incarnation)
+        return yield* sqlClient<{ incarnation: number }>`INSERT INTO generalist_rivet_host (singleton, incarnation)
           VALUES (1, 1)
           ON CONFLICT(singleton) DO UPDATE SET incarnation = incarnation + 1
           RETURNING incarnation`
@@ -246,7 +246,7 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
     actionInputSchemas,
     onWake: async (c) => {
       await c.cron.every({
-        name: "tenetkit-runtime-recovery",
+        name: "generalist-runtime-recovery",
         interval: recoveryInterval,
         action: "runtime.drain",
         maxHistory: 0,

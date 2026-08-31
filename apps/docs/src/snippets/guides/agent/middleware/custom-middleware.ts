@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "generalist"
 
 const dropReasoning: ModelMiddleware.Middleware = {
   transformPart: (part) => Effect.succeed(part.type === "reasoning-delta" ? Option.none() : Option.some(part)),

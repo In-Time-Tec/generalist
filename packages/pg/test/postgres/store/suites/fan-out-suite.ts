@@ -1,5 +1,5 @@
-import { childRunsRunGroupSuite } from "../../../../../tenetkit/test/runtime/child/suites/run-group.js"
-import { claimReadyWorker } from "../../../../../tenetkit/test/runtime/run/queued-activation.js"
+import { childRunsRunGroupSuite } from "../../../../../generalist/test/runtime/child/suites/run-group.js"
+import { claimReadyWorker } from "../../../../../generalist/test/runtime/run/queued-activation.js"
 import { postgresAvailable, postgresDatabase, postgresLayer } from "../../database.js"
 
 const database = postgresDatabase("child-runs-run-group")

@@ -1,8 +1,8 @@
 import type { Layer } from "effect"
 import type { SqlClient } from "effect/unstable/sql"
 import { SqliteClient } from "@effect/sql-sqlite-do"
-import type { ExternalChildStore, RunStore } from "tenetkit/runtime"
-import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "tenetkit/runtime/sql-driver"
+import type { ExternalChildStore, RunStore } from "generalist/runtime"
+import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "generalist/runtime/sql-driver"
 
 export * as HibernatingWebSocket from "./hibernating-websocket.js"
 

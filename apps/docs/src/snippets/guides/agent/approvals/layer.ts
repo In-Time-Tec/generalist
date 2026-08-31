@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { Approvals } from "tenetkit"
+import { Approvals } from "generalist"
 
 export const suspendForHumans: Layer.Layer<Approvals.Approvals> = Approvals.layerTest({
   resolve: (request) =>

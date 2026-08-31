@@ -7,9 +7,9 @@ export const coreModelsReference = definePage({
   description: "ModelRegistry, ModelMiddleware, ModelResilience, and the Guardrail middleware combinators.",
   content: [
     lead(
-      "Four namespaces of tenetkit cover the model side of a run: ModelRegistry selects models per run, ModelMiddleware transforms prompts and stream parts, ModelResilience retries transient failures, and Guardrail builds common middleware.",
+      "Four namespaces of generalist cover the model side of a run: ModelRegistry selects models per run, ModelMiddleware transforms prompts and stream parts, ModelResilience retries transient failures, and Guardrail builds common middleware.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
     h2("model-registry", "ModelRegistry"),
     p(
       "A registry of named model registrations. ",
@@ -71,7 +71,7 @@ export const coreModelsReference = definePage({
     p(
       "Optional prompt/stream interceptor: a ",
       code("ReadonlyArray<Middleware>"),
-      " applied in array order. When no layer is provided, TenetKit uses the empty identity chain. Both hooks are optional; omitted hooks are identity.",
+      " applied in array order. When no layer is provided, Generalist uses the empty identity chain. Both hooks are optional; omitted hooks are identity.",
     ),
     table(
       ["Hook", "Signature", "Contract"],

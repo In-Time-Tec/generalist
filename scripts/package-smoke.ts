@@ -22,7 +22,7 @@ import {
   workerSafePackageExports,
 } from "./package-smoke-config.js"
 
-class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@tenetkit/scripts/PackageSmokeFailed", {
+class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@generalist/scripts/PackageSmokeFailed", {
   message: Schema.String,
 }) {}
 
@@ -248,9 +248,9 @@ const verifyLocalRuntimeGraph = Effect.fn("PackageSmoke.verifyLocalRuntimeGraph"
       cycles.flatMap((cycle) => cycle.map((file) => path.relative(directory, file))),
       (left, right) => left.localeCompare(right),
     )
-    return yield* smokeError(`TenetKit emitted runtime graph contains local cycles:\n${members.join("\n")}`)
+    return yield* smokeError(`Generalist emitted runtime graph contains local cycles:\n${members.join("\n")}`)
   }
-  yield* Console.log(`${nodes.size} TenetKit runtime modules, ${edges} local static edges, 0 cycles`)
+  yield* Console.log(`${nodes.size} Generalist runtime modules, ${edges} local static edges, 0 cycles`)
 })
 
 const verifyDeclarationSpecifiers = Effect.fn("PackageSmoke.verifyDeclarationSpecifiers")(function* (root: string) {
@@ -269,7 +269,11 @@ const verifyDeclarationSpecifiers = Effect.fn("PackageSmoke.verifyDeclarationSpe
     const directory = path.join(root, "packages", packageName, "dist")
     for (const file of yield* emittedFiles(directory, ".d.ts")) {
       for (const item of transpiler.scanImports(yield* fileSystem.readFileString(file))) {
-        if (item.path !== "tenetkit" && !item.path.startsWith("tenetkit/") && !item.path.startsWith("@tenetkit/")) {
+        if (
+          item.path !== "generalist" &&
+          !item.path.startsWith("generalist/") &&
+          !item.path.startsWith("@generalist/")
+        ) {
           continue
         }
         if (!allowed.has(item.path)) blocked.push(`${path.relative(root, file)} -> ${item.path}`)
@@ -297,20 +301,20 @@ const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints"
     {
       name: "neutral",
       specifiers: workerSafePackageExports.filter(
-        (specifier) => specifier !== "tenetkit/ai/openrouter" && specifier !== "tenetkit/runtime/sql-driver",
+        (specifier) => specifier !== "generalist/ai/openrouter" && specifier !== "generalist/runtime/sql-driver",
       ),
       forbidProviders: true,
       allowSqlRuntime: false,
     },
     {
       name: "sql-driver",
-      specifiers: workerSafePackageExports.filter((specifier) => specifier === "tenetkit/runtime/sql-driver"),
+      specifiers: workerSafePackageExports.filter((specifier) => specifier === "generalist/runtime/sql-driver"),
       forbidProviders: true,
       allowSqlRuntime: true,
     },
     {
       name: "openrouter",
-      specifiers: workerSafePackageExports.filter((specifier) => specifier === "tenetkit/ai/openrouter"),
+      specifiers: workerSafePackageExports.filter((specifier) => specifier === "generalist/ai/openrouter"),
       forbidProviders: false,
       allowSqlRuntime: false,
     },
@@ -338,7 +342,7 @@ export default { test: () => void loaded }
     yield* fileSystem.writeFileString(
       wranglerConfig,
       encodeJson({
-        name: `tenetkit-worker-safe-${group.name}`,
+        name: `generalist-worker-safe-${group.name}`,
         main: sourceName,
         compatibility_date: "2026-08-19",
       }),
@@ -377,7 +381,7 @@ export default { test: () => void loaded }
         ) {
           return true
         }
-        if (!group.allowSqlRuntime && normalized.includes("/tenetkit/dist/runtime/sql/")) {
+        if (!group.allowSqlRuntime && normalized.includes("/generalist/dist/runtime/sql/")) {
           return (
             !normalized.endsWith("/errors.js") &&
             !normalized.endsWith("/operations.js") &&
@@ -429,17 +433,17 @@ const verifyCloudflareProfile = Effect.fn("PackageSmoke.verifyCloudflareProfile"
     path.join(input.directory, "forbidden-root.mjs"),
     `let blocked = false
 try {
-  await import("@tenetkit/cloudflare")
+  await import("@generalist/cloudflare")
 } catch (error) {
   blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED" || error?.code === "ERR_MODULE_NOT_FOUND"
 }
-if (!blocked) throw new Error("${profileContext(input.profile, runtime, ["@tenetkit/cloudflare"])} unexpected package root export")
+if (!blocked) throw new Error("${profileContext(input.profile, runtime, ["@generalist/cloudflare"])} unexpected package root export")
 `,
   )
   yield* runProfileCommand({
     profile: input.profile,
     runtime,
-    specifiers: ["@tenetkit/cloudflare"],
+    specifiers: ["@generalist/cloudflare"],
     command: "bun",
     args: ["forbidden-root.mjs"],
     cwd: input.directory,
@@ -466,7 +470,11 @@ export default { test: () => void checks }
   const metafile = path.join(input.directory, "worker.meta.json")
   yield* fileSystem.writeFileString(
     wranglerConfig,
-    encodeJson({ name: "tenetkit-cloudflare-package-smoke", main: "cloudflare.ts", compatibility_date: "2026-08-19" }),
+    encodeJson({
+      name: "generalist-cloudflare-package-smoke",
+      main: "cloudflare.ts",
+      compatibility_date: "2026-08-19",
+    }),
   )
   yield* runProfileCommand({
     profile: input.profile,
@@ -526,10 +534,10 @@ const worker :Workerd.Worker = (
 })
 
 const validateMinimumConsumerProfiles = Effect.fn("PackageSmoke.validateMinimumConsumerProfiles")(function* (input: {
-  readonly tenetkitManifest: typeof PackageManifest.Type
+  readonly generalistManifest: typeof PackageManifest.Type
   readonly packageExports: ReadonlyArray<string>
 }) {
-  const optionalPeers = Object.keys(input.tenetkitManifest.peerDependencies ?? {}).filter(
+  const optionalPeers = Object.keys(input.generalistManifest.peerDependencies ?? {}).filter(
     (dependency) => dependency !== "effect",
   )
   const profiledPeers = new Set(minimumConsumerProfiles.flatMap((profile) => profile.peers))
@@ -594,7 +602,7 @@ const program = Effect.gen(function* () {
     return { effectVersion, sourceManifests }
   })
   const { effectVersion, sourceManifests } = yield* validateSourcePackages
-  const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-package-smoke-" })
+  const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-package-smoke-" })
   const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
   const tarballDirectory = Option.match(configuredArtifactDirectory, {
     onNone: () => path.join(directory, "packages"),
@@ -605,7 +613,7 @@ const program = Effect.gen(function* () {
   yield* fileSystem.makeDirectory(consumerDirectory, { recursive: true })
 
   yield* run("bun", ["run", "build"], root)
-  yield* verifyLocalRuntimeGraph(path.join(root, "packages", "tenetkit", "dist"))
+  yield* verifyLocalRuntimeGraph(path.join(root, "packages", "generalist", "dist"))
   yield* verifyDeclarationSpecifiers(root)
 
   const packAndValidatePackages = Effect.gen(function* () {
@@ -620,7 +628,7 @@ const program = Effect.gen(function* () {
           const archive = yield* fileSystem.readFile(tarball)
           if (archive.byteLength > compressedSizeLimits[packageName]) {
             return yield* smokeError(
-              `@tenetkit/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
+              `@generalist/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
             )
           }
           const listing = yield* run("tar", ["-tzf", tarball], root)
@@ -635,17 +643,17 @@ const program = Effect.gen(function* () {
               !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
           )
           if (unexpected.length > 0) {
-            return yield* smokeError(`@tenetkit/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
+            return yield* smokeError(`@generalist/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
           }
           if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
-            return yield* smokeError(`@tenetkit/${packageName} contains an unsafe path`)
+            return yield* smokeError(`@generalist/${packageName} contains an unsafe path`)
           }
           const verboseListing = yield* run("tar", ["-tvzf", tarball], root)
           const unsafeTypes = verboseListing
             .split("\n")
             .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
           if (unsafeTypes.length > 0) {
-            return yield* smokeError(`@tenetkit/${packageName} contains a non-regular entry`)
+            return yield* smokeError(`@generalist/${packageName} contains a non-regular entry`)
           }
           return entries
         })
@@ -656,14 +664,14 @@ const program = Effect.gen(function* () {
             return yield* smokeError(`packed identity mismatch for ${packageName}`)
           }
           if (manifest.peerDependencies?.effect !== effectVersion || manifest.dependencies?.effect !== undefined) {
-            return yield* smokeError(`@tenetkit/${packageName} must expose Effect only as exact peer`)
+            return yield* smokeError(`@generalist/${packageName} must expose Effect only as exact peer`)
           }
           if (/workspace:|catalog:/.test(encodeJson(manifest))) {
-            return yield* smokeError(`@tenetkit/${packageName} contains an unresolved protocol`)
+            return yield* smokeError(`@generalist/${packageName} contains an unresolved protocol`)
           }
           for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
             if (manifest.scripts?.[lifecycle] !== undefined) {
-              return yield* smokeError(`@tenetkit/${packageName} contains the ${lifecycle} lifecycle hook`)
+              return yield* smokeError(`@generalist/${packageName} contains the ${lifecycle} lifecycle hook`)
             }
           }
           const sourceManifestText = sourceManifests.get(path.join(packageDirectory, "package.json"))
@@ -687,24 +695,24 @@ const program = Effect.gen(function* () {
             "bugs",
           ] as const) {
             if (!Equal.equals(manifest[field], sourceManifest[field])) {
-              return yield* smokeError(`@tenetkit/${packageName} changed its packed ${field} metadata`)
+              return yield* smokeError(`@generalist/${packageName} changed its packed ${field} metadata`)
             }
           }
           if (!Equal.equals(manifest.exports, sourceManifest.exports)) {
-            return yield* smokeError(`@tenetkit/${packageName} changed its public exports`)
+            return yield* smokeError(`@generalist/${packageName} changed its public exports`)
           }
           const actualExports = sorted(Object.keys(manifest.exports), (left, right) => left.localeCompare(right))
           if (!Equal.equals(actualExports, exactPackageExports[packageName])) {
-            return yield* smokeError(`@tenetkit/${packageName} exact exports changed: ${actualExports.join(", ")}`)
+            return yield* smokeError(`@generalist/${packageName} exact exports changed: ${actualExports.join(", ")}`)
           }
           for (const [specifier, target] of Object.entries(manifest.exports)) {
             if (!Equal.equals(Object.keys(target), ["types", "import"])) {
-              return yield* smokeError(`@tenetkit/${packageName}${specifier} must list types before import`)
+              return yield* smokeError(`@generalist/${packageName}${specifier} must list types before import`)
             }
             for (const [condition, value] of Object.entries(target)) {
               const expectedExtension = condition === "types" ? ".d.ts" : ".js"
               if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
-                return yield* smokeError(`@tenetkit/${packageName}${specifier} has invalid ${condition} target`)
+                return yield* smokeError(`@generalist/${packageName}${specifier} has invalid ${condition} target`)
               }
               if (specifier.includes("*")) {
                 const wildcardIndex = value.indexOf("*")
@@ -714,10 +722,10 @@ const program = Effect.gen(function* () {
                   (entry) => entry.startsWith(`package/${prefix.slice(2)}`) && entry.endsWith(suffix),
                 )
                 if (matches.length === 0) {
-                  return yield* smokeError(`@tenetkit/${packageName}${specifier} resolves to no ${condition} target`)
+                  return yield* smokeError(`@generalist/${packageName}${specifier} resolves to no ${condition} target`)
                 }
               } else if (!entries.includes(`package/${value.slice(2)}`)) {
-                return yield* smokeError(`@tenetkit/${packageName}${specifier} is missing ${value}`)
+                return yield* smokeError(`@generalist/${packageName}${specifier} is missing ${value}`)
               }
             }
           }
@@ -740,15 +748,15 @@ const program = Effect.gen(function* () {
                 }),
               )
               if (!Equal.equals(sortRecord(manifest[section]), sortRecord(expected))) {
-                return yield* smokeError(`@tenetkit/${packageName} changed its packed ${section}`)
+                return yield* smokeError(`@generalist/${packageName} changed its packed ${section}`)
               }
               for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
                 if (
-                  (dependency === "tenetkit" || dependency.startsWith("@tenetkit/")) &&
+                  (dependency === "generalist" || dependency.startsWith("@generalist/")) &&
                   dependencyVersion !== version
                 ) {
                   return yield* smokeError(
-                    `@tenetkit/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
+                    `@generalist/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
                   )
                 }
               }
@@ -756,22 +764,24 @@ const program = Effect.gen(function* () {
           })
           yield* validateDependencySections
           if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
-            return yield* smokeError(`@tenetkit/${packageName} must not bundle dependencies`)
+            return yield* smokeError(`@generalist/${packageName} must not bundle dependencies`)
           }
           for (const dependency of packedEffectDependencies[packageName]) {
             const dependencyVersion =
-              packageName === "tenetkit" ? manifest.peerDependencies?.[dependency] : manifest.dependencies?.[dependency]
+              packageName === "generalist"
+                ? manifest.peerDependencies?.[dependency]
+                : manifest.dependencies?.[dependency]
             if (dependencyVersion !== effectVersion) {
               return yield* smokeError(
-                `@tenetkit/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
+                `@generalist/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
               )
             }
           }
-          if (packageName === "tenetkit") {
+          if (packageName === "generalist") {
             for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
               if (manifest.peerDependencies?.[dependency] !== dependencyVersion) {
                 return yield* smokeError(
-                  `tenetkit must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
+                  `generalist must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
                 )
               }
             }
@@ -806,14 +816,14 @@ const program = Effect.gen(function* () {
   )
 
   const integrationPeers = Object.fromEntries(
-    Object.entries(packedManifests.tenetkit?.peerDependencies ?? {}).filter(
+    Object.entries(packedManifests.generalist?.peerDependencies ?? {}).filter(
       ([dependency]) => dependency !== "effect" && dependency !== "foldkit",
     ),
   )
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "package.json"),
     encodeJson({
-      name: "tenetkit-package-consumer",
+      name: "generalist-package-consumer",
       private: true,
       type: "module",
       dependencies: {
@@ -825,18 +835,18 @@ const program = Effect.gen(function* () {
         typescript: rootManifest.workspaces.catalog.typescript,
       },
       /**
-       * The driver packages depend on an exact `tenetkit` version that only exists once this
+       * The driver packages depend on an exact `generalist` version that only exists once this
        * release is published, and an unscoped name cannot be pointed at the local registry the way
-       * `@tenetkit:registry` can. Overriding it to the packed tarball resolves the transitive
+       * `@generalist:registry` can. Overriding it to the packed tarball resolves the transitive
        * dependency without redirecting every unrelated package through a stub server. FoldKit
        * 0.148.2 still declares rc.109, so its targeted override proves the current rc.112 runtime
        * instead of disabling peer resolution for the whole consumer.
        */
       overrides: {
-        tenetkit: tarballs["tenetkit"],
+        generalist: tarballs["generalist"],
         foldkit: { effect: effectVersion },
       },
-      resolutions: { tenetkit: tarballs["tenetkit"] },
+      resolutions: { generalist: tarballs["generalist"] },
     }),
   )
   const registryDirectory = path.join(directory, "registry")
@@ -865,8 +875,8 @@ const server = createServer((request, response) => {
     response.writeHead(404).end("not found")
     return
   }
-  const packagePart = name === "tenetkit" ? "tenetkit" : name.slice("@tenetkit/".length)
-  const filename = packagePart === "tenetkit" ? \`tenetkit-\${version}.tgz\` : \`tenetkit-\${packagePart}-\${version}.tgz\`
+  const packagePart = name === "generalist" ? "generalist" : name.slice("@generalist/".length)
+  const filename = packagePart === "generalist" ? \`generalist-\${version}.tgz\` : \`generalist-\${packagePart}-\${version}.tgz\`
   const body = JSON.stringify({
     name,
     "dist-tags": { latest: version },
@@ -887,7 +897,7 @@ server.listen(0, "127.0.0.1", () => {
   const registryOrigin = yield* Stream.runHead(Stream.splitLines(Stream.decodeText(registry.stdout))).pipe(
     Effect.flatMap(Option.match({ onNone: () => smokeError("local registry did not start"), onSome: Effect.succeed })),
   )
-  yield* fileSystem.writeFileString(path.join(consumerDirectory, ".npmrc"), `@tenetkit:registry=${registryOrigin}\n`)
+  yield* fileSystem.writeFileString(path.join(consumerDirectory, ".npmrc"), `@generalist:registry=${registryOrigin}\n`)
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "tsconfig.json"),
     encodeJson({
@@ -905,8 +915,8 @@ server.listen(0, "127.0.0.1", () => {
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(packageExports))
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "external-child-bundle.ts"),
-    `import * as ExternalChildPlacement from "tenetkit/runtime/external-child-placement"
-import { ExternalChildStore } from "tenetkit/runtime/external-child-store"
+    `import * as ExternalChildPlacement from "generalist/runtime/external-child-placement"
+import { ExternalChildStore } from "generalist/runtime/external-child-store"
 console.log(ExternalChildPlacement, ExternalChildStore)
 `,
   )
@@ -914,7 +924,7 @@ console.log(ExternalChildPlacement, ExternalChildStore)
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${encodeJson(packageExports)}
 const runtimeSpecifiers = process.versions.bun === undefined
-  ? specifiers.filter((specifier) => specifier !== "tenetkit/runtime/sqlite-bun")
+  ? specifiers.filter((specifier) => specifier !== "generalist/runtime/sqlite-bun")
   : specifiers
 for (const specifier of runtimeSpecifiers) await import(specifier)
 const forbidden = ${encodeJson(forbiddenPackageExports)}
@@ -927,19 +937,19 @@ for (const specifier of forbidden) {
   }
   if (!blocked) throw new Error(\`forbidden package export resolved: \${specifier}\`)
 }
-const { A2A } = await import("tenetkit/a2a")
-const { AGUI } = await import("tenetkit/ag-ui")
-const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("tenetkit")
-const { VectorStore } = await import("tenetkit/memory")
-const { State, Store } = await import("tenetkit/agent-guidance")
-const { MCPClient } = await import("tenetkit/mcp")
-const McpHttpClient = await import("tenetkit/mcp/client/http")
-const ModelCatalog = await import("tenetkit/ai/model-catalog")
-const OpenAI = await import("tenetkit/ai/openai")
-const skills = await import("tenetkit/skills")
-const { TestModel } = await import("tenetkit/test")
-const { Runtime, RunEvent } = await import("tenetkit/runtime")
-const { Snapshot, Wire } = await import("tenetkit/transport")
+const { A2A } = await import("generalist/a2a")
+const { AGUI } = await import("generalist/ag-ui")
+const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("generalist")
+const { VectorStore } = await import("generalist/memory")
+const { State, Store } = await import("generalist/instructions")
+const { MCPClient } = await import("generalist/mcp")
+const McpHttpClient = await import("generalist/mcp/client/http")
+const ModelCatalog = await import("generalist/ai/model-catalog")
+const OpenAI = await import("generalist/ai/openai")
+const skills = await import("generalist/instructions/skills")
+const { TestModel } = await import("generalist/test")
+const { Runtime, RunEvent } = await import("generalist/runtime")
+const { Snapshot, Wire } = await import("generalist/transport")
 const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
@@ -967,14 +977,14 @@ const layers = [
     transport: McpHttpClient.make({ url: "https://mcp.example/rpc" }),
   }),
 ]
-if (layers.some((value) => !Layer.isLayer(value))) throw new Error("TenetKit layer does not use the root Effect identity")
+if (layers.some((value) => !Layer.isLayer(value))) throw new Error("Generalist layer does not use the root Effect identity")
 if (!Layer.isLayer(OpenAI.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
   throw new Error("provider constructor does not use the root Layer identity")
 }
 if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {
   throw new Error("TestModel does not use the root Effect identity")
 }
-console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
+console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
 `,
   )
 
@@ -1009,8 +1019,8 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
   )
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], consumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "bun", "runtime.mjs"], consumerDirectory)
-  if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@tenetkit")) {
-    return yield* smokeError("Bun consumer resolved a TenetKit package from npm")
+  if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@generalist")) {
+    return yield* smokeError("Bun consumer resolved a Generalist package from npm")
   }
 
   yield* verifyWorkerEntrypoints({ root, consumerDirectory })
@@ -1036,15 +1046,15 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
   if (
     (yield* fileSystem.readFileString(path.join(npmConsumerDirectory, "package-lock.json"))).includes(
-      "npmjs.org/@tenetkit",
+      "npmjs.org/@generalist",
     )
   ) {
-    return yield* smokeError("npm consumer resolved a TenetKit package from npm")
+    return yield* smokeError("npm consumer resolved a Generalist package from npm")
   }
 
-  const tenetkitManifest = packedManifests.tenetkit
-  if (tenetkitManifest === undefined) return yield* smokeError("packed tenetkit manifest is missing")
-  const optionalPeers = yield* validateMinimumConsumerProfiles({ tenetkitManifest, packageExports })
+  const generalistManifest = packedManifests.generalist
+  if (generalistManifest === undefined) return yield* smokeError("packed generalist manifest is missing")
+  const optionalPeers = yield* validateMinimumConsumerProfiles({ generalistManifest, packageExports })
 
   const verifyRivetDeclarationDependency = Effect.fn("PackageSmoke.verifyRivetDeclarationDependency")(function* (
     profile: MinimumConsumerProfile,
@@ -1071,11 +1081,11 @@ console.log(\`imported \${runtimeSpecifiers.length} TenetKit exports\`)
       path.join(profileDirectory, "require.cjs"),
       `let blocked = false
 try {
-  require("@tenetkit/rivet/actors")
+  require("@generalist/rivet/actors")
 } catch (error) {
   blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
 }
-if (!blocked) throw new Error("@tenetkit/rivet/actors must remain ESM-only")
+if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
 `,
     )
     yield* runProfileCommand({
@@ -1097,7 +1107,7 @@ if (!blocked) throw new Error("@tenetkit/rivet/actors must remain ESM-only")
     yield* fileSystem.makeDirectory(profileDirectory, { recursive: true })
     const peerDependencies: Record<string, string> = {}
     for (const dependency of profile.peers) {
-      const dependencyVersion = tenetkitManifest.peerDependencies?.[dependency]
+      const dependencyVersion = generalistManifest.peerDependencies?.[dependency]
       if (dependencyVersion === undefined) {
         return yield* smokeError(
           `${profileContext(profile, runtime, specifiers)} missing package ${dependency} version`,
@@ -1108,19 +1118,19 @@ if (!blocked) throw new Error("@tenetkit/rivet/actors must remain ESM-only")
     const packageDependencies = Object.fromEntries(
       profile.packages.map((packageName) => [packageNames[packageName], tarballs[packageNames[packageName]]]),
     )
-    const baseOverrides = { tenetkit: tarballs.tenetkit }
+    const baseOverrides = { generalist: tarballs.generalist }
     const overrides = profile.peers.includes("foldkit")
       ? { ...baseOverrides, foldkit: { effect: effectVersion } }
       : baseOverrides
     yield* fileSystem.writeFileString(
       path.join(profileDirectory, "package.json"),
       encodeJson({
-        name: `tenetkit-package-smoke-${profile.name}-${runtime}`,
+        name: `generalist-package-smoke-${profile.name}-${runtime}`,
         private: true,
         type: "module",
         dependencies: { effect: effectVersion, ...packageDependencies, ...peerDependencies },
         overrides,
-        resolutions: { tenetkit: tarballs.tenetkit },
+        resolutions: { generalist: tarballs.generalist },
       }),
     )
     if (runtime === "node") {
@@ -1190,9 +1200,9 @@ if (!blocked) throw new Error("@tenetkit/rivet/actors must remain ESM-only")
     yield* verifyRivetCommonJsBoundary(profile, runtime, specifiers, profileDirectory)
 
     const lockfile = path.join(profileDirectory, runtime === "node" ? "package-lock.json" : "bun.lock")
-    if ((yield* fileSystem.readFileString(lockfile)).includes("npmjs.org/@tenetkit")) {
+    if ((yield* fileSystem.readFileString(lockfile)).includes("npmjs.org/@generalist")) {
       return yield* smokeError(
-        `${profileContext(profile, runtime, specifiers)} unexpected package source npmjs.org/@tenetkit`,
+        `${profileContext(profile, runtime, specifiers)} unexpected package source npmjs.org/@generalist`,
       )
     }
   })

@@ -27,7 +27,7 @@ export default {
       processEnvironment: typeof globalThis.process === "object" ? Object.keys(globalThis.process.env ?? {}) : [],
       processSpawn: typeof globalThis.process?.spawn,
       bun: typeof globalThis.Bun,
-      ambientSecret: typeof globalThis.TENETKIT_CONFORMANCE_SECRET,
+      ambientSecret: typeof globalThis.GENERALIST_CONFORMANCE_SECRET,
       networkDenied
     });
   }

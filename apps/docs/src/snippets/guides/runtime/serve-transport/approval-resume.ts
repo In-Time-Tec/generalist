@@ -10,8 +10,8 @@ import {
   Tool,
   ToolExecutor,
   Toolkit,
-} from "tenetkit"
-import { RunExecutor, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "tenetkit/runtime"
+} from "generalist"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "generalist/runtime"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service",

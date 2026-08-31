@@ -1,7 +1,7 @@
 id: no-relayfx-imports
 language: TypeScript
 severity: error
-message: TenetKit must never depend on Relay. Do not import or re-export from '@relayfx/*'.
+message: Generalist must never depend on Relay. Do not import or re-export from '@relayfx/*'.
 rule:
   any:
     - kind: import_statement

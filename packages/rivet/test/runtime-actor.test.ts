@@ -4,8 +4,8 @@ import { setupTest } from "rivetkit/test"
 import { expect, test } from "vitest"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, AgentManifest, Pins } from "tenetkit"
-import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "tenetkit/runtime"
+import { Agent, AgentManifest, Pins } from "generalist"
+import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
 import { makeRuntimeActor, type RuntimeActorDefinition } from "../src/actors/index.js"
 
 const usage = Response.Usage.make({

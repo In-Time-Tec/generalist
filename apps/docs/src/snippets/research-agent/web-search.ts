@@ -13,7 +13,7 @@ export interface Service {
 }
 
 export class WebSearch extends Context.Service<WebSearch, Service>()(
-  "@tenetkit/docs/snippets/research-agent/web-search/WebSearch",
+  "@generalist/docs/snippets/research-agent/web-search/WebSearch",
 ) {}
 
 const cannedResults: ReadonlyArray<SearchResult> = [

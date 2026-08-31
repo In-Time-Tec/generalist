@@ -1,8 +1,8 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "tenetkit"
-import { connect } from "tenetkit/mcp/tools"
-import { make as makeStdioTransport } from "tenetkit/mcp/client/stdio"
-import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "generalist"
+import { connect } from "generalist/mcp/tools"
+import { make as makeStdioTransport } from "generalist/mcp/client/stdio"
+import { layer as openRouterLayer } from "generalist/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {

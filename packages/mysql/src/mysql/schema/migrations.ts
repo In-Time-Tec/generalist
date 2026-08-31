@@ -11,7 +11,7 @@ import {
   SchemaVersionUnsupported,
   planSqlSchema,
   type SqlSchemaPlan,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import {
   MIGRATION_LOCK,
   MIGRATION_NAME,
@@ -34,7 +34,7 @@ const migrationFailure = (source: string, fallback: string) => (error: SqlError)
 const AcquiredRows = Schema.Array(Schema.Tuple([Schema.NullOr(Schema.Finite)]))
 const PresentRows = Schema.Array(Schema.Tuple([Schema.Finite]))
 
-const migrationLockWait = Metric.timer("tenetkit_runtime_sql_migration_lock_wait_duration", {
+const migrationLockWait = Metric.timer("generalist_runtime_sql_migration_lock_wait_duration", {
   description: "Runtime SQL migration lock acquisition duration",
   attributes: { backend: "mysql" },
 })
@@ -90,8 +90,8 @@ export const apply = (source: string) =>
       const acquired = yield* query("SELECT GET_LOCK(?, 30) AS acquired", [MIGRATION_LOCK]).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(AcquiredRows)),
         Effect.trackDuration(migrationLockWait),
-        Effect.withSpan("TenetKit.Runtime.sqlMigrationLock", {
-          attributes: { "tenetkit.runtime.sql.backend": "mysql" },
+        Effect.withSpan("Generalist.Runtime.sqlMigrationLock", {
+          attributes: { "generalist.runtime.sql.backend": "mysql" },
         }),
       )
       if (acquired[0]?.[0] !== 1) {
@@ -110,7 +110,7 @@ export const apply = (source: string) =>
       if ((existing[0]?.[0] ?? 0) > 0) {
         return yield* SchemaMigrationFailed.make({
           source,
-          message: "cannot create the baseline over an existing TenetKit schema",
+          message: "cannot create the baseline over an existing Generalist schema",
         })
       }
       for (const statement of SCHEMA_STATEMENTS) yield* query(statement)

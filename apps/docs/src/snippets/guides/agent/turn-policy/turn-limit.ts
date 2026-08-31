@@ -1,5 +1,15 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, AgentEvent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit, Policy } from "tenetkit"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Response,
+  Tool,
+  Toolkit,
+  Policy,
+} from "generalist"
 
 const lookupTool = Tool.make("lookup", {
   description: "Look up one fact",

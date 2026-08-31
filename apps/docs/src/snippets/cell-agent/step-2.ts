@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { CellTool, KernelProfile } from "tenetkit/repl"
+import { CellTool, KernelProfile } from "generalist/repl"
 
 const profile = KernelProfile.make({
   provider: "bun-local",

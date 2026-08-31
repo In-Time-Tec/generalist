@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { Tool, Toolkit } from "tenetkit"
+import { Tool, Toolkit } from "generalist"
 import { SearchResult, WebSearch } from "./web-search"
 /** @experimental */
 export const webSearchTool = Tool.make("web_search", {

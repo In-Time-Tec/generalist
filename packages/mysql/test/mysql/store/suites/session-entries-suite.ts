@@ -1,9 +1,9 @@
 import { beforeAll } from "vitest"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { Errors, RunStore, Runtime } from "tenetkit/runtime"
-import { assistantAddress, textPrompt } from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
-import { provideScoped } from "../../../../../tenetkit/test/runtime/execution/scoped-provide.js"
+import { Errors, RunStore, Runtime } from "generalist/runtime"
+import { assistantAddress, textPrompt } from "../../../../../generalist/test/runtime/execution/fixtures.js"
+import { provideScoped } from "../../../../../generalist/test/runtime/execution/scoped-provide.js"
 import { mysqlAvailable, mysqlDatabase, mysqlLayer, uniqueSession } from "../../runtime/environment.js"
 
 const describeBackend = describe.runIf(mysqlAvailable)

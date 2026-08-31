@@ -1,8 +1,8 @@
 # AgentOS CodeExecutor rejected
 
-TenetKit does not provide an AgentOS `CodeExecutor`. The exact public artifact tested on 2026-08-30 was
+Generalist does not provide an AgentOS `CodeExecutor`. The exact public artifact tested on 2026-08-30 was
 `@rivet-dev/agentos@0.2.15`, which resolved `@rivet-dev/agentos-core@0.2.15` exactly. The engine has useful isolation
-and true active-CPU accounting, but its supported public boundary cannot satisfy two mandatory TenetKit contracts:
+and true active-CPU accounting, but its supported public boundary cannot satisfy two mandatory Generalist contracts:
 typed terminal attribution and exact output accounting before frame decoding. No adapter, AgentOS dependency, or
 competing Agent/session facade is shipped.
 
@@ -14,7 +14,7 @@ handle](https://github.com/rivet-dev/agentos/blob/v0.2.15/packages/core/src/agen
 and the sidecar runs [V8 isolate sessions](https://github.com/rivet-dev/agentos/blob/v0.2.15/crates/execution/src/v8_runtime.rs#L1-L37).
 Passing that handle through `AgentOs.create({ sidecar: { kind: "explicit", handle } })` [leases the VM from that exact
 sidecar](https://github.com/rivet-dev/agentos/blob/v0.2.15/packages/core/src/agent-os.ts#L3443-L3451). A prospective
-adapter would therefore create one fresh native sidecar plus one V8 isolate per invocation and dispose both. TenetKit
+adapter would therefore create one fresh native sidecar plus one V8 isolate per invocation and dispose both. Generalist
 names that boundary `sidecar-process-v8-isolate`; it does not claim a container or microVM.
 
 The supported dependency is `@rivet-dev/agentos`. Its [public root statically imports RivetKit, reexports core, and
@@ -64,7 +64,7 @@ failure, host-binding failure, output overflow, sidecar crash, and cleanup failu
 
 A second public-package probe configured both `capturedOutputLimitBytes` and `eventPayloadLimitBytes` to 128 bytes, then
 logged 1 MiB once. The retained result was truncated to 128 bytes, but `onStdout` received decoded chunks of 1,048,576
-and 1 byte. The capture limit therefore did not bound the host-side event path. Omitting TenetKit's callback cannot
+and 1 byte. The capture limit therefore did not bound the host-side event path. Omitting Generalist's callback cannot
 establish a pre-decode bound because AgentOS itself [maps each complete event chunk to a new
 `Uint8Array`](https://github.com/rivet-dev/agentos/blob/v0.2.15/packages/core/src/agent-os.ts#L2886-L2898) before
 dispatching public handlers.
@@ -103,7 +103,7 @@ manifests omit repository and git-head fields, while source manifest versions ar
 the exact JavaScript build-to-commit provenance is not self-contained. The tarball hashes above, not an asserted source
 commit, identify what was tested.
 
-Reconsider only when a supported pinned AgentOS boundary exposes stable typed terminal reasons for every TenetKit
+Reconsider only when a supported pinned AgentOS boundary exposes stable typed terminal reasons for every Generalist
 failure class and enforces the requested cumulative output-byte limit before decoding or callback delivery. A future
 adapter must then pass the remaining isolation, binding, crash-containment, cleanup, provider-conformance, and real-flow
 gates with one fresh sidecar and V8 isolate per invocation.

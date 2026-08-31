@@ -1,6 +1,6 @@
-import { layer as openRouterLayer } from "tenetkit/ai/openrouter"
+import { layer as openRouterLayer } from "generalist/ai/openrouter"
 import { Config, Effect, Layer, Option, Schema, Stream } from "effect"
-import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
+import { LanguageModel, ModelRegistry, Prompt, Response } from "generalist"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const WebSearchSuccess = Schema.Struct({

@@ -1,8 +1,8 @@
 import { Duration, Layer } from "effect"
 import { layer as bunServices } from "@effect/platform-bun/BunServices"
-import { ToolContext, ToolExecutor } from "tenetkit"
-import { CellTool, HostBindings, KernelProfile } from "tenetkit/repl"
-import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "tenetkit/repl/bun"
+import { ToolContext, ToolExecutor } from "generalist"
+import { CellTool, HostBindings, KernelProfile } from "generalist/repl"
+import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "generalist/repl/bun"
 
 declare const workspace: HostBindings.Module
 declare const dataRoot: string

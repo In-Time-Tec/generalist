@@ -1,8 +1,8 @@
 import { layer } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
-import { Agent, AgentManifest, Approvals, ModelMiddleware, Pins, ToolExecutor } from "tenetkit"
-import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "tenetkit/runtime"
-import { SSE, WebSocket } from "tenetkit/transport"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Pins, ToolExecutor } from "generalist"
+import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
+import { SSE, WebSocket } from "generalist/transport"
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { agent } from "./agent"
@@ -85,7 +85,7 @@ const routesLayer = HttpRouter.use((router) =>
             return yield* SSE.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
-        Effect.catchTag("tenetkit/transport/InvalidCursor", errorResponse(400)),
+        Effect.catchTag("generalist/transport/InvalidCursor", errorResponse(400)),
       ),
     )
 

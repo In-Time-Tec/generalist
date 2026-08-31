@@ -1,4 +1,4 @@
-import { Agent, LanguageModel, Tool, Policy } from "tenetkit"
+import { Agent, LanguageModel, Tool, Policy } from "generalist"
 import { WebSearch } from "./web-search"
 import { toolkit, webSearchTool } from "./tools"
 

@@ -1,9 +1,9 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema } from "effect"
-import { ToolContext, ToolExecutor } from "tenetkit"
+import { ToolContext, ToolExecutor } from "generalist"
 import { Response } from "effect/unstable/ai"
-import { Cell, CellTool, HostBindings, KernelProfile, TestKernel } from "tenetkit/repl"
+import { Cell, CellTool, HostBindings, KernelProfile, TestKernel } from "generalist/repl"
 
-class NotFound extends Schema.TaggedError<NotFound>()("@tenetkit/tutorial/NotFound", {
+class NotFound extends Schema.TaggedError<NotFound>()("@generalist/tutorial/NotFound", {
   path: Schema.String,
 }) {}
 

@@ -4,7 +4,7 @@ import { dual } from "effect/Function"
 import { addressedMessaging } from "../pages/guides/agent/addressed-messaging"
 import { approvals } from "../pages/guides/agent/approvals"
 import { compaction } from "../pages/guides/agent/compaction"
-import { agentGuidance } from "../pages/guides/agent/guidance"
+import { instructionGuidance } from "../pages/guides/agent/instruction-guidance"
 import { defineTools } from "../pages/guides/tools/define-tools"
 import { durableCompositeTools } from "../pages/guides/tools/durable-composite-tools"
 import { foldkitChat } from "../pages/guides/runtime/foldkit-chat"
@@ -39,7 +39,7 @@ import { coreToolsReference } from "../pages/reference/core/tools"
 import { a2aReference } from "../pages/reference/integrations/a2a"
 import { agUiReference } from "../pages/reference/integrations/ag-ui"
 import { foldkitReference } from "../pages/reference/runtime/foldkit"
-import { agentGuidanceReference } from "../pages/reference/runtime/agent-guidance"
+import { instructionGuidanceReference } from "../pages/reference/runtime/instruction-guidance"
 import { mcpReference } from "../pages/reference/integrations/mcp"
 import { memoryReference } from "../pages/reference/integrations/memory"
 import { providersReference } from "../pages/reference/integrations/providers"
@@ -88,7 +88,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   mcp,
   multiAgent,
   typescriptCells,
-  agentGuidance,
+  instructionGuidance,
   durableCompositeTools,
   addressedMessaging,
   serveTransport,
@@ -109,7 +109,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   testReference,
   memoryReference,
   replReference,
-  agentGuidanceReference,
+  instructionGuidanceReference,
   transportReference,
   foldkitReference,
   versioningReference,
@@ -225,10 +225,10 @@ export const searchDocs: {
 )
 
 const siteTagline =
-  "TenetKit: an Effect-native TypeScript agent framework with plain-value agents, typed event streams, deterministic service seams, and an optional native durable Runtime."
+  "Generalist: an Effect-native TypeScript agent framework with plain-value agents, typed event streams, deterministic service seams, and an optional native durable Runtime."
 
 export const llmsIndex = (): string => {
-  const header: ReadonlyArray<string> = ["# TenetKit", "", `> ${siteTagline}`, ""]
+  const header: ReadonlyArray<string> = ["# Generalist", "", `> ${siteTagline}`, ""]
   const sections = navGroups.flatMap((group) =>
     [`## ${group.title}`].concat(
       group.pages.map((page) => `- [${page.title}](${page.path}): ${page.description}`),
@@ -240,7 +240,7 @@ export const llmsIndex = (): string => {
 
 export const llmsFull = (): string =>
   [
-    "# TenetKit",
+    "# Generalist",
     "",
     `> ${siteTagline}`,
     "",

@@ -1,8 +1,8 @@
 /* oxlint-disable effecttsgo/async-function, no-await-in-loop */
 import { Effect, Option, Schema } from "effect"
-import { Cursor, Runtime } from "tenetkit/runtime"
-import { page } from "tenetkit/transport/replay"
-import { decodeCommand } from "tenetkit/transport/wire"
+import { Cursor, Runtime } from "generalist/runtime"
+import { page } from "generalist/transport/replay"
+import { decodeCommand } from "generalist/transport/wire"
 
 const Attachment = Schema.Union([
   Schema.Struct({ version: Schema.Literal(1), state: Schema.Literal("unattached") }),
@@ -46,7 +46,7 @@ export interface FlushResult {
   readonly hasMore: boolean
 }
 
-const tag = "tenetkit:replay:v1"
+const tag = "generalist:replay:v1"
 const maxAttachmentBytes = 2_048
 const textEncoder = new TextEncoder()
 const operations = new WeakMap<Socket, Promise<unknown>>()

@@ -1,6 +1,6 @@
 # Nested durable operations
 
-A nested operation is one durable operation that runs inside another. A composite tool call — a cell, an agent program step — crosses many authoritative boundaries, and each crossing is journaled under the outer operation's identity before the handler runs. `tenetkit` owns the contract and the process-local implementation; `tenetkit/runtime` owns the durable one.
+A nested operation is one durable operation that runs inside another. A composite tool call — a cell, an agent program step — crosses many authoritative boundaries, and each crossing is journaled under the outer operation's identity before the handler runs. `generalist` owns the contract and the process-local implementation; `generalist/runtime` owns the durable one.
 
 - `NestedOperation.run(request, effect)` executes one crossing. A `Request` carries `kind`, `payload`, a `replayPolicy`, an optional `approval`, and an optional `render`.
 - Identity is derived, never supplied. The ambient `ToolContext` names the outer operation through `operationKey`, and the host assigns the ordinal, so tool or cell code cannot forge, reorder, or collide with another call's journal. The persisted key is `<operationKey>#<ordinal>`.

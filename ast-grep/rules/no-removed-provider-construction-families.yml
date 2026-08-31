@@ -5,100 +5,100 @@ message: Provider construction is Layer-only; use the provider module's layer co
 rule:
   any:
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai"
+        context: import { $API as $LOCAL } from "generalist/ai"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai"
+        context: import { $API } from "generalist/ai"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai"
+        context: export { $API as $LOCAL } from "generalist/ai"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai"
+        context: export { $API } from "generalist/ai"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai/anthropic"
+        context: import { $API as $LOCAL } from "generalist/ai/anthropic"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai/anthropic"
+        context: import { $API } from "generalist/ai/anthropic"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai/anthropic"
+        context: export { $API as $LOCAL } from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai/anthropic"
+        context: export { $API } from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai/openai"
+        context: import { $API as $LOCAL } from "generalist/ai/openai"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai/openai"
+        context: import { $API } from "generalist/ai/openai"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai/openai"
+        context: export { $API as $LOCAL } from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai/openai"
+        context: export { $API } from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai/openai-compat"
+        context: import { $API as $LOCAL } from "generalist/ai/openai-compat"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai/openai-compat"
+        context: import { $API } from "generalist/ai/openai-compat"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai/openai-compat"
+        context: export { $API as $LOCAL } from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai/openai-compat"
+        context: export { $API } from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai/openrouter"
+        context: import { $API as $LOCAL } from "generalist/ai/openrouter"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai/openrouter"
+        context: import { $API } from "generalist/ai/openrouter"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai/openrouter"
+        context: export { $API as $LOCAL } from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai/openrouter"
+        context: export { $API } from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai/deterministic"
+        context: import { $API as $LOCAL } from "generalist/ai/deterministic"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai/deterministic"
+        context: import { $API } from "generalist/ai/deterministic"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai/deterministic"
+        context: export { $API as $LOCAL } from "generalist/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai/deterministic"
+        context: export { $API } from "generalist/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai/embedding"
+        context: import { $API as $LOCAL } from "generalist/ai/embedding"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai/embedding"
+        context: import { $API } from "generalist/ai/embedding"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai/embedding"
+        context: export { $API as $LOCAL } from "generalist/ai/embedding"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai/embedding"
+        context: export { $API } from "generalist/ai/embedding"
         selector: export_statement
     - pattern:
-        context: import { $API as $LOCAL } from "tenetkit/ai/presets"
+        context: import { $API as $LOCAL } from "generalist/ai/presets"
         selector: import_statement
     - pattern:
-        context: import { $API } from "tenetkit/ai/presets"
+        context: import { $API } from "generalist/ai/presets"
         selector: import_statement
     - pattern:
-        context: export { $API as $LOCAL } from "tenetkit/ai/presets"
+        context: export { $API as $LOCAL } from "generalist/ai/presets"
         selector: export_statement
     - pattern:
-        context: export { $API } from "tenetkit/ai/presets"
+        context: export { $API } from "generalist/ai/presets"
         selector: export_statement
 constraints:
   API:

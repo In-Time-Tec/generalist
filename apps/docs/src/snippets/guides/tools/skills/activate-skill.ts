@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillCatalog, ToolExecutor } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillCatalog, ToolExecutor } from "generalist"
 
 const releaseNotesSkill: SkillCatalog.Skill = {
   name: "release-notes",

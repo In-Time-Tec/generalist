@@ -1,16 +1,16 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../../prose"
 export const memoryReference = definePage({
   path: "/docs/reference/memory",
-  title: "tenetkit/memory",
+  title: "generalist/memory",
   navTitle: "memory",
   group: "Reference",
   description: "WorkingMemory, SemanticRecall, the VectorStore seam, and the combined layer.",
   content: [
     lead(
-      "tenetkit/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
+      "generalist/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
-    p(code("tenetkit/memory"), " is an import subpath, not a package."),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    p(code("generalist/memory"), " is an import subpath, not a package."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -119,7 +119,7 @@ export const memoryReference = definePage({
     ),
     p(
       "Embedding layers live in ",
-      link("/docs/reference/providers", "the tenetkit/ai/* provider leaves"),
+      link("/docs/reference/providers", "the generalist/ai/* provider leaves"),
       ". See ",
       link("/docs/guides/memory", "How to add memory"),
       ".",

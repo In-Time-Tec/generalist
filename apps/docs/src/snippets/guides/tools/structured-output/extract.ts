@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "generalist"
 
 const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
 

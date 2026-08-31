@@ -31,7 +31,7 @@ export const researchAgent = definePage({
       link("/docs/start/quickstart", "the quickstart"),
       ", start there. The finished, styled version of this app lives in the repository at ",
       link(
-        "https://github.com/In-Time-Tec/tenetkit/tree/main/examples/deep-research-agent",
+        "https://github.com/In-Time-Tec/generalist/tree/main/examples/deep-research-agent",
         "examples/deep-research-agent",
       ),
       ".",
@@ -140,7 +140,7 @@ export const researchAgent = definePage({
     codeBlock({ label: "index.html", language: "html", source: webIndexSource }),
     h3("wire-the-chat", "Wire the chat"),
     p(
-      code("tenetkit/foldkit"),
+      code("generalist/foldkit"),
       " ships a headless chat submodel that decodes durable frames and projects normalized model responses, tool state, and approval state. The program embeds ",
       code("Chat.Model"),
       " in its own model, forwards ",

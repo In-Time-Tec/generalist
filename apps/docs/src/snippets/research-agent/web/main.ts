@@ -1,4 +1,4 @@
-import { Chat, Connection } from "tenetkit/foldkit"
+import { Chat, Connection } from "generalist/foldkit"
 import { Cause, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"

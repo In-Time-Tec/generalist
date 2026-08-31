@@ -7,9 +7,9 @@ export const corePoliciesReference = definePage({
   description: "Policy, Approvals, and Permissions: every decision union and layer constructor.",
   content: [
     lead(
-      "Three namespaces of tenetkit gate what a run may do next: Policy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
+      "Three namespaces of generalist gate what a run may do next: Policy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
     h2("turn-policy", "Policy"),
     p(
       "A policy is ",

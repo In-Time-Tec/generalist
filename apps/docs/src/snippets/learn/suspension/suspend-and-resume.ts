@@ -1,5 +1,15 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, AgentEvent, Approvals, LanguageModel, ModelMiddleware, Prompt, Response, Tool, Toolkit } from "tenetkit"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Prompt,
+  Response,
+  Tool,
+  Toolkit,
+} from "generalist"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service to production",

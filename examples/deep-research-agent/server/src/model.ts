@@ -1,6 +1,6 @@
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import { LanguageModel, ModelRegistry, Prompt, Response } from "tenetkit"
-import { layer, type ClientOptions } from "tenetkit/ai/openrouter"
+import { LanguageModel, ModelRegistry, Prompt, Response } from "generalist"
+import { layer, type ClientOptions } from "generalist/ai/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 type StreamText = Parameters<typeof LanguageModel.make>[0]["streamText"]

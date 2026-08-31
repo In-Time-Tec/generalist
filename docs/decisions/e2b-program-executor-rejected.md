@@ -1,6 +1,6 @@
 # E2B Program executor rejected
 
-TenetKit does not provide `@tenetkit/e2b/program` because E2B cannot currently enforce the strict
+Generalist does not provide `@generalist/e2b/program` because E2B cannot currently enforce the strict
 `CodeExecutor` CPU contract. This decision was checked against `e2b@2.46.1` (npm integrity
 `sha512-OqYovS2oFrt4mk737CgfW/RoMadBYK84l5qjKpvbEoOB9KKxaZIXm7YUwOKSRTlijrrwDRX7oZlyPoVXiCpyTw==`).
 

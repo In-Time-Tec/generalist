@@ -10,7 +10,7 @@ export const seamsAsServices = definePage({
     "One required model service, optional seams discovered at run time, and a test layer for every behavior-bearing seam.",
   content: [
     p(
-      "TenetKit has no plugin API. Every extension point is an Effect service, and a plugin is a ",
+      "Generalist has no plugin API. Every extension point is an Effect service, and a plugin is a ",
       code("Layer"),
       ". That one decision splits the framework's surface into two tiers: the model service a run cannot start without, handler layers required by the tools you attach, and optional seams the loop discovers at run time with ",
       code("Effect.serviceOption"),
@@ -106,9 +106,9 @@ export const seamsAsServices = definePage({
       link("/docs/guides/testing-evals", "agents are tested and evaled in CI"),
       " without an API key.",
     ),
-    h2("why-this-makes-tenetkit-embeddable", "Why this makes TenetKit embeddable"),
+    h2("why-this-makes-generalist-embeddable", "Why this makes Generalist embeddable"),
     p(
-      "Because every seam is a service, a host can replace any of them without core importing host code. An in-process CLI provides a model and the handler layers for its local tools. tenetkit/runtime provides the same model/tool surface plus durable implementations of execution concerns (a database-backed ",
+      "Because every seam is a service, a host can replace any of them without core importing host code. An in-process CLI provides a model and the handler layers for its local tools. generalist/runtime provides the same model/tool surface plus durable implementations of execution concerns (a database-backed ",
       code("SessionDirectory"),
       ", a blob-backed ",
       code("Store"),

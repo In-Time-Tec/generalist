@@ -54,7 +54,7 @@ export const instructions = definePage({
     p(
       code("load"),
       " from ",
-      code("tenetkit/instructions"),
+      code("generalist/instructions"),
       " walks ancestor directories for ",
       code("AGENTS.md"),
       " or ",

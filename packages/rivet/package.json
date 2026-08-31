@@ -17,15 +17,15 @@
     "node": ">=22",
     "bun": ">=1.4.0"
   },
-  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "homepage": "https://github.com/In-Time-Tec/generalist#readme",
   "bugs": {
-    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+    "url": "https://github.com/In-Time-Tec/generalist/issues"
   },
   "publishConfig": {
     "access": "public"
   },
-  "name": "@tenetkit/rivet",
-  "description": "Rivet Actors Runtime host for TenetKit",
+  "name": "@generalist/rivet",
+  "description": "Rivet Actors Runtime host for Generalist",
   "exports": {
     "./actors": {
       "types": "./dist/actors/index.d.ts",
@@ -40,7 +40,7 @@
   "dependencies": {
     "@standard-schema/spec": "catalog:",
     "rivetkit": "catalog:",
-    "tenetkit": "workspace:*"
+    "generalist": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
@@ -51,7 +51,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "url": "git+https://github.com/In-Time-Tec/generalist.git",
     "directory": "packages/rivet"
   }
 }

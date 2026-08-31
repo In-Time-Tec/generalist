@@ -1,11 +1,11 @@
-import { CodeExecutor } from "tenetkit"
+import { CodeExecutor } from "generalist"
 
 export const identity = (compatibilityDate: string): CodeExecutor.Identity =>
   CodeExecutor.declareIdentity({
     provider: "cloudflare",
-    implementation: { name: "@tenetkit/cloudflare/dynamic-workers", version: "1" },
+    implementation: { name: "@generalist/cloudflare/dynamic-workers", version: "1" },
     runtime: { name: "cloudflare-workers-compatibility-date", version: compatibilityDate },
-    template: { name: "tenetkit-program-runner", version: CodeExecutor.protocolVersion },
+    template: { name: "generalist-program-runner", version: CodeExecutor.protocolVersion },
     physicalIsolation: "worker-isolate",
     persistence: "fresh-per-execution",
     network: {

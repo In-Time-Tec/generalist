@@ -1,4 +1,4 @@
-import { CodeExecutor, ProgramCapabilities } from "tenetkit"
+import { CodeExecutor, ProgramCapabilities } from "generalist"
 import { Schema } from "effect"
 
 /** @experimental Minimal Worker Loader code contract used by this adapter. */

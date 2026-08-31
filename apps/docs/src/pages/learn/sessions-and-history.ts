@@ -10,7 +10,7 @@ export const sessionsAndHistory = definePage({
     "The append-only session entry log, Effect AI prompt projection, and the two ways a run can carry history.",
   content: [
     p(
-      "TenetKit separates two ideas that most frameworks fuse: the record of a conversation, and the context a model sees. The record is an append-only log; the context is a pure function of a path through it. This page explains the ",
+      "Generalist separates two ideas that most frameworks fuse: the record of a conversation, and the context a model sees. The record is an append-only log; the context is a pure function of a path through it. This page explains the ",
       code("Session"),
       " seam and the two ways a run can carry history at all.",
     ),
@@ -66,7 +66,7 @@ export const sessionsAndHistory = definePage({
     p(
       "After the compaction entry the projected context shrinks to a checkpoint plus the kept tail, while the log still holds all five entries. Rewinding is moving the leaf; auditing is reading the log; shrinking context is appending an entry. ",
       link("/docs/guides/compaction", "How to stay inside the context window"),
-      " covers the strategy that decides when TenetKit appends one for you.",
+      " covers the strategy that decides when Generalist appends one for you.",
     ),
     h2("two-ways-to-carry-history", "Two ways a run carries history"),
     p("A run can be given its past in two ways, each fitting a different owner:"),
@@ -101,11 +101,11 @@ export const sessionsAndHistory = definePage({
     ),
     h2("where-durable-history-lives", "Where durable history lives"),
     p(
-      "The tenetkit layers on this page are non-durable by design: ",
+      "The generalist layers on this page are non-durable by design: ",
       code("Session.layerMemory"),
       " is an application-scoped keyed directory of independent Ref-backed stores. Omitting ",
       code("sessionId"),
-      " leaves a run ephemeral even when the directory is present. For durable, addressable execution, tenetkit/runtime stores the Session and canonical RunEvent stream and reconstructs the core driver across attempts. Application conversation storage can implement ",
+      " leaves a run ephemeral even when the directory is present. For durable, addressable execution, generalist/runtime stores the Session and canonical RunEvent stream and reconstructs the core driver across attempts. Application conversation storage can implement ",
       code("Session.Directory"),
       " over its own database. The core/runtime split is covered in ",
       link("/docs/learn/native-runtime", "Core and Runtime: where durability lives"),

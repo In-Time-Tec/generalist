@@ -34,7 +34,7 @@ layer(Layer.merge(bunLayer, FetchHttpClient.layer), { excludeTestServices: true,
           const path = yield* Path.Path
           const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
           const repositoryRoot = path.resolve(".")
-          const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-worker-loader-" })
+          const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-worker-loader-" })
           const bundle = path.join(directory, "worker.js")
           const config = path.join(directory, "config.capnp")
           const port = yield* Random.nextIntBetween(20_000, 40_000, { halfOpen: true })

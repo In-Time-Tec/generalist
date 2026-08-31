@@ -2,15 +2,15 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Prompt, Response } from "effect/unstable/ai"
-import { Handoff, Pins, Session } from "tenetkit"
-import { Errors, RunEvent, Runtime, RunStore } from "tenetkit/runtime"
+import { Handoff, Pins, Session } from "generalist"
+import { Errors, RunEvent, Runtime, RunStore } from "generalist/runtime"
 import {
   assistant,
   assistantAddress,
   assistantRef,
   researcherRef,
   textPrompt,
-} from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
+} from "../../../../../generalist/test/runtime/execution/fixtures.js"
 import { mysqlAvailable, mysqlDatabase, mysqlLayer, uniqueSession } from "../../runtime/environment.js"
 
 const describeMysql = describe.runIf(mysqlAvailable)
@@ -116,7 +116,7 @@ const setLastSequence = (runId: string, sequence: number) =>
   scopedWith(database.client)(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* sql`UPDATE tenetkit_runs SET last_sequence = ${sequence} WHERE run_id = ${runId}`
+      yield* sql`UPDATE generalist_runs SET last_sequence = ${sequence} WHERE run_id = ${runId}`
     }),
   )
 
@@ -220,17 +220,17 @@ describeMysql("mysql Session authority", () => {
       yield* scopedWith(database.client)(
         Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
-          yield* sql`DELETE FROM tenetkit_tree_event_index WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_run_events WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_run_registrations WHERE run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_tree_roots WHERE root_run_id = ${runId}`
-          yield* sql`DELETE FROM tenetkit_runs WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_tree_event_index WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_run_events WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_run_registrations WHERE run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_tree_roots WHERE root_run_id = ${runId}`
+          yield* sql`DELETE FROM generalist_runs WHERE run_id = ${runId}`
           const foreignKeys = yield* sql<{ count: string }>`
             SELECT COUNT(*) AS count
             FROM information_schema.referential_constraints
             WHERE constraint_schema = DATABASE()
-              AND table_name IN ('tenetkit_sessions', 'tenetkit_session_entries')
-              AND referenced_table_name = 'tenetkit_runs'
+              AND table_name IN ('generalist_sessions', 'generalist_session_entries')
+              AND referenced_table_name = 'generalist_runs'
           `
           expect(Number(foreignKeys[0]!.count)).toBe(0)
         }),

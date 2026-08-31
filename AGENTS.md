@@ -1,6 +1,6 @@
-# TenetKit
+# Generalist
 
-TenetKit is an Effect-native agent framework over `effect/unstable/ai`. The `tenetkit` package provides the process-local agent loop and optional durable Runtime; `@tenetkit/pg`, `@tenetkit/mysql`, `@tenetkit/cloudflare`, and `@tenetkit/rivet` provide host-specific storage and runtime adapters. Core stays usable without Relay or another durable runtime.
+Generalist is an Effect-native agent framework over `effect/unstable/ai`. The `generalist` package provides the process-local agent loop and optional durable Runtime; `@generalist/pg`, `@generalist/mysql`, `@generalist/cloudflare`, and `@generalist/rivet` provide host-specific storage and runtime adapters. Core stays usable without Relay or another durable runtime.
 
 ## Commands
 
@@ -16,13 +16,13 @@ bun run format                # write formatting changes
 Run the narrowest useful check while editing:
 
 ```bash
-bun --bun vitest run packages/tenetkit/test/<path>.test.ts --no-file-parallelism
-bun run --cwd packages/tenetkit typecheck
+bun --bun vitest run packages/generalist/test/<path>.test.ts --no-file-parallelism
+bun run --cwd packages/generalist typecheck
 bun run --cwd packages/pg test
 bun node_modules/prettier/bin/prettier.cjs --check <paths>
 ```
 
-Replace the package directory or test path as needed. PostgreSQL tests require `TENETKIT_DATABASE_URL` or `DATABASE_URL`; MySQL tests require `TENETKIT_MYSQL_URL` or `MYSQL_URL`. These suites skip when their database is unavailable, and a skipped suite is not conformance evidence.
+Replace the package directory or test path as needed. PostgreSQL tests require `GENERALIST_DATABASE_URL` or `DATABASE_URL`; MySQL tests require `GENERALIST_MYSQL_URL` or `MYSQL_URL`. These suites skip when their database is unavailable, and a skipped suite is not conformance evidence.
 
 Before review, run the full checks:
 
@@ -41,7 +41,7 @@ This is the downstream compatibility check. It packs the five public packages, v
 
 ## Boundaries
 
-- Never import `@relayfx/*` from TenetKit; repository checks enforce the standalone core boundary.
+- Never import `@relayfx/*` from Generalist; repository checks enforce the standalone core boundary.
 - Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly. Do not add a parallel payload or tool format.
 - Keep Effects lazy and run them only at process, framework, or test-host boundaries. Preserve typed failures, requirements, interruption, scopes, and bounded concurrency.
 - Use Effect platform services instead of raw filesystem, process, HTTP, time, randomness, socket, or terminal APIs when Effect owns that boundary. Every resource and fiber needs a visible scope owner.
@@ -58,11 +58,11 @@ Package manifests, `scripts/package-smoke*.ts`, and `.github/workflows/publish.y
 
 ## Durable Runtime checks
 
-`tenetkit/test/runtime-driver` is the authoritative capability-based driver suite. Add shared expectations there and register only capabilities a driver implements; do not copy generic conformance tests into each driver. Memory and PostgreSQL register the suite directly. MySQL and Cloudflare also have backend-specific package suites.
+`generalist/test/runtime-driver` is the authoritative capability-based driver suite. Add shared expectations there and register only capabilities a driver implements; do not copy generic conformance tests into each driver. Memory and PostgreSQL register the suite directly. MySQL and Cloudflare also have backend-specific package suites.
 
 ```bash
 bun --bun vitest run \
-  packages/tenetkit/test/test/runtime-driver/index.test.ts \
+  packages/generalist/test/test/runtime-driver/index.test.ts \
   packages/pg/test/postgres/index.test.ts \
   --no-file-parallelism --maxWorkers=1
 bun run --cwd packages/pg test
@@ -74,23 +74,23 @@ Persistence or replay changes must exercise a close/reopen or fresh-Layer bounda
 
 ```bash
 bun --bun vitest run \
-  packages/tenetkit/test/runtime/execution/recovery/exclusive.test.ts \
-  packages/tenetkit/test/runtime/memory/store/operation/recovery.test.ts \
-  packages/tenetkit/test/runtime/sql/store.test.ts \
-  packages/tenetkit/test/transport/replay.test.ts \
+  packages/generalist/test/runtime/execution/recovery/exclusive.test.ts \
+  packages/generalist/test/runtime/memory/store/operation/recovery.test.ts \
+  packages/generalist/test/runtime/sql/store.test.ts \
+  packages/generalist/test/transport/replay.test.ts \
   --no-file-parallelism
 ```
 
 ## Release
 
-The lockstep public train is `tenetkit`, `@tenetkit/pg`, `@tenetkit/mysql`, `@tenetkit/cloudflare`, and `@tenetkit/rivet`. Root and package manifest versions match exactly. Do not publish from a workstation.
+The lockstep public train is `generalist`, `@generalist/pg`, `@generalist/mysql`, `@generalist/cloudflare`, and `@generalist/rivet`. Root and package manifest versions match exactly. Do not publish from a workstation.
 
 A release change must:
 
 1. Add the user-visible change to `CHANGELOG.md`.
-2. Set one lockstep semantic version in the root manifest and `packages/{tenetkit,pg,mysql,cloudflare,rivet}/package.json`.
+2. Set one lockstep semantic version in the root manifest and `packages/{generalist,pg,mysql,cloudflare,rivet}/package.json`.
 3. Pass `bun run check`, `bun run test` with PostgreSQL and MySQL available, and `bun run package`.
-4. Use the `tenetkit-release` skill to produce and verify artifacts from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
+4. Use the `generalist-release` skill to produce and verify artifacts from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
 5. Land the exact release commit on both `main` and `release`, then create the immutable `v<version>` tag at that commit.
 6. Push the tag to start `.github/workflows/publish.yml`. The workflow builds once, passes the same checksummed assets to GitHub and npm, and checks registry integrity. Manual dispatch only reconciles an existing tag and requires the tag plus its full 40-character commit SHA.
 

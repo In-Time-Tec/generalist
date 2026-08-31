@@ -4,8 +4,8 @@ import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
-import { Cursor } from "tenetkit/runtime"
-import { RunClient, Wire } from "tenetkit/transport"
+import { Cursor } from "generalist/runtime"
+import { RunClient, Wire } from "generalist/transport"
 
 const encodeEvents = (value: ReadonlyArray<{ readonly _tag: string }>): string => JSON.stringify(value)
 
@@ -30,7 +30,7 @@ const admitRun = (
     runId: "deep-research-e2e-run",
     sessionId: "deep-research-e2e-session",
     idempotencyKey: "question-1",
-    prompt: "What makes TenetKit agent framework standalone?",
+    prompt: "What makes Generalist agent framework standalone?",
   }).pipe(
     Effect.flatMap(HttpClientResponse.schemaBodyJson(RunReceipt)),
     Effect.catch((error) =>
@@ -95,7 +95,7 @@ const waitForServerReady = (port: number, attempts: number): Effect.Effect<void,
     ),
   )
 
-describe("deep-research-agent TenetKit transport e2e", () => {
+describe("deep-research-agent Generalist transport e2e", () => {
   layer(FetchHttpClient.layer.pipe(Layer.provideMerge(bunServicesLayer)), {
     excludeTestServices: true,
     timeout: 60_000,
@@ -152,7 +152,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
                 approvalId: "approval:search-1",
                 operation: "search-1",
                 capability: "web_search",
-                input: { query: "What makes TenetKit agent framework standalone?" },
+                input: { query: "What makes Generalist agent framework standalone?" },
               },
             },
           })
@@ -162,7 +162,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
               approvalId: "approval:search-1",
               operation: "search-1",
               capability: "web_search",
-              input: { query: "What makes TenetKit agent framework standalone?" },
+              input: { query: "What makes Generalist agent framework standalone?" },
             },
           })
           expect(approvalRequested?._tag === "ApprovalRequested" ? approvalRequested.request : undefined).toEqual(
@@ -171,7 +171,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
           expect(toolCall).toMatchObject({
             type: "tool-call",
             name: "web_search",
-            params: { query: "What makes TenetKit agent framework standalone?" },
+            params: { query: "What makes Generalist agent framework standalone?" },
           })
           expect(completedTool).toMatchObject({
             _tag: "ToolExecutionCompleted",
@@ -181,7 +181,7 @@ describe("deep-research-agent TenetKit transport e2e", () => {
             return yield* Effect.die("expected an Agent RunCompleted event")
           }
           expect(completed.result.text).toContain("Based on 2 sources")
-          expect(completed.result.text).toContain("https://github.com/tenetkit/tenetkit")
+          expect(completed.result.text).toContain("https://github.com/generalist/generalist")
         }),
       ),
     )

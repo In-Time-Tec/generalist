@@ -1,6 +1,6 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Agent, ModelRegistry } from "tenetkit"
-import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
+import { Agent, ModelRegistry } from "generalist"
+import { layer as deterministicLayer } from "generalist/ai/deterministic"
 
 const agent = Agent.make({ name: "local-assistant" })
 const selection = { provider: "deterministic", model: "local" }

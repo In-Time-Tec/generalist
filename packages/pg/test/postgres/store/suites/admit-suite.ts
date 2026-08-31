@@ -1,10 +1,14 @@
-import { Runtime } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
+import { Runtime } from "generalist/runtime"
+import { RunClaims } from "generalist/runtime/sql-driver"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { assistantRef, registrationsFor, textPrompt } from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
-import { provideScoped } from "../../../../../tenetkit/test/runtime/execution/scoped-provide.js"
-import { stagedRootSuite } from "../../../../../tenetkit/test/runtime/operation/suites/staged-root.js"
+import {
+  assistantRef,
+  registrationsFor,
+  textPrompt,
+} from "../../../../../generalist/test/runtime/execution/fixtures.js"
+import { provideScoped } from "../../../../../generalist/test/runtime/execution/scoped-provide.js"
+import { stagedRootSuite } from "../../../../../generalist/test/runtime/operation/suites/staged-root.js"
 import { postgresAvailable, postgresDatabase, postgresLayer } from "../../database.js"
 
 const database = postgresDatabase("staged-root")

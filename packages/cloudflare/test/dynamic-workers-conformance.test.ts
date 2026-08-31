@@ -1,6 +1,6 @@
-import { codeExecutorConformance } from "tenetkit/test"
+import { codeExecutorConformance } from "generalist/test"
 import { Effect } from "effect"
-import { layer } from "@tenetkit/cloudflare/dynamic-workers"
+import { layer } from "@generalist/cloudflare/dynamic-workers"
 import { makeVmWorkerLoader } from "./dynamic-workers-vm-loader.js"
 
 const loader = makeVmWorkerLoader()

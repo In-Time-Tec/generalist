@@ -24,7 +24,7 @@ import { themeSelector } from "./theme-selector"
 
 const h = html<Message>()
 
-export const githubUrl = "https://github.com/In-Time-Tec/tenetkit"
+export const githubUrl = "https://github.com/In-Time-Tec/generalist"
 
 const foldkitUrl = "https://foldkit.dev"
 
@@ -166,7 +166,7 @@ const footer = (): Html =>
               ".",
             ],
           ),
-          h.p([], ["TenetKit"]),
+          h.p([], ["Generalist"]),
         ],
       ),
     ],
@@ -191,7 +191,7 @@ const mobileNavDrawer = (model: Model): Html => {
             [h.Class("flex items-center gap-2")],
             [
               mark("size-6"),
-              h.span([h.Class("text-lg font-medium tracking-tight text-gray-900 dark:text-white")], ["TenetKit"]),
+              h.span([h.Class("text-lg font-medium tracking-tight text-gray-900 dark:text-white")], ["Generalist"]),
               betaBadge(),
             ],
           ),

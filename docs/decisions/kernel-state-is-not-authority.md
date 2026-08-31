@@ -1,6 +1,6 @@
 # Kernel memory is working memory; the run log is the authority
 
-A cell's namespace is not durable state. TenetKit operations, events, Session entries, and children remain the only truth, and nothing in `tenetkit/repl` is consulted to reconstruct a run.
+A cell's namespace is not durable state. Generalist operations, events, Session entries, and children remain the only truth, and nothing in `generalist/repl` is consulted to reconstruct a run.
 
 Three consequences follow, and each is a contract rather than a convention.
 
@@ -10,4 +10,4 @@ Three consequences follow, and each is a contract rather than a convention.
 
 **An uncertain cell is never replayed.** When a kernel dies mid-cell the outcome is `CellOutcomeUnknown`, which states that the cell may or may not have committed its effects. A host resolves it explicitly. Automatic replay would repeat whatever the cell already did outside the namespace, which is precisely what the durable journal exists to prevent.
 
-This is why the pool holds no authority beyond the current epoch, and why `tenetkit/repl`'s root export has no process dependencies at all: a projection, a decoder, or a test host reads the contract without ever touching a worker.
+This is why the pool holds no authority beyond the current epoch, and why `generalist/repl`'s root export has no process dependencies at all: a projection, a decoder, or a test host reads the contract without ever touching a worker.

@@ -4,133 +4,133 @@ severity: error
 message: Deleted provider option types must not be imported or re-exported.
 rule:
   any:
-    - pattern: import type { $VALUE as $TYPE } from "tenetkit/ai"
-    - pattern: import { type $VALUE as $TYPE } from "tenetkit/ai"
+    - pattern: import type { $VALUE as $TYPE } from "generalist/ai"
+    - pattern: import { type $VALUE as $TYPE } from "generalist/ai"
     - pattern:
-        context: export type { $VALUE as $TYPE } from "tenetkit/ai"
+        context: export type { $VALUE as $TYPE } from "generalist/ai"
         selector: export_statement
     - pattern:
-        context: export { type $VALUE as $TYPE } from "tenetkit/ai"
+        context: export { type $VALUE as $TYPE } from "generalist/ai"
         selector: export_statement
-    - pattern: import type { $VALUE as $TYPE } from "tenetkit/ai/anthropic"
-    - pattern: import { type $VALUE as $TYPE } from "tenetkit/ai/anthropic"
+    - pattern: import type { $VALUE as $TYPE } from "generalist/ai/anthropic"
+    - pattern: import { type $VALUE as $TYPE } from "generalist/ai/anthropic"
     - pattern:
-        context: export type { $VALUE as $TYPE } from "tenetkit/ai/anthropic"
-        selector: export_statement
-    - pattern:
-        context: export { type $VALUE as $TYPE } from "tenetkit/ai/anthropic"
-        selector: export_statement
-    - pattern: import type { $TYPE as $LOCAL } from "tenetkit/ai/anthropic"
-    - pattern: import type { $TYPE } from "tenetkit/ai/anthropic"
-    - pattern: import { type $TYPE as $LOCAL } from "tenetkit/ai/anthropic"
-    - pattern: import { type $TYPE } from "tenetkit/ai/anthropic"
-    - pattern:
-        context: export type { $TYPE as $LOCAL } from "tenetkit/ai/anthropic"
+        context: export type { $VALUE as $TYPE } from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export type { $TYPE } from "tenetkit/ai/anthropic"
+        context: export { type $VALUE as $TYPE } from "generalist/ai/anthropic"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "generalist/ai/anthropic"
+    - pattern: import type { $TYPE } from "generalist/ai/anthropic"
+    - pattern: import { type $TYPE as $LOCAL } from "generalist/ai/anthropic"
+    - pattern: import { type $TYPE } from "generalist/ai/anthropic"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE as $LOCAL } from "tenetkit/ai/anthropic"
+        context: export type { $TYPE } from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE } from "tenetkit/ai/anthropic"
-        selector: export_statement
-    - pattern: import type { $VALUE as $TYPE } from "tenetkit/ai/openai"
-    - pattern: import { type $VALUE as $TYPE } from "tenetkit/ai/openai"
-    - pattern:
-        context: export type { $VALUE as $TYPE } from "tenetkit/ai/openai"
+        context: export { type $TYPE as $LOCAL } from "generalist/ai/anthropic"
         selector: export_statement
     - pattern:
-        context: export { type $VALUE as $TYPE } from "tenetkit/ai/openai"
+        context: export { type $TYPE } from "generalist/ai/anthropic"
         selector: export_statement
-    - pattern: import type { $TYPE as $LOCAL } from "tenetkit/ai/openai"
-    - pattern: import type { $TYPE } from "tenetkit/ai/openai"
-    - pattern: import { type $TYPE as $LOCAL } from "tenetkit/ai/openai"
-    - pattern: import { type $TYPE } from "tenetkit/ai/openai"
+    - pattern: import type { $VALUE as $TYPE } from "generalist/ai/openai"
+    - pattern: import { type $VALUE as $TYPE } from "generalist/ai/openai"
     - pattern:
-        context: export type { $TYPE as $LOCAL } from "tenetkit/ai/openai"
+        context: export type { $VALUE as $TYPE } from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: export type { $TYPE } from "tenetkit/ai/openai"
+        context: export { type $VALUE as $TYPE } from "generalist/ai/openai"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "generalist/ai/openai"
+    - pattern: import type { $TYPE } from "generalist/ai/openai"
+    - pattern: import { type $TYPE as $LOCAL } from "generalist/ai/openai"
+    - pattern: import { type $TYPE } from "generalist/ai/openai"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE as $LOCAL } from "tenetkit/ai/openai"
+        context: export type { $TYPE } from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE } from "tenetkit/ai/openai"
-        selector: export_statement
-    - pattern: import type { $VALUE as $TYPE } from "tenetkit/ai/openai-compat"
-    - pattern: import { type $VALUE as $TYPE } from "tenetkit/ai/openai-compat"
-    - pattern:
-        context: export type { $VALUE as $TYPE } from "tenetkit/ai/openai-compat"
+        context: export { type $TYPE as $LOCAL } from "generalist/ai/openai"
         selector: export_statement
     - pattern:
-        context: export { type $VALUE as $TYPE } from "tenetkit/ai/openai-compat"
+        context: export { type $TYPE } from "generalist/ai/openai"
         selector: export_statement
-    - pattern: import type { $TYPE as $LOCAL } from "tenetkit/ai/openai-compat"
-    - pattern: import type { $TYPE } from "tenetkit/ai/openai-compat"
-    - pattern: import { type $TYPE as $LOCAL } from "tenetkit/ai/openai-compat"
-    - pattern: import { type $TYPE } from "tenetkit/ai/openai-compat"
+    - pattern: import type { $VALUE as $TYPE } from "generalist/ai/openai-compat"
+    - pattern: import { type $VALUE as $TYPE } from "generalist/ai/openai-compat"
     - pattern:
-        context: export type { $TYPE as $LOCAL } from "tenetkit/ai/openai-compat"
+        context: export type { $VALUE as $TYPE } from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export type { $TYPE } from "tenetkit/ai/openai-compat"
+        context: export { type $VALUE as $TYPE } from "generalist/ai/openai-compat"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "generalist/ai/openai-compat"
+    - pattern: import type { $TYPE } from "generalist/ai/openai-compat"
+    - pattern: import { type $TYPE as $LOCAL } from "generalist/ai/openai-compat"
+    - pattern: import { type $TYPE } from "generalist/ai/openai-compat"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE as $LOCAL } from "tenetkit/ai/openai-compat"
+        context: export type { $TYPE } from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE } from "tenetkit/ai/openai-compat"
-        selector: export_statement
-    - pattern: import type { $VALUE as $TYPE } from "tenetkit/ai/openrouter"
-    - pattern: import { type $VALUE as $TYPE } from "tenetkit/ai/openrouter"
-    - pattern:
-        context: export type { $VALUE as $TYPE } from "tenetkit/ai/openrouter"
+        context: export { type $TYPE as $LOCAL } from "generalist/ai/openai-compat"
         selector: export_statement
     - pattern:
-        context: export { type $VALUE as $TYPE } from "tenetkit/ai/openrouter"
+        context: export { type $TYPE } from "generalist/ai/openai-compat"
         selector: export_statement
-    - pattern: import type { $TYPE as $LOCAL } from "tenetkit/ai/openrouter"
-    - pattern: import type { $TYPE } from "tenetkit/ai/openrouter"
-    - pattern: import { type $TYPE as $LOCAL } from "tenetkit/ai/openrouter"
-    - pattern: import { type $TYPE } from "tenetkit/ai/openrouter"
+    - pattern: import type { $VALUE as $TYPE } from "generalist/ai/openrouter"
+    - pattern: import { type $VALUE as $TYPE } from "generalist/ai/openrouter"
     - pattern:
-        context: export type { $TYPE as $LOCAL } from "tenetkit/ai/openrouter"
+        context: export type { $VALUE as $TYPE } from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export type { $TYPE } from "tenetkit/ai/openrouter"
+        context: export { type $VALUE as $TYPE } from "generalist/ai/openrouter"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "generalist/ai/openrouter"
+    - pattern: import type { $TYPE } from "generalist/ai/openrouter"
+    - pattern: import { type $TYPE as $LOCAL } from "generalist/ai/openrouter"
+    - pattern: import { type $TYPE } from "generalist/ai/openrouter"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE as $LOCAL } from "tenetkit/ai/openrouter"
+        context: export type { $TYPE } from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE } from "tenetkit/ai/openrouter"
-        selector: export_statement
-    - pattern: import type { $VALUE as $TYPE } from "tenetkit/ai/deterministic"
-    - pattern: import { type $VALUE as $TYPE } from "tenetkit/ai/deterministic"
-    - pattern:
-        context: export type { $VALUE as $TYPE } from "tenetkit/ai/deterministic"
+        context: export { type $TYPE as $LOCAL } from "generalist/ai/openrouter"
         selector: export_statement
     - pattern:
-        context: export { type $VALUE as $TYPE } from "tenetkit/ai/deterministic"
+        context: export { type $TYPE } from "generalist/ai/openrouter"
         selector: export_statement
-    - pattern: import type { $TYPE as $LOCAL } from "tenetkit/ai/deterministic"
-    - pattern: import type { $TYPE } from "tenetkit/ai/deterministic"
-    - pattern: import { type $TYPE as $LOCAL } from "tenetkit/ai/deterministic"
-    - pattern: import { type $TYPE } from "tenetkit/ai/deterministic"
+    - pattern: import type { $VALUE as $TYPE } from "generalist/ai/deterministic"
+    - pattern: import { type $VALUE as $TYPE } from "generalist/ai/deterministic"
     - pattern:
-        context: export type { $TYPE as $LOCAL } from "tenetkit/ai/deterministic"
+        context: export type { $VALUE as $TYPE } from "generalist/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: export type { $TYPE } from "tenetkit/ai/deterministic"
+        context: export { type $VALUE as $TYPE } from "generalist/ai/deterministic"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "generalist/ai/deterministic"
+    - pattern: import type { $TYPE } from "generalist/ai/deterministic"
+    - pattern: import { type $TYPE as $LOCAL } from "generalist/ai/deterministic"
+    - pattern: import { type $TYPE } from "generalist/ai/deterministic"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "generalist/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE as $LOCAL } from "tenetkit/ai/deterministic"
+        context: export type { $TYPE } from "generalist/ai/deterministic"
         selector: export_statement
     - pattern:
-        context: export { type $TYPE } from "tenetkit/ai/deterministic"
+        context: export { type $TYPE as $LOCAL } from "generalist/ai/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE } from "generalist/ai/deterministic"
         selector: export_statement
 constraints:
   TYPE:

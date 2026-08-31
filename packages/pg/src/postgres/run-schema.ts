@@ -8,7 +8,7 @@ import {
   SchemaMigrationFailed,
   planSqlSchema,
   type SqlSchemaPlan,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import {
   MIGRATION_NAME,
   MIGRATIONS_TABLE,
@@ -110,12 +110,12 @@ export const apply = (source: string) =>
     if ((existing[0]?.present ?? 0) > 0) {
       return yield* SchemaMigrationFailed.make({
         source,
-        message: "cannot create the baseline over an existing TenetKit schema",
+        message: "cannot create the baseline over an existing Generalist schema",
       })
     }
     yield* runMigrations(source)
     yield* check(source).pipe(
-      Effect.catchTag("tenetkit/runtime/SchemaUpgradeRequired", (error) =>
+      Effect.catchTag("generalist/runtime/SchemaUpgradeRequired", (error) =>
         SchemaMigrationFailed.make({ source, message: `schema absent after apply: ${error.current}` }),
       ),
     )

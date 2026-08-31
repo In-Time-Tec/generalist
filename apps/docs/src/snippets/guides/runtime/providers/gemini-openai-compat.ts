@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { layerGoogleAIStudio } from "tenetkit/ai/openai-compatible"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "generalist"
+import { layerGoogleAIStudio } from "generalist/ai/openai-compatible"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "gemini-agent" })

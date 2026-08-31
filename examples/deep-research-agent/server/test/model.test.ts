@@ -1,6 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Prompt } from "tenetkit"
+import { LanguageModel, Prompt } from "generalist"
 import { layerOrDeterministic } from "../src/model"
 import { toolkit, toolkitLayer } from "../src/tools"
 import { testLayer } from "../src/web-search"
@@ -28,14 +28,14 @@ describe("DeepResearchAgent model", () => {
   layer(Layer.mergeAll(deterministicModel, toolkitServices))("streams tool calls and cited answers", (it) => {
     it.effect("streams a web_search tool call before any tool result exists", () =>
       Effect.gen(function* () {
-        const parts = yield* collectStreamText("What makes TenetKit standalone?")
+        const parts = yield* collectStreamText("What makes Generalist standalone?")
 
         expect(parts).toMatchObject([
           {
             type: "tool-call",
             id: "search-1",
             name: "web_search",
-            params: { query: "What makes TenetKit standalone?" },
+            params: { query: "What makes Generalist standalone?" },
             providerExecuted: false,
           },
           { type: "finish", reason: "tool-calls" },
@@ -65,7 +65,7 @@ describe("DeepResearchAgent model", () => {
         const parts = yield* collectStreamText([
           {
             role: "user",
-            content: [{ type: "text", text: "What makes TenetKit standalone?" }],
+            content: [{ type: "text", text: "What makes Generalist standalone?" }],
           },
           {
             role: "tool",
@@ -78,13 +78,13 @@ describe("DeepResearchAgent model", () => {
                 result: {
                   results: [
                     {
-                      title: "TenetKit transport",
-                      url: "https://tenetkit.test/transport",
-                      snippet: "TenetKit streams same-process sessions over transport frames.",
+                      title: "Generalist transport",
+                      url: "https://generalist.test/transport",
+                      snippet: "Generalist streams same-process sessions over transport frames.",
                     },
                     {
-                      title: "TenetKit agent loop",
-                      url: "https://tenetkit.test/agent",
+                      title: "Generalist agent loop",
+                      url: "https://generalist.test/agent",
                       snippet: "The agent loop plans, calls tools, and synthesizes answers.",
                     },
                   ],
@@ -99,8 +99,8 @@ describe("DeepResearchAgent model", () => {
         expect(parts[0]?.type).toBe("text-delta")
         if (parts[0]?.type === "text-delta") {
           expect(parts[0].delta).toContain("Based on 2 sources")
-          expect(parts[0].delta).toContain("TenetKit transport")
-          expect(parts[0].delta).toContain("https://tenetkit.test/agent")
+          expect(parts[0].delta).toContain("Generalist transport")
+          expect(parts[0].delta).toContain("https://generalist.test/agent")
         }
       }),
     )
@@ -110,7 +110,7 @@ describe("DeepResearchAgent model", () => {
         const parts = yield* collectStreamText([
           {
             role: "user",
-            content: [{ type: "text", text: "What makes TenetKit standalone?" }],
+            content: [{ type: "text", text: "What makes Generalist standalone?" }],
           },
           {
             role: "tool",

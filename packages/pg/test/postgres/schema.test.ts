@@ -3,5 +3,5 @@ import { SCHEMA_VERSION, schemaChecksum } from "../../src/postgres/schema.js"
 
 it("freezes the logical SQL Runtime schema checksum", () => {
   expect(SCHEMA_VERSION).toBe(4)
-  expect(schemaChecksum()).toBe("440b5f1b645eb00d37f28a2f4cbb3dab9e7da4a10864631a860967aaef934729")
+  expect(schemaChecksum()).toBe("c9ff31038d2758d3398dc9836880285b23a0428fd0a08c4c0752757a6e647d4a")
 })

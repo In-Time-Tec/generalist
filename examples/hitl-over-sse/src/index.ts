@@ -10,9 +10,9 @@ import {
   Tool,
   ToolExecutor,
   Toolkit,
-} from "tenetkit"
-import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
-import { SSE } from "tenetkit/transport"
+} from "generalist"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "generalist/runtime"
+import { SSE } from "generalist/transport"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 

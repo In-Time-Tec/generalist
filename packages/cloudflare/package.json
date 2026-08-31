@@ -13,15 +13,15 @@
     "LICENSE",
     "README.md"
   ],
-  "homepage": "https://github.com/In-Time-Tec/tenetkit#readme",
+  "homepage": "https://github.com/In-Time-Tec/generalist#readme",
   "bugs": {
-    "url": "https://github.com/In-Time-Tec/tenetkit/issues"
+    "url": "https://github.com/In-Time-Tec/generalist/issues"
   },
   "publishConfig": {
     "access": "public"
   },
-  "name": "@tenetkit/cloudflare",
-  "description": "Cloudflare Workers and Durable Objects adapters for TenetKit",
+  "name": "@generalist/cloudflare",
+  "description": "Cloudflare Workers and Durable Objects adapters for Generalist",
   "exports": {
     "./workers": {
       "types": "./dist/workers/index.d.ts",
@@ -44,7 +44,7 @@
   "dependencies": {
     "@effect/sql-sqlite-do": "catalog:",
     "es-module-lexer": "catalog:",
-    "tenetkit": "workspace:*"
+    "generalist": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
@@ -57,7 +57,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/In-Time-Tec/tenetkit.git",
+    "url": "git+https://github.com/In-Time-Tec/generalist.git",
     "directory": "packages/cloudflare"
   }
 }

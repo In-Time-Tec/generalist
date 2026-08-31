@@ -1,6 +1,6 @@
 /* oxlint-disable anti-slop/no-reflect-apply, anti-slop/no-reflect-get, anti-slop/no-runtime-typeof, effecttsgo/async-function, effecttsgo/global-timers, effecttsgo/new-promise */
 import { createContext, SourceTextModule } from "node:vm"
-import type { WorkerCode, WorkerLoader } from "@tenetkit/cloudflare/dynamic-workers"
+import type { WorkerCode, WorkerLoader } from "@generalist/cloudflare/dynamic-workers"
 
 export interface VmWorkerLoader extends WorkerLoader {
   readonly activeInvocations: () => number

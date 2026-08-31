@@ -1,6 +1,15 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, AgentManifest, Approvals, LanguageModel, ModelMiddleware, Pins, Response, ToolExecutor } from "tenetkit"
-import { Cursor, ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "tenetkit/runtime"
+import {
+  Agent,
+  AgentManifest,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Pins,
+  Response,
+  ToolExecutor,
+} from "generalist"
+import { Cursor, ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
@@ -33,7 +42,7 @@ const modelLayer = Layer.effect(
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () =>
       Stream.make(
-        Response.makePart("text-delta", { id: "assistant", delta: "Hello from TenetKit." }),
+        Response.makePart("text-delta", { id: "assistant", delta: "Hello from Generalist." }),
         Response.makePart("finish", { reason: "stop", usage, response: { status: 200, headers: {} } }),
       ),
   }),

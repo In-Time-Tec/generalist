@@ -14,8 +14,8 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { Anthropic } from "tenetkit/ai"
-                - pattern: import * as Anthropic from "tenetkit/ai/anthropic"
+                - pattern: import { Anthropic } from "generalist/ai"
+                - pattern: import * as Anthropic from "generalist/ai/anthropic"
               stopBy: end
             stopBy: end
     - all:
@@ -31,8 +31,8 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { OpenAi } from "tenetkit/ai"
-                - pattern: import * as OpenAi from "tenetkit/ai/openai"
+                - pattern: import { OpenAi } from "generalist/ai"
+                - pattern: import * as OpenAi from "generalist/ai/openai"
               stopBy: end
             stopBy: end
     - all:
@@ -45,8 +45,8 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { OpenAiCompatible } from "tenetkit/ai"
-                - pattern: import * as OpenAiCompatible from "tenetkit/ai/openai-compat"
+                - pattern: import { OpenAiCompatible } from "generalist/ai"
+                - pattern: import * as OpenAiCompatible from "generalist/ai/openai-compat"
               stopBy: end
             stopBy: end
     - all:
@@ -59,8 +59,8 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { OpenRouter } from "tenetkit/ai"
-                - pattern: import * as OpenRouter from "tenetkit/ai/openrouter"
+                - pattern: import { OpenRouter } from "generalist/ai"
+                - pattern: import * as OpenRouter from "generalist/ai/openrouter"
               stopBy: end
             stopBy: end
     - all:
@@ -73,8 +73,8 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { Deterministic } from "tenetkit/ai"
-                - pattern: import * as Deterministic from "tenetkit/ai/deterministic"
+                - pattern: import { Deterministic } from "generalist/ai"
+                - pattern: import * as Deterministic from "generalist/ai/deterministic"
               stopBy: end
             stopBy: end
     - all:
@@ -87,8 +87,8 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { Embedding } from "tenetkit/ai"
-                - pattern: import * as Embedding from "tenetkit/ai/embedding"
+                - pattern: import { Embedding } from "generalist/ai"
+                - pattern: import * as Embedding from "generalist/ai/embedding"
               stopBy: end
             stopBy: end
     - all:
@@ -125,8 +125,8 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { Presets } from "tenetkit/ai"
-                - pattern: import * as Presets from "tenetkit/ai/presets"
+                - pattern: import { Presets } from "generalist/ai"
+                - pattern: import * as Presets from "generalist/ai/presets"
               stopBy: end
             stopBy: end
     - all:
@@ -135,20 +135,20 @@ rule:
             kind: program
             has:
               any:
-                - pattern: import { Anthropic as $NAMESPACE } from "tenetkit/ai"
-                - pattern: import { OpenAi as $NAMESPACE } from "tenetkit/ai"
-                - pattern: import { OpenAiCompatible as $NAMESPACE } from "tenetkit/ai"
-                - pattern: import { OpenRouter as $NAMESPACE } from "tenetkit/ai"
-                - pattern: import { Deterministic as $NAMESPACE } from "tenetkit/ai"
-                - pattern: import { Embedding as $NAMESPACE } from "tenetkit/ai"
-                - pattern: import { Presets as $NAMESPACE } from "tenetkit/ai"
-                - pattern: import * as $NAMESPACE from "tenetkit/ai/anthropic"
-                - pattern: import * as $NAMESPACE from "tenetkit/ai/openai"
-                - pattern: import * as $NAMESPACE from "tenetkit/ai/openai-compat"
-                - pattern: import * as $NAMESPACE from "tenetkit/ai/openrouter"
-                - pattern: import * as $NAMESPACE from "tenetkit/ai/deterministic"
-                - pattern: import * as $NAMESPACE from "tenetkit/ai/embedding"
-                - pattern: import * as $NAMESPACE from "tenetkit/ai/presets"
+                - pattern: import { Anthropic as $NAMESPACE } from "generalist/ai"
+                - pattern: import { OpenAi as $NAMESPACE } from "generalist/ai"
+                - pattern: import { OpenAiCompatible as $NAMESPACE } from "generalist/ai"
+                - pattern: import { OpenRouter as $NAMESPACE } from "generalist/ai"
+                - pattern: import { Deterministic as $NAMESPACE } from "generalist/ai"
+                - pattern: import { Embedding as $NAMESPACE } from "generalist/ai"
+                - pattern: import { Presets as $NAMESPACE } from "generalist/ai"
+                - pattern: import * as $NAMESPACE from "generalist/ai/anthropic"
+                - pattern: import * as $NAMESPACE from "generalist/ai/openai"
+                - pattern: import * as $NAMESPACE from "generalist/ai/openai-compat"
+                - pattern: import * as $NAMESPACE from "generalist/ai/openrouter"
+                - pattern: import * as $NAMESPACE from "generalist/ai/deterministic"
+                - pattern: import * as $NAMESPACE from "generalist/ai/embedding"
+                - pattern: import * as $NAMESPACE from "generalist/ai/presets"
               stopBy: end
             stopBy: end
 constraints:

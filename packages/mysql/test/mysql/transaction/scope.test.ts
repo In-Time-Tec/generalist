@@ -33,11 +33,11 @@ it.live("retries the whole transaction after a deadlock", () => {
     })
     expect(attempts.value).toBe(3)
     const snapshots = yield* Metric.snapshot
-    const retries = snapshots.find((snapshot) => snapshot.id === "tenetkit_runtime_sql_deadlock_retries")
+    const retries = snapshots.find((snapshot) => snapshot.id === "generalist_runtime_sql_deadlock_retries")
     expect(retries?.type).toBe("Counter")
     if (retries?.type === "Counter") expect(retries.state.count).toBe(2)
-    expect(spans[0]?.attributes.get("tenetkit.runtime.sql.retry.classification")).toBe("deadlock")
-    expect(spans[0]?.attributes.get("tenetkit.runtime.sql.retry.attempt")).toBe(2)
+    expect(spans[0]?.attributes.get("generalist.runtime.sql.retry.classification")).toBe("deadlock")
+    expect(spans[0]?.attributes.get("generalist.runtime.sql.retry.attempt")).toBe(2)
   }).pipe(
     Effect.withSpan("mysql-transaction-test"),
     Effect.provideService(Tracer.Tracer, tracer),

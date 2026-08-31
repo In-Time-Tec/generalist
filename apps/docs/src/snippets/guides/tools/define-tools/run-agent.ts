@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, LanguageModel, Response } from "tenetkit"
+import { Agent, LanguageModel, Response } from "generalist"
 import { docsToolLayer } from "./executor"
 import { toolkit } from "./search-tool"
 

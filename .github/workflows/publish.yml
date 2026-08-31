@@ -52,7 +52,7 @@ jobs:
           tag="v$version"
           source_commit=$(git rev-parse HEAD)
           [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]]
-          for manifest in package.json packages/{tenetkit,pg,mysql,cloudflare,rivet}/package.json; do
+          for manifest in package.json packages/{generalist,pg,mysql,cloudflare,rivet}/package.json; do
             [[ "$(jq -r .version "$manifest")" == "$version" ]]
           done
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
@@ -129,11 +129,11 @@ jobs:
           set -euo pipefail
           cd release
           package_assets=(
-            "tenetkit-${VERSION}.tgz"
-            "tenetkit-pg-${VERSION}.tgz"
-            "tenetkit-mysql-${VERSION}.tgz"
-            "tenetkit-cloudflare-${VERSION}.tgz"
-            "tenetkit-rivet-${VERSION}.tgz"
+            "generalist-${VERSION}.tgz"
+            "generalist-pg-${VERSION}.tgz"
+            "generalist-mysql-${VERSION}.tgz"
+            "generalist-cloudflare-${VERSION}.tgz"
+            "generalist-rivet-${VERSION}.tgz"
           )
           mapfile -t package_assets < <(printf '%s\n' "${package_assets[@]}" | sort)
           expected=(SHA256SUMS "${package_assets[@]}" release-evidence.json)
@@ -151,7 +151,7 @@ jobs:
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql @tenetkit/cloudflare @tenetkit/rivet | sort)
+          mapfile -t expected_packages < <(printf '%s\n' generalist @generalist/pg @generalist/mysql @generalist/cloudflare @generalist/rivet | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do
@@ -210,11 +210,11 @@ jobs:
           set -euo pipefail
           cd release
           package_assets=(
-            "tenetkit-${VERSION}.tgz"
-            "tenetkit-pg-${VERSION}.tgz"
-            "tenetkit-mysql-${VERSION}.tgz"
-            "tenetkit-cloudflare-${VERSION}.tgz"
-            "tenetkit-rivet-${VERSION}.tgz"
+            "generalist-${VERSION}.tgz"
+            "generalist-pg-${VERSION}.tgz"
+            "generalist-mysql-${VERSION}.tgz"
+            "generalist-cloudflare-${VERSION}.tgz"
+            "generalist-rivet-${VERSION}.tgz"
           )
           mapfile -t package_assets < <(printf '%s\n' "${package_assets[@]}" | sort)
           expected=(SHA256SUMS "${package_assets[@]}" release-evidence.json)
@@ -232,7 +232,7 @@ jobs:
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' tenetkit @tenetkit/pg @tenetkit/mysql @tenetkit/cloudflare @tenetkit/rivet | sort)
+          mapfile -t expected_packages < <(printf '%s\n' generalist @generalist/pg @generalist/mysql @generalist/cloudflare @generalist/rivet | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do
@@ -242,7 +242,7 @@ jobs:
           registry_document() {
             curl --fail --silent --show-error "https://registry.npmjs.org/${1/\//%2f}/$2" 2>/dev/null || true
           }
-          latest_version=$(curl --fail --silent --show-error https://registry.npmjs.org/tenetkit 2>/dev/null | jq -r '."dist-tags".latest // empty' || true)
+          latest_version=$(curl --fail --silent --show-error https://registry.npmjs.org/generalist 2>/dev/null | jq -r '."dist-tags".latest // empty' || true)
           if [[ -n "$latest_version" ]] && [[ "$(printf '%s\n' "$latest_version" "$VERSION" | sort -V | tail -1)" == "$latest_version" ]] && [[ "$latest_version" != "$VERSION" ]]; then
             publish_args+=(--tag "patch-$(printf '%s' "$VERSION" | cut -d. -f1-2 | tr . -)")
           fi

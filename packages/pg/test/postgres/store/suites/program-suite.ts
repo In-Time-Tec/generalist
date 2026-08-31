@@ -1,10 +1,10 @@
-import { layer as backendLayer } from "@tenetkit/pg"
+import { layer as backendLayer } from "@generalist/pg"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
-import { registrationsFor } from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
-import { agentMapProgramFixture } from "../../../../../tenetkit/test/runtime/program/fixture.js"
+import { RunExecutor, Runtime, RunStore } from "generalist/runtime"
+import { RunClaims } from "generalist/runtime/sql-driver"
+import { registrationsFor } from "../../../../../generalist/test/runtime/execution/fixtures.js"
+import { agentMapProgramFixture } from "../../../../../generalist/test/runtime/program/fixture.js"
 import { postgresAvailable, postgresDatabase, postgresTestMaxConnections } from "../../database.js"
 
 const describePostgres = postgresAvailable ? describe : describe.skip

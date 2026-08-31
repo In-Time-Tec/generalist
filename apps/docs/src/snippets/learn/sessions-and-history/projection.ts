@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Prompt, Session } from "tenetkit"
+import { Prompt, Session } from "generalist"
 
 const message = (entry: Prompt.Message): Session.AppendInput => ({ _tag: "Message", message: entry })
 

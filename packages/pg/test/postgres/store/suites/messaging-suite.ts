@@ -1,10 +1,10 @@
-import { messagingAuthorizationSuite } from "../../../../../tenetkit/test/runtime/messaging/suites/authorization.js"
-import { messagingDeliveryIdempotenceSuite } from "../../../../../tenetkit/test/runtime/messaging/suites/delivery/idempotence.js"
-import { messagingDurabilitySuite } from "../../../../../tenetkit/test/runtime/messaging/suites/delivery/durability.js"
-import { messagingMailboxSuite } from "../../../../../tenetkit/test/runtime/messaging/suites/mailbox.js"
-import { messagingPolicySuite } from "../../../../../tenetkit/test/runtime/messaging/suites/policy.js"
-import { messagingSendOperationSuite } from "../../../../../tenetkit/test/runtime/messaging/suites/send-operation.js"
-import { claimReadyWorker } from "../../../../../tenetkit/test/runtime/run/queued-activation.js"
+import { messagingAuthorizationSuite } from "../../../../../generalist/test/runtime/messaging/suites/authorization.js"
+import { messagingDeliveryIdempotenceSuite } from "../../../../../generalist/test/runtime/messaging/suites/delivery/idempotence.js"
+import { messagingDurabilitySuite } from "../../../../../generalist/test/runtime/messaging/suites/delivery/durability.js"
+import { messagingMailboxSuite } from "../../../../../generalist/test/runtime/messaging/suites/mailbox.js"
+import { messagingPolicySuite } from "../../../../../generalist/test/runtime/messaging/suites/policy.js"
+import { messagingSendOperationSuite } from "../../../../../generalist/test/runtime/messaging/suites/send-operation.js"
+import { claimReadyWorker } from "../../../../../generalist/test/runtime/run/queued-activation.js"
 import { postgresAvailable, postgresDatabase, postgresMessagingLayer, postgresLayer } from "../../database.js"
 
 /**

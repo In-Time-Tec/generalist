@@ -6,7 +6,7 @@ import {
   type SqlDriverStoreError,
   type SqlRuntimeDriver,
   type SqlStoreOptions,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import { eventStream } from "../events/event-stream.js"
 import { transactionRunner } from "../events/transaction-events.js"
 import { check as checkSchema } from "../run-schema.js"

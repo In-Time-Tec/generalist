@@ -1,7 +1,7 @@
 import { Effect, Schedule, Stream, SynchronizedRef } from "effect"
 import type { PgClient } from "@effect/sql-pg"
-import { Cursor, Errors, RunEvent } from "tenetkit/runtime"
-import type { EventHub } from "tenetkit/runtime/sql-driver"
+import { Cursor, Errors, RunEvent } from "generalist/runtime"
+import type { EventHub } from "generalist/runtime/sql-driver"
 import { NOTIFY_CHANNEL } from "../schema.js"
 
 type EventsError = Errors.CursorExpired | Errors.RunNotFound | Errors.RuntimeUnavailable | Errors.SubscriberLagged

@@ -1,8 +1,8 @@
 import { Config, Layer, Redacted } from "effect"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { MysqlClient } from "@effect/sql-mysql2"
-import { layerSqlRuntime, type SqlRuntimeServices } from "tenetkit/runtime/sql-driver"
-import { ExecutableResolver } from "tenetkit/runtime"
+import { layerSqlRuntime, type SqlRuntimeServices } from "generalist/runtime/sql-driver"
+import { ExecutableResolver } from "generalist/runtime"
 import { mysqlDriver, type RuntimeError, type Options } from "../store/implementation.js"
 
 export type { Options }

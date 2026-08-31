@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { Policy } from "tenetkit"
+import { Policy } from "generalist"
 
 export const focusLateTurns: Policy.Policy = Policy.make((info) => {
   if (info.turn >= 6) return Effect.succeed(Policy.decision.stop({ _tag: "GoalSatisfied" }))

@@ -1,6 +1,6 @@
 import { FileSystem, Layer, Path } from "effect"
-import { SkillCatalog } from "tenetkit"
-import { FileSystemCatalog } from "tenetkit/skills"
+import { SkillCatalog } from "generalist"
+import { FileSystemCatalog } from "generalist/instructions/skills"
 
 export const fileSystemSkills: Layer.Layer<
   SkillCatalog.SkillCatalog,

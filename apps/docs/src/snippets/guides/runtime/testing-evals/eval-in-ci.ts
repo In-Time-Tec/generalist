@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "generalist"
+import { layer as deterministicLayer } from "generalist/ai/deterministic"
 
 const agent = Agent.make({ name: "eval-agent" })
 

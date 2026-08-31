@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { MCPClient } from "tenetkit/mcp"
+import { MCPClient } from "generalist/mcp"
 
 const client: MCPClient.Service = {
   server: "local-docs",

@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "tenetkit"
-import { layerOrDeterministic } from "tenetkit/ai/openai"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "generalist"
+import { layerOrDeterministic } from "generalist/ai/openai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "release-notes" })

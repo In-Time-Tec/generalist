@@ -9,7 +9,7 @@ import {
   ToolExecutor,
   Tool,
   Toolkit,
-} from "tenetkit"
+} from "generalist"
 
 const summarizer = Agent.make({
   name: "summarizer",
@@ -53,19 +53,19 @@ const modelLayer = Layer.effect(
             Response.makePart("tool-call", {
               id: "summarize-1",
               name: "summarize",
-              params: { document: "TenetKit is an Effect-native agent loop." },
+              params: { document: "Generalist is an Effect-native agent loop." },
               providerExecuted: false,
             }),
           )
         case 2:
           return Stream.make(
-            Response.makePart("text-delta", { id: "assistant", delta: "TenetKit runs agent loops on Effect." }),
+            Response.makePart("text-delta", { id: "assistant", delta: "Generalist runs agent loops on Effect." }),
           )
         default:
           return Stream.make(
             Response.makePart("text-delta", {
               id: "assistant",
-              delta: "Summary ready: TenetKit runs agent loops on Effect.",
+              delta: "Summary ready: Generalist runs agent loops on Effect.",
             }),
           )
       }

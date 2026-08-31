@@ -1,11 +1,11 @@
 import { Context, Effect, Schema } from "effect"
-import { Tool, Toolkit } from "tenetkit"
+import { Tool, Toolkit } from "generalist"
 export interface DocsIndexService {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<string>>
 }
 
 export class DocsIndex extends Context.Service<DocsIndex, DocsIndexService>()(
-  "@tenetkit/docs/snippets/guides/tools/define-tools/search-tool/DocsIndex",
+  "@generalist/docs/snippets/guides/tools/define-tools/search-tool/DocsIndex",
 ) {}
 
 export const searchDocsTool = Tool.make("search_docs", {

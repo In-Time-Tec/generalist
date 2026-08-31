@@ -1,6 +1,6 @@
 import { Effect } from "effect"
-import { ToolContext } from "tenetkit"
-import { ChildAdmission } from "tenetkit/runtime"
+import { ToolContext } from "generalist"
+import { ChildAdmission } from "generalist/runtime"
 
 type InExecution = ChildAdmission.AgentChildren | ToolContext.ToolContext
 

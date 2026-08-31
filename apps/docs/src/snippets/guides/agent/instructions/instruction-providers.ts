@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
-import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "tenetkit"
+import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "generalist"
 
 const persona = Instructions.fromText("persona", "You are the release-notes assistant.")
 

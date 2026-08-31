@@ -16,7 +16,7 @@ export const middleware = definePage({
   content: [
     p(
       code("ModelMiddleware"),
-      " is optional. When absent, TenetKit uses the same identity behavior as ",
+      " is optional. When absent, Generalist uses the same identity behavior as ",
       code("ModelMiddleware.layerIdentity"),
       ". A middleware has two optional hooks: ",
       code("transformPrompt"),
@@ -71,7 +71,7 @@ export const middleware = definePage({
       code("Guardrail.validateInput"),
       " turns a check into a ",
       code("transformPrompt"),
-      " middleware that fails the run before the prompt reaches the provider. TenetKit keeps detectors out of core, so plug in whatever compliance dependency your host already uses.",
+      " middleware that fails the run before the prompt reaches the provider. Generalist keeps detectors out of core, so plug in whatever compliance dependency your host already uses.",
     ),
     codeBlock({ label: "validate-input.ts", source: validateInput, expectedOutput: validateInputExpected }),
     p(
@@ -96,8 +96,8 @@ export const middleware = definePage({
     bullets(
       [
         "Response metadata is withheld while a retry is possible. Reasoning, text, and tool-call output are absolute retry barriers, so a consumed stream is never replayed.",
-        "Set streamIdleTimeout only when the host wants an explicit model-silence deadline; TenetKit has no hidden timeout.",
-        "Set invalidToolCallCorrectionLimit (0–2) to allow bounded, instrumented correction attempts under the same logical model call. TenetKit corrects only its precise pre-emission tool-parameter validation signal; generic model output decode failures are terminal unless ordinary provider resilience classifies them otherwise. Direct custom models with schema-backed tools must attach their exact compiler with ModelRegistry.withToolJsonSchemaCompiler. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support this projection; OpenRouter fails typed before transport when schema-backed correction is enabled.",
+        "Set streamIdleTimeout only when the host wants an explicit model-silence deadline; Generalist has no hidden timeout.",
+        "Set invalidToolCallCorrectionLimit (0–2) to allow bounded, instrumented correction attempts under the same logical model call. Generalist corrects only its precise pre-emission tool-parameter validation signal; generic model output decode failures are terminal unless ordinary provider resilience classifies them otherwise. Direct custom models with schema-backed tools must attach their exact compiler with ModelRegistry.withToolJsonSchemaCompiler. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support this projection; OpenRouter fails typed before transport when schema-backed correction is enabled.",
       ],
       [
         "Without a layer the agent uses ",

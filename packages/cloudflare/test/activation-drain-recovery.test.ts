@@ -11,13 +11,13 @@ import {
   RunStore as RunStoreFacade,
   Runtime,
   TreePolicy,
-} from "tenetkit/runtime"
+} from "generalist/runtime"
 import {
   makeExclusiveExecutionRecovery,
   type RunActivation,
   type RunActivationProjection,
   SqliteRunActivation,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import {
   assistant,
   assistantAddress,
@@ -25,14 +25,14 @@ import {
   completedResult,
   registrationsFor,
   textPrompt,
-} from "../../tenetkit/test/runtime/execution/fixtures.js"
-import { tempDbPath } from "../../tenetkit/test/runtime/sql/scenario.js"
-import { closedTestAgent } from "../../tenetkit/test/runtime/run/identity.js"
-import { makeSqliteRunStore } from "../../tenetkit/src/runtime/sql/store.js"
-import { makeRuntime } from "../../tenetkit/src/runtime/memory/layer.js"
-import { layer as activeExecutionsLayer } from "../../tenetkit/src/runtime/execution/active-executions.js"
+} from "../../generalist/test/runtime/execution/fixtures.js"
+import { tempDbPath } from "../../generalist/test/runtime/sql/scenario.js"
+import { closedTestAgent } from "../../generalist/test/runtime/run/identity.js"
+import { makeSqliteRunStore } from "../../generalist/src/runtime/sql/store.js"
+import { makeRuntime } from "../../generalist/src/runtime/memory/layer.js"
+import { layer as activeExecutionsLayer } from "../../generalist/src/runtime/execution/active-executions.js"
 
-import { Runtime as SqliteRuntime } from "../../tenetkit/src/runtime/sqlite-bun.js"
+import { Runtime as SqliteRuntime } from "../../generalist/src/runtime/sqlite-bun.js"
 const LocalScheduler = LocalSchedulerFacade.LocalScheduler
 const RunExecutor = RunExecutorFacade.RunExecutor
 const RunStore = RunStoreFacade.RunStore
@@ -187,14 +187,14 @@ it.live("atomically projects a fan-out child promoted into ready capacity", () =
       ).toBe(true)
       expect((yield* runtime.inspect(first!)).status).toBe("running")
       expect((yield* runtime.inspectFanOut(fanOut.fanOutId)).members[1]?.status).toBe("pending")
-      expect(yield* sql`SELECT run_id FROM tenetkit_activations WHERE run_id = ${second!}`).toHaveLength(0)
+      expect(yield* sql`SELECT run_id FROM generalist_activations WHERE run_id = ${second!}`).toHaveLength(0)
 
       rejectProjection = false
       yield* store.complete({ ...firstClaim, result: completedResult("first complete") })
       expect((yield* runtime.inspectFanOut(fanOut.fanOutId)).members[1]?.status).toBe("running")
       expect(
         yield* sql<{ intent: string; run_status: string }>`
-          SELECT intent, run_status FROM tenetkit_activations WHERE run_id = ${second!}
+          SELECT intent, run_status FROM generalist_activations WHERE run_id = ${second!}
         `,
       ).toEqual([{ intent: "execute", run_status: "queued" }])
     }),
@@ -211,9 +211,9 @@ it.live("deletes inactive projections and rolls candidate writes back with the c
       yield* sql.withTransaction(
         projection.applyInTransaction([{ runId: "run", intent: "execute", attemptFence: 0, runStatus: "running" }]),
       )
-      expect(yield* sql`SELECT run_id FROM tenetkit_activations`).toHaveLength(1)
+      expect(yield* sql`SELECT run_id FROM generalist_activations`).toHaveLength(1)
       yield* sql.withTransaction(projection.applyInTransaction([{ runId: "run", intent: "inactive" }]))
-      expect(yield* sql`SELECT run_id FROM tenetkit_activations`).toHaveLength(0)
+      expect(yield* sql`SELECT run_id FROM generalist_activations`).toHaveLength(0)
       yield* Effect.exit(
         sql.withTransaction(
           projection
@@ -221,7 +221,7 @@ it.live("deletes inactive projections and rolls candidate writes back with the c
             .pipe(Effect.andThen(Effect.fail("rollback"))),
         ),
       )
-      expect(yield* sql`SELECT run_id FROM tenetkit_activations WHERE run_id = 'rollback'`).toHaveLength(0)
+      expect(yield* sql`SELECT run_id FROM generalist_activations WHERE run_id = 'rollback'`).toHaveLength(0)
     }),
   ),
 )
@@ -234,14 +234,14 @@ it.live("rearms a shared host alarm from final transaction state and lets earlie
       yield* SqliteRunActivation.createSchema
       yield* sql`CREATE TABLE host_ready_work (due_at_millis INTEGER NOT NULL)`
       yield* sql`INSERT INTO host_ready_work VALUES (0)`
-      const observed: Array<{ readonly tenetkit?: number; readonly shared: number }> = []
+      const observed: Array<{ readonly generalist?: number; readonly shared: number }> = []
       const rearm = Effect.gen(function* () {
-        const tenetkit = yield* SqliteRunActivation.nextDueAt
+        const generalist = yield* SqliteRunActivation.nextDueAt
         const host = yield* sql<{ readonly due_at_millis: number }>`
           SELECT MIN(due_at_millis) AS due_at_millis FROM host_ready_work
         `
-        const shared = Math.min(tenetkit ?? Number.POSITIVE_INFINITY, host[0]!.due_at_millis)
-        const observation = tenetkit === undefined ? { shared } : { tenetkit, shared }
+        const shared = Math.min(generalist ?? Number.POSITIVE_INFINITY, host[0]!.due_at_millis)
+        const observation = generalist === undefined ? { shared } : { generalist, shared }
         observed.push(observation)
       }).pipe(
         Effect.provideService(SqlClient.SqlClient, sql),
@@ -249,12 +249,12 @@ it.live("rearms a shared host alarm from final transaction state and lets earlie
       )
       yield* sql.withTransaction(
         SqliteRunActivation.makeProjection(sql, rearm).applyInTransaction([
-          { runId: "tenetkit", intent: "execute", attemptFence: 1, runStatus: "running" },
+          { runId: "generalist", intent: "execute", attemptFence: 1, runStatus: "running" },
         ]),
       )
 
       expect(observed).toHaveLength(1)
-      expect(observed[0]!.tenetkit).toBeTypeOf("number")
+      expect(observed[0]!.generalist).toBeTypeOf("number")
       expect(observed[0]!.shared).toBe(0)
     }),
   ),
@@ -267,7 +267,7 @@ it.live("drains deterministically with bounded fuel and leaves duplicate or stal
       const sql = yield* SqlClient.SqlClient
       yield* SqliteRunActivation.createSchema
       const future = (yield* Clock.currentTimeMillis) + 60_000
-      yield* sql`INSERT INTO tenetkit_activations VALUES
+      yield* sql`INSERT INTO generalist_activations VALUES
         ('b', 'execute', 0, 0, 'queued'),
         ('a', 'execute', 0, 0, 'queued'),
         ('future', 'execute', ${future}, 0, 'queued')`
@@ -431,12 +431,12 @@ it.live("recovers stale running and cancelling claims by status, raises fences, 
 
       const snapshots = yield* Metric.snapshot
       const recoveredClaims = snapshots.find(
-        (snapshot) => snapshot.id === "tenetkit_runtime_sqlite_exclusive_recovered_claims",
+        (snapshot) => snapshot.id === "generalist_runtime_sqlite_exclusive_recovered_claims",
       )
       expect(recoveredClaims?.type).toBe("Counter")
       if (recoveredClaims?.type === "Counter") expect(recoveredClaims.state.count).toBe(2)
       const recoveryDuration = snapshots.find(
-        (snapshot) => snapshot.id === "tenetkit_runtime_sqlite_exclusive_recovery_duration",
+        (snapshot) => snapshot.id === "generalist_runtime_sqlite_exclusive_recovery_duration",
       )
       expect(recoveryDuration?.type).toBe("Histogram")
       if (recoveryDuration?.type === "Histogram") expect(recoveryDuration.state.count).toBe(1)

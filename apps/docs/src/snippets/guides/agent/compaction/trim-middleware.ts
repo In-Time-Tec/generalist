@@ -1,5 +1,5 @@
 import { Effect, Layer, Schema } from "effect"
-import { ModelMiddleware, Prompt } from "tenetkit"
+import { ModelMiddleware, Prompt } from "generalist"
 
 const maxUserChars = 8_000
 

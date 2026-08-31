@@ -1,4 +1,4 @@
-import { Agent, Policy } from "tenetkit"
+import { Agent, Policy } from "generalist"
 import type { LanguageModel, Tool } from "effect/unstable/ai"
 import { toolkit, type webSearchTool } from "./tools"
 import { WebSearch } from "./web-search"

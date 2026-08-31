@@ -1,16 +1,16 @@
 import { bullets, code, definePage, h2, link, p, strong } from "../../prose"
 export const comparisons = definePage({
   path: "/docs/learn/comparisons",
-  title: "When to use TenetKit",
-  navTitle: "When to use TenetKit",
+  title: "When to use Generalist",
+  navTitle: "When to use Generalist",
   group: "Learn",
   description:
-    "The workloads TenetKit is built for, the workloads it deliberately is not, and how to tell in one read which side yours falls on.",
+    "The workloads Generalist is built for, the workloads it deliberately is not, and how to tell in one read which side yours falls on.",
   content: [
     p(
-      "TenetKit is a TypeScript framework for building AI agents on Effect, and it is scoped on purpose: agents as plain values, runs as typed event streams, every seam an Effect service. This page states plainly which workloads that scope serves and which it does not, so you can decide in one read.",
+      "Generalist is a TypeScript framework for building AI agents on Effect, and it is scoped on purpose: agents as plain values, runs as typed event streams, every seam an Effect service. This page states plainly which workloads that scope serves and which it does not, so you can decide in one read.",
     ),
-    h2("reach-for-tenetkit", "Reach for TenetKit when"),
+    h2("reach-for-generalist", "Reach for Generalist when"),
     bullets(
       [
         strong("The agent lives inside your process."),
@@ -36,7 +36,7 @@ export const comparisons = definePage({
       ],
       [
         strong("You are streaming a run to a browser."),
-        " tenetkit/transport projects Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model on the client (",
+        " generalist/transport projects Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model on the client (",
         link("/docs/guides/serve-transport", "Serve over a transport"),
         ").",
       ],
@@ -51,28 +51,28 @@ export const comparisons = definePage({
         strong("A single model call with tools is enough."),
         " Use ",
         code("effect/unstable/ai"),
-        " directly: it is TenetKit's own substrate, and it resolves tool calls within one generation. TenetKit starts paying for itself when a model call becomes an agent: multiple turns, policies, approvals, an observable stream.",
+        " directly: it is Generalist's own substrate, and it resolves tool calls within one generation. Generalist starts paying for itself when a model call becomes an agent: multiple turns, policies, approvals, an observable stream.",
       ],
       [
         strong("Runs must survive deploys, crashes, or multi-day waits."),
         " Add ",
-        code("tenetkit/runtime"),
+        code("generalist/runtime"),
         ", which hosts the same core agents as durable, addressable runs on SQLite, PostgreSQL, or MySQL (",
         link("/docs/learn/native-runtime", "where durability lives"),
         ").",
       ],
       [
         strong("You need multi-step orchestration across services."),
-        " TenetKit owns one agent's turns, nothing wider. Orchestration belongs to your application or to a durable runtime above it.",
+        " Generalist owns one agent's turns, nothing wider. Orchestration belongs to your application or to a durable runtime above it.",
       ],
       [
         strong("Effect is not in your stack."),
-        " TenetKit's extension mechanism is Effect services and layers; without Effect you would be fighting the framework's one idea.",
+        " Generalist's extension mechanism is Effect services and layers; without Effect you would be fighting the framework's one idea.",
       ],
     ),
     h2("the-shape-of-the-decision", "The shape of the decision"),
     p(
-      "Count the turns and decide whether execution state must survive the process. One model call: use Effect AI directly. For a process-local agent loop, use tenetkit. For addressable runs that need replay or recovery, add tenetkit/runtime. The fastest way to test the core fit is ",
+      "Count the turns and decide whether execution state must survive the process. One model call: use Effect AI directly. For a process-local agent loop, use generalist. For addressable runs that need replay or recovery, add generalist/runtime. The fastest way to test the core fit is ",
       link("/docs/start/quickstart", "the quickstart"),
       ", which builds a tool-calling agent and a CI eval in about five minutes, no API key required.",
     ),

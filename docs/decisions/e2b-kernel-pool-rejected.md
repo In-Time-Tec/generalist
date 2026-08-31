@@ -1,6 +1,6 @@
 # E2B KernelPool adapter rejected
 
-TenetKit does not provide `@tenetkit/e2b/repl` because E2B cannot currently enforce the remote
+Generalist does not provide `@generalist/e2b/repl` because E2B cannot currently enforce the remote
 `KernelPool` ownership contract. This decision was checked against the current release, `e2b@2.46.1`
 (npm integrity `sha512-OqYovS2oFrt4mk737CgfW/RoMadBYK84l5qjKpvbEoOB9KKxaZIXm7YUwOKSRTlijrrwDRX7oZlyPoVXiCpyTw==`,
 tarball SHA-256 `3e9f1184b391e37ba5026d56b4dd6637c5456b52373843e941adf50c7009a922`, release commit
@@ -20,7 +20,7 @@ host loses the response or stops after E2B creates the sandbox but before `Kerne
 ID, retrying can create a duplicate. Listing by create-time metadata has no documented uniqueness or consistency
 guarantee, so it cannot prove create-before-bind recovery.
 
-Command reconnect also has no replay cursor, event sequence, or completed-result lookup. A TenetKit guest journal could
+Command reconnect also has no replay cursor, event sequence, or completed-result lookup. A Generalist guest journal could
 resolve that ambiguity and distinguish an exact terminal frame from `CellOutcomeUnknown`, but it cannot repair either
 ownership gap. A deterministic E2B-shaped fixture would therefore prove the fixture, not the published provider
 contract, and no adapter or simulated conformance is shipped. No credentialed lifecycle acceptance was run: no exact

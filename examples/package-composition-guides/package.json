@@ -1,12 +1,12 @@
 {
-  "name": "@tenetkit/example-package-composition-guides",
+  "name": "@generalist/example-package-composition-guides",
   "private": true,
   "type": "module",
   "scripts": {
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "tenetkit": "workspace:*",
+    "generalist": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"
   },

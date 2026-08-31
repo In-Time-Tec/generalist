@@ -22,33 +22,33 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: tenetkit
-          POSTGRES_PASSWORD: tenetkit
-          POSTGRES_DB: tenetkit
+          POSTGRES_USER: generalist
+          POSTGRES_PASSWORD: generalist
+          POSTGRES_DB: generalist
         ports:
           - 55432:5432
         options: >-
-          --health-cmd "pg_isready -U tenetkit -d tenetkit"
+          --health-cmd "pg_isready -U generalist -d generalist"
           --health-interval 1s
           --health-timeout 3s
           --health-retries 60
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: tenetkit
-          MYSQL_DATABASE: tenetkit
-          MYSQL_USER: tenetkit
-          MYSQL_PASSWORD: tenetkit
+          MYSQL_ROOT_PASSWORD: generalist
+          MYSQL_DATABASE: generalist
+          MYSQL_USER: generalist
+          MYSQL_PASSWORD: generalist
         ports:
           - 33306:3306
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -utenetkit -ptenetkit"
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ugeneralist -pgeneralist"
           --health-interval 1s
           --health-timeout 3s
           --health-retries 60
     env:
-      TENETKIT_DATABASE_URL: postgres://tenetkit:tenetkit@127.0.0.1:55432/tenetkit
-      TENETKIT_MYSQL_URL: mysql://tenetkit:tenetkit@127.0.0.1:33306/tenetkit
+      GENERALIST_DATABASE_URL: postgres://generalist:generalist@127.0.0.1:55432/generalist
+      GENERALIST_MYSQL_URL: mysql://generalist:generalist@127.0.0.1:33306/generalist
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -84,7 +84,7 @@ jobs:
         run: bun run check
 
       - name: Configure MySQL test databases
-        run: mysql -h 127.0.0.1 -P 33306 -uroot -ptenetkit -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT ALL PRIVILEGES ON \`tenetkit\_%\`.* TO 'tenetkit'@'%'; FLUSH PRIVILEGES;"
+        run: mysql -h 127.0.0.1 -P 33306 -uroot -pgeneralist -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT ALL PRIVILEGES ON \`generalist\_%\`.* TO 'generalist'@'%'; FLUSH PRIVILEGES;"
 
       - name: Test
         run: bun run test

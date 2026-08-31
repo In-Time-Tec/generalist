@@ -53,7 +53,7 @@ export const brandLockup = (): Html =>
     [h.Href("/"), h.Class("flex items-center gap-2")],
     [
       mark("size-6 md:size-7"),
-      h.span([h.Class("text-lg font-medium tracking-tight text-gray-900 dark:text-white")], ["TenetKit"]),
+      h.span([h.Class("text-lg font-medium tracking-tight text-gray-900 dark:text-white")], ["Generalist"]),
       betaBadge(),
     ],
   )

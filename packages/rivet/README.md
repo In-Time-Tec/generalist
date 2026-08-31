@@ -1,12 +1,12 @@
-# @tenetkit/rivet
+# @generalist/rivet
 
-Rivet Actors host for the TenetKit durable Runtime.
+Rivet Actors host for the Generalist durable Runtime.
 
 ```bash
-bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @tenetkit/rivet@0.44.0
+bun add effect@4.0.0-rc.112 generalist@0.44.0 @generalist/rivet@0.44.0
 ```
 
-Only the ESM `@tenetkit/rivet/actors` subpath is exported. Node 22+ and Bun 1.4+ are supported; CommonJS is not.
+Only the ESM `@generalist/rivet/actors` subpath is exported. Node 22+ and Bun 1.4+ are supported; CommonJS is not.
 
 ## Runtime actor
 
@@ -14,10 +14,10 @@ Only the ESM `@tenetkit/rivet/actors` subpath is exported. Node 22+ and Bun 1.4+
 set of Runs that must share a Runtime transaction domain, then register the definition with raw `rivetkit`:
 
 ```ts
-import { makeRuntimeActor } from "@tenetkit/rivet/actors"
+import { makeRuntimeActor } from "@generalist/rivet/actors"
 import { Layer } from "effect"
 import { setup } from "rivetkit"
-import { ExecutableResolver } from "tenetkit/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 
 declare const addresses: Parameters<typeof makeRuntimeActor>[0]["addresses"]
 declare const executables: Parameters<typeof ExecutableResolver.layerStatic>[0]
@@ -34,14 +34,14 @@ export default { fetch: (request: Request) => registry.handler(request) }
 ```
 
 Clients call the nested `partition.runtime.send`, `signal`, `respond`, `cancel`, `resolveOperation`, `inspect`, and
-`drain` actions. These actions use TenetKit Runtime's existing inputs and outputs rather than defining another payload,
+`drain` actions. These actions use Generalist Runtime's existing inputs and outputs rather than defining another payload,
 transcript, operation, or scheduler format.
 
 Actor-local SQLite is the only mutable Runtime authority. Run, operation, Session, event, claim, and activation facts
 commit through the existing SQL lifecycle kernel. Rivet one-shot schedules and the persistent recovery cron are lossy
 doorbells only: every wake backfills and drains durable activation rows before accepting normal work. A fresh wake also
 atomically advances an actor-local host-incarnation row and recovers stale execution and Session claims under that new
-owner identity. Unknown non-idempotent operations retain TenetKit's `needs-resolution` behavior and are not redispatched.
+owner identity. Unknown non-idempotent operations retain Generalist's `needs-resolution` behavior and are not redispatched.
 
 ## Dependency and ownership boundary
 
@@ -50,7 +50,7 @@ The adapter pins raw `rivetkit@2.3.10`, whose runtime graph has no Effect depend
 callbacks retain their Effect Context and typed Cause, interruption waits for a non-cancellable statement or rollback to
 settle, and the Runtime's `ManagedRuntime` is disposed on actor sleep and destroy.
 
-Do not add `@rivetkit/effect@2.3.10`: its published source calls Effect APIs absent from TenetKit's pinned Effect release
+Do not add `@rivetkit/effect@2.3.10`: its published source calls Effect APIs absent from Generalist's pinned Effect release
 and cannot import under the supported Node runtime. `@standard-schema/spec@1.1.0` is a direct dependency because
 RivetKit's public declarations reference it while RivetKit lists it only as a development dependency.
 
@@ -64,6 +64,6 @@ authoritative rows. No hosted Rivet resource was used, so these are SDK and pinn
 about a particular hosted deployment.
 
 RivetKit 2.3.10 can log an upstream `transaction_closed` error while synchronizing its private schedule-event table as
-an actor sleeps or a local registry shuts down. TenetKit does not close `RawAccess`; adding a second close or lifecycle
+an actor sleeps or a local registry shuts down. Generalist does not close `RawAccess`; adding a second close or lifecycle
 workaround would violate ownership. Durable activation recovery is independent of that diagnostic, but operators should
 expect the log until Rivet fixes its schedule-sync shutdown ordering.

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Rename the project and every package from TenetKit to **Generalist**: `tenetkit` → `generalist`, `@tenetkit/*` → `@generalist/*`, and `TENETKIT_*` environment variables → `GENERALIST_*`. Boundary error tags, service keys, and the snapshot codec move from `tenetkit/...` to `generalist/...`; durable registrations pinned under an old codec must be re-pinned. Versions up to 0.44.0 remain published under the old names.
+- Merge the instructions surface into one module: `tenetkit/agent-guidance` is now `generalist/instructions`, which carries the ordered provider registry, the AGENTS.md/CLAUDE.md file loader, and the versioned guidance engine together; `tenetkit/skills` moves to `generalist/instructions/skills` — skills are lazy instructions.
+
 ## 0.44.0
 
 - Finish the current naming contract: FoldKit exposes `Connection.Connection`, test connections implement the scoped `session` API directly, SQL adapters use `RunClaims["Service"]`, and research examples call their concrete capability `WebSearch`. OpenAI model assembly now stays in a private provider module instead of leaking internal helpers from `tenetkit/ai/openai`.

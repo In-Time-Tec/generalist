@@ -1,17 +1,22 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../../prose"
 export const skillsReference = definePage({
   path: "/docs/reference/skills",
-  title: "tenetkit/skills",
+  title: "generalist/instructions/skills",
   navTitle: "skills",
   group: "Reference",
   description:
     "Filesystem and manifest-backed HTTP, S3, and GitHub SKILL.md catalogs plus AGENTS.md/CLAUDE.md loading.",
   content: [
     lead(
-      "tenetkit/skills implements the core SkillCatalog seam through filesystem and manifest-backed HTTP, S3, and GitHub adapters. tenetkit/instructions loads AGENTS.md/CLAUDE.md instruction files.",
+      "generalist/instructions/skills implements the core SkillCatalog seam through filesystem and manifest-backed HTTP, S3, and GitHub adapters. generalist/instructions loads AGENTS.md/CLAUDE.md instruction files.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
-    p(code("tenetkit/skills"), " and ", code("tenetkit/instructions"), " are import subpaths, not packages."),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    p(
+      code("generalist/instructions/skills"),
+      " and ",
+      code("generalist/instructions"),
+      " are import subpaths, not packages.",
+    ),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -29,7 +34,7 @@ export const skillsReference = definePage({
             code("GitHubCatalog"),
           ],
         ],
-        [[code("tenetkit/instructions")], [code("File"), ", ", code("Options"), ", and ", code("load")]],
+        [[code("generalist/instructions")], [code("File"), ", ", code("Options"), ", and ", code("load")]],
       ],
     ),
     h2("file-system-catalog", "FileSystemCatalog.layer"),
@@ -86,7 +91,7 @@ export const skillsReference = definePage({
     table(
       ["Provider", "Contract"],
       [
-        [[code("HttpCatalog")], "Same-origin paths relative to one versioned TenetKit manifest URL"],
+        [[code("HttpCatalog")], "Same-origin paths relative to one versioned Generalist manifest URL"],
         [[code("S3Catalog")], "Virtual-hosted HTTPS manifest object; caller HttpClient owns signing"],
         [[code("GitHubCatalog")], "GitHub Contents API raw reads pinned to a 40/64-hex commit id"],
       ],
@@ -96,7 +101,7 @@ export const skillsReference = definePage({
       code("skillPath"),
       ", and the lowercase SHA-256 of the full ",
       code("SKILL.md"),
-      ". Metadata loads at catalog construction; bodies stay lazy and are verified on activation. The manifest is a TenetKit adapter contract, not part of the Agent Skills standard.",
+      ". Metadata loads at catalog construction; bodies stay lazy and are verified on activation. The manifest is a Generalist adapter contract, not part of the Agent Skills standard.",
     ),
     h2("skill-md", "The SKILL.md contract"),
     p(
@@ -125,7 +130,7 @@ export const skillsReference = definePage({
     ),
     h2("instruction-files", "Instruction files"),
     p(
-      code('load(options?) from "tenetkit/instructions"'),
+      code('load(options?) from "generalist/instructions"'),
       " returns ",
       code("ReadonlyArray<InstructionFile>"),
       " (",

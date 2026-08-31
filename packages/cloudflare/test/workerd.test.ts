@@ -4,7 +4,7 @@ import { Effect, Fiber, FileSystem, Layer, Path, Random, Schedule, Schema } from
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { build } from "esbuild"
-import { encodeCommand, observerCodec } from "tenetkit/transport/wire"
+import { encodeCommand, observerCodec } from "generalist/transport/wire"
 
 const ConformanceResponse = Schema.Struct({
   backend: Schema.Literal("sqlite"),
@@ -22,14 +22,14 @@ const ConformanceResponse = Schema.Struct({
   transitionAffected: Schema.Tuple([Schema.Literal(1), Schema.Literal(0)]),
   pluralInitialOrder: Schema.Tuple([Schema.Literal("a"), Schema.Literal("b"), Schema.Literal("c")]),
   pluralRemainingAfterOutOfOrder: Schema.Tuple([Schema.Literal("b")]),
-  pluralConflictingTag: Schema.Literal("tenetkit/runtime/ResponseConflict"),
+  pluralConflictingTag: Schema.Literal("generalist/runtime/ResponseConflict"),
   pluralFinalOpen: Schema.Literal(0),
   pluralResumeEvents: Schema.Literal(3),
   pluralAuthoredHistory: Schema.Tuple([Schema.Literal("a"), Schema.Literal("b"), Schema.Literal("c")]),
   acknowledgementInitialSequence: Schema.Literal(-1),
   acknowledgedSequence: Schema.Finite,
-  acknowledgementInvalidTag: Schema.Literal("tenetkit/runtime/AckInvalid"),
-  acknowledgementBeyondTag: Schema.Literal("tenetkit/runtime/AckBeyondCommitted"),
+  acknowledgementInvalidTag: Schema.Literal("generalist/runtime/AckInvalid"),
+  acknowledgementBeyondTag: Schema.Literal("generalist/runtime/AckBeyondCommitted"),
   acknowledgementTailSequences: Schema.Tuple([Schema.Finite]),
 })
 
@@ -66,7 +66,7 @@ layer(Layer.merge(bunLayer, FetchHttpClient.layer), { excludeTestServices: true,
           const path = yield* Path.Path
           const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
           const repositoryRoot = path.resolve(".")
-          const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "tenetkit-workerd-" })
+          const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-workerd-" })
           const bundle = path.join(directory, "worker.js")
           const config = path.join(directory, "config.capnp")
           const storage = path.join(directory, "storage")
@@ -140,18 +140,18 @@ const worker :Workerd.Worker = (
               alarm: 4_000_000_000_000,
               schemaVersion: 4,
               logicalSchemaViolations: [],
-              migrations: [{ id: 1, name: "tenetkit_runtime" }],
+              migrations: [{ id: 1, name: "generalist_runtime" }],
               transitionAffected: [1, 0],
               pluralInitialOrder: ["a", "b", "c"],
               pluralRemainingAfterOutOfOrder: ["b"],
-              pluralConflictingTag: "tenetkit/runtime/ResponseConflict",
+              pluralConflictingTag: "generalist/runtime/ResponseConflict",
               pluralFinalOpen: 0,
               pluralResumeEvents: 3,
               pluralAuthoredHistory: ["a", "b", "c"],
               acknowledgementInitialSequence: -1,
               acknowledgedSequence: responses[0]!.acknowledgedSequence,
-              acknowledgementInvalidTag: "tenetkit/runtime/AckInvalid",
-              acknowledgementBeyondTag: "tenetkit/runtime/AckBeyondCommitted",
+              acknowledgementInvalidTag: "generalist/runtime/AckInvalid",
+              acknowledgementBeyondTag: "generalist/runtime/AckBeyondCommitted",
               acknowledgementTailSequences: [responses[0]!.acknowledgedSequence + 1],
             },
             {
@@ -166,24 +166,24 @@ const worker :Workerd.Worker = (
               alarm: 4_000_000_000_000,
               schemaVersion: 4,
               logicalSchemaViolations: [],
-              migrations: [{ id: 1, name: "tenetkit_runtime" }],
+              migrations: [{ id: 1, name: "generalist_runtime" }],
               transitionAffected: [1, 0],
               pluralInitialOrder: ["a", "b", "c"],
               pluralRemainingAfterOutOfOrder: ["b"],
-              pluralConflictingTag: "tenetkit/runtime/ResponseConflict",
+              pluralConflictingTag: "generalist/runtime/ResponseConflict",
               pluralFinalOpen: 0,
               pluralResumeEvents: 3,
               pluralAuthoredHistory: ["a", "b", "c"],
               acknowledgementInitialSequence: -1,
               acknowledgedSequence: responses[1]!.acknowledgedSequence,
-              acknowledgementInvalidTag: "tenetkit/runtime/AckInvalid",
-              acknowledgementBeyondTag: "tenetkit/runtime/AckBeyondCommitted",
+              acknowledgementInvalidTag: "generalist/runtime/AckInvalid",
+              acknowledgementBeyondTag: "generalist/runtime/AckBeyondCommitted",
               acknowledgementTailSequences: [responses[1]!.acknowledgedSequence + 1],
             },
           ])
           for (const response of responses) {
             expect(response.tables).toEqual(
-              expect.arrayContaining(["tenetkit_runs", "tenetkit_run_acknowledgements", "tenetkit_schema_meta"]),
+              expect.arrayContaining(["generalist_runs", "generalist_run_acknowledgements", "generalist_schema_meta"]),
             )
           }
 

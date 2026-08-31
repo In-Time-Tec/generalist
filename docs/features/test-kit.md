@@ -1,6 +1,6 @@
 # Test kit
 
-`tenetkit/test` supplies a scripted Effect AI language model and normalized request capture without credentials or a test-runner dependency.
+`generalist/test` supplies a scripted Effect AI language model and normalized request capture without credentials or a test-runner dependency.
 
 One fixture owns one atomic FIFO script cursor across streaming and non-streaming calls. Requests are captured before scripted delay or failure. A claimed slot stays consumed after failure or interruption; retries consume later slots. Exhausted calls are still captured and fail with Effect AI `InvalidRequestError`.
 
@@ -8,6 +8,6 @@ Fixtures expose direct and `ModelRegistry` layers, captured prompts and requests
 
 `TestModel.truncated(parts, { stopAfter })` scripts a streaming turn whose body ends without a `finish` part, reproducing a provider response that reached EOF before its terminal event. It emits `response-metadata` first, then the leading parts in full, and stops at the named point: `stopAfter: "tool-params-delta"` emits `tool-params-start` and unclosed parameter JSON but never the closing `tool-call`. Truncated steps are streaming-only.
 
-`tenetkit/test/runtime-driver` is the test-runner-coupled entrypoint for Runtime driver conformance. Calling `driverConformance` registers authoritative `@effect/vitest` tests for only the capabilities selected by the host: admission identity and idempotency, Runtime control and durable events, RunTree replay cursors, SQL transactions, multi-worker claims and fencing, and notification recovery through durable replay.
+`generalist/test/runtime-driver` is the test-runner-coupled entrypoint for Runtime driver conformance. Calling `driverConformance` registers authoritative `@effect/vitest` tests for only the capabilities selected by the host: admission identity and idempotency, Runtime control and durable events, RunTree replay cursors, SQL transactions, multi-worker claims and fencing, and notification recovery through durable replay.
 
 The host supplies its public Runtime Layer and an address. Driver-specific test operations stay in explicit adapters: `claim` activates a Run, `forceRollback` injects a transaction failure, `expire` expires one exact worker claim, and `setup` provisions or resets external storage before each test. Multi-worker tests may use a separate Layer that includes `RunClaims`. A driver omits unsupported capabilities instead of implementing fake behavior, and the conformance API does not expose a database schema or persisted Run representation.

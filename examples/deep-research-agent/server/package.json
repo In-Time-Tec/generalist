@@ -1,5 +1,5 @@
 {
-  "name": "@tenetkit/example-deep-research-agent-server",
+  "name": "@generalist/example-deep-research-agent-server",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "tenetkit": "workspace:*",
+    "generalist": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"
   },

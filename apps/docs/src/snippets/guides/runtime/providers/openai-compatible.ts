@@ -1,7 +1,7 @@
 import { Config, Layer } from "effect"
-import { ModelRegistry } from "tenetkit"
-import { layer as chatCompletionsLayer } from "tenetkit/ai/openai-chat-completions"
-import { layer as responsesLayer } from "tenetkit/ai/openai-responses"
+import { ModelRegistry } from "generalist"
+import { layer as chatCompletionsLayer } from "generalist/ai/openai-chat-completions"
+import { layer as responsesLayer } from "generalist/ai/openai-responses"
 import { HttpClient } from "effect/unstable/http"
 
 const responses = responsesLayer({

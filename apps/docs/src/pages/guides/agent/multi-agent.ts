@@ -28,11 +28,11 @@ export const multiAgent = definePage({
     "Fan out child runs with Handoff.fanOut, route through a transfer-tool supervisor, and expose any agent as a tool with AgentTool.asTool.",
   content: [
     p(
-      "tenetkit multi-agent helpers are same-process and non-durable: they compose ",
+      "generalist multi-agent helpers are same-process and non-durable: they compose ",
       code("Agent.generate"),
       ", toolkits, and the ",
       code("ToolExecutor"),
-      " seam rather than adding a second execution model. For durable, addressable parent and child Runs, use tenetkit/runtime; see ",
+      " seam rather than adding a second execution model. For durable, addressable parent and child Runs, use generalist/runtime; see ",
       link("/docs/learn/native-runtime", "Core and Runtime"),
       ".",
     ),
@@ -136,7 +136,7 @@ export const multiAgent = definePage({
     ),
     p(
       "The runnable version of this page is ",
-      link("https://github.com/In-Time-Tec/tenetkit/tree/main/examples/multi-agent", "examples/multi-agent"),
+      link("https://github.com/In-Time-Tec/generalist/tree/main/examples/multi-agent", "examples/multi-agent"),
       "; contracts for ",
       code("Handoff"),
       " and ",

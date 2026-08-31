@@ -1,6 +1,6 @@
 /* oxlint-disable effecttsgo/abort-controller-in-effect, effecttsgo/async-function, effecttsgo/new-promise, effecttsgo/prefer-schema-over-json, effecttsgo/run-effect-inside-effect, effecttsgo/try-catch-in-effect-gen, effecttsgo/unnecessary-fail-yieldable-error, no-await-in-loop */
 import { Clock, Duration, Effect, Layer, Option, Result, Schema } from "effect"
-import { CodeExecutor, ProgramCapabilities } from "tenetkit"
+import { CodeExecutor, ProgramCapabilities } from "generalist"
 import { identity } from "./identity.js"
 import { capabilityFailurePrefix, normalize, runner, runnerName } from "./source.js"
 import { type CapabilityRpc, CapabilityRpcRequest, type Options, type WorkerCode } from "./types.js"
@@ -392,7 +392,7 @@ export const make = (options: Options): CodeExecutor.Service => {
                   .load(code)
                   .getEntrypoint()
                   .fetch(
-                    new Request("https://sandbox.tenetkit.invalid/execute", {
+                    new Request("https://sandbox.generalist.invalid/execute", {
                       method: "POST",
                       signal: invocation.signal,
                       body: `{"protocolVersion":${JSON.stringify(request.protocolVersion)},"requestId":${JSON.stringify(request.requestId)},"input":${encodedInput}}`,
@@ -425,9 +425,9 @@ export const makeUnavailable = (message = "Worker Loader is unavailable"): CodeE
   CodeExecutor.CodeExecutor.of({
     identity: CodeExecutor.declareIdentity({
       provider: "cloudflare",
-      implementation: { name: "@tenetkit/cloudflare/dynamic-workers", version: "1" },
+      implementation: { name: "@generalist/cloudflare/dynamic-workers", version: "1" },
       runtime: { name: "cloudflare-workers", version: "not-configured" },
-      template: { name: "tenetkit-program-runner", version: CodeExecutor.protocolVersion },
+      template: { name: "generalist-program-runner", version: CodeExecutor.protocolVersion },
       physicalIsolation: "none",
       persistence: "none",
       network: {

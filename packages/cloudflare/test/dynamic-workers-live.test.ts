@@ -2,8 +2,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 
-const endpoint = process.env.TENETKIT_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_URL
-const token = process.env.TENETKIT_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_TOKEN
+const endpoint = process.env.GENERALIST_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_URL
+const token = process.env.GENERALIST_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_TOKEN
 const describeLive = endpoint !== undefined && token !== undefined ? describe : describe.skip
 
 const ResourceFailure = Schema.Struct({
@@ -51,5 +51,5 @@ describeLive("credentialed Cloudflare Dynamic Worker provider conformance", () =
 })
 
 if (endpoint === undefined || token === undefined)
-  it.skip("Cloudflare provider gate skipped: set TENETKIT_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_URL and _TOKEN", () =>
+  it.skip("Cloudflare provider gate skipped: set GENERALIST_CLOUDFLARE_DYNAMIC_WORKER_CONFORMANCE_URL and _TOKEN", () =>
     undefined)

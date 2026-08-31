@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, LanguageModel, Response, Tool, Toolkit } from "tenetkit"
+import { Agent, LanguageModel, Response, Tool, Toolkit } from "generalist"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",

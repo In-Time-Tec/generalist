@@ -1,18 +1,18 @@
-import { messagingAuthorizationSuite } from "../../../tenetkit/test/runtime/messaging/suites/authorization.js"
-import { messagingDeliveryIdempotenceSuite } from "../../../tenetkit/test/runtime/messaging/suites/delivery/idempotence.js"
-import { messagingDurabilitySuite } from "../../../tenetkit/test/runtime/messaging/suites/delivery/durability.js"
-import { messagingMailboxSuite } from "../../../tenetkit/test/runtime/messaging/suites/mailbox.js"
-import { messagingPolicySuite } from "../../../tenetkit/test/runtime/messaging/suites/policy.js"
-import { messagingSendOperationSuite } from "../../../tenetkit/test/runtime/messaging/suites/send-operation.js"
-import { claimReadyWorker } from "../../../tenetkit/test/runtime/run/queued-activation.js"
-import { assistantAddress } from "../../../tenetkit/test/runtime/execution/fixtures.js"
+import { messagingAuthorizationSuite } from "../../../generalist/test/runtime/messaging/suites/authorization.js"
+import { messagingDeliveryIdempotenceSuite } from "../../../generalist/test/runtime/messaging/suites/delivery/idempotence.js"
+import { messagingDurabilitySuite } from "../../../generalist/test/runtime/messaging/suites/delivery/durability.js"
+import { messagingMailboxSuite } from "../../../generalist/test/runtime/messaging/suites/mailbox.js"
+import { messagingPolicySuite } from "../../../generalist/test/runtime/messaging/suites/policy.js"
+import { messagingSendOperationSuite } from "../../../generalist/test/runtime/messaging/suites/send-operation.js"
+import { claimReadyWorker } from "../../../generalist/test/runtime/run/queued-activation.js"
+import { assistantAddress } from "../../../generalist/test/runtime/execution/fixtures.js"
 import {
   driverConformance,
   modelResponseFaultConformance,
   sqlTransactionFaultConformance,
   type ClaimExecution,
   type ModelResponseFaultBoundary,
-} from "tenetkit/test/runtime-driver"
+} from "generalist/test/runtime-driver"
 import { Effect, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { mysqlAvailable, mysqlDatabase, mysqlMessagingLayer, mysqlLayer } from "./runtime/environment.js"
@@ -70,22 +70,22 @@ const withConformanceClient = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlCl
 const faultTarget = (boundary: ModelResponseFaultBoundary) => {
   switch (boundary) {
     case "after-claim-validation":
-      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_session_entries" }
+      return { timing: "BEFORE", operation: "INSERT", table: "generalist_session_entries" }
     case "after-session-entry":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_sessions" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_sessions" }
     case "after-session-leaf":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_run_operations" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_run_operations" }
     case "after-operation":
     case "after-tree-index":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_runs" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_runs" }
     case "after-checkpoint":
-      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_run_events" }
+      return { timing: "BEFORE", operation: "INSERT", table: "generalist_run_events" }
     case "after-event":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_tree_roots" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_tree_roots" }
     case "after-tree-position":
-      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_tree_event_index" }
+      return { timing: "BEFORE", operation: "INSERT", table: "generalist_tree_event_index" }
     case "before-commit":
-      return { timing: "AFTER", operation: "UPDATE", table: "tenetkit_runs" }
+      return { timing: "AFTER", operation: "UPDATE", table: "generalist_runs" }
   }
 }
 
@@ -100,7 +100,7 @@ const installModelFault = (input: { readonly boundary: ModelResponseFaultBoundar
           ? `BEGIN IF NEW.last_sequence > OLD.last_sequence THEN ${signal}; END IF; END`
           : signal
       yield* sql.unsafe(`
-        CREATE TRIGGER tenetkit_model_response_fault
+        CREATE TRIGGER generalist_model_response_fault
         ${target.timing} ${target.operation} ON ${target.table}
         FOR EACH ROW ${body}
       `).unprepared
@@ -111,7 +111,7 @@ const removeModelFault = () =>
   withConformanceClient(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* sql.unsafe("DROP TRIGGER IF EXISTS tenetkit_model_response_fault").unprepared
+      yield* sql.unsafe("DROP TRIGGER IF EXISTS generalist_model_response_fault").unprepared
     }),
   ).pipe(Effect.orDie)
 

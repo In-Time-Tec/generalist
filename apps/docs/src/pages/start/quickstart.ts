@@ -32,7 +32,7 @@ export const quickstart = definePage({
     codeBlock({ label: "Terminal", language: "bash", source: step1 }),
     p(
       "The install summary lists ",
-      code("tenetkit@0.44.0"),
+      code("generalist@0.44.0"),
       ". Provider leaves are subpaths of that package, not separate installs. npm and pnpm work the same way; ",
       link("/docs/start/installation", "Installation"),
       " has the variants.",
@@ -59,7 +59,7 @@ export const quickstart = definePage({
     callout(
       "info",
       "The base run is small",
-      "A TenetKit run always needs a model. A tool-calling run also needs the Effect AI handler layer for its toolkit. ToolExecutor, approvals, middleware, permissions, memory, skills, compaction, and steering are optional seams: absent means default behavior. ",
+      "A Generalist run always needs a model. A tool-calling run also needs the Effect AI handler layer for its toolkit. ToolExecutor, approvals, middleware, permissions, memory, skills, compaction, and steering are optional seams: absent means default behavior. ",
       link("/docs/learn/seams-as-services", "Seams as services"),
       " explains the two-tier model.",
     ),

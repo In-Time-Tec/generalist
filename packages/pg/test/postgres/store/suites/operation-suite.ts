@@ -1,10 +1,10 @@
-import { layer as backendLayer } from "@tenetkit/pg"
+import { layer as backendLayer } from "@generalist/pg"
 import { describe, expect, layer } from "@effect/vitest"
 import { Clock, Effect, Layer } from "effect"
-import { Pins } from "tenetkit"
+import { Pins } from "generalist"
 import { SqlClient } from "effect/unstable/sql"
-import { Errors, RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
+import { Errors, RunExecutor, Runtime, RunStore } from "generalist/runtime"
+import { RunClaims, RuntimeWorker } from "generalist/runtime/sql-driver"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -12,17 +12,17 @@ import {
   programAddress,
   programExecutable,
   programFixture,
-} from "../../../../../tenetkit/test/runtime/program/fixture.js"
-import { provideScoped } from "../../../../../tenetkit/test/runtime/execution/scoped-provide.js"
+} from "../../../../../generalist/test/runtime/program/fixture.js"
+import { provideScoped } from "../../../../../generalist/test/runtime/execution/scoped-provide.js"
 import { postgresAvailable, postgresClient, postgresDatabase, postgresTestMaxConnections } from "../../database.js"
-import { registrationsFor } from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
+import { registrationsFor } from "../../../../../generalist/test/runtime/execution/fixtures.js"
 import {
   programBudgetContract,
   programCancellationFenceContract,
   programCancellationFinalizerContract,
   programReplayDivergenceContract,
   programSettledReplayContract,
-} from "../../../../../tenetkit/test/runtime/program/store-contract.js"
+} from "../../../../../generalist/test/runtime/program/store-contract.js"
 
 const describePostgres = postgresAvailable ? describe : describe.skip
 
@@ -263,7 +263,7 @@ describePostgres("PostgreSQL Program store contract", () => {
             Effect.gen(function* () {
               const sql = yield* SqlClient.SqlClient
               yield* sql`
-                UPDATE tenetkit_runs SET status = 'running', owner_worker_id = 'postgres-program-cancelled-approval'
+                UPDATE generalist_runs SET status = 'running', owner_worker_id = 'postgres-program-cancelled-approval'
                 WHERE run_id = ${receipt.runId}
               `
             }),
@@ -386,13 +386,13 @@ describePostgres("PostgreSQL Program store contract", () => {
             const response = yield* runtime
               .respond({ runId: cancelled.runId, waitId, resolution: { _tag: "Approved" } })
               .pipe(Effect.flip)
-            expect(response._tag).toBe("tenetkit/runtime/RunTerminal")
+            expect(response._tag).toBe("generalist/runtime/RunTerminal")
             const signal = yield* runtime.signal({ runId: cancelled.runId, name: waitId }).pipe(Effect.flip)
-            expect(signal._tag).toBe("tenetkit/runtime/RunTerminal")
+            expect(signal._tag).toBe("generalist/runtime/RunTerminal")
             const resume = yield* store
               .resume({ runId: cancelled.runId, waitId, resolution: { _tag: "Approved" } })
               .pipe(Effect.flip)
-            expect(resume._tag).toBe("tenetkit/runtime/RunTerminal")
+            expect(resume._tag).toBe("generalist/runtime/RunTerminal")
             expect(yield* store.getProgramOperation({ runId: cancelled.runId, operation: "workers" })).toMatchObject({
               status: "failed",
             })

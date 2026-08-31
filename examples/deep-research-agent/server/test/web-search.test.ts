@@ -47,8 +47,8 @@ describe("WebSearch", () => {
         new Response(
           encodeJson({
             results: [
-              { title: "TenetKit transport", url: "https://tenetkit.test/transport", text: "Exa text result" },
-              { title: null, url: "https://tenetkit.test/snippet", snippet: "Exa snippet result" },
+              { title: "Generalist transport", url: "https://generalist.test/transport", text: "Exa text result" },
+              { title: null, url: "https://generalist.test/snippet", snippet: "Exa snippet result" },
               { title: null, url: null, highlights: ["first highlight", "second highlight"] },
             ],
           }),
@@ -62,13 +62,13 @@ describe("WebSearch", () => {
     (it) => {
       it.effect("sends Exa search requests with the expected endpoint, header, body, and Schema decode", () =>
         Effect.gen(function* () {
-          const results = yield* search("tenetkit transport")
+          const results = yield* search("generalist transport")
 
           expect(results).toEqual([
-            { title: "TenetKit transport", url: "https://tenetkit.test/transport", snippet: "Exa text result" },
+            { title: "Generalist transport", url: "https://generalist.test/transport", snippet: "Exa text result" },
             {
-              title: "https://tenetkit.test/snippet",
-              url: "https://tenetkit.test/snippet",
+              title: "https://generalist.test/snippet",
+              url: "https://generalist.test/snippet",
               snippet: "Exa snippet result",
             },
             { title: "Untitled", url: "", snippet: "first highlight\nsecond highlight" },
@@ -80,7 +80,7 @@ describe("WebSearch", () => {
               apiKey: "exa-test",
               accept: "application/json",
               body: {
-                query: "tenetkit transport",
+                query: "generalist transport",
                 numResults: 5,
                 contents: { text: { maxCharacters: 1000 } },
               },
@@ -114,9 +114,9 @@ describe("WebSearch", () => {
   )("falls back to the canned corpus on Exa failure", (it) => {
     it.effect("falls back to the canned corpus on Exa failure", () =>
       Effect.gen(function* () {
-        const results = yield* search("tenetkit agent framework")
+        const results = yield* search("generalist agent framework")
 
-        expect(results).toEqual(cannedResultsFor("tenetkit agent framework"))
+        expect(results).toEqual(cannedResultsFor("generalist agent framework"))
       }),
     )
   })

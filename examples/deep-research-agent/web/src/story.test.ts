@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 
-import { Response } from "tenetkit"
-import { Chat, Connection } from "tenetkit/foldkit"
-import { Errors, ExecutableManifest } from "tenetkit/runtime"
+import { Response } from "generalist"
+import { Chat, Connection } from "generalist/foldkit"
+import { Errors, ExecutableManifest } from "generalist/runtime"
 import { Schema } from "effect"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
@@ -42,12 +42,12 @@ const readyModel = (): Model => {
 const submittedQuestionModel = (): Model => {
   const [drafted] = update(
     readyModel(),
-    GotChatAction({ action: Chat.ChangedDraft({ text: "What makes TenetKit standalone?" }) }),
+    GotChatAction({ action: Chat.ChangedDraft({ text: "What makes Generalist standalone?" }) }),
   )
   const [submitted, commands] = update(drafted, GotChatAction({ action: Chat.SubmittedMessage() }))
   expect(commands).toHaveLength(1)
   expect(commands[0]?.name).toBe("SendUserMessage")
-  expect(submitted.chat.entries).toEqual([Chat.UserEntry({ text: "What makes TenetKit standalone?" })])
+  expect(submitted.chat.entries).toEqual([Chat.UserEntry({ text: "What makes Generalist standalone?" })])
   return submitted
 }
 
@@ -55,7 +55,7 @@ const toolCall = Schema.decodeSync(Response.ToolCallPart("web_search", Schema.St
   type: "tool-call",
   id: "search-1",
   name: "web_search",
-  params: { query: "What makes TenetKit standalone?" },
+  params: { query: "What makes Generalist standalone?" },
   providerExecuted: false,
 })
 
@@ -64,12 +64,20 @@ const toolResult = Response.makePart("tool-result", {
   name: "web_search",
   result: {
     results: [
-      { title: "TenetKit docs", url: "https://tenetkit.test/docs", snippet: "TenetKit streams transport frames." },
+      {
+        title: "Generalist docs",
+        url: "https://generalist.test/docs",
+        snippet: "Generalist streams transport frames.",
+      },
     ],
   },
   encodedResult: {
     results: [
-      { title: "TenetKit docs", url: "https://tenetkit.test/docs", snippet: "TenetKit streams transport frames." },
+      {
+        title: "Generalist docs",
+        url: "https://generalist.test/docs",
+        snippet: "Generalist streams transport frames.",
+      },
     ],
   },
   isFailure: false,
@@ -122,14 +130,14 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     _tag: "RunCompleted",
     result: {
       turns: 2,
-      text: "Final cited answer\n\nSources:\n[1] TenetKit docs",
+      text: "Final cited answer\n\nSources:\n[1] Generalist docs",
       session: { sessionId, leafId: "model-response-entry-1" },
     },
   }),
 ]
 
 describe("deep-research-agent web update", () => {
-  test("projects a successful TenetKit transport event stream into the chat model", () => {
+  test("projects a successful Generalist transport event stream into the chat model", () => {
     Story.story(
       update,
       Story.given(submittedQuestionModel()),
@@ -146,12 +154,12 @@ describe("deep-research-agent web update", () => {
           throw new Error("successful transport stream projected an unexpected chat entry shape")
         }
 
-        expect(user).toEqual(Chat.UserEntry({ text: "What makes TenetKit standalone?" }))
+        expect(user).toEqual(Chat.UserEntry({ text: "What makes Generalist standalone?" }))
         expect(tool).toEqual(
           Chat.ToolEntry({
             callId: "search-1",
             name: "web_search",
-            params: { query: "What makes TenetKit standalone?" },
+            params: { query: "What makes Generalist standalone?" },
             phase: "executing",
             outcome: {
               _tag: "Completed",
@@ -159,9 +167,9 @@ describe("deep-research-agent web update", () => {
               result: {
                 results: [
                   {
-                    title: "TenetKit docs",
-                    url: "https://tenetkit.test/docs",
-                    snippet: "TenetKit streams transport frames.",
+                    title: "Generalist docs",
+                    url: "https://generalist.test/docs",
+                    snippet: "Generalist streams transport frames.",
                   },
                 ],
               },
@@ -176,7 +184,7 @@ describe("deep-research-agent web update", () => {
     )
   })
 
-  test("clicking stop dispatches the existing TenetKit cancel command", () => {
+  test("clicking stop dispatches the existing Generalist cancel command", () => {
     Story.story(
       update,
       Story.given(
@@ -201,11 +209,11 @@ describe("deep-research-agent web update", () => {
         chat: Object.assign({}, readyModel().chat, {
           run: Chat.Running({ turn: 0 }),
           entries: [
-            Chat.UserEntry({ text: "What makes TenetKit standalone?" }),
+            Chat.UserEntry({ text: "What makes Generalist standalone?" }),
             Chat.ToolEntry({
               callId: "search-1",
               name: "web_search",
-              params: { query: "What makes TenetKit standalone?" },
+              params: { query: "What makes Generalist standalone?" },
               phase: "called",
               outcome: { _tag: "Pending" },
               progress: [],

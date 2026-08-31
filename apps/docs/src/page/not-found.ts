@@ -8,7 +8,7 @@ export const notFound = () =>
     [
       h.p([h.Class("text-sm font-medium text-muted-foreground")], ["404"]),
       h.h1([h.Class("mt-3 text-3xl font-semibold tracking-tight")], ["Page not found"]),
-      h.p([h.Class("mt-4 text-muted-foreground")], ["The requested TenetKit docs page does not exist."]),
+      h.p([h.Class("mt-4 text-muted-foreground")], ["The requested Generalist docs page does not exist."]),
       h.a(
         [h.Href("/docs/start/quickstart"), h.Class("mt-6 font-medium text-primary underline underline-offset-4")],
         ["Open the quickstart"],

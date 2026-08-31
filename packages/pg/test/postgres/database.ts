@@ -1,10 +1,10 @@
-import { layer, RuntimeSchema } from "@tenetkit/pg"
+import { layer, RuntimeSchema } from "@generalist/pg"
 import { Config, Effect, Layer, Option } from "effect"
-import { provideScoped } from "../../../tenetkit/test/runtime/execution/scoped-provide.js"
+import { provideScoped } from "../../../generalist/test/runtime/execution/scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { ExecutableResolver } from "tenetkit/runtime"
-import { RuntimeWorker } from "tenetkit/runtime/sql-driver"
+import { ExecutableResolver } from "generalist/runtime"
+import { RuntimeWorker } from "generalist/runtime/sql-driver"
 import type { RuntimeError } from "../../src/postgres/runtime-layer.js"
 import {
   analyst,
@@ -16,12 +16,12 @@ import {
   researcherAddress,
   registrationsFor,
   researcherRef,
-} from "../../../tenetkit/test/runtime/execution/fixtures.js"
-import { closedTestAgent } from "../../../tenetkit/test/runtime/run/identity.js"
-import type { MessagingOverrides } from "../../../tenetkit/test/runtime/messaging/scenario.js"
+} from "../../../generalist/test/runtime/execution/fixtures.js"
+import { closedTestAgent } from "../../../generalist/test/runtime/run/identity.js"
+import type { MessagingOverrides } from "../../../generalist/test/runtime/messaging/scenario.js"
 
 export const postgresUrl = Effect.runSync(
-  Config.option(Config.string("TENETKIT_DATABASE_URL").pipe(Config.orElse(() => Config.string("DATABASE_URL")))).pipe(
+  Config.option(Config.string("GENERALIST_DATABASE_URL").pipe(Config.orElse(() => Config.string("DATABASE_URL")))).pipe(
     Effect.map(Option.getOrUndefined),
   ),
 )
@@ -33,11 +33,11 @@ export const postgresTestMaxConnections = 8
 export const postgresClient = (url: string) => RuntimeSchema.layerClient({ url, maxConnections: 2 })
 
 type PostgresWorkerLayer = Layer.Layer<
-  | import("tenetkit/runtime").RunExecutor.RunExecutor
-  | import("tenetkit/runtime/sql-driver").RunClaims
-  | import("tenetkit/runtime").RunStore.RunStore
-  | import("tenetkit/runtime").Runtime.Runtime
-  | import("tenetkit/runtime/sql-driver").RuntimeWorker.RuntimeWorker,
+  | import("generalist/runtime").RunExecutor.RunExecutor
+  | import("generalist/runtime/sql-driver").RunClaims
+  | import("generalist/runtime").RunStore.RunStore
+  | import("generalist/runtime").Runtime.Runtime
+  | import("generalist/runtime/sql-driver").RuntimeWorker.RuntimeWorker,
   SqlError | RuntimeError,
   never
 >
@@ -96,7 +96,7 @@ export const postgresWithWorker = (options: PostgresWorkerOptions): PostgresWork
 const serverUrl = postgresUrl ?? "postgres://postgres-unavailable"
 
 const schemaName = (label: string) =>
-  `tenetkit_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
+  `generalist_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
 
 export interface PostgresDatabase {
   readonly url: string

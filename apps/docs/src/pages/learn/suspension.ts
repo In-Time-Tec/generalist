@@ -10,7 +10,7 @@ export const suspension = definePage({
     "AgentSuspended on the error channel is the human-in-the-loop contract: the host stores a token and re-enters the run with RunOptions.resume.",
   content: [
     p(
-      "Suspension is not failure handling. It is the human-in-the-loop contract: a typed statement that the run did not finish and must be re-entered once someone (a person, an external system, a durable runtime) resolves a token out-of-band. TenetKit puts that statement on the stream's error channel as ",
+      "Suspension is not failure handling. It is the human-in-the-loop contract: a typed statement that the run did not finish and must be re-entered once someone (a person, an external system, a durable runtime) resolves a token out-of-band. Generalist puts that statement on the stream's error channel as ",
       code("AgentSuspended"),
       ".",
     ),
@@ -81,9 +81,9 @@ export const suspension = definePage({
     ),
     h2("why-the-shape-mirrors-a-tool-call", "Why the shape mirrors a tool call"),
     p(
-      "The field shape (id, name, params) is deliberately the shape of a tool call, because that is what a durable host must persist to re-enter later. Store those three fields plus the token and the transcript, and a resume days later reconstructs the exact call identity the model emitted. tenetkit/runtime persists that suspension as a durable Run wait and applies its resolution to the authoritative core suspension on re-entry; see ",
+      "The field shape (id, name, params) is deliberately the shape of a tool call, because that is what a durable host must persist to re-enter later. Store those three fields plus the token and the transcript, and a resume days later reconstructs the exact call identity the model emitted. generalist/runtime persists that suspension as a durable Run wait and applies its resolution to the authoritative core suspension on re-entry; see ",
       link("/docs/learn/native-runtime", "where durability lives"),
-      ". tenetkit defines the suspension contract but does not persist it.",
+      ". generalist defines the suspension contract but does not persist it.",
     ),
     h2("why-an-error-and-not-a-callback", "Why an error and not a callback"),
     p(

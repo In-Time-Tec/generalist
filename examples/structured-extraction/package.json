@@ -1,5 +1,5 @@
 {
-  "name": "@tenetkit/example-structured-extraction",
+  "name": "@generalist/example-structured-extraction",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "tenetkit": "workspace:*",
+    "generalist": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -13,10 +13,10 @@ export const providers = definePage({
   navTitle: "Register model providers",
   group: "Guides",
   description:
-    "Bind provider and model pairs from exact tenetkit/ai/* leaves, combine registries, and keep a deterministic fallback for keyless environments.",
+    "Bind provider and model pairs from exact generalist/ai/* leaves, combine registries, and keep a deterministic fallback for keyless environments.",
   content: [
     p(
-      code("tenetkit"),
+      code("generalist"),
       " is provider-agnostic: ",
       code("ModelRegistry"),
       " maps a ",
@@ -26,12 +26,12 @@ export const providers = definePage({
       " layer and fails with a typed ",
       code("LanguageModelNotRegistered"),
       " when the selection is missing. ",
-      code("tenetkit/ai/*"),
+      code("generalist/ai/*"),
       " leaves add registration helpers over the upstream ",
       code("@effect/ai-*"),
       " packages.",
     ),
-    command("OpenRouter profile", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @effect/ai-openrouter@4.0.0-rc.112"),
+    command("OpenRouter profile", "bun add effect@4.0.0-rc.112 generalist@0.44.0 @effect/ai-openrouter@4.0.0-rc.112"),
     p(
       "Install only the peer for each provider leaf you import. Anthropic uses ",
       code("@effect/ai-anthropic@4.0.0-rc.112"),
@@ -107,7 +107,7 @@ export const providers = definePage({
       code("LanguageModel"),
       " layer rather than a registry, the deep-research example builds the same fallback at the model-layer level; see ",
       link(
-        "https://github.com/In-Time-Tec/tenetkit/blob/main/examples/deep-research-agent/server/src/model.ts",
+        "https://github.com/In-Time-Tec/generalist/blob/main/examples/deep-research-agent/server/src/model.ts",
         "layerOrDeterministic in examples/deep-research-agent",
       ),
       ".",
@@ -173,7 +173,7 @@ export const providers = definePage({
     ),
     h2("recipe-gemini", "Recipe: Gemini via the OpenAI-compatible preset"),
     p(
-      "TenetKit has no first-party Google helper yet because the upstream Effect AI Google provider is not compatible with the pinned beta, but Google AI Studio speaks the OpenAI protocol. Register it with the ",
+      "Generalist has no first-party Google helper yet because the upstream Effect AI Google provider is not compatible with the pinned beta, but Google AI Studio speaks the OpenAI protocol. Register it with the ",
       code("layerGoogleAIStudio"),
       " preset and select ",
       code('{ provider: "google", model: "gemini-2.0-flash" }'),

@@ -1,12 +1,12 @@
 id: no-bare-boundary-error-tags-tsx
 language: Tsx
 severity: error
-message: Boundary error tags must use tenetkit/<subpath>/<Name> for wire uniqueness.
+message: Boundary error tags must use generalist/<subpath>/<Name> for wire uniqueness.
 rule:
   pattern: Schema.TaggedErrorClass<$$$>()($TAG, $$$ARGS)
 constraints:
   TAG:
     not:
-      regex: '^"tenetkit/([a-z0-9-]+/)+[A-Z][A-Za-z0-9]*"$'
+      regex: '^"generalist/([a-z0-9-]+/)+[A-Z][A-Za-z0-9]*"$'
 files:
   - "packages/*/src/**/*.tsx"

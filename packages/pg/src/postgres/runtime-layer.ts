@@ -2,14 +2,14 @@ import { Effect, Layer } from "effect"
 import { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { ExecutableResolver } from "tenetkit/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 import {
   SchemaMigrationFailed,
   layerSqlRuntime,
   type SqlDriverStoreError,
   type SqlRuntimeServices,
   type SqlStoreOptions,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import { layerClient } from "./client.js"
 import { postgresDriver } from "./store/index.js"
 

@@ -42,7 +42,7 @@ const withClient = <A, E, R>(raw: RawAccess, effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.provide(layerSqlClient(raw)))
 
 class Required extends Context.Service<Required, { readonly value: string }>()(
-  "@tenetkit/rivet/test/raw-sql.test/Required",
+  "@generalist/rivet/test/raw-sql.test/Required",
 ) {}
 
 class ExpectedFailure extends Schema.TaggedError<ExpectedFailure>()("ExpectedFailure", {}) {}

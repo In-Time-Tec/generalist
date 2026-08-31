@@ -55,7 +55,7 @@ export const skills = definePage({
     p(
       code("FileSystemCatalog.layer"),
       " from ",
-      code("tenetkit/skills"),
+      code("generalist/instructions/skills"),
       " discovers ",
       code("SKILL.md"),
       " files under your roots (defaults: ",
@@ -83,7 +83,7 @@ export const skills = definePage({
     callout(
       "warning",
       "Hosted distribution is adapter-owned",
-      "The Agent Skills standard defines directory contents, not catalogs. TenetKit uses its own versioned manifest; authenticate or sign requests by decorating the provided HttpClient. S3 does not list buckets, and GitHub requires an immutable commit ref.",
+      "The Agent Skills standard defines directory contents, not catalogs. Generalist uses its own versioned manifest; authenticate or sign requests by decorating the provided HttpClient. S3 does not list buckets, and GitHub requires an immutable commit ref.",
     ),
     h2("mind-the-budget", "5. Mind the listing budget"),
     p(

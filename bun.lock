@@ -5,10 +5,10 @@
     "": {
       "name": "tenetkit",
       "dependencies": {
-        "@tenetkit/mysql": "workspace:*",
-        "@tenetkit/pg": "workspace:*",
+        "@generalist/mysql": "workspace:*",
+        "@generalist/pg": "workspace:*",
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@ast-grep/cli": "catalog:",
@@ -36,7 +36,7 @@
       },
     },
     "apps/docs": {
-      "name": "@tenetkit/docs",
+      "name": "@generalist/docs",
       "version": "0.0.0",
       "dependencies": {
         "@foldkit/ui": "catalog:",
@@ -44,8 +44,8 @@
         "clsx": "catalog:",
         "effect": "catalog:",
         "foldkit": "catalog:",
+        "generalist": "workspace:*",
         "tailwind-merge": "catalog:",
-        "tenetkit": "workspace:*",
       },
       "devDependencies": {
         "@foldkit/vite-plugin": "catalog:",
@@ -58,11 +58,11 @@
       },
     },
     "examples/capstone-local-assistant": {
-      "name": "@tenetkit/example-capstone-local-assistant",
+      "name": "@generalist/example-capstone-local-assistant",
       "dependencies": {
         "effect": "catalog:",
         "foldkit": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -70,11 +70,11 @@
       },
     },
     "examples/cloudflare-worker": {
-      "name": "@tenetkit/example-cloudflare-worker",
+      "name": "@generalist/example-cloudflare-worker",
       "dependencies": {
-        "@tenetkit/cloudflare": "workspace:*",
+        "@generalist/cloudflare": "workspace:*",
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -83,17 +83,17 @@
       },
     },
     "examples/deep-research-agent": {
-      "name": "@tenetkit/example-deep-research-agent",
+      "name": "@generalist/example-deep-research-agent",
       "devDependencies": {
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
     },
     "examples/deep-research-agent/server": {
-      "name": "@tenetkit/example-deep-research-agent-server",
+      "name": "@generalist/example-deep-research-agent-server",
       "dependencies": {
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -101,15 +101,15 @@
       },
     },
     "examples/deep-research-agent/web": {
-      "name": "@tenetkit/example-deep-research-agent-web",
+      "name": "@generalist/example-deep-research-agent-web",
       "dependencies": {
         "@foldkit/ui": "catalog:",
         "class-variance-authority": "catalog:",
         "clsx": "catalog:",
         "effect": "catalog:",
         "foldkit": "catalog:",
+        "generalist": "workspace:*",
         "tailwind-merge": "catalog:",
-        "tenetkit": "workspace:*",
       },
       "devDependencies": {
         "@foldkit/vite-plugin": "catalog:",
@@ -120,10 +120,10 @@
       },
     },
     "examples/eval-in-ci": {
-      "name": "@tenetkit/example-eval-in-ci",
+      "name": "@generalist/example-eval-in-ci",
       "dependencies": {
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -131,10 +131,10 @@
       },
     },
     "examples/hitl-over-sse": {
-      "name": "@tenetkit/example-hitl-over-sse",
+      "name": "@generalist/example-hitl-over-sse",
       "dependencies": {
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -142,10 +142,10 @@
       },
     },
     "examples/mcp-agent": {
-      "name": "@tenetkit/example-mcp-agent",
+      "name": "@generalist/example-mcp-agent",
       "dependencies": {
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -153,11 +153,11 @@
       },
     },
     "examples/mcp-toolkit-server": {
-      "name": "@tenetkit/example-mcp-toolkit-server",
+      "name": "@generalist/example-mcp-toolkit-server",
       "dependencies": {
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -165,10 +165,10 @@
       },
     },
     "examples/memory-chat": {
-      "name": "@tenetkit/example-memory-chat",
+      "name": "@generalist/example-memory-chat",
       "dependencies": {
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -176,10 +176,10 @@
       },
     },
     "examples/multi-agent": {
-      "name": "@tenetkit/example-multi-agent",
+      "name": "@generalist/example-multi-agent",
       "dependencies": {
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -187,11 +187,11 @@
       },
     },
     "examples/package-composition-guides": {
-      "name": "@tenetkit/example-package-composition-guides",
+      "name": "@generalist/example-package-composition-guides",
       "dependencies": {
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -199,10 +199,10 @@
       },
     },
     "examples/structured-extraction": {
-      "name": "@tenetkit/example-structured-extraction",
+      "name": "@generalist/example-structured-extraction",
       "dependencies": {
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -210,10 +210,10 @@
       },
     },
     "examples/tool-calling-chatbot": {
-      "name": "@tenetkit/example-tool-calling-chatbot",
+      "name": "@generalist/example-tool-calling-chatbot",
       "dependencies": {
         "effect": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -221,12 +221,12 @@
       },
     },
     "packages/cloudflare": {
-      "name": "@tenetkit/cloudflare",
+      "name": "@generalist/cloudflare",
       "version": "0.44.0",
       "dependencies": {
         "@effect/sql-sqlite-do": "catalog:",
         "es-module-lexer": "catalog:",
-        "tenetkit": "workspace:*",
+        "generalist": "workspace:*",
       },
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -241,65 +241,8 @@
         "effect": "catalog:",
       },
     },
-    "packages/mysql": {
-      "name": "@tenetkit/mysql",
-      "version": "0.44.0",
-      "dependencies": {
-        "@effect/sql-mysql2": "catalog:",
-        "tenetkit": "workspace:*",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-        "@types/bun": "catalog:",
-        "effect": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-      "peerDependencies": {
-        "effect": "catalog:",
-      },
-    },
-    "packages/pg": {
-      "name": "@tenetkit/pg",
-      "version": "0.44.0",
-      "dependencies": {
-        "@effect/sql-pg": "catalog:",
-        "pg": "catalog:",
-        "tenetkit": "workspace:*",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-        "@types/bun": "catalog:",
-        "@types/pg": "catalog:",
-        "effect": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-      "peerDependencies": {
-        "effect": "catalog:",
-      },
-    },
-    "packages/rivet": {
-      "name": "@tenetkit/rivet",
-      "version": "0.44.0",
-      "dependencies": {
-        "@standard-schema/spec": "catalog:",
-        "rivetkit": "catalog:",
-        "tenetkit": "workspace:*",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-        "@types/bun": "catalog:",
-        "effect": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-      "peerDependencies": {
-        "effect": "catalog:",
-      },
-    },
-    "packages/tenetkit": {
-      "name": "tenetkit",
+    "packages/generalist": {
+      "name": "generalist",
       "version": "0.44.0",
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
@@ -354,6 +297,63 @@
         "foldkit",
         "vitest",
       ],
+    },
+    "packages/mysql": {
+      "name": "@generalist/mysql",
+      "version": "0.44.0",
+      "dependencies": {
+        "@effect/sql-mysql2": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "effect": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
+    "packages/pg": {
+      "name": "@generalist/pg",
+      "version": "0.44.0",
+      "dependencies": {
+        "@effect/sql-pg": "catalog:",
+        "generalist": "workspace:*",
+        "pg": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "@types/pg": "catalog:",
+        "effect": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
+    "packages/rivet": {
+      "name": "@generalist/rivet",
+      "version": "0.44.0",
+      "dependencies": {
+        "@standard-schema/spec": "catalog:",
+        "generalist": "workspace:*",
+        "rivetkit": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "effect": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
     },
   },
   "catalog": {
@@ -641,6 +641,44 @@
     "@foldkit/ui": ["@foldkit/ui@0.148.2", "", { "dependencies": { "@floating-ui/dom": "^1.7.6" }, "peerDependencies": { "effect": "4.0.0-rc.109", "foldkit": "^0" } }, "sha512-am9hXP16nyIbAOQKLlemfxr5mehWjBW7mWsA0Ib3B3UOGoQ9X/joDfCUnzY1bISQlwuBCs/4RtKcq+mtUhhd3w=="],
 
     "@foldkit/vite-plugin": ["@foldkit/vite-plugin@0.16.1", "", { "dependencies": { "magic-string": "^0.30.21", "ws": "^8.21.0" }, "peerDependencies": { "effect": "4.0.0-rc.109", "foldkit": ">=0.148.0", "vite": "^7.0.0 || ^8.0.0" } }, "sha512-zYbiQbYPRh32jSeocJEKVwsbrL1xD3IKZDBPbE1Dvq4s6LOMWbqbJmON781SVwVJ9cFp0Wh6AITNGsH8GLvccA=="],
+
+    "@generalist/cloudflare": ["@generalist/cloudflare@workspace:packages/cloudflare"],
+
+    "@generalist/docs": ["@generalist/docs@workspace:apps/docs"],
+
+    "@generalist/example-capstone-local-assistant": ["@generalist/example-capstone-local-assistant@workspace:examples/capstone-local-assistant"],
+
+    "@generalist/example-cloudflare-worker": ["@generalist/example-cloudflare-worker@workspace:examples/cloudflare-worker"],
+
+    "@generalist/example-deep-research-agent": ["@generalist/example-deep-research-agent@workspace:examples/deep-research-agent"],
+
+    "@generalist/example-deep-research-agent-server": ["@generalist/example-deep-research-agent-server@workspace:examples/deep-research-agent/server"],
+
+    "@generalist/example-deep-research-agent-web": ["@generalist/example-deep-research-agent-web@workspace:examples/deep-research-agent/web"],
+
+    "@generalist/example-eval-in-ci": ["@generalist/example-eval-in-ci@workspace:examples/eval-in-ci"],
+
+    "@generalist/example-hitl-over-sse": ["@generalist/example-hitl-over-sse@workspace:examples/hitl-over-sse"],
+
+    "@generalist/example-mcp-agent": ["@generalist/example-mcp-agent@workspace:examples/mcp-agent"],
+
+    "@generalist/example-mcp-toolkit-server": ["@generalist/example-mcp-toolkit-server@workspace:examples/mcp-toolkit-server"],
+
+    "@generalist/example-memory-chat": ["@generalist/example-memory-chat@workspace:examples/memory-chat"],
+
+    "@generalist/example-multi-agent": ["@generalist/example-multi-agent@workspace:examples/multi-agent"],
+
+    "@generalist/example-package-composition-guides": ["@generalist/example-package-composition-guides@workspace:examples/package-composition-guides"],
+
+    "@generalist/example-structured-extraction": ["@generalist/example-structured-extraction@workspace:examples/structured-extraction"],
+
+    "@generalist/example-tool-calling-chatbot": ["@generalist/example-tool-calling-chatbot@workspace:examples/tool-calling-chatbot"],
+
+    "@generalist/mysql": ["@generalist/mysql@workspace:packages/mysql"],
+
+    "@generalist/pg": ["@generalist/pg@workspace:packages/pg"],
+
+    "@generalist/rivet": ["@generalist/rivet@workspace:packages/rivet"],
 
     "@hono/node-server": ["@hono/node-server@1.19.17", "", { "peerDependencies": { "hono": "^4" } }, "sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ=="],
 
@@ -1002,44 +1040,6 @@
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.3.2", "", { "dependencies": { "@tailwindcss/node": "4.3.2", "@tailwindcss/oxide": "4.3.2", "tailwindcss": "4.3.2" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7 || ^8" } }, "sha512-eHpMeX4JXfVNJDEcsouTeCBubJBTcTLigeaw/NTUW6PB5ATKKXdyonnXgTBX2VuRbjz1hjfz6C5XAhr52ImQXA=="],
 
-    "@tenetkit/cloudflare": ["@tenetkit/cloudflare@workspace:packages/cloudflare"],
-
-    "@tenetkit/docs": ["@tenetkit/docs@workspace:apps/docs"],
-
-    "@tenetkit/example-capstone-local-assistant": ["@tenetkit/example-capstone-local-assistant@workspace:examples/capstone-local-assistant"],
-
-    "@tenetkit/example-cloudflare-worker": ["@tenetkit/example-cloudflare-worker@workspace:examples/cloudflare-worker"],
-
-    "@tenetkit/example-deep-research-agent": ["@tenetkit/example-deep-research-agent@workspace:examples/deep-research-agent"],
-
-    "@tenetkit/example-deep-research-agent-server": ["@tenetkit/example-deep-research-agent-server@workspace:examples/deep-research-agent/server"],
-
-    "@tenetkit/example-deep-research-agent-web": ["@tenetkit/example-deep-research-agent-web@workspace:examples/deep-research-agent/web"],
-
-    "@tenetkit/example-eval-in-ci": ["@tenetkit/example-eval-in-ci@workspace:examples/eval-in-ci"],
-
-    "@tenetkit/example-hitl-over-sse": ["@tenetkit/example-hitl-over-sse@workspace:examples/hitl-over-sse"],
-
-    "@tenetkit/example-mcp-agent": ["@tenetkit/example-mcp-agent@workspace:examples/mcp-agent"],
-
-    "@tenetkit/example-mcp-toolkit-server": ["@tenetkit/example-mcp-toolkit-server@workspace:examples/mcp-toolkit-server"],
-
-    "@tenetkit/example-memory-chat": ["@tenetkit/example-memory-chat@workspace:examples/memory-chat"],
-
-    "@tenetkit/example-multi-agent": ["@tenetkit/example-multi-agent@workspace:examples/multi-agent"],
-
-    "@tenetkit/example-package-composition-guides": ["@tenetkit/example-package-composition-guides@workspace:examples/package-composition-guides"],
-
-    "@tenetkit/example-structured-extraction": ["@tenetkit/example-structured-extraction@workspace:examples/structured-extraction"],
-
-    "@tenetkit/example-tool-calling-chatbot": ["@tenetkit/example-tool-calling-chatbot@workspace:examples/tool-calling-chatbot"],
-
-    "@tenetkit/mysql": ["@tenetkit/mysql@workspace:packages/mysql"],
-
-    "@tenetkit/pg": ["@tenetkit/pg@workspace:packages/pg"],
-
-    "@tenetkit/rivet": ["@tenetkit/rivet@workspace:packages/rivet"],
-
     "@tsconfig/bun": ["@tsconfig/bun@1.0.9", "", {}, "sha512-4M0/Ivfwcpz325z6CwSifOBZYji3DFOEpY6zEUt0+Xi2qRhzwvmqQN9XAHJh3OVvRJuAqVTLU2abdCplvp6mwQ=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg=="],
@@ -1343,6 +1343,8 @@
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
 
     "function-bind": ["function-bind@1.1.2", "", {}, "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="],
+
+    "generalist": ["generalist@workspace:packages/generalist"],
 
     "generate-function": ["generate-function@2.3.1", "", { "dependencies": { "is-property": "^1.0.2" } }, "sha512-eeB5GfMNeevm/GRYq20ShmsaGcmI81kIX2K9XQx5miC8KdHaC6Jm0qQ8ZNeGOi7wYB8OsdxKs+Y2oVuTFuVwKQ=="],
 
@@ -1771,8 +1773,6 @@
     "tar-fs": ["tar-fs@2.1.5", "", { "dependencies": { "chownr": "^1.1.1", "mkdirp-classic": "^0.5.2", "pump": "^3.0.0", "tar-stream": "^2.1.4" } }, "sha512-OboTd8mmMhZDNPV+UjQcK9yKAatXu2aJ+r1w4im1Otd4M4fl2hwvdoXUxIYHFTHWK/3y3FarBP70v3vwmGlOxw=="],
 
     "tar-stream": ["tar-stream@2.2.0", "", { "dependencies": { "bl": "^4.0.3", "end-of-stream": "^1.4.1", "fs-constants": "^1.0.0", "inherits": "^2.0.3", "readable-stream": "^3.1.1" } }, "sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ=="],
-
-    "tenetkit": ["tenetkit@workspace:packages/tenetkit"],
 
     "thread-stream": ["thread-stream@3.2.0", "", { "dependencies": { "real-require": "^0.2.0" } }, "sha512-zLBvqpwr4Esa0kRjcrzGU6zL25lePWaCLMx0RQFrmteozIfeNdaMLpG5U7PeHzvlFkAWaRKA9/KVW4F60iB+qw=="],
 

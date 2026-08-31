@@ -6,10 +6,10 @@ import {
   type ModelResponseFaultBoundary,
   type MultiWorkerClaimCapability,
   type SqlTransactionCapability,
-} from "tenetkit/test/runtime-driver"
+} from "generalist/test/runtime-driver"
 import { Effect, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { assistantAddress } from "../../../tenetkit/test/runtime/execution/fixtures.js"
+import { assistantAddress } from "../../../generalist/test/runtime/execution/fixtures.js"
 import { postgresAvailable, postgresDatabase, postgresLayer } from "./database.js"
 
 const database = postgresDatabase("runtime-driver-conformance")
@@ -34,10 +34,10 @@ const installRollback = withClient(
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql.unsafe(`
-      CREATE OR REPLACE FUNCTION tenetkit_conformance_rollback() RETURNS trigger AS $$
+      CREATE OR REPLACE FUNCTION generalist_conformance_rollback() RETURNS trigger AS $$
       BEGIN
         IF EXISTS (
-          SELECT 1 FROM tenetkit_run_events
+          SELECT 1 FROM generalist_run_events
           WHERE event_id = NEW.event_id AND event_json LIKE '%"_tag":"RunCompleted"%'
         ) THEN
           RAISE EXCEPTION 'forced conformance rollback';
@@ -47,10 +47,10 @@ const installRollback = withClient(
       $$ LANGUAGE plpgsql
     `)
     yield* sql.unsafe(`
-      CREATE CONSTRAINT TRIGGER tenetkit_conformance_rollback
-      AFTER INSERT ON tenetkit_tree_event_index
+      CREATE CONSTRAINT TRIGGER generalist_conformance_rollback
+      AFTER INSERT ON generalist_tree_event_index
       DEFERRABLE INITIALLY DEFERRED
-      FOR EACH ROW EXECUTE FUNCTION tenetkit_conformance_rollback()
+      FOR EACH ROW EXECUTE FUNCTION generalist_conformance_rollback()
     `)
   }),
 )
@@ -58,8 +58,8 @@ const installRollback = withClient(
 const removeRollback = withClient(
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql.unsafe(`DROP TRIGGER IF EXISTS tenetkit_conformance_rollback ON tenetkit_tree_event_index`)
-    yield* sql.unsafe(`DROP FUNCTION IF EXISTS tenetkit_conformance_rollback()`)
+    yield* sql.unsafe(`DROP TRIGGER IF EXISTS generalist_conformance_rollback ON generalist_tree_event_index`)
+    yield* sql.unsafe(`DROP FUNCTION IF EXISTS generalist_conformance_rollback()`)
   }),
 )
 
@@ -73,22 +73,22 @@ const forceRollback: SqlTransactionCapability["forceRollback"] = (effect) =>
 const faultTarget = (boundary: ModelResponseFaultBoundary) => {
   switch (boundary) {
     case "after-claim-validation":
-      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_session_entries" }
+      return { timing: "BEFORE", operation: "INSERT", table: "generalist_session_entries" }
     case "after-session-entry":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_sessions" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_sessions" }
     case "after-session-leaf":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_run_operations" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_run_operations" }
     case "after-operation":
     case "after-tree-index":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_runs" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_runs" }
     case "after-checkpoint":
-      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_run_events" }
+      return { timing: "BEFORE", operation: "INSERT", table: "generalist_run_events" }
     case "after-event":
-      return { timing: "BEFORE", operation: "UPDATE", table: "tenetkit_tree_roots" }
+      return { timing: "BEFORE", operation: "UPDATE", table: "generalist_tree_roots" }
     case "after-tree-position":
-      return { timing: "BEFORE", operation: "INSERT", table: "tenetkit_tree_event_index" }
+      return { timing: "BEFORE", operation: "INSERT", table: "generalist_tree_event_index" }
     case "before-commit":
-      return { timing: "AFTER", operation: "UPDATE", table: "tenetkit_runs" }
+      return { timing: "AFTER", operation: "UPDATE", table: "generalist_runs" }
   }
 }
 
@@ -125,17 +125,17 @@ const installModelFault = (input: {
       const sql = yield* SqlClient.SqlClient
       const target = faultTarget(input.boundary)
       yield* sql.unsafe(`
-        CREATE OR REPLACE FUNCTION tenetkit_model_response_fault() RETURNS trigger AS $$
+        CREATE OR REPLACE FUNCTION generalist_model_response_fault() RETURNS trigger AS $$
         BEGIN
           RAISE EXCEPTION '${input.boundary}';
         END;
         $$ LANGUAGE plpgsql
       `)
       yield* sql.unsafe(`
-        CREATE TRIGGER tenetkit_model_response_fault
+        CREATE TRIGGER generalist_model_response_fault
         ${target.timing} ${target.operation} ON ${target.table}
         FOR EACH ROW WHEN (${faultCondition(input.boundary, input.runId, input.sessionId)})
-        EXECUTE FUNCTION tenetkit_model_response_fault()
+        EXECUTE FUNCTION generalist_model_response_fault()
       `)
     }),
   ).pipe(Effect.orDie)
@@ -144,8 +144,8 @@ const removeModelFault = (boundary: ModelResponseFaultBoundary) =>
   withClient(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* sql.unsafe(`DROP TRIGGER IF EXISTS tenetkit_model_response_fault ON ${faultTarget(boundary).table}`)
-      yield* sql.unsafe(`DROP FUNCTION IF EXISTS tenetkit_model_response_fault()`)
+      yield* sql.unsafe(`DROP TRIGGER IF EXISTS generalist_model_response_fault ON ${faultTarget(boundary).table}`)
+      yield* sql.unsafe(`DROP FUNCTION IF EXISTS generalist_model_response_fault()`)
     }),
   ).pipe(Effect.orDie)
 
@@ -154,7 +154,7 @@ const expire: MultiWorkerClaimCapability["expire"] = (stale) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       yield* sql`
-        UPDATE tenetkit_runs
+        UPDATE generalist_runs
         SET lease_expires_at = NOW() - INTERVAL '1 second'
         WHERE run_id = ${stale.runId}
           AND owner_worker_id = ${stale.workerId}

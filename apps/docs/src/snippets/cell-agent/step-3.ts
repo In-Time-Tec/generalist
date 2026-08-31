@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
-import { KernelPool, KernelProfile, CellTool, TestKernel } from "tenetkit/repl"
+import { KernelPool, KernelProfile, CellTool, TestKernel } from "generalist/repl"
 
 const profile = KernelProfile.make({
   provider: "bun-local",

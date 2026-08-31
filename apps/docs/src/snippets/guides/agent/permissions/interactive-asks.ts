@@ -1,5 +1,5 @@
 import { Console, Effect, Layer } from "effect"
-import { Approvals, Permissions } from "tenetkit"
+import { Approvals, Permissions } from "generalist"
 
 const _policyLayer = Layer.mergeAll(
   Permissions.layerRuleset({

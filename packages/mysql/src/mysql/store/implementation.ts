@@ -6,7 +6,7 @@ import {
   type SqlRuntimeDriver,
   type SqlStoreLocks,
   type SqlStoreOptions,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import { check as checkSchema } from "../schema/migrations.js"
 import { transactionRunner } from "../transaction/events.js"
 import { initializeReadCommitted, mysqlClaimMechanics } from "./claims.js"
@@ -23,7 +23,7 @@ export type RuntimeError = SqlDriverStoreError
 const lockRun = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
+    yield* sql`SELECT run_id FROM generalist_runs WHERE run_id = ${runId} FOR UPDATE`
   })
 
 const lockHierarchy = (runId: string) =>
@@ -31,7 +31,7 @@ const lockHierarchy = (runId: string) =>
     const sql = yield* SqlClient.SqlClient
     yield* lockRun(runId)
     const rows = yield* sql<{ parent_run_id: string | null }>`
-      SELECT parent_run_id FROM tenetkit_runs WHERE run_id = ${runId}
+      SELECT parent_run_id FROM generalist_runs WHERE run_id = ${runId}
     `
     const parentRunId = rows[0]?.parent_run_id
     if (parentRunId !== null && parentRunId !== undefined) yield* lockRun(parentRunId)
@@ -40,10 +40,10 @@ const lockHierarchy = (runId: string) =>
 const lockNamed = (key: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const held = yield* sql`SELECT lock_key FROM tenetkit_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
+    const held = yield* sql`SELECT lock_key FROM generalist_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
     if (held.length === 0) {
-      yield* sql`INSERT IGNORE INTO tenetkit_runtime_locks (lock_key) VALUES (${key})`
-      yield* sql`SELECT lock_key FROM tenetkit_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
+      yield* sql`INSERT IGNORE INTO generalist_runtime_locks (lock_key) VALUES (${key})`
+      yield* sql`SELECT lock_key FROM generalist_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
     }
   })
 
@@ -52,11 +52,12 @@ const locks: SqlStoreLocks = {
   fence: lockRun,
   hierarchy: lockHierarchy,
   spawn: lockRun,
-  admission: (input) => lockNamed(`tenetkit:admit:${input.address}:${input.sessionId}`),
+  admission: (input) => lockNamed(`generalist:admit:${input.address}:${input.sessionId}`),
   admissionRegistrations: Effect.void,
-  registrations: lockNamed("tenetkit:executable-registrations"),
-  mailbox: (sessionId) => lockNamed(`tenetkit:mailbox:${sessionId}`),
-  fanOut: (input) => lockNamed(`tenetkit:fanout:${input.parentRunId}`).pipe(Effect.andThen(lockRun(input.parentRunId))),
+  registrations: lockNamed("generalist:executable-registrations"),
+  mailbox: (sessionId) => lockNamed(`generalist:mailbox:${sessionId}`),
+  fanOut: (input) =>
+    lockNamed(`generalist:fanout:${input.parentRunId}`).pipe(Effect.andThen(lockRun(input.parentRunId))),
 }
 
 /** MySQL's physical transaction, lock, claim, polling, and host initialization mechanics. */

@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import { HttpClient } from "effect/unstable/http"
-import { ToolContext } from "tenetkit"
+import { ToolContext } from "generalist"
 
 const _crawlDocsHandler = Effect.fn("Docs.crawlDocs")(function* (params: { readonly startUrl: string }) {
   const context = yield* ToolContext.ToolContext

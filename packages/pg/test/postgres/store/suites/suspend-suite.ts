@@ -1,7 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { Errors, RunStore, Runtime } from "tenetkit/runtime"
-import { assistantAddress, textPrompt } from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
+import { Errors, RunStore, Runtime } from "generalist/runtime"
+import { assistantAddress, textPrompt } from "../../../../../generalist/test/runtime/execution/fixtures.js"
 import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../../database.js"
 
 const describeBackend = postgresAvailable ? describe : describe.skip

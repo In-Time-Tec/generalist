@@ -1,8 +1,8 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, AgentManifest, Pins } from "tenetkit"
-import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "tenetkit/runtime"
-import { TestModel } from "tenetkit/test"
-import { SSE } from "tenetkit/transport"
+import { Agent, AgentManifest, Pins } from "generalist"
+import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
+import { TestModel } from "generalist/test"
+import { SSE } from "generalist/transport"
 
 const agent = Agent.make({ name: "transport-agent" })
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {

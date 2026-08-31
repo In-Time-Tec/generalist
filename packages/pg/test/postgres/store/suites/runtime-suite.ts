@@ -1,7 +1,7 @@
-import { childAdmissionSuite } from "../../../../../tenetkit/test/runtime/child/suites/admission.js"
-import { nestedOperationsSuite } from "../../../../../tenetkit/test/runtime/operation/suites/nested.js"
-import { claimReadyWorker } from "../../../../../tenetkit/test/runtime/run/queued-activation.js"
-import { strandedDeliverySuite } from "../../../../../tenetkit/test/runtime/messaging/suites/delivery/stranded.js"
+import { childAdmissionSuite } from "../../../../../generalist/test/runtime/child/suites/admission.js"
+import { nestedOperationsSuite } from "../../../../../generalist/test/runtime/operation/suites/nested.js"
+import { claimReadyWorker } from "../../../../../generalist/test/runtime/run/queued-activation.js"
+import { strandedDeliverySuite } from "../../../../../generalist/test/runtime/messaging/suites/delivery/stranded.js"
 import { postgresAvailable, postgresDatabase, postgresLayer } from "../../database.js"
 
 /**

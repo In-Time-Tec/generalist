@@ -12,21 +12,21 @@ import {
   ModelResilience,
   Session,
   ToolOutput,
-} from "tenetkit"
-import { A2A } from "tenetkit/a2a"
-import { AGUI } from "tenetkit/ag-ui"
-import { VectorStore } from "tenetkit/memory"
-import { MCPClient, OAuth } from "tenetkit/mcp"
-import { make as makeMcpHttpTransport } from "tenetkit/mcp/client/http"
-import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "tenetkit/mcp/tools"
-import { load } from "tenetkit/instructions"
-import { GitHubCatalog, HttpCatalog, S3Catalog } from "tenetkit/skills"
-import { layer as deterministicLayer } from "tenetkit/ai/deterministic"
-import { make as makeModelRoute } from "tenetkit/ai/model-route"
-import { TestModel } from "tenetkit/test"
-import { Cursor, Runtime, RunEvent } from "tenetkit/runtime"
-import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "tenetkit/runtime/sqlite-bun"
-import { RunClient, Snapshot, SSE, WebSocket, Wire } from "tenetkit/transport"
+} from "generalist"
+import { A2A } from "generalist/a2a"
+import { AGUI } from "generalist/ag-ui"
+import { VectorStore } from "generalist/memory"
+import { MCPClient, OAuth } from "generalist/mcp"
+import { make as makeMcpHttpTransport } from "generalist/mcp/client/http"
+import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "generalist/mcp/tools"
+import { load } from "generalist/instructions"
+import { GitHubCatalog, HttpCatalog, S3Catalog } from "generalist/instructions/skills"
+import { layer as deterministicLayer } from "generalist/ai/deterministic"
+import { make as makeModelRoute } from "generalist/ai/model-route"
+import { TestModel } from "generalist/test"
+import { Cursor, Runtime, RunEvent } from "generalist/runtime"
+import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
+import { RunClient, Snapshot, SSE, WebSocket, Wire } from "generalist/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
@@ -39,8 +39,8 @@ type Equal<Left, Right> =
 type Assert<Value extends true> = Value
 type MemberEqual<Left, Right, Key extends keyof Left & keyof Right> = Equal<Left[Key], Right[Key]>
 type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
-type SkillsRoot = typeof import("tenetkit/skills")
-type InstructionsLoad = Assert<Equal<typeof load, typeof import("tenetkit/instructions").load>>
+type SkillsRoot = typeof import("generalist/instructions/skills")
+type InstructionsLoad = Assert<Equal<typeof load, typeof import("generalist/instructions").load>>
 type InstructionFilesRemovedFromSkills = Assert<
   Equal<"InstructionFiles" extends keyof SkillsRoot ? true : false, false>
 >
@@ -54,9 +54,9 @@ type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonl
 type MiddlewareCanonical = Assert<
   Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>
 >
-type ModelResilienceFailureInput = Assert<Equal<ModelResilience.FailureInput, import("tenetkit").ModelResilience.FailureInput>>
+type ModelResilienceFailureInput = Assert<Equal<ModelResilience.FailureInput, import("generalist").ModelResilience.FailureInput>>
 type ModelResilienceFailureResolver = Assert<
-  Equal<ModelResilience.FailureResolver, import("tenetkit").ModelResilience.FailureResolver>
+  Equal<ModelResilience.FailureResolver, import("generalist").ModelResilience.FailureResolver>
 >
 type SessionCanonical = Assert<
   Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionDirectory, never, never]>
@@ -79,10 +79,10 @@ type MemoryRunRequirements = Assert<
   Equal<StreamServices<typeof memoryRun>, LanguageModel.LanguageModel | Memory.Memory>
 >
 void Handoff
-type TransportRoot = typeof import("tenetkit/transport")
-type RuntimeRoot = typeof import("tenetkit/runtime")
-type A2ARoot = typeof import("tenetkit/a2a")
-type AGUIRoot = typeof import("tenetkit/ag-ui")
+type TransportRoot = typeof import("generalist/transport")
+type RuntimeRoot = typeof import("generalist/runtime")
+type A2ARoot = typeof import("generalist/a2a")
+type AGUIRoot = typeof import("generalist/ag-ui")
 type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
 type AGUICanonical = Assert<Equal<AGUIRoot["AGUI"], typeof AGUI>>
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
@@ -93,29 +93,29 @@ type RuntimeAdmitInputCanonical = Assert<
 type RuntimeActivateInputCanonical = Assert<
   Equal<Parameters<Runtime.Service["activate"]>[0], Runtime.ActivateInput>
 >
-type SqliteRuntimeOptions = import("tenetkit/runtime/sqlite-bun").Runtime.Options
-type SqliteRunStoreOptions = import("tenetkit/runtime/sqlite-bun").RunStore.Options
+type SqliteRuntimeOptions = import("generalist/runtime/sqlite-bun").Runtime.Options
+type SqliteRunStoreOptions = import("generalist/runtime/sqlite-bun").RunStore.Options
 void SqliteRuntime.layerSqlite
 void SqliteRunStore.layerSqlite
 void deterministicLayer
 void makeModelRoute
 type TransportClientSubpath = Assert<
-  MemberEqual<TransportRoot["RunClient"], typeof import("tenetkit/transport/run-client"), "layerWebSocket">
+  MemberEqual<TransportRoot["RunClient"], typeof import("generalist/transport/run-client"), "layerWebSocket">
 >
 type TransportErrorsSubpath = Assert<
-  MemberEqual<TransportRoot["Errors"], typeof import("tenetkit/transport/errors"), "TransportError">
+  MemberEqual<TransportRoot["Errors"], typeof import("generalist/transport/errors"), "TransportError">
 >
 type TransportSseSubpath = Assert<
-  MemberEqual<TransportRoot["SSE"], typeof import("tenetkit/transport/sse"), "respond">
+  MemberEqual<TransportRoot["SSE"], typeof import("generalist/transport/sse"), "respond">
 >
 type TransportWsSubpath = Assert<
-  MemberEqual<TransportRoot["WebSocket"], typeof import("tenetkit/transport/websocket"), "handle">
+  MemberEqual<TransportRoot["WebSocket"], typeof import("generalist/transport/websocket"), "handle">
 >
 type TransportWireSubpath = Assert<
-  MemberEqual<TransportRoot["Wire"], typeof import("tenetkit/transport/wire"), "producerCodec">
+  MemberEqual<TransportRoot["Wire"], typeof import("generalist/transport/wire"), "producerCodec">
 >
 type TransportSnapshotSubpath = Assert<
-  MemberEqual<TransportRoot["Snapshot"], typeof import("tenetkit/transport/snapshot"), "get">
+  MemberEqual<TransportRoot["Snapshot"], typeof import("generalist/transport/snapshot"), "get">
 >
 const cursor: Cursor.Cursor = Cursor.origin
 const snapshot = Snapshot.get("run:package-smoke")

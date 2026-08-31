@@ -1,20 +1,20 @@
 import { Effect, Metric } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
-import { withConsistentSnapshot, withSql, type SqlStoreRun, type SqlStoreRunner } from "tenetkit/runtime/sql-driver"
+import { withConsistentSnapshot, withSql, type SqlStoreRun, type SqlStoreRunner } from "generalist/runtime/sql-driver"
 
 const isDeadlock = (error: SqlError): boolean => {
   const text = `${error.message} ${String(error.reason)}`.toLowerCase()
   return text.includes("deadlock") || text.includes("1213") || text.includes("40001")
 }
 
-const deadlockRetries = Metric.counter("tenetkit_runtime_sql_deadlock_retries", {
+const deadlockRetries = Metric.counter("generalist_runtime_sql_deadlock_retries", {
   description: "MySQL whole-transaction deadlock retries",
   incremental: true,
   attributes: { backend: "mysql" },
 })
 
-const deadlockExhaustions = Metric.counter("tenetkit_runtime_sql_deadlock_exhaustions", {
+const deadlockExhaustions = Metric.counter("generalist_runtime_sql_deadlock_exhaustions", {
   description: "MySQL whole-transaction deadlock retry exhaustion",
   incremental: true,
   attributes: { backend: "mysql" },
@@ -34,8 +34,8 @@ export const transactionWithDeadlockRetry = <A, E, R>(input: {
           if (!isDeadlock(error)) return Effect.fail(error)
           if (retries > 0) {
             return Effect.annotateCurrentSpan({
-              "tenetkit.runtime.sql.retry.attempt": configuredRetries - retries + 1,
-              "tenetkit.runtime.sql.retry.classification": "deadlock",
+              "generalist.runtime.sql.retry.attempt": configuredRetries - retries + 1,
+              "generalist.runtime.sql.retry.classification": "deadlock",
             }).pipe(
               Effect.andThen(Metric.update(deadlockRetries, 1)),
               Effect.andThen(Effect.sleep("10 millis")),
@@ -43,8 +43,8 @@ export const transactionWithDeadlockRetry = <A, E, R>(input: {
             )
           }
           return Effect.annotateCurrentSpan({
-            "tenetkit.runtime.sql.retry.attempt": configuredRetries,
-            "tenetkit.runtime.sql.retry.classification": "deadlock-exhausted",
+            "generalist.runtime.sql.retry.attempt": configuredRetries,
+            "generalist.runtime.sql.retry.classification": "deadlock-exhausted",
           }).pipe(Effect.andThen(Metric.update(deadlockExhaustions, 1)), Effect.andThen(Effect.fail(error)))
         }),
       ),

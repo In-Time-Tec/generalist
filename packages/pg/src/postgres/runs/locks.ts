@@ -10,14 +10,14 @@ export const lockRun = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`run:${runId}`}))`
-    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
+    yield* sql`SELECT run_id FROM generalist_runs WHERE run_id = ${runId} FOR UPDATE`
   })
 
 /** Preserve row-only fencing for claimed operation and program transitions. */
 export const lockRunRow = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${runId} FOR UPDATE`
+    yield* sql`SELECT run_id FROM generalist_runs WHERE run_id = ${runId} FOR UPDATE`
   })
 
 export const lockRunHierarchy = (runId: string) =>
@@ -27,7 +27,7 @@ export const lockRunHierarchy = (runId: string) =>
     let current = runId
     while (true) {
       const row = (yield* sql<{ parent_run_id: string | null }>`
-        SELECT parent_run_id FROM tenetkit_runs WHERE run_id = ${current}
+        SELECT parent_run_id FROM generalist_runs WHERE run_id = ${current}
       `)[0]
       if (row?.parent_run_id === null || row?.parent_run_id === undefined) break
       hierarchy.push(row.parent_run_id)
@@ -66,13 +66,13 @@ export const lockAdmission = (input: {
 /** Serialize the global executable registration inventory. */
 export const lockRegistrations = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  yield* sql`SELECT pg_advisory_xact_lock(hashtext('tenetkit:executable-registrations'))`
+  yield* sql`SELECT pg_advisory_xact_lock(hashtext('generalist:executable-registrations'))`
 })
 
 /** Preserve the PostgreSQL fan-out row-then-advisory lock order. */
 export const lockFanOut = (input: { readonly parentRunId: string; readonly idempotencyKey: string }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`SELECT run_id FROM tenetkit_runs WHERE run_id = ${input.parentRunId} FOR UPDATE`
+    yield* sql`SELECT run_id FROM generalist_runs WHERE run_id = ${input.parentRunId} FOR UPDATE`
     yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`fanout:${input.parentRunId}:${input.idempotencyKey}`}))`
   })

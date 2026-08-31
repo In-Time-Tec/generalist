@@ -1,1 +1,1 @@
-Summary ready: TenetKit runs agent loops on Effect.
+Summary ready: Generalist runs agent loops on Effect.

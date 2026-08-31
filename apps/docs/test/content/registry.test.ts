@@ -3,7 +3,7 @@ import { expect, test } from "vitest"
 
 import { allPages, pageByPath } from "../../src/content/registry"
 import { addressedMessaging } from "../../src/pages/guides/agent/addressed-messaging"
-import { agentGuidance } from "../../src/pages/guides/agent/guidance"
+import { instructionGuidance } from "../../src/pages/guides/agent/instruction-guidance"
 import { durableCompositeTools } from "../../src/pages/guides/tools/durable-composite-tools"
 import { typescriptCells } from "../../src/pages/guides/tools/typescript-cells"
 import { kernelBoundaries } from "../../src/pages/learn/kernel-boundaries"
@@ -21,7 +21,7 @@ test("every new capability page is registered under its Diataxis group", () => {
     cellAgent,
     kernelBoundaries,
     typescriptCells,
-    agentGuidance,
+    instructionGuidance,
     durableCompositeTools,
     addressedMessaging,
   ]) {
@@ -30,7 +30,7 @@ test("every new capability page is registered under its Diataxis group", () => {
   }
   expect(cellAgent.group).toBe("Start")
   expect(kernelBoundaries.group).toBe("Learn")
-  for (const page of [typescriptCells, agentGuidance, durableCompositeTools, addressedMessaging]) {
+  for (const page of [typescriptCells, instructionGuidance, durableCompositeTools, addressedMessaging]) {
     expect(page.group, page.path).toBe("Guides")
   }
 })
@@ -97,10 +97,10 @@ test("the cell guide keeps the execution and failure contracts", () => {
 test("the cell tutorial walks a beginner from an epoch to the real kernel", () => {
   for (const marker of [
     "KernelProfile",
-    "bun add effect@4.0.0-rc.112 tenetkit@0.44.0",
+    "bun add effect@4.0.0-rc.112 generalist@0.44.0",
     "TestKernel.layerTestPool",
     "HostBindings",
-    "tenetkit/repl/bun",
+    "generalist/repl/bun",
     "bindingsDigest",
     "sequence",
   ]) {
@@ -111,7 +111,7 @@ test("the cell tutorial walks a beginner from an epoch to the real kernel", () =
   expect(steps.length).toBeGreaterThanOrEqual(5)
 })
 
-test("the agent-guidance guide keeps the authorship boundary and the durable-store guarantees", () => {
+test("the instruction-guidance guide keeps the authorship boundary and the durable-store guarantees", () => {
   for (const marker of [
     "Authorship.author",
     "AuthoredProposal",
@@ -128,7 +128,7 @@ test("the agent-guidance guide keeps the authorship boundary and the durable-sto
     "corrupt",
     "Registration.make(state, name)",
   ]) {
-    expect(agentGuidance.markdown, marker).toContain(marker)
+    expect(instructionGuidance.markdown, marker).toContain(marker)
   }
 })
 

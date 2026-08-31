@@ -1,10 +1,10 @@
-import { CodeExecutor } from "tenetkit"
+import { CodeExecutor } from "generalist"
 import { ImportType, initSync, parse } from "es-module-lexer"
 
 const validName = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+\.js$/
 /** @experimental Host-owned generated entrypoint excluded from user module graphs. */
-export const runnerName = "__tenetkit_runner.js"
-export const capabilityFailurePrefix = "tenetkit-capability-failure:"
+export const runnerName = "__generalist_runner.js"
+export const capabilityFailurePrefix = "generalist-capability-failure:"
 
 /** @experimental Validated source graph passed to Worker Loader. */
 export interface NormalizedSource {

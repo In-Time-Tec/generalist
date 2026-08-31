@@ -1,7 +1,7 @@
 import policyAndSend from "virtual:source/src/snippets/guides/agent/addressed-messaging/policy-and-send.ts"
 import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../../prose"
 
-const inExecution = `import { Messaging } from "tenetkit/runtime"
+const inExecution = `import { Messaging } from "generalist/runtime"
 
 // Inside an execution: the sender is the running Run, resolved from its own record.
 const reply = Messaging.AgentMessaging.use((messaging) =>
@@ -21,10 +21,10 @@ export const addressedMessaging = definePage({
     "Address a Run, a Session, or a name; widen authorization with one host policy; and understand why steering consumption is the ack.",
   content: [
     p(
-      code("tenetkit/runtime"),
+      code("generalist/runtime"),
       " owns durable agent-to-agent messaging: a directory of addressable Runs, a per-target durable inbox, delivery through the existing steering boundary, and one durable ",
       code("send"),
-      " operation. Applications supply only the policy for addressing beyond TenetKit's derived relationships.",
+      " operation. Applications supply only the policy for addressing beyond Generalist's derived relationships.",
     ),
     h2("choose-an-address", "1. Choose an address"),
     table(
@@ -53,7 +53,7 @@ export const addressedMessaging = definePage({
     ),
     h2("authorize", "2. Authorize the pair"),
     p(
-      "TenetKit derives ",
+      "Generalist derives ",
       code("self"),
       ", ",
       code("parent"),
@@ -73,7 +73,7 @@ export const addressedMessaging = definePage({
     ),
     codeBlock({ label: "policy-and-send.ts", source: policyAndSend }),
     bullets(
-      ["Policy only ever widens: TenetKit's four relationships are checked first."],
+      ["Policy only ever widens: Generalist's four relationships are checked first."],
       ["Policy is directional. Allowing A→B does not allow B→A."],
       [
         "The pair passed to ",
@@ -97,7 +97,7 @@ export const addressedMessaging = definePage({
       code("Runtime.sendMessage"),
       " takes ",
       code("fromRunId"),
-      ", not a sender Address: TenetKit resolves the sender from its Run record, so cell code cannot forge ",
+      ", not a sender Address: Generalist resolves the sender from its Run record, so cell code cannot forge ",
       code("from"),
       ". Inside an execution the same rule holds through the ambient context.",
     ),
@@ -143,7 +143,7 @@ export const addressedMessaging = definePage({
     ),
     p(
       "A delivered message enters the model as ordinary user content carrying its authoritative sender, so messaging adds no competing payload vocabulary. See ",
-      link("/docs/reference/runtime", "the tenetkit/runtime reference"),
+      link("/docs/reference/runtime", "the generalist/runtime reference"),
       " for the surrounding Run lifecycle and ",
       link("/docs/guides/steering", "How to steer a run"),
       " for the boundary delivery lands on.",

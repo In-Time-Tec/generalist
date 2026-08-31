@@ -1,18 +1,18 @@
-import { layer as backendLayer } from "@tenetkit/mysql"
+import { layer as backendLayer } from "@generalist/mysql"
 import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Errors, RunExecutor, Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims, RuntimeWorker } from "tenetkit/runtime/sql-driver"
+import { Errors, RunExecutor, Runtime, RunStore } from "generalist/runtime"
+import { RunClaims, RuntimeWorker } from "generalist/runtime/sql-driver"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
   programAddress,
   programExecutable,
   programFixture,
-} from "../../../../../tenetkit/test/runtime/program/fixture.js"
+} from "../../../../../generalist/test/runtime/program/fixture.js"
 import { mysqlAvailable, mysqlDatabase } from "../../runtime/environment.js"
-import { registrationsFor } from "../../../../../tenetkit/test/runtime/execution/fixtures.js"
+import { registrationsFor } from "../../../../../generalist/test/runtime/execution/fixtures.js"
 import {
   programBudgetContract,
   programCancellationFenceContract,
@@ -20,7 +20,7 @@ import {
   programReplayDivergenceContract,
   programSettledReplayContract,
   programUnknownOutcomeContract,
-} from "../../../../../tenetkit/test/runtime/program/store-contract.js"
+} from "../../../../../generalist/test/runtime/program/store-contract.js"
 
 const describeMysql = describe.runIf(mysqlAvailable)
 

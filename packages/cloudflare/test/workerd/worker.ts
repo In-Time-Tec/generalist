@@ -1,8 +1,8 @@
 import { Effect, Exit, Layer, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, Permissions, Tool, Toolkit } from "tenetkit"
-import { decodeConfig as decodeOpenRouterConfig } from "tenetkit/ai/openrouter"
-import { TestModel } from "tenetkit/test"
+import { Agent, AgentEvent, Approvals, Permissions, Tool, Toolkit } from "generalist"
+import { decodeConfig as decodeOpenRouterConfig } from "generalist/ai/openrouter"
+import { TestModel } from "generalist/test"
 import { SqlClient } from "effect/unstable/sql"
 import {
   Address,
@@ -12,15 +12,15 @@ import {
   RunEvent,
   RunStore as RunStoreFacade,
   type Runtime,
-} from "tenetkit/runtime"
+} from "generalist/runtime"
 import {
   HibernatingWebSocket,
   layerRunStore,
   layerSqlClient,
   type DurableObjectStorage,
-} from "@tenetkit/cloudflare/durable-objects"
-import { SqliteRunActivation } from "tenetkit/runtime/sql-driver"
-import { inspectLogicalSqlSchema } from "../../../tenetkit/test/runtime/sql/schema-conformance.js"
+} from "@generalist/cloudflare/durable-objects"
+import { SqliteRunActivation } from "generalist/runtime/sql-driver"
+import { inspectLogicalSqlSchema } from "../../../generalist/test/runtime/sql/schema-conformance.js"
 
 const test = ExecutableManifest.makeTest
 const makeMessage = Message.make
@@ -322,7 +322,7 @@ export class SqlObject {
               catch: (cause) => RuntimeUnavailable.make({ message: `alarm failed: ${String(cause)}` }),
             })
           const insertRun = (runId: string) => sql`
-            INSERT INTO tenetkit_runs (
+            INSERT INTO generalist_runs (
               run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
               executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents,
               attempt, attempt_fence, last_sequence, cancellation_requested, accepted_sequence,
@@ -336,8 +336,8 @@ export class SqlObject {
           `
           yield* sql.withTransaction(
             Effect.gen(function* () {
-              yield* sql`DELETE FROM tenetkit_activations WHERE run_id = 'workerd-committed'`
-              yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-committed'`
+              yield* sql`DELETE FROM generalist_activations WHERE run_id = 'workerd-committed'`
+              yield* sql`DELETE FROM generalist_runs WHERE run_id = 'workerd-committed'`
               yield* insertRun("workerd-committed")
               yield* SqliteRunActivation.makeProjection(sql, rearm(committedAlarm)).applyInTransaction([
                 { runId: "workerd-committed", intent: "execute", attemptFence: 1, runStatus: "running" },
@@ -347,7 +347,7 @@ export class SqlObject {
           yield* Effect.exit(
             sql.withTransaction(
               Effect.gen(function* () {
-                yield* sql`DELETE FROM tenetkit_runs WHERE run_id = 'workerd-rolled-back'`
+                yield* sql`DELETE FROM generalist_runs WHERE run_id = 'workerd-rolled-back'`
                 yield* insertRun("workerd-rolled-back")
                 yield* SqliteRunActivation.makeProjection(sql, rearm(rolledBackAlarm)).applyInTransaction([
                   { runId: "workerd-rolled-back", intent: "execute", attemptFence: 1, runStatus: "running" },
@@ -370,7 +370,7 @@ export class SqlObject {
           yield* store.cancel({ runId: cancellationRunId, reason: "close" })
           const requested = yield* sql<{ readonly cancellation_requested: unknown; readonly storage_type: string }>`
             SELECT cancellation_requested, typeof(cancellation_requested) AS storage_type
-            FROM tenetkit_runs WHERE run_id = ${cancellationRunId}
+            FROM generalist_runs WHERE run_id = ${cancellationRunId}
           `
           yield* store.fail({
             ...claim,
@@ -455,7 +455,7 @@ export class SqlObject {
           const pluralEvents = yield* store.history({ runId: pluralRunId, cursor: -1, limit: 100 })
           const pluralResumeEvents = pluralEvents.filter((event) => event._tag === "RunResumed").length
           const pluralRows = yield* sql<{ readonly wait_id: string }>`
-            SELECT wait_id FROM tenetkit_run_waits WHERE run_id = ${pluralRunId} ORDER BY authored_order
+            SELECT wait_id FROM generalist_run_waits WHERE run_id = ${pluralRunId} ORDER BY authored_order
           `
           const pluralAuthoredHistory = suffixes(pluralRows.map(({ wait_id: waitId }) => ({ waitId })))
 
@@ -524,21 +524,21 @@ export class SqlObject {
               Effect.gen(function* () {
                 const probeWaitId = `${pluralRunId}:affected-row-probe`
                 yield* sql`
-                  INSERT INTO tenetkit_run_waits
+                  INSERT INTO generalist_run_waits
                     (run_id, wait_id, authored_order, reason, status, response_json, opened_at, closed_at)
                   VALUES
                     (${pluralRunId}, ${probeWaitId}, 3, '{"_tag":"ToolWait"}', 'open', NULL,
                      '2026-08-29T00:00:00.000Z', NULL)
                 `
                 const first = yield* sql<{ readonly wait_id: string }>`
-                  UPDATE tenetkit_run_waits
+                  UPDATE generalist_run_waits
                   SET status = 'responded', response_json = '{"_tag":"ToolResult","result":"probe","encodedResult":"probe"}',
                       closed_at = '2026-08-29T00:00:01.000Z'
                   WHERE run_id = ${pluralRunId} AND wait_id = ${probeWaitId} AND status = 'open'
                   RETURNING wait_id
                 `
                 const duplicate = yield* sql<{ readonly wait_id: string }>`
-                  UPDATE tenetkit_run_waits
+                  UPDATE generalist_run_waits
                   SET status = 'responded', response_json = '{"_tag":"ToolResult","result":"probe","encodedResult":"probe"}',
                       closed_at = '2026-08-29T00:00:01.000Z'
                   WHERE run_id = ${pluralRunId} AND wait_id = ${probeWaitId} AND status = 'open'
@@ -550,27 +550,27 @@ export class SqlObject {
             ),
           )
           const cancellationTerminal = yield* sql<{ readonly status: string }>`
-            SELECT status FROM tenetkit_runs WHERE run_id = ${cancellationRunId}
+            SELECT status FROM generalist_runs WHERE run_id = ${cancellationRunId}
           `
           const tables = yield* sql<{ readonly name: string }>`
             SELECT name FROM sqlite_schema
-            WHERE type = 'table' AND substr(name, 1, 9) = 'tenetkit_'
+            WHERE type = 'table' AND substr(name, 1, 11) = 'generalist_'
             ORDER BY name
           `
           const probe = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
           const committed = yield* sql<{ readonly count: number }>`
-            SELECT COUNT(*) AS count FROM tenetkit_runs r JOIN tenetkit_activations a ON a.run_id = r.run_id
+            SELECT COUNT(*) AS count FROM generalist_runs r JOIN generalist_activations a ON a.run_id = r.run_id
             WHERE r.run_id = 'workerd-committed'
           `
           const rolledBack = yield* sql<{ readonly count: number }>`
-            SELECT COUNT(*) AS count FROM tenetkit_runs r LEFT JOIN tenetkit_activations a ON a.run_id = r.run_id
+            SELECT COUNT(*) AS count FROM generalist_runs r LEFT JOIN generalist_activations a ON a.run_id = r.run_id
             WHERE r.run_id = 'workerd-rolled-back' OR a.run_id = 'workerd-rolled-back'
           `
           const schemaMeta = yield* sql<{
             readonly version: number
-          }>`SELECT version FROM tenetkit_schema_meta WHERE id = 1`
+          }>`SELECT version FROM generalist_schema_meta WHERE id = 1`
           const migrations = yield* sql<{ readonly id: number; readonly name: string }>`
-            SELECT migration_id AS id, name FROM tenetkit_sql_migrations ORDER BY migration_id
+            SELECT migration_id AS id, name FROM generalist_sql_migrations ORDER BY migration_id
           `
           const [probeRow] = decodeProbeRow(probe)
           const [committedRow] = decodeCountRow(committed)

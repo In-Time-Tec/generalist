@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "tenetkit"
-import { MCPClient } from "tenetkit/mcp"
-import { layerToolkit, toolkit } from "tenetkit/mcp/tools"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "generalist"
+import { MCPClient } from "generalist/mcp"
+import { layerToolkit, toolkit } from "generalist/mcp/tools"
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const client: MCPClient.Service = {

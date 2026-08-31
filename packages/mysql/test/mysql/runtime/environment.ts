@@ -1,10 +1,10 @@
-import { layer, RuntimeSchema } from "@tenetkit/mysql"
+import { layer, RuntimeSchema } from "@generalist/mysql"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
-import { provideScoped } from "../../../../tenetkit/test/runtime/execution/scoped-provide.js"
+import { provideScoped } from "../../../../generalist/test/runtime/execution/scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { MysqlClient } from "@effect/sql-mysql2"
-import { ExecutableResolver } from "tenetkit/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 import type { RuntimeError } from "../../../src/mysql/store/implementation.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 import {
@@ -17,12 +17,12 @@ import {
   researcherAddress,
   registrationsFor,
   researcherRef,
-} from "../../../../tenetkit/test/runtime/execution/fixtures.js"
-import { closedTestAgent } from "../../../../tenetkit/test/runtime/run/identity.js"
-import type { MessagingOverrides } from "../../../../tenetkit/test/runtime/messaging/scenario.js"
+} from "../../../../generalist/test/runtime/execution/fixtures.js"
+import { closedTestAgent } from "../../../../generalist/test/runtime/run/identity.js"
+import type { MessagingOverrides } from "../../../../generalist/test/runtime/messaging/scenario.js"
 
 export const mysqlUrl = Effect.runSync(
-  Config.option(Config.string("TENETKIT_MYSQL_URL").pipe(Config.orElse(() => Config.string("MYSQL_URL")))).pipe(
+  Config.option(Config.string("GENERALIST_MYSQL_URL").pipe(Config.orElse(() => Config.string("MYSQL_URL")))).pipe(
     Effect.map(Option.getOrUndefined),
   ),
 )
@@ -70,32 +70,32 @@ export const mysqlMessagingLayer = (database: MysqlDatabase) => (overrides: Mess
   )
 
 const RUNTIME_TABLES = [
-  "tenetkit_session_entries",
-  "tenetkit_sessions",
-  "tenetkit_run_registrations",
-  "tenetkit_executable_registrations",
-  "tenetkit_program_operations",
-  "tenetkit_program_runs",
-  "tenetkit_tree_event_index",
-  "tenetkit_tree_roots",
-  "tenetkit_fan_out_members",
-  "tenetkit_fan_outs",
-  "tenetkit_run_steering",
-  "tenetkit_messages",
-  "tenetkit_agent_names",
-  "tenetkit_external_child_placements",
-  "tenetkit_run_links",
-  "tenetkit_run_waits",
-  "tenetkit_run_operations",
-  "tenetkit_run_events",
-  "tenetkit_runs",
-  "tenetkit_lanes",
+  "generalist_session_entries",
+  "generalist_sessions",
+  "generalist_run_registrations",
+  "generalist_executable_registrations",
+  "generalist_program_operations",
+  "generalist_program_runs",
+  "generalist_tree_event_index",
+  "generalist_tree_roots",
+  "generalist_fan_out_members",
+  "generalist_fan_outs",
+  "generalist_run_steering",
+  "generalist_messages",
+  "generalist_agent_names",
+  "generalist_external_child_placements",
+  "generalist_run_links",
+  "generalist_run_waits",
+  "generalist_run_operations",
+  "generalist_run_events",
+  "generalist_runs",
+  "generalist_lanes",
 ] as const
 
-const serverUrl = mysqlUrl ?? "mysql://mysql-unavailable/tenetkit"
+const serverUrl = mysqlUrl ?? "mysql://mysql-unavailable/generalist"
 
 const databaseName = (label: string) =>
-  `tenetkit_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
+  `generalist_${label.replace(/[^A-Za-z0-9]+/g, "_").toLowerCase()}_${process.pid.toString(36)}`
 
 type MysqlClientError = SqlError | Config.ConfigError
 
@@ -151,7 +151,7 @@ export const mysqlDatabase = (label: string): MysqlDatabase => {
         for (const table of RUNTIME_TABLES) yield* sql.unsafe(`DELETE FROM ${table}`)
         yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=1")
         yield* sql`
-          UPDATE tenetkit_schema_meta
+          UPDATE generalist_schema_meta
           SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0
           WHERE id = 1
         `

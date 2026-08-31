@@ -1,6 +1,6 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Agent } from "tenetkit"
-import { TestModel } from "tenetkit/test"
+import { Agent } from "generalist"
+import { TestModel } from "generalist/test"
 
 const modelLayer = TestModel.layer([TestModel.text("A deterministic answer.")])
 const agent = Agent.make({ name: "tested-agent" })

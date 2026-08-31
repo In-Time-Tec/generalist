@@ -12,7 +12,7 @@ import { toPath, type Route } from "../route/match"
 import type { Message } from "./message"
 import type { Model } from "./model"
 
-const site = "TenetKit"
+const site = "Generalist"
 
 const routeTitle = (route: Route): string =>
   Match.value(route).pipe(

@@ -7,6 +7,6 @@ rule:
     - kind: import_statement
     - has:
         field: source
-        regex: '^[''"](?:tenetkit(?:/(?:core|runtime|ai))?|(?:\.\.?/)+(?:index|(?:core|runtime|harness|skills|transport|mcp|repl(?:/bun)?|memory|foldkit|test|interoperability/(?:a2a|ag-ui))/index)\.js)[''"]$'
+        regex: '^[''"](?:generalist(?:/(?:core|runtime|ai))?|(?:\.\.?/)+(?:index|(?:core|runtime|harness|skills|transport|mcp|repl(?:/bun)?|memory|foldkit|test|interoperability/(?:a2a|ag-ui))/index)\.js)[''"]$'
 files:
-  - "packages/tenetkit/src/**/*.ts"
+  - "packages/generalist/src/**/*.ts"

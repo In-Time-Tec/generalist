@@ -3,7 +3,7 @@ import { layer } from "@effect/platform-bun/BunServices"
 import { version as bunVersion } from "bun"
 
 class InstallPreflightFailed extends Schema.TaggedError<InstallPreflightFailed>()(
-  "@tenetkit/scripts/InstallPreflightFailed",
+  "@generalist/scripts/InstallPreflightFailed",
   { message: Schema.String },
 ) {}
 
@@ -42,12 +42,12 @@ const program = Effect.gen(function* () {
     if (!(yield* fileSystem.exists(manifestPath))) continue
     const source = yield* fileSystem.readFileString(manifestPath)
     const manifest = yield* Schema.decodeEffect(Schema.fromJsonString(PackageManifest))(source)
-    if (manifest.name !== `@tenetkit/${packageName}`) {
+    if (manifest.name !== `@generalist/${packageName}`) {
       return yield* preflightError(`${manifestPath} has a non-canonical package name`)
     }
     for (const dependencies of [manifest.dependencies, manifest.devDependencies, manifest.peerDependencies]) {
       for (const [dependency, version] of Object.entries(dependencies ?? {})) {
-        if (dependency.startsWith("@tenetkit/") && version !== "workspace:*") {
+        if (dependency.startsWith("@generalist/") && version !== "workspace:*") {
           return yield* preflightError(`${manifestPath} must use workspace:* for ${dependency}`)
         }
       }

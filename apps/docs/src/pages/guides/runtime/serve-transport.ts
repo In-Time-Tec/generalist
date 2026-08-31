@@ -14,16 +14,16 @@ export const serveTransport = definePage({
   description: "Admit exact Runtime runs and expose their canonical RunEvents through SSE and WebSocket.",
   content: [
     p(
-      code("tenetkit/runtime"),
+      code("generalist/runtime"),
       " owns run admission, execution, replay, waits, and cancellation. ",
-      code("tenetkit/transport"),
+      code("generalist/transport"),
       " only projects those Runtime-owned RunEvents through ",
       code("SSE.respond"),
       " and ",
       code("WebSocket.handle"),
       ".",
     ),
-    command("Terminal", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
     h2("run-in-memory", "1. Run an agent in memory"),
     p(
       code("Runtime.layerMemory"),
@@ -117,9 +117,9 @@ export const serveTransport = definePage({
     ),
     p(
       "The wire contract is in ",
-      link("/docs/reference/transport", "the tenetkit/transport reference"),
+      link("/docs/reference/transport", "the generalist/transport reference"),
       ", and Runtime ownership is documented in ",
-      link("/docs/reference/runtime", "the tenetkit/runtime reference"),
+      link("/docs/reference/runtime", "the generalist/runtime reference"),
       ".",
     ),
   ],

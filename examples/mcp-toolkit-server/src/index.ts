@@ -3,7 +3,7 @@ import { runMain } from "@effect/platform-bun/BunRuntime"
 import { Config, Effect, Layer, Schema } from "effect"
 import { McpProtocol, McpServer } from "effect/unstable/ai"
 import { HttpRouter } from "effect/unstable/http"
-import { Tool, Toolkit } from "tenetkit"
+import { Tool, Toolkit } from "generalist"
 
 const greeting = Tool.make("greeting", {
   description: "Create a greeting for a person",
@@ -21,7 +21,7 @@ const mcpLayer = McpServer.toolkit(toolkit).pipe(
   Layer.provideMerge(handlers),
   Layer.provide(
     McpServer.layerHttp({
-      name: "tenetkit-toolkit-example",
+      name: "generalist-toolkit-example",
       version: "1.0.0",
       path: "/mcp",
       protocols: [McpProtocol.v2025_06_18],

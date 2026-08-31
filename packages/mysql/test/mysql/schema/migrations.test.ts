@@ -7,41 +7,41 @@ import {
   SchemaDirty,
   SchemaMigrationFailed,
   SchemaVersionUnsupported,
-} from "tenetkit/runtime/sql-driver"
+} from "generalist/runtime/sql-driver"
 import { apply as applyRunSchema } from "../../../src/mysql/schema/migrations.js"
 import { SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
-import { inspectLogicalSqlSchema } from "../../../../tenetkit/test/runtime/sql/schema-conformance.js"
+import { inspectLogicalSqlSchema } from "../../../../generalist/test/runtime/sql/schema-conformance.js"
 import { mysqlAvailable, mysqlDatabase } from "../runtime/environment.js"
 
 const describeMysql = describe.runIf(mysqlAvailable)
 const database = mysqlDatabase("migration")
 const client = database.client
 const tables = [
-  "tenetkit_session_entries",
-  "tenetkit_sessions",
-  "tenetkit_run_registrations",
-  "tenetkit_executable_registrations",
-  "tenetkit_program_operations",
-  "tenetkit_program_runs",
-  "tenetkit_tree_event_index",
-  "tenetkit_tree_roots",
-  "tenetkit_fan_out_members",
-  "tenetkit_fan_outs",
-  "tenetkit_run_steering",
-  "tenetkit_messages",
-  "tenetkit_agent_names",
-  "tenetkit_external_child_placements",
-  "tenetkit_external_roots",
-  "tenetkit_run_links",
-  "tenetkit_run_waits",
-  "tenetkit_run_operations",
-  "tenetkit_run_acknowledgements",
-  "tenetkit_run_events",
-  "tenetkit_runs",
-  "tenetkit_lanes",
-  "tenetkit_runtime_locks",
-  "tenetkit_sql_migrations",
-  "tenetkit_schema_meta",
+  "generalist_session_entries",
+  "generalist_sessions",
+  "generalist_run_registrations",
+  "generalist_executable_registrations",
+  "generalist_program_operations",
+  "generalist_program_runs",
+  "generalist_tree_event_index",
+  "generalist_tree_roots",
+  "generalist_fan_out_members",
+  "generalist_fan_outs",
+  "generalist_run_steering",
+  "generalist_messages",
+  "generalist_agent_names",
+  "generalist_external_child_placements",
+  "generalist_external_roots",
+  "generalist_run_links",
+  "generalist_run_waits",
+  "generalist_run_operations",
+  "generalist_run_acknowledgements",
+  "generalist_run_events",
+  "generalist_runs",
+  "generalist_lanes",
+  "generalist_runtime_locks",
+  "generalist_sql_migrations",
+  "generalist_schema_meta",
 ] as const
 
 const resetSchema = Effect.gen(function* () {
@@ -54,14 +54,14 @@ const resetSchema = Effect.gen(function* () {
 const inspectSchema = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   const columns = yield* sql<{ column_name: string }>`
-    SELECT COLUMN_NAME AS column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tenetkit_runs'
+    SELECT COLUMN_NAME AS column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'generalist_runs'
   `
   const meta = yield* sql<{
     version: number
     checksum: string
-  }>`SELECT version, checksum FROM tenetkit_schema_meta WHERE id = 1`
+  }>`SELECT version, checksum FROM generalist_schema_meta WHERE id = 1`
   const migrations = yield* sql<{ migration_id: number }>`
-    SELECT migration_id FROM tenetkit_sql_migrations ORDER BY migration_id
+    SELECT migration_id FROM generalist_sql_migrations ORDER BY migration_id
   `
   expect({ version: Number(meta[0]?.version), checksum: meta[0]?.checksum }).toEqual({
     version: SCHEMA_VERSION,
@@ -80,20 +80,20 @@ const inspectSchema = Effect.gen(function* () {
   expect(runColumns).not.toContain("transcript_json")
   const sessionTables = yield* sql<{ table_name: string }>`
     SELECT TABLE_NAME AS table_name FROM information_schema.tables
-    WHERE table_schema = DATABASE() AND table_name IN ('tenetkit_sessions', 'tenetkit_session_entries')
+    WHERE table_schema = DATABASE() AND table_name IN ('generalist_sessions', 'generalist_session_entries')
     ORDER BY table_name
   `
   const placementTables = yield* sql<{ table_name: string }>`
     SELECT TABLE_NAME AS table_name FROM information_schema.tables
-    WHERE table_schema = DATABASE() AND table_name = 'tenetkit_external_child_placements'
+    WHERE table_schema = DATABASE() AND table_name = 'generalist_external_child_placements'
   `
   const acknowledgementTables = yield* sql<{ table_name: string }>`
     SELECT TABLE_NAME AS table_name FROM information_schema.tables
-    WHERE table_schema = DATABASE() AND table_name = 'tenetkit_run_acknowledgements'
+    WHERE table_schema = DATABASE() AND table_name = 'generalist_run_acknowledgements'
   `
-  expect(sessionTables.map((row) => row.table_name)).toEqual(["tenetkit_session_entries", "tenetkit_sessions"])
-  expect(placementTables.map((row) => row.table_name)).toEqual(["tenetkit_external_child_placements"])
-  expect(acknowledgementTables.map((row) => row.table_name)).toEqual(["tenetkit_run_acknowledgements"])
+  expect(sessionTables.map((row) => row.table_name)).toEqual(["generalist_session_entries", "generalist_sessions"])
+  expect(placementTables.map((row) => row.table_name)).toEqual(["generalist_external_child_placements"])
+  expect(acknowledgementTables.map((row) => row.table_name)).toEqual(["generalist_run_acknowledgements"])
   expect(migrations.map((row) => row.migration_id)).toEqual([1])
   expect(yield* inspectLogicalSqlSchema).toEqual([])
 })
@@ -110,7 +110,7 @@ describeMysql("mysql schema baseline", () => {
         yield* inspectSchema
         const snapshot = (yield* Metric.snapshot).find(
           (item) =>
-            item.id === "tenetkit_runtime_sql_migration_lock_wait_duration" && item.attributes?.backend === "mysql",
+            item.id === "generalist_runtime_sql_migration_lock_wait_duration" && item.attributes?.backend === "mysql",
         )
         expect(snapshot?.type).toBe("Histogram")
         if (snapshot?.type === "Histogram") expect(snapshot.state.count).toBe(1)
@@ -119,17 +119,17 @@ describeMysql("mysql schema baseline", () => {
   })
 
   layer(client, { excludeTestServices: true })("refuses a foreign schema", (suite) => {
-    suite.effect("refuses to create the baseline over unrelated tenetkit tables", () =>
+    suite.effect("refuses to create the baseline over unrelated generalist tables", () =>
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
         yield* resetSchema
-        yield* sql`CREATE TABLE tenetkit_runs (run_id VARCHAR(255) PRIMARY KEY)
+        yield* sql`CREATE TABLE generalist_runs (run_id VARCHAR(255) PRIMARY KEY)
           ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`
 
         expect(yield* applyRunSchema("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
         expect(
           yield* sql`SELECT TABLE_NAME AS table_name FROM information_schema.tables
-          WHERE table_schema = DATABASE() AND table_name = 'tenetkit_schema_meta'`,
+          WHERE table_schema = DATABASE() AND table_name = 'generalist_schema_meta'`,
         ).toEqual([])
         yield* resetSchema
       }),
@@ -147,10 +147,15 @@ describeMysql("mysql schema baseline", () => {
         expect(
           (yield* sql<{ table_name: string }>`
               SELECT TABLE_NAME AS table_name FROM information_schema.tables
-              WHERE table_schema = DATABASE() AND table_name LIKE 'tenetkit_%'
+              WHERE table_schema = DATABASE() AND table_name LIKE 'generalist_%'
               ORDER BY table_name
             `).map((row) => row.table_name),
-        ).toEqual(["tenetkit_lanes", "tenetkit_runtime_locks", "tenetkit_schema_meta", "tenetkit_sql_migrations"])
+        ).toEqual([
+          "generalist_lanes",
+          "generalist_runtime_locks",
+          "generalist_schema_meta",
+          "generalist_sql_migrations",
+        ])
       }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie))),
     )
   })
@@ -161,7 +166,7 @@ describeMysql("mysql schema baseline", () => {
         const sql = yield* SqlClient.SqlClient
         yield* resetSchema
         yield* applyRunSchema("mysql-migration-test")
-        yield* sql`UPDATE tenetkit_sql_migrations SET name = 'wrong' WHERE migration_id = 1`
+        yield* sql`UPDATE generalist_sql_migrations SET name = 'wrong' WHERE migration_id = 1`
 
         expect(yield* applyRunSchema("mysql-migration-test").pipe(Effect.flip)).toBeInstanceOf(SchemaMigrationFailed)
         yield* resetSchema
@@ -170,12 +175,12 @@ describeMysql("mysql schema baseline", () => {
   })
 
   for (const [label, update, expected] of [
-    ["dirty", "UPDATE tenetkit_schema_meta SET dirty = 1 WHERE id = 1", SchemaDirty],
-    ["checksum", "UPDATE tenetkit_schema_meta SET checksum = 'wrong' WHERE id = 1", SchemaChecksumMismatch],
-    ["old", `UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION - 1} WHERE id = 1`, SchemaVersionUnsupported],
+    ["dirty", "UPDATE generalist_schema_meta SET dirty = 1 WHERE id = 1", SchemaDirty],
+    ["checksum", "UPDATE generalist_schema_meta SET checksum = 'wrong' WHERE id = 1", SchemaChecksumMismatch],
+    ["old", `UPDATE generalist_schema_meta SET version = ${SCHEMA_VERSION - 1} WHERE id = 1`, SchemaVersionUnsupported],
     [
       "future",
-      `UPDATE tenetkit_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`,
+      `UPDATE generalist_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`,
       SchemaVersionUnsupported,
     ],
   ] as const) {

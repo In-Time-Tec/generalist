@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { Agent, Prompt, Policy } from "tenetkit"
+import { Agent, Prompt, Policy } from "generalist"
 
 const approximateTokens = (history: Prompt.Prompt): number => Math.ceil(JSON.stringify(history.content).length / 4)
 

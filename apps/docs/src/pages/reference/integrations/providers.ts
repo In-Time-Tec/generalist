@@ -1,36 +1,36 @@
 import { callout, code, command, definePage, h2, lead, link, p, table } from "../../../prose"
 export const providersReference = definePage({
   path: "/docs/reference/providers",
-  title: "tenetkit/ai/*",
+  title: "generalist/ai/*",
   navTitle: "providers",
   group: "Reference",
   description: "Provider-neutral model utilities and exact provider, preset, catalog, and embedding subpaths.",
   content: [
     lead(
-      "Exact tenetkit/ai/* leaves own the model catalog, deterministic test model, model routes, provider adapters, presets, and embeddings. There is no aggregate entry that loads every optional provider.",
+      "Exact generalist/ai/* leaves own the model catalog, deterministic test model, model routes, provider adapters, presets, and embeddings. There is no aggregate entry that loads every optional provider.",
     ),
-    command("Install core", "bun add effect@4.0.0-rc.112 tenetkit@0.44.0"),
+    command("Install core", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
     p(
       "Provider-neutral deterministic, catalog, and route leaves need no optional provider peer. For a provider leaf, add exactly the dependency shown below.",
     ),
     table(
       ["Import", "Additional dependency", "Runtime"],
       [
-        [[code("tenetkit/ai/deterministic")], "none", "Node and Bun"],
-        [[code("tenetkit/ai/anthropic")], [code("@effect/ai-anthropic@4.0.0-rc.112")], "Node and Bun"],
+        [[code("generalist/ai/deterministic")], "none", "Node and Bun"],
+        [[code("generalist/ai/anthropic")], [code("@effect/ai-anthropic@4.0.0-rc.112")], "Node and Bun"],
         [
-          [code("tenetkit/ai/openai"), " and OpenAI protocol leaves"],
+          [code("generalist/ai/openai"), " and OpenAI protocol leaves"],
           [code("@effect/ai-openai@4.0.0-rc.112")],
           "Node and Bun",
         ],
         [
-          [code("tenetkit/ai/openai-compatible"), " and compatible protocol leaves"],
+          [code("generalist/ai/openai-compatible"), " and compatible protocol leaves"],
           [code("@effect/ai-openai-compat@4.0.0-rc.112")],
           "Node and Bun",
         ],
-        [[code("tenetkit/ai/openrouter")], [code("@effect/ai-openrouter@4.0.0-rc.112")], "Node and Bun"],
+        [[code("generalist/ai/openrouter")], [code("@effect/ai-openrouter@4.0.0-rc.112")], "Node and Bun"],
         [
-          [code("tenetkit/ai/amazon-bedrock")],
+          [code("generalist/ai/amazon-bedrock")],
           [
             code("@aws-sdk/client-bedrock-runtime@3.859.0"),
             ", ",

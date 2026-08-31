@@ -1,11 +1,11 @@
-import { layer } from "@tenetkit/mysql"
+import { layer } from "@generalist/mysql"
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
-import { cancellationConvergenceSuite } from "../../../../../tenetkit/test/runtime/operation/suites/cancellation-convergence-suite.js"
-import { operationRecoverySuite } from "../../../../../tenetkit/test/runtime/operation/suites/recovery.js"
-import { toolCancellationSuite } from "../../../../../tenetkit/test/runtime/operation/suites/tool-cancellation.js"
-import { provideScoped } from "../../../../../tenetkit/test/runtime/execution/scoped-provide.js"
+import { RunClaims } from "generalist/runtime/sql-driver"
+import { cancellationConvergenceSuite } from "../../../../../generalist/test/runtime/operation/suites/cancellation-convergence-suite.js"
+import { operationRecoverySuite } from "../../../../../generalist/test/runtime/operation/suites/recovery.js"
+import { toolCancellationSuite } from "../../../../../generalist/test/runtime/operation/suites/tool-cancellation.js"
+import { provideScoped } from "../../../../../generalist/test/runtime/execution/scoped-provide.js"
 import { mysqlAvailable, mysqlDatabase, mysqlLayer } from "../../runtime/environment.js"
 
 const database = mysqlDatabase("operation-recovery")
@@ -47,7 +47,7 @@ operationRecoverySuite({
       database.client,
       Effect.flatMap(
         SqlClient.SqlClient,
-        (sql) => sql`UPDATE tenetkit_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${runId}`,
+        (sql) => sql`UPDATE generalist_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${runId}`,
       ),
     ).pipe(Effect.scoped, Effect.asVoid, Effect.orDie),
 })
@@ -88,7 +88,7 @@ toolCancellationSuite({
       database.client,
       Effect.flatMap(
         SqlClient.SqlClient,
-        (sql) => sql`UPDATE tenetkit_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${runId}`,
+        (sql) => sql`UPDATE generalist_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${runId}`,
       ),
     ).pipe(Effect.scoped, Effect.asVoid, Effect.orDie),
 })

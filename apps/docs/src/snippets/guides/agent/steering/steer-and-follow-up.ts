@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "tenetkit"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "generalist"
 
 const statusTool = Tool.make("check_status", {
   description: "Check the deploy status of a service",

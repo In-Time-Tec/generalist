@@ -17,7 +17,7 @@ export interface RequestContext {
 
 /** @experimental */
 export class WorkerContext extends Context.Service<WorkerContext, RequestContext>()(
-  "@tenetkit/cloudflare/workers/WorkerContext",
+  "@generalist/cloudflare/workers/WorkerContext",
 ) {}
 
 /** @experimental */

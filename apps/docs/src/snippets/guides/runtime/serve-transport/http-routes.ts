@@ -11,9 +11,9 @@ import {
   Tool,
   ToolExecutor,
   Toolkit,
-} from "tenetkit"
-import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "tenetkit/runtime"
-import { SSE, WebSocket } from "tenetkit/transport"
+} from "generalist"
+import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "generalist/runtime"
+import { SSE, WebSocket } from "generalist/transport"
 
 const searchTool = Tool.make("web_search", {
   description: "Search the web",
@@ -100,7 +100,7 @@ const routesLayer = HttpRouter.use((router) =>
             return yield* SSE.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
-        Effect.catchTag("tenetkit/transport/InvalidCursor", errorResponse(400)),
+        Effect.catchTag("generalist/transport/InvalidCursor", errorResponse(400)),
       ),
     )
 

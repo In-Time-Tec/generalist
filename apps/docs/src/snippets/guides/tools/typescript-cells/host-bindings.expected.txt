@@ -1,5 +1,5 @@
 mounted: workspace.read
 allowed: Success
-denied: Failure @tenetkit/docs/WorkspaceDenied
-tenetkit/repl/HostModuleNotFound module=web
-tenetkit/repl/HostModuleSchemaFailure stage=decode-input
+denied: Failure @generalist/docs/WorkspaceDenied
+generalist/repl/HostModuleNotFound module=web
+generalist/repl/HostModuleSchemaFailure stage=decode-input

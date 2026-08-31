@@ -1,5 +1,5 @@
 {
-  "name": "@tenetkit/example-memory-chat",
+  "name": "@generalist/example-memory-chat",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "tenetkit": "workspace:*",
+    "generalist": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

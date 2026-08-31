@@ -1,14 +1,14 @@
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
-import { Runtime, RunStore } from "tenetkit/runtime"
-import { RunClaims } from "tenetkit/runtime/sql-driver"
+import { Runtime, RunStore } from "generalist/runtime"
+import { RunClaims } from "generalist/runtime/sql-driver"
 import {
   assistantAddress,
   completedResult,
   openWait,
   suspension,
   textPrompt,
-} from "../../../../tenetkit/test/runtime/execution/fixtures.js"
+} from "../../../../generalist/test/runtime/execution/fixtures.js"
 import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../database.js"
 
 const describePostgres = postgresAvailable ? describe : describe.skip
@@ -97,5 +97,5 @@ describePostgres("PostgreSQL process tracer", () => {
 })
 
 if (!postgresAvailable) {
-  it.skip("postgres tracer skipped: set TENETKIT_DATABASE_URL or DATABASE_URL", () => undefined)
+  it.skip("postgres tracer skipped: set GENERALIST_DATABASE_URL or DATABASE_URL", () => undefined)
 }

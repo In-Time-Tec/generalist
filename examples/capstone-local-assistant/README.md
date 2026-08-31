@@ -8,8 +8,8 @@ bun --cwd examples/capstone-local-assistant start
 
 Manual acceptance script for a full app built from this shape:
 
-1. Start an HTTP server with `tenetkit/transport` SSE and WebSocket handlers.
-2. Render a FoldKit chat page backed by `tenetkit/foldkit` resources and subscriptions.
+1. Start an HTTP server with `generalist/transport` SSE and WebSocket handlers.
+2. Render a FoldKit chat page backed by `generalist/foldkit` resources and subscriptions.
 3. Send a prompt that activates the research skill and calls an approval-gated tool.
 4. Observe suspend, approve, and resume.
 5. Reconnect mid-stream and verify replay after the last sequence.

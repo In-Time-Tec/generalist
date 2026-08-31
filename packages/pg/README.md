@@ -1,23 +1,23 @@
-# @tenetkit/pg
+# @generalist/pg
 
-PostgreSQL runtime backend for TenetKit.
+PostgreSQL runtime backend for Generalist.
 
 ```bash
-bun add effect@4.0.0-rc.112 tenetkit@0.44.0 @tenetkit/pg@0.44.0
+bun add effect@4.0.0-rc.112 generalist@0.44.0 @generalist/pg@0.44.0
 ```
 
 `layer(options)` supports Node 22+ and Bun 1.4+. Pass URL options to let the adapter acquire its client, or provide an Effect `PgClient` for shared transactions. Import `RuntimeSchema` from this package for predeploy schema work.
 
 ## Shared client
 
-`layer(options)` uses a caller-supplied Effect `PgClient`. Provide the same client Layer to the host so host SQL and TenetKit Runtime operations share one transaction service:
+`layer(options)` uses a caller-supplied Effect `PgClient`. Provide the same client Layer to the host so host SQL and Generalist Runtime operations share one transaction service:
 
 ```ts
 import { PgClient } from "@effect/sql-pg"
 import { Effect, Layer, Redacted } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { layer } from "@tenetkit/pg"
-import { Run, Runtime } from "tenetkit/runtime"
+import { layer } from "@generalist/pg"
+import { Run, Runtime } from "generalist/runtime"
 
 declare const options: Parameters<typeof layer>[0]
 declare const admission: Runtime.AdmitInput

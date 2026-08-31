@@ -1,10 +1,10 @@
 /* oxlint-disable effecttsgo/async-function, effecttsgo/strict-effect-provide */
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Ref } from "effect"
-import { Wire } from "tenetkit/transport"
+import { Wire } from "generalist/transport"
 import { HibernatingWebSocket } from "../src/durable-objects/index.js"
-import { event, runtimeLayer } from "../../tenetkit/test/transport/fixtures.js"
-import { Runtime } from "tenetkit/runtime"
+import { event, runtimeLayer } from "../../generalist/test/transport/fixtures.js"
+import { Runtime } from "generalist/runtime"
 
 type StoredAttachment = HibernatingWebSocket.Attachment | { readonly version: number }
 
