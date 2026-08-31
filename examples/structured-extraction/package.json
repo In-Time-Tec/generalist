@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-structured-extraction",
+  "name": "generalist-example-structured-extraction",
   "private": true,
   "type": "module",
   "scripts": {

@@ -85,7 +85,7 @@ describe("instruction snapshot pinning through the runtime registration seam", (
     Effect.gen(function* () {
       const failure = yield* ExecutableRegistration.validate(
         executable,
-        registrationsFor(executable, guidanceRegistration({ codec: "@generalist/other" })),
+        registrationsFor(executable, guidanceRegistration({ codec: "generalist/other" })),
       ).pipe(Effect.flip)
       expect(failure._tag).toBe("generalist/runtime/ExecutableRegistrationInvalid")
     }),

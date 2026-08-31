@@ -1,31 +1,16 @@
-export const packages = ["generalist", "pg", "mysql", "cloudflare", "rivet"] as const
-export const packageNames = {
-  generalist: "generalist",
-  pg: "@generalist/pg",
-  mysql: "@generalist/mysql",
-  cloudflare: "@generalist/cloudflare",
-  rivet: "@generalist/rivet",
-} satisfies Record<(typeof packages)[number], string>
-export const compressedSizeLimits = {
-  generalist: 700_000,
-  pg: 180_000,
-  mysql: 120_000,
-  cloudflare: 120_000,
-  rivet: 80_000,
-} satisfies Record<(typeof packages)[number], number>
-export const packedEffectDependencies = {
-  generalist: [
-    "@effect/ai-anthropic",
-    "@effect/ai-openai",
-    "@effect/ai-openai-compat",
-    "@effect/ai-openrouter",
-    "@effect/sql-sqlite-bun",
-  ],
-  pg: ["@effect/sql-pg"],
-  mysql: ["@effect/sql-mysql2"],
-  cloudflare: ["@effect/sql-sqlite-do"],
-  rivet: [],
-} satisfies Record<(typeof packages)[number], ReadonlyArray<string>>
+export const packageName = "generalist"
+export const packageDirectory = "packages/generalist"
+export const compressedSizeLimit = 1_200_000
+export const packedEffectDependencies = [
+  "@effect/ai-anthropic",
+  "@effect/ai-openai",
+  "@effect/ai-openai-compat",
+  "@effect/ai-openrouter",
+  "@effect/sql-mysql2",
+  "@effect/sql-pg",
+  "@effect/sql-sqlite-bun",
+  "@effect/sql-sqlite-do",
+] as const
 export const packedProviderDependencies = {
   "@aws-sdk/client-bedrock-runtime": "3.859.0",
   "@aws-sdk/credential-provider-node": "3.859.0",
@@ -40,7 +25,6 @@ export interface ConsumerImport {
 }
 export interface MinimumConsumerProfile {
   readonly name: string
-  readonly packages: ReadonlyArray<(typeof packages)[number]>
   readonly peers: ReadonlyArray<string>
   readonly imports: ReadonlyArray<ConsumerImport>
 }
@@ -53,7 +37,6 @@ const workerOnly = ["worker"] as const
 export const minimumConsumerProfiles = [
   {
     name: "core-runtime",
-    packages: ["generalist"],
     peers: [],
     imports: [
       { specifier: "generalist", runtimes: nodeAndBun, exports: ["Agent", "Session"] },
@@ -83,13 +66,11 @@ export const minimumConsumerProfiles = [
   },
   {
     name: "sqlite-bun",
-    packages: ["generalist"],
     peers: ["@effect/sql-sqlite-bun"],
     imports: [{ specifier: "generalist/runtime/sqlite-bun", runtimes: bunOnly, exports: ["Runtime", "RunStore"] }],
   },
   {
     name: "mcp",
-    packages: ["generalist"],
     peers: ["@modelcontextprotocol/sdk"],
     imports: [
       { specifier: "generalist/mcp", runtimes: nodeAndBun },
@@ -102,25 +83,21 @@ export const minimumConsumerProfiles = [
   },
   {
     name: "foldkit",
-    packages: ["generalist"],
     peers: ["foldkit"],
     imports: [{ specifier: "generalist/foldkit", runtimes: nodeAndBun }],
   },
   {
     name: "a2a",
-    packages: ["generalist"],
     peers: ["@a2a-js/sdk"],
     imports: [{ specifier: "generalist/a2a", runtimes: nodeAndBun }],
   },
   {
     name: "ag-ui",
-    packages: ["generalist"],
     peers: ["@ag-ui/core"],
     imports: [{ specifier: "generalist/ag-ui", runtimes: nodeAndBun }],
   },
   {
     name: "test-host",
-    packages: ["generalist"],
     peers: ["@effect/vitest", "vitest"],
     imports: [
       { specifier: "generalist/test", runtimes: nodeAndBun, exports: ["TestModel"] },
@@ -129,13 +106,11 @@ export const minimumConsumerProfiles = [
   },
   {
     name: "anthropic",
-    packages: ["generalist"],
     peers: ["@effect/ai-anthropic"],
     imports: [{ specifier: "generalist/ai/anthropic", runtimes: nodeAndBun, exports: ["layer"] }],
   },
   {
     name: "openai",
-    packages: ["generalist"],
     peers: ["@effect/ai-openai"],
     imports: [
       { specifier: "generalist/ai/openai", runtimes: nodeAndBun, exports: ["layer"] },
@@ -145,7 +120,6 @@ export const minimumConsumerProfiles = [
   },
   {
     name: "openai-compatible",
-    packages: ["generalist"],
     peers: ["@effect/ai-openai-compat"],
     imports: [
       { specifier: "generalist/ai/openai-chat-completions", runtimes: nodeAndBun },
@@ -155,44 +129,39 @@ export const minimumConsumerProfiles = [
   },
   {
     name: "openrouter",
-    packages: ["generalist"],
     peers: ["@effect/ai-openrouter"],
     imports: [{ specifier: "generalist/ai/openrouter", runtimes: nodeAndBun, exports: ["layer"] }],
   },
   {
     name: "amazon-bedrock",
-    packages: ["generalist"],
     peers: ["@aws-sdk/client-bedrock-runtime", "@aws-sdk/credential-provider-node", "@smithy/types"],
     imports: [{ specifier: "generalist/ai/amazon-bedrock", runtimes: nodeOnly, exports: ["layer"] }],
   },
   {
     name: "sql-adapters",
-    packages: ["generalist", "pg", "mysql"],
-    peers: [],
+    peers: ["@effect/sql-pg", "@effect/sql-mysql2", "pg"],
     imports: [
-      { specifier: "@generalist/pg", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
-      { specifier: "@generalist/mysql", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
+      { specifier: "generalist/pg", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
+      { specifier: "generalist/mysql", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
     ],
   },
   {
     name: "cloudflare",
-    packages: ["generalist", "cloudflare"],
-    peers: [],
+    peers: ["@effect/sql-sqlite-do", "es-module-lexer"],
     imports: [
       {
-        specifier: "@generalist/cloudflare/durable-objects",
+        specifier: "generalist/cloudflare/durable-objects",
         runtimes: workerOnly,
         exports: ["HibernatingWebSocket", "layerRunStore"],
       },
-      { specifier: "@generalist/cloudflare/dynamic-workers", runtimes: workerOnly, exports: ["layer", "make"] },
-      { specifier: "@generalist/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
+      { specifier: "generalist/cloudflare/dynamic-workers", runtimes: workerOnly, exports: ["layer", "make"] },
+      { specifier: "generalist/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
     ],
   },
   {
     name: "rivet",
-    packages: ["generalist", "rivet"],
-    peers: [],
-    imports: [{ specifier: "@generalist/rivet/actors", runtimes: nodeAndBun, exports: ["makeRuntimeActor"] }],
+    peers: ["@standard-schema/spec", "rivetkit"],
+    imports: [{ specifier: "generalist/rivet/actors", runtimes: nodeAndBun, exports: ["makeRuntimeActor"] }],
   },
 ] as const satisfies ReadonlyArray<MinimumConsumerProfile>
 
@@ -210,7 +179,8 @@ export const workerSafePackageExports = [
 
 export const wildcardExportExamples = [] as const
 export const forbiddenPackageExports = [
-  "@generalist/cloudflare",
+  "generalist/cloudflare",
+  "generalist/rivet",
   "generalist/ai",
   "generalist/core",
   "generalist/ai/index",
@@ -220,58 +190,59 @@ export const forbiddenPackageExports = [
   "generalist/runtime/execution/run-executor-internal",
 ] as const
 
-export const exactPackageExports = {
-  generalist: [
-    ".",
-    "./a2a",
-    "./ag-ui",
-    "./ai/amazon-bedrock",
-    "./ai/anthropic",
-    "./ai/deterministic",
-    "./ai/model-catalog",
-    "./ai/model-route",
-    "./ai/openai",
-    "./ai/openai-account-auth",
-    "./ai/openai-account-auth-http",
-    "./ai/openai-chat-completions",
-    "./ai/openai-compatible",
-    "./ai/openai-compatible-embedding",
-    "./ai/openai-embedding",
-    "./ai/openai-responses",
-    "./ai/openrouter",
-    "./foldkit",
-    "./instructions",
-    "./instructions/skills",
-    "./mcp",
-    "./mcp/client",
-    "./mcp/client/http",
-    "./mcp/client/stdio",
-    "./mcp/oauth",
-    "./mcp/tools",
-    "./memory",
-    "./repl",
-    "./repl/bun",
-    "./runtime",
-    "./runtime/external-child-placement",
-    "./runtime/external-child-store",
-    "./runtime/sql-driver",
-    "./runtime/sqlite-bun",
-    "./test",
-    "./test/runtime-driver",
-    "./transport",
-    "./transport/errors",
-    "./transport/replay",
-    "./transport/run-client",
-    "./transport/snapshot",
-    "./transport/sse",
-    "./transport/websocket",
-    "./transport/wire",
-  ],
-  pg: ["."],
-  mysql: ["."],
-  cloudflare: ["./durable-objects", "./dynamic-workers", "./workers"],
-  rivet: ["./actors"],
-} as const satisfies Record<(typeof packages)[number], ReadonlyArray<string>>
+export const exactPackageExports = [
+  ".",
+  "./a2a",
+  "./ag-ui",
+  "./ai/amazon-bedrock",
+  "./ai/anthropic",
+  "./ai/deterministic",
+  "./ai/model-catalog",
+  "./ai/model-route",
+  "./ai/openai",
+  "./ai/openai-account-auth",
+  "./ai/openai-account-auth-http",
+  "./ai/openai-chat-completions",
+  "./ai/openai-compatible",
+  "./ai/openai-compatible-embedding",
+  "./ai/openai-embedding",
+  "./ai/openai-responses",
+  "./ai/openrouter",
+  "./cloudflare/durable-objects",
+  "./cloudflare/dynamic-workers",
+  "./cloudflare/workers",
+  "./foldkit",
+  "./instructions",
+  "./instructions/skills",
+  "./mcp",
+  "./mcp/client",
+  "./mcp/client/http",
+  "./mcp/client/stdio",
+  "./mcp/oauth",
+  "./mcp/tools",
+  "./memory",
+  "./mysql",
+  "./pg",
+  "./repl",
+  "./repl/bun",
+  "./rivet/actors",
+  "./runtime",
+  "./runtime/external-child-placement",
+  "./runtime/external-child-store",
+  "./runtime/sql-driver",
+  "./runtime/sqlite-bun",
+  "./test",
+  "./test/runtime-driver",
+  "./transport",
+  "./transport/errors",
+  "./transport/replay",
+  "./transport/run-client",
+  "./transport/snapshot",
+  "./transport/sse",
+  "./transport/websocket",
+  "./transport/wire",
+] as const
+
 const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
   Array.from(values).reduce<Array<A>>((result, value) => {
     const index = result.findIndex((item) => compare(value, item) < 0)
@@ -300,7 +271,4 @@ export const catalogVersion = (input: {
   return catalog?.[input.dependency]
 }
 
-export const tarballName = (input: { readonly packageName: string; readonly version: string }): string =>
-  input.packageName === "generalist"
-    ? `generalist-${input.version}.tgz`
-    : `generalist-${input.packageName}-${input.version}.tgz`
+export const tarballName = (version: string): string => `generalist-${version}.tgz`

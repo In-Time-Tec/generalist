@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-deep-research-agent-web",
+  "name": "generalist-example-deep-research-agent-web",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.0",

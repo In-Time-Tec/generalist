@@ -1,6 +1,6 @@
 # Generalist
 
-Generalist is an Effect-native agent framework over `effect/unstable/ai`. The `generalist` package provides the process-local agent loop and optional durable Runtime; `@generalist/pg`, `@generalist/mysql`, `@generalist/cloudflare`, and `@generalist/rivet` provide host-specific storage and runtime adapters. Core stays usable without Relay or another durable runtime.
+Generalist is an Effect-native agent framework over `effect/unstable/ai`. The `generalist` package provides the process-local agent loop and optional durable Runtime; `generalist/pg`, `generalist/mysql`, `generalist/cloudflare`, and `generalist/rivet` provide host-specific storage and runtime adapters. Core stays usable without Relay or another durable runtime.
 
 ## Commands
 
@@ -18,11 +18,10 @@ Run the narrowest useful check while editing:
 ```bash
 bun --bun vitest run packages/generalist/test/<path>.test.ts --no-file-parallelism
 bun run --cwd packages/generalist typecheck
-bun run --cwd packages/pg test
 bun node_modules/prettier/bin/prettier.cjs --check <paths>
 ```
 
-Replace the package directory or test path as needed. PostgreSQL tests require `GENERALIST_DATABASE_URL` or `DATABASE_URL`; MySQL tests require `GENERALIST_MYSQL_URL` or `MYSQL_URL`. These suites skip when their database is unavailable, and a skipped suite is not conformance evidence.
+Replace the test path as needed; adapter suites live under `packages/generalist/test/{pg,mysql,cloudflare,rivet}`. PostgreSQL tests require `GENERALIST_DATABASE_URL` or `DATABASE_URL`; MySQL tests require `GENERALIST_MYSQL_URL` or `MYSQL_URL`. These suites skip when their database is unavailable, and a skipped suite is not conformance evidence.
 
 Before review, run the full checks:
 
@@ -37,7 +36,7 @@ For changes to public exports, package manifests, dependencies, or release outpu
 PACKAGE_ARTIFACT_DIR=release bun run package
 ```
 
-This is the downstream compatibility check. It packs the five public packages, validates every exact manifest export plus concrete wildcard examples, installs the tarballs in fresh Bun-isolated, core-only, and npm consumers, typechecks and bundles a consumer, imports public entrypoints under Node and Bun, and verifies one Effect installation. It writes five tarballs, `release-evidence.json`, and `SHA256SUMS`.
+This is the downstream compatibility check. It packs the public package, validates every exact manifest export plus concrete wildcard examples, installs the tarball in fresh Bun-isolated, core-only, and npm consumers, typechecks and bundles a consumer, imports public entrypoints under Node and Bun, and verifies one Effect installation. It writes one tarball, `release-evidence.json`, and `SHA256SUMS`.
 
 ## Boundaries
 
@@ -63,11 +62,9 @@ Package manifests, `scripts/package-smoke*.ts`, and `.github/workflows/publish.y
 ```bash
 bun --bun vitest run \
   packages/generalist/test/test/runtime-driver/index.test.ts \
-  packages/pg/test/postgres/index.test.ts \
+  packages/generalist/test/pg/index.test.ts \
   --no-file-parallelism --maxWorkers=1
-bun run --cwd packages/pg test
-bun run --cwd packages/mysql test
-bun run --cwd packages/cloudflare test
+bun --bun vitest run packages/generalist/test/pg packages/generalist/test/mysql packages/generalist/test/cloudflare --no-file-parallelism
 ```
 
 Persistence or replay changes must exercise a close/reopen or fresh-Layer boundary, recovery of interrupted operations, and strict replay from an authoritative cursor without redispatch. Start with:
@@ -83,12 +80,12 @@ bun --bun vitest run \
 
 ## Release
 
-The lockstep public train is `generalist`, `@generalist/pg`, `@generalist/mysql`, `@generalist/cloudflare`, and `@generalist/rivet`. Root and package manifest versions match exactly. Do not publish from a workstation.
+The public package is `generalist`; the `generalist/pg`, `generalist/mysql`, `generalist/cloudflare/*`, and `generalist/rivet/actors` adapters are subpath exports of that one package, not separately published packages. Root and package manifest versions match exactly. Do not publish from a workstation.
 
 A release change must:
 
 1. Add the user-visible change to `CHANGELOG.md`.
-2. Set one lockstep semantic version in the root manifest and `packages/{generalist,pg,mysql,cloudflare,rivet}/package.json`.
+2. Set one lockstep semantic version in the root manifest and `packages/generalist/package.json`.
 3. Pass `bun run check`, `bun run test` with PostgreSQL and MySQL available, and `bun run package`.
 4. Use the `generalist-release` skill to produce and verify artifacts from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
 5. Land the exact release commit on both `main` and `release`, then create the immutable `v<version>` tag at that commit.

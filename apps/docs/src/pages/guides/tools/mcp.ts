@@ -18,7 +18,7 @@ export const mcp = definePage({
       code("generalist"),
       ".",
     ),
-    command("Terminal", "bun add effect@4.0.0-rc.112 generalist@0.44.0 @modelcontextprotocol/sdk@1.29.0"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 generalist@0.45.0 @modelcontextprotocol/sdk@1.29.0"),
     h2("connect-to-a-server", "1. Connect to a server"),
     p(
       code("MCPClient.layer"),

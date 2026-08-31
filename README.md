@@ -34,12 +34,12 @@ Use `generalist` directly for process-local agents and chat streaming. Add `gene
 ## Install
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist@0.44.0
+bun add effect@4.0.0-rc.112 generalist@0.45.0
 # Add only the peer for the provider you select, for example:
 bun add @effect/ai-openrouter@4.0.0-rc.112
 ```
 
-The next lockstep train packs five versioned packages—`generalist`, `@generalist/pg`, `@generalist/mysql`, `@generalist/cloudflare`, and `@generalist/rivet`—with compiled ESM and declarations. `generalist/*` names are import subpaths, not packages to pass to a package manager. The supported engines are Node 22+ and Bun 1.4+; Bun SQLite is Bun-only, Cloudflare adapters run in Workers, and the Rivet package exposes an ESM-only Actors host.
+Everything ships as the single `generalist` package with compiled ESM and declarations; `generalist/pg`, `generalist/mysql`, `generalist/cloudflare/*`, and `generalist/rivet/actors` are import subpaths, not packages to pass to a package manager. Each adapter's host dependencies are optional peers, so you install and bundle only what you import. The supported engines are Node 22+ and Bun 1.4+; Bun SQLite is Bun-only, Cloudflare adapters run in Workers, and the Rivet subpath exposes an ESM-only Actors host.
 
 ## Capability matrix
 
@@ -58,7 +58,7 @@ The next lockstep train packs five versioned packages—`generalist`, `@generali
 | FoldKit connection, subscription, commands, headless chat model     | `generalist/foldkit`             | experimental |
 | A2A v1 server projection over Runtime                               | `generalist/a2a`                 | experimental |
 | AG-UI event projection over Runtime                                 | `generalist/ag-ui`               | experimental |
-| Rivet actor-local SQLite Runtime host                               | `@generalist/rivet/actors`       | experimental |
+| Rivet actor-local SQLite Runtime host                               | `generalist/rivet/actors`        | experimental |
 
 ## A plugin is a Layer
 
@@ -95,7 +95,7 @@ const durableTools = ToolExecutor.layerRouter([
 
 | Generalist release | Tested Effect version                            | Notes                                                                               |
 | ------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `0.44.0`           | `effect@4.0.0-rc.112` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.45.0`           | `effect@4.0.0-rc.112` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 
@@ -114,18 +114,14 @@ External contributors can request repository access through the path in [CONTRIB
 
 ## Repository layout
 
-| Path                  | Purpose                                                                                 |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| `packages/generalist` | Core agent loop, Runtime, feature entries, and exact `generalist/ai/*` provider leaves. |
-| `packages/pg`         | `@generalist/pg` PostgreSQL durable Runtime adapter.                                    |
-| `packages/mysql`      | `@generalist/mysql` MySQL durable Runtime adapter.                                      |
-| `packages/cloudflare` | `@generalist/cloudflare` Durable Object and dynamic Worker adapters.                    |
-| `packages/rivet`      | `@generalist/rivet` actor-local SQLite Runtime host.                                    |
-| `docs/features`       | Current behavior and rules relied on by the code.                                       |
-| `docs/decisions`      | Important choices and why they were made.                                               |
-| `docs/tradeoffs`      | Useful notes about meaningful gains and costs.                                          |
-| `apps/docs`           | Consumer-facing guides, recipes, API stability, and positioning.                        |
-| `examples`            | Private Bun workspaces typechecked in CI.                                               |
+| Path                  | Purpose                                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/generalist` | The whole framework: core agent loop, Runtime, feature entries, `generalist/ai/*` provider leaves, and the pg/mysql/cloudflare/rivet adapters. |
+| `docs/features`       | Current behavior and rules relied on by the code.                                                                                              |
+| `docs/decisions`      | Important choices and why they were made.                                                                                                      |
+| `docs/tradeoffs`      | Useful notes about meaningful gains and costs.                                                                                                 |
+| `apps/docs`           | Consumer-facing guides, recipes, API stability, and positioning.                                                                               |
+| `examples`            | Private Bun workspaces typechecked in CI.                                                                                                      |
 
 ## Verification
 
@@ -135,7 +131,7 @@ bun run check
 bun run package
 ```
 
-`bun run package` builds once, verifies clean Bun and npm consumers, and writes five tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
+`bun run package` builds once, verifies clean Bun and npm consumers, and writes one tarball plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarball to npm.
 
 ## Provenance
 

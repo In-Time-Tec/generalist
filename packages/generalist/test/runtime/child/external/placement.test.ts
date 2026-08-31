@@ -103,12 +103,12 @@ const suite = <E>(
           expect(
             (yield* external.admitRoot({ ...input, requestDigest: `${input.requestDigest}:changed` }).pipe(Effect.flip))
               ._tag,
-          ).toBe("@generalist/runtime/ExternalRootConflict")
+          ).toBe("generalist/runtime/ExternalRootConflict")
           expect(
             (yield* external
               .admitRoot({ ...externalRoot(`${name}:digest-mismatch`), executableDigest: "wrong" })
               .pipe(Effect.flip))._tag,
-          ).toBe("@generalist/runtime/ExternalRootExecutableMismatch")
+          ).toBe("generalist/runtime/ExternalRootExecutableMismatch")
           expect(yield* external.activateRoot(input.placementId)).toMatchObject({ activated: true })
           expect(yield* external.activateRoot(input.placementId)).toMatchObject({ activated: true })
           const history = yield* store.history({ runId: input.ref.runId, cursor: -1, limit: 20 })
@@ -151,7 +151,7 @@ const suite = <E>(
             (yield* external
               .acknowledgeRootSettlement({ placementId: input.placementId, settlementId: "wrong" })
               .pipe(Effect.flip))._tag,
-          ).toBe("@generalist/runtime/ExternalChildSettlementConflict")
+          ).toBe("generalist/runtime/ExternalChildSettlementConflict")
           expect(
             yield* external.acknowledgeRootSettlement({
               placementId: input.placementId,
@@ -184,23 +184,23 @@ const suite = <E>(
           })
           expect(yield* external.reserve(input)).toMatchObject({ placementId: input.placementId })
           expect((yield* external.reserve({ ...input, requestDigest: "different" }).pipe(Effect.flip))._tag).toBe(
-            "@generalist/runtime/ExternalChildPlacementConflict",
+            "generalist/runtime/ExternalChildPlacementConflict",
           )
           expect(
             (yield* external
               .reserve({ ...placement(claim, "placement:ref-conflict"), ref: input.ref })
               .pipe(Effect.flip))._tag,
-          ).toBe("@generalist/runtime/ExternalChildPlacementConflict")
+          ).toBe("generalist/runtime/ExternalChildPlacementConflict")
           expect(
             (yield* external
               .reserve({ ...placement(claim, "placement:invocation-conflict"), invocationId: input.invocationId })
               .pipe(Effect.flip))._tag,
-          ).toBe("@generalist/runtime/ExternalChildPlacementConflict")
+          ).toBe("generalist/runtime/ExternalChildPlacementConflict")
           expect((yield* external.reserve(placement(claim, "placement:2")).pipe(Effect.flip))._tag).toBe(
-            "@generalist/runtime/ExternalChildCapacityUnavailable",
+            "generalist/runtime/ExternalChildCapacityUnavailable",
           )
           expect((yield* external.acknowledge("placement:2").pipe(Effect.flip))._tag).toBe(
-            "@generalist/runtime/ExternalChildPlacementNotFound",
+            "generalist/runtime/ExternalChildPlacementNotFound",
           )
         }),
       ),
@@ -250,7 +250,7 @@ const suite = <E>(
                 outcome: { ...outcome, eventId: "remote:event:divergent" },
               })
               .pipe(Effect.flip))._tag,
-          ).toBe("@generalist/runtime/ExternalChildSettlementConflict")
+          ).toBe("generalist/runtime/ExternalChildSettlementConflict")
           expect(yield* external.cancel("placement:race")).toMatchObject({ cancelRequested: false })
 
           yield* external.reserve(placement(claim, "placement:cancel"))
@@ -357,7 +357,7 @@ const suite = <E>(
             "generalist/runtime/StaleClaim",
           )
           expect((yield* external.acknowledge("placement:stale").pipe(Effect.flip))._tag).toBe(
-            "@generalist/runtime/ExternalChildPlacementNotFound",
+            "generalist/runtime/ExternalChildPlacementNotFound",
           )
         }),
       ),
@@ -460,7 +460,7 @@ it.live("rolls back reservation and projects settlement-driven cancellation in S
       expect((yield* external.reserve(input).pipe(Effect.flip))._tag).toBe("generalist/runtime/RuntimeUnavailable")
       rejectProjection = false
       expect((yield* external.acknowledge(input.placementId).pipe(Effect.flip))._tag).toBe(
-        "@generalist/runtime/ExternalChildPlacementNotFound",
+        "generalist/runtime/ExternalChildPlacementNotFound",
       )
       expect((yield* store.loadExecution(parent.runId)).suspension).toBeUndefined()
       expect(yield* external.reserve(input)).toMatchObject({

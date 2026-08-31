@@ -10,7 +10,7 @@ export const skillsReference = definePage({
     lead(
       "generalist/instructions/skills implements the core SkillCatalog seam through filesystem and manifest-backed HTTP, S3, and GitHub adapters. generalist/instructions loads AGENTS.md/CLAUDE.md instruction files.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     p(
       code("generalist/instructions/skills"),
       " and ",

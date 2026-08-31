@@ -6,23 +6,23 @@ import { builtinModules } from "node:module"
 import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
   catalogVersion,
-  compressedSizeLimits,
+  compressedSizeLimit,
   type ConsumerRuntime,
   exactPackageExports,
   forbiddenPackageExports,
   type MinimumConsumerProfile,
   minimumConsumerProfiles,
+  packageDirectory,
+  packageName,
   packedEffectDependencies,
   packedProviderDependencies,
-  packages,
-  packageNames,
   sortRecord,
   tarballName,
   wildcardExportExamples,
   workerSafePackageExports,
 } from "./package-smoke-config.js"
 
-class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("@generalist/scripts/PackageSmokeFailed", {
+class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("generalist/scripts/PackageSmokeFailed", {
   message: Schema.String,
 }) {}
 
@@ -257,27 +257,17 @@ const verifyDeclarationSpecifiers = Effect.fn("PackageSmoke.verifyDeclarationSpe
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const allowed = new Set(
-    packages.flatMap((packageName) =>
-      exactPackageExports[packageName].map((specifier) =>
-        specifier === "." ? packageNames[packageName] : `${packageNames[packageName]}${specifier.slice(1)}`,
-      ),
-    ),
+    exactPackageExports.map((specifier) => (specifier === "." ? packageName : `${packageName}${specifier.slice(1)}`)),
   )
   const blocked: Array<string> = []
   const transpiler = new Bun.Transpiler({ loader: "ts" })
-  for (const packageName of packages) {
-    const directory = path.join(root, "packages", packageName, "dist")
-    for (const file of yield* emittedFiles(directory, ".d.ts")) {
-      for (const item of transpiler.scanImports(yield* fileSystem.readFileString(file))) {
-        if (
-          item.path !== "generalist" &&
-          !item.path.startsWith("generalist/") &&
-          !item.path.startsWith("@generalist/")
-        ) {
-          continue
-        }
-        if (!allowed.has(item.path)) blocked.push(`${path.relative(root, file)} -> ${item.path}`)
+  const directory = path.join(root, packageDirectory, "dist")
+  for (const file of yield* emittedFiles(directory, ".d.ts")) {
+    for (const item of transpiler.scanImports(yield* fileSystem.readFileString(file))) {
+      if (item.path !== packageName && !item.path.startsWith(`${packageName}/`)) {
+        continue
       }
+      if (!allowed.has(item.path)) blocked.push(`${path.relative(root, file)} -> ${item.path}`)
     }
   }
   if (blocked.length > 0) {
@@ -295,7 +285,7 @@ const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints"
   const path = yield* Path.Path
   const workerDirectory = path.join(input.consumerDirectory, "worker-safe")
   const wrangler = path.join(input.root, "examples/cloudflare-worker/node_modules/.bin/wrangler")
-  const workerd = path.join(input.root, "packages/cloudflare/node_modules/.bin/workerd")
+  const workerd = path.join(input.root, packageDirectory, "node_modules/.bin/workerd")
   const workerdVersion = (yield* run(workerd, ["--version"], input.root)).trim()
   const workerGroups = [
     {
@@ -428,22 +418,22 @@ const verifyCloudflareProfile = Effect.fn("PackageSmoke.verifyCloudflareProfile"
     .filter((item) => item.runtimes.includes(runtime))
     .map((item) => item.specifier)
   const wrangler = path.join(input.root, "examples/cloudflare-worker/node_modules/.bin/wrangler")
-  const workerd = path.join(input.root, "packages/cloudflare/node_modules/.bin/workerd")
+  const workerd = path.join(input.root, packageDirectory, "node_modules/.bin/workerd")
   yield* fileSystem.writeFileString(
     path.join(input.directory, "forbidden-root.mjs"),
     `let blocked = false
 try {
-  await import("@generalist/cloudflare")
+  await import("generalist/cloudflare")
 } catch (error) {
   blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED" || error?.code === "ERR_MODULE_NOT_FOUND"
 }
-if (!blocked) throw new Error("${profileContext(input.profile, runtime, ["@generalist/cloudflare"])} unexpected package root export")
+if (!blocked) throw new Error("${profileContext(input.profile, runtime, ["generalist/cloudflare"])} unexpected package root export")
 `,
   )
   yield* runProfileCommand({
     profile: input.profile,
     runtime,
-    specifiers: ["@generalist/cloudflare"],
+    specifiers: ["generalist/cloudflare"],
     command: "bun",
     args: ["forbidden-root.mjs"],
     cwd: input.directory,
@@ -534,10 +524,10 @@ const worker :Workerd.Worker = (
 })
 
 const validateMinimumConsumerProfiles = Effect.fn("PackageSmoke.validateMinimumConsumerProfiles")(function* (input: {
-  readonly generalistManifest: typeof PackageManifest.Type
+  readonly manifest: typeof PackageManifest.Type
   readonly packageExports: ReadonlyArray<string>
 }) {
-  const optionalPeers = Object.keys(input.generalistManifest.peerDependencies ?? {}).filter(
+  const optionalPeers = Object.keys(input.manifest.peerDependencies ?? {}).filter(
     (dependency) => dependency !== "effect",
   )
   const profiledPeers = new Set(minimumConsumerProfiles.flatMap((profile) => profile.peers))
@@ -567,7 +557,7 @@ const program = Effect.gen(function* () {
   const root = path.resolve(".")
   const rootManifest = parseRootManifest(yield* fileSystem.readFileString(path.join(root, "package.json")))
   const version = rootManifest.version
-  const validateSourcePackages = Effect.gen(function* () {
+  const validateSourcePackage = Effect.gen(function* () {
     const effectVersion = catalogVersion({ rootManifest, dependency: "effect", reference: "catalog:" })
     if (effectVersion === undefined) return yield* smokeError("root catalog must define effect")
     if (!/^\d+\.\d+\.\d+$/.test(version)) {
@@ -575,33 +565,27 @@ const program = Effect.gen(function* () {
     }
     const discovered: Array<string> = yield* fileSystem.readDirectory(path.join(root, "packages"))
     discovered.sort()
-    const expectedPackages: Array<string> = [...packages]
-    expectedPackages.sort()
-    if (!Equal.equals(discovered, expectedPackages)) {
+    if (!Equal.equals(discovered, [packageName])) {
       return yield* smokeError(`public package set mismatch: ${discovered.join(", ")}`)
     }
-    const sourceManifests = new Map<string, string>()
-    for (const packageName of packages) {
-      const manifestPath = path.join(root, "packages", packageName, "package.json")
-      const source = yield* fileSystem.readFileString(manifestPath)
-      const manifest = parsePackageManifest(source)
-      if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
-        return yield* smokeError(`${manifestPath} does not match canonical name/version`)
-      }
-      if (
-        manifest.private !== false ||
-        manifest.type !== "module" ||
-        manifest.sideEffects !== false ||
-        manifest.license !== "MIT" ||
-        !Equal.equals(manifest.files, ["dist", "LICENSE", "README.md"])
-      ) {
-        return yield* smokeError(`${manifestPath} does not match the public MIT-licensed ESM package contract`)
-      }
-      sourceManifests.set(manifestPath, source)
+    const manifestPath = path.join(root, packageDirectory, "package.json")
+    const sourceManifest = yield* fileSystem.readFileString(manifestPath)
+    const manifest = parsePackageManifest(sourceManifest)
+    if (manifest.name !== packageName || manifest.version !== version) {
+      return yield* smokeError(`${manifestPath} does not match canonical name/version`)
     }
-    return { effectVersion, sourceManifests }
+    if (
+      manifest.private !== false ||
+      manifest.type !== "module" ||
+      manifest.sideEffects !== false ||
+      manifest.license !== "MIT" ||
+      !Equal.equals(manifest.files, ["dist", "LICENSE", "README.md"])
+    ) {
+      return yield* smokeError(`${manifestPath} does not match the public MIT-licensed ESM package contract`)
+    }
+    return { effectVersion, manifestPath, sourceManifest }
   })
-  const { effectVersion, sourceManifests } = yield* validateSourcePackages
+  const { effectVersion, manifestPath, sourceManifest } = yield* validateSourcePackage
   const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-package-smoke-" })
   const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
   const tarballDirectory = Option.match(configuredArtifactDirectory, {
@@ -613,210 +597,171 @@ const program = Effect.gen(function* () {
   yield* fileSystem.makeDirectory(consumerDirectory, { recursive: true })
 
   yield* run("bun", ["run", "build"], root)
-  yield* verifyLocalRuntimeGraph(path.join(root, "packages", "generalist", "dist"))
+  yield* verifyLocalRuntimeGraph(path.join(root, packageDirectory, "dist"))
   yield* verifyDeclarationSpecifiers(root)
 
-  const packAndValidatePackages = Effect.gen(function* () {
-    const tarballs: Record<string, string> = {}
-    const packedManifests: Record<string, typeof PackageManifest.Type> = {}
-    for (const packageName of packages) {
-      const packPackage = Effect.gen(function* () {
-        const packageDirectory = path.join(root, "packages", packageName)
-        const tarball = path.join(tarballDirectory, tarballName({ packageName, version }))
-        yield* run("bun", ["pm", "pack", "--filename", tarball, "--quiet"], packageDirectory)
-        const validateArchive = Effect.gen(function* () {
-          const archive = yield* fileSystem.readFile(tarball)
-          if (archive.byteLength > compressedSizeLimits[packageName]) {
-            return yield* smokeError(
-              `@generalist/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
-            )
-          }
-          const listing = yield* run("tar", ["-tzf", tarball], root)
-          const entries = listing.split("\n").filter((entry) => entry.length > 0)
-          const unexpected = entries.filter(
-            (entry) =>
-              entry !== "package/" &&
-              entry !== "package/package.json" &&
-              entry !== "package/LICENSE" &&
-              entry !== "package/README.md" &&
-              entry !== "package/dist/" &&
-              !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
-          )
-          if (unexpected.length > 0) {
-            return yield* smokeError(`@generalist/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
-          }
-          if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
-            return yield* smokeError(`@generalist/${packageName} contains an unsafe path`)
-          }
-          const verboseListing = yield* run("tar", ["-tvzf", tarball], root)
-          const unsafeTypes = verboseListing
-            .split("\n")
-            .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
-          if (unsafeTypes.length > 0) {
-            return yield* smokeError(`@generalist/${packageName} contains a non-regular entry`)
-          }
-          return entries
-        })
-        const entries = yield* validateArchive
-        const manifest = parsePackageManifest(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
-        const validateManifestIdentity = Effect.gen(function* () {
-          if (manifest.name !== packageNames[packageName] || manifest.version !== version) {
-            return yield* smokeError(`packed identity mismatch for ${packageName}`)
-          }
-          if (manifest.peerDependencies?.effect !== effectVersion || manifest.dependencies?.effect !== undefined) {
-            return yield* smokeError(`@generalist/${packageName} must expose Effect only as exact peer`)
-          }
-          if (/workspace:|catalog:/.test(encodeJson(manifest))) {
-            return yield* smokeError(`@generalist/${packageName} contains an unresolved protocol`)
-          }
-          for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
-            if (manifest.scripts?.[lifecycle] !== undefined) {
-              return yield* smokeError(`@generalist/${packageName} contains the ${lifecycle} lifecycle hook`)
-            }
-          }
-          const sourceManifestText = sourceManifests.get(path.join(packageDirectory, "package.json"))
-          if (sourceManifestText === undefined) {
-            return yield* smokeError(`source manifest missing for ${packageName}`)
-          }
-          const sourceManifest = parsePackageManifest(sourceManifestText)
-          return sourceManifest
-        })
-        const sourceManifest = yield* validateManifestIdentity
-        const validateManifestExports = Effect.gen(function* () {
-          for (const field of [
-            "description",
-            "type",
-            "sideEffects",
-            "license",
-            "files",
-            "engines",
-            "repository",
-            "homepage",
-            "bugs",
-          ] as const) {
-            if (!Equal.equals(manifest[field], sourceManifest[field])) {
-              return yield* smokeError(`@generalist/${packageName} changed its packed ${field} metadata`)
-            }
-          }
-          if (!Equal.equals(manifest.exports, sourceManifest.exports)) {
-            return yield* smokeError(`@generalist/${packageName} changed its public exports`)
-          }
-          const actualExports = sorted(Object.keys(manifest.exports), (left, right) => left.localeCompare(right))
-          if (!Equal.equals(actualExports, exactPackageExports[packageName])) {
-            return yield* smokeError(`@generalist/${packageName} exact exports changed: ${actualExports.join(", ")}`)
-          }
-          for (const [specifier, target] of Object.entries(manifest.exports)) {
-            if (!Equal.equals(Object.keys(target), ["types", "import"])) {
-              return yield* smokeError(`@generalist/${packageName}${specifier} must list types before import`)
-            }
-            for (const [condition, value] of Object.entries(target)) {
-              const expectedExtension = condition === "types" ? ".d.ts" : ".js"
-              if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
-                return yield* smokeError(`@generalist/${packageName}${specifier} has invalid ${condition} target`)
-              }
-              if (specifier.includes("*")) {
-                const wildcardIndex = value.indexOf("*")
-                const prefix = value.slice(0, wildcardIndex)
-                const suffix = value.slice(wildcardIndex + 1)
-                const matches = entries.filter(
-                  (entry) => entry.startsWith(`package/${prefix.slice(2)}`) && entry.endsWith(suffix),
-                )
-                if (matches.length === 0) {
-                  return yield* smokeError(`@generalist/${packageName}${specifier} resolves to no ${condition} target`)
-                }
-              } else if (!entries.includes(`package/${value.slice(2)}`)) {
-                return yield* smokeError(`@generalist/${packageName}${specifier} is missing ${value}`)
-              }
-            }
-          }
-        })
-        yield* validateManifestExports
-        const validateManifestDependencies = Effect.gen(function* () {
-          const validateDependencySections = Effect.gen(function* () {
-            for (const section of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
-              const expected = Object.fromEntries(
-                Object.entries(sourceManifest[section] ?? {}).map(([dependency, dependencyVersion]) => {
-                  if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
-                  if (dependencyVersion.startsWith("catalog:")) {
-                    const resolvedVersion = catalogVersion({ rootManifest, dependency, reference: dependencyVersion })
-                    if (resolvedVersion === undefined) {
-                      throw new Error(`${sourceManifest.name} references missing catalog dependency ${dependency}`)
-                    }
-                    return [dependency, resolvedVersion]
-                  }
-                  return [dependency, dependencyVersion]
-                }),
-              )
-              if (!Equal.equals(sortRecord(manifest[section]), sortRecord(expected))) {
-                return yield* smokeError(`@generalist/${packageName} changed its packed ${section}`)
-              }
-              for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
-                if (
-                  (dependency === "generalist" || dependency.startsWith("@generalist/")) &&
-                  dependencyVersion !== version
-                ) {
-                  return yield* smokeError(
-                    `@generalist/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
-                  )
-                }
-              }
-            }
-          })
-          yield* validateDependencySections
-          if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
-            return yield* smokeError(`@generalist/${packageName} must not bundle dependencies`)
-          }
-          for (const dependency of packedEffectDependencies[packageName]) {
-            const dependencyVersion =
-              packageName === "generalist"
-                ? manifest.peerDependencies?.[dependency]
-                : manifest.dependencies?.[dependency]
-            if (dependencyVersion !== effectVersion) {
-              return yield* smokeError(
-                `@generalist/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
-              )
-            }
-          }
-          if (packageName === "generalist") {
-            for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
-              if (manifest.peerDependencies?.[dependency] !== dependencyVersion) {
-                return yield* smokeError(
-                  `generalist must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
-                )
-              }
-            }
-          }
-        })
-        yield* validateManifestDependencies
-        return { manifest, tarball }
-      })
-      const { manifest, tarball } = yield* packPackage
-      packedManifests[manifest.name] = manifest
-      tarballs[packageNames[packageName]] = `file:${tarball}`
-    }
-
-    for (const [manifestPath, source] of sourceManifests) {
-      if ((yield* fileSystem.readFileString(manifestPath)) !== source) {
-        return yield* smokeError(`packing mutated ${manifestPath}`)
+  const packAndValidatePackage = Effect.gen(function* () {
+    const sourceDirectory = path.join(root, packageDirectory)
+    const tarball = path.join(tarballDirectory, tarballName(version))
+    yield* run("bun", ["pm", "pack", "--filename", tarball, "--quiet"], sourceDirectory)
+    const validateArchive = Effect.gen(function* () {
+      const archive = yield* fileSystem.readFile(tarball)
+      if (archive.byteLength > compressedSizeLimit) {
+        return yield* smokeError(`${packageName} tarball exceeds ${compressedSizeLimit} bytes: ${archive.byteLength}`)
       }
+      const listing = yield* run("tar", ["-tzf", tarball], root)
+      const entries = listing.split("\n").filter((entry) => entry.length > 0)
+      const unexpected = entries.filter(
+        (entry) =>
+          entry !== "package/" &&
+          entry !== "package/package.json" &&
+          entry !== "package/LICENSE" &&
+          entry !== "package/README.md" &&
+          entry !== "package/dist/" &&
+          !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
+      )
+      if (unexpected.length > 0) {
+        return yield* smokeError(`${packageName} contains unexpected files: ${unexpected.join(", ")}`)
+      }
+      if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
+        return yield* smokeError(`${packageName} contains an unsafe path`)
+      }
+      const verboseListing = yield* run("tar", ["-tvzf", tarball], root)
+      const unsafeTypes = verboseListing
+        .split("\n")
+        .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
+      if (unsafeTypes.length > 0) {
+        return yield* smokeError(`${packageName} contains a non-regular entry`)
+      }
+      return entries
+    })
+    const entries = yield* validateArchive
+    const manifest = parsePackageManifest(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
+    const source = parsePackageManifest(sourceManifest)
+    const validateManifestIdentity = Effect.gen(function* () {
+      if (manifest.name !== packageName || manifest.version !== version) {
+        return yield* smokeError(`packed identity mismatch for ${packageName}`)
+      }
+      if (manifest.peerDependencies?.effect !== effectVersion || manifest.dependencies?.effect !== undefined) {
+        return yield* smokeError(`${packageName} must expose Effect only as exact peer`)
+      }
+      if (/workspace:|catalog:/.test(encodeJson(manifest))) {
+        return yield* smokeError(`${packageName} contains an unresolved protocol`)
+      }
+      for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
+        if (manifest.scripts?.[lifecycle] !== undefined) {
+          return yield* smokeError(`${packageName} contains the ${lifecycle} lifecycle hook`)
+        }
+      }
+    })
+    yield* validateManifestIdentity
+    const validateManifestExports = Effect.gen(function* () {
+      for (const field of [
+        "description",
+        "type",
+        "sideEffects",
+        "license",
+        "files",
+        "engines",
+        "repository",
+        "homepage",
+        "bugs",
+      ] as const) {
+        if (!Equal.equals(manifest[field], source[field])) {
+          return yield* smokeError(`${packageName} changed its packed ${field} metadata`)
+        }
+      }
+      if (!Equal.equals(manifest.exports, source.exports)) {
+        return yield* smokeError(`${packageName} changed its public exports`)
+      }
+      const actualExports = sorted(Object.keys(manifest.exports), (left, right) => left.localeCompare(right))
+      if (!Equal.equals(actualExports, exactPackageExports)) {
+        return yield* smokeError(`${packageName} exact exports changed: ${actualExports.join(", ")}`)
+      }
+      for (const [specifier, target] of Object.entries(manifest.exports)) {
+        if (!Equal.equals(Object.keys(target), ["types", "import"])) {
+          return yield* smokeError(`${packageName}${specifier} must list types before import`)
+        }
+        for (const [condition, value] of Object.entries(target)) {
+          const expectedExtension = condition === "types" ? ".d.ts" : ".js"
+          if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
+            return yield* smokeError(`${packageName}${specifier} has invalid ${condition} target`)
+          }
+          if (specifier.includes("*")) {
+            const wildcardIndex = value.indexOf("*")
+            const prefix = value.slice(0, wildcardIndex)
+            const suffix = value.slice(wildcardIndex + 1)
+            const matches = entries.filter(
+              (entry) => entry.startsWith(`package/${prefix.slice(2)}`) && entry.endsWith(suffix),
+            )
+            if (matches.length === 0) {
+              return yield* smokeError(`${packageName}${specifier} resolves to no ${condition} target`)
+            }
+          } else if (!entries.includes(`package/${value.slice(2)}`)) {
+            return yield* smokeError(`${packageName}${specifier} is missing ${value}`)
+          }
+        }
+      }
+    })
+    yield* validateManifestExports
+    const validateManifestDependencies = Effect.gen(function* () {
+      for (const section of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
+        const expected = Object.fromEntries(
+          Object.entries(source[section] ?? {}).map(([dependency, dependencyVersion]) => {
+            if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
+            if (dependencyVersion.startsWith("catalog:")) {
+              const resolvedVersion = catalogVersion({ rootManifest, dependency, reference: dependencyVersion })
+              if (resolvedVersion === undefined) {
+                throw new Error(`${source.name} references missing catalog dependency ${dependency}`)
+              }
+              return [dependency, resolvedVersion]
+            }
+            return [dependency, dependencyVersion]
+          }),
+        )
+        if (!Equal.equals(sortRecord(manifest[section]), sortRecord(expected))) {
+          return yield* smokeError(`${packageName} changed its packed ${section}`)
+        }
+      }
+      if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
+        return yield* smokeError(`${packageName} must not bundle dependencies`)
+      }
+      for (const dependency of packedEffectDependencies) {
+        const dependencyVersion = manifest.peerDependencies?.[dependency]
+        if (dependencyVersion !== effectVersion) {
+          return yield* smokeError(
+            `${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
+          )
+        }
+      }
+      for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
+        if (manifest.peerDependencies?.[dependency] !== dependencyVersion) {
+          return yield* smokeError(
+            `${packageName} must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
+          )
+        }
+      }
+    })
+    yield* validateManifestDependencies
+    if ((yield* fileSystem.readFileString(manifestPath)) !== sourceManifest) {
+      return yield* smokeError(`packing mutated ${manifestPath}`)
     }
-    return { packedManifests, tarballs }
+    return { manifest, tarball }
   })
-  const { packedManifests, tarballs } = yield* packAndValidatePackages
+  const { manifest: packedManifest, tarball } = yield* packAndValidatePackage
+  const packageTarball = `file:${tarball}`
   const packageExports = sorted(
     [
-      ...Object.values(packedManifests).flatMap((manifest) =>
-        Object.keys(manifest.exports)
-          .filter((specifier) => !specifier.includes("*"))
-          .map((specifier) => (specifier === "." ? manifest.name : `${manifest.name}${specifier.slice(1)}`)),
-      ),
+      ...Object.keys(packedManifest.exports)
+        .filter((specifier) => !specifier.includes("*"))
+        .map((specifier) => (specifier === "." ? packageName : `${packageName}${specifier.slice(1)}`)),
       ...wildcardExportExamples,
     ],
     (left, right) => left.localeCompare(right),
   )
 
   const integrationPeers = Object.fromEntries(
-    Object.entries(packedManifests.generalist?.peerDependencies ?? {}).filter(
+    Object.entries(packedManifest.peerDependencies ?? {}).filter(
       ([dependency]) => dependency !== "effect" && dependency !== "foldkit",
     ),
   )
@@ -827,7 +772,7 @@ const program = Effect.gen(function* () {
       private: true,
       type: "module",
       dependencies: {
-        ...tarballs,
+        [packageName]: packageTarball,
         ...integrationPeers,
         effect: effectVersion,
         esbuild: rootManifest.workspaces.catalog.esbuild,
@@ -835,69 +780,14 @@ const program = Effect.gen(function* () {
         typescript: rootManifest.workspaces.catalog.typescript,
       },
       /**
-       * The driver packages depend on an exact `generalist` version that only exists once this
-       * release is published, and an unscoped name cannot be pointed at the local registry the way
-       * `@generalist:registry` can. Overriding it to the packed tarball resolves the transitive
-       * dependency without redirecting every unrelated package through a stub server. FoldKit
-       * 0.148.2 still declares rc.109, so its targeted override proves the current rc.112 runtime
-       * instead of disabling peer resolution for the whole consumer.
+       * FoldKit 0.148.2 still declares rc.109, so its targeted override proves the current rc.112
+       * runtime instead of disabling peer resolution for the whole consumer.
        */
       overrides: {
-        generalist: tarballs["generalist"],
         foldkit: { effect: effectVersion },
       },
-      resolutions: { generalist: tarballs["generalist"] },
     }),
   )
-  const registryDirectory = path.join(directory, "registry")
-  yield* fileSystem.makeDirectory(registryDirectory)
-  yield* fileSystem.writeFileString(
-    path.join(registryDirectory, "data.json"),
-    encodeJson({ version, tarballDirectory, manifests: packedManifests }),
-  )
-  yield* fileSystem.writeFileString(
-    path.join(registryDirectory, "server.mjs"),
-    `import { createReadStream, readFileSync, statSync } from "node:fs"
-import { createServer } from "node:http"
-import { basename, join } from "node:path"
-const { manifests, tarballDirectory, version } = JSON.parse(readFileSync(new URL("./data.json", import.meta.url)))
-const server = createServer((request, response) => {
-  const pathname = decodeURIComponent(new URL(request.url, "http://registry").pathname)
-  if (pathname.startsWith("/tarballs/")) {
-    const file = join(tarballDirectory, basename(pathname))
-    response.writeHead(200, { "content-type": "application/octet-stream", "content-length": statSync(file).size })
-    createReadStream(file).pipe(response)
-    return
-  }
-  const name = pathname.slice(1)
-  const manifest = manifests[name]
-  if (manifest === undefined) {
-    response.writeHead(404).end("not found")
-    return
-  }
-  const packagePart = name === "generalist" ? "generalist" : name.slice("@generalist/".length)
-  const filename = packagePart === "generalist" ? \`generalist-\${version}.tgz\` : \`generalist-\${packagePart}-\${version}.tgz\`
-  const body = JSON.stringify({
-    name,
-    "dist-tags": { latest: version },
-    versions: { [version]: { ...manifest, dist: { tarball: \`\${origin}/tarballs/\${filename}\` } } },
-  })
-  response.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(body) }).end(body)
-})
-let origin
-server.listen(0, "127.0.0.1", () => {
-  origin = \`http://127.0.0.1:\${server.address().port}\`
-  console.log(origin)
-})
-`,
-  )
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-  const registry = yield* spawner.spawn(ChildProcess.make("node", ["server.mjs"], { cwd: registryDirectory }))
-  yield* Effect.addFinalizer(() => Effect.orDie(registry.kill()))
-  const registryOrigin = yield* Stream.runHead(Stream.splitLines(Stream.decodeText(registry.stdout))).pipe(
-    Effect.flatMap(Option.match({ onNone: () => smokeError("local registry did not start"), onSome: Effect.succeed })),
-  )
-  yield* fileSystem.writeFileString(path.join(consumerDirectory, ".npmrc"), `@generalist:registry=${registryOrigin}\n`)
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "tsconfig.json"),
     encodeJson({
@@ -1019,15 +909,17 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
   )
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], consumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "bun", "runtime.mjs"], consumerDirectory)
-  if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@generalist")) {
-    return yield* smokeError("Bun consumer resolved a Generalist package from npm")
+  if (
+    (yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/generalist/-/")
+  ) {
+    return yield* smokeError("Bun consumer resolved the Generalist package from npm")
   }
 
   yield* verifyWorkerEntrypoints({ root, consumerDirectory })
 
   const npmConsumerDirectory = path.join(directory, "npm-consumer")
   yield* fileSystem.makeDirectory(npmConsumerDirectory)
-  for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs", ".npmrc"]) {
+  for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs"]) {
     yield* fileSystem.copyFile(path.join(consumerDirectory, filename), path.join(npmConsumerDirectory, filename))
   }
   yield* run("npm", ["install", "--ignore-scripts"], npmConsumerDirectory)
@@ -1046,15 +938,41 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
   if (
     (yield* fileSystem.readFileString(path.join(npmConsumerDirectory, "package-lock.json"))).includes(
-      "npmjs.org/@generalist",
+      "npmjs.org/generalist/-/",
     )
   ) {
-    return yield* smokeError("npm consumer resolved a Generalist package from npm")
+    return yield* smokeError("npm consumer resolved the Generalist package from npm")
   }
 
-  const generalistManifest = packedManifests.generalist
-  if (generalistManifest === undefined) return yield* smokeError("packed generalist manifest is missing")
-  const optionalPeers = yield* validateMinimumConsumerProfiles({ generalistManifest, packageExports })
+  const optionalPeers = yield* validateMinimumConsumerProfiles({ manifest: packedManifest, packageExports })
+
+  // An optional peer must never be installed on Generalist's behalf when the consumer does not
+  // declare it. Only Bun's isolated linker auto-materializes peers, so scope the assertion to the
+  // store subtree Bun resolves for the Generalist package itself; a peer that arrives as a real
+  // dependency of the consumer's own tooling (for example @standard-schema/spec via vitest) is not
+  // a violation.
+  const verifyOptionalPeersNotInstalled = Effect.fn("PackageSmoke.verifyOptionalPeersNotInstalled")(function* (
+    profile: MinimumConsumerProfile,
+    runtime: ConsumerRuntime,
+    specifiers: ReadonlyArray<string>,
+    profileDirectory: string,
+  ) {
+    const bunStore = path.join(profileDirectory, "node_modules", ".bun")
+    if (!(yield* fileSystem.exists(bunStore))) return
+    for (const dependency of optionalPeers) {
+      if (profile.peers.includes(dependency)) continue
+      const installed = (yield* run(
+        "find",
+        [bunStore, "-path", `*/${packageName}@*/node_modules/${dependency}/package.json`, "-print"],
+        profileDirectory,
+      )).trim()
+      if (installed.length > 0) {
+        return yield* smokeError(
+          `${profileContext(profile, runtime, specifiers)} unexpected package ${dependency} installed for ${packageName}:\n${installed}`,
+        )
+      }
+    }
+  })
 
   const verifyRivetDeclarationDependency = Effect.fn("PackageSmoke.verifyRivetDeclarationDependency")(function* (
     profile: MinimumConsumerProfile,
@@ -1081,11 +999,11 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
       path.join(profileDirectory, "require.cjs"),
       `let blocked = false
 try {
-  require("@generalist/rivet/actors")
+  require("generalist/rivet/actors")
 } catch (error) {
   blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
 }
-if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
+if (!blocked) throw new Error("generalist/rivet/actors must remain ESM-only")
 `,
     )
     yield* runProfileCommand({
@@ -1107,7 +1025,7 @@ if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
     yield* fileSystem.makeDirectory(profileDirectory, { recursive: true })
     const peerDependencies: Record<string, string> = {}
     for (const dependency of profile.peers) {
-      const dependencyVersion = generalistManifest.peerDependencies?.[dependency]
+      const dependencyVersion = packedManifest.peerDependencies?.[dependency]
       if (dependencyVersion === undefined) {
         return yield* smokeError(
           `${profileContext(profile, runtime, specifiers)} missing package ${dependency} version`,
@@ -1115,24 +1033,16 @@ if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
       }
       peerDependencies[dependency] = dependencyVersion
     }
-    const packageDependencies = Object.fromEntries(
-      profile.packages.map((packageName) => [packageNames[packageName], tarballs[packageNames[packageName]]]),
-    )
-    const baseOverrides = { generalist: tarballs.generalist }
-    const overrides = profile.peers.includes("foldkit")
-      ? { ...baseOverrides, foldkit: { effect: effectVersion } }
-      : baseOverrides
-    yield* fileSystem.writeFileString(
-      path.join(profileDirectory, "package.json"),
-      encodeJson({
-        name: `generalist-package-smoke-${profile.name}-${runtime}`,
-        private: true,
-        type: "module",
-        dependencies: { effect: effectVersion, ...packageDependencies, ...peerDependencies },
-        overrides,
-        resolutions: { generalist: tarballs.generalist },
+    const profileManifest = {
+      name: `generalist-package-smoke-${profile.name}-${runtime}`,
+      private: true,
+      type: "module",
+      dependencies: { effect: effectVersion, [packageName]: packageTarball, ...peerDependencies },
+      ...(profile.peers.includes("foldkit") && {
+        overrides: { foldkit: { effect: effectVersion } },
       }),
-    )
+    } satisfies Schema.Json
+    yield* fileSystem.writeFileString(path.join(profileDirectory, "package.json"), encodeJson(profileManifest))
     if (runtime === "node") {
       yield* runProfileCommand({
         profile,
@@ -1154,21 +1064,13 @@ if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
       })
     }
 
-    for (const dependency of ["effect", ...Object.keys(packageDependencies), ...profile.peers]) {
+    for (const dependency of ["effect", packageName, ...profile.peers]) {
       if ((yield* installedPackages(profileDirectory, [dependency])).length === 0) {
         return yield* smokeError(`${profileContext(profile, runtime, specifiers)} missing package ${dependency}`)
       }
     }
     yield* verifyRivetDeclarationDependency(profile, runtime, specifiers, profileDirectory)
-    for (const dependency of optionalPeers) {
-      if (profile.peers.includes(dependency)) continue
-      const installed = yield* installedPackages(profileDirectory, [dependency])
-      if (installed.length > 0) {
-        return yield* smokeError(
-          `${profileContext(profile, runtime, specifiers)} unexpected package ${dependency}:\n${installed.join("\n")}`,
-        )
-      }
-    }
+    yield* verifyOptionalPeersNotInstalled(profile, runtime, specifiers, profileDirectory)
     const installedEffectsForProfile = (yield* run(
       "find",
       ["node_modules", "-path", "*/effect/package.json", "-print"],
@@ -1200,9 +1102,9 @@ if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
     yield* verifyRivetCommonJsBoundary(profile, runtime, specifiers, profileDirectory)
 
     const lockfile = path.join(profileDirectory, runtime === "node" ? "package-lock.json" : "bun.lock")
-    if ((yield* fileSystem.readFileString(lockfile)).includes("npmjs.org/@generalist")) {
+    if ((yield* fileSystem.readFileString(lockfile)).includes("npmjs.org/generalist/-/")) {
       return yield* smokeError(
-        `${profileContext(profile, runtime, specifiers)} unexpected package source npmjs.org/@generalist`,
+        `${profileContext(profile, runtime, specifiers)} unexpected package source npmjs.org/generalist`,
       )
     }
   })
@@ -1222,37 +1124,21 @@ if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
   )
 
   const writeReleaseEvidence = Effect.gen(function* () {
-    const evidencePackages: Array<{
-      readonly name: string
-      readonly version: string
-      readonly filename: string
-      readonly compressedBytes: number
-      readonly unpackedBytes: number
-      readonly sha256: string
-      readonly dependencies: Readonly<Record<string, string>>
-      readonly peerDependencies: Readonly<Record<string, string>>
-      readonly exports: Readonly<Record<string, typeof ExportTarget.Type>>
-    }> = []
-    for (const packageName of packages) {
-      const filename = tarballName({ packageName, version })
-      const archive = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
-      const manifest = parsePackageManifest(
-        yield* run("tar", ["-xOzf", path.join(tarballDirectory, filename), "package/package.json"], root),
-      )
-      evidencePackages.push({
-        name: manifest.name,
-        version,
-        filename,
-        compressedBytes: archive.byteLength,
-        unpackedBytes: (yield* run("tar", ["-tvzf", path.join(tarballDirectory, filename)], root))
-          .split("\n")
-          .filter(Boolean)
-          .reduce((total, entry) => total + Number(entry.trim().split(/\s+/)[2]), 0),
-        sha256: new CryptoHasher("sha256").update(archive).digest("hex"),
-        dependencies: manifest.dependencies ?? {},
-        peerDependencies: manifest.peerDependencies ?? {},
-        exports: manifest.exports,
-      })
+    const filename = tarballName(version)
+    const archive = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
+    const evidencePackage = {
+      name: packageName,
+      version,
+      filename,
+      compressedBytes: archive.byteLength,
+      unpackedBytes: (yield* run("tar", ["-tvzf", path.join(tarballDirectory, filename)], root))
+        .split("\n")
+        .filter(Boolean)
+        .reduce((total, entry) => total + Number(entry.trim().split(/\s+/)[2]), 0),
+      sha256: new CryptoHasher("sha256").update(archive).digest("hex"),
+      dependencies: packedManifest.dependencies ?? {},
+      peerDependencies: packedManifest.peerDependencies ?? {},
+      exports: packedManifest.exports,
     }
     const evidence = {
       schemaVersion: 1,
@@ -1262,21 +1148,19 @@ if (!blocked) throw new Error("@generalist/rivet/actors must remain ESM-only")
         node: (yield* run("node", ["--version"], root)).trim(),
         typescript: rootManifest.workspaces.catalog.typescript,
       },
-      packages: sorted(evidencePackages, (left, right) => left.name.localeCompare(right.name)),
+      packages: [evidencePackage],
     }
     const evidencePath = path.join(tarballDirectory, "release-evidence.json")
     yield* fileSystem.writeFileString(evidencePath, `${encodeJson(evidence)}\n`)
-    const checksumFiles = sorted(
-      [...evidencePackages.map(({ filename }) => filename), "release-evidence.json"],
-      (left, right) => left.localeCompare(right),
-    )
     const checksums: Array<string> = []
-    for (const filename of checksumFiles) {
-      const bytes = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
-      checksums.push(`${new CryptoHasher("sha256").update(bytes).digest("hex")}  ${filename}`)
+    for (const checksumFile of sorted([filename, "release-evidence.json"], (left, right) =>
+      left.localeCompare(right),
+    )) {
+      const bytes = yield* fileSystem.readFile(path.join(tarballDirectory, checksumFile))
+      checksums.push(`${new CryptoHasher("sha256").update(bytes).digest("hex")}  ${checksumFile}`)
     }
     yield* fileSystem.writeFileString(path.join(tarballDirectory, "SHA256SUMS"), `${checksums.join("\n")}\n`)
-    for (const item of evidencePackages) yield* Console.log(`${item.name}: ${item.compressedBytes} compressed bytes`)
+    yield* Console.log(`${evidencePackage.name}: ${evidencePackage.compressedBytes} compressed bytes`)
   })
   yield* writeReleaseEvidence
 })

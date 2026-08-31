@@ -9,7 +9,7 @@ export const coreModelsReference = definePage({
     lead(
       "Four namespaces of generalist cover the model side of a run: ModelRegistry selects models per run, ModelMiddleware transforms prompts and stream parts, ModelResilience retries transient failures, and Guardrail builds common middleware.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("model-registry", "ModelRegistry"),
     p(
       "A registry of named model registrations. ",

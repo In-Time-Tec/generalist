@@ -9,7 +9,7 @@ export const corePoliciesReference = definePage({
     lead(
       "Three namespaces of generalist gate what a run may do next: Policy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("turn-policy", "Policy"),
     p(
       "A policy is ",

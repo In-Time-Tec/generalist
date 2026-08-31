@@ -9,7 +9,7 @@ export const memoryReference = definePage({
     lead(
       "generalist/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     p(code("generalist/memory"), " is an import subpath, not a package."),
     h2("exports", "Exports map"),
     table(

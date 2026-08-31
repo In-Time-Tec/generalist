@@ -52,7 +52,7 @@ jobs:
           tag="v$version"
           source_commit=$(git rev-parse HEAD)
           [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]]
-          for manifest in package.json packages/{generalist,pg,mysql,cloudflare,rivet}/package.json; do
+          for manifest in package.json packages/generalist/package.json; do
             [[ "$(jq -r .version "$manifest")" == "$version" ]]
           done
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
@@ -130,10 +130,6 @@ jobs:
           cd release
           package_assets=(
             "generalist-${VERSION}.tgz"
-            "generalist-pg-${VERSION}.tgz"
-            "generalist-mysql-${VERSION}.tgz"
-            "generalist-cloudflare-${VERSION}.tgz"
-            "generalist-rivet-${VERSION}.tgz"
           )
           mapfile -t package_assets < <(printf '%s\n' "${package_assets[@]}" | sort)
           expected=(SHA256SUMS "${package_assets[@]}" release-evidence.json)
@@ -147,11 +143,11 @@ jobs:
           sha256sum --check SHA256SUMS
           jq -e --arg commit "$SOURCE_COMMIT" --arg version "$VERSION" '
             .schemaVersion == 1 and .sourceCommit == $commit and
-            (.packages | length) == 5 and all(.packages[]; .version == $version)
+            (.packages | length) == 1 and all(.packages[]; .version == $version)
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' generalist @generalist/pg @generalist/mysql @generalist/cloudflare @generalist/rivet | sort)
+          mapfile -t expected_packages < <(printf '%s\n' generalist | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do
@@ -211,10 +207,6 @@ jobs:
           cd release
           package_assets=(
             "generalist-${VERSION}.tgz"
-            "generalist-pg-${VERSION}.tgz"
-            "generalist-mysql-${VERSION}.tgz"
-            "generalist-cloudflare-${VERSION}.tgz"
-            "generalist-rivet-${VERSION}.tgz"
           )
           mapfile -t package_assets < <(printf '%s\n' "${package_assets[@]}" | sort)
           expected=(SHA256SUMS "${package_assets[@]}" release-evidence.json)
@@ -228,11 +220,11 @@ jobs:
           sha256sum --check SHA256SUMS
           jq -e --arg commit "$SOURCE_COMMIT" --arg version "$VERSION" '
             .schemaVersion == 1 and .sourceCommit == $commit and
-            (.packages | length) == 5 and all(.packages[]; .version == $version)
+            (.packages | length) == 1 and all(.packages[]; .version == $version)
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '%s\n' generalist @generalist/pg @generalist/mysql @generalist/cloudflare @generalist/rivet | sort)
+          mapfile -t expected_packages < <(printf '%s\n' generalist | sort)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do

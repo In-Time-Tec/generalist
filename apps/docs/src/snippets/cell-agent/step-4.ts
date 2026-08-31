@@ -3,7 +3,7 @@ import { ToolContext, ToolExecutor } from "generalist"
 import { Response } from "effect/unstable/ai"
 import { Cell, CellTool, HostBindings, KernelProfile, TestKernel } from "generalist/repl"
 
-class NotFound extends Schema.TaggedError<NotFound>()("@generalist/tutorial/NotFound", {
+class NotFound extends Schema.TaggedError<NotFound>()("generalist/tutorial/NotFound", {
   path: Schema.String,
 }) {}
 

@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-mcp-toolkit-server",
+  "name": "generalist-example-mcp-toolkit-server",
   "private": true,
   "type": "module",
   "scripts": {

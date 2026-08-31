@@ -3,7 +3,7 @@ import { layer } from "@effect/platform-bun/BunServices"
 import { version as bunVersion } from "bun"
 
 class InstallPreflightFailed extends Schema.TaggedError<InstallPreflightFailed>()(
-  "@generalist/scripts/InstallPreflightFailed",
+  "generalist/scripts/InstallPreflightFailed",
   { message: Schema.String },
 ) {}
 
@@ -36,22 +36,15 @@ const program = Effect.gen(function* () {
     return yield* preflightError("root workspace must include packages/*")
   }
   const packageDirectory = path.join(root, "packages")
-  const packageNames = yield* fileSystem.readDirectory(packageDirectory)
-  for (const packageName of packageNames.filter((name) => !name.startsWith("."))) {
-    const manifestPath = path.join(packageDirectory, packageName, "package.json")
-    if (!(yield* fileSystem.exists(manifestPath))) continue
-    const source = yield* fileSystem.readFileString(manifestPath)
-    const manifest = yield* Schema.decodeEffect(Schema.fromJsonString(PackageManifest))(source)
-    if (manifest.name !== `@generalist/${packageName}`) {
-      return yield* preflightError(`${manifestPath} has a non-canonical package name`)
-    }
-    for (const dependencies of [manifest.dependencies, manifest.devDependencies, manifest.peerDependencies]) {
-      for (const [dependency, version] of Object.entries(dependencies ?? {})) {
-        if (dependency.startsWith("@generalist/") && version !== "workspace:*") {
-          return yield* preflightError(`${manifestPath} must use workspace:* for ${dependency}`)
-        }
-      }
-    }
+  const packageNames = (yield* fileSystem.readDirectory(packageDirectory)).filter((name) => !name.startsWith("."))
+  if (packageNames.length !== 1 || packageNames[0] !== "generalist") {
+    return yield* preflightError(`packages/ must contain exactly the generalist package: ${packageNames.join(", ")}`)
+  }
+  const manifestPath = path.join(packageDirectory, "generalist", "package.json")
+  const source = yield* fileSystem.readFileString(manifestPath)
+  const manifest = yield* Schema.decodeEffect(Schema.fromJsonString(PackageManifest))(source)
+  if (manifest.name !== "generalist") {
+    return yield* preflightError(`${manifestPath} has a non-canonical package name`)
   }
   yield* Effect.logInfo(`install preflight passed for Bun ${bunVersion}`)
 })

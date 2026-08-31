@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-package-composition-guides",
+  "name": "generalist-example-package-composition-guides",
   "private": true,
   "type": "module",
   "scripts": {

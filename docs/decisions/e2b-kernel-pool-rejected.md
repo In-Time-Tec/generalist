@@ -1,6 +1,6 @@
 # E2B KernelPool adapter rejected
 
-Generalist does not provide `@generalist/e2b/repl` because E2B cannot currently enforce the remote
+Generalist does not provide `generalist/e2b/repl` because E2B cannot currently enforce the remote
 `KernelPool` ownership contract. This decision was checked against the current release, `e2b@2.46.1`
 (npm integrity `sha512-OqYovS2oFrt4mk737CgfW/RoMadBYK84l5qjKpvbEoOB9KKxaZIXm7YUwOKSRTlijrrwDRX7oZlyPoVXiCpyTw==`,
 tarball SHA-256 `3e9f1184b391e37ba5026d56b4dd6637c5456b52373843e941adf50c7009a922`, release commit

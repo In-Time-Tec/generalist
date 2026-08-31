@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -14,12 +14,19 @@
     "@effect/ai-openai": "catalog:",
     "@effect/ai-openai-compat": "catalog:",
     "@effect/ai-openrouter": "catalog:",
+    "@effect/sql-mysql2": "catalog:",
+    "@effect/sql-pg": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
+    "@effect/sql-sqlite-do": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@smithy/types": "catalog:",
+    "@standard-schema/spec": "catalog:",
     "effect": "catalog:",
+    "es-module-lexer": "catalog:",
     "foldkit": "catalog:peer",
+    "pg": "catalog:",
+    "rivetkit": "catalog:",
     "vitest": "catalog:"
   },
   "files": [
@@ -216,6 +223,30 @@
     "./runtime/external-child-store": {
       "types": "./dist/runtime/child/external/store.d.ts",
       "import": "./dist/runtime/child/external/store.js"
+    },
+    "./pg": {
+      "types": "./dist/pg/index.d.ts",
+      "import": "./dist/pg/index.js"
+    },
+    "./mysql": {
+      "types": "./dist/mysql/index.d.ts",
+      "import": "./dist/mysql/index.js"
+    },
+    "./cloudflare/workers": {
+      "types": "./dist/cloudflare/workers/index.d.ts",
+      "import": "./dist/cloudflare/workers/index.js"
+    },
+    "./cloudflare/durable-objects": {
+      "types": "./dist/cloudflare/durable-objects/index.d.ts",
+      "import": "./dist/cloudflare/durable-objects/index.js"
+    },
+    "./cloudflare/dynamic-workers": {
+      "types": "./dist/cloudflare/dynamic-workers/index.d.ts",
+      "import": "./dist/cloudflare/dynamic-workers/index.js"
+    },
+    "./rivet/actors": {
+      "types": "./dist/rivet/actors/index.d.ts",
+      "import": "./dist/rivet/actors/index.js"
     }
   },
   "scripts": {
@@ -234,15 +265,25 @@
     "@effect/ai-openai-compat": "catalog:",
     "@effect/ai-openrouter": "catalog:",
     "@effect/platform-bun": "catalog:",
+    "@effect/sql-mysql2": "catalog:",
+    "@effect/sql-pg": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
+    "@effect/sql-sqlite-do": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@smithy/types": "catalog:",
+    "@standard-schema/spec": "catalog:",
     "@types/bun": "catalog:",
+    "@types/pg": "catalog:",
     "effect": "catalog:",
+    "esbuild": "catalog:",
+    "es-module-lexer": "catalog:",
     "foldkit": "catalog:",
+    "pg": "catalog:",
+    "rivetkit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "workerd": "1.20260819.1"
   },
   "repository": {
     "type": "git",
@@ -274,7 +315,16 @@
     "@effect/ai-openrouter": {
       "optional": true
     },
+    "@effect/sql-mysql2": {
+      "optional": true
+    },
+    "@effect/sql-pg": {
+      "optional": true
+    },
     "@effect/sql-sqlite-bun": {
+      "optional": true
+    },
+    "@effect/sql-sqlite-do": {
       "optional": true
     },
     "@effect/vitest": {
@@ -286,7 +336,19 @@
     "@smithy/types": {
       "optional": true
     },
+    "@standard-schema/spec": {
+      "optional": true
+    },
+    "es-module-lexer": {
+      "optional": true
+    },
     "foldkit": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "rivetkit": {
       "optional": true
     },
     "vitest": {

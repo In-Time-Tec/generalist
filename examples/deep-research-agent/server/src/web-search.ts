@@ -116,7 +116,7 @@ export interface Service {
 
 /** @experimental */
 export class WebSearch extends Context.Service<WebSearch, Service>()(
-  "@generalist/example-deep-research-agent-server/web-search/WebSearch",
+  "generalist-example-deep-research-agent-server/web-search/WebSearch",
 ) {}
 
 const exaSearchBody = (query: string) => ({

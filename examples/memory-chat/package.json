@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-memory-chat",
+  "name": "generalist-example-memory-chat",
   "private": true,
   "type": "module",
   "scripts": {

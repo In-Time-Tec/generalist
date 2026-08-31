@@ -8,7 +8,7 @@ export const runtimeReference = definePage({
   description: "Addressable Run admission, canonical events, inspection, waits, stores, and workers.",
   content: [
     lead("generalist/runtime owns the authoritative lifecycle for addressable Generalist runs."),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("surface", "Core surface"),
     table(
       ["Namespace", "Role"],
@@ -64,13 +64,13 @@ export const runtimeReference = definePage({
       " from ",
       code("generalist/runtime/sqlite-bun"),
       " is durable for one process. ",
-      code("layer from @generalist/pg"),
+      code("layer from generalist/pg"),
       " and ",
-      code("layer from @generalist/mysql"),
+      code("layer from generalist/mysql"),
       " support multi-worker claims and require the schema to be applied before Runtime startup. PostgreSQL uses ",
-      code("@generalist/pg RuntimeSchema"),
+      code("generalist/pg RuntimeSchema"),
       "; MySQL 8+ uses ",
-      code("@generalist/mysql RuntimeSchema"),
+      code("generalist/mysql RuntimeSchema"),
       ".",
     ),
     p(

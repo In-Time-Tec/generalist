@@ -1,16 +1,16 @@
 import { code, definePage, h2, lead, link, p, pills, table } from "../../../prose"
 
-const version = "0.44.0"
+const version = "0.45.0"
 
 export const versioningReference = definePage({
   path: "/docs/reference/versioning",
   title: "Versioning and releases",
   navTitle: "Versioning",
   group: "Reference",
-  description: "The 0.44.0 package set, experimental policy, Effect compatibility, and release train.",
+  description: "The 0.45.0 package, experimental policy, Effect compatibility, and release train.",
   content: [
-    lead("The five Generalist packages publish to npm as a coordinated train at the same version."),
-    h2("published-set", "Published packages"),
+    lead("Generalist publishes to npm as one package; every adapter is a subpath export at the same version."),
+    h2("published-set", "Published package"),
     table(
       ["Package", "Version", "Subpath exports"],
       [
@@ -18,24 +18,21 @@ export const versioningReference = definePage({
           [code("generalist")],
           [code(version)],
           [
-            "44 explicit exports for Core, Runtime, exact AI leaves, MCP, memory, skills, test hosts, transport, and integrations",
+            "49 explicit exports for Core, Runtime, exact AI leaves, MCP, memory, instructions and skills, test hosts, transport, integrations, and the ",
+            code("./pg"),
+            ", ",
+            code("./mysql"),
+            ", ",
+            code("./cloudflare/workers"),
+            ", ",
+            code("./cloudflare/durable-objects"),
+            ", ",
+            code("./cloudflare/dynamic-workers"),
+            ", and ",
+            code("./rivet/actors"),
+            " adapters",
           ],
         ],
-        [[code("@generalist/pg")], [code(version)], [code(".")]],
-        [[code("@generalist/mysql")], [code(version)], [code(".")]],
-        [
-          [code("@generalist/cloudflare")],
-          [code(version)],
-          [
-            code("./workers"),
-            ", ",
-            code("./durable-objects"),
-            ", ",
-            code("./dynamic-workers"),
-            "; no package-root export",
-          ],
-        ],
-        [[code("@generalist/rivet")], [code(version)], [code("./actors")]],
       ],
     ),
     h2("experimental-policy", "The @experimental policy"),
@@ -49,14 +46,14 @@ export const versioningReference = definePage({
     h2("effect-compat", "Effect compatibility"),
     table(
       ["Generalist", "effect", "Notes"],
-      [[[code("0.44.0")], [code("4.0.0-rc.112")], "The exact peer and tested workspace catalog version"]],
+      [[[code("0.45.0")], [code("4.0.0-rc.112")], "The exact peer and tested workspace catalog version"]],
     ),
     h2("release-train", "The release train"),
-    p("Every release builds and publishes all packages from one committed lockstep version:"),
-    pills(["generalist", "@generalist/pg", "@generalist/mysql", "@generalist/cloudflare", "@generalist/rivet"]),
+    p("Every release builds and publishes from one committed version:"),
+    pills(["generalist"]),
     p(
-      "The tag workflow builds once, verifies five unchanged tarballs in clean minimum-dependency consumers, emits checksums and release evidence, attaches those seven assets to GitHub, and publishes the exact five tarballs to npm. A manual run only reconciles an existing immutable tag and commit.",
+      "The tag workflow builds once, verifies the unchanged tarball in clean minimum-dependency consumers, emits checksums and release evidence, attaches those three assets to GitHub, and publishes the exact tarball to npm. A manual run only reconciles an existing immutable tag and commit.",
     ),
-    p("For install commands and package roles, see ", link("/docs/start/installation", "Installation"), "."),
+    p("For install commands and adapter peers, see ", link("/docs/start/installation", "Installation"), "."),
   ],
 })

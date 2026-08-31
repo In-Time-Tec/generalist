@@ -10,7 +10,7 @@ export const coreAgentReference = definePage({
     lead(
       "The Agent namespace of generalist defines an opaque agent value, scoped Run handles, stream and generate projections, and every option and service a Run consumes.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("agent-make", "Agent.make"),
     p(
       "An ",

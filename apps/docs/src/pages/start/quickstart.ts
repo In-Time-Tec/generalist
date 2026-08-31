@@ -32,7 +32,7 @@ export const quickstart = definePage({
     codeBlock({ label: "Terminal", language: "bash", source: step1 }),
     p(
       "The install summary lists ",
-      code("generalist@0.44.0"),
+      code("generalist@0.45.0"),
       ". Provider leaves are subpaths of that package, not separate installs. npm and pnpm work the same way; ",
       link("/docs/start/installation", "Installation"),
       " has the variants.",

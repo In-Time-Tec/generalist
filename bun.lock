@@ -5,8 +5,6 @@
     "": {
       "name": "tenetkit",
       "dependencies": {
-        "@generalist/mysql": "workspace:*",
-        "@generalist/pg": "workspace:*",
         "effect": "catalog:",
         "generalist": "workspace:*",
       },
@@ -36,7 +34,7 @@
       },
     },
     "apps/docs": {
-      "name": "@generalist/docs",
+      "name": "generalist-docs",
       "version": "0.0.0",
       "dependencies": {
         "@foldkit/ui": "catalog:",
@@ -58,7 +56,7 @@
       },
     },
     "examples/capstone-local-assistant": {
-      "name": "@generalist/example-capstone-local-assistant",
+      "name": "generalist-example-capstone-local-assistant",
       "dependencies": {
         "effect": "catalog:",
         "foldkit": "catalog:",
@@ -70,9 +68,8 @@
       },
     },
     "examples/cloudflare-worker": {
-      "name": "@generalist/example-cloudflare-worker",
+      "name": "generalist-example-cloudflare-worker",
       "dependencies": {
-        "@generalist/cloudflare": "workspace:*",
         "effect": "catalog:",
         "generalist": "workspace:*",
       },
@@ -83,13 +80,13 @@
       },
     },
     "examples/deep-research-agent": {
-      "name": "@generalist/example-deep-research-agent",
+      "name": "generalist-example-deep-research-agent",
       "devDependencies": {
         "generalist": "workspace:*",
       },
     },
     "examples/deep-research-agent/server": {
-      "name": "@generalist/example-deep-research-agent-server",
+      "name": "generalist-example-deep-research-agent-server",
       "dependencies": {
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
@@ -101,7 +98,7 @@
       },
     },
     "examples/deep-research-agent/web": {
-      "name": "@generalist/example-deep-research-agent-web",
+      "name": "generalist-example-deep-research-agent-web",
       "dependencies": {
         "@foldkit/ui": "catalog:",
         "class-variance-authority": "catalog:",
@@ -120,7 +117,7 @@
       },
     },
     "examples/eval-in-ci": {
-      "name": "@generalist/example-eval-in-ci",
+      "name": "generalist-example-eval-in-ci",
       "dependencies": {
         "effect": "catalog:",
         "generalist": "workspace:*",
@@ -131,7 +128,7 @@
       },
     },
     "examples/hitl-over-sse": {
-      "name": "@generalist/example-hitl-over-sse",
+      "name": "generalist-example-hitl-over-sse",
       "dependencies": {
         "effect": "catalog:",
         "generalist": "workspace:*",
@@ -142,7 +139,7 @@
       },
     },
     "examples/mcp-agent": {
-      "name": "@generalist/example-mcp-agent",
+      "name": "generalist-example-mcp-agent",
       "dependencies": {
         "effect": "catalog:",
         "generalist": "workspace:*",
@@ -153,7 +150,7 @@
       },
     },
     "examples/mcp-toolkit-server": {
-      "name": "@generalist/example-mcp-toolkit-server",
+      "name": "generalist-example-mcp-toolkit-server",
       "dependencies": {
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
@@ -165,7 +162,7 @@
       },
     },
     "examples/memory-chat": {
-      "name": "@generalist/example-memory-chat",
+      "name": "generalist-example-memory-chat",
       "dependencies": {
         "effect": "catalog:",
         "generalist": "workspace:*",
@@ -176,7 +173,7 @@
       },
     },
     "examples/multi-agent": {
-      "name": "@generalist/example-multi-agent",
+      "name": "generalist-example-multi-agent",
       "dependencies": {
         "effect": "catalog:",
         "generalist": "workspace:*",
@@ -187,7 +184,7 @@
       },
     },
     "examples/package-composition-guides": {
-      "name": "@generalist/example-package-composition-guides",
+      "name": "generalist-example-package-composition-guides",
       "dependencies": {
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
@@ -199,7 +196,7 @@
       },
     },
     "examples/structured-extraction": {
-      "name": "@generalist/example-structured-extraction",
+      "name": "generalist-example-structured-extraction",
       "dependencies": {
         "effect": "catalog:",
         "generalist": "workspace:*",
@@ -210,7 +207,7 @@
       },
     },
     "examples/tool-calling-chatbot": {
-      "name": "@generalist/example-tool-calling-chatbot",
+      "name": "generalist-example-tool-calling-chatbot",
       "dependencies": {
         "effect": "catalog:",
         "generalist": "workspace:*",
@@ -218,32 +215,11 @@
       "devDependencies": {
         "@types/bun": "catalog:",
         "typescript": "catalog:",
-      },
-    },
-    "packages/cloudflare": {
-      "name": "@generalist/cloudflare",
-      "version": "0.44.0",
-      "dependencies": {
-        "@effect/sql-sqlite-do": "catalog:",
-        "es-module-lexer": "catalog:",
-        "generalist": "workspace:*",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-        "@types/bun": "catalog:",
-        "effect": "catalog:",
-        "esbuild": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-        "workerd": "1.20260819.1",
-      },
-      "peerDependencies": {
-        "effect": "catalog:",
       },
     },
     "packages/generalist": {
       "name": "generalist",
-      "version": "0.44.0",
+      "version": "0.45.0",
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",
@@ -254,15 +230,25 @@
         "@effect/ai-openai-compat": "catalog:",
         "@effect/ai-openrouter": "catalog:",
         "@effect/platform-bun": "catalog:",
+        "@effect/sql-mysql2": "catalog:",
+        "@effect/sql-pg": "catalog:",
         "@effect/sql-sqlite-bun": "catalog:",
+        "@effect/sql-sqlite-do": "catalog:",
         "@effect/vitest": "catalog:",
         "@modelcontextprotocol/sdk": "catalog:",
         "@smithy/types": "catalog:",
+        "@standard-schema/spec": "catalog:",
         "@types/bun": "catalog:",
+        "@types/pg": "catalog:",
         "effect": "catalog:",
+        "es-module-lexer": "catalog:",
+        "esbuild": "catalog:",
         "foldkit": "catalog:",
+        "pg": "catalog:",
+        "rivetkit": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
+        "workerd": "1.20260819.1",
       },
       "peerDependencies": {
         "@a2a-js/sdk": "catalog:",
@@ -273,12 +259,19 @@
         "@effect/ai-openai": "catalog:",
         "@effect/ai-openai-compat": "catalog:",
         "@effect/ai-openrouter": "catalog:",
+        "@effect/sql-mysql2": "catalog:",
+        "@effect/sql-pg": "catalog:",
         "@effect/sql-sqlite-bun": "catalog:",
+        "@effect/sql-sqlite-do": "catalog:",
         "@effect/vitest": "catalog:",
         "@modelcontextprotocol/sdk": "catalog:",
         "@smithy/types": "catalog:",
+        "@standard-schema/spec": "catalog:",
         "effect": "catalog:",
+        "es-module-lexer": "catalog:",
         "foldkit": "catalog:peer",
+        "pg": "catalog:",
+        "rivetkit": "catalog:",
         "vitest": "catalog:",
       },
       "optionalPeers": [
@@ -290,70 +283,20 @@
         "@effect/ai-openai",
         "@effect/ai-openai-compat",
         "@effect/ai-openrouter",
+        "@effect/sql-mysql2",
+        "@effect/sql-pg",
         "@effect/sql-sqlite-bun",
+        "@effect/sql-sqlite-do",
         "@effect/vitest",
         "@modelcontextprotocol/sdk",
         "@smithy/types",
+        "@standard-schema/spec",
+        "es-module-lexer",
         "foldkit",
+        "pg",
+        "rivetkit",
         "vitest",
       ],
-    },
-    "packages/mysql": {
-      "name": "@generalist/mysql",
-      "version": "0.44.0",
-      "dependencies": {
-        "@effect/sql-mysql2": "catalog:",
-        "generalist": "workspace:*",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-        "@types/bun": "catalog:",
-        "effect": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-      "peerDependencies": {
-        "effect": "catalog:",
-      },
-    },
-    "packages/pg": {
-      "name": "@generalist/pg",
-      "version": "0.44.0",
-      "dependencies": {
-        "@effect/sql-pg": "catalog:",
-        "generalist": "workspace:*",
-        "pg": "catalog:",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-        "@types/bun": "catalog:",
-        "@types/pg": "catalog:",
-        "effect": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-      "peerDependencies": {
-        "effect": "catalog:",
-      },
-    },
-    "packages/rivet": {
-      "name": "@generalist/rivet",
-      "version": "0.44.0",
-      "dependencies": {
-        "@standard-schema/spec": "catalog:",
-        "generalist": "workspace:*",
-        "rivetkit": "catalog:",
-      },
-      "devDependencies": {
-        "@effect/vitest": "catalog:",
-        "@types/bun": "catalog:",
-        "effect": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-      "peerDependencies": {
-        "effect": "catalog:",
-      },
     },
   },
   "catalog": {
@@ -641,44 +584,6 @@
     "@foldkit/ui": ["@foldkit/ui@0.148.2", "", { "dependencies": { "@floating-ui/dom": "^1.7.6" }, "peerDependencies": { "effect": "4.0.0-rc.109", "foldkit": "^0" } }, "sha512-am9hXP16nyIbAOQKLlemfxr5mehWjBW7mWsA0Ib3B3UOGoQ9X/joDfCUnzY1bISQlwuBCs/4RtKcq+mtUhhd3w=="],
 
     "@foldkit/vite-plugin": ["@foldkit/vite-plugin@0.16.1", "", { "dependencies": { "magic-string": "^0.30.21", "ws": "^8.21.0" }, "peerDependencies": { "effect": "4.0.0-rc.109", "foldkit": ">=0.148.0", "vite": "^7.0.0 || ^8.0.0" } }, "sha512-zYbiQbYPRh32jSeocJEKVwsbrL1xD3IKZDBPbE1Dvq4s6LOMWbqbJmON781SVwVJ9cFp0Wh6AITNGsH8GLvccA=="],
-
-    "@generalist/cloudflare": ["@generalist/cloudflare@workspace:packages/cloudflare"],
-
-    "@generalist/docs": ["@generalist/docs@workspace:apps/docs"],
-
-    "@generalist/example-capstone-local-assistant": ["@generalist/example-capstone-local-assistant@workspace:examples/capstone-local-assistant"],
-
-    "@generalist/example-cloudflare-worker": ["@generalist/example-cloudflare-worker@workspace:examples/cloudflare-worker"],
-
-    "@generalist/example-deep-research-agent": ["@generalist/example-deep-research-agent@workspace:examples/deep-research-agent"],
-
-    "@generalist/example-deep-research-agent-server": ["@generalist/example-deep-research-agent-server@workspace:examples/deep-research-agent/server"],
-
-    "@generalist/example-deep-research-agent-web": ["@generalist/example-deep-research-agent-web@workspace:examples/deep-research-agent/web"],
-
-    "@generalist/example-eval-in-ci": ["@generalist/example-eval-in-ci@workspace:examples/eval-in-ci"],
-
-    "@generalist/example-hitl-over-sse": ["@generalist/example-hitl-over-sse@workspace:examples/hitl-over-sse"],
-
-    "@generalist/example-mcp-agent": ["@generalist/example-mcp-agent@workspace:examples/mcp-agent"],
-
-    "@generalist/example-mcp-toolkit-server": ["@generalist/example-mcp-toolkit-server@workspace:examples/mcp-toolkit-server"],
-
-    "@generalist/example-memory-chat": ["@generalist/example-memory-chat@workspace:examples/memory-chat"],
-
-    "@generalist/example-multi-agent": ["@generalist/example-multi-agent@workspace:examples/multi-agent"],
-
-    "@generalist/example-package-composition-guides": ["@generalist/example-package-composition-guides@workspace:examples/package-composition-guides"],
-
-    "@generalist/example-structured-extraction": ["@generalist/example-structured-extraction@workspace:examples/structured-extraction"],
-
-    "@generalist/example-tool-calling-chatbot": ["@generalist/example-tool-calling-chatbot@workspace:examples/tool-calling-chatbot"],
-
-    "@generalist/mysql": ["@generalist/mysql@workspace:packages/mysql"],
-
-    "@generalist/pg": ["@generalist/pg@workspace:packages/pg"],
-
-    "@generalist/rivet": ["@generalist/rivet@workspace:packages/rivet"],
 
     "@hono/node-server": ["@hono/node-server@1.19.17", "", { "peerDependencies": { "hono": "^4" } }, "sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ=="],
 
@@ -1346,6 +1251,36 @@
 
     "generalist": ["generalist@workspace:packages/generalist"],
 
+    "generalist-docs": ["generalist-docs@workspace:apps/docs"],
+
+    "generalist-example-capstone-local-assistant": ["generalist-example-capstone-local-assistant@workspace:examples/capstone-local-assistant"],
+
+    "generalist-example-cloudflare-worker": ["generalist-example-cloudflare-worker@workspace:examples/cloudflare-worker"],
+
+    "generalist-example-deep-research-agent": ["generalist-example-deep-research-agent@workspace:examples/deep-research-agent"],
+
+    "generalist-example-deep-research-agent-server": ["generalist-example-deep-research-agent-server@workspace:examples/deep-research-agent/server"],
+
+    "generalist-example-deep-research-agent-web": ["generalist-example-deep-research-agent-web@workspace:examples/deep-research-agent/web"],
+
+    "generalist-example-eval-in-ci": ["generalist-example-eval-in-ci@workspace:examples/eval-in-ci"],
+
+    "generalist-example-hitl-over-sse": ["generalist-example-hitl-over-sse@workspace:examples/hitl-over-sse"],
+
+    "generalist-example-mcp-agent": ["generalist-example-mcp-agent@workspace:examples/mcp-agent"],
+
+    "generalist-example-mcp-toolkit-server": ["generalist-example-mcp-toolkit-server@workspace:examples/mcp-toolkit-server"],
+
+    "generalist-example-memory-chat": ["generalist-example-memory-chat@workspace:examples/memory-chat"],
+
+    "generalist-example-multi-agent": ["generalist-example-multi-agent@workspace:examples/multi-agent"],
+
+    "generalist-example-package-composition-guides": ["generalist-example-package-composition-guides@workspace:examples/package-composition-guides"],
+
+    "generalist-example-structured-extraction": ["generalist-example-structured-extraction@workspace:examples/structured-extraction"],
+
+    "generalist-example-tool-calling-chatbot": ["generalist-example-tool-calling-chatbot@workspace:examples/tool-calling-chatbot"],
+
     "generate-function": ["generate-function@2.3.1", "", { "dependencies": { "is-property": "^1.0.2" } }, "sha512-eeB5GfMNeevm/GRYq20ShmsaGcmI81kIX2K9XQx5miC8KdHaC6Jm0qQ8ZNeGOi7wYB8OsdxKs+Y2oVuTFuVwKQ=="],
 
     "generator-function": ["generator-function@2.0.1", "", {}, "sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g=="],
@@ -1830,7 +1765,7 @@
 
     "util-deprecate": ["util-deprecate@1.0.2", "", {}, "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="],
 
-    "uuid": ["uuid@12.0.1", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-9obBF8sMIHJWNQaO6IGOG8giGa/jUpKX34bz6o4whVs8M0WAvhID2tNxYp6A2XEBJPuZSX8wsS/6TEKfIDc+nw=="],
+    "uuid": ["uuid@11.1.1", "", { "bin": { "uuid": "dist/esm/bin/uuid" } }, "sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ=="],
 
     "vary": ["vary@1.1.2", "", {}, "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg=="],
 
@@ -1870,13 +1805,11 @@
 
     "youch-core": ["youch-core@0.3.3", "", { "dependencies": { "@poppinss/exception": "^1.2.2", "error-stack-parser-es": "^1.0.5" } }, "sha512-ho7XuGjLaJ2hWHoK8yFnsUGy2Y5uDpqSTq1FkHLK4/oqKtyUU1AFbOOxY4IpC9f0fTLjwYbslUz0Po5BpD1wrA=="],
 
-    "zod": ["zod@4.5.4", "", {}, "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="],
+    "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.2", "", { "peerDependencies": { "zod": "^3.25.28 || ^4" } }, "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA=="],
 
-    "@a2a-js/sdk/uuid": ["uuid@11.1.1", "", { "bin": { "uuid": "dist/esm/bin/uuid" } }, "sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ=="],
-
-    "@ag-ui/core/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+    "@asteasolutions/zod-to-openapi/zod": ["zod@4.5.4", "", {}, "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="],
 
     "@aws-crypto/sha256-browser/@smithy/util-utf8": ["@smithy/util-utf8@2.3.0", "", { "dependencies": { "@smithy/util-buffer-from": "^2.2.0", "tslib": "^2.6.2" } }, "sha512-R8Rdn8Hy72KKcebgLiv8jQcQkXoLMOGGv5uI1/k0l+snqkOzQ1R0ChUBCxWMlBsFMekWjq0wRudIweFs7sKT5A=="],
 
@@ -1888,9 +1821,9 @@
 
     "@effect/schema/fast-check": ["fast-check@3.23.2", "", { "dependencies": { "pure-rand": "^6.1.0" } }, "sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A=="],
 
-    "@img/sharp-wasm32/@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
+    "@hono/zod-openapi/zod": ["zod@4.5.4", "", {}, "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="],
 
-    "@modelcontextprotocol/sdk/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+    "@img/sharp-wasm32/@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
 
     "@poppinss/dumper/supports-color": ["supports-color@10.2.2", "", {}, "sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g=="],
 
@@ -1957,6 +1890,10 @@
     "public-encrypt/bn.js": ["bn.js@4.12.5", "", {}, "sha512-3aRg6/JxfffFD+OlOjOFR3Vo79l39ooBTFucxx+MT3dhCtzn3EmiUPQo+6/OZuI2jbXi3YKgmiTFBgChQMwIRQ=="],
 
     "ripemd160/hash-base": ["hash-base@3.1.2", "", { "dependencies": { "inherits": "^2.0.4", "readable-stream": "^2.3.8", "safe-buffer": "^5.2.1", "to-buffer": "^1.2.1" } }, "sha512-Bb33KbowVTIj5s7Ked1OsqHUeCpz//tPwR+E2zJgJKo9Z5XolZ9b6bdUgjmYlwnWhoOQKoTd1TYToZGn5mAYOg=="],
+
+    "rivetkit/uuid": ["uuid@12.0.1", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-9obBF8sMIHJWNQaO6IGOG8giGa/jUpKX34bz6o4whVs8M0WAvhID2tNxYp6A2XEBJPuZSX8wsS/6TEKfIDc+nw=="],
+
+    "rivetkit/zod": ["zod@4.5.4", "", {}, "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="],
 
     "router/path-to-regexp": ["path-to-regexp@8.4.2", "", {}, "sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA=="],
 

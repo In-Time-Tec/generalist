@@ -9,7 +9,7 @@ export const coreContextReference = definePage({
     lead(
       "Seven namespaces of generalist shape what the model sees and how a conversation persists. All are optional seams discovered per run; absent means default behavior.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("instructions", "Instructions"),
     p(
       "An ordered registry of instruction ",

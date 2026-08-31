@@ -9,7 +9,7 @@ export const coreEventsReference = definePage({
     lead(
       "AgentEvent is the process-local observation surface of the core loop. Runtime keeps the semantic execution facts from that stream, adds durable lifecycle facts, and deliberately excludes raw provider fragments.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("model-output", "Model output has two observation levels"),
     table(
       ["Event", "Fields", "Contract"],

@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-capstone-local-assistant",
+  "name": "generalist-example-capstone-local-assistant",
   "private": true,
   "type": "module",
   "scripts": {

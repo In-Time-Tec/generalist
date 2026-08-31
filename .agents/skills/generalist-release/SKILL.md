@@ -59,10 +59,7 @@ diff -u \
   <(printf '%s\n' \
     SHA256SUMS \
     release-evidence.json \
-    "generalist-${version}.tgz" \
-    "generalist-cloudflare-${version}.tgz" \
-    "generalist-mysql-${version}.tgz" \
-    "generalist-pg-${version}.tgz" | sort) \
+    "generalist-${version}.tgz" | sort) \
   <(find "$artifacts" -maxdepth 1 -type f -printf '%f\n' | sort)
 
 (
@@ -74,9 +71,6 @@ jq -e --arg commit "$commit" --arg version "$version" '
   .schemaVersion == 1 and
   .sourceCommit == $commit and
   ([.packages[].name] | sort) == [
-    "@generalist/cloudflare",
-    "@generalist/mysql",
-    "@generalist/pg",
     "generalist"
   ] and
   all(.packages[]; .version == $version)
@@ -91,7 +85,7 @@ printf 'commit=%s\nversion=%s\ntag=v%s\nartifacts=%s\n' "$commit" "$version" "$v
 
 `bun run test` skips PostgreSQL or MySQL tests when `GENERALIST_DATABASE_URL` or `GENERALIST_MYSQL_URL` is absent. Report either missing variable as a gap; do not call that run full driver proof.
 
-Keep the six verified files together and unchanged. If source, tools, or version changes, produce a new candidate in a new empty directory.
+Keep the three verified files together and unchanged. If source, tools, or version changes, produce a new candidate in a new empty directory.
 
 ## Publication facts
 

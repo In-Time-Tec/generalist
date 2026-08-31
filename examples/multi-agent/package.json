@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-multi-agent",
+  "name": "generalist-example-multi-agent",
   "private": true,
   "type": "module",
   "scripts": {

@@ -9,7 +9,7 @@ export const replReference = definePage({
     lead(
       "generalist/repl gives an agent one persistent TypeScript cell per Session. The root export is contracts only, so projections, decoders, and test hosts import it without any worker code; generalist/repl/bun carries the Bun kernel and is the only module with process dependencies.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     p(code("generalist/repl"), " and ", code("generalist/repl/bun"), " are import subpaths, not packages."),
     h2("exports", "Exports map"),
     table(

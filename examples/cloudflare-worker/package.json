@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-cloudflare-worker",
+  "name": "generalist-example-cloudflare-worker",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,6 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "@generalist/cloudflare": "workspace:*",
     "effect": "catalog:",
     "generalist": "workspace:*"
   },

@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema } from "effect"
 import { Agent, Approvals, Permissions, Tool, Toolkit } from "generalist"
 import { TestModel } from "generalist/test"
-import { make } from "@generalist/cloudflare/workers"
+import { make } from "generalist/cloudflare/workers"
 
 const lookup = Tool.make("lookup", {
   description: "Look up one provider fact",

@@ -23,7 +23,7 @@ export const serveTransport = definePage({
       code("WebSocket.handle"),
       ".",
     ),
-    command("Terminal", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Terminal", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("run-in-memory", "1. Run an agent in memory"),
     p(
       code("Runtime.layerMemory"),

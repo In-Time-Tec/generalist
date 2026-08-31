@@ -96,7 +96,7 @@ describe("pinned content in executable registrations", () => {
 
   it.effect("fails typed on a wrong codec", () =>
     Effect.gen(function* () {
-      const failure = yield* validate([...others, registrationFor({ codec: "@generalist/other" })]).pipe(Effect.flip)
+      const failure = yield* validate([...others, registrationFor({ codec: "generalist/other" })]).pipe(Effect.flip)
       expect(failure._tag).toBe("generalist/runtime/ExecutableRegistrationInvalid")
       expect(String(failure)).toContain("codec does not match pinned content")
     }),

@@ -48,15 +48,15 @@ export const nativeRuntime = definePage({
       [
         [[code("Runtime.layerMemory")], "Local development and tests; all state is lost with the process"],
         [[code("SqliteRuntime.layerSqlite")], "Durable single-process execution with automatic schema migration"],
-        [[code("layer from @generalist/pg")], "Durable multi-worker execution on PostgreSQL"],
-        [[code("layer from @generalist/mysql")], "Durable multi-worker execution on MySQL 8+"],
+        [[code("layer from generalist/pg")], "Durable multi-worker execution on PostgreSQL"],
+        [[code("layer from generalist/mysql")], "Durable multi-worker execution on MySQL 8+"],
       ],
     ),
     p(
       "PostgreSQL and MySQL startup verifies an already-applied schema rather than running DDL. Use ",
-      code("RuntimeSchema from @generalist/pg"),
+      code("RuntimeSchema from generalist/pg"),
       " for PostgreSQL or ",
-      code("RuntimeSchema from @generalist/mysql"),
+      code("RuntimeSchema from generalist/mysql"),
       " for MySQL in a predeploy migration step.",
     ),
     p(

@@ -36,6 +36,8 @@ rules:
       exclude:
         - "packages/*/test/**/*.tui.test.ts"
         - "packages/*/test/**/*.proc.test.ts"
+        # Cross-module Cloudflare harnesses (live workerd, conformance, export graphs) test no single src module
+        - "packages/*/test/cloudflare/*.test.ts"
     - source: "packages/*/test/**/*.tui.test.ts"
       target: "packages/*/src/**/*.ts"
       pattern: "*.tui.test.ts -> *.ts"
@@ -105,8 +107,13 @@ rules:
     - pattern: "packages/*/src"
       childCase: kebab
       maxFiles: 12
+      maxDirectories: 16
+    - pattern: "packages/*/src/*"
+      case: kebab
+      childCase: kebab
+      maxFiles: 12
       maxDirectories: 12
-    - pattern: "packages/*/src/**"
+    - pattern: "packages/*/src/*/**"
       case: kebab
       childCase: kebab
       maxFiles: 12
@@ -114,8 +121,13 @@ rules:
     - pattern: "packages/*/test"
       childCase: kebab
       maxFiles: 12
+      maxDirectories: 16
+    - pattern: "packages/*/test/*"
+      case: kebab
+      childCase: kebab
+      maxFiles: 12
       maxDirectories: 12
-    - pattern: "packages/*/test/**"
+    - pattern: "packages/*/test/*/**"
       case: kebab
       childCase: kebab
       maxFiles: 12

@@ -6,7 +6,7 @@ interface Written {
   readonly patch: string
 }
 
-class WriteFailed extends Schema.TaggedError<WriteFailed>()("@generalist/docs/WriteFailed", {
+class WriteFailed extends Schema.TaggedError<WriteFailed>()("generalist/docs/WriteFailed", {
   path: Schema.String,
 }) {}
 
@@ -60,7 +60,7 @@ export const route: ToolPlacement.Route<InExecution> = ToolExecutor.route<InExec
             encodedResult: { path: written.path, patch: written.patch },
           }),
         ),
-        Effect.catchTag("@generalist/docs/WriteFailed", (failure) =>
+        Effect.catchTag("generalist/docs/WriteFailed", (failure) =>
           Effect.succeed<ToolExecutor.Outcome>({
             _tag: "DomainFailure",
             failure,

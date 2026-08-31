@@ -82,20 +82,15 @@ layer(bunLayer)("release workflows", (it) => {
       expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
       expect(source.match(new RegExp(`\\(\\.packages \\| length\\) == ${packageNames.length}`, "g"))).toHaveLength(2)
       expect(source.match(/\(\.packages \| length\) == \d+/g)).toHaveLength(2)
-      expect(
-        source.match(
-          /printf '%s\\n' generalist @generalist\/pg @generalist\/mysql @generalist\/cloudflare @generalist\/rivet/g,
-        ),
-      ).toHaveLength(2)
-      for (const manifests of source.matchAll(/for manifest in package\.json packages\/\{(.+?)\}/g)) {
-        expect(sorted(manifests[1].split(","))).toEqual(packageNames)
+      expect(source.match(/printf '%s\\n' generalist \| sort/g)).toHaveLength(2)
+      for (const manifests of source.matchAll(
+        /for manifest in package\.json((?: packages\/[a-z-]+\/package\.json)+); do/g,
+      )) {
+        const listed = [...manifests[1].matchAll(/packages\/([a-z-]+)\/package\.json/g)].map((match) => match[1])
+        expect(sorted(listed)).toEqual(packageNames)
       }
-      expect(source.match(/for manifest in package\.json packages\/\{/g)).toHaveLength(1)
-      for (const packageName of packageNames) {
-        expect(source).toContain(
-          packageName === "generalist" ? `generalist-\${VERSION}.tgz` : `generalist-${packageName}-\${VERSION}.tgz`,
-        )
-      }
+      expect(source.match(/for manifest in package\.json packages\//g)).toHaveLength(1)
+      expect(source).toContain(`generalist-\${VERSION}.tgz`)
       expect(source).not.toMatch(/bun publish|Rewrite package manifests/)
       for (const workflowFile of [".github/workflows/ci.yml", ".github/workflows/publish.yml"]) {
         const uses = [

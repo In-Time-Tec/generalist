@@ -9,7 +9,7 @@ export const coreToolsReference = definePage({
     lead(
       "Four namespaces of generalist cover tool execution: ToolExecutor optionally overrides where calls run, ToolContext is the ambient per-call context, ToolOutput bounds large results, and AgentTool wraps an agent as a tool.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.44.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("tool-executor", "ToolExecutor"),
     p(
       "Optional override seam for durable hosts, client-executed tools, remote workers, MCP, sandboxing, and suspension. Ordinary in-process tools use the active Effect AI ",

@@ -12,7 +12,7 @@ interface PgRow {
 }
 
 class PgClient extends Context.Service<PgClient, PgClientService>()(
-  "@generalist/docs/snippets/guides/agent/memory/pgvector-store/PgClient",
+  "generalist-docs/snippets/guides/agent/memory/pgvector-store/PgClient",
 ) {}
 
 const storeError = (error: Error) => VectorStore.VectorStoreError.make({ message: error.message })

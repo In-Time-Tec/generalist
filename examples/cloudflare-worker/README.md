@@ -1,6 +1,6 @@
 # Cloudflare Worker
 
-Run one request-scoped, process-local Generalist Agent through `@generalist/cloudflare/workers`. The recipe uses a deterministic model, a schema-backed read-only tool, structured output, finite resource budgets, and a permission ruleset whose fallback is `deny`.
+Run one request-scoped, process-local Generalist Agent through `generalist/cloudflare/workers`. The recipe uses a deterministic model, a schema-backed read-only tool, structured output, finite resource budgets, and a permission ruleset whose fallback is `deny`.
 
 ```bash
 bun --cwd examples/cloudflare-worker typecheck

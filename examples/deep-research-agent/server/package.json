@@ -1,5 +1,5 @@
 {
-  "name": "@generalist/example-deep-research-agent-server",
+  "name": "generalist-example-deep-research-agent-server",
   "private": true,
   "type": "module",
   "scripts": {

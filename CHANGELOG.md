@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.45.0
 
-- Rename the project and every package from TenetKit to **Generalist**: `tenetkit` → `generalist`, `@tenetkit/*` → `@generalist/*`, and `TENETKIT_*` environment variables → `GENERALIST_*`. Boundary error tags, service keys, and the snapshot codec move from `tenetkit/...` to `generalist/...`; durable registrations pinned under an old codec must be re-pinned. Versions up to 0.44.0 remain published under the old names.
+- Rename the project from TenetKit to **Generalist** and consolidate to one package: `tenetkit` → `generalist`, and the adapter packages `@tenetkit/pg`, `@tenetkit/mysql`, `@tenetkit/cloudflare`, and `@tenetkit/rivet` fold into the same `generalist` package as subpath exports — `generalist/pg`, `generalist/mysql`, `generalist/cloudflare/{workers,durable-objects,dynamic-workers}`, and `generalist/rivet/actors`. One tarball, one version, one install; each adapter's host dependencies (`pg`, `@effect/sql-pg`, `@effect/sql-mysql2`, `@effect/sql-sqlite-do`, `es-module-lexer`, `rivetkit`, `@standard-schema/spec`) are optional peers, so consumers install only what their imported subpaths need. `TENETKIT_*` environment variables → `GENERALIST_*`. Boundary error tags, service keys, and the snapshot codec move from `tenetkit/...` to `generalist/...`; durable registrations pinned under an old codec must be re-pinned. Versions up to 0.44.0 remain published under the old names.
 - Merge the instructions surface into one module: `tenetkit/agent-guidance` is now `generalist/instructions`, which carries the ordered provider registry, the AGENTS.md/CLAUDE.md file loader, and the versioned guidance engine together; `tenetkit/skills` moves to `generalist/instructions/skills` — skills are lazy instructions.
 
 ## 0.44.0

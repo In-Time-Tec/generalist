@@ -9,7 +9,7 @@ const generalistRoot = new URL("./packages/generalist/", import.meta.url)
 const generalistExports: Readonly<Record<string, { readonly import: string }>> = generalistManifest.exports
 
 /**
- * `@generalist/pg` and `@generalist/mysql` import the published `generalist` entrypoints while the shared
+ * `generalist/pg` and `generalist/mysql` import the published `generalist` entrypoints while the shared
  * test helpers import `packages/generalist/src`. Left alone the suite loads two copies of every
  * service and error class, so `instanceof` assertions fail against structurally identical values.
  * The `exports` map is the only place that knows how a specifier maps onto a file, so the alias
@@ -43,7 +43,7 @@ const workers = Math.max(2, Math.min(6, availableParallelism()))
 export default defineConfig({
   resolve: {
     /**
-     * `@generalist/pg` and `@generalist/mysql` import the published `generalist` entrypoints, while the
+     * `generalist/pg` and `generalist/mysql` import the published `generalist` entrypoints, while the
      * shared test helpers import `packages/generalist/src`. Without this the suite loads two copies
      * of every service and error class, and `instanceof` assertions fail against identical values.
      */

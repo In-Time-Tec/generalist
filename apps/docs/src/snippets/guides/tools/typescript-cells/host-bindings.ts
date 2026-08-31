@@ -1,7 +1,7 @@
 import { Console, Effect, ManagedRuntime, Option, Schema } from "effect"
 import { HostBindings } from "generalist/repl"
 
-class WorkspaceDenied extends Schema.TaggedError<WorkspaceDenied>()("@generalist/docs/WorkspaceDenied", {
+class WorkspaceDenied extends Schema.TaggedError<WorkspaceDenied>()("generalist/docs/WorkspaceDenied", {
   path: Schema.String,
 }) {}
 

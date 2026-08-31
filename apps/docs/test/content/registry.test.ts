@@ -97,7 +97,7 @@ test("the cell guide keeps the execution and failure contracts", () => {
 test("the cell tutorial walks a beginner from an epoch to the real kernel", () => {
   for (const marker of [
     "KernelProfile",
-    "bun add effect@4.0.0-rc.112 generalist@0.44.0",
+    "bun add effect@4.0.0-rc.112 generalist@0.45.0",
     "TestKernel.layerTestPool",
     "HostBindings",
     "generalist/repl/bun",

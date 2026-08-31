@@ -100,42 +100,42 @@ export const suspensionIdentity = (input: ParentSuspension): string =>
 
 /** @experimental No child slot is available; reservation made no mutation. */
 export class ExternalChildCapacityUnavailable extends Schema.TaggedError<ExternalChildCapacityUnavailable>()(
-  "@generalist/runtime/ExternalChildCapacityUnavailable",
+  "generalist/runtime/ExternalChildCapacityUnavailable",
   { parentRunId: Schema.String, limit: Schema.Int },
 ) {}
 
 /** @experimental A placement id was replayed with different immutable facts. */
 export class ExternalChildPlacementConflict extends Schema.TaggedError<ExternalChildPlacementConflict>()(
-  "@generalist/runtime/ExternalChildPlacementConflict",
+  "generalist/runtime/ExternalChildPlacementConflict",
   { placementId: Schema.String },
 ) {}
 
 /** @experimental No external placement has this id. */
 export class ExternalChildPlacementNotFound extends Schema.TaggedError<ExternalChildPlacementNotFound>()(
-  "@generalist/runtime/ExternalChildPlacementNotFound",
+  "generalist/runtime/ExternalChildPlacementNotFound",
   { placementId: Schema.String },
 ) {}
 
 /** @experimental A settlement identity was replayed with a different outcome. */
 export class ExternalChildSettlementConflict extends Schema.TaggedError<ExternalChildSettlementConflict>()(
-  "@generalist/runtime/ExternalChildSettlementConflict",
+  "generalist/runtime/ExternalChildSettlementConflict",
   { placementId: Schema.String, settlementId: Schema.String },
 ) {}
 
 /** @experimental An external root identity was replayed with different immutable facts. */
 export class ExternalRootConflict extends Schema.TaggedError<ExternalRootConflict>()(
-  "@generalist/runtime/ExternalRootConflict",
+  "generalist/runtime/ExternalRootConflict",
   { placementId: Schema.String },
 ) {}
 
 /** @experimental No locally owned external root has this placement id. */
 export class ExternalRootNotFound extends Schema.TaggedError<ExternalRootNotFound>()(
-  "@generalist/runtime/ExternalRootNotFound",
+  "generalist/runtime/ExternalRootNotFound",
   { placementId: Schema.String },
 ) {}
 
 /** @experimental The supplied digest does not identify the root executable. */
 export class ExternalRootExecutableMismatch extends Schema.TaggedError<ExternalRootExecutableMismatch>()(
-  "@generalist/runtime/ExternalRootExecutableMismatch",
+  "generalist/runtime/ExternalRootExecutableMismatch",
   { placementId: Schema.String, expected: Schema.String, actual: Schema.String },
 ) {}

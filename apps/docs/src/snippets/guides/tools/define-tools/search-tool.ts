@@ -5,7 +5,7 @@ export interface DocsIndexService {
 }
 
 export class DocsIndex extends Context.Service<DocsIndex, DocsIndexService>()(
-  "@generalist/docs/snippets/guides/tools/define-tools/search-tool/DocsIndex",
+  "generalist-docs/snippets/guides/tools/define-tools/search-tool/DocsIndex",
 ) {}
 
 export const searchDocsTool = Tool.make("search_docs", {
