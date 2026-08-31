@@ -217,8 +217,12 @@ export const coreContextReference = definePage({
           ],
         ],
         [
-          [code("truncate(maxTokens)")],
-          ["Truncate-only implementation over an ", code("Ai.Tokenizer"), " when one is provided"],
+          [code("layerTruncate(maxTokens)"), " / ", code("layerTruncateEstimated(maxTokens)")],
+          [
+            "Truncate-only layers: exact over an ",
+            code("Ai.Tokenizer"),
+            " (requirement declared), or approximate over the token estimator",
+          ],
         ],
         [[code("make(strategy, options?)"), " / ", code("layerTest")], "Service from a strategy; layer from a service"],
       ],

@@ -61,6 +61,8 @@ export interface Request {
   readonly compactionId: string
   readonly agentName: string
   readonly sessionId: string
+  /** Durable run identity. Keys the unchanged-threshold cache so concurrent runs never share an entry. */
+  readonly runId?: string
   readonly turn: number
   readonly history: Prompt.Prompt
   readonly prompt: Prompt.Prompt
@@ -374,6 +376,7 @@ export const make: {
   (args) => args.length !== 1 || "shouldCompact" in args[0],
   (compactionStrategy: Strategy, options: DefaultOptions = {}): Service => {
     const thresholds = makeThresholdState()
+    const thresholdId = (input: Request) => input.runId ?? input.sessionId
     return {
       willCompact: ({ usage, overflow }) =>
         overflow || compactionStrategy.shouldCompact(normalizeUsage(usage, options)),
@@ -382,7 +385,7 @@ export const make: {
           const usage = normalizeUsage(input.usage, options)
           const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
           if (!shouldCompact) {
-            thresholds.clear(input.sessionId)
+            thresholds.clear(thresholdId(input))
             return Effect.succeed(Option.none<Result>())
           }
           const revision = ContextRevision.make(
@@ -390,16 +393,16 @@ export const make: {
             input.history.content,
             input.prompt.content,
           )
-          if (revision !== undefined && !input.overflow && thresholds.isUnchanged(input.sessionId, usage, revision))
+          if (revision !== undefined && !input.overflow && thresholds.isUnchanged(thresholdId(input), usage, revision))
             return Effect.succeed(Option.none())
           const pass = withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage)
-          if (input.overflow) return pass.pipe(Effect.ensuring(Effect.sync(() => thresholds.clear(input.sessionId))))
+          if (input.overflow) return pass.pipe(Effect.ensuring(Effect.sync(() => thresholds.clear(thresholdId(input)))))
           return pass.pipe(
             Effect.tap((result) =>
               Effect.sync(() => {
                 if (revision !== undefined && Option.isNone(result))
-                  thresholds.recordUnchanged(input.sessionId, usage, revision)
-                else thresholds.clear(input.sessionId)
+                  thresholds.recordUnchanged(thresholdId(input), usage, revision)
+                else thresholds.clear(thresholdId(input))
               }),
             ),
           )
@@ -470,8 +473,7 @@ export const layer: {
   ): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options))),
 )
 
-/** @experimental Truncate-only compaction over `Tokenizer`. */
-export const truncate = (maxTokens: number): Service => ({
+const truncateService = (tokenizer: typeof Tokenizer.Tokenizer.Service, maxTokens: number): Service => ({
   maybeCompact: (input) =>
     Effect.gen(function* () {
       const usage = input.usage
@@ -481,15 +483,45 @@ export const truncate = (maxTokens: number): Service => ({
       ) {
         return Option.none<Result>()
       }
-      const tokenizer = yield* Effect.serviceOption(Tokenizer.Tokenizer)
-      if (Option.isNone(tokenizer)) return Option.none<Result>()
-      return yield* tokenizer.value.truncate(Prompt.concat(input.history, input.prompt), maxTokens).pipe(
+      return yield* tokenizer.truncate(Prompt.concat(input.history, input.prompt), maxTokens).pipe(
         Effect.map((prompt) => Option.some<Result>(makeMicrocompact(Prompt.empty, prompt))),
         Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
         withCompactionLifecycle(input, usage),
       )
     }),
 })
+
+/** @experimental Exact truncate-only compaction. The layer declares the `Tokenizer` requirement. */
+export const layerTruncate = (maxTokens: number): Layer.Layer<Compaction, never, Tokenizer.Tokenizer> =>
+  Layer.effect(
+    Compaction,
+    Effect.map(Tokenizer.Tokenizer, (tokenizer) => Compaction.of(truncateService(tokenizer, maxTokens))),
+  )
+
+/** @experimental Approximate truncate-only compaction over the prompt token estimator; no `Tokenizer` required. */
+export const layerTruncateEstimated = (maxTokens: number): Layer.Layer<Compaction> =>
+  Layer.succeed(
+    Compaction,
+    Compaction.of({
+      maybeCompact: (input) =>
+        Effect.suspend(() => {
+          const usage = input.usage
+          if (
+            !input.overflow &&
+            !(Number.isFinite(usage.contextWindow) && usage.contextTokens > usage.contextWindow - usage.reserveTokens)
+          ) {
+            return Effect.succeed(Option.none<Result>())
+          }
+          let kept = Prompt.concat(input.history, input.prompt).content
+          while (kept.length > 1 && estimatePromptTokens(Prompt.fromMessages(kept)) > maxTokens) {
+            kept = kept.slice(1)
+          }
+          return Effect.succeed(Option.some<Result>(makeMicrocompact(Prompt.empty, Prompt.fromMessages(kept)))).pipe(
+            withCompactionLifecycle(input, usage),
+          )
+        }),
+    }),
+  )
 
 /** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Compaction> =>

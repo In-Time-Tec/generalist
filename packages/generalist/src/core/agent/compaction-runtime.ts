@@ -387,6 +387,7 @@ export const make = (context: CompactionContext) => {
             compactionId,
             agentName: agent.name,
             sessionId,
+            runId: logicalId,
             turn,
             history: detachedHistory,
             prompt: detachedPrompt,

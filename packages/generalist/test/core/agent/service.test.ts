@@ -3976,8 +3976,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("truncated"))),
         Session.layerMemory,
-        Compaction.layerTest(Compaction.truncate(1)),
-        tokenizer,
+        Compaction.layerTruncate(1).pipe(Layer.provide(tokenizer)),
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,

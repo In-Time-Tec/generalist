@@ -934,19 +934,20 @@ describe("Compaction", () => {
   })
 
   ItLayer.make(it, "truncate uses Tokenizer to keep the newest context", () => {
-    const service = Compaction.truncate(2)
+    const tokenizer = Layer.succeed(
+      Tokenizer.Tokenizer,
+      Tokenizer.Tokenizer.of({
+        tokenize: (input) => Effect.succeed(Prompt.make(input).content.map((_, index) => index)),
+        truncate: (input, tokens) => Effect.succeed(Prompt.fromMessages(Prompt.make(input).content.slice(-tokens))),
+      }),
+    )
     return [
       Layer.mergeAll(
-        Layer.succeed(
-          Tokenizer.Tokenizer,
-          Tokenizer.Tokenizer.of({
-            tokenize: (input) => Effect.succeed(Prompt.make(input).content.map((_, index) => index)),
-            truncate: (input, tokens) => Effect.succeed(Prompt.fromMessages(Prompt.make(input).content.slice(-tokens))),
-          }),
-        ),
+        Compaction.layerTruncate(2).pipe(Layer.provide(tokenizer)),
         modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
       ),
       Effect.gen(function* () {
+        const service = yield* Compaction.Compaction
         const compacted = yield* service.maybeCompact({
           compactionId: "compaction-truncate",
           agentName: "truncate-agent",
@@ -968,6 +969,38 @@ describe("Compaction", () => {
       }),
     ] as const
   })
+
+  ItLayer.make(
+    it,
+    "estimated truncation drops oldest messages without a Tokenizer",
+    () =>
+      [
+        Layer.mergeAll(
+          Compaction.layerTruncateEstimated(2),
+          modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+        ),
+        Effect.gen(function* () {
+          const service = yield* Compaction.Compaction
+          const compacted = yield* service.maybeCompact({
+            compactionId: "compaction-truncate-estimated",
+            agentName: "truncate-agent",
+            sessionId: "session",
+            turn: 0,
+            history: Prompt.fromMessages([user("old"), user("middle")]),
+            prompt: Prompt.fromMessages([user("new")]),
+            usage: { contextTokens: 3, contextWindow: 2, reserveTokens: 0 },
+            overflow: false,
+          })
+
+          expect(Option.isSome(compacted)).toBe(true)
+          if (Option.isSome(compacted)) {
+            const payload = Json.stringify(compacted.value.prompt.content)
+            expect(payload).not.toContain("old")
+            expect(payload).toContain("new")
+          }
+        }),
+      ] as const,
+  )
 
   it("composes ordered strategy parts onto the default strategy", () => {
     const composed = Compaction.strategy([
