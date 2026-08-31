@@ -104,6 +104,15 @@ describeMysql("mysql schema baseline", () => {
   layer(client, { excludeTestServices: true })("creates the current baseline and applies idempotently", (suite) => {
     suite.effect("creates the current baseline and applies idempotently", () =>
       Effect.gen(function* () {
+        // The migration timer is a module-level metric: its hooks bind to the first registry that
+        // updates it, and the provision hook has already applied the schema once in this file's
+        // module graph. Providing a fresh registry here can therefore never observe the metric, so
+        // assert the delta on the ambient registry instead.
+        const lockWaits = (yield* Metric.snapshot).find(
+          (item) =>
+            item.id === "generalist_runtime_sql_migration_lock_wait_duration" && item.attributes?.backend === "mysql",
+        )
+        const appliedBefore = lockWaits?.type === "Histogram" ? lockWaits.state.count : 0
         yield* resetSchema
         yield* applyRunSchema("mysql-migration-test")
         yield* applyRunSchema("mysql-migration-test")
@@ -113,8 +122,8 @@ describeMysql("mysql schema baseline", () => {
             item.id === "generalist_runtime_sql_migration_lock_wait_duration" && item.attributes?.backend === "mysql",
         )
         expect(snapshot?.type).toBe("Histogram")
-        if (snapshot?.type === "Histogram") expect(snapshot.state.count).toBe(1)
-      }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
+        if (snapshot?.type === "Histogram") expect(snapshot.state.count - appliedBefore).toBe(1)
+      }),
     )
   })
 
