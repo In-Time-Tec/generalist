@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Metric, Predicate, Schema } from "effect"
+import { Cause, Context, Effect, Exit, Metric, Predicate, Schema } from "effect"
 import { RuntimeUnavailable } from "../../../errors.js"
 import { RunStore, type Service as RunStoreService, type StoreBackend } from "../../../run/store.js"
 import { ExternalChildStore, type Service as ExternalChildStoreService } from "../../../child/external/store.js"
@@ -28,15 +28,11 @@ interface TransitionObservation {
   outcome: SqlTransitionOutcome
 }
 
-const unobservedTransition: TransitionObservation = {
-  active: false,
-  transition: "unobserved",
-  outcome: "committed",
-}
-const transitionsByFiber = new Map<number, TransitionObservation>()
-const currentTransition = Effect.withFiber((fiber) =>
-  Effect.succeed(transitionsByFiber.get(fiber.id) ?? unobservedTransition),
+const CurrentTransition = Context.Reference<TransitionObservation>(
+  "generalist/runtime/sql/store/kernel/observability/CurrentTransition",
+  { defaultValue: () => ({ active: false, transition: "unobserved", outcome: "committed" }) },
 )
+const currentTransition = CurrentTransition
 
 const transitionDuration = Metric.timer("generalist_runtime_sql_transition_duration", {
   description: "Runtime SQL semantic transition duration",
@@ -158,30 +154,21 @@ const observeSqlTransition = <A, E, R>(
   const duration = Metric.withAttributes(transitionDuration, metricAttributes)
   const outcomes = Metric.withAttributes(transitionOutcomes, metricAttributes)
 
-  return Effect.withFiber((fiber) => {
-    const prior = transitionsByFiber.get(fiber.id)
-    transitionsByFiber.set(fiber.id, observation)
-    return effect.pipe(
-      Effect.onExit((exit) => {
-        let outcome = observation.outcome
-        if (Exit.isFailure(exit) && outcome !== "divergent-retry") outcome = failureOutcome(exit.cause)
-        return Effect.annotateCurrentSpan({
-          "generalist.runtime.sql.outcome": outcome,
-          ...(outcome === "exact-retry" || outcome === "divergent-retry"
-            ? { "generalist.runtime.sql.retry.classification": outcome }
-            : undefined),
-        }).pipe(Effect.andThen(Metric.update(outcomes, outcome)))
-      }),
-      Effect.trackDuration(duration),
-      Effect.withSpan("Generalist.Runtime.sqlTransition", { attributes: spanAttributes }),
-      Effect.ensuring(
-        Effect.sync(() => {
-          if (prior === undefined) transitionsByFiber.delete(fiber.id)
-          else transitionsByFiber.set(fiber.id, prior)
-        }),
-      ),
-    )
-  })
+  return effect.pipe(
+    Effect.onExit((exit) => {
+      let outcome = observation.outcome
+      if (Exit.isFailure(exit) && outcome !== "divergent-retry") outcome = failureOutcome(exit.cause)
+      return Effect.annotateCurrentSpan({
+        "generalist.runtime.sql.outcome": outcome,
+        ...(outcome === "exact-retry" || outcome === "divergent-retry"
+          ? { "generalist.runtime.sql.retry.classification": outcome }
+          : undefined),
+      }).pipe(Effect.andThen(Metric.update(outcomes, outcome)))
+    }),
+    Effect.trackDuration(duration),
+    Effect.withSpan("Generalist.Runtime.sqlTransition", { attributes: spanAttributes }),
+    Effect.provideService(CurrentTransition, observation),
+  )
 }
 
 type SqlSchemaStatus =
