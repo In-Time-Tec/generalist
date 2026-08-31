@@ -1,13 +1,12 @@
-import { Console, Effect, ManagedRuntime } from "effect"
-import { Agent, ModelRegistry } from "generalist"
-import { layer as deterministicLayer } from "generalist/ai/deterministic"
+import { Console, Effect } from "effect"
+import { Agent } from "generalist"
+import { layerModel as deterministicModel } from "generalist/ai/deterministic"
 
 const agent = Agent.make({ name: "eval-agent" })
 
 const program = Effect.gen(function* () {
-  const result = yield* ModelRegistry.withModel(
-    { provider: "deterministic", model: "local" },
-    Agent.generate(agent, { prompt: "Say the deterministic answer." }),
+  const result = yield* Agent.generate(agent, { prompt: "Say the deterministic answer." }).pipe(
+    Effect.provide(deterministicModel()),
   )
   if (result.text !== "deterministic response") {
     return yield* Effect.die(`Unexpected eval output: ${result.text}`)
@@ -15,5 +14,4 @@ const program = Effect.gen(function* () {
   yield* Console.log("eval passed")
 })
 
-const runtime = ManagedRuntime.make(deterministicLayer({ model: "local" }))
-await runtime.runPromise(program)
+await Effect.runPromise(program)

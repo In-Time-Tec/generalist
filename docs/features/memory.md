@@ -62,7 +62,10 @@ Retention transcript
 ## Implementations
 
 - `WorkingMemory.layer` keeps a non-durable recency window per key and can
-  summarize overflow into a `working-summary` item.
+  summarize overflow into a `working-summary` item. Pass
+  `summarize: { model }` with a closed `Layer<LanguageModel>` (typically a
+  provider's `layerModel`) to give summary calls their own model; omit `model`
+  and the layer carries the ambient `LanguageModel` requirement.
 - `SemanticRecall.layer` plus `VectorStore.layerMemory` is non-durable. It
   embeds prompt user text for recall and stores the final user/assistant
   exchange only on terminal turns.

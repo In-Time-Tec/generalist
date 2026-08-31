@@ -17,8 +17,8 @@ bun add generalist @effect/ai-openai # or the provider you use
 ```ts
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
-import { Agent, Compaction, ModelRegistry, Tool, Toolkit } from "generalist"
-import { layer as openai } from "generalist/ai/openai"
+import { Agent, Approvals, Compaction, Permissions, Tool, Toolkit } from "generalist"
+import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/ai/openai"
 import { WorkingMemory } from "generalist/memory"
 
 const searchDocs = Tool.make("search_docs", {
@@ -34,22 +34,23 @@ const support = Agent.make({
   toolkit,
 })
 
-const program = ModelRegistry.withModel(
-  { provider: "openai", model: "gpt-5.6-sol" }, // any OpenAI model id
-  Agent.generate(support, {
-    prompt: "How do I rotate my API key?",
-    memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
-    compaction: { contextWindow: 200_000 }, // old turns compress, never drop
-  }),
-)
+// One provider client; models are thin layers over it.
+const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(Layer.provide(FetchHttpClient.layer))
+const sol = openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAi)) // any OpenAI model id
+
+const program = Agent.generate(support, {
+  prompt: "How do I rotate my API key?",
+  memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
+  compaction: { contextWindow: 200_000 }, // old turns compress, never drop
+})
 
 await program.pipe(
+  Effect.provide(sol), // choose the model per run — nothing else changes
   Effect.provide(
     Layer.mergeAll(
-      openai({ model: "gpt-5.6-sol", apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(
-        Layer.provide(FetchHttpClient.layer),
-      ),
       toolkit.toLayer({ search_docs: () => Effect.succeed(["Settings → API keys → Rotate"]) }),
+      Permissions.layerAllowAll, // explicit tool policy: no implicit defaults
+      Approvals.layerAutoApprove,
       WorkingMemory.layer({ maxMessages: 50 }),
       Compaction.layer({
         contextWindow: 200_000,
@@ -66,7 +67,7 @@ await program.pipe(
 )
 ```
 
-Tools, per-user memory, and compaction — all layers you can swap for tests. Durable runs (`generalist/runtime`) add stop, inspect, and resume across restarts; any agent can also be exposed as a tool another agent calls.
+Tools, per-user memory, and compaction — all layers you can swap for tests. Child agents inherit the ambient model or choose their own via a model layer. Durable runs (`generalist/runtime`) add stop, inspect, and resume across restarts; any agent can also be exposed as a tool another agent calls.
 
 ## Documentation
 

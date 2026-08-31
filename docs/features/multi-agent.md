@@ -15,19 +15,20 @@ const billingAgent = Agent.make({
 })
 
 // Isolated child Run: fresh Run ID, inbox, and model telemetry.
-const askBilling = AgentTool.asTool(billingAgent, { name: "ask_billing" })
+// `model` is optional — omit it and the child inherits the ambient model.
+const askBilling = AgentTool.asTool(billingAgent, { name: "ask_billing", model: cheapModel })
 const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(askBilling.tool) })
 
-// Same Run: the billing agent becomes active on the next turn.
+// Same Run: the billing agent becomes active on the next turn, on its own model.
 const supervisor = Handoff.supervisor({
   name: "front-desk",
-  specialists: [Handoff.target(billingAgent)],
+  specialists: [Handoff.target(billingAgent, { model: billingModel })],
 })
 const handoffLayer = Layer.mergeAll(ToolExecutor.layerToolkit(supervisor.toolkit), supervisor.catalog)
 const run = Agent.generate(supervisor.agent, { prompt: "Refund order 42" })
 ```
 
-Provide `handoffLayer` with the model, approvals, middleware, and target requirements. The model calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`.
+Provide `handoffLayer` with the model, permissions, approvals, middleware, and target requirements. The model calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`. A child's `model` option is any closed `Layer<LanguageModel>` — typically a provider's `layerModel` over its `layerConfig` client; omitting it means the child inherits the ambient model.
 
 ## What runs
 
@@ -93,6 +94,7 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 - A producer holding the original `RunHandle` can keep steering after handoff.
 - Same-run handoff tools execute through the agent loop, never direct toolkit invocation.
 - The catalog resolves targets but does not provide target requirements.
+- Children inherit the ambient `LanguageModel`; a `model` layer on `AgentTool.asTool` or `Handoff.target` overrides it for exactly that child, and a declared specialist model selection that cannot resolve under an ambient run fails loudly at handoff commit rather than being ignored.
 - A projection may not leave unresolved tool calls in projected history.
 - Each handoff charges `RunBudget.handoffs`; run options can only narrow the active agent's default budget.
 - A repeated `source:target` edge defaults to limit `1`; configure `handoffOptions.maxRepeatedEdge`.

@@ -187,7 +187,7 @@ export const coreModelsReference = definePage({
     ),
     p(
       "See ",
-      link("/docs/guides/providers", "How to register real model providers"),
+      link("/docs/guides/providers", "How to provide model providers"),
       ", ",
       link("/docs/guides/middleware", "How to add guardrails, middleware, and retries"),
       ", and ",

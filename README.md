@@ -1,12 +1,12 @@
 # Generalist
 
-Generalist is a TypeScript framework for building AI agents on [Effect](https://effect.website). An agent is a plain value — a name, instructions, tools, and a turn policy — and running one produces a typed event stream. Models, approvals, permissions, memory, skills, and every other capability are Effect services you can swap, each with a deterministic test layer, so agents run in CI with no API keys.
+Generalist is a TypeScript framework for building AI agents on [Effect](https://effect.website). An agent is a plain value — a name, instructions, tools, and a turn policy — and running one produces a typed event stream. Models, approvals, permissions, memory, skills, and every other capability are Effect layers you provide at the call site, each with a deterministic test layer, so agents run in CI with no API keys.
 
 ```ts
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
-import { Agent, Compaction, ModelRegistry, Tool, Toolkit } from "generalist"
-import { layer as openai } from "generalist/ai/openai"
+import { Agent, Approvals, Compaction, Permissions, Tool, Toolkit } from "generalist"
+import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/ai/openai"
 import { WorkingMemory } from "generalist/memory"
 
 const searchDocs = Tool.make("search_docs", {
@@ -22,22 +22,23 @@ const support = Agent.make({
   toolkit,
 })
 
-const program = ModelRegistry.withModel(
-  { provider: "openai", model: "gpt-5.6-sol" }, // any OpenAI model id
-  Agent.generate(support, {
-    prompt: "How do I rotate my API key?",
-    memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
-    compaction: { contextWindow: 200_000 }, // old turns compress, never drop
-  }),
-)
+// One provider client; models are thin layers over it.
+const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(Layer.provide(FetchHttpClient.layer))
+const sol = openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAi)) // any OpenAI model id
+
+const program = Agent.generate(support, {
+  prompt: "How do I rotate my API key?",
+  memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
+  compaction: { contextWindow: 200_000 }, // old turns compress, never drop
+})
 
 await program.pipe(
+  Effect.provide(sol), // choose the model per run — nothing else changes
   Effect.provide(
     Layer.mergeAll(
-      openai({ model: "gpt-5.6-sol", apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(
-        Layer.provide(FetchHttpClient.layer),
-      ),
       toolkit.toLayer({ search_docs: () => Effect.succeed(["Settings → API keys → Rotate"]) }),
+      Permissions.layerAllowAll, // explicit tool policy: no implicit defaults
+      Approvals.layerAutoApprove,
       WorkingMemory.layer({ maxMessages: 50 }),
       Compaction.layer({
         contextWindow: 200_000,
@@ -54,7 +55,25 @@ await program.pipe(
 )
 ```
 
-One agent, typed tools, per-user memory, and compaction against the context window — all layers you can swap for tests. Need [Anthropic](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [OpenRouter](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [Bedrock](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), or a deterministic model? Swap the provider layer.
+One agent, typed tools, per-user memory, and compaction against the context window — all layers you can swap for tests. Change the model by providing a different model layer; change the provider by providing a different client layer under it. [Anthropic](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [OpenRouter](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [Bedrock](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), and a deterministic model all work the same way.
+
+Agents compose, and each child inherits the ambient model or chooses its own:
+
+```ts
+import { Handoff } from "generalist"
+
+const luna = openAiModel({ model: "gpt-5.6-luna" }).pipe(Layer.provide(openAi), Layer.orDie) // closed layer: config resolves at startup
+
+const billing = Agent.make({ name: "billing", instructions: "Resolve billing requests." })
+
+const frontDesk = Handoff.supervisor({
+  name: "front-desk",
+  instructions: "Route each request to the right specialist.",
+  specialists: [
+    Handoff.target(billing, { model: luna }), // this specialist runs on Luna; omit to inherit Sol
+  ],
+})
+```
 
 The same agent runs durably. Pin it once (the [durable runtime guide](https://generalist-docs-production.up.railway.app/docs/guides/runtime/serve-transport) shows how), then runs survive restarts, and you can stop, inspect, and resume them from any process:
 
@@ -77,7 +96,7 @@ const program = Effect.gen(function* () {
 })
 ```
 
-Agents also compose: any agent can be exposed as a tool another agent calls, or coordinated by a supervisor. See the [multi-agent guide](https://generalist-docs-production.up.railway.app/docs/guides/agent/multi-agent).
+See the [multi-agent guide](https://generalist-docs-production.up.railway.app/docs/guides/agent/multi-agent) for supervisors, handoffs, and fan-out.
 
 ## Install
 

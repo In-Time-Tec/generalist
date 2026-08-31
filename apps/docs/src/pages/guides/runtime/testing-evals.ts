@@ -72,7 +72,7 @@ export const testingEvals = definePage({
       "For an eval binary, select the deterministic registration through the same ",
       code("ModelRegistry.withModel"),
       " pattern used for real providers. Swapping in OpenRouter later changes the selection and the layer, nothing else (",
-      link("/docs/guides/providers", "How to register real model providers"),
+      link("/docs/guides/providers", "How to provide model providers"),
       "). This is ",
       link("https://github.com/In-Time-Tec/generalist/tree/main/examples/eval-in-ci", "examples/eval-in-ci"),
       " verbatim.",

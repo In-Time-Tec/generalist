@@ -68,7 +68,7 @@ idle
        └─ changed ─▶ checkpoint committed ─▶ Applied
 ```
 
-The default strategy first bounds successful tool outputs, then keeps a safe recent suffix and summarizes the older head. Cut points never separate a tool call from its result.
+The default strategy first bounds successful tool outputs, then keeps a safe recent suffix and summarizes the older head. Cut points never separate a tool call from its result. When summaries are not worth a model call, `Compaction.layerTruncate(maxTokens)` (with `Tokenizer`) or `Compaction.layerTruncateEstimated(maxTokens)` drops the oldest turns instead.
 
 ## Invariants
 

@@ -86,7 +86,7 @@ Successful output is JSON-sized at the common post-codec boundary before durable
 - `Approved` executes and remembers only an explicit `remember` rule; `Denied` fails; `Pending` suspends once.
 - `ApprovalRequested` contains canonical `{ approvalId, operation, capability, input }`; its ID is the permission token or `approval:<tool-call-id>`, never an adapter replacement.
 - `Permissions.layerFailClosed` asks on unmatched calls; `layerRuleset` also defaults to `ask` unless `fallback` says otherwise; `layerAllowAll` is the explicit trusted-job, development, or test posture.
-- Without an `Approvals` layer, Agent leaves approval pending; trusted jobs and tests can install `Approvals.layerAutoApprove`.
+- A tooled agent with no authorization policy in context fails fast with `AgentError` before the first model call; there is no implicit default. Provide `Permissions` and `Approvals` (for example `Permissions.layerAllowAll` with `Approvals.layerAutoApprove`), a `ToolAuthorizer` layer, or set `Agent.authorization`. Tool-less agents need no policy.
 - Approval suspension coordinates execution, not business authorization; hosts own durable approval records and domain policy outside Generalist suspension and Runtime state.
 - `ToolContext` carries Session/run identities, scoped `AbortSignal`, progress emission, attempt metadata, and stable `operationKey`/`idempotencyKey`; provider-idempotent recovery reuses the keys.
 - `ToolExecutor.replayPolicy` is synchronous and defaults to `never`; routing policy, execution, and cancellation use the same first matching route.

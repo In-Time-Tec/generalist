@@ -1,40 +1,41 @@
 # Providers
 
-Provider leaves register concrete Effect AI model layers in `ModelRegistry`; callers select one exact `{ provider, model, registrationKey? }` for each run. Missing identities fail with typed `LanguageModelNotRegistered`; per-run model layers bypass selection, and core never imports provider SDKs.
+Provider leaves export two layers: a client layer (`layerConfig`, or `layerClient` for Bedrock) and a thin model layer over it (`layerModel`). Provide the model layer directly to a run with `Effect.provide` — that is the default wiring. `ModelRegistry` remains for genuinely dynamic selection; core never imports provider SDKs.
 
 ## Usage
 
 ```ts
-import { Config, Console, Effect } from "effect"
-import { LanguageModel, ModelRegistry } from "generalist"
-import { layer as openAiLayer } from "generalist/ai/openai"
+import { Config, Console, Effect, Layer } from "effect"
+import { LanguageModel } from "generalist"
+import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/ai/openai"
 import { FetchHttpClient } from "effect/unstable/http"
 
-const models = openAiLayer({
-  model: "gpt-4o-mini",
-  apiKey: Config.redacted("OPENAI_API_KEY"),
-})
+const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") })
+const sol = openAiModel({ model: "gpt-4o-mini" }).pipe(Layer.provide(openAi))
 
-const program = ModelRegistry.withModel(
-  { provider: "openai", model: "gpt-4o-mini" },
-  LanguageModel.generateText({ prompt: "Summarize the incident." }),
-).pipe(Effect.flatMap((result) => Console.log(result.text)))
+const program = LanguageModel.generateText({ prompt: "Summarize the incident." }).pipe(
+  Effect.provide(sol),
+  Effect.flatMap((result) => Console.log(result.text)),
+)
 
-Effect.runPromise(program.pipe(Effect.provide(models), Effect.provide(FetchHttpClient.layer)))
+Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))
 ```
 
 ## What runs
 
 ```text
-ModelRegistry.withModel({ provider: "openai",
-                          model: "gpt-4o-mini" })
-├── resolve ["openai", "gpt-4o-mini", null]
-├── build the registered LanguageModel layer once per registry scope
-├── provide provider/model identity and registration metadata
-└── LanguageModel.generateText("Summarize the incident.")
-    └── @effect/ai-openai Responses client
-        └── host-provided HttpClient
+openAiModel({ model: "gpt-4o-mini" })
+├── Layer<LanguageModel | ProviderName | ModelName, _, OpenAiClient>
+├── Layer.provide(openAiClient({ apiKey }))  # closes the client requirement
+└── Effect.provide(sol)                     # scopes the model to this run
+    └── LanguageModel.generateText("Summarize the incident.")
+        └── @effect/ai-openai Responses client
+            └── host-provided HttpClient
 ```
+
+Change the model: provide a different `layerModel`. Change the provider: swap the client layer under it. Give one child agent a different model: pass the model layer as the `model` option of `AgentTool.asTool` or `Handoff.target`; children without one inherit the ambient model.
+
+When the model is genuinely runtime data — chosen per request from a database row or user setting — register providers with their `layer(config)` constructor and resolve each run with `ModelRegistry.withModel({ provider, model, registrationKey? }, effect)`. Missing identities fail with typed `LanguageModelNotRegistered`.
 
 ## Provider leaves
 
@@ -80,7 +81,7 @@ candidate 1: anthropic/claude-3-5-haiku-latest
 
 ## Deterministic model and embeddings
 
-- `Deterministic.layer()` registers `deterministic/deterministic` and always emits `"deterministic response"`; it imports no provider.
+- `Deterministic.layerModel()` provides the scripted model directly and always emits `"deterministic response"`; `Deterministic.layer()` registers `deterministic/deterministic` for `withModel` selection. Both import no provider.
 - OpenAI's `layerOrDeterministic` always registers the requested fallback and adds OpenAI only when API-key config is present; invalid or failing config remains typed.
 - `openai-embedding.layer({ model, apiKey, clientConfig?, config? })` provides `EmbeddingModel` through `@effect/ai-openai`.
 - `openai-compatible-embedding.layer({ model, baseUrl, apiKey?, clientConfig?, config? })` targets an arbitrary compatible endpoint.
@@ -104,7 +105,7 @@ The account client fixes the endpoint and bearer/account headers without putting
 - Registration identity is canonical `(provider, model, registrationKey?)` in an immutable hash map; later writes of the same identity replace the entry.
 - A selected layer is built once in the registry scope and reused for that registry lifetime.
 - `withModel` holds an optional semaphore permit for the whole Effect; `stream` holds it through failure, interruption, consumption, and early termination.
-- Provider layers provide `ModelRegistry`, not `LanguageModel`; combine independent provider registries with `ModelRegistry.layerMerged`, not `Layer.mergeAll`.
+- `layerModel` layers provide `LanguageModel` plus `ProviderName`/`ModelName` tags directly; provider `layer` constructors provide `ModelRegistry`, not `LanguageModel`. Combine independent provider registries with `ModelRegistry.layerMerged`, not `Layer.mergeAll`; model layers need no combinator — the closest `Effect.provide` wins.
 - All provider config decoders fail through typed `Schema.SchemaError`; the selected model remains authoritative.
 - Released providers accept user image parts only as PNG, JPEG, GIF, or WebP bytes, canonical bare base64, matching canonical data URLs, or `URL` objects; malformed data, MIME mismatch, unsupported MIME, and assistant images fail before transport.
 - OpenAI Responses, both compatible protocols, Anthropic, and OpenRouter preserve remote image URLs; Bedrock rejects URLs because Converse requires bytes.
