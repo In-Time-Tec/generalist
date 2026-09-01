@@ -837,7 +837,7 @@ const McpHttpClient = await import("generalist/mcp/client/http")
 const ModelCatalog = await import("generalist/ai/model-catalog")
 const OpenAI = await import("generalist/ai/openai")
 const skills = await import("generalist/instructions/skills")
-const { TestModel } = await import("generalist/test")
+const { TestModel, Testing } = await import("generalist/testing")
 const { Runtime, RunEvent } = await import("generalist/runtime")
 const { Snapshot, Wire } = await import("generalist/transport")
 const { Config, Effect, Layer, Schema } = await import("effect")
@@ -848,6 +848,7 @@ for (const value of [
   AGUI.layer,
   State.empty,
   Store.layerMemory,
+  Testing.runtimeDriver,
   Runtime.layerMemory,
   RunEvent.RunEvent,
   Snapshot.get,

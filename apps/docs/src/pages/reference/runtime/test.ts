@@ -2,16 +2,16 @@ import { code, command, definePage, h2, lead, link, p, table } from "../../../pr
 
 export const testReference = definePage({
   path: "/docs/reference/test",
-  title: "generalist/test",
-  navTitle: "test",
+  title: "generalist/testing",
+  navTitle: "testing",
   group: "Reference",
   description: "Scripted Effect AI model fixtures and normalized request capture for deterministic agent tests.",
   content: [
     lead(
-      "generalist/test runs the real Generalist loop against scripted Effect AI responses, captures normalized provider requests, and needs no provider credentials or test-runner dependency.",
+      "generalist/testing runs the real Generalist loop against scripted Effect AI responses and exports public adapter conformance suites, deterministic chaos helpers, and certification reporting.",
     ),
     command("Install", "bun add -d effect@4.0.0-rc.112 generalist@0.45.0 @effect/vitest@4.0.0-rc.112 vitest@4.1.11"),
-    p(code("generalist/test"), " is an import subpath, not a package."),
+    p(code("generalist/testing"), " is an import subpath, not a package."),
     h2("script", "Script responses"),
     table(
       ["API", "Purpose"],

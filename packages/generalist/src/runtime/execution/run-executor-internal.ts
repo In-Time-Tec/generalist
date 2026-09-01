@@ -15,6 +15,7 @@ import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../prog
 import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode.js"
 import { hostContext, sessionBinding } from "./context.js"
 import { make as makeOperations } from "../operation/nested-operations.js"
+import { JournalFault } from "../operation/journal-fault.js"
 import { make as makeExecutionInterruption } from "./interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { make as makeAgentExecutionFailure } from "./agent/failure.js"
@@ -48,6 +49,7 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
+    const journalFault = yield* Effect.serviceOption(JournalFault)
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
     const reconcileCancellation = yield* makeToolCancellation({ store, resolver })
     const executeClaim = (claim: ExecutionClaim, afterExit: Ref.Ref<Effect.Effect<void>>): Effect.Effect<void> =>
@@ -213,6 +215,10 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
                               ),
                               steeringEntryIds,
                               steeringEvents,
+                            })
+                            yield* Option.match(journalFault, {
+                              onNone: () => Effect.void,
+                              onSome: (fault) => fault.afterJournaledOperation,
                             })
                             yield* Ref.update(preparedCompletions, (current) => {
                               const next = new Map(current)

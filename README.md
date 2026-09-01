@@ -119,16 +119,16 @@ Runnable examples live in [`examples/`](examples/), one README each.
 
 ## Capabilities at a glance
 
-| Area                                         | Import                                                                                    |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Agent loop, typed tools, approvals, steering | `generalist`                                                                              |
-| Durable, addressable, replayable runs        | `generalist/runtime`                                                                      |
-| Model providers and a deterministic model    | `generalist/ai/*`                                                                         |
-| Memory, skills, versioned instructions       | `generalist/memory`, `generalist/instructions`                                            |
-| MCP, A2A, and AG-UI integrations             | `generalist/mcp`, `generalist/a2a`, `generalist/ag-ui`                                    |
-| SSE/WebSocket transport and FoldKit chat     | `generalist/transport`, `generalist/foldkit`                                              |
-| Durable stores                               | `generalist/pg`, `generalist/mysql`, `generalist/cloudflare/*`, `generalist/rivet/actors` |
-| Scripted models for tests                    | `generalist/test`                                                                         |
+| Area                                          | Import                                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Agent loop, typed tools, approvals, steering  | `generalist`                                                                              |
+| Durable, addressable, replayable runs         | `generalist/runtime`                                                                      |
+| Model providers and a deterministic model     | `generalist/ai/*`                                                                         |
+| Memory, skills, versioned instructions        | `generalist/memory`, `generalist/instructions`                                            |
+| MCP, A2A, and AG-UI integrations              | `generalist/mcp`, `generalist/a2a`, `generalist/ag-ui`                                    |
+| SSE/WebSocket transport and FoldKit chat      | `generalist/transport`, `generalist/foldkit`                                              |
+| Durable stores                                | `generalist/pg`, `generalist/mysql`, `generalist/cloudflare/*`, `generalist/rivet/actors` |
+| Scripted models and public conformance suites | `generalist/testing`                                                                      |
 
 ## Repository layout
 

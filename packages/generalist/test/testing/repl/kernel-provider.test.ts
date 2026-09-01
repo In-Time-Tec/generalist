@@ -1,5 +1,5 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- this test registration is the provider composition root. */
-import { KernelProviderConformance } from "generalist/test"
+import { KernelProviderConformance } from "generalist/testing"
 import { Effect } from "effect"
 import { makeHarness, platform } from "../../repl/bun-harness.js"
 import { makeRemoteHarness } from "../../repl/remote-provider-fixture.js"

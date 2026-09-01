@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Agent, Approvals, ModelMiddleware, Response, ToolContext, ToolExecutor } from "generalist"
-import { TestModel } from "generalist/test"
+import { TestModel } from "generalist/testing"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { connect, layerToolkit, toolkit } from "../../src/mcp/tools.js"
 import { MCPClient } from "../../src/mcp/index"

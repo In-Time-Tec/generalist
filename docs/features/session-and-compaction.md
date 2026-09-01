@@ -7,7 +7,7 @@
 ```ts
 import { Effect, Layer } from "effect"
 import { Agent, Compaction, Session } from "generalist"
-import { TestModel } from "generalist/test"
+import { TestModel } from "generalist/testing"
 
 const agent = Agent.make({ name: "assistant", instructions: "Be concise." })
 const services = Layer.mergeAll(

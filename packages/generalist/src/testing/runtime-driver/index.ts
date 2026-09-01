@@ -8,6 +8,7 @@ import { StaleClaim } from "../../runtime/sql/errors.js"
 import { RunClaims } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
+import { record } from "../report.js"
 import type {
   MultiWorkerClaimCapability,
   NotificationRecoveryCapability,
@@ -42,7 +43,13 @@ const provideLayer = <A, E, LayerError>(
 const prepare = <A, E, LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
   effect: Effect.Effect<A, E>,
-): Effect.Effect<A, E> => (options.setup === undefined ? effect : Effect.andThen(options.setup, effect))
+): Effect.Effect<A, E> => {
+  const capabilities = Object.entries(options.capabilities).flatMap(([name, value]) =>
+    value === undefined || value === false ? [] : [name],
+  )
+  const prepared = options.setup === undefined ? effect : Effect.andThen(options.setup, effect)
+  return record({ name: `runtimeDriver:${options.name}`, capabilities }).pipe(Effect.andThen(prepared))
+}
 
 const provide = <A, E, LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
@@ -413,9 +420,7 @@ const registerNotificationRecovery = <LayerError, ClaimsLayerError>(
 }
 
 /** @experimental Registers only the conformance suites selected by the supplied driver capabilities. */
-export const driverConformance = <LayerError, ClaimsLayerError>(
-  options: Options<LayerError, ClaimsLayerError>,
-): void => {
+export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): void => {
   const suite = options.skip === true ? describe.skip : describe
   suite(`${options.name} Generalist Runtime driver conformance`, () => {
     if (options.capabilities.admission === true) registerAdmission(options)

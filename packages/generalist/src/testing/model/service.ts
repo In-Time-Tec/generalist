@@ -136,7 +136,7 @@ interface Claimed {
 
 const invalidRequest = (method: Operation, description: string): AiError.AiError =>
   AiError.make({
-    module: "generalist/test/TestModel",
+    module: "generalist/testing/TestModel",
     method,
     reason: AiError.InvalidRequestError.make({ description }),
   })

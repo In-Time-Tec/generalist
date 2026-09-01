@@ -100,8 +100,8 @@ export const minimumConsumerProfiles = [
     name: "test-host",
     peers: ["@effect/vitest", "vitest"],
     imports: [
-      { specifier: "generalist/test", runtimes: nodeAndBun, exports: ["TestModel"] },
-      { specifier: "generalist/test/runtime-driver", runtimes: nodeAndBun },
+      { specifier: "generalist/testing", runtimes: nodeAndBun, exports: ["TestModel", "Testing"] },
+      { specifier: "generalist/testing/runtime-driver", runtimes: nodeAndBun, exports: ["runtimeDriver"] },
     ],
   },
   {
@@ -231,8 +231,8 @@ export const exactPackageExports = [
   "./runtime/external-child-store",
   "./runtime/sql-driver",
   "./runtime/sqlite-bun",
-  "./test",
-  "./test/runtime-driver",
+  "./testing",
+  "./testing/runtime-driver",
   "./transport",
   "./transport/errors",
   "./transport/replay",

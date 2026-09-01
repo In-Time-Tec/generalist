@@ -23,7 +23,7 @@ import { load } from "generalist/instructions"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "generalist/instructions/skills"
 import { layer as deterministicLayer } from "generalist/ai/deterministic"
 import { make as makeModelRoute } from "generalist/ai/model-route"
-import { TestModel } from "generalist/test"
+import { TestModel, Testing } from "generalist/testing"
 import { Cursor, Runtime, RunEvent } from "generalist/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
 import { RunClient, Snapshot, SSE, WebSocket, Wire } from "generalist/transport"
@@ -50,6 +50,7 @@ type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? 
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
+type TestingRuntimeDriver = Assert<Equal<typeof Testing.runtimeDriver, typeof import("generalist/testing/runtime-driver").runtimeDriver>>
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
 type MiddlewareCanonical = Assert<
   Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>

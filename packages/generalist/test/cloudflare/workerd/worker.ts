@@ -2,7 +2,7 @@ import { Effect, Exit, Layer, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Permissions, Tool, Toolkit } from "generalist"
 import { decodeConfig as decodeOpenRouterConfig } from "generalist/ai/openrouter"
-import { TestModel } from "generalist/test"
+import { TestModel } from "generalist/testing"
 import { SqlClient } from "effect/unstable/sql"
 import {
   Address,

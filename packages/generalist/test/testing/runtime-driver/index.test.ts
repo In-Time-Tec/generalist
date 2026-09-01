@@ -1,10 +1,10 @@
 import { Database } from "bun:sqlite"
 import {
-  driverConformance,
   modelResponseFaultConformance,
   type ClaimExecution,
   type ModelResponseFaultBoundary,
-} from "generalist/test/runtime-driver"
+} from "generalist/testing/runtime-driver"
+import { Testing } from "generalist/testing"
 import { Effect } from "effect"
 import { assistantAddress, memoryLayer } from "../../runtime/execution/fixtures.js"
 import { sqliteManualClaimLayer, tempDbPath } from "../../runtime/sql/scenario.js"
@@ -59,7 +59,7 @@ const sqliteFaultTrigger = (boundary: ModelResponseFaultBoundary, runId: string,
   }
 }
 
-driverConformance({
+Testing.runtimeDriver({
   name: "memory",
   address: assistantAddress,
   layer: memoryLayer,
@@ -70,7 +70,7 @@ driverConformance({
   },
 })
 
-driverConformance({
+Testing.runtimeDriver({
   name: "sqlite",
   address: assistantAddress,
   layer: sqliteTestLayer,

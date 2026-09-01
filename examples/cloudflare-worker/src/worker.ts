@@ -1,6 +1,6 @@
 import { Effect, Layer, Schema } from "effect"
 import { Agent, Approvals, Permissions, Tool, Toolkit } from "generalist"
-import { TestModel } from "generalist/test"
+import { TestModel } from "generalist/testing"
 import { make } from "generalist/cloudflare/workers"
 
 const lookup = Tool.make("lookup", {

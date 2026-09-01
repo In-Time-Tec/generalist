@@ -17,6 +17,7 @@ import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { make as makeCursor, type Cursor } from "../runtime/cursor.js"
+import { ConnectionFault } from "./connection-fault.js"
 import { ReconnectExhausted, TransportError } from "./errors.js"
 import { encodeCommand, ObserverRunEvent, observerCodec, type ClientCommand } from "./wire.js"
 
@@ -122,6 +123,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
   RunClient,
   Effect.gen(function* () {
     const constructor = yield* Socket.WebSocketConstructor
+    const connectionFault = yield* Effect.serviceOption(ConnectionFault)
     return RunClient.of({
       connect: (options) =>
         Effect.gen(function* () {
@@ -177,6 +179,12 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
                         Effect.flatMap((event) =>
                           Queue.offer(eventQueue, event).pipe(
                             Effect.andThen(Ref.set(cursorRef, Option.some(makeCursor(event.sequence)))),
+                            Effect.andThen(
+                              Option.match(connectionFault, {
+                                onNone: () => Effect.void,
+                                onSome: (fault) => fault.afterEvent,
+                              }),
+                            ),
                           ),
                         ),
                       ),

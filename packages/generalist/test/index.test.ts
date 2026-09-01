@@ -104,7 +104,11 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
     ["Errors", "Replay", "RunClient", "SSE", "Snapshot", "WebSocket", "Wire"],
   ],
   ["mcp", () => import("../src/mcp/index.js"), ["MCPClient", "OAuth"]],
-  ["test", () => import("../src/test/index.js"), ["KernelProviderConformance", "TestModel", "codeExecutorConformance"]],
+  [
+    "testing",
+    () => import("../src/testing/index.js"),
+    ["KernelProviderConformance", "TestModel", "Testing", "codeExecutorConformance"],
+  ],
   [
     "repl",
     () => import("../src/repl/index.js"),

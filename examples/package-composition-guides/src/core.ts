@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Session } from "generalist"
-import { TestModel } from "generalist/test"
+import { TestModel } from "generalist/testing"
 
 const applicationLayer = Layer.mergeAll(
   TestModel.layer([TestModel.text("I will remember that."), TestModel.text("Your name is Ada.")]),
