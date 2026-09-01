@@ -104,21 +104,30 @@ const pumpDescriptor = (
   onChunk: (bytes: Uint8Array) => Effect.Effect<void>,
 ): Effect.Effect<void> =>
   Effect.suspend(() => {
-    const pump: Effect.Effect<void> = Effect.suspend(() =>
+    const open: Effect.Effect<void> = Effect.suspend(() =>
       Effect.acquireUseRelease(
         Effect.sync(() => Bun.file(fd).stream().getReader()),
-        (reader) => Effect.tryPromise(() => reader.read()),
-        (reader) => Effect.promise(() => reader.cancel()).pipe(Effect.ignore),
+        (reader) => {
+          const read: Effect.Effect<void> = Effect.suspend(() =>
+            Effect.tryPromise(() => reader.read()).pipe(
+              Effect.flatMap((result) =>
+                result.done ? Effect.void : onChunk(result.value).pipe(Effect.andThen(read)),
+              ),
+              Effect.ignore,
+            ),
+          )
+          return read
+        },
+        (reader) => Effect.sync(() => reader.releaseLock()).pipe(Effect.ignore),
       ).pipe(
-        Effect.flatMap((result) => (result.done ? Effect.void : onChunk(result.value).pipe(Effect.andThen(pump)))),
-        Effect.catch(() =>
+        Effect.andThen(
           Effect.flatMap(isFinished, (finished) =>
-            finished ? Effect.void : realDelay(idlePollMillis).pipe(Effect.andThen(pump)),
+            finished ? Effect.void : realDelay(idlePollMillis).pipe(Effect.andThen(open)),
           ),
         ),
       ),
     )
-    return pump
+    return open
   })
 
 const lineReader = (onLine: (line: string) => Effect.Effect<void>) => {
@@ -221,18 +230,33 @@ export const start = (options: WorkerOptions): Effect.Effect<Worker, KernelUnava
     yield* pumpDescriptor(
       frameOut,
       Deferred.isDone(exit),
-      lineReader((line) =>
-        !line.startsWith(frameNonce)
-          ? Effect.void
-          : decodeFrame(line.slice(frameNonce.length)).pipe(
-              Effect.flatMap((frame) =>
-                frame._tag === "Ready"
-                  ? Deferred.succeed(ready, undefined).pipe(Effect.asVoid)
-                  : Queue.offer(frames, frame).pipe(Effect.asVoid),
-              ),
-              Effect.ignore,
+      lineReader((line) => {
+        if (!line.startsWith(frameNonce))
+          return Effect.logWarning("kernel-session.frame-dropped").pipe(
+            Effect.annotateLogs({
+              "generalist.drop.reason": "nonce-mismatch",
+              "generalist.line.bytes": line.length,
+              "generalist.line.preview": line.slice(0, 160),
+            }),
+            Effect.asVoid,
+          )
+        return decodeFrame(line.slice(frameNonce.length)).pipe(
+          Effect.flatMap((frame) =>
+            frame._tag === "Ready"
+              ? Deferred.succeed(ready, undefined).pipe(Effect.asVoid)
+              : Queue.offer(frames, frame).pipe(Effect.asVoid),
+          ),
+          Effect.catch((error: Schema.SchemaError) =>
+            Effect.logWarning("kernel-session.frame-decode-failed").pipe(
+              Effect.annotateLogs({
+                "generalist.line.bytes": line.length,
+                "generalist.line.preview": line.slice(frameNonce.length, frameNonce.length + 160),
+                "generalist.failure": String(error).slice(0, 300),
+              }),
             ),
-      ),
+          ),
+        )
+      }),
     ).pipe(Effect.forkScoped)
     const rawReader = (channel: RawOutput["channel"], stream: ReadableStream<Uint8Array>) => {
       const decoder = new TextDecoder()

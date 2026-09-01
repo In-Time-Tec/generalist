@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.46.1
+
+- Fix Bun kernel frame delivery silently dying mid-session. The fd-3 frame pump created a fresh `Bun.file(fd).stream().getReader()` per chunk and cancelled it between reads; on Bun 1.4.0/macOS that corrupts frames spanning multiple reads (bytes duplicated or dropped) and a parked read can report a spurious `done` during idle, ending the pump for a live worker. Either way the worker's frames vanished without a trace: cells then waited out their full deadline and the pool killed and rebooted the worker with no surfaced error. The pump now owns one persistent reader for the descriptor's lifetime, recreates the stream only when a `done` arrives while the worker is verifiably alive, and still terminates cleanly on real peer exit.
+- Kernel frame drops are no longer invisible: a line that fails the nonce filter or JSON/schema decoding logs `kernel-session.frame-dropped` / `kernel-session.frame-decode-failed` warnings with bounded annotations (byte length, short payload preview without the frame nonce) instead of being silently ignored.
+- A failure to answer a worker's host request (for example, the command channel closing mid-cell) now logs `kernel.host-request-answer-failed` with the request id, module, and operation instead of being silently ignored.
+
 ## 0.46.0
 
 - Provide models as layers. Every provider now exports `layerModel` — a `Model.Model` layer pinned to one model id over the provider client — so a run receives its model with plain `Effect.provide`: change the model by editing one value, change the provider for that model by swapping one layer. OpenAI, OpenAI Responses, OpenAI Chat Completions, Anthropic, OpenRouter, Amazon Bedrock, and the deterministic test provider all follow the same shape. `ModelRegistry` remains for genuinely dynamic selection by string id.

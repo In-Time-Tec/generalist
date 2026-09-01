@@ -178,7 +178,19 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
                   }).pipe(Effect.ignore)
                 })
             }
-            yield* answerHostRequest(input, frame).pipe(Effect.ignore, Effect.forkScoped)
+            yield* answerHostRequest(input, frame).pipe(
+              Effect.catch((error) =>
+                Effect.logWarning("kernel.host-request-answer-failed").pipe(
+                  Effect.annotateLogs({
+                    "generalist.request.id": frame.requestId,
+                    "generalist.request.module": frame.module,
+                    "generalist.request.operation": frame.operation,
+                    "generalist.failure": String(error).slice(0, 300),
+                  }),
+                ),
+              ),
+              Effect.forkScoped,
+            )
             return
           }
           const cell = yield* Ref.get(active)
