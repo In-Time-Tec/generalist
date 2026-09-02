@@ -54,7 +54,7 @@ export const minimumConsumerProfiles = [
       {
         specifier: "generalist/unstable/learning",
         runtimes: ["bun", "node", "worker"],
-        exports: ["Proposal", "layer", "proposeWithModel"],
+        exports: ["Proposal", "declaration", "layer", "proposeWithModel"],
       },
       { specifier: "generalist/memory", runtimes: nodeAndBun },
       { specifier: "generalist/repl", runtimes: nodeAndBun },

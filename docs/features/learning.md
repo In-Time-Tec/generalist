@@ -44,7 +44,7 @@ const forRuntime = (runtime: Runtime.Service) => learning.pipe(Layer.provide(Lay
 
 The logging handlers above are deliberately placeholders: Instructions and SkillCatalog do not expose a matching public mutation API, and trajectory export still needs an application-owned destination. Replace each placeholder with the product's real Effect. `Remember` is the one direct adapter because the core Memory service already owns a matching operation.
 
-`layer` provides a `Hooks` service and requires `Runtime` plus `Approvals`. Merge it into the environment captured when the Agent is registered. It needs a hosted Runtime because process-local runs have no durable operation journal or restartable approval wait.
+`layer` provides a `Hooks` service holding only the learning declaration and requires `Runtime` plus `Approvals`. When the environment already declares other hooks, build the declaration with `Learning.declaration(options)` and pass it to `Hooks.layer([...])` or a Host plugin's `hooks` instead, because one environment has one `Hooks` service. Either way it needs a hosted Runtime because process-local runs have no durable operation journal or restartable approval wait.
 
 ## Approval and recovery
 

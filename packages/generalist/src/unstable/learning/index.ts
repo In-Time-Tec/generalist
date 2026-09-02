@@ -3,7 +3,7 @@ import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
 import { Approvals, type Service as ApprovalsService } from "../../core/policy/approvals.js"
 import { RunId } from "../../core/durable/run-id.js"
 import { GuidanceId } from "../../instructions/entry.js"
-import { Hooks, onRunEnd, type RunEndInput } from "../../hooks/index.js"
+import { type Declaration, Hooks, onRunEnd, type RunEndInput } from "../../hooks/index.js"
 import {
   Denied as NestedOperationDenied,
   Operations,
@@ -224,38 +224,44 @@ const runLearning = <ProposeR, ProposeE, ApplyR, ApplyE>(options: {
   })
 
 /**
- * @experimental Install one `Hooks.onRunEnd` proposer whose outputs use the hosted Runtime's nested-operation journal.
+ * @experimental Build one `Hooks.onRunEnd` declaration whose proposals use the hosted Runtime's nested-operation
+ * journal. Compose it with other declarations through `Hooks.layer([...])` or a Host plugin's `hooks`.
+ */
+export const declaration = <ProposeR, ProposeE, ApplyR, ApplyE>(
+  options: LayerOptions<ProposeR, ProposeE, ApplyR, ApplyE>,
+): Effect.Effect<Declaration, never, Runtime | Approvals | ProposeR | ApplyR> =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime
+    const approvals = yield* Approvals
+    const context = yield* Effect.context<Runtime | Approvals | ProposeR | ApplyR>()
+    return onRunEnd((input) =>
+      Effect.gen(function* () {
+        const operations = yield* Effect.serviceOption(Operations)
+        if (Option.isNone(operations)) {
+          return yield* Effect.die(
+            new Error("Learning requires a hosted Runtime nested-operation journal at Hooks.onRunEnd"),
+          )
+        }
+        yield* runLearning({
+          input,
+          runtime,
+          operations: operations.value,
+          approvals,
+          context,
+          configured: options,
+        })
+      }),
+    )
+  })
+
+/**
+ * @experimental Provide `Hooks` consisting of the learning declaration alone. Use `declaration` when the environment
+ * already has other hook declarations.
  */
 export const layer = <ProposeR, ProposeE, ApplyR, ApplyE>(
   options: LayerOptions<ProposeR, ProposeE, ApplyR, ApplyE>,
 ): Layer.Layer<Hooks, never, Runtime | Approvals | ProposeR | ApplyR> =>
   Layer.effect(
     Hooks,
-    Effect.gen(function* () {
-      const runtime = yield* Runtime
-      const approvals = yield* Approvals
-      const context = yield* Effect.context<Runtime | Approvals | ProposeR | ApplyR>()
-      return Hooks.of({
-        declarations: [
-          onRunEnd((input) =>
-            Effect.gen(function* () {
-              const operations = yield* Effect.serviceOption(Operations)
-              if (Option.isNone(operations)) {
-                return yield* Effect.die(
-                  new Error("Learning requires a hosted Runtime nested-operation journal at Hooks.onRunEnd"),
-                )
-              }
-              yield* runLearning({
-                input,
-                runtime,
-                operations: operations.value,
-                approvals,
-                context,
-                configured: options,
-              })
-            }),
-          ),
-        ],
-      })
-    }),
+    Effect.map(declaration(options), (learning) => Hooks.of({ declarations: [learning] })),
   )
