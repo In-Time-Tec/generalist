@@ -1,7 +1,10 @@
-import { describe, expect, layer } from "@effect/vitest"
-import { Effect, Fiber, Layer, Schedule, Schema, Stream } from "effect"
+import { describe, expect, it, layer } from "@effect/vitest"
+import { Effect, Fiber, Layer, Ref, Schedule, Schema, Stream } from "effect"
+import { TestClock } from "effect/testing"
+import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { RunClient, Wire } from "../../src/transport/index.js"
+import { Testing } from "../../src/testing/index.js"
+import { Errors, RunClient, Wire } from "../../src/transport/index.js"
 import { event } from "./fixtures.js"
 
 class FakeWebSocket extends EventTarget implements WebSocket {
@@ -56,6 +59,59 @@ const socketAt = (sockets: ReadonlyArray<FakeWebSocket>, index: number): Effect.
   })
 
 describe("RunClient", () => {
+  it.effect("uses jittered reconnect delays and stops after two elapsed minutes", () =>
+    Effect.gen(function* () {
+      const failure = Errors.TransportError.make({ message: "offline", kind: "socket" })
+      const attempts = yield* Ref.make(0)
+      const fiber = yield* Ref.update(attempts, (current) => current + 1).pipe(
+        Effect.andThen(Effect.fail(failure)),
+        Effect.retry(RunClient.defaultReconnectSchedule),
+        Effect.flip,
+        Effect.forkChild,
+      )
+      yield* Effect.yieldNow
+
+      expect(yield* Ref.get(attempts)).toBe(1)
+      yield* TestClock.adjust("199 millis")
+      expect(yield* Ref.get(attempts)).toBe(1)
+      yield* TestClock.adjust("101 millis")
+      expect(yield* Ref.get(attempts)).toBe(2)
+      yield* TestClock.adjust("10 minutes")
+
+      expect(yield* Fiber.join(fiber)).toBe(failure)
+      expect(yield* Ref.get(attempts)).toBeGreaterThan(1)
+    }),
+  )
+
+  it.effect("SSE resumes after the last event without duplicates", () => {
+    const cursors: Array<number | undefined> = []
+    const events = [event(0), event(1), event(2)]
+    const frames = events.map(
+      (item) => `id: ${item.sequence}\ndata: ${Effect.runSync(Wire.producerCodec.encode(item))}\n\n`,
+    )
+    const client = HttpClient.make((request, url) =>
+      Effect.sync(() => {
+        const cursorText = url.searchParams.get("cursor")
+        const cursor = cursorText === null ? undefined : Number(cursorText)
+        cursors.push(cursor)
+        return HttpClientResponse.fromWeb(
+          request,
+          new Response(frames.filter((_, index) => events[index]!.sequence > (cursor ?? -1)).join(""), {
+            headers: { "content-type": "text/event-stream" },
+          }),
+        )
+      }),
+    )
+    return RunClient.streamSSE({ url: "https://test/runs/run-1/events", reconnect: Schedule.recurs(1) }).pipe(
+      Stream.runCollect,
+      Effect.map((events) => {
+        expect(events.map((item) => item.sequence)).toEqual([0, 1, 2])
+        expect(cursors).toEqual([undefined, 1])
+      }),
+      Effect.provide(Layer.merge(Layer.succeed(HttpClient.HttpClient, client), Testing.chaos.dropConnection(2))),
+    )
+  })
+
   {
     const sockets: Array<FakeWebSocket> = []
     const webSocketConstructor = Layer.succeed(Socket.WebSocketConstructor, (url) => {
@@ -74,7 +130,7 @@ describe("RunClient", () => {
                   url: "ws://test/runs",
                   runId: "run-1",
                   eventCapacity: 1,
-                  reconnect: { schedule: Schedule.recurs(1), retryable: () => true },
+                  reconnect: Schedule.recurs(1),
                 }),
               )
               const first = yield* socketAt(sockets, 0)
