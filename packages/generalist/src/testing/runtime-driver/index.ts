@@ -11,6 +11,7 @@ import { checkpoint, replay } from "../../runtime/tree.js"
 import { registerAgentStart } from "./agent-start.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
 import { registerApprovalSuspend } from "./approval-suspend.js"
+import { registerHostSessions } from "./host-sessions.js"
 import { record } from "../report.js"
 import type {
   MultiWorkerClaimCapability,
@@ -433,6 +434,13 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
   suite(`${options.name} Generalist Runtime driver conformance`, () => {
     if (options.capabilities.admission === true) registerAdmission(options)
     if (options.capabilities.runtime !== undefined) registerRuntime(options, options.capabilities.runtime)
+    if (options.capabilities["host-sessions"] !== undefined) {
+      registerHostSessions({
+        options,
+        capability: options.capabilities["host-sessions"],
+        provide: (use) => provide(options, use),
+      })
+    }
     registerAgentStart({ options, provide: (use) => provide(options, use) })
     if (options.capabilities.runTree !== undefined) registerRunTree(options, options.capabilities.runTree)
     if (options.capabilities.sqlTransactions !== undefined) {

@@ -24,10 +24,13 @@ interface ClaimedRow {
 const eventHub: EventHub = {
   touchRun: () => Effect.void,
   publish: () => Effect.void,
+  publishHostSession: () => Effect.void,
   catchUp: (input) => Effect.succeed(input.cursor),
+  catchUpHostSession: (input) => Effect.succeed(input.cursor),
   wakeTree: () => Effect.void,
   subscribe: () => Stream.empty,
   subscribeTree: () => Stream.empty,
+  subscribeHostSession: () => Stream.empty,
   shutdown: Effect.void,
 }
 

@@ -71,6 +71,7 @@ import type { Notification as ChildSettlementNotification } from "./child/settle
 import type { Event as ModelPreviewEvent } from "./execution/model-response/preview.js"
 import type { RunActivationProjection } from "./run/activation.js"
 import type { Point as AcknowledgementPoint } from "./acknowledgement.js"
+import type { RuntimeHostSessions } from "./session/host.js"
 
 export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
@@ -387,7 +388,7 @@ export type FanOutError =
 export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
 
-export interface Service {
+export interface Service extends RuntimeHostSessions {
   /** Register one Agent name and its exact environment for start and recovery. */
   readonly register: <
     Tools extends Record<string, Tool.Any>,

@@ -128,4 +128,37 @@ export const mysqlDriver = (options: Options): SqlRuntimeDriver<RuntimeError> =>
           )
       }),
     ),
+  hostSessionEvents: (input, context) =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const pollCursor = yield* Ref.make(input.cursor)
+        const deliveredCursor = yield* Ref.make(input.cursor)
+        const poll = Ref.get(pollCursor).pipe(
+          Effect.flatMap((cursor) =>
+            context.hub.catchUpHostSession({
+              sessionId: input.sessionId,
+              cursor,
+              loadAfter: context.loadAfter(cursor),
+            }),
+          ),
+          Effect.flatMap((cursor) => Ref.set(pollCursor, cursor)),
+          Effect.ignore,
+          Effect.repeat(Schedule.spaced(options.pollInterval ?? "50 millis")),
+          Effect.asVoid,
+        )
+        return context.hub
+          .subscribeHostSession({
+            sessionId: input.sessionId,
+            cursor: input.cursor,
+            loadReplay: context.loadReplay,
+            capacity: context.capacity,
+            onSubscribed: poll,
+          })
+          .pipe(
+            Stream.filterEffect((entry) =>
+              Ref.modify(deliveredCursor, (cursor) => [entry.cursor > cursor, Math.max(cursor, entry.cursor)]),
+            ),
+          )
+      }),
+    ),
 })

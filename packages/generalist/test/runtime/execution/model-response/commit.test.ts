@@ -291,7 +291,7 @@ it.live("observes SQLite model commits, exact retries, divergence, and stale cla
           span.name === "Generalist.Runtime.sqlTransition" &&
           span.attributes.get("generalist.runtime.sql.transition") === "migrate",
       )
-      expect(migration?.attributes.get("generalist.runtime.sql.schema.version")).toBe(5)
+      expect(migration?.attributes.get("generalist.runtime.sql.schema.version")).toBe(6)
       expect(migration?.attributes.get("generalist.runtime.sql.schema.status")).toBe("current")
       expect(migration?.attributes.get("generalist.runtime.sql.schema.checksum")).toMatch(/^[a-f\d]{64}$/)
 

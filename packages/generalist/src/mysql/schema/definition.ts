@@ -29,6 +29,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   accepted_sequence BIGINT NOT NULL,
   queue_json LONGTEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS generalist_host_sessions (
+  session_id VARCHAR(255) PRIMARY KEY,
+  title TEXT,
+  next_event_sequence BIGINT NOT NULL DEFAULT 0,
+  created_at VARCHAR(30) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS generalist_runs (
   run_id VARCHAR(255) PRIMARY KEY,
   status VARCHAR(32) NOT NULL,
@@ -70,9 +76,13 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   sequence INT NOT NULL,
   event_id VARCHAR(255) NOT NULL,
   event_json LONGTEXT NOT NULL,
+  host_session_id VARCHAR(255),
+  host_session_sequence BIGINT,
   PRIMARY KEY (run_id, sequence),
   UNIQUE KEY generalist_run_events_event_id_key (event_id),
-  CONSTRAINT generalist_run_events_run_fk FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
+  UNIQUE KEY generalist_run_events_host_session_key (host_session_id, host_session_sequence),
+  CONSTRAINT generalist_run_events_run_fk FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id),
+  CONSTRAINT generalist_run_events_host_session_fk FOREIGN KEY (host_session_id) REFERENCES generalist_host_sessions(session_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS generalist_run_acknowledgements (
   run_id VARCHAR(255) PRIMARY KEY,

@@ -1,18 +1,17 @@
-import { Context, Effect, Layer, Option, Queue, Ref, SynchronizedRef } from "effect"
+import { Context, Effect, Layer, Option, Ref, SynchronizedRef } from "effect"
 import {
   AddressNotFound,
   CursorExpired,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
-  SubscriberLagged,
   TreeCursorExpired,
   TreeCursorFuture,
   TreeReplayLimitInvalid,
 } from "../errors.js"
 import { RunStore, type CompletionOutcome } from "../run/store.js"
 import type { LayerOptions } from "../service.js"
-import { emptyState, idempotencyKey, type MemoryPublication, type MemoryState } from "./state.js"
+import { emptyState, idempotencyKey, type MemoryState } from "./state.js"
 import { admitSend, admitSpawn, admitStart } from "./store/admit.js"
 import { activateRoot, activationOf } from "./store/activate.js"
 import { admitProgramChild, admitProgramChildrenAndSuspend } from "./store/child/admit-program-child.js"
@@ -74,6 +73,9 @@ import { externalChildOperations } from "./store/child/external.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import type { RunActivation } from "../run/activation.js"
 import { acknowledge, loadAcknowledged } from "./store/acknowledgement.js"
+import { make as makeHostSessionStore } from "./store/host-session.js"
+import { publish } from "./store/event/publications.js"
+
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
@@ -84,34 +86,6 @@ const makeStoreServices = (options: LayerOptions) =>
       }),
     )
     yield* Effect.addFinalizer(() => shutdownStore(stateRef))
-    const publish = (initial: MemoryState, publications: ReadonlyArray<MemoryPublication>) =>
-      Effect.gen(function* () {
-        let state = initial
-        for (const publication of publications) {
-          yield* Effect.forEach(publication.treeSubscribers.values(), (queue) => Queue.offer(queue, undefined), {
-            discard: true,
-          })
-          for (const [subscriberId, queue] of publication.subscribers) {
-            const run = state.runs.get(publication.runId)
-            if (run?.subscribers.get(subscriberId) !== queue) continue
-            const offered = yield* Queue.offer(queue, publication.event)
-            if (offered) continue
-            yield* Queue.fail(
-              queue,
-              SubscriberLagged.make({
-                runId: publication.runId,
-                lastDeliveredSequence: publication.lastDeliveredSequence,
-              }),
-            )
-            const subscribers = new Map(run.subscribers)
-            subscribers.delete(subscriberId)
-            const runs = new Map(state.runs)
-            runs.set(run.runId, { ...run, subscribers })
-            state = Object.assign({}, state, { runs })
-          }
-        }
-        return state
-      })
     const modifyState = <A, E>(
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
     ): Effect.Effect<A, E | RuntimeUnavailable> =>
@@ -132,7 +106,7 @@ const makeStoreServices = (options: LayerOptions) =>
           const publications = next.publications
           const committed: MemoryState = { ...next, publications: [] }
           yield* Ref.set(stateRef.backing, committed)
-          const published = yield* publish(committed, publications)
+          const published = yield* publish({ initial: committed, publications })
           if (published !== committed) yield* Ref.set(stateRef.backing, published)
           return result
         }).pipe(Effect.uninterruptible),
@@ -242,6 +216,7 @@ const makeStoreServices = (options: LayerOptions) =>
       acknowledge: (input) => update((state) => acknowledge(state, input)),
       acknowledged: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadAcknowledged(state, runId))),
+      ...makeHostSessionStore({ stateRef, modifyState }),
       sessionRoots: (sessionId) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.map((state) =>

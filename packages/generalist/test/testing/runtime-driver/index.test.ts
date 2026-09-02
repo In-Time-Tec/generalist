@@ -66,6 +66,7 @@ Testing.runtimeDriver({
   capabilities: {
     admission: true,
     runtime: { claim },
+    "host-sessions": { claim },
     "start-by-agent": { claim },
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
@@ -81,6 +82,7 @@ Testing.runtimeDriver({
   capabilities: {
     admission: true,
     runtime: { claim },
+    "host-sessions": { claim },
     "start-by-agent": { claim },
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },

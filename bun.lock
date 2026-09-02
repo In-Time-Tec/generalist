@@ -138,6 +138,17 @@
         "typescript": "catalog:",
       },
     },
+    "examples/host": {
+      "name": "generalist-example-host",
+      "dependencies": {
+        "effect": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/mcp-agent": {
       "name": "generalist-example-mcp-agent",
       "dependencies": {
@@ -1292,6 +1303,8 @@
     "generalist-example-eval-in-ci": ["generalist-example-eval-in-ci@workspace:examples/eval-in-ci"],
 
     "generalist-example-hitl-over-sse": ["generalist-example-hitl-over-sse@workspace:examples/hitl-over-sse"],
+
+    "generalist-example-host": ["generalist-example-host@workspace:examples/host"],
 
     "generalist-example-mcp-agent": ["generalist-example-mcp-agent@workspace:examples/mcp-agent"],
 

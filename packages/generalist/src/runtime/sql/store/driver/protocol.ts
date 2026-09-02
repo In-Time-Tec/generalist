@@ -18,6 +18,7 @@ import type { RuntimeUnavailable, RunNotFound } from "../../../errors.js"
 import type { ClaimedRun } from "../../run/claims.js"
 import type { EventHub } from "../../subscribers.js"
 import type { WithoutSqlError } from "../../effect.js"
+import type { HostSessionEvent, SessionNotFound } from "../../../session/host.js"
 
 export type SqlStoreRun = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlClient.SqlClient>,
@@ -101,6 +102,21 @@ export interface SqlStoreDriver<Error = never> {
       readonly loadAfter: (cursor: number) => Effect.Effect<ReadonlyArray<RunEvent>, RuntimeUnavailable>
     },
   ) => ReturnType<RunStoreService["events"]>
+  readonly hostSessionEvents?: (
+    input: Parameters<RunStoreService["hostSessionEvents"]>[0],
+    context: {
+      readonly hub: EventHub
+      readonly capacity: number
+      readonly runNoTransaction: SqlStoreRun
+      readonly loadReplay: Effect.Effect<
+        { readonly replay: ReadonlyArray<HostSessionEvent>; readonly lastCursor: number },
+        SessionNotFound | RuntimeUnavailable
+      >
+      readonly loadAfter: (
+        cursor: number,
+      ) => Effect.Effect<ReadonlyArray<HostSessionEvent>, SessionNotFound | RuntimeUnavailable>
+    },
+  ) => ReturnType<RunStoreService["hostSessionEvents"]>
   readonly treeChanges?: (
     rootRunId: string,
     context: {

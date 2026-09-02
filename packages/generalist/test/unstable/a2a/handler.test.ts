@@ -183,6 +183,11 @@ const makeRuntime = (acceptedSequence = 0) => {
       const run = runs.get(runId)!
       return Effect.succeed(run.events.filter((event) => event.sequence > cursor).slice(0, limit))
     },
+    createSession: () => Effect.die("not used"),
+    session: () => Effect.die("not used"),
+    listSessions: Effect.die("not used"),
+    sessionRuns: () => Effect.die("not used"),
+    sessionEvents: () => Stream.die("not used"),
     acknowledge: () => Effect.die("not used"),
     acknowledged: () => Effect.die("not used"),
     treeReplay: () => Effect.die("not used"),

@@ -85,6 +85,7 @@ import {
 } from "./store/child/external.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import { acknowledge, loadAcknowledged } from "./acknowledgement.js"
+import { make as makeHostSessionStore } from "./session/host.js"
 import { RunClaims } from "./run/claims.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
@@ -296,6 +297,7 @@ const makeSqlStoreServices = <DriverError>(
         snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
         acknowledge: (input) => locked(locks.run(input.runId), acknowledge(input)),
         acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
+        ...makeHostSessionStore({ driver, locks, locked, runNoTransaction: runNoTxn, hub, capacity }),
         treeCheckpoint: (rootRunId) => runInspection(loadTreeCheckpoint(rootRunId)),
         sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
         history: (input) =>

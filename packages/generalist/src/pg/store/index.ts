@@ -8,6 +8,7 @@ import {
   type SqlStoreOptions,
 } from "../../runtime/sql-driver.js"
 import { eventStream } from "../events/event-stream.js"
+import { hostSessionEventStream } from "../events/host-session-event-stream.js"
 import { transactionRunner } from "../events/transaction-events.js"
 import { check as checkSchema } from "../run-schema.js"
 import { postgresClaimMechanics } from "../runs/claims.js"
@@ -58,6 +59,16 @@ export const postgresDriver = (driverInput: {
       hub: context.hub,
       pg: driverInput.pg,
       runId: eventInput.runId,
+      cursor: eventInput.cursor,
+      capacity: context.capacity,
+      loadReplay: context.loadReplay,
+      loadAfter: context.loadAfter,
+    }),
+  hostSessionEvents: (eventInput, context) =>
+    hostSessionEventStream({
+      hub: context.hub,
+      pg: driverInput.pg,
+      sessionId: eventInput.sessionId,
       cursor: eventInput.cursor,
       capacity: context.capacity,
       loadReplay: context.loadReplay,

@@ -23,6 +23,7 @@ Testing.runtimeDriver({
     admission: true,
     runtime: { claim },
     "approval-suspend": { claim, recovery: "rebuild" },
+    "host-sessions": { claim },
     runTree: { claim },
   },
 })
@@ -40,7 +41,7 @@ Testing.memory({ layer: MyMemory.layerTest })
 Testing.ruleStore({ layer: MyRuleStore.layerTest })
 ```
 
-`memory` checks remember/recall, key isolation, whole-key deletion, and deletion by implementation-owned item id. `ruleStore` checks concurrent retention and replacement of an existing pattern. Each test gets a fresh Layer build.
+The Runtime `host-sessions` capability checks product Session metadata, root Run membership, and strict replay-then-live Session cursors. `memory` checks remember/recall, key isolation, whole-key deletion, and deletion by implementation-owned item id. `ruleStore` checks concurrent retention and replacement of an existing pattern. Each test gets a fresh Layer build.
 
 Sandbox leaves declare their factual isolation label and run supported and unsupported operations through the same suite:
 

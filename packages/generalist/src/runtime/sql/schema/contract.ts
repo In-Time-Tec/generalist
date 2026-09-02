@@ -12,7 +12,7 @@ import {
 export const SQL_SCHEMA_NAME = "generalist_runtime"
 
 /** The single logical SQL Runtime schema version. */
-export const SQL_SCHEMA_VERSION = 5
+export const SQL_SCHEMA_VERSION = 6
 
 export interface SqlLogicalTable {
   readonly name: string
@@ -72,6 +72,10 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
     },
     { name: "generalist_lanes", columns: ["session_id", "accepted_sequence", "queue_json"] },
     {
+      name: "generalist_host_sessions",
+      columns: ["session_id", "title", "next_event_sequence", "created_at"],
+    },
+    {
       name: "generalist_runs",
       columns: [
         "run_id",
@@ -107,7 +111,10 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
         "updated_at",
       ],
     },
-    { name: "generalist_run_events", columns: ["run_id", "sequence", "event_id", "event_json"] },
+    {
+      name: "generalist_run_events",
+      columns: ["run_id", "sequence", "event_id", "event_json", "host_session_id", "host_session_sequence"],
+    },
     {
       name: "generalist_run_acknowledgements",
       columns: ["run_id", "sequence", "acknowledged_at"],
@@ -375,7 +382,13 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
       columns: ["address", "session_id", "idempotency_key"],
     },
     { table: "generalist_run_events", kind: "unique", columns: ["event_id"] },
+    {
+      table: "generalist_run_events",
+      kind: "unique",
+      columns: ["host_session_id", "host_session_sequence"],
+    },
     { table: "generalist_run_events", kind: "foreign-key", columns: ["run_id"] },
+    { table: "generalist_run_events", kind: "foreign-key", columns: ["host_session_id"] },
     { table: "generalist_run_operations", kind: "unique", columns: ["run_id", "operation_key"] },
     { table: "generalist_run_links", kind: "unique", columns: ["child_run_id"] },
     {

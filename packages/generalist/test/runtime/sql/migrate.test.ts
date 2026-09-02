@@ -102,6 +102,7 @@ const inspect = (filename: string) => {
     "generalist_external_roots",
     "generalist_fan_out_members",
     "generalist_fan_outs",
+    "generalist_host_sessions",
     "generalist_lanes",
     "generalist_messages",
     "generalist_permission_rules",

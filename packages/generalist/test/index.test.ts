@@ -24,6 +24,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "ExecutableResolver",
       "ExecutionState",
       "FanOut",
+      "HostSession",
       "LocalScheduler",
       "Mailbox",
       "Message",

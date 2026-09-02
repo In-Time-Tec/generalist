@@ -58,6 +58,11 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
         }),
       history: ({ cursor }) =>
         Effect.succeed([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
+      createSession: () => Effect.die("unused createSession"),
+      session: () => Effect.die("unused session"),
+      listSessions: Effect.die("unused listSessions"),
+      sessionRuns: () => Effect.die("unused sessionRuns"),
+      sessionEvents: () => Stream.die("unused sessionEvents"),
       acknowledge: () => Effect.die("unused acknowledge"),
       acknowledged: () => Effect.die("unused acknowledged"),
       sessionEntry: () => Effect.die("unused sessionEntry"),

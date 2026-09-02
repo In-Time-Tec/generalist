@@ -1,0 +1,17 @@
+{
+  "name": "generalist-example-host",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:",
+    "generalist": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}
