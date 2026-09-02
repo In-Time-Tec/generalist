@@ -4,7 +4,13 @@ import { Prompt, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
 import type { RunSnapshot } from "../../src/runtime/run.js"
 import type { RunEvent } from "../../src/runtime/run/event.js"
-import * as Trajectory from "../../src/trajectory/index.js"
+import {
+  JsonlRecord,
+  encode,
+  export as exportTrajectory,
+  fromJournal,
+  type JournalReader,
+} from "../../src/trajectory/index.js"
 import { pinnedTestExecutable } from "../runtime/run/identity.js"
 
 const runId = "run:trajectory:golden"
@@ -114,12 +120,12 @@ const runtime = {
   history: () => Effect.succeed(events),
   sessionEntry: () => Effect.succeed(inputEntry),
   resolveModelResponse: () => Effect.succeed(response),
-} satisfies Trajectory.JournalReader
+} satisfies JournalReader
 
 it.effect("projects a recorded journal to stable JSON", () =>
   Effect.gen(function* () {
-    const trajectory = yield* Trajectory.fromJournal(runtime, runId)
-    expect(yield* Trajectory.encode(trajectory)).toMatchInlineSnapshot(`
+    const trajectory = yield* fromJournal(runtime, runId)
+    expect(yield* encode(trajectory)).toMatchInlineSnapshot(`
       {
         "agent": "golden-agent",
         "budget": {
@@ -214,10 +220,10 @@ it.effect("projects a recorded journal to stable JSON", () =>
 
 it.effect("exports one documented JSONL record as bytes", () =>
   Effect.gen(function* () {
-    const trajectory = yield* Trajectory.fromJournal(runtime, runId)
-    const bytes = yield* Stream.runCollect(Trajectory.export(trajectory, { format: "jsonl" }))
+    const trajectory = yield* fromJournal(runtime, runId)
+    const bytes = yield* Stream.runCollect(exportTrajectory(trajectory, { format: "jsonl" }))
     const line = new TextDecoder().decode(bytes[0])
-    const record = yield* Schema.decodeEffect(Schema.fromJsonString(Trajectory.JsonlRecord))(line.trim())
+    const record = yield* Schema.decodeEffect(Schema.fromJsonString(JsonlRecord))(line.trim())
     expect(record.schemaVersion).toBe("1")
   }),
 )

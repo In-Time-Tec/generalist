@@ -2,7 +2,15 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
-import * as Eval from "../../src/eval/index.js"
+import {
+  SuiteResult,
+  judge,
+  outputMatches,
+  runSuite,
+  score,
+  toolCalledAtMost,
+  usageUnder,
+} from "../../src/eval/index.js"
 import { ExecutableResolver, Runtime } from "../../src/runtime/index.js"
 import type { Trajectory } from "../../src/trajectory/index.js"
 import { TestModel } from "../../src/testing/index.js"
@@ -51,9 +59,9 @@ const trajectory: Trajectory = {
 
 it.effect("scores output schemas deterministically", () =>
   Effect.gen(function* () {
-    const [pass, fail] = yield* Eval.score(trajectory, [
-      Eval.outputMatches(Schema.Struct({ severity: Schema.Literal("high") })),
-      Eval.outputMatches(Schema.Struct({ severity: Schema.Literal("low") })),
+    const [pass, fail] = yield* score(trajectory, [
+      outputMatches(Schema.Struct({ severity: Schema.Literal("high") })),
+      outputMatches(Schema.Struct({ severity: Schema.Literal("low") })),
     ])
     expect(pass?.passed).toBe(true)
     expect(fail?.passed).toBe(false)
@@ -62,10 +70,7 @@ it.effect("scores output schemas deterministically", () =>
 
 it.effect("counts tool calls across turns", () =>
   Effect.gen(function* () {
-    const [pass, fail] = yield* Eval.score(trajectory, [
-      Eval.toolCalledAtMost("search", 2),
-      Eval.toolCalledAtMost("search", 1),
-    ])
+    const [pass, fail] = yield* score(trajectory, [toolCalledAtMost("search", 2), toolCalledAtMost("search", 1)])
     expect(pass?.passed).toBe(true)
     expect(fail?.passed).toBe(false)
   }),
@@ -73,9 +78,9 @@ it.effect("counts tool calls across turns", () =>
 
 it.effect("checks token and bundled-catalog USD limits", () =>
   Effect.gen(function* () {
-    const [pass, fail] = yield* Eval.score(trajectory, [
-      Eval.usageUnder({ tokens: 2_000_000, usd: 0.75 }),
-      Eval.usageUnder({ usd: 0.74 }),
+    const [pass, fail] = yield* score(trajectory, [
+      usageUnder({ tokens: 2_000_000, usd: 0.75 }),
+      usageUnder({ usd: 0.74 }),
     ])
     expect(pass).toMatchObject({ passed: true, message: "2000000 tokens; $0.750000" })
     expect(fail?.passed).toBe(false)
@@ -85,9 +90,9 @@ it.effect("checks token and bundled-catalog USD limits", () =>
 it.effect("uses the required LanguageModel for judge", () =>
   Effect.gen(function* () {
     const fixture = yield* TestModel.make([TestModel.object({ passed: true, reason: "faithful" })])
-    const [matched, judged] = yield* Eval.score(trajectory, [
-      Eval.outputMatches(Schema.Struct({ severity: Schema.Literal("high") })),
-      Eval.judge({ rubric: "faithful", model: "scripted" }),
+    const [matched, judged] = yield* score(trajectory, [
+      outputMatches(Schema.Struct({ severity: Schema.Literal("high") })),
+      judge({ rubric: "faithful", model: "scripted" }),
     ]).pipe((effect) => provideScoped(fixture.layer, effect))
     expect(matched?.passed).toBe(true)
     expect(judged).toMatchObject({ scorer: "judge:scripted", passed: true, message: "faithful" })
@@ -101,11 +106,11 @@ it.live("runs a bounded suite through Runtime and prints its schema result", () 
     const runtime = Runtime.layerMemory({ addresses: [] }).pipe(
       Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
     )
-    const suite = yield* Eval.runSuite(agent, ["classify"], [Eval.outputMatches(Schema.String)], {
+    const suite = yield* runSuite(agent, ["classify"], [outputMatches(Schema.String)], {
       concurrency: 1,
     }).pipe((effect) => provideScoped(Layer.merge(runtime, fixture.layer), effect))
 
-    expect(Schema.is(Eval.SuiteResult)(suite)).toBe(true)
+    expect(Schema.is(SuiteResult)(suite)).toBe(true)
     expect(suite.rows[0]).toMatchObject({ output: "high", scores: [{ passed: true }] })
   }),
 )
