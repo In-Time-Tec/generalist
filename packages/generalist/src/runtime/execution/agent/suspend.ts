@@ -1,10 +1,11 @@
 import { DateTime, Effect, Schema } from "effect"
 import { AgentSuspended } from "../../../core/agent/event.js"
+import { Suspended as NestedOperationSuspended } from "../../../core/tools/nested-operation.js"
 import type { ExecutionSuspension } from "../state.js"
 import type { Service as CodeMode } from "../../code-mode.js"
 import type { Service as Operations } from "../../operation/nested-operations.js"
 import type { ExecutionClaim, Service as RunStore } from "../../run/store.js"
-import { approvalReason } from "../../run/wait.js"
+import { approvalReason, type WaitReason } from "../../run/wait.js"
 
 /** Persist one aggregate Agent suspension after every admitted authored call reached a safe checkpoint. */
 export const suspend = (input: {
@@ -23,26 +24,42 @@ export const suspend = (input: {
       latest.checkpoint === undefined ? undefined : { checkpoint: latest.checkpoint },
       latest.continuation === undefined ? undefined : { continuation: latest.continuation },
     )
-    const authoredWaits = Schema.is(AgentSuspended)(input.suspension) ? input.suspension.waits : []
-    const waits = yield* Effect.forEach(authoredWaits, (wait) =>
-      input.nested.waitFor(wait).pipe(
-        Effect.map(
-          (nestedWait) =>
-            nestedWait ?? {
-              waitId: wait.waitId,
-              reason:
-                wait.reason === "approval"
-                  ? approvalReason({
-                      approvalId: wait.token,
-                      operation: wait.call.id,
-                      capability: wait.call.name,
-                      input: wait.call.params,
-                    })
-                  : { _tag: "ToolWait" as const },
-            },
+    let waits: ReadonlyArray<{ readonly waitId: string; readonly reason: WaitReason }>
+    if (Schema.is(NestedOperationSuspended)(input.suspension)) {
+      const wait = yield* input.nested.waitFor({ token: input.suspension.token })
+      waits = [
+        wait ?? {
+          waitId: input.suspension.token,
+          reason: approvalReason({
+            approvalId: input.suspension.token,
+            operation: `${input.suspension.operationKey}#${input.suspension.ordinal}`,
+            capability: input.suspension.capability,
+            input: undefined,
+          }),
+        },
+      ]
+    } else {
+      const authoredWaits = Schema.is(AgentSuspended)(input.suspension) ? input.suspension.waits : []
+      waits = yield* Effect.forEach(authoredWaits, (wait) =>
+        input.nested.waitFor(wait).pipe(
+          Effect.map(
+            (nestedWait) =>
+              nestedWait ?? {
+                waitId: wait.waitId,
+                reason:
+                  wait.reason === "approval"
+                    ? approvalReason({
+                        approvalId: wait.token,
+                        operation: wait.call.id,
+                        capability: wait.call.name,
+                        input: wait.call.params,
+                      })
+                    : { _tag: "ToolWait" as const },
+              },
+          ),
         ),
-      ),
-    )
+      )
+    }
     const openedWaits = waits.map((wait) => ({ ...wait, status: "open" as const, openedAt }))
     if (
       input.codeMode !== undefined &&

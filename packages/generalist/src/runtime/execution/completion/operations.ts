@@ -3,6 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import { AgentSuspended } from "../../../core/agent/event.js"
 import { BudgetExhausted, Exhausted } from "../../../core/durable/run-budget.js"
 import { DriverCheckpoint } from "../../../core/durable/driver.js"
+import { Suspended as NestedOperationSuspended } from "../../../core/tools/nested-operation.js"
 import { RunTerminal } from "../../errors.js"
 import type { ExecutionContinuation } from "../../run/steering.js"
 import type { make as makeAgentRunOptions } from "../agent/run-options.js"
@@ -41,10 +42,12 @@ export const runTerminalReason = (reason: Cause.Reason<unknown> | undefined): bo
 
 export const suspendedReason = (
   reason: Cause.Reason<unknown> | undefined,
-): AgentSuspended | BudgetExhausted | undefined => {
+): AgentSuspended | BudgetExhausted | NestedOperationSuspended | undefined => {
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
   const agent = Schema.decodeUnknownOption(AgentSuspended)(reason.error).pipe(Option.getOrUndefined)
   if (agent !== undefined) return agent
+  const nested = Schema.decodeUnknownOption(NestedOperationSuspended)(reason.error).pipe(Option.getOrUndefined)
+  if (nested !== undefined) return nested
   const budget = Schema.decodeUnknownOption(Exhausted)(reason.error).pipe(Option.getOrUndefined)
   return budget === undefined ? undefined : { _tag: "BudgetExhausted", budget: budget.budget }
 }

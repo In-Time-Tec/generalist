@@ -249,6 +249,10 @@
       "types": "./dist/unstable/foldkit/index.d.ts",
       "import": "./dist/unstable/foldkit/index.js"
     },
+    "./unstable/learning": {
+      "types": "./dist/unstable/learning/index.d.ts",
+      "import": "./dist/unstable/learning/index.js"
+    },
     "./unstable/a2a": {
       "types": "./dist/unstable/a2a/index.d.ts",
       "import": "./dist/unstable/a2a/index.js"

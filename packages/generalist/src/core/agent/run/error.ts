@@ -27,6 +27,7 @@ import { Rejected } from "../../policy/handoff-rejected.js"
 import { PolicyError } from "../../turn/policy.js"
 import { PolicyInvalid } from "../../turn/steering.js"
 import { HookFailed } from "../../../hooks/index.js"
+import { Suspended as NestedOperationSuspended } from "../../tools/nested-operation.js"
 
 /** The error channel and durable codec of `Agent.run` and `Agent.stream`. */
 export const RunError = Schema.Union([
@@ -54,6 +55,7 @@ export const RunError = Schema.Union([
   DriverError,
   DriverStateInvalid,
   DriverUnknownReplay,
+  NestedOperationSuspended,
   Exhausted,
   TargetMissing,
   HandoffLimitExceeded,
