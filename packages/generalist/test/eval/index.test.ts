@@ -40,7 +40,7 @@ const trajectory: Trajectory = {
         { id: "search-1", name: "search", params: { q: "one" }, result: [] },
         { id: "search-2", name: "search", params: { q: "two" }, result: [] },
       ],
-      usage: [
+      usageFacts: [
         {
           _tag: "Completed",
           runId: "run:eval",

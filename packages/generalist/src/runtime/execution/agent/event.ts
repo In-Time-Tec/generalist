@@ -52,6 +52,15 @@ export type DurableAgentLoopEvent =
   | ModelResponseCommitted
   | ModelResponseInterrupted
 
+/** Durable Agent event whose payload is also a process-local Inspector event. */
+export type InspectionEvent = Exclude<
+  DurableAgentLoopEvent,
+  { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" | "TurnCompleted" }
+>
+
+export const isInspectionEvent = (event: DurableAgentLoopEvent): event is InspectionEvent =>
+  event._tag !== "ModelResponseCommitted" && event._tag !== "ModelResponseInterrupted" && event._tag !== "TurnCompleted"
+
 export const durableEvent = (
   event: Exclude<AgentLoopEvent, { readonly _tag: "ModelPart" | "ModelResponseCommitted" }>,
 ): DurableAgentLoopEvent => {

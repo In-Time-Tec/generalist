@@ -43,6 +43,7 @@ import {
   type RespondApprovalError,
   type RunHandle,
   type RunSend,
+  type RuntimeInspection,
   type StartError,
   type StartOptions,
 } from "../runtime/service.js"
@@ -128,7 +129,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
       options?: RunStartOptions,
     ) => Effect.Effect<HostRun<unknown>, StartError | SessionError | AgentNotRegistered | AgentInputInvalid>
     readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
-    readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
+    readonly inspect: (runId: string) => Effect.Effect<RuntimeInspection, InspectError>
     readonly send: RunSend
     readonly cancel: (runId: string, reason?: string) => Effect.Effect<void, CancelError>
     readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>

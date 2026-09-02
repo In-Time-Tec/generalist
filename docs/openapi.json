@@ -1958,6 +1958,1364 @@
                         "required": ["runId", "forkedAt"],
                         "additionalProperties": false
                       }
+                    },
+                    "turn": { "type": "integer", "minimum": 0 },
+                    "usage": {
+                      "type": "object",
+                      "properties": { "inputTokens": { "type": "number" }, "outputTokens": { "type": "number" } },
+                      "required": ["inputTokens", "outputTokens"],
+                      "additionalProperties": false
+                    },
+                    "usageFacts": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["Completed"] },
+                              "runId": { "type": "string", "minLength": 1 },
+                              "turn": { "type": "number" },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["conversation", "structured-output", "compaction-summary"]
+                              },
+                              "modelCallId": { "type": "string" },
+                              "modelAttemptId": { "type": "string" },
+                              "attempt": { "type": "integer" },
+                              "usageAt": { "type": "number" },
+                              "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                              "provider": { "type": "string" },
+                              "model": { "type": "string" },
+                              "requestId": { "type": "string" },
+                              "responseModel": { "type": "string" },
+                              "serviceTier": { "type": "string" }
+                            },
+                            "required": [
+                              "_tag",
+                              "runId",
+                              "turn",
+                              "purpose",
+                              "modelCallId",
+                              "modelAttemptId",
+                              "attempt",
+                              "usageAt",
+                              "usage"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["Failed"] },
+                              "runId": { "type": "string", "minLength": 1 },
+                              "turn": { "type": "number" },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["conversation", "structured-output", "compaction-summary"]
+                              },
+                              "modelCallId": { "type": "string" },
+                              "modelAttemptId": { "type": "string" },
+                              "attempt": { "type": "integer" },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "authentication",
+                                  "rate-limit",
+                                  "transport",
+                                  "provider-response",
+                                  "stream-decode",
+                                  "truncated-stream",
+                                  "context-overflow",
+                                  "invalid-tool-call",
+                                  "token-budget",
+                                  "timeout",
+                                  "cancellation",
+                                  "unknown"
+                                ]
+                              },
+                              "usageAt": { "type": "number" },
+                              "providerUsage": {
+                                "type": "object",
+                                "properties": {
+                                  "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                  "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                  "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                },
+                                "additionalProperties": false
+                              },
+                              "provider": { "type": "string" },
+                              "model": { "type": "string" }
+                            },
+                            "required": [
+                              "_tag",
+                              "runId",
+                              "turn",
+                              "purpose",
+                              "modelCallId",
+                              "modelAttemptId",
+                              "attempt",
+                              "category",
+                              "usageAt",
+                              "providerUsage"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "activeTools": { "type": "array", "items": { "type": "string" } },
+                    "lastEvent": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["TurnStarted"] },
+                            "turn": { "type": "number" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ModelResponseCommitted"] },
+                            "turn": { "type": "number" },
+                            "operationKey": { "type": "string" },
+                            "modelCallId": { "type": "string" },
+                            "modelAttemptId": { "type": "string" },
+                            "attempt": { "type": "number" },
+                            "sessionId": { "type": "string" },
+                            "sessionParentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                            "sessionEntryId": { "type": "string" },
+                            "budgetCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                            "digest": { "type": "string" },
+                            "usage": {
+                              "type": "object",
+                              "properties": {
+                                "inputTokens": {
+                                  "type": "object",
+                                  "properties": {
+                                    "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "outputTokens": {
+                                  "type": "object",
+                                  "properties": {
+                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["inputTokens", "outputTokens"],
+                              "additionalProperties": false
+                            },
+                            "finishReason": {
+                              "type": "string",
+                              "enum": [
+                                "stop",
+                                "length",
+                                "content-filter",
+                                "tool-calls",
+                                "error",
+                                "pause",
+                                "other",
+                                "unknown"
+                              ]
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": [
+                            "_tag",
+                            "turn",
+                            "operationKey",
+                            "modelCallId",
+                            "modelAttemptId",
+                            "attempt",
+                            "sessionId",
+                            "sessionParentId",
+                            "sessionEntryId",
+                            "budgetCharge",
+                            "digest"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ModelResponseInterrupted"] },
+                            "turn": { "type": "number" },
+                            "operationKey": { "type": "string" },
+                            "modelCallId": { "type": "string" },
+                            "modelAttemptId": { "type": "string" },
+                            "attempt": { "type": "number" },
+                            "sessionId": { "type": "string" },
+                            "sessionParentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                            "sessionEntryId": { "type": "string" },
+                            "reason": { "type": "string", "enum": ["cancel", "failure"] },
+                            "digest": { "type": "string" },
+                            "usage": {
+                              "type": "object",
+                              "properties": {
+                                "inputTokens": {
+                                  "type": "object",
+                                  "properties": {
+                                    "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "outputTokens": {
+                                  "type": "object",
+                                  "properties": {
+                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["inputTokens", "outputTokens"],
+                              "additionalProperties": false
+                            },
+                            "finishReason": {
+                              "type": "string",
+                              "enum": [
+                                "stop",
+                                "length",
+                                "content-filter",
+                                "tool-calls",
+                                "error",
+                                "pause",
+                                "other",
+                                "unknown"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "_tag",
+                            "turn",
+                            "operationKey",
+                            "modelCallId",
+                            "modelAttemptId",
+                            "attempt",
+                            "sessionId",
+                            "sessionParentId",
+                            "sessionEntryId",
+                            "reason",
+                            "digest"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolExecutionStarted"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolProgress"] },
+                            "turn": { "type": "number" },
+                            "toolCallId": { "type": "string" },
+                            "message": { "type": "string" },
+                            "data": { "type": "object" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "toolCallId"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolExecutionCompleted"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "result": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-result"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "isFailure": { "type": "boolean" },
+                                "result": {},
+                                "encodedResult": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "preliminary": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                },
+                                "memoized": {
+                                  "type": "object",
+                                  "properties": {
+                                    "fromRun": { "type": "string" },
+                                    "fromOperation": { "type": "string" }
+                                  },
+                                  "required": ["fromRun", "fromOperation"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "id",
+                                "name",
+                                "isFailure",
+                                "result",
+                                "encodedResult",
+                                "providerExecuted",
+                                "preliminary",
+                                "metadata"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call", "result"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolExecutionWaiting"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "waitId": { "type": "string" },
+                            "token": { "type": "string" },
+                            "awaitEvent": {
+                              "type": "object",
+                              "properties": {
+                                "filter": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Timer"] },
+                                        "scheduleId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Webhook"] },
+                                        "source": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                        "childRunId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                        "path": { "type": "string" },
+                                        "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                        "approvalId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "deadline": { "type": "string" }
+                              },
+                              "required": ["filter", "deadline"],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call", "waitId", "token"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["HandoffRequested"] },
+                            "turn": { "type": "number" },
+                            "handoffId": { "type": "string" },
+                            "source": { "type": "string" },
+                            "target": { "type": "string" },
+                            "reason": { "type": "string" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "handoffId", "source", "target"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["HandoffCompleted"] },
+                            "turn": { "type": "number" },
+                            "handoffId": { "type": "string" },
+                            "source": { "type": "string" },
+                            "target": { "type": "string" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "handoffId", "source", "target"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Rejected"] },
+                            "turn": { "type": "number" },
+                            "handoffId": { "type": "string" },
+                            "reason": { "type": "string" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "handoffId", "reason"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ApprovalRequested"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "request": {
+                              "type": "object",
+                              "properties": {
+                                "approvalId": { "type": "string", "minLength": 1 },
+                                "operation": { "type": "string", "minLength": 1 },
+                                "capability": { "type": "string", "minLength": 1 },
+                                "input": {}
+                              },
+                              "required": ["approvalId", "operation", "capability", "input"],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call", "request"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["SteeringDrained"] },
+                            "turn": { "type": "number" },
+                            "queue": { "type": "string", "enum": ["steering", "followUp"] },
+                            "count": { "type": "number" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "queue", "count"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["TurnCompleted"] },
+                            "turn": { "type": "number" },
+                            "usage": {
+                              "type": "object",
+                              "properties": {
+                                "inputTokens": {
+                                  "type": "object",
+                                  "properties": {
+                                    "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "outputTokens": {
+                                  "type": "object",
+                                  "properties": {
+                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                    "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": ["inputTokens", "outputTokens"],
+                              "additionalProperties": false
+                            },
+                            "finishReason": {
+                              "type": "string",
+                              "enum": [
+                                "stop",
+                                "length",
+                                "content-filter",
+                                "tool-calls",
+                                "error",
+                                "pause",
+                                "other",
+                                "unknown"
+                              ]
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["GateResult"] },
+                            "turn": { "type": "number" },
+                            "name": { "type": "string" },
+                            "verdict": { "type": "string", "enum": ["pass", "fail"] },
+                            "evidence": {}
+                          },
+                          "required": ["_tag", "turn", "name", "verdict", "evidence"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelCallStarted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["conversation", "structured-output", "compaction-summary"]
+                                },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "compactionId": { "type": "string" },
+                                "startedAt": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "modelCallId", "purpose", "startedAt"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptStarted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "registrationKey": { "type": "string" },
+                                "candidate": { "type": "integer", "minimum": 0 },
+                                "startedAt": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "startedAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptFirstOutput"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "kind": { "type": "string", "enum": ["reasoning", "text", "tool-call"] },
+                                "at": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "kind",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptCompleted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "completedAt": { "type": "number" },
+                                "usage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": {
+                                      "type": "object",
+                                      "properties": {
+                                        "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "outputTokens": {
+                                      "type": "object",
+                                      "properties": {
+                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["inputTokens", "outputTokens"],
+                                  "additionalProperties": false
+                                },
+                                "usageAt": { "type": "number" },
+                                "finishReason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stop",
+                                    "length",
+                                    "content-filter",
+                                    "tool-calls",
+                                    "error",
+                                    "pause",
+                                    "other",
+                                    "unknown"
+                                  ]
+                                },
+                                "providerMetadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "registrationKey": { "type": "string" },
+                                "candidate": { "type": "integer", "minimum": 0 },
+                                "requestId": { "type": "string" },
+                                "responseModel": { "type": "string" },
+                                "serviceTier": { "type": "string" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "completedAt",
+                                "usage",
+                                "usageAt",
+                                "finishReason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptFailed"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "failedAt": { "type": "number" },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "classification": { "type": "string", "enum": ["transient", "terminal"] },
+                                "disposition": { "type": "string", "enum": ["retry", "fallback", "terminal"] },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "registrationKey": { "type": "string" },
+                                "candidate": { "type": "integer", "minimum": 0 },
+                                "providerUsage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "failedAt",
+                                "category",
+                                "classification",
+                                "disposition"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelRetryScheduled"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": ["provider-resilience", "invalid-tool-call-correction"]
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "delayMillis": { "type": "number" },
+                                "at": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "attempt",
+                                "reason",
+                                "category",
+                                "delayMillis",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelFallbackScheduled"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "fromCandidate": { "type": "integer", "minimum": 0 },
+                                "fromProvider": { "type": "string" },
+                                "fromModel": { "type": "string" },
+                                "fromRegistrationKey": { "type": "string" },
+                                "toCandidate": { "type": "integer", "minimum": 0 },
+                                "toProvider": { "type": "string" },
+                                "toModel": { "type": "string" },
+                                "toRegistrationKey": { "type": "string" },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "at": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "attempt",
+                                "fromCandidate",
+                                "fromProvider",
+                                "fromModel",
+                                "toCandidate",
+                                "toProvider",
+                                "toModel",
+                                "category",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelCallCompleted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["conversation", "structured-output", "compaction-summary"]
+                                },
+                                "attempts": { "type": "integer", "minimum": 0 },
+                                "completedAt": { "type": "number" },
+                                "usage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": {
+                                      "type": "object",
+                                      "properties": {
+                                        "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "outputTokens": {
+                                      "type": "object",
+                                      "properties": {
+                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                                        "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["inputTokens", "outputTokens"],
+                                  "additionalProperties": false
+                                },
+                                "failedAttemptUsage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "finishReason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stop",
+                                    "length",
+                                    "content-filter",
+                                    "tool-calls",
+                                    "error",
+                                    "pause",
+                                    "other",
+                                    "unknown"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "purpose",
+                                "attempts",
+                                "completedAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelCallFailed"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["conversation", "structured-output", "compaction-summary"]
+                                },
+                                "attempts": { "type": "integer", "minimum": 0 },
+                                "failedAt": { "type": "number" },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "classification": { "type": "string", "enum": ["transient", "terminal"] },
+                                "failedAttemptUsage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "purpose",
+                                "attempts",
+                                "failedAt",
+                                "category",
+                                "classification"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionStarted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "trigger": { "type": "string", "enum": ["threshold", "overflow"] },
+                                "startedAt": { "type": "number" },
+                                "contextTokensBefore": { "type": "number" },
+                                "entriesBefore": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "compactionId", "trigger", "startedAt"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionSkipped"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "skippedAt": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "compactionId", "skippedAt"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionApplied"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "checkpointId": { "type": "string" },
+                                "kind": { "type": "string", "enum": ["microcompact", "summarize"] },
+                                "appliedAt": { "type": "number" },
+                                "commit": {
+                                  "type": "object",
+                                  "properties": {
+                                    "compactionId": { "type": "string" },
+                                    "checkpointId": { "type": "string" },
+                                    "summaryModelCallId": { "type": "string" },
+                                    "contextTokensBefore": { "type": "number" },
+                                    "contextTokensAfter": { "type": "number" },
+                                    "entriesBefore": { "type": "number" },
+                                    "entriesAfter": { "type": "number" }
+                                  },
+                                  "required": ["compactionId", "checkpointId"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "compactionId",
+                                "checkpointId",
+                                "kind",
+                                "appliedAt",
+                                "commit"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionFailed"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "failedAt": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "compactionId", "failedAt"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "elapsed": { "type": "number", "minimum": 0 },
+                    "budget": {
+                      "type": "object",
+                      "properties": {
+                        "tokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "usd": {
+                          "anyOf": [
+                            { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                            { "type": "string", "enum": ["unknown"] }
+                          ]
+                        },
+                        "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                        "toolCalls": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "additionalProperties": false
+                    },
+                    "gates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "verdict": { "type": "string", "enum": ["pass", "fail"] },
+                          "evidence": {}
+                        },
+                        "required": ["name", "verdict", "evidence"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "children": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "childRunId": { "type": "string" },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "waiting",
+                              "needs-resolution",
+                              "cancelling",
+                              "succeeded",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "readiness": { "type": "string", "enum": ["queued", "ready", "settled"] },
+                          "invocationId": { "type": "string" },
+                          "origin": {
+                            "type": "object",
+                            "properties": { "operationKey": { "type": "string" }, "ordinal": { "type": "number" } },
+                            "required": ["operationKey", "ordinal"],
+                            "additionalProperties": false
+                          },
+                          "outcome": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Succeeded"] },
+                                  "result": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "text": { "type": "string" },
+                                          "output": {},
+                                          "turns": { "type": "number" },
+                                          "session": {
+                                            "type": "object",
+                                            "properties": {
+                                              "sessionId": { "type": "string" },
+                                              "leafId": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+                                            },
+                                            "required": ["sessionId", "leafId"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["text", "turns", "session"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Program"] },
+                                          "value": {}
+                                        },
+                                        "required": ["_tag", "value"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "result", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Failed"] },
+                                  "error": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_AgentExecutionFailureEncoded"
+                                      },
+                                      { "$ref": "#/components/schemas/generalist_runtime_ExecutablePinMissingEncoded" },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableIdentityMismatchEncoded"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationInvalidEncoded"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationMissingEncoded"
+                                      },
+                                      {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxUnavailableEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxSourceInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxInputInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxOutputInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxExecutionFailureEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxProtocolViolationEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxDeadlineExceededEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxCancelledEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxResourceExceededEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxGuaranteeUnavailableEncoded"
+                                              },
+                                              {
+                                                "anyOf": [
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCapabilityMissingEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCapabilityDeniedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramAuthorizationFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramSchemaFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramToolFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramStepFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramAgentFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramBudgetExhaustedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramReplayDivergenceEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramOperationUnknownEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramSuspendedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCancelledEncoded"
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "$ref": "#/components/schemas/generalist_core_ProgramHandlerMismatchEncoded"
+                                          },
+                                          {
+                                            "$ref": "#/components/schemas/generalist_core_ProgramIdentityMismatchEncoded"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "error", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Cancelled"] },
+                                  "reason": { "type": "string" },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["childRunId", "status", "readiness"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "suspension": {
+                      "anyOf": [
+                        { "$ref": "#/components/schemas/generalist_core_AgentSuspendedEncoded" },
+                        { "$ref": "#/components/schemas/generalist_core_ProgramSuspendedEncoded" },
+                        { "$ref": "#/components/schemas/generalist_runtime_UnknownAgentEncoded" },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["BudgetExhausted"] },
+                            "budget": {
+                              "type": "string",
+                              "enum": ["tokens", "usd", "duration", "toolCalls", "children"]
+                            }
+                          },
+                          "required": ["_tag", "budget"],
+                          "additionalProperties": false
+                        },
+                        { "$ref": "#/components/schemas/generalist_core_NestedOperationSuspendedEncoded" }
+                      ]
                     }
                   },
                   "required": [
@@ -1970,7 +3328,15 @@
                     "waits",
                     "lastSequence",
                     "durability",
-                    "branches"
+                    "branches",
+                    "turn",
+                    "usage",
+                    "usageFacts",
+                    "activeTools",
+                    "elapsed",
+                    "budget",
+                    "gates",
+                    "children"
                   ],
                   "additionalProperties": false
                 }
@@ -3572,6 +4938,831 @@
             "additionalProperties": false
           }
         ]
+      },
+      "effect_ai_AiResponse_UsageEncoded": {
+        "type": "object",
+        "properties": {
+          "inputTokens": {
+            "type": "object",
+            "properties": {
+              "uncached": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "total": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "cacheRead": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "cacheWrite": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
+            },
+            "additionalProperties": false
+          },
+          "outputTokens": {
+            "type": "object",
+            "properties": {
+              "total": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "text": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "reasoning": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["inputTokens", "outputTokens"],
+        "additionalProperties": false
+      },
+      "generalist_core_RunBudgetExhaustedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/RunBudgetExhausted"] },
+          "budget": { "type": "string", "enum": ["tokens", "usd", "duration", "toolCalls", "children"] },
+          "requested": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+          "remaining": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "budget", "requested"],
+        "additionalProperties": false
+      },
+      "generalist_core_GateFailedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/GateFailed"] },
+          "gate": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "verdict": { "type": "string", "enum": ["pass", "fail"] },
+              "evidence": {}
+            },
+            "required": ["name", "verdict", "evidence"],
+            "additionalProperties": false
+          },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "gate"],
+        "additionalProperties": false
+      },
+      "generalist_core_PermissionDeniedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/PermissionDenied"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "ToolResultPart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["tool-result"] },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "isFailure": { "type": "boolean" },
+          "result": {},
+          "providerExecuted": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] }
+        },
+        "required": ["type", "id", "name", "isFailure", "result"],
+        "additionalProperties": false
+      },
+      "generalist_core_AgentSuspendedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/AgentSuspended"] },
+          "checkpoint": {
+            "type": "object",
+            "properties": {
+              "turn": { "type": "integer", "minimum": 0 },
+              "calls": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "call": {
+                      "type": "object",
+                      "properties": {
+                        "type": { "type": "string", "enum": ["tool-call"] },
+                        "id": { "type": "string" },
+                        "name": { "type": "string" },
+                        "params": {},
+                        "providerExecuted": { "type": "boolean" },
+                        "metadata": { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } }
+                      },
+                      "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                      "additionalProperties": false
+                    },
+                    "effectiveCall": {
+                      "type": "object",
+                      "properties": {
+                        "type": { "type": "string", "enum": ["tool-call"] },
+                        "id": { "type": "string" },
+                        "name": { "type": "string" },
+                        "params": {},
+                        "providerExecuted": { "type": "boolean" },
+                        "metadata": { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } }
+                      },
+                      "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                      "additionalProperties": false
+                    },
+                    "operationKey": { "type": "string" },
+                    "state": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Ready"] },
+                            "stage": { "type": "string", "enum": ["authorization", "execution"] }
+                          },
+                          "required": ["_tag", "stage"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Scheduled"] },
+                            "inputDigest": { "type": "string" },
+                            "replayPolicy": { "type": "string", "enum": ["pure", "provider-idempotent", "never"] }
+                          },
+                          "required": ["_tag", "inputDigest", "replayPolicy"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Waiting"] },
+                            "reason": { "type": "string", "enum": ["approval", "tool-wait"] },
+                            "waitId": { "type": "string" },
+                            "token": { "type": "string" },
+                            "awaitEvent": {
+                              "type": "object",
+                              "properties": {
+                                "filter": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Timer"] },
+                                        "scheduleId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Webhook"] },
+                                        "source": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                        "childRunId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                        "path": { "type": "string" },
+                                        "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                        "approvalId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "deadline": { "type": "string" }
+                              },
+                              "required": ["filter", "deadline"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["_tag", "reason", "waitId", "token"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Completed"] },
+                            "result": { "$ref": "#/components/schemas/ToolResultPart" }
+                          },
+                          "required": ["_tag", "result"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Unknown"] },
+                            "operationId": { "type": "string" }
+                          },
+                          "required": ["_tag", "operationId"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Cancelled"] },
+                            "reason": { "type": "string" }
+                          },
+                          "required": ["_tag"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["call", "operationKey", "state"],
+                  "additionalProperties": false
+                }
+              },
+              "activeTools": { "type": "array", "items": { "type": "string" } },
+              "authorizationContextDigest": { "type": "string" },
+              "activatedSkills": { "type": "array", "items": { "type": "string" } },
+              "invocationPath": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": [
+              "turn",
+              "calls",
+              "activeTools",
+              "authorizationContextDigest",
+              "activatedSkills",
+              "invocationPath"
+            ],
+            "additionalProperties": false
+          },
+          "waits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "waitId": { "type": "string" },
+                "token": { "type": "string" },
+                "reason": { "type": "string", "enum": ["approval", "tool-wait"] },
+                "callIndex": { "type": "integer", "minimum": 0 },
+                "call": {
+                  "type": "object",
+                  "properties": {
+                    "type": { "type": "string", "enum": ["tool-call"] },
+                    "id": { "type": "string" },
+                    "name": { "type": "string" },
+                    "params": {},
+                    "providerExecuted": { "type": "boolean" },
+                    "metadata": { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } }
+                  },
+                  "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                  "additionalProperties": false
+                },
+                "awaitEvent": {
+                  "type": "object",
+                  "properties": {
+                    "filter": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Timer"] },
+                            "scheduleId": { "type": "string" }
+                          },
+                          "required": ["_tag"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Webhook"] },
+                            "source": { "type": "string" }
+                          },
+                          "required": ["_tag"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                            "childRunId": { "type": "string" }
+                          },
+                          "required": ["_tag"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["FileChanged"] },
+                            "path": { "type": "string" },
+                            "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                          },
+                          "required": ["_tag"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                            "approvalId": { "type": "string" }
+                          },
+                          "required": ["_tag"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "deadline": { "type": "string" }
+                  },
+                  "required": ["filter", "deadline"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["waitId", "token", "reason", "callIndex", "call"],
+              "additionalProperties": false
+            }
+          },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "checkpoint", "waits"],
+        "additionalProperties": false
+      },
+      "generalist_core_ResumeMismatchEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ResumeMismatch"] },
+          "reason": { "type": "string", "enum": ["checkpoint-not-found", "identity-mismatch"] },
+          "expected": {
+            "anyOf": [{ "$ref": "#/components/schemas/generalist_core_AgentSuspendedEncoded" }, { "type": "null" }]
+          },
+          "received": { "$ref": "#/components/schemas/generalist_core_AgentSuspendedEncoded" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "reason", "received"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_AgentExecutionFailureEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/AgentExecutionFailure"] },
+          "message": { "type": "string" },
+          "failure": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/generalist_core_RunBudgetExhaustedEncoded" },
+              { "$ref": "#/components/schemas/generalist_core_GateFailedEncoded" },
+              { "$ref": "#/components/schemas/generalist_core_PermissionDeniedEncoded" },
+              { "$ref": "#/components/schemas/generalist_core_ResumeMismatchEncoded" }
+            ]
+          },
+          "cause": {},
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ExecutablePinMissingEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ExecutablePinMissing"] },
+          "runId": { "type": "string" },
+          "ref": {
+            "type": "object",
+            "properties": {
+              "executable": { "type": "string", "pattern": "^executable-pin:v1:sha256:[0-9a-f]{64}$" },
+              "active": {
+                "anyOf": [
+                  { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                ]
+              }
+            },
+            "required": ["executable", "active"],
+            "additionalProperties": false
+          },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId", "ref"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ExecutableIdentityMismatchEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ExecutableIdentityMismatch"] },
+          "runId": { "type": "string" },
+          "expectedRef": {
+            "type": "object",
+            "properties": {
+              "executable": { "type": "string", "pattern": "^executable-pin:v1:sha256:[0-9a-f]{64}$" },
+              "active": {
+                "anyOf": [
+                  { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                ]
+              }
+            },
+            "required": ["executable", "active"],
+            "additionalProperties": false
+          },
+          "actualRef": {
+            "type": "object",
+            "properties": {
+              "executable": { "type": "string", "pattern": "^executable-pin:v1:sha256:[0-9a-f]{64}$" },
+              "active": {
+                "anyOf": [
+                  { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                ]
+              }
+            },
+            "required": ["executable", "active"],
+            "additionalProperties": false
+          },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId", "expectedRef", "actualRef"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ExecutableRegistrationInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ExecutableRegistrationInvalid"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ExecutableRegistrationMissingEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ExecutableRegistrationMissing"] },
+          "pin": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "pin"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxUnavailableEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxUnavailable"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxSourceInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxSourceInvalid"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxInputInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxInputInvalid"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxOutputInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxOutputInvalid"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxExecutionFailureEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxExecutionFailure"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxProtocolViolationEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxProtocolViolation"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxDeadlineExceededEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxDeadlineExceeded"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxCancelledEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxCancelled"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxResourceExceededEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxResourceExceeded"] },
+          "resource": { "type": "string", "enum": ["cpu", "subrequests", "output"] },
+          "limit": { "type": "integer", "minimum": 1 },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "resource", "limit"],
+        "additionalProperties": false
+      },
+      "generalist_core_SandboxGuaranteeUnavailableEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/SandboxGuaranteeUnavailable"] },
+          "guarantee": {
+            "type": "string",
+            "enum": [
+              "physicalIsolation",
+              "persistence",
+              "network",
+              "deadlineMillis",
+              "cpuMillis",
+              "subrequests",
+              "outputBytes",
+              "filesystem",
+              "processes"
+            ]
+          },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "guarantee", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramCapabilityMissingEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramCapabilityMissing"] },
+          "capability": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "capability"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramCapabilityDeniedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramCapabilityDenied"] },
+          "capability": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "reason": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "capability", "operation", "reason"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramAuthorizationFailureEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramAuthorizationFailure"] },
+          "capability": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "cause": {},
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "capability", "operation", "cause"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramSchemaFailureEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramSchemaFailure"] },
+          "boundary": {
+            "type": "string",
+            "enum": [
+              "program-input",
+              "program-output",
+              "tool-input",
+              "tool-output",
+              "step-input",
+              "step-output",
+              "agent-input",
+              "agent-output"
+            ]
+          },
+          "capability": { "type": "string" },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "boundary", "message"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramToolFailureEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramToolFailure"] },
+          "tool": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "cause": {},
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "tool", "operation", "cause"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramStepFailureEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramStepFailure"] },
+          "step": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "cause": {},
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "step", "operation", "cause"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramAgentFailureEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramAgentFailure"] },
+          "selection": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "cause": {},
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "selection", "operation", "cause"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramBudgetExhaustedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramBudgetExhausted"] },
+          "dimension": {
+            "type": "string",
+            "enum": ["agentRuns", "concurrency", "toolCalls", "tokens", "wallClockMillis", "logBytes", "outputBytes"]
+          },
+          "limit": { "type": "number" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "dimension", "limit"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramReplayDivergenceEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramReplayDivergence"] },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "expected": { "type": "string" },
+          "actual": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation", "expected", "actual"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramOperationUnknownEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramOperationUnknown"] },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramSuspendedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramSuspended"] },
+          "operation": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "reason": { "type": "string", "enum": ["approval", "tool-wait", "agent", "step"] },
+          "token": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation", "reason"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramCancelledEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramCancelled"] },
+          "reason": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "reason"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramHandlerMismatchEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramHandlerMismatch"] },
+          "kind": { "type": "string", "enum": ["tool", "step", "agent"] },
+          "name": { "type": "string" },
+          "reason": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "kind", "name", "reason"],
+        "additionalProperties": false
+      },
+      "generalist_core_ProgramIdentityMismatchEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/ProgramIdentityMismatch"] },
+          "expected": { "type": "string" },
+          "actual": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "expected", "actual"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_UnknownAgentEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/UnknownAgent"] },
+          "name": { "type": "string" },
+          "runId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "name", "runId"],
+        "additionalProperties": false
+      },
+      "generalist_core_NestedOperationSuspendedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/NestedOperationSuspended"] },
+          "token": { "type": "string" },
+          "operationKey": { "type": "string" },
+          "ordinal": { "type": "integer", "minimum": 0, "maximum": 65535 },
+          "capability": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "token", "operationKey", "ordinal", "capability"],
+        "additionalProperties": false
       }
     },
     "securitySchemes": { "bearer": { "type": "http", "scheme": "Bearer" } }

@@ -191,9 +191,16 @@ it.live("migrates and reopens a durable sqlite store", () =>
       expect(inspection.status).toBe("succeeded")
       expect(inspection.executableRef).toEqual(assistantRef.ref)
       expect(inspection.executableManifest).toEqual(assistantRef.manifest)
+      expect(inspection).toMatchObject({
+        usage: { inputTokens: 2, outputTokens: 1 },
+        usageFacts: [expect.objectContaining({ modelAttemptId: "reopen-attempt" })],
+        activeTools: [],
+        lastEvent: { _tag: "CompactionApplied", compactionId: "reopen-compaction" },
+      })
+      expect(inspection.elapsed).toBeGreaterThanOrEqual(0)
       const snapshot = yield* runtime.snapshot(first)
       expect(snapshot.outcome?._tag).toBe("Succeeded")
-      expect(snapshot.usage.map((fact) => fact.modelAttemptId)).toEqual(["reopen-attempt"])
+      expect(snapshot.usageFacts.map((fact) => fact.modelAttemptId)).toEqual(["reopen-attempt"])
       expect(snapshot.compactions.map((compaction) => compaction._tag)).toEqual(["Applied"])
       const tree = (yield* RunTree.checkpoint(first)).inspection
       expect(tree._tag).toBe("Terminal")

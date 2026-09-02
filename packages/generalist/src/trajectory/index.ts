@@ -21,7 +21,7 @@ export const Turn = Schema.Struct({
   prompt: Prompt.Prompt,
   response: CompletedModelResponse,
   toolCalls: Schema.Array(ToolCall),
-  usage: Schema.Array(RawUsageFact),
+  usageFacts: Schema.Array(RawUsageFact),
   compaction: Schema.optionalKey(CompactionInspection),
 })
 export type Turn = typeof Turn.Type
@@ -147,7 +147,7 @@ export const fromJournal = Effect.fn("Trajectory.fromJournal")(function* (
       prompt: buildContext(path),
       response,
       toolCalls: toolCallsFor(events, event.turn),
-      usage: snapshot.usage
+      usageFacts: snapshot.usageFacts
         .filter((fact) => fact.turn === event.turn)
         .map((fact) => (fact._tag === "Completed" ? { ...fact, usage: Response.Usage.make(fact.usage) } : fact)),
     }

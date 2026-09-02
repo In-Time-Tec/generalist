@@ -56,7 +56,7 @@ const trajectory: Trajectory = {
         finishReason: "stop",
       },
       toolCalls: [],
-      usage: [],
+      usageFacts: [],
     },
   ],
   stopReason: "stop",

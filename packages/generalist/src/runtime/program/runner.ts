@@ -183,7 +183,7 @@ export const make = (input: {
         }
         let inputTokens = 0
         let outputTokens = 0
-        for (const fact of snapshot.usage) {
+        for (const fact of snapshot.usageFacts) {
           if (fact._tag !== "Completed") continue
           inputTokens += fact.usage.inputTokens.total ?? fact.usage.inputTokens.uncached ?? 0
           outputTokens += fact.usage.outputTokens.total ?? 0

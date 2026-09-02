@@ -418,7 +418,7 @@ export const projectRunSnapshot = (run: InspectionRun) =>
       run: run.inspection,
       cursor: run.inspection.lastSequence,
       turn,
-      usage: yield* factsFor([run]),
+      usageFacts: yield* factsFor([run]),
       budget: yield* budgetForEvents(run.events),
       compactions: yield* compactionsFor([run]),
       gates: yield* gatesFor(run),
@@ -477,7 +477,7 @@ export const projectTreeCheckpoint: {
       const common = {
         rootRunId,
         runs: inspected,
-        usage: yield* factsFor(runs),
+        usageFacts: yield* factsFor(runs),
         compactions: yield* compactionsFor(runs),
       }
       const inspection: Inspection =

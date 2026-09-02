@@ -325,11 +325,17 @@ it.effect("recomputes spend after SQLite reopen and resumes without redispatch",
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run", { budget: RunBudget.make({ tokens: 1 }) })
         yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget:before-reopen" }))
-        expect(yield* runtime.inspect(handle.runId)).toMatchObject({
+        const inspection = yield* runtime.inspect(handle.runId)
+        expect(inspection).toMatchObject({
           status: "waiting",
+          usage: { inputTokens: 1, outputTokens: 1 },
+          usageFacts: [expect.objectContaining({ _tag: "Completed" })],
+          activeTools: [],
+          elapsed: 0,
           budget: { tokens: 0 },
           suspension: { _tag: "BudgetExhausted", budget: "tokens" },
         })
+        expect(inspection.lastEvent).toBeDefined()
         return handle.runId
       }).pipe((effect) => provideScoped(layer(), effect)),
     )
@@ -339,7 +345,16 @@ it.effect("recomputes spend after SQLite reopen and resumes without redispatch",
         const runtime = yield* Runtime.Runtime
         const executor = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
-        expect(yield* runtime.inspect(runId)).toMatchObject({ status: "waiting", budget: { tokens: 0 } })
+        const reopened = yield* runtime.inspect(runId)
+        expect(reopened).toMatchObject({
+          status: "waiting",
+          usage: { inputTokens: 1, outputTokens: 1 },
+          usageFacts: [expect.objectContaining({ _tag: "Completed" })],
+          activeTools: [],
+          elapsed: 0,
+          budget: { tokens: 0 },
+        })
+        expect(reopened.lastEvent).toBeDefined()
         yield* runtime.register(agent)
         yield* runtime.operator.extendBudget(runId, { tokens: 10 }, "operator:budget-reopen")
         expect((yield* store.recoveryJournal(runId)).actions).toEqual([

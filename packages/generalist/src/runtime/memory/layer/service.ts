@@ -59,6 +59,7 @@ import { generateId } from "../../../core/model/telemetry/events.js"
 import { WakeEvent } from "../../../core/agent/tools/wake-event.js"
 import { WakeEventInvalid } from "../../execution/trigger/wake.js"
 import { make as makeChildAdmission } from "../../child/admission.js"
+import { fieldsForEvents as inspectorFieldsForEvents } from "../../execution/agent/inspection.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
@@ -636,19 +637,30 @@ const makeRuntimeWith = (
       resolveOperation: store.resolveOperation,
       extendBudget: extendRunBudget,
       inspect: (runId) =>
-        Effect.all([store.snapshot(runId), store.loadExecution(runId), childAdmission.listDirect(runId)]).pipe(
-          Effect.map(([snapshot, execution, children]) => {
-            const inspection = {
-              ...snapshot.run,
-              turn: snapshot.turn,
-              usage: snapshot.usage,
-              budget: snapshot.budget,
-              gates: snapshot.gates,
-              children,
-            }
-            return execution.suspension === undefined ? inspection : { ...inspection, suspension: execution.suspension }
-          }),
-        ),
+        Effect.gen(function* () {
+          const [snapshot, execution, children] = yield* Effect.all([
+            store.snapshot(runId),
+            store.loadExecution(runId),
+            childAdmission.listDirect(runId),
+          ])
+          const events = yield* store
+            .history({ runId, cursor: -1, limit: snapshot.cursor + 1 })
+            .pipe(
+              Effect.catchTag("generalist/runtime/CursorExpired", () =>
+                RuntimeUnavailable.make({ message: `Run ${runId} history no longer contains its inspection origin` }),
+              ),
+            )
+          const inspector = yield* inspectorFieldsForEvents(snapshot.usageFacts)(events)
+          const inspection = {
+            ...snapshot.run,
+            turn: snapshot.turn,
+            ...inspector,
+            budget: snapshot.budget,
+            gates: snapshot.gates,
+            children,
+          }
+          return execution.suspension === undefined ? inspection : { ...inspection, suspension: execution.suspension }
+        }),
       fork: (runId, input) =>
         Effect.gen(function* () {
           const newRunId = `run_${yield* generateId}`
