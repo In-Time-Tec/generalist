@@ -42,13 +42,7 @@ export const cacheAware = (options: Options): Strategy => {
     shouldCompact: ({ tokens, contextWindow }) => Number.isFinite(contextWindow) && tokens > contextWindow,
     keepRecentTokens,
     cut: (prompt, recentTokens) => {
-      const entries = prompt.content.map((message, index) => ({
-        _tag: "Message" as const,
-        id: String(index),
-        parentId: index === 0 ? null : String(index - 1),
-        message,
-      }))
-      const recentStart = safeCutIndex(entries, recentTokens)
+      const recentStart = safeCutIndex(prompt.content, recentTokens)
       const prefixEnd = stablePrefixEnd(prompt.content, stablePrefixTurns)
       if (prefixEnd >= recentStart) return Option.none()
       return Option.some({

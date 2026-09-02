@@ -1,4 +1,4 @@
-import { Effect, Function, Layer, Option, Schema } from "effect"
+import { Effect, Function, Layer, Option, Schema, type Types } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { ContextRevision } from "./compaction-context-revision.js"
 import { safeCutIndex } from "./compaction-cut.js"
@@ -259,20 +259,14 @@ export const summarizeWithModel = (options: SummarizeWithModelOptions = {}): Str
 
 /** @experimental The default two-stage compaction strategy. */
 export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
-  const summarizeOptions: SummarizeWithModelOptions = {}
-  if (options.summaryModel !== undefined) Object.assign(summarizeOptions, { model: options.summaryModel })
-  if (options.summaryPrompt !== undefined) Object.assign(summarizeOptions, { prompt: options.summaryPrompt })
+  const summarizeOptions: Types.Mutable<SummarizeWithModelOptions> = {}
+  if (options.summaryModel !== undefined) summarizeOptions.model = options.summaryModel
+  if (options.summaryPrompt !== undefined) summarizeOptions.prompt = options.summaryPrompt
   return {
     shouldCompact: ({ tokens, contextWindow }) => Number.isFinite(contextWindow) && tokens > contextWindow,
     cut: (prompt, keepRecentTokens) => {
-      const entries = prompt.content.map((message, index) => ({
-        _tag: "Message" as const,
-        id: String(index),
-        parentId: index === 0 ? null : String(index - 1),
-        message,
-      }))
-      const index = safeCutIndex(entries, keepRecentTokens)
-      if (index <= 0 || index >= entries.length) return Option.none()
+      const index = safeCutIndex(prompt.content, keepRecentTokens)
+      if (index <= 0 || index >= prompt.content.length) return Option.none()
       const compact = prompt.content.slice(0, index)
       const keep = compact.filter((message) => message.role === "system")
       return Option.some({
