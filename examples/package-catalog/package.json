@@ -1,0 +1,17 @@
+{
+  "name": "generalist-example-package-catalog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "catalog:",
+    "effect": "catalog:",
+    "generalist": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

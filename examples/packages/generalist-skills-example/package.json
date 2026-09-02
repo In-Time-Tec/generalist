@@ -1,0 +1,24 @@
+{
+  "name": "@in-time-tec/generalist-skills-example",
+  "version": "1.0.0",
+  "description": "Reference Generalist package catalog extension",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "AGENTS.md",
+    "dist",
+    "skills"
+  ],
+  "peerDependencies": {
+    "effect": "^4.0.0-rc.112"
+  },
+  "generalist": {
+    "instructions": [
+      "AGENTS.md"
+    ],
+    "skills": [
+      "skills/*/SKILL.md"
+    ],
+    "tools": "dist/tools.js"
+  }
+}
