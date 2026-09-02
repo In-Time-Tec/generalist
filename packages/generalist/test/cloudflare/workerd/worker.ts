@@ -103,7 +103,7 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
   const successFixture = yield* TestModel.make([
     TestModel.toolCall("lookup", { query: "Boise provider" }, { id: "lookup-1" }),
     TestModel.text("I found one provider."),
-    TestModel.object({ objective: "Arrange service", facts: ["Provider serves Boise"] }),
+    TestModel.object({ output: { objective: "Arrange service", facts: ["Provider serves Boise"] } }),
   ])
   const successLayer = Layer.mergeAll(
     successFixture.layer,
