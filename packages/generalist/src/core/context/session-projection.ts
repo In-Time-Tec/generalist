@@ -3,7 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import { projectTranscript } from "./memory.js"
 import type { Entry, SkillEntry } from "./session.js"
 
-/** @experimental Model context cannot be admitted while framework tool calls lack outcomes. */
+/** Model context cannot be admitted while framework tool calls lack outcomes. */
 export class ContextInvalid extends Schema.TaggedError<ContextInvalid>()("generalist/core/ContextInvalid", {
   issues: Schema.Array(
     Schema.Struct({
@@ -49,11 +49,11 @@ const inspectToolContext = (prompt: Prompt.Prompt) => {
   return { unresolved, issues }
 }
 
-/** @experimental Framework tool calls in model context that do not yet have a corresponding result. */
+/** Framework tool calls in model context that do not yet have a corresponding result. */
 export const unresolvedToolCalls = (prompt: Prompt.Prompt): ReadonlyArray<Prompt.ToolCallPart> =>
   inspectToolContext(prompt).unresolved
 
-/** @experimental Reject model context unless every framework tool call has exactly one matching result. */
+/** Reject model context unless every framework tool call has exactly one matching result. */
 export const validateContext = (prompt: Prompt.Prompt): Effect.Effect<void, ContextInvalid> => {
   const inspection = inspectToolContext(prompt)
   return inspection.issues.length === 0 ? Effect.void : Effect.fail(ContextInvalid.make({ issues: inspection.issues }))
@@ -112,10 +112,10 @@ const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Mes
   return messages
 }
 
-/** @experimental Purely projects a root-to-leaf session path into model context. */
+/** Purely projects a root-to-leaf session path into model context. */
 export const buildContext = (path: ReadonlyArray<Entry>): Prompt.Prompt => Prompt.fromMessages(projectedMessages(path))
 
-/** @experimental Purely projects a lossless path for memory retention. */
+/** Purely projects a lossless path for memory retention. */
 export const buildMemoryContext = (path: ReadonlyArray<Entry>): Prompt.Prompt => {
   const messages = path.flatMap((entry): ReadonlyArray<Prompt.Message> => {
     switch (entry._tag) {

@@ -2,7 +2,7 @@ import { Deferred, Effect, Option, Queue, Random, Schema, Scope, Semaphore } fro
 import { KernelUnavailable, type SessionId } from "../cell.js"
 import { HostFrame, WorkerFrame, wireVersion } from "./protocol.js"
 
-/** @experimental Where the kernel worker module lives, and how its child process is started. */
+/** Where the kernel worker module lives, and how its child process is started. */
 export interface WorkerOptions {
   readonly sessionId: SessionId
   readonly epoch: number
@@ -13,24 +13,24 @@ export interface WorkerOptions {
   readonly environment: Readonly<Record<string, string>>
 }
 
-/** @experimental Bytes a cell wrote straight to the process's own stdout or stderr. */
+/** Bytes a cell wrote straight to the process's own stdout or stderr. */
 export interface RawChunk {
   readonly _tag: "Chunk"
   readonly channel: "stdout" | "stderr"
   readonly text: string
 }
 
-/** @experimental The end of one cell's writes to one raw output channel. */
+/** The end of one cell's writes to one raw output channel. */
 export interface RawBarrier {
   readonly _tag: "Barrier"
   readonly channel: "stdout" | "stderr"
   readonly cellId: string
 }
 
-/** @experimental Raw output and its cell-settlement boundary. */
+/** Raw output and its cell-settlement boundary. */
 export type RawOutput = RawChunk | RawBarrier
 
-/** @experimental One live kernel child process, its private frame channel, and its raw output. */
+/** One live kernel child process, its private frame channel, and its raw output. */
 export interface Worker {
   readonly epoch: number
   readonly frames: Queue.Dequeue<WorkerFrame>
@@ -171,7 +171,7 @@ const signalGroup = (pid: number, signal: "SIGINT" | "SIGKILL"): Effect.Effect<v
   }).pipe(Effect.catch((code) => (code === "ESRCH" ? Effect.void : Effect.fail(code))))
 
 /**
- * @experimental Start one kernel child process and frame its stdio. The reader fiber only moves
+ * Start one kernel child process and frame its stdio. The reader fiber only moves
  * frames onto a queue, so it is never blocked behind an executing cell and a host reply always
  * reaches the cell awaiting it.
  */

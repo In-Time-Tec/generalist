@@ -2,24 +2,22 @@ import { digest } from "../core/durable/pin.js"
 import { Function, Schema } from "effect"
 import { GuidanceEntry, GuidanceScope, GuidanceSnapshotId, RefinementEvent, kinds, type GuidanceKind } from "./entry.js"
 
-/** @experimental Entries of one state grouped by kind and sorted by id. */
+/** Entries of one state grouped by kind and sorted by id. */
 export const GuidanceEntries = Schema.Struct({
   prompt: Schema.Array(GuidanceEntry),
   memory: Schema.Array(GuidanceEntry),
   skill: Schema.Array(GuidanceEntry),
   subagent: Schema.Array(GuidanceEntry),
 })
-/** @experimental */
 export type GuidanceEntries = typeof GuidanceEntries.Type
 
-/** @experimental One complete versioned instruction state for one scope. */
+/** One complete versioned instruction state for one scope. */
 export const GuidanceState = Schema.Struct({
   schemaVersion: Schema.Literal("1"),
   scope: GuidanceScope,
   entries: GuidanceEntries,
   refinements: Schema.Array(RefinementEvent),
 })
-/** @experimental */
 export type GuidanceState = typeof GuidanceState.Type
 
 interface EntryGroups {
@@ -38,7 +36,7 @@ const compareText = (left: string, right: string): number => {
 const sortEntries = (entries: ReadonlyArray<GuidanceEntry>): ReadonlyArray<GuidanceEntry> =>
   entries.toSorted((left, right) => compareText(left.id, right.id))
 
-/** @experimental An empty state for one scope. */
+/** An empty state for one scope. */
 export const empty = (scope: GuidanceScope): GuidanceState => ({
   schemaVersion: "1",
   scope,
@@ -46,7 +44,7 @@ export const empty = (scope: GuidanceScope): GuidanceState => ({
   refinements: [],
 })
 
-/** @experimental Build one state from unordered entries and refinements. */
+/** Build one state from unordered entries and refinements. */
 export const make = (input: {
   readonly scope: GuidanceScope
   readonly entries?: ReadonlyArray<GuidanceEntry>
@@ -72,11 +70,11 @@ export const make = (input: {
   }
 }
 
-/** @experimental Every entry of one state in canonical kind then id order. */
+/** Every entry of one state in canonical kind then id order. */
 export const allEntries = (state: GuidanceState): ReadonlyArray<GuidanceEntry> =>
   kinds.flatMap((kind) => state.entries[kind])
 
-/** @experimental The entry of one kind and id, when present. */
+/** The entry of one kind and id, when present. */
 export const findEntry: {
   (kind: GuidanceKind, id: string): (state: GuidanceState) => GuidanceEntry | undefined
   (state: GuidanceState, kind: GuidanceKind, id: string): GuidanceEntry | undefined
@@ -84,7 +82,7 @@ export const findEntry: {
   state.entries[kind].find((entry) => entry.id === id),
 )
 
-/** @experimental Replace the entries of one kind, keeping canonical order. */
+/** Replace the entries of one kind, keeping canonical order. */
 export const withEntries: {
   (kind: GuidanceKind, entries: ReadonlyArray<GuidanceEntry>): (state: GuidanceState) => GuidanceState
   (state: GuidanceState, kind: GuidanceKind, entries: ReadonlyArray<GuidanceEntry>): GuidanceState
@@ -98,7 +96,7 @@ export const withEntries: {
 
 const encodeEntries = Schema.encodeSync(GuidanceEntries)
 
-/** @experimental Content-addressed identity of one exact state, independent of refinement history. */
+/** Content-addressed identity of one exact state, independent of refinement history. */
 export const snapshotId = (state: GuidanceState): GuidanceSnapshotId =>
   `guidance-snapshot:v1:sha256:${digest({
     schemaVersion: state.schemaVersion,
@@ -107,7 +105,7 @@ export const snapshotId = (state: GuidanceState): GuidanceSnapshotId =>
   })}`
 
 /**
- * @experimental Overlay one inner scope on one outer scope. An inner entry wins over an outer entry of the same
+ * Overlay one inner scope on one outer scope. An inner entry wins over an outer entry of the same
  * kind and id; every surviving entry keeps the scope that authored it.
  */
 export const merge: {

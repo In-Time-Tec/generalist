@@ -31,7 +31,7 @@ export interface Suspend {
   readonly token: string
 }
 
-/** @experimental Durable tool execution outcome. */
+/** Durable tool execution outcome. */
 export const Outcome = Schema.Union([
   Schema.Struct({
     _tag: Schema.tag("Success"),

@@ -8,17 +8,13 @@ import {
   promoteStreamFailures,
 } from "./response/failure.js"
 import { isTerminationFailure } from "./stream-termination.js"
-
-/** @experimental */
 export { defaultResolveFailure }
-
-/** @experimental */
 export type { FailureInput, FailureResolver } from "./response/failure.js"
 
-/** @experimental Classification of a model-call failure. */
+/** Classification of a model-call failure. */
 export type Classification = "transient" | "terminal"
 
-/** @experimental Retry and correction policy for one logical model call. */
+/** Retry and correction policy for one logical model call. */
 export interface Policy {
   readonly classify: (cause: unknown) => Classification
   readonly resolve: FailureResolver
@@ -34,20 +30,18 @@ interface MutablePolicy {
   invalidToolCallCorrectionLimit: number
   streamIdleTimeout?: Duration.Input
 }
-
-/** @experimental */
 export class ModelResilience extends Context.Service<ModelResilience, Policy>()(
   "generalist/core/model/resilience/ModelResilience",
 ) {}
 
-/** @experimental A model resilience policy contains an unsafe correction bound. */
+/** A model resilience policy contains an unsafe correction bound. */
 export class Misconfigured extends Schema.TaggedError<Misconfigured>()("generalist/core/ModelResilienceMisconfigured", {
   reason: Schema.Literal("invalid-tool-call-correction-limit"),
   message: Schema.String,
 }) {}
 
 /**
- * @experimental A stream that ended without its terminal event is retryable
+ * A stream that ended without its terminal event is retryable
  * only while nothing a consumer would replay escaped downstream; retrying after
  * that would duplicate the consumer's transcript.
  */
@@ -63,16 +57,12 @@ const defaultProviderClassify = (cause: unknown): Classification =>
     (cause.reason._tag === "NetworkError" && cause.reason.reason === "TransportError"))
     ? "transient"
     : "terminal"
-
-/** @experimental */
 export const defaultPolicy: Policy = {
   classify: defaultProviderClassify,
   resolve: defaultResolveFailure,
   retrySchedule: Schedule.exponential("500 millis").pipe(Schedule.jittered, Schedule.upTo({ times: 5 })),
   invalidToolCallCorrectionLimit: 0,
 }
-
-/** @experimental */
 export const none: Policy = {
   ...defaultPolicy,
   classify: () => "terminal",
@@ -85,7 +75,7 @@ const misconfigured = (): Misconfigured =>
     message: "invalidToolCallCorrectionLimit must be a safe integer between 0 and 2",
   })
 
-/** @experimental Validate a structurally supplied model resilience policy. */
+/** Validate a structurally supplied model resilience policy. */
 export const validate = (implementation: Policy): Effect.Effect<Policy, Misconfigured> =>
   Effect.suspend(() => {
     const limit = implementation.invalidToolCallCorrectionLimit
@@ -93,8 +83,6 @@ export const validate = (implementation: Policy): Effect.Effect<Policy, Misconfi
       ? Effect.succeed(implementation)
       : Effect.fail(misconfigured())
   })
-
-/** @experimental */
 export const make = (input?: Partial<Policy>): Effect.Effect<Policy, Misconfigured> => {
   const implementation: MutablePolicy = {
     classify: input?.classify ?? defaultClassify,
@@ -105,12 +93,8 @@ export const make = (input?: Partial<Policy>): Effect.Effect<Policy, Misconfigur
   if (input?.streamIdleTimeout !== undefined) implementation.streamIdleTimeout = input.streamIdleTimeout
   return validate(implementation)
 }
-
-/** @experimental */
 export const layer = (input?: Partial<Policy>): Layer.Layer<ModelResilience, Misconfigured> =>
   Layer.effect(ModelResilience, make(input).pipe(Effect.map(ModelResilience.of)))
-
-/** @experimental */
 export const layerTest = (implementation: Policy): Layer.Layer<ModelResilience, Misconfigured> =>
   Layer.effect(ModelResilience, validate(implementation).pipe(Effect.map(ModelResilience.of)))
 
@@ -174,8 +158,6 @@ const retryStream = <A, B, E, R>(
         Result.isFailure(result) ? Stream.failCause(result.failure) : Stream.succeed(result.success),
     ),
   )
-
-/** @experimental */
 export const apply: {
   (resilience: Policy): (model: LanguageModel.Service) => LanguageModel.Service
   (model: LanguageModel.Service, resilience: Policy): LanguageModel.Service

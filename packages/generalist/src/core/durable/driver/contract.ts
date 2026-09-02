@@ -13,22 +13,18 @@ const ParseOptionsInput = Schema.Struct({
 })
 const isParseOptions = Schema.is(ParseOptionsInput)
 
-/** @experimental Version string for a durable driver implementation. */
+/** Version string for a durable driver implementation. */
 export const DriverVersion = Schema.String
-
-/** @experimental */
 export type DriverVersion = typeof DriverVersion.Type
 
-/** @experimental Current durable driver contract version. */
+/** Current durable driver contract version. */
 export const currentDriverVersion = "1" as const
 
-/** @experimental How a host may replay one persisted operation after recovery. */
+/** How a host may replay one persisted operation after recovery. */
 export const ReplayPolicy = Schema.Literals(["pure", "provider-idempotent", "never"])
-
-/** @experimental */
 export type ReplayPolicy = typeof ReplayPolicy.Type
 
-/** @experimental Bounded operation kinds the driver may schedule. */
+/** Bounded operation kinds the driver may schedule. */
 export const DriverOperationKind = Schema.Literals([
   "model",
   "tool",
@@ -39,11 +35,9 @@ export const DriverOperationKind = Schema.Literals([
   "wait",
   "structured-output",
 ])
-
-/** @experimental */
 export type DriverOperationKind = typeof DriverOperationKind.Type
 
-/** @experimental One schedulable nondeterministic operation with deterministic identity. */
+/** One schedulable nondeterministic operation with deterministic identity. */
 export const DriverOperation = Schema.Struct({
   key: Schema.String,
   kind: DriverOperationKind,
@@ -51,31 +45,25 @@ export const DriverOperation = Schema.Struct({
   inputDigest: Schema.String,
   replayPolicy: ReplayPolicy,
 })
-
-/** @experimental */
 export type DriverOperation = typeof DriverOperation.Type
 
-/** @experimental Persisted outcome for one operation attempt. */
+/** Persisted outcome for one operation attempt. */
 export const OperationOutcome = Schema.Union([
   Schema.Struct({ _tag: Schema.tag("Succeeded"), value: Schema.Unknown }),
   Schema.Struct({ _tag: Schema.tag("Failed"), error: Schema.Unknown }),
   Schema.Struct({ _tag: Schema.tag("Unknown"), operationId: Schema.String }),
 ])
-
-/** @experimental */
 export type OperationOutcome = typeof OperationOutcome.Type
 
-/** @experimental Wait the driver requests before the next decision. */
+/** Wait the driver requests before the next decision. */
 export const WaitDefinition = Schema.Struct({
   waitId: Schema.String,
   reason: Schema.String,
   replayToken: Schema.optionalKey(Schema.String),
 })
-
-/** @experimental */
 export type WaitDefinition = typeof WaitDefinition.Type
 
-/** @experimental Reconstructable durable checkpoint for one agent run. */
+/** Reconstructable durable checkpoint for one agent run. */
 export const DriverCheckpoint = Schema.Struct({
   driverVersion: DriverVersion,
   executable: Schema.optionalKey(ExecutableRef),
@@ -83,37 +71,25 @@ export const DriverCheckpoint = Schema.Struct({
   budget: RunBudget,
   state: Schema.Unknown,
 })
-
-/** @experimental */
 export type DriverCheckpoint = typeof DriverCheckpoint.Type
 
-/** @experimental Terminal structured result carried by a Complete decision. */
+/** Terminal structured result carried by a Complete decision. */
 export const DriverResult = Schema.Struct({
   text: Schema.String,
   turns: Schema.Finite,
 })
-
-/** @experimental */
 export type DriverResult = typeof DriverResult.Type
 
-/** @experimental Next step chosen deterministically from one checkpoint. */
+/** Next step chosen deterministically from one checkpoint. */
 export const DriverDecision = Schema.Union([
   Schema.Struct({ _tag: Schema.tag("Execute"), operation: DriverOperation }),
   Schema.Struct({ _tag: Schema.tag("Wait"), wait: WaitDefinition }),
   Schema.Struct({ _tag: Schema.tag("Continue"), checkpoint: DriverCheckpoint }),
   Schema.Struct({ _tag: Schema.tag("Complete"), result: DriverResult }),
 ])
-
-/** @experimental */
 export type DriverDecision = typeof DriverDecision.Type
-
-/** @experimental */
 export const operationKey = (parts: ReadonlyArray<string | number>): string => parts.map(String).join(":")
-
-/** @experimental */
 export const inputDigest = (input: Parameters<typeof canonicalDigest>[0]): string => canonicalDigest(input)
-
-/** @experimental */
 export const make = (input: {
   readonly key: string
   readonly kind: DriverOperationKind
@@ -126,8 +102,6 @@ export const make = (input: {
   inputDigest: inputDigest(input.input),
   replayPolicy: input.replayPolicy,
 })
-
-/** @experimental */
 export const encodeCheckpoint: {
   (
     input: DriverCheckpoint,
@@ -144,8 +118,6 @@ export const encodeCheckpoint: {
   ): Effect.Effect<typeof DriverCheckpoint.Encoded, Schema.SchemaError, never> =>
     Schema.encodeEffect(DriverCheckpoint)(input, options),
 )
-
-/** @experimental */
 export const decodeCheckpoint: {
   (
     input: typeof DriverCheckpoint.Encoded,
@@ -162,8 +134,6 @@ export const decodeCheckpoint: {
   ): Effect.Effect<DriverCheckpoint, Schema.SchemaError, never> =>
     Schema.decodeEffect(DriverCheckpoint)(input, options),
 )
-
-/** @experimental */
 export const encodeDecision: {
   (
     input: DriverDecision,
@@ -180,8 +150,6 @@ export const encodeDecision: {
   ): Effect.Effect<typeof DriverDecision.Encoded, Schema.SchemaError, never> =>
     Schema.encodeEffect(DriverDecision)(input, options),
 )
-
-/** @experimental */
 export const decodeDecision: {
   (
     input: typeof DriverDecision.Encoded,
@@ -197,8 +165,6 @@ export const decodeDecision: {
     options?: ParseOptions,
   ): Effect.Effect<DriverDecision, Schema.SchemaError, never> => Schema.decodeEffect(DriverDecision)(input, options),
 )
-
-/** @experimental */
 export const encodeOutcome: {
   (
     input: OperationOutcome,
@@ -215,8 +181,6 @@ export const encodeOutcome: {
   ): Effect.Effect<typeof OperationOutcome.Encoded, Schema.SchemaError, never> =>
     Schema.encodeEffect(OperationOutcome)(input, options),
 )
-
-/** @experimental */
 export const decodeOutcome: {
   (
     input: typeof OperationOutcome.Encoded,
@@ -233,16 +197,11 @@ export const decodeOutcome: {
   ): Effect.Effect<OperationOutcome, Schema.SchemaError, never> =>
     Schema.decodeEffect(OperationOutcome)(input, options),
 )
-/** @experimental */
 export const isUnknownOutcome = (
   outcome: OperationOutcome,
 ): outcome is Extract<OperationOutcome, { _tag: "Unknown" }> => outcome._tag === "Unknown"
-
-/** @experimental */
 export const isSucceededOutcome = (
   outcome: OperationOutcome,
 ): outcome is Extract<OperationOutcome, { _tag: "Succeeded" }> => outcome._tag === "Succeeded"
-
-/** @experimental */
 export const isFailedOutcome = (outcome: OperationOutcome): outcome is Extract<OperationOutcome, { _tag: "Failed" }> =>
   outcome._tag === "Failed"

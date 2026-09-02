@@ -1,7 +1,7 @@
 import { Option, Schema } from "effect"
 import { Response, Tool } from "effect/unstable/ai"
 
-/** @experimental A provider response reduced to semantic content and reported terminal facts. */
+/** A provider response reduced to semantic content and reported terminal facts. */
 export interface CompletedModelResponse<Tools extends Record<string, Tool.Any>> {
   readonly content: ReadonlyArray<Response.Part<Tools>>
   readonly usage?: Response.Usage
@@ -14,7 +14,7 @@ interface MutableCompletedModelResponse<Tools extends Record<string, Tool.Any>> 
   finishReason?: Response.FinishReason
 }
 
-/** @experimental Incrementally normalizes validated provider stream parts. */
+/** Incrementally normalizes validated provider stream parts. */
 export interface Builder<Tools extends Record<string, Tool.Any>> {
   readonly accept: (part: Response.StreamPart<Tools>) => void
   readonly snapshot: () => CompletedModelResponse<Tools>
@@ -93,7 +93,7 @@ const mergeMetadata = (target: MutableMetadata, source: Response.ProviderMetadat
 
 const streamKey = (kind: StreamKind, id: string): string => `${kind}:${id}`
 
-/** @experimental Makes a bounded retained-state builder for one model attempt. */
+/** Makes a bounded retained-state builder for one model attempt. */
 export const make = <Tools extends Record<string, Tool.Any>>(): Builder<Tools> => {
   const entries = new Array<Entry<Tools>>()
   const streams = new Map<string, StreamEntry>()
@@ -226,7 +226,7 @@ export const make = <Tools extends Record<string, Tool.Any>>(): Builder<Tools> =
   return { accept, snapshot, complete }
 }
 
-/** @experimental Concatenates the normalized visible text of a completed response. */
+/** Concatenates the normalized visible text of a completed response. */
 export const text = <Tools extends Record<string, Tool.Any>>(response: CompletedModelResponse<Tools>): string => {
   const parts = new Array<string>()
   for (const part of response.content) {

@@ -1,7 +1,5 @@
 import { Context, Deferred, Effect, Fiber, Layer, Scope } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
-
-/** @experimental */
 export const make = (model: Layer.Layer<LanguageModel.LanguageModel>) => {
   const fibers = new WeakMap<
     Scope.Scope,

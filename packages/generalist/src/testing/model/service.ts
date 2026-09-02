@@ -10,20 +10,14 @@ import {
   registration as modelRegistration,
 } from "../../core/model/registry.js"
 import { compile, type CompiledStream } from "./compile.js"
-
-/** @experimental */
 export interface TextPart {
   readonly _tag: "Text"
   readonly text: string
 }
-
-/** @experimental */
 export interface ReasoningPart {
   readonly _tag: "Reasoning"
   readonly text: string
 }
-
-/** @experimental */
 export interface ToolCallPart {
   readonly _tag: "ToolCall"
   readonly name: string
@@ -31,32 +25,26 @@ export interface ToolCallPart {
   readonly id?: string
   readonly providerExecuted: boolean
 }
-
-/** @experimental */
 export type Part = TextPart | ReasoningPart | ToolCallPart
-
-/** @experimental */
 export interface StepOptions {
   readonly finishReason?: Response.FinishReason
   readonly usage?: Response.Usage
   readonly delay?: Duration.Input
   readonly streamPartDelay?: Duration.Input
 }
-
-/** @experimental */
 export interface TurnStep extends StepOptions {
   readonly _tag: "Turn"
   readonly parts: ReadonlyArray<Part>
 }
 
 /**
- * @experimental Where a truncated step stops emitting. The stream always ends
+ * Where a truncated step stops emitting. The stream always ends
  * without a `finish` part, reproducing a provider body that reached EOF without
  * its terminal event.
  */
 export type TruncationPoint = "reasoning-delta" | "text-delta" | "tool-params-delta" | "response-metadata"
 
-/** @experimental A provider stream that ends mid-content and never emits `finish`. */
+/** A provider stream that ends mid-content and never emits `finish`. */
 export interface TruncatedStep {
   readonly _tag: "Truncated"
   readonly parts: ReadonlyArray<Part>
@@ -64,41 +52,27 @@ export interface TruncatedStep {
   readonly delay?: Duration.Input
   readonly streamPartDelay?: Duration.Input
 }
-
-/** @experimental */
 export interface ObjectStep extends StepOptions {
   readonly _tag: "Object"
   readonly value: unknown
 }
-
-/** @experimental */
 export interface FailureStep {
   readonly _tag: "Failure"
   readonly error: AiError.AiError
   readonly delay?: Duration.Input
 }
-
-/** @experimental */
 export type Step = Part | TurnStep | ObjectStep | FailureStep | TruncatedStep
-
-/** @experimental */
 export interface ToolCallOptions {
   readonly id?: string
   readonly providerExecuted?: boolean
 }
-
-/** @experimental */
 export interface MakeOptions {
   readonly provider?: string
   readonly model?: string
   readonly registrationKey?: string
   readonly metadata?: Metadata
 }
-
-/** @experimental */
 export type Operation = "streamText" | "generateText" | "generateObject"
-
-/** @experimental */
 export interface Request {
   readonly index: number
   readonly operation: Operation
@@ -109,8 +83,6 @@ export interface Request {
   readonly previousResponseId: string | undefined
   readonly incrementalPrompt: Prompt.Prompt | undefined
 }
-
-/** @experimental */
 export interface Fixture {
   readonly layer: Layer.Layer<LanguageModel.LanguageModel>
   readonly selection: ModelSelection
@@ -239,14 +211,8 @@ const executeStream = (
     if (AiError.isAiError(compiled)) return yield* compiled
     return compiled
   })
-
-/** @experimental */
 export const text = (value: string): TextPart => ({ _tag: "Text", text: value })
-
-/** @experimental */
 export const reasoning = (value: string): ReasoningPart => ({ _tag: "Reasoning", text: value })
-
-/** @experimental */
 export const toolCall: {
   (params: typeof Schema.Unknown.Type, options?: ToolCallOptions): (name: string) => ToolCallPart
   (name: string, params: typeof Schema.Unknown.Type, options?: ToolCallOptions): ToolCallPart
@@ -263,8 +229,6 @@ export const toolCall: {
     return part
   },
 )
-
-/** @experimental */
 export const turn: {
   (options?: StepOptions): (parts: ReadonlyArray<Part>) => TurnStep
   (parts: ReadonlyArray<Part>, options?: StepOptions): TurnStep
@@ -278,7 +242,7 @@ export const turn: {
 )
 
 /**
- * @experimental A turn whose provider stream ends without a `finish` part.
+ * A turn whose provider stream ends without a `finish` part.
  * `stopAfter: "tool-params-delta"` emits `tool-params-start` and unclosed
  * parameter JSON but never the closing `tool-call`.
  */
@@ -325,8 +289,6 @@ const isStepOptionsLike = (value: typeof Schema.Unknown.Type): value is StepOpti
     value.usage !== undefined ||
     value.delay !== undefined ||
     value.streamPartDelay !== undefined)
-
-/** @experimental */
 export const object: {
   (options?: StepOptions): (value: typeof Schema.Unknown.Type) => ObjectStep
   (value: typeof Schema.Unknown.Type, options?: StepOptions): ObjectStep
@@ -338,8 +300,6 @@ export const object: {
     ...options,
   }),
 )
-
-/** @experimental */
 export const failure: {
   (options?: { readonly delay?: Duration.Input }): (error: AiError.AiError) => FailureStep
   (error: AiError.AiError, options?: { readonly delay?: Duration.Input }): FailureStep
@@ -351,8 +311,6 @@ export const failure: {
     ...options,
   }),
 )
-
-/** @experimental */
 export const make: {
   (options?: MakeOptions): (script: ReadonlyArray<Step>) => Effect.Effect<Fixture>
   (script: ReadonlyArray<Step>, options?: MakeOptions): Effect.Effect<Fixture>
@@ -410,8 +368,6 @@ export const make: {
       }
     }),
 )
-
-/** @experimental */
 export const layer: {
   (options?: MakeOptions): (script: ReadonlyArray<Step>) => Layer.Layer<LanguageModel.LanguageModel>
   (script: ReadonlyArray<Step>, options?: MakeOptions): Layer.Layer<LanguageModel.LanguageModel>
@@ -420,8 +376,6 @@ export const layer: {
   (script: ReadonlyArray<Step>, options: MakeOptions = {}) =>
     Layer.unwrap(make(script, options).pipe(Effect.map((fixture) => fixture.layer))),
 )
-
-/** @experimental */
 export const layerRegistry: {
   (governance?: GovernanceOptions): (fixtures: ReadonlyArray<Fixture>) => Layer.Layer<ModelRegistry>
   (fixtures: ReadonlyArray<Fixture>, governance?: GovernanceOptions): Layer.Layer<ModelRegistry>

@@ -12,7 +12,7 @@ export const WaitResolution = Schema.Union([
 ])
 export type WaitResolution = typeof WaitResolution.Type
 
-/** @experimental Typed reason and request payload for one durable wait. */
+/** Typed reason and request payload for one durable wait. */
 export const WaitReason = Schema.Union([
   Schema.TaggedStruct("ToolWait", {}),
   Schema.TaggedStruct("Approval", { request: ApprovalRequest }),
@@ -32,7 +32,7 @@ export const RunWait = Schema.Struct({
 })
 export type RunWait = typeof RunWait.Type
 
-/** @experimental Construct the approval reason shared by Runtime producers and controls. */
+/** Construct the approval reason shared by Runtime producers and controls. */
 export const approvalReason = (request: ApprovalRequest): WaitReason => ({
   _tag: "Approval",
   request,

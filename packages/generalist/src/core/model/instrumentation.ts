@@ -307,7 +307,7 @@ const callStream = (
   )
 
 /**
- * @experimental Wrap a model with call, attempt, and retry telemetry emission
+ * Wrap a model with call, attempt, and retry telemetry emission
  * plus the caller's resilience policy. Idempotent per run: a model already
  * instrumented with the same emit target is returned unchanged, while a
  * nested run re-wraps the underlying model with its own instrumentation so

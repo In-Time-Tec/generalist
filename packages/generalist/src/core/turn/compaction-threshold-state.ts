@@ -8,7 +8,7 @@ const MAX_UNCHANGED_RUNS = 1_024
 const key = (usage: Usage, contextRevision: string): string =>
   `${usage.contextTokens}:${usage.contextWindow}:${usage.reserveTokens}:${contextRevision}`
 
-/** @experimental Remembers unchanged threshold passes per run until their usage changes. */
+/** Remembers unchanged threshold passes per run until their usage changes. */
 export const make = () => {
   const unchanged = new Map<string, string>()
   return {

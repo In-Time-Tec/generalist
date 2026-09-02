@@ -11,18 +11,17 @@ import {
   type ProgramOperationName,
 } from "./capabilities.js"
 
-/** @experimental Replay behavior selected by the host, never by program source. */
+/** Replay behavior selected by the host, never by program source. */
 export const ProgramReplayPolicy = Schema.Literals(["recorded", "idempotent", "non-idempotent"])
-/** @experimental */
 export type ProgramReplayPolicy = typeof ProgramReplayPolicy.Type
 
-/** @experimental Host-owned authorization callback for one decoded invocation. */
+/** Host-owned authorization callback for one decoded invocation. */
 export type Authorize<I> = (request: {
   readonly operation: ProgramOperationName
   readonly input: I
 }) => Effect.Effect<boolean, ProgramAuthorizationFailure | ProgramCapabilityDenied | ProgramSuspended>
 
-/** @experimental One live typed tool implementation and its exact identity. */
+/** One live typed tool implementation and its exact identity. */
 export interface ToolHandler<I, IE, O, OE, E = never> {
   readonly name: string
   readonly pin: CapabilityPin
@@ -33,12 +32,12 @@ export interface ToolHandler<I, IE, O, OE, E = never> {
   readonly execute: (input: I) => Effect.Effect<O, E>
 }
 
-/** @experimental One live typed named step implementation and its exact identity. */
+/** One live typed named step implementation and its exact identity. */
 export interface StepHandler<I, IE, O, OE, E = never> extends Omit<ToolHandler<I, IE, O, OE, E>, "name"> {
   readonly name: string
 }
 
-/** @experimental One exact Agent implementation callable by a program host. */
+/** One exact Agent implementation callable by a program host. */
 export interface AgentHandler<I extends Prompt.RawInput, IE, E = never> {
   readonly selection: string
   readonly agent: AgentPin
@@ -50,7 +49,7 @@ export interface AgentHandler<I extends Prompt.RawInput, IE, E = never> {
 }
 
 /**
- * @experimental One decoded invocation of a tool or step. The decoded input stays inside the handler, so
+ * One decoded invocation of a tool or step. The decoded input stays inside the handler, so
  * authorization and execution keep the exact type the handler declared.
  */
 export interface Invocation<O = unknown, E = ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> {
@@ -60,7 +59,7 @@ export interface Invocation<O = unknown, E = ProgramInvocationFailure | ProgramS
   readonly execute: Effect.Effect<O, E>
 }
 
-/** @experimental One decoded Agent invocation, exposing only the prompt every Agent input must produce. */
+/** One decoded Agent invocation, exposing only the prompt every Agent input must produce. */
 export interface AgentInvocation {
   readonly prompt: Prompt.RawInput
   readonly authorize: (
@@ -70,7 +69,7 @@ export interface AgentInvocation {
 }
 
 /**
- * @experimental Host-facing view of one tool in a heterogeneous handler set. Its identity, replay policy, and
+ * Host-facing view of one tool in a heterogeneous handler set. Its identity, replay policy, and
  * boundary codecs stay observable; its decoded input type is reachable only through {@link Invocation}.
  */
 export interface AnyTool {
@@ -82,18 +81,18 @@ export interface AnyTool {
   readonly decode: (encoded: typeof Schema.Unknown.Type) => Effect.Effect<Invocation, Schema.SchemaError>
 }
 
-/** @experimental Host-facing view of one named step, with the same hidden input as {@link AnyTool}. */
+/** Host-facing view of one named step, with the same hidden input as {@link AnyTool}. */
 export type AnyStep = AnyTool
 
-/** @experimental A tool handler retaining its exact decoded invocation types. */
+/** A tool handler retaining its exact decoded invocation types. */
 export type TypedTool = AnyTool & {
   readonly decode: (encoded: typeof Schema.Unknown.Type) => Effect.Effect<Invocation, Schema.SchemaError>
 }
 
-/** @experimental A step handler retaining its exact decoded invocation types. */
+/** A step handler retaining its exact decoded invocation types. */
 export type TypedStep = TypedTool
 
-/** @experimental Host-facing view of one Agent handler, with its decoded input hidden behind {@link AgentInvocation}. */
+/** Host-facing view of one Agent handler, with its decoded input hidden behind {@link AgentInvocation}. */
 export interface AnyAgent {
   readonly selection: string
   readonly agent: AgentPin
@@ -114,7 +113,7 @@ const checkUnique = (kind: string, values: ReadonlyArray<readonly [string, strin
   }
 }
 
-/** @experimental Complete live authority available to a ProgramRunner. */
+/** Complete live authority available to a ProgramRunner. */
 export interface Handlers {
   readonly tools: ReadonlyArray<TypedTool>
   readonly steps: ReadonlyArray<TypedStep>
@@ -126,7 +125,7 @@ const decodeInput = <I, IE>(
   encoded: typeof Schema.Unknown.Type,
 ): Effect.Effect<I, Schema.SchemaError> => Schema.decodeUnknownEffect(codec, { onExcessProperty: "error" })(encoded)
 
-/** @experimental Construct a typed tool handler. */
+/** Construct a typed tool handler. */
 export const tool = <I, IE, O, OE, E>(
   handler: ToolHandler<I, IE, O, OE, E>,
 ): TypedTool & {
@@ -154,14 +153,14 @@ export const tool = <I, IE, O, OE, E>(
     ),
 })
 
-/** @experimental Construct a typed named step handler. */
+/** Construct a typed named step handler. */
 export const step = <I, IE, O, OE, E>(
   handler: StepHandler<I, IE, O, OE, E>,
 ): TypedStep & {
   readonly decode: (encoded: typeof Schema.Unknown.Type) => Effect.Effect<Invocation<O>, Schema.SchemaError>
 } => tool(handler)
 
-/** @experimental Construct an exact typed Agent handler. */
+/** Construct an exact typed Agent handler. */
 export const agent = <I extends Prompt.RawInput, IE, E>(handler: AgentHandler<I, IE, E>): AnyAgent => ({
   selection: handler.selection,
   agent: handler.agent,
@@ -186,7 +185,7 @@ export const agent = <I extends Prompt.RawInput, IE, E>(handler: AgentHandler<I,
     ),
 })
 
-/** @experimental Construct the runner's complete live Program handler set. */
+/** Construct the runner's complete live Program handler set. */
 export const make = (handlers: Handlers): Handlers => {
   checkUnique(
     "tool",

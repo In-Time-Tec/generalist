@@ -16,7 +16,7 @@ import {
   unavailable,
 } from "./runtime.js"
 
-/** @experimental One cell in flight inside a kernel: its event sink, its channels, and its outcome. */
+/** One cell in flight inside a kernel: its event sink, its channels, and its outcome. */
 interface ActiveCell {
   readonly cellId: CellId
   readonly events: Queue.Queue<CellEvent, Cause.Done<void>>
@@ -35,7 +35,7 @@ type MutableDisplayEvent = { -readonly [Key in keyof DisplayEvent]: DisplayEvent
 type HostRequestInput = Parameters<typeof answerHostRequest>[0]
 type MutableHostRequestInput = { -readonly [Key in keyof HostRequestInput]: HostRequestInput[Key] }
 
-/** @experimental A live kernel for one Session: one child process, one namespace, one epoch. */
+/** A live kernel for one Session: one child process, one namespace, one epoch. */
 export interface Kernel {
   readonly epoch: number
   readonly worker: Worker
@@ -59,7 +59,7 @@ export interface Kernel {
   readonly kill: Effect.Effect<void, KernelUnavailable>
 }
 
-/** @experimental Everything a kernel needs to boot and to answer an executing cell. */
+/** Everything a kernel needs to boot and to answer an executing cell. */
 export interface KernelOptions extends WorkerOptions {
   readonly bindings: HostBindingsService | undefined
   readonly controlTimeoutMillis: number
@@ -69,7 +69,7 @@ const controlReply = (frame: WorkerFrame): string | undefined =>
   frame._tag === "Captured" || frame._tag === "Restored" || frame._tag === "Inspected" ? frame.requestId : undefined
 
 /**
- * @experimental Boot one kernel child process and run its frame router. The router owns the frame
+ * Boot one kernel child process and run its frame router. The router owns the frame
  * queue for the process lifetime: it never blocks on an executing cell, so a host reply always
  * reaches the cell awaiting it, and control replies never race a cell's own frames.
  */
@@ -395,7 +395,7 @@ export const make = (options: KernelOptions): Effect.Effect<Kernel, KernelUnavai
     }
   })
 
-/** @experimental Why a kernel that already exists cannot serve the next cell. */
+/** Why a kernel that already exists cannot serve the next cell. */
 export const restartReasonOf = (input: {
   readonly killed: boolean
   readonly profileChanged: boolean

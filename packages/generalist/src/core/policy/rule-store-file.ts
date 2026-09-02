@@ -5,7 +5,7 @@ import { InvalidRuleFile, PermissionError, RuleFile, RuleStore, type Rule } from
 const directoryMode = 0o700
 const fileMode = 0o600
 
-/** @experimental One JSON or YAML permission-rule file. */
+/** One JSON or YAML permission-rule file. */
 export interface RuleStoreFileOptions {
   readonly path: string
 }
@@ -113,7 +113,7 @@ const make = (options: RuleStoreFileOptions) =>
     })
   })
 
-/** @experimental A watched, atomically written JSON or YAML RuleStore. */
+/** A watched, atomically written JSON or YAML RuleStore. */
 export const layerRuleStoreFile = (
   options: RuleStoreFileOptions,
 ): Layer.Layer<RuleStore, InvalidRuleFile | PermissionError, FileSystem.FileSystem | Path.Path> =>

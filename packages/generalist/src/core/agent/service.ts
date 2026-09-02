@@ -47,10 +47,9 @@ export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
 export { start, type StartEvent, type StartOptions } from "./lifecycle/start.js"
 export { streamToolCalls } from "./tool-calls.js"
 export { defaultObjectPrompt, type RunHandle }
-/** @experimental Allocate one scoped Run and its producer handle before consuming its event stream. */
+/** Allocate one scoped Run and its producer handle before consuming its event stream. */
 export { allocateRun }
 export type * from "./tool-calls.js"
-/** @experimental */
 export interface MakeOptions<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   PolicyServices = never,
@@ -74,7 +73,7 @@ export interface MakeOptions<
   readonly budget?: BudgetLimits
 }
 
-/** @experimental Agent options with ordered static declarations instead of a pre-built toolkit. */
+/** Agent options with ordered static declarations instead of a pre-built toolkit. */
 export interface MakeToolsOptions<
   StaticTools extends ReadonlyArray<Tool.Any>,
   PolicyServices = never,
@@ -117,7 +116,7 @@ interface MakeImplementationResult {
   readonly name: string
 }
 
-/** @experimental Defaults: empty toolkit, `defaultPolicy`. */
+/** Defaults: empty toolkit, `defaultPolicy`. */
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
   const O extends MakeToolsOptions<
@@ -222,14 +221,14 @@ export interface Resume {
   readonly suspension: AgentSuspended
   readonly resolutions?: ReadonlyArray<ToolBatchResolution>
 }
-/** @experimental Bounded buffering behavior for tool progress events. */
+/** Bounded buffering behavior for tool progress events. */
 export type ProgressOverflowPolicy =
   | { readonly _tag: "Backpressure"; readonly capacity: number }
   | { readonly _tag: "Dropping"; readonly capacity: number }
   | { readonly _tag: "Sliding"; readonly capacity: number }
   | { readonly _tag: "Fail"; readonly capacity: number }
 
-/** @experimental Internal prompt-level options for an Agent run. */
+/** Internal prompt-level options for an Agent run. */
 export interface RunOptions {
   /** Schema-encoded Agent input for the first turn. Ignored when `resume` is set. */
   readonly prompt: Prompt.RawInput
@@ -242,43 +241,43 @@ export interface RunOptions {
   /** Overrides the derived system message when `history` is not set. */
   readonly system?: string
   readonly resume?: Resume
-  /** @experimental Opaque host-assigned identity for this run/session. */
+  /** Opaque host-assigned identity for this run/session. */
   readonly sessionId?: string
-  /** @experimental Stable host identity for the logical model operations in this run. */
+  /** Stable host identity for the logical model operations in this run. */
   readonly logicalOperationId?: string
-  /** @experimental Authoritative invocation facts supplied by a durable host. */
+  /** Authoritative invocation facts supplied by a durable host. */
   readonly invocation?: {
     readonly runId: RunIdType
     readonly rootRunId: RunIdType
     readonly attempt: number
     readonly admittedAt?: string
   }
-  /** @experimental First model-call ordinal for a host resuming from a durable checkpoint. */
+  /** First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number
-  /** @experimental First turn number for a host continuing an existing transcript. */
+  /** First turn number for a host continuing an existing transcript. */
   readonly turnStart?: number
-  /** @experimental Runtime-owned checkpoint used to reconstruct the same durable driver. */
+  /** Runtime-owned checkpoint used to reconstruct the same durable driver. */
   readonly driverCheckpoint?: DriverCheckpoint
-  /** @experimental Pinned identity admitted by a durable host. */
+  /** Pinned identity admitted by a durable host. */
   readonly executableRef?: import("../durable/manifest/executable-manifest.js").ExecutableRef
-  /** @experimental Complete pinned closure used to resolve same-run handoffs exactly. */
+  /** Complete pinned closure used to resolve same-run handoffs exactly. */
   readonly executableManifest?: import("../durable/manifest/executable-manifest.js").ExecutableManifest
   readonly toolOutputMaxBytes?: number
-  /** @experimental Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64. */
+  /** Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64. */
   readonly toolProgress?: ProgressOverflowPolicy
-  /** @experimental Finite process-local input policy for this Run. */
+  /** Finite process-local input policy for this Run. */
   readonly steering?: import("../turn/steering.js").Options
-  /** @experimental Context-window hint for optional compaction. */
+  /** Context-window hint for optional compaction. */
   readonly compaction?: {
     readonly contextWindow?: number
     readonly reserveTokens?: number
   }
-  /** @experimental Per-run budget narrowing; dimensions omitted inherit the agent default. */
+  /** Per-run budget narrowing; dimensions omitted inherit the agent default. */
   readonly budget?: BudgetLimits
-  /** @experimental Pre-reserved child grant from a parent run; not for direct caller use. */
+  /** Pre-reserved child grant from a parent run; not for direct caller use. */
   readonly inheritedBudget?: RunBudget
   readonly suspensionPropagation?: "propagate" | "collapse-to-domain-failure"
-  /** @experimental Consult the Memory service for this run. */
+  /** Consult the Memory service for this run. */
   readonly memory?: {
     readonly key: Key
   }
@@ -287,10 +286,10 @@ export interface RunOptions {
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
 export { RunError }
 
-/** @experimental Per-invocation options after the Agent input has moved to the second argument. */
+/** Per-invocation options after the Agent input has moved to the second argument. */
 export type InvocationOptions = Omit<RunOptions, "prompt">
 
-/** @experimental Services required by one run option set. */
+/** Services required by one run option set. */
 export type RunRequirements<
   Tools extends Record<string, Tool.Any>,
   R,
@@ -350,7 +349,7 @@ interface StreamFunction {
   >
 }
 
-/** @experimental Stream an Agent run as Events ending in `Completed { output }`. */
+/** Stream an Agent run as Events ending in `Completed { output }`. */
 export const stream: StreamFunction = dual(
   isDataFirst,
   <
@@ -415,7 +414,7 @@ interface RunFunction {
   >
 }
 
-/** @experimental Run an Agent to its schema-decoded output. */
+/** Run an Agent to its schema-decoded output. */
 export const run: RunFunction = dual(
   isDataFirst,
   <

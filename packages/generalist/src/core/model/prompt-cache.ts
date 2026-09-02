@@ -80,10 +80,10 @@ const markLastPart = (
   return Prompt.makeMessage("tool", { content, options: message.options })
 }
 
-/** @experimental The last-send gap above which the conversation boundary escalates to the one-hour cache. */
+/** The last-send gap above which the conversation boundary escalates to the one-hour cache. */
 export const conversationEscalationMillis = 5 * 60 * 1_000
 
-/** @experimental Mark one wire send with provider cache breakpoints derived from the run's send clock. */
+/** Mark one wire send with provider cache breakpoints derived from the run's send clock. */
 export const withWireCache: {
   (prompt: Prompt.Prompt, purpose: CallPurpose, sendClock: SendClock): Effect.Effect<Prompt.Prompt, never, Clock.Clock>
   (
@@ -107,7 +107,7 @@ interface WithCacheBreakpoints {
   (purpose: CallPurpose, idleMillis: number | undefined): (prompt: Prompt.Prompt) => Prompt.Prompt
 }
 
-/** @experimental Provider cache breakpoints derived for one send; markers are never persisted. */
+/** Provider cache breakpoints derived for one send; markers are never persisted. */
 export const withCacheBreakpoints: WithCacheBreakpoints = Function.dual(
   3,
   (prompt: Prompt.Prompt, purpose: CallPurpose, idleMillis: number | undefined): Prompt.Prompt =>

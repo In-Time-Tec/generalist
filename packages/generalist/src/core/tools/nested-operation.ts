@@ -10,35 +10,32 @@ const singleFailureReason = <E>(cause: Cause.Cause<E>) => {
   return reason !== undefined && Cause.isFailReason(reason) ? reason : undefined
 }
 
-/** @experimental Replay policy for one nested durable operation. */
+/** Replay policy for one nested durable operation. */
 export const ReplayPolicy = ReplayPolicySchema
-/** @experimental */
 export type ReplayPolicy = typeof ReplayPolicy.Type
 
 const Kind = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
 const Ordinal = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65535))
 
-/** @experimental Derived identity of one nested operation beneath a composite tool call. */
+/** Derived identity of one nested operation beneath a composite tool call. */
 export const Identity = Schema.Struct({
   operationKey: Schema.String.check(Schema.isNonEmpty()),
   ordinal: Ordinal,
   kind: Kind,
   payloadDigest: Schema.String.check(Schema.isNonEmpty()),
 })
-/** @experimental */
 export type Identity = typeof Identity.Type
 
-/** @experimental Authorization the host must settle before the handler crosses its boundary. */
+/** Authorization the host must settle before the handler crosses its boundary. */
 export const ApprovalRequirement = Schema.Struct({
   capability: Kind,
   request: Schema.optionalKey(Schema.Unknown),
 })
-/** @experimental */
 export type ApprovalRequirement = typeof ApprovalRequirement.Type
 
-/** @experimental One nested operation a composite tool asks the host to journal. */
+/** One nested operation a composite tool asks the host to journal. */
 /**
- * @experimental A host-derived projection of a nested operation's own outcome.
+ * A host-derived projection of a nested operation's own outcome.
  *
  * The value is produced by the handler's `render` function from the operation's real result, never
  * read from the request payload, so a cell that plants `render` in its input cannot dictate what
@@ -59,21 +56,19 @@ export const Render = Schema.Union([
     patch: Schema.String,
   }),
 ])
-/** @experimental */
 export type Render = typeof Render.Type
 
-/** @experimental A projection larger than this is withheld whole rather than truncated. */
+/** A projection larger than this is withheld whole rather than truncated. */
 export const maxRenderBytes = 64 * 1024
 
-/** @experimental Lifecycle of one nested operation as the host observes it. */
+/** Lifecycle of one nested operation as the host observes it. */
 export const ProgressStatus = Schema.Literals(["running", "succeeded", "failed", "unknown"])
-/** @experimental */
 export type ProgressStatus = typeof ProgressStatus.Type
 
-/** @experimental The `ToolContext.Progress` data key nested-operation progress travels under. */
+/** The `ToolContext.Progress` data key nested-operation progress travels under. */
 export const progressKey = "nestedOperation"
 
-/** @experimental One nested-operation progress record a host projects. */
+/** One nested-operation progress record a host projects. */
 export const Progress = Schema.Struct({
   kind: Kind,
   ordinal: Ordinal,
@@ -81,7 +76,6 @@ export const Progress = Schema.Struct({
   render: Schema.optionalKey(Render),
   renderWithheldBytes: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
 })
-/** @experimental */
 export type Progress = typeof Progress.Type
 type ProgressEncoded = typeof Progress.Encoded
 
@@ -91,7 +85,7 @@ interface ProgressData {
 }
 
 /**
- * @experimental Encodes one progress record under `progressKey`.
+ * Encodes one progress record under `progressKey`.
  *
  * An oversized projection is withheld whole and reported as `renderWithheldBytes`: a partial diff
  * or a truncated artifact descriptor would render as a smaller correct change rather than as a
@@ -132,7 +126,7 @@ export interface Request<A = unknown, E = unknown> {
   readonly render?: (value: A) => Render
 }
 
-/** @experimental The same nested identity was reused with different content. */
+/** The same nested identity was reused with different content. */
 export class Divergence extends Schema.TaggedError<Divergence>()("generalist/core/NestedOperationDivergence", {
   operationKey: Schema.String,
   ordinal: Ordinal,
@@ -142,14 +136,14 @@ export class Divergence extends Schema.TaggedError<Divergence>()("generalist/cor
   requestedDigest: Schema.String,
 }) {}
 
-/** @experimental A non-idempotent nested operation crossed its boundary with an unobserved outcome. */
+/** A non-idempotent nested operation crossed its boundary with an unobserved outcome. */
 export class Unknown extends Schema.TaggedError<Unknown>()("generalist/core/NestedOperationUnknown", {
   operationKey: Schema.String,
   ordinal: Ordinal,
   operationId: Schema.String,
 }) {}
 
-/** @experimental The host denied the nested operation's approval request. */
+/** The host denied the nested operation's approval request. */
 export class Denied extends Schema.TaggedError<Denied>()("generalist/core/NestedOperationDenied", {
   operationKey: Schema.String,
   ordinal: Ordinal,
@@ -157,19 +151,17 @@ export class Denied extends Schema.TaggedError<Denied>()("generalist/core/Nested
   reason: Schema.String,
 }) {}
 
-/** @experimental The run must suspend until the host resolves the nested operation's approval. */
+/** The run must suspend until the host resolves the nested operation's approval. */
 export class Suspended extends Schema.TaggedError<Suspended>()("generalist/core/NestedOperationSuspended", {
   token: Schema.String,
   operationKey: Schema.String,
   ordinal: Ordinal,
   capability: Kind,
 }) {}
-
-/** @experimental */
 export type Failure = Divergence | Unknown | Denied | Suspended
 
 /**
- * @experimental Host seam executing one nested durable operation for a composite tool call.
+ * Host seam executing one nested durable operation for a composite tool call.
  *
  * Identity is derived, never supplied: the ambient `ToolContext` names the outer operation and the
  * host assigns the ordinal, so cell or tool code cannot forge, reorder, or collide with another
@@ -181,23 +173,21 @@ export interface Service {
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | Failure, R | ToolContext>
 }
-
-/** @experimental */
 export class Operations extends Context.Service<Operations, Service>()(
   "generalist/core/tools/nested-operation/Operations",
 ) {}
 
-/** @experimental Canonical payload digest shared by every nested-operation implementation. */
+/** Canonical payload digest shared by every nested-operation implementation. */
 export const payloadDigest: {
   (payload: Payload): (kind: string) => string
   (kind: string, payload: Payload): string
 } = Function.dual(2, (kind: string, payload: Payload): string => canonicalDigest({ kind, payload }))
 
-/** @experimental Derived operation id for one nested operation. */
+/** Derived operation id for one nested operation. */
 export const operationId = (input: { readonly operationKey: string; readonly ordinal: number }): string =>
   `${input.operationKey}#${input.ordinal}`
 
-/** @experimental Run one nested durable operation through the ambient host seam. */
+/** Run one nested durable operation through the ambient host seam. */
 export const run: {
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
@@ -215,7 +205,7 @@ export const run: {
     Effect.flatMap(Operations, (operations) => operations.run(request, effect)),
 )
 
-/** @experimental Translate a nested-operation approval suspension into the tool executor's Suspend outcome. */
+/** Translate a nested-operation approval suspension into the tool executor's Suspend outcome. */
 export const catchSuspension = <E, R>(effect: Effect.Effect<Outcome, E, R>) =>
   Effect.catchIf(effect, Schema.is(Suspended), (error) =>
     Effect.succeed<Outcome>({ _tag: "Suspend", token: error.token }),
@@ -230,7 +220,7 @@ interface DirectRecord {
 }
 
 /**
- * @experimental Process-local nested operations for hosts without durable storage.
+ * Process-local nested operations for hosts without durable storage.
  *
  * Identity, duplicate return, and divergence hold for the life of the run; approvals auto-approve
  * because a process-local host owns no resolution seam.
@@ -295,7 +285,5 @@ export const layerDirect: Layer.Layer<Operations> = Layer.effect(
     })
   }),
 )
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Operations> =>
   Layer.succeed(Operations, Operations.of(implementation))

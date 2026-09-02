@@ -17,7 +17,7 @@ const Manifest = Schema.Struct({
   skills: Schema.Array(ManifestSkill),
 })
 
-/** @experimental Shared hosted-catalog limits and trusted tools. */
+/** Shared hosted-catalog limits and trusted tools. */
 export interface Limits {
   readonly manifestMaxBytes?: number
   readonly bodyMaxBytes?: number
@@ -110,7 +110,7 @@ const decodeText = (source: string, bytes: Uint8Array): Effect.Effect<string, Sk
 const sameFrontmatter = (left: Frontmatter, right: Frontmatter): boolean =>
   JSON.stringify(left) === JSON.stringify(right)
 
-/** @experimental Validate one safe relative SKILL.md path. */
+/** Validate one safe relative SKILL.md path. */
 export const validateSkillPath: {
   (skillPath: string): (source: string) => Effect.Effect<string, SkillCatalogError>
   (source: string, skillPath: string): Effect.Effect<string, SkillCatalogError>
@@ -127,7 +127,7 @@ export const validateSkillPath: {
     : Effect.fail(sourceError(source, "Unsafe hosted skill path"))
 })
 
-/** @experimental Resolve a same-origin path beneath a manifest directory. */
+/** Resolve a same-origin path beneath a manifest directory. */
 export const resolveRelative: {
   (manifestUrl: string, skillPath: string): (source: string) => Effect.Effect<string, SkillCatalogError>
   (source: string, manifestUrl: string, skillPath: string): Effect.Effect<string, SkillCatalogError>
@@ -150,7 +150,7 @@ export const resolveRelative: {
   }),
 )
 
-/** @experimental Build a hosted manifest catalog over Effect HTTP and Crypto services. */
+/** Build a hosted manifest catalog over Effect HTTP and Crypto services. */
 export const make = (options: MakeOptions) =>
   Effect.gen(function* () {
     const client = yield* HttpClient.HttpClient

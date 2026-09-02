@@ -1,4 +1,4 @@
-/** @experimental Stable identity of one Agent execution. */
+/** Stable identity of one Agent execution. */
 export { RunId } from "./core/durable/run-id.js"
 export { withCacheBreakpoints } from "./core/model/prompt-cache.js"
 

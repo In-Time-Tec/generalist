@@ -17,16 +17,12 @@ import {
   type Config as OpenAIConfig,
   type RegistrationOptions,
 } from "./openai.js"
-
-/** @experimental */
 export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
   readonly config?: OpenAIConfig
   readonly classifyFailure?: FailureClassifier
 }
-
-/** @experimental */
 export interface ClientOptions extends Options {
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
   readonly baseUrl?: string
@@ -52,18 +48,14 @@ const clientOptions = (input: ClientOptions) => {
   const configured = input.apiKey === undefined ? input.clientConfig : { ...input.clientConfig, apiKey: input.apiKey }
   return input.baseUrl === undefined ? configured : { ...configured, apiUrl: Config.succeed(input.baseUrl) }
 }
-
-/** @experimental */
 export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   modelRegistryLayer([registration(registrationOptions(input))]).pipe(
     Layer.provide(openAiLayerConfig(clientOptions(input))),
   )
 
-/** @experimental Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
+/** Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
 export const layerModel = (
   input: Options,
 ): Model.Model<string, LanguageModel.LanguageModel, OpenAIClient.OpenAiClient> =>
   Model.make(input.provider ?? "openai-responses", input.model, layerLanguageModel(input))
-
-/** @experimental */
 export { decodeConfig, openAiLayerConfig as layerConfig, toolJsonSchemaCompiler }

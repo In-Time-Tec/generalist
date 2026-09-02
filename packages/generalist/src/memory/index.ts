@@ -13,8 +13,6 @@ export * as SemanticRecall from "./semantic-recall.js"
 export * as Supermemory from "./supermemory.js"
 export * as VectorStore from "./vector-store.js"
 export * as WorkingMemory from "./working-memory.js"
-
-/** @experimental */
 export interface Options {
   readonly working?: WorkingMemoryOptions
   readonly semantic?: SemanticRecallOptions
@@ -31,10 +29,7 @@ export type WorkingRequirement<O> = O extends { readonly working?: infer W }
     ? never
     : SummaryRequirement<Extract<W, WorkingMemoryOptions>>
   : never
-
-/** @experimental */
 export function layer(): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel>
-/** @experimental */
 export function layer<O extends Options>(
   options: O,
 ): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | WorkingRequirement<O>>

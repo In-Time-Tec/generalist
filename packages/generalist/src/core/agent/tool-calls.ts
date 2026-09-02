@@ -26,10 +26,10 @@ import { make as makeToolExecution } from "./tools/execution.js"
 import { resumeBatch } from "./tools/resume-batch.js"
 import type { AnyToolCall, PendingToolResult } from "./tools/result.js"
 
-/** @experimental One non-empty externally completed, authored-order framework tool-call batch. */
+/** One non-empty externally completed, authored-order framework tool-call batch. */
 export type ToolCallBatch = readonly [Response.ToolCallPartEncoded, ...ReadonlyArray<Response.ToolCallPartEncoded>]
 
-/** @experimental Host facts required before a new externally completed tool-call batch is admitted. */
+/** Host facts required before a new externally completed tool-call batch is admitted. */
 export interface ToolCallBatchStart {
   readonly _tag: "Start"
   readonly calls: ToolCallBatch
@@ -43,7 +43,7 @@ export interface ToolCallBatchStart {
   readonly invocation?: RunOptions["invocation"]
 }
 
-/** @experimental Host facts required to recover or resolve one persisted tool-call batch. */
+/** Host facts required to recover or resolve one persisted tool-call batch. */
 export interface ToolCallBatchResume {
   readonly _tag: "Resume"
   readonly driverCheckpoint: DriverCheckpoint
@@ -53,14 +53,14 @@ export interface ToolCallBatchResume {
   readonly invocation?: RunOptions["invocation"]
 }
 
-/** @experimental One fresh or persisted externally completed framework tool-call batch. */
+/** One fresh or persisted externally completed framework tool-call batch. */
 export type ToolCallBatchOptions = ToolCallBatchStart | ToolCallBatchResume
 
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
 
-/** @experimental Services used by externally completed framework calls; no LanguageModel call is performed. */
+/** Services used by externally completed framework calls; no LanguageModel call is performed. */
 export type ToolCallBatchRequirements<Tools extends Record<string, Tool.Any>, AuthorizationServices> =
   | AuthorizationServices
   | StaticToolServices<Tools>
@@ -354,7 +354,7 @@ const streamToolCallsImpl = <Tools extends Record<string, Tool.Any>, R, P, A>(
     }),
   )
 
-/** @experimental Execute one externally completed tool-call batch without invoking a LanguageModel. */
+/** Execute one externally completed tool-call batch without invoking a LanguageModel. */
 export const streamToolCalls: {
   (
     options: ToolCallBatchOptions,

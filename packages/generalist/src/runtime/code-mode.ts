@@ -49,14 +49,14 @@ const BudgetDimensions = [
 ] as const
 const AuthorityDimension = Schema.Literals(["sourceBytes", "tools", "agents", "steps", ...BudgetDimensions])
 
-/** @experimental Exact selection IDs advertised to the model for one ProgramAuthority. */
+/** Exact selection IDs advertised to the model for one ProgramAuthority. */
 export interface AuthorityCatalog {
   readonly tools: ReadonlyArray<string>
   readonly agents: ReadonlyArray<string>
   readonly steps: ReadonlyArray<string>
 }
 
-/** @experimental Construct the exact canonical selection catalog for one ProgramAuthority. */
+/** Construct the exact canonical selection catalog for one ProgramAuthority. */
 export const makeCatalog = (authority: ProgramAuthority): AuthorityCatalog => ({
   tools: authority.tools.map(({ name }) => name),
   agents: authority.agents.map(({ selection }) => selection),
@@ -66,7 +66,7 @@ export const makeCatalog = (authority: ProgramAuthority): AuthorityCatalog => ({
 const boundedInt = (minimum: number, maximum: number) =>
   Schema.Int.check(Schema.isGreaterThanOrEqualTo(minimum), Schema.isLessThanOrEqualTo(maximum))
 
-/** @experimental Exact model-authored Program request admitted only through an authorized Agent Run. */
+/** Exact model-authored Program request admitted only through an authorized Agent Run. */
 export interface Parameters {
   readonly source: string
   readonly input: string
@@ -86,7 +86,7 @@ const selectionArray = (catalog: ReadonlyArray<string>): Schema.Codec<ReadonlyAr
     ? Schema.Array(SelectionId).pipe(Schema.check(Schema.isMaxLength(0)))
     : Schema.Array(Schema.Literals(catalog)).pipe(Schema.check(Schema.isMaxLength(64)))
 
-/** @experimental Construct the model-visible request schema for one exact ProgramAuthority. */
+/** Construct the model-visible request schema for one exact ProgramAuthority. */
 export const makeParameters = (authority: ProgramAuthority) => {
   const catalog = makeCatalog(authority)
   return Schema.Struct({
@@ -106,14 +106,10 @@ export const makeParameters = (authority: ProgramAuthority) => {
     }),
   })
 }
-
-/** @experimental */
 export class ProgramAuthorityMissing extends Schema.TaggedError<ProgramAuthorityMissing>()(
   "generalist/runtime/ProgramAuthorityMissing",
   { runId: Schema.String },
 ) {}
-
-/** @experimental */
 export class ProgramAuthorityExceeded extends Schema.TaggedError<ProgramAuthorityExceeded>()(
   "generalist/runtime/ProgramAuthorityExceeded",
   {
@@ -123,8 +119,6 @@ export class ProgramAuthorityExceeded extends Schema.TaggedError<ProgramAuthorit
     message: Schema.String.check(Schema.isMaxLength(512)),
   },
 ) {}
-
-/** @experimental */
 export class ProgramAdmissionFailed extends Schema.TaggedError<ProgramAdmissionFailed>()(
   "generalist/runtime/ProgramAdmissionFailed",
   { message: Schema.String },
@@ -138,7 +132,7 @@ const makeDeclaration = (parameters: ReturnType<typeof makeParameters>) =>
     failure: Schema.Union([ProgramAuthorityMissing, ProgramAuthorityExceeded, ProgramAdmissionFailed]),
   })
 
-/** @experimental Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority. */
+/** Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority. */
 export const makeTool = (authority: ProgramAuthority) => makeDeclaration(makeParameters(authority))
 
 const selected = <A>(
@@ -238,7 +232,7 @@ export interface Service {
   }) => Effect.Effect<void, ProgramAdmissionFailed>
 }
 
-/** @experimental Construct the Run-attempt scoped implementation; applications still own sandbox and handlers resolution. */
+/** Construct the Run-attempt scoped implementation; applications still own sandbox and handlers resolution. */
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
@@ -362,7 +356,7 @@ export const make = (input: {
   }
 }
 
-/** @experimental Add the Runtime-owned parallel-safe declaration without changing the resolved Agent identity. */
+/** Add the Runtime-owned parallel-safe declaration without changing the resolved Agent identity. */
 export const withTool: {
   (
     implementation: Service,
@@ -411,7 +405,7 @@ export const withTool: {
   },
 )
 
-/** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
+/** Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
 const makeExecutor = <
   Tools extends Record<string, Tool.Any>,
   R,
@@ -470,5 +464,5 @@ const makeExecutor = <
   })
 }
 
-/** @experimental Tool executor that owns the code_mode route. */
+/** Tool executor that owns the code_mode route. */
 export const Executor = { make: makeExecutor }

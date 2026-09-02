@@ -9,7 +9,7 @@ export class TreeCursorInvalid extends Schema.TaggedError<TreeCursorInvalid>()("
   message: Schema.String,
 }) {}
 
-/** @experimental The cursor belongs to a different root Run. */
+/** The cursor belongs to a different root Run. */
 export class TreeCursorRootMismatch extends Schema.TaggedError<TreeCursorRootMismatch>()(
   "generalist/runtime/TreeCursorRootMismatch",
   {

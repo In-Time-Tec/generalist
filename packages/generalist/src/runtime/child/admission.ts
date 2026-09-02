@@ -17,7 +17,7 @@ import type { Service as RunStoreService } from "../run/store.js"
 import type { ChildReadiness } from "./readiness.js"
 
 /**
- * @experimental A Run addressed a child it does not own.
+ * A Run addressed a child it does not own.
  *
  * Parentage is read from the durable child record, so knowing a child Run id grants nothing to a
  * Run that did not admit it.
@@ -27,18 +27,17 @@ export class ChildParentageInvalid extends Schema.TaggedError<ChildParentageInva
   { parentRunId: Schema.String, childRunId: Schema.String },
 ) {}
 
-/** @experimental Parameters for one non-blocking child admission. */
+/** Parameters for one non-blocking child admission. */
 export const AdmitParameters = Schema.Struct({
   selection: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
   prompt: Schema.String.check(Schema.isNonEmpty()),
   /** Host-supplied admission identity. Two admissions under one key name one child. */
   key: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
 })
-/** @experimental */
 export type AdmitParameters = typeof AdmitParameters.Type
 
 /**
- * @experimental Stable receipt returned at admission, never an outcome.
+ * Stable receipt returned at admission, never an outcome.
  *
  * Admission answers "which durable child owns this work", not "what did it produce". A caller that
  * wants the answer joins explicitly, so a crash between admission and join never loses the child.
@@ -48,10 +47,9 @@ export const AdmitReceipt = Schema.Struct({
   key: Schema.String,
   duplicate: Schema.Boolean,
 })
-/** @experimental */
 export type AdmitReceipt = typeof AdmitReceipt.Type
 
-/** @experimental One direct child as the parent may observe it. */
+/** One direct child as the parent may observe it. */
 export interface ChildInspection {
   readonly childRunId: string
   readonly status: RunStatus
@@ -62,7 +60,7 @@ export interface ChildInspection {
 }
 
 /**
- * @experimental Non-blocking direct-child operations scoped to one parent Run.
+ * Non-blocking direct-child operations scoped to one parent Run.
  *
  * Every operation takes the parent Run id the host derived from the ambient `ToolContext`. Model
  * code never supplies parentage, so a child cannot be adopted, inspected, or cancelled by a Run
@@ -77,8 +75,6 @@ export type AdmitChildError =
   | RunNotFound
   | RunTerminal
   | RuntimeUnavailable
-
-/** @experimental */
 export type ChildLookupError = ChildParentageInvalid | RunNotFound | RuntimeUnavailable
 
 export interface Service {
@@ -111,7 +107,7 @@ export interface Service {
 }
 
 /**
- * @experimental Where one admitted child came from, carried on the admission itself.
+ * Where one admitted child came from, carried on the admission itself.
  *
  * A cell admits many children in one tool call, so the tool call alone does not say which cell
  * statement produced which child, nor in what order. Origin names the operation that ran the code
@@ -125,7 +121,7 @@ export interface ChildOrigin {
 }
 
 /**
- * @experimental The invocation identity one admission key names beneath its parent.
+ * The invocation identity one admission key names beneath its parent.
  *
  * Origin travels inside the invocation id because `invocationId` is the one admission field that
  * Generalist already carries into `ChildLinked` and every canonical child-tree event. Encoding it here
@@ -143,14 +139,14 @@ export const invocationIdFor = (input: {
         input.origin.ordinal
       }:${encodeURIComponent(input.key)}`
 
-/** @experimental The complete admission identity one invocation id carries. */
+/** The complete admission identity one invocation id carries. */
 export interface ChildAdmissionIdentity {
   readonly toolCallId: string
   readonly key: string
   readonly origin?: ChildOrigin
 }
 
-/** @experimental Read the admission identity an invocation id encodes, if it is one. */
+/** Read the admission identity an invocation id encodes, if it is one. */
 export const admissionOf = (invocationId: string): ChildAdmissionIdentity | undefined => {
   const parts = invocationId.split(":")
   if (parts[0] !== "child-admit") return undefined
@@ -170,11 +166,11 @@ export const admissionOf = (invocationId: string): ChildAdmissionIdentity | unde
   }
 }
 
-/** @experimental Read the origin an invocation id carries, if it carries one. */
+/** Read the origin an invocation id carries, if it carries one. */
 export const originOf = (invocationId: string): ChildOrigin | undefined => admissionOf(invocationId)?.origin
 
 /**
- * @experimental Build non-blocking child admission over one RunStore.
+ * Build non-blocking child admission over one RunStore.
  *
  * This is additive: blocking `invoke` and the child-group operations keep their existing semantics.
  * A host that wants an immediate handle uses `admit`; a host that wants the loop to wait uses the
@@ -279,7 +275,7 @@ export const make = (store: RunStoreService): Service => {
 }
 
 /**
- * @experimental Parent Run identity the host derived, never text the model supplied.
+ * Parent Run identity the host derived, never text the model supplied.
  *
  * A route reads parentage here rather than from tool parameters, which is what makes admission,
  * inspection, and cancellation unforgeable from model code.
@@ -311,7 +307,6 @@ const origin: Effect.Effect<
 })
 
 /**
- * @experimental
  *
  * @effect-expect-leaking ToolContext
  * ToolContext is the per-call ambient identity of the running execution. Binding one Run into the
@@ -339,7 +334,7 @@ export class AgentChildren extends Context.Service<
 >()("generalist/runtime/child/admission/AgentChildren") {}
 
 /**
- * @experimental Build in-execution direct-child operations over one RunStore.
+ * Build in-execution direct-child operations over one RunStore.
  *
  * The ordinal is derived from the parent's own durable children, never from an in-process counter
  * and never from the caller's payload. Two properties depend on that choice. It is unforgeable,

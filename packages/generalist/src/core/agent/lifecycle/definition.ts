@@ -11,17 +11,17 @@ import type { ToolOrigin } from "../event.js"
 
 export const AgentTypeId = "generalist/core/Agent"
 
-/** @experimental Agent-owned metadata values. */
+/** Agent-owned metadata values. */
 export type AgentMetadata = Readonly<Record<string, Schema.Json>>
 
-/** @experimental An agent definition: a plain value, not a service. */
+/** An agent definition: a plain value, not a service. */
 export interface HandoffAgent<R> {
   readonly name: string
   readonly description?: string
   readonly requirements: (value: R) => R
 }
 
-/** @experimental An Agent definition carrying its tools, requirements, input, and output contract. */
+/** An Agent definition carrying its tools, requirements, input, and output contract. */
 export interface Agent<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   R = LanguageModel.LanguageModel,
@@ -52,7 +52,7 @@ export interface Agent<
 }
 
 /**
- * @experimental Safe scheduling policy for framework-executed calls emitted by one model turn. Tools not explicitly
+ * Safe scheduling policy for framework-executed calls emitted by one model turn. Tools not explicitly
  * listed as parallel-safe execute as authored-order exclusive barriers.
  */
 export interface ToolSchedulingPolicy {
@@ -60,13 +60,13 @@ export interface ToolSchedulingPolicy {
   readonly parallelSafe: ReadonlyArray<string>
 }
 
-/** @experimental One origin-preserving static or Handoff tool declaration. */
+/** One origin-preserving static or Handoff tool declaration. */
 export interface ToolDeclaration {
   readonly tool: Tool.Any
   readonly origin: Extract<ToolOrigin, { readonly _tag: "Static" | "Handoff" }>
 }
 
-/** @experimental One Agent observed where its tool and requirement types are hidden. */
+/** One Agent observed where its tool and requirement types are hidden. */
 export interface Any {
   readonly [AgentTypeId]: unknown
   readonly name: string
@@ -83,7 +83,7 @@ export interface Any {
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
 }
 
-/** @experimental Services closed over with an Agent. */
+/** Services closed over with an Agent. */
 export type ClosedServices<
   Tools extends Record<string, Tool.Any>,
   R,
@@ -97,7 +97,7 @@ export type ClosedServices<
   | OutputCodec["DecodingServices"]
   | OutputCodec["EncodingServices"]
 
-/** @experimental Consumer of a hidden Agent identity and its environment. */
+/** Consumer of a hidden Agent identity and its environment. */
 export interface Opened<A> {
   <Tools extends Record<string, Tool.Any>, R, InputSchema extends Schema.Top, OutputSchema extends Schema.Top>(
     agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>,
@@ -105,28 +105,28 @@ export interface Opened<A> {
   ): A
 }
 
-/** @experimental An Agent closed over its exact environment. */
+/** An Agent closed over its exact environment. */
 export interface Closed extends Any {
   readonly open: <A>(f: Opened<A>) => A
 }
 
-/** @experimental Extract an agent's runtime requirements. */
+/** Extract an agent's runtime requirements. */
 export type Requirements<A> = A extends Agent<infer _Tools, infer R> ? R : never
 
-/** @experimental Extract an Agent's decoded input type. */
+/** Extract an Agent's decoded input type. */
 export type Input<A> = A extends { readonly input: infer InputCodec extends Schema.Top } ? InputCodec["Type"] : never
 
-/** @experimental Extract an Agent's encoded input type. */
+/** Extract an Agent's encoded input type. */
 export type EncodedInput<A> = A extends { readonly input: infer InputCodec extends Schema.Top }
   ? InputCodec["Encoded"]
   : never
 
-/** @experimental Extract an Agent's decoded output type. */
+/** Extract an Agent's decoded output type. */
 export type Output<A> = A extends { readonly output: infer OutputCodec extends Schema.Top }
   ? OutputCodec["Type"]
   : never
 
-/** @experimental Extract an Agent's encoded output type. */
+/** Extract an Agent's encoded output type. */
 export type EncodedOutput<A> = A extends { readonly output: infer OutputCodec extends Schema.Top }
   ? OutputCodec["Encoded"]
   : never
@@ -150,7 +150,7 @@ const cloneToolkit = <Tools extends Record<string, Tool.Any>>(
   return candidate
 }
 
-/** @experimental Close one Agent over the exact environment it requires. */
+/** Close one Agent over the exact environment it requires. */
 export const close: {
   <Tools extends Record<string, Tool.Any>, R>(
     environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
@@ -183,7 +183,7 @@ export const close: {
   ): Closed => ({ ...agent, open: (f) => f(agent, environment) }),
 )
 
-/** @experimental Add host-owned tools while preserving an Agent's requirements. */
+/** Add host-owned tools while preserving an Agent's requirements. */
 export const withTools: {
   <Tools extends Record<string, Tool.Any>, R>(
     declared: ReadonlyArray<Tool.Any>,

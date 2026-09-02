@@ -47,7 +47,7 @@ export interface AdmitStartInput extends AdmitSendInput {
   >
 }
 
-/** @experimental Exact Runtime-internal Program child admission. */
+/** Exact Runtime-internal Program child admission. */
 export interface AdmitProgramChildInput extends ExecutionClaim {
   readonly childRunId: string
   readonly invocationId: string
@@ -57,7 +57,7 @@ export interface AdmitProgramChildInput extends ExecutionClaim {
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
-/** @experimental Atomic Code Mode child admissions and parent suspension. */
+/** Atomic Code Mode child admissions and parent suspension. */
 export interface AdmitProgramChildAndSuspendInput extends ExecutionClaim {
   readonly children: readonly [
     Omit<AdmitProgramChildInput, keyof ExecutionClaim>,
@@ -89,7 +89,7 @@ export interface RecordOperationInput extends ExecutionClaim {
   readonly steeringEvents?: ReadonlyArray<DurableAgentLoopEvent>
 }
 
-/** @experimental Exact durable mailbox admission derived from authoritative sender identity. */
+/** Exact durable mailbox admission derived from authoritative sender identity. */
 export interface AdmitMessageInput {
   readonly fromRunId: string
   readonly fromAddress: Address
@@ -106,14 +106,8 @@ export interface AdmitMessageInput {
   readonly metadata: Metadata
   readonly bounds: MailboxBounds
 }
-
-/** @experimental */
 export type AdmitMessageError = MailboxFull | MailboxRateLimited | MessageConflict | RunNotFound | RuntimeUnavailable
-
-/** @experimental */
 export type DirectoryLookupError = RunNotFound | RuntimeUnavailable
-
-/** @experimental */
 export type ResolveAddressError = import("../errors.js").AddressNotFound | AddressInvalid | RuntimeUnavailable
 
 export interface AdmitSteeringInput {
@@ -155,7 +149,7 @@ export interface ExecutionRecord {
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
-/** @experimental Storage-issued authority for one exact Runtime Session writer. */
+/** Storage-issued authority for one exact Runtime Session writer. */
 export interface SessionWriteClaim {
   readonly sessionId: string
   readonly runId: string
@@ -164,7 +158,7 @@ export interface SessionWriteClaim {
   readonly epoch: string
 }
 
-/** @experimental Read-only Session history capability. */
+/** Read-only Session history capability. */
 export type SessionReader = Pick<SessionService, "path" | "leaf">
 
 export interface ExecutionClaim {

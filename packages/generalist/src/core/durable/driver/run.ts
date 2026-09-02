@@ -4,11 +4,7 @@ import { Exhausted, type BudgetLimits, type RunBudget } from "../run-budget.js"
 import { LoopDriverState } from "../loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../service.js"
 import type { ControlState } from "../../agent/handoff/state.js"
-
-/** @experimental */
 export const checkpoint = Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.checkpoint)
-
-/** @experimental */
 export const logicalOperationId = checkpoint.pipe(
   Effect.flatMap((current) =>
     Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
@@ -17,8 +13,6 @@ export const logicalOperationId = checkpoint.pipe(
     ),
   ),
 )
-
-/** @experimental */
 export const intercept: {
   <A, E, SRD, SRE, FRD, FRE>(
     spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
@@ -52,8 +46,6 @@ export const intercept: {
       return yield* interpreter.run(spec, effect)
     }),
 )
-
-/** @experimental */
 export const interceptStream: {
   <A, E, SRD, SRE, FRD, FRE>(
     spec: OperationSpec<ReadonlyArray<A>, E, SRD, SRE, FRD, FRE>,
@@ -100,30 +92,18 @@ export const updateToolBatch = (
     checkpoint: import("../../agent/tools/checkpoint.js").ToolBatchCheckpoint,
   ) => import("../../agent/tools/checkpoint.js").ToolBatchCheckpoint,
 ) => Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.updateToolBatch(update))
-
-/** @experimental */
 export const abortPending = (error: typeof Schema.Unknown.Type) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.abortPending(error))
-
-/** @experimental */
 export const chargeUsage = (usage: BudgetLimits) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.chargeUsage(usage))
-
-/** @experimental */
 export const setBudget = (budget: RunBudget) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.setBudget(budget))
-
-/** @experimental */
 export const reserveChildBudget = (grant: BudgetLimits) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.reserveChild(grant))
-
-/** @experimental */
 export const refundChildBudget = (child: RunBudget) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.refundChild(child))
 
 /** @internal Persist a live handoff control transition in the owning checkpoint. */
 export const setHandoffState = (state: ControlState) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.setHandoffState(state))
-
-/** @experimental */
 export const recorded = Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.recorded)

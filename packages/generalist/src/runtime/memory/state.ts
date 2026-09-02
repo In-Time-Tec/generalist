@@ -25,7 +25,7 @@ export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavaila
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
 export type TreeSubscriberQueue = Queue.Queue<void, RuntimeUnavailable>
 
-/** @experimental Internal publication deferred until the owning memory transition commits. */
+/** Internal publication deferred until the owning memory transition commits. */
 export interface MemoryPublication {
   readonly runId: string
   readonly event: RunEvent

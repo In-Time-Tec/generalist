@@ -34,12 +34,11 @@ const LimitEnforcement = Schema.Union([
   Schema.Struct({ status: Schema.Literal("unenforced"), reason: identityText }),
 ])
 
-/** @experimental Exact normalized JavaScript module supplied to an isolated executor. */
+/** Exact normalized JavaScript module supplied to an isolated executor. */
 export const Module = Schema.Struct({ name: moduleName, source: Schema.String })
-/** @experimental */
 export type Module = typeof Module.Type
 
-/** @experimental Explicit capability authority admitted for one execution. */
+/** Explicit capability authority admitted for one execution. */
 export const CapabilityGrant = Schema.Struct({
   operation: Schema.Literals([
     "discoverTools",
@@ -53,13 +52,12 @@ export const CapabilityGrant = Schema.Struct({
   ]),
   names: Schema.Array(Schema.String),
 })
-/** @experimental */
 export type CapabilityGrant = typeof CapabilityGrant.Type
 
-/** @experimental Canonical protocol version implemented by CodeExecutor adapters. */
+/** Canonical protocol version implemented by CodeExecutor adapters. */
 export const protocolVersion = "1" as const
 
-/** @experimental Complete immutable reconstruction request for one sandbox invocation. */
+/** Complete immutable reconstruction request for one sandbox invocation. */
 export interface Request {
   readonly protocolVersion: typeof protocolVersion
   readonly requestId: string
@@ -79,7 +77,7 @@ export interface Request {
   readonly capabilities: ReadonlyArray<CapabilityGrant>
 }
 
-/** @experimental Identity-bound encoded output returned by an isolated executor. */
+/** Identity-bound encoded output returned by an isolated executor. */
 export const Result = Schema.Struct({
   protocolVersion: Schema.Literal(protocolVersion),
   requestId: Schema.String,
@@ -88,65 +86,53 @@ export const Result = Schema.Struct({
   outputCodec: Schema.String,
   output: Schema.Unknown,
 })
-/** @experimental */
 export type Result = typeof Result.Type
-
-/** @experimental */
 export class SandboxUnavailable extends Schema.TaggedError<SandboxUnavailable>()("generalist/core/SandboxUnavailable", {
   message: Schema.String,
 }) {}
-/** @experimental */
 export class SandboxSourceInvalid extends Schema.TaggedError<SandboxSourceInvalid>()(
   "generalist/core/SandboxSourceInvalid",
   {
     message: Schema.String,
   },
 ) {}
-/** @experimental */
 export class SandboxInputInvalid extends Schema.TaggedError<SandboxInputInvalid>()(
   "generalist/core/SandboxInputInvalid",
   {
     message: Schema.String,
   },
 ) {}
-/** @experimental */
 export class SandboxOutputInvalid extends Schema.TaggedError<SandboxOutputInvalid>()(
   "generalist/core/SandboxOutputInvalid",
   {
     message: Schema.String,
   },
 ) {}
-/** @experimental */
 export class SandboxProtocolViolation extends Schema.TaggedError<SandboxProtocolViolation>()(
   "generalist/core/SandboxProtocolViolation",
   { message: Schema.String },
 ) {}
-/** @experimental */
 export class SandboxDeadlineExceeded extends Schema.TaggedError<SandboxDeadlineExceeded>()(
   "generalist/core/SandboxDeadlineExceeded",
   { message: Schema.String },
 ) {}
-/** @experimental */
 export class SandboxCancelled extends Schema.TaggedError<SandboxCancelled>()("generalist/core/SandboxCancelled", {
   message: Schema.String,
 }) {}
-/** @experimental */
 export class SandboxResourceExceeded extends Schema.TaggedError<SandboxResourceExceeded>()(
   "generalist/core/SandboxResourceExceeded",
   { resource: Schema.Literals(["cpu", "subrequests", "output"]), limit: positiveInt },
 ) {}
-/** @experimental */
 export class SandboxGuaranteeUnavailable extends Schema.TaggedError<SandboxGuaranteeUnavailable>()(
   "generalist/core/SandboxGuaranteeUnavailable",
   { guarantee: guaranteeName, message: Schema.String },
 ) {}
-/** @experimental */
 export class SandboxExecutionFailure extends Schema.TaggedError<SandboxExecutionFailure>()(
   "generalist/core/SandboxExecutionFailure",
   { message: Schema.String },
 ) {}
 
-/** @experimental Typed failures that may cross the sandbox capability protocol. */
+/** Typed failures that may cross the sandbox capability protocol. */
 export const ExecutionFailure = Schema.Union([
   SandboxUnavailable,
   SandboxSourceInvalid,
@@ -160,10 +146,9 @@ export const ExecutionFailure = Schema.Union([
   SandboxGuaranteeUnavailable,
   CapabilityFailure,
 ])
-/** @experimental */
 export type ExecutionFailure = typeof ExecutionFailure.Type
 
-/** @experimental Persistable provider facts and exact guarantees enforced for every invocation. */
+/** Persistable provider facts and exact guarantees enforced for every invocation. */
 export const Identity = Schema.Struct({
   provider: identityText,
   implementation: Schema.Struct({ name: identityText, version: identityText }),
@@ -191,10 +176,9 @@ export const Identity = Schema.Struct({
   }),
   knownLimitations: Schema.Array(identityText).pipe(Schema.check(Schema.isMaxLength(16))),
 })
-/** @experimental */
 export type Identity = typeof Identity.Type
 
-/** @experimental Validate and deeply freeze persistable executor identity facts. */
+/** Validate and deeply freeze persistable executor identity facts. */
 export const declareIdentity = (input: Identity): Identity => {
   const identity = Schema.decodeSync(Identity, { onExcessProperty: "error" })(input)
   const freezeEnforcement = <A extends typeof Enforcement.Type | typeof LimitEnforcement.Type>(value: A): A =>
@@ -216,14 +200,12 @@ export const declareIdentity = (input: Identity): Identity => {
     knownLimitations: Object.freeze([...identity.knownLimitations]),
   })
 }
-
-/** @experimental */
 export interface Service {
   readonly identity: Identity
   readonly execute: (request: Request) => Effect.Effect<Result, ExecutionFailure, ProgramCapabilities | Scope.Scope>
 }
 
-/** @experimental Host-supplied isolated source executor. */
+/** Host-supplied isolated source executor. */
 export class CodeExecutor extends Context.Service<CodeExecutor, Service>()(
   "generalist/core/program/code-executor/CodeExecutor",
 ) {}
@@ -231,7 +213,7 @@ export class CodeExecutor extends Context.Service<CodeExecutor, Service>()(
 const guaranteeUnavailable = (guarantee: typeof guaranteeName.Type, message: string): SandboxGuaranteeUnavailable =>
   SandboxGuaranteeUnavailable.make({ guarantee, message })
 
-/** @experimental Fail closed before source evaluation when an executor cannot enforce the normalized request. */
+/** Fail closed before source evaluation when an executor cannot enforce the normalized request. */
 export const admit: {
   (request: Request, nowMillis: number): (identity: Identity) => Effect.Effect<void, SandboxGuaranteeUnavailable>
   (identity: Identity, request: Request, nowMillis: number): Effect.Effect<void, SandboxGuaranteeUnavailable>
@@ -264,7 +246,7 @@ export const admit: {
   return Effect.void
 })
 
-/** @experimental Strictly decode a result and bind every protocol and codec identity field to its request. */
+/** Strictly decode a result and bind every protocol and codec identity field to its request. */
 export const validateResult: {
   (value: Schema.Json): (request: Request) => Effect.Effect<Result, SandboxProtocolViolation>
   (request: Request, value: Schema.Json): Effect.Effect<Result, SandboxProtocolViolation>
@@ -283,7 +265,7 @@ export const validateResult: {
   ),
 )
 
-/** @experimental Compute the sole digest representation for normalized source. */
+/** Compute the sole digest representation for normalized source. */
 export const sourceDigest = (input: {
   readonly modules: ReadonlyArray<Module>
   readonly entrypoint: string
@@ -305,7 +287,7 @@ export const sourceDigest = (input: {
     outputCodec: input.outputCodec,
   })
 
-/** @experimental Synthesize the canonical single-module request used by current Program manifests. */
+/** Synthesize the canonical single-module request used by current Program manifests. */
 export const makeRequest = (input: {
   readonly requestId: string
   readonly source: string
@@ -350,7 +332,7 @@ export const makeRequest = (input: {
   }
 }
 
-/** @experimental Identity carried by trusted fixture executors. */
+/** Identity carried by trusted fixture executors. */
 export const testIdentity: Identity = declareIdentity({
   provider: "generalist",
   implementation: { name: "generalist/CodeExecutor/test", version: "1" },
@@ -373,12 +355,12 @@ export const testIdentity: Identity = declareIdentity({
   knownLimitations: ["Trusted test fixture only; it provides no source or host isolation."],
 })
 
-/** @experimental Trusted fixture executor for tests only. */
+/** Trusted fixture executor for tests only. */
 export type TestExecute = (
   request: Request,
 ) => Effect.Effect<unknown, ExecutionFailure, ProgramCapabilities | Scope.Scope>
 
-/** @experimental Trusted fixture executor for tests only. */
+/** Trusted fixture executor for tests only. */
 export const makeTest = (execute: TestExecute): Service =>
   CodeExecutor.of({
     identity: testIdentity,
@@ -399,6 +381,6 @@ export const makeTest = (execute: TestExecute): Service =>
       ),
   })
 
-/** @experimental Trusted fixture Layer for tests only. It provides no source isolation. */
+/** Trusted fixture Layer for tests only. It provides no source isolation. */
 export const layerTest = (execute: TestExecute): Layer.Layer<CodeExecutor> =>
   Layer.succeed(CodeExecutor, makeTest(execute))

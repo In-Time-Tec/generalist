@@ -13,8 +13,6 @@ import {
 import type { AwsCredentialIdentity } from "@smithy/types"
 import { Context, Effect, Layer, Option, Redacted, Schema, Semaphore } from "effect"
 import { defaultChain, type Credential, type Credentials } from "./credentials.js"
-
-/** @experimental */
 export class ClientFailure extends Schema.TaggedError<ClientFailure>()("generalist/ai/AmazonBedrockClientFailure", {
   operation: Schema.Literals(["converse", "converseStream", "invokeModel"]),
   description: Schema.String,
@@ -23,31 +21,21 @@ export class ClientFailure extends Schema.TaggedError<ClientFailure>()("generali
   httpStatus: Schema.optional(Schema.Finite),
   requestId: Schema.optional(Schema.String),
 }) {}
-
-/** @experimental */
 export class RecoveryFailure extends Schema.TaggedError<RecoveryFailure>()(
   "generalist/ai/AmazonBedrockRecoveryFailure",
   {
     description: Schema.String,
   },
 ) {}
-
-/** @experimental */
 export interface Service {
   readonly converse: (input: ConverseCommandInput) => Effect.Effect<ConverseCommandOutput, ClientFailure>
   readonly converseStream: (input: ConverseCommandInput) => Effect.Effect<ConverseStreamCommandOutput, ClientFailure>
   readonly invokeModel: (input: InvokeModelCommandInput) => Effect.Effect<InvokeModelCommandOutput, ClientFailure>
 }
-
-/** @experimental */
 export interface Recovery {
   readonly recover: (rejectedGeneration: string) => Effect.Effect<void, RecoveryFailure>
 }
-
-/** @experimental */
 export class Client extends Context.Service<Client, Service>()("generalist/ai/provider/amazon-bedrock/client") {}
-
-/** @experimental */
 export interface ClientOptions {
   readonly region?: string
   readonly endpoint?: string
@@ -65,8 +53,6 @@ const awsMetadata = Schema.Struct({
   httpStatusCode: Schema.optionalKey(Schema.Finite),
   requestId: Schema.optionalKey(Schema.String),
 })
-
-/** @experimental */
 export const isRecoverableCredentialFailure = (failure: ClientFailure): boolean =>
   failure.awsErrorName !== undefined && recoverable.has(failure.awsErrorName)
 
@@ -134,8 +120,6 @@ const wrapStream = (output: ConverseStreamCommandOutput, client: BedrockRuntimeC
     },
   }
 }
-
-/** @experimental */
 export const layerClient = (options: ClientOptions = {}) => {
   if (options.client !== undefined) return Layer.succeed(Client, options.client)
   return Layer.effect(

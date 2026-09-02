@@ -21,8 +21,8 @@ const estimateSerializedTokens = (value: SerializedPromptValue): number => {
   return Math.ceil(text.length / APPROX_CHARS_PER_TOKEN) + images * IMAGE_TOKEN_ESTIMATE
 }
 
-/** @experimental Provider-realistic fallback estimate for a prompt when no tokenizer is installed. */
+/** Provider-realistic fallback estimate for a prompt when no tokenizer is installed. */
 export const estimatePromptTokens = (prompt: Prompt.Prompt): number => estimateSerializedTokens(prompt.content)
 
-/** @experimental Provider-realistic fallback estimate for one prompt message. */
+/** Provider-realistic fallback estimate for one prompt message. */
 export const estimateMessageTokens = (message: Prompt.Message): number => estimateSerializedTokens(message)

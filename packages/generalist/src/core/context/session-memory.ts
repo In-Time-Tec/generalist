@@ -276,7 +276,7 @@ interface Cell {
 
 const makeCell: Effect.Effect<Cell> = Effect.all({ store: makeStore, semaphore: Semaphore.make(1) })
 
-/** @experimental Ref-backed non-durable Session directory with one linear lane per Session ID. */
+/** Ref-backed non-durable Session directory with one linear lane per Session ID. */
 export const layerMemory: Layer.Layer<SessionDirectory> = Layer.effect(
   SessionDirectory,
   SynchronizedRef.make<ReadonlyMap<string, Cell>>(new Map()).pipe(

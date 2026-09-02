@@ -50,7 +50,7 @@ export class ExecutableIdentityMismatch extends Schema.TaggedError<ExecutableIde
   },
 ) {}
 
-/** @experimental The structured Agent failures a durable terminal event preserves verbatim. */
+/** The structured Agent failures a durable terminal event preserves verbatim. */
 export type StructuredAgentFailure = Exhausted | ResumeMismatch
 
 export const StructuredAgentFailure: Schema.Codec<
@@ -145,13 +145,13 @@ export class ResponseConflict extends Schema.TaggedError<ResponseConflict>()("ge
   waitId: Schema.String,
 }) {}
 
-/** @experimental The approval no longer names an unresolved request. */
+/** The approval no longer names an unresolved request. */
 export class ApprovalStale extends Schema.TaggedError<ApprovalStale>()("generalist/runtime/ApprovalStale", {
   runId: Schema.String,
   approvalId: Schema.String,
 }) {}
 
-/** @experimental The response conflicts with the authoritative approval identity or decision. */
+/** The response conflicts with the authoritative approval identity or decision. */
 export class ApprovalMismatch extends Schema.TaggedError<ApprovalMismatch>()("generalist/runtime/ApprovalMismatch", {
   runId: Schema.String,
   approvalId: Schema.String,
@@ -176,14 +176,14 @@ export class TreeCursorExpired extends Schema.TaggedError<TreeCursorExpired>()("
   earliestCursor: TreeCursor,
 }) {}
 
-/** @experimental The cursor names a position that has not committed. */
+/** The cursor names a position that has not committed. */
 export class TreeCursorFuture extends Schema.TaggedError<TreeCursorFuture>()("generalist/runtime/TreeCursorFuture", {
   rootRunId: Schema.String,
   cursor: TreeCursor,
   latestCursor: TreeCursor,
 }) {}
 
-/** @experimental A replay request falls outside the fixed page-size contract. */
+/** A replay request falls outside the fixed page-size contract. */
 export class TreeReplayLimitInvalid extends Schema.TaggedError<TreeReplayLimitInvalid>()(
   "generalist/runtime/TreeReplayLimitInvalid",
   {
@@ -198,7 +198,7 @@ export class SubscriberLagged extends Schema.TaggedError<SubscriberLagged>()("ge
   lastDeliveredSequence: Schema.Int,
 }) {}
 
-/** @experimental The acknowledged sequence is not a valid processed-through point for the Run. */
+/** The acknowledged sequence is not a valid processed-through point for the Run. */
 export class AckInvalid extends Schema.TaggedError<AckInvalid>()("generalist/runtime/AckInvalid", {
   runId: Schema.String,
   // oxlint-disable-next-line effecttsgo/schema-number
@@ -206,7 +206,7 @@ export class AckInvalid extends Schema.TaggedError<AckInvalid>()("generalist/run
   message: Schema.String,
 }) {}
 
-/** @experimental The acknowledged sequence is beyond the last committed model cycle. */
+/** The acknowledged sequence is beyond the last committed model cycle. */
 export class AckBeyondCommitted extends Schema.TaggedError<AckBeyondCommitted>()(
   "generalist/runtime/AckBeyondCommitted",
   {

@@ -419,7 +419,7 @@ const registerNotificationRecovery = <LayerError, ClaimsLayerError>(
   )
 }
 
-/** @experimental Registers only the conformance suites selected by the supplied driver capabilities. */
+/** Registers only the conformance suites selected by the supplied driver capabilities. */
 export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): void => {
   const suite = options.skip === true ? describe.skip : describe
   suite(`${options.name} Generalist Runtime driver conformance`, () => {

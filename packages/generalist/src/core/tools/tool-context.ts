@@ -1,13 +1,13 @@
 import { Context, Effect, Layer, Schema } from "effect"
 
-/** @experimental A progress update emitted by a running tool. */
+/** A progress update emitted by a running tool. */
 export interface Progress {
   readonly toolCallId: string
   readonly message?: string
   readonly data?: Schema.JsonObject
 }
 
-/** @experimental Ambient context available to a tool handler for the current call. */
+/** Ambient context available to a tool handler for the current call. */
 export interface Service {
   readonly signal: AbortSignal
   readonly emit: (progress: Progress) => Effect.Effect<boolean>
@@ -21,13 +21,9 @@ export interface Service {
   readonly admittedAt?: string
   readonly deadline?: string
 }
-
-/** @experimental */
 export class ToolContext extends Context.Service<ToolContext, Service>()(
   "generalist/core/tools/tool-context/ToolContext",
 ) {}
-
-/** @experimental */
 export const layerDefault: Layer.Layer<ToolContext> = Layer.sync(ToolContext, () =>
   ToolContext.of({
     signal: new AbortController().signal,
@@ -35,7 +31,5 @@ export const layerDefault: Layer.Layer<ToolContext> = Layer.sync(ToolContext, ()
     sessionId: "local",
   }),
 )
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<ToolContext> =>
   Layer.succeed(ToolContext, ToolContext.of(implementation))

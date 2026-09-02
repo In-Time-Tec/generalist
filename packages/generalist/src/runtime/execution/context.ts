@@ -9,7 +9,7 @@ import { Executor as CodeModeExecutor, type Service as CodeModeService } from ".
 import type { Service as Operations } from "../operation/nested-operations.js"
 import type { Service as RunStoreService } from "../run/store.js"
 
-/** @experimental Select the resolved executable's ToolExecutor before the ambient host executor. */
+/** Select the resolved executable's ToolExecutor before the ambient host executor. */
 export const selectToolExecutor: {
   (ambient: Option.Option<ToolExecutorService>): <R>(services: Context.Context<R>) => Option.Option<ToolExecutorService>
   <R>(services: Context.Context<R>, ambient: Option.Option<ToolExecutorService>): Option.Option<ToolExecutorService>
@@ -19,7 +19,7 @@ export const selectToolExecutor: {
 })
 
 /**
- * @experimental Build the Run-scoped context that hosts one resolved Agent. The resolver environment is built once
+ * Build the Run-scoped context that hosts one resolved Agent. The resolver environment is built once
  * for the Run, Runtime child tools wrap Code Mode and the resolved executor without replacing either.
  */
 export const hostContext = <
@@ -75,7 +75,7 @@ export const hostContext = <
     )
   })
 
-/** @experimental Bind one hosted Run to exactly one durable Session store. */
+/** Bind one hosted Run to exactly one durable Session store. */
 export const sessionBinding = (input: {
   readonly store: RunStoreService
   readonly claim: import("../run/store.js").ExecutionClaim

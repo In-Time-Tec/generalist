@@ -2,7 +2,7 @@ import { Effect, FileSystem, Layer, Path, PlatformError, Stream } from "effect"
 import { type Skill, SkillCatalog, SkillCatalogError } from "../../core/context/skill-catalog.js"
 import { parseDocument, parseFrontmatter, splitDocument } from "./document.js"
 
-/** @experimental Filesystem skill catalog options. */
+/** Filesystem skill catalog options. */
 export interface Options {
   readonly cwd: string
   readonly roots?: ReadonlyArray<string>
@@ -87,7 +87,7 @@ const discoverRoot = (
     return skills
   })
 
-/** @experimental Build a composable SkillCatalog from filesystem roots. */
+/** Build a composable SkillCatalog from filesystem roots. */
 export const make = (options: Options) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
@@ -108,7 +108,7 @@ export const make = (options: Options) =>
     }
   })
 
-/** @experimental Build a SkillCatalog layer from filesystem roots. */
+/** Build a SkillCatalog layer from filesystem roots. */
 export const layer = (
   options: Options,
 ): Layer.Layer<SkillCatalog, SkillCatalogError, FileSystem.FileSystem | Path.Path> =>

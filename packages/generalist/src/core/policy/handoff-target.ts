@@ -11,8 +11,6 @@ export interface Target {
   /** Model layer the specialist runs on after the handoff. Wins over the active registry selection. */
   readonly model?: Layer.Layer<LanguageModel.LanguageModel>
 }
-
-/** @experimental */
 export interface TargetOptions {
   readonly pin?: AgentPin
   /** Model layer the specialist runs on after the handoff. Wins over the active registry selection. */

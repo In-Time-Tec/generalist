@@ -66,7 +66,7 @@ const claimFromRow = (row: ClaimedRow): ExecutionClaim | undefined => {
   }
 }
 
-/** @experimental Recover stale claims after a host proves exclusive ownership of the database. */
+/** Recover stale claims after a host proves exclusive ownership of the database. */
 export const makeExclusiveExecutionRecovery: {
   (sqlClient: SqlClient.SqlClient, projection: RunActivationProjection): ExclusiveExecutionRecovery
   (projection: RunActivationProjection): (sqlClient: SqlClient.SqlClient) => ExclusiveExecutionRecovery

@@ -1,18 +1,12 @@
 import { Effect, Function, Layer, Stream } from "effect"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
 import { adapt } from "../../core/model/middleware.js"
-
-/** @experimental */
 export type Method = "generateText" | "generateObject" | "streamText"
-
-/** @experimental */
 export interface FailureInput {
   readonly error: unknown
   readonly metadata: Response.ErrorPart["metadata"]
   readonly method: Method
 }
-
-/** @experimental */
 export type Resolver = (input: FailureInput) => AiError.AiError
 
 /** @internal Conservative cross-provider availability semantics. */
@@ -52,8 +46,6 @@ const conformFailureModel = (model: LanguageModel.Service, resolve: Resolver): L
         ),
       ),
   })
-
-/** @experimental */
 export const layerModelFailures: {
   (
     resolve: Resolver,

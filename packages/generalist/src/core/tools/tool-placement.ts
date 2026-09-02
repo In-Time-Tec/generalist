@@ -12,8 +12,6 @@ import {
 import type { CancellationFailure, CancellationOutcome, CancellationRequest } from "./tool-executor-cancellation.js"
 import type { ToolContext } from "./tool-context.js"
 import type { ConcreteSchemaTool, PlacementSchemaServices } from "./tool-placement-internal.js"
-
-/** @experimental */
 export interface Route<R = ToolContext> {
   readonly tools: ReadonlyArray<string>
   readonly matches: (request: Request) => boolean
@@ -23,8 +21,6 @@ export interface Route<R = ToolContext> {
     | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
     | undefined
 }
-
-/** @experimental */
 export interface RouteOptions<R = ToolContext> {
   readonly tools?: ReadonlyArray<string> | undefined
   readonly matches?: ((request: Request) => boolean) | undefined
@@ -34,25 +30,17 @@ export interface RouteOptions<R = ToolContext> {
     | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
     | undefined
 }
-
-/** @experimental */
 export type RouteInput<R = never> = Route<R> | Effect.Effect<Route<R>, never, R>
-
-/** @experimental */
 export type Placement = "client" | "remote" | "mcp" | "sandbox"
-
-/** @experimental */
 export interface PlacementRequest extends Request {
   readonly placement: Placement
   readonly tool: Tool.Any
 }
 
-/** @experimental An idempotent remote placement request carrying its endpoint deduplication key. */
+/** An idempotent remote placement request carrying its endpoint deduplication key. */
 export interface RemotePlacementRequest extends PlacementRequest {
   readonly operationKey: string
 }
-
-/** @experimental */
 export type PlacementResponse =
   | { readonly _tag: "Success"; readonly result: unknown }
   | { readonly _tag: "DomainFailure"; readonly failure: unknown }
@@ -66,8 +54,6 @@ type PlacementTool<Tools extends Record<string, Tool.Any>> = Tools[keyof Tools] 
 type PlacementToolkit<Tools extends Record<string, Tool.Any>> = ToolkitInput<Tools> & {
   readonly tools: Readonly<Record<string, PlacementTool<Tools>>>
 }
-
-/** @experimental */
 export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure> {
   readonly toolkit: PlacementToolkit<Tools>
   readonly tools?: ReadonlyArray<string> | undefined
@@ -75,15 +61,13 @@ export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>, E
     request: PlacementRequest,
   ) => Effect.Effect<PlacementResponse, E, ToolContext | PlacementSchemaServices<Tools>>
 }
-
-/** @experimental */
 export interface RemoteRouteNonIdempotentOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure>
   extends PlacementRouteOptions<Tools, E> {
   readonly idempotent?: false | undefined
   readonly schedule?: Schedule.Schedule<unknown, unknown> | undefined
 }
 
-/** @experimental Idempotent remote route whose endpoint deduplicates the stable operation key. */
+/** Idempotent remote route whose endpoint deduplicates the stable operation key. */
 export interface RemoteRouteIdempotentOptions<Tools extends Record<string, Tool.Any>, E> {
   readonly toolkit: PlacementToolkit<Tools>
   readonly tools?: ReadonlyArray<string> | undefined
@@ -95,8 +79,6 @@ export interface RemoteRouteIdempotentOptions<Tools extends Record<string, Tool.
     request: RemotePlacementRequest,
   ) => Effect.Effect<PlacementResponse, E, ToolContext | PlacementSchemaServices<Tools>>
 }
-
-/** @experimental */
 export type RemoteRouteOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure> =
   | RemoteRouteNonIdempotentOptions<Tools, E>
   | RemoteRouteIdempotentOptions<Tools, E>

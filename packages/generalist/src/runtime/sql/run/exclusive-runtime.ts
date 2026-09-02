@@ -13,17 +13,15 @@ import { RunStore } from "../../run/store.js"
 import { Runtime } from "../../service.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "../store.js"
 
-/** @experimental Services constructed by an exclusive SQLite Runtime host. */
+/** Services constructed by an exclusive SQLite Runtime host. */
 export type SqliteRuntimeServices = Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler
-
-/** @experimental */
 export interface SqliteRuntimeOptions {
   readonly options: SqliteStoreOptions
   readonly workerId: string
   readonly schedulerMode?: "poll" | "external"
 }
 
-/** @experimental Assemble one exclusive SQLite host around Runtime's lifecycle kernel. */
+/** Assemble one exclusive SQLite host around Runtime's lifecycle kernel. */
 export const layerSqliteRuntime = (
   input: SqliteRuntimeOptions,
 ): Layer.Layer<SqliteRuntimeServices, SqliteStoreError, SqlClient.SqlClient | ExecutableResolver> => {

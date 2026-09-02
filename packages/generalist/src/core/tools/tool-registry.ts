@@ -2,18 +2,12 @@ import { Array, Effect, HashMap, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { ToolNameCollision, type ToolOrigin } from "../agent/event.js"
-
-/** @experimental */
 export type Dispatch = "Static" | "Builtin" | "Skill" | "Handoff"
-
-/** @experimental */
 export interface Candidate {
   readonly tool: Tool.Any
   readonly origin: ToolOrigin
   readonly dispatch: Dispatch
 }
-
-/** @experimental */
 export interface Registry {
   readonly entries: ReadonlyArray<Candidate>
   readonly byName: HashMap.HashMap<string, Candidate>
@@ -35,8 +29,6 @@ const makeToolkit = (entries: ReadonlyArray<Candidate>): Toolkit.Toolkit<Record<
   }
   return toolkit
 }
-
-/** @experimental */
 export const assemble = (candidates: ReadonlyArray<Candidate>): Effect.Effect<Registry, ToolNameCollision> => {
   const named = candidates.map((candidate) => ({
     candidate,
@@ -63,16 +55,12 @@ export const assemble = (candidates: ReadonlyArray<Candidate>): Effect.Effect<Re
     toolkit: makeToolkit(entries),
   })
 }
-
-/** @experimental */
 export const get: {
   (name: string): (registry: Registry) => Candidate | undefined
   (registry: Registry, name: string): Candidate | undefined
 } = dual(2, (registry: Registry, name: string): Candidate | undefined =>
   Option.getOrUndefined(HashMap.get(registry.byName, name)),
 )
-
-/** @experimental */
 export const select: {
   (names: ReadonlyArray<string>): (registry: Registry) => Registry
   (registry: Registry, names: ReadonlyArray<string>): Registry

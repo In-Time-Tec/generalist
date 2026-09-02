@@ -17,7 +17,7 @@ const compareText = (left: string, right: string): number => {
 
 export { NamedCapability, PinnedContent }
 
-/** @experimental One child profile name this Agent may select from its executable registry. */
+/** One child profile name this Agent may select from its executable registry. */
 export interface ChildSelection {
   readonly selection: string
 }
@@ -30,12 +30,12 @@ export interface PortablePolicy {
   readonly second?: PortablePolicy
 }
 
-/** @experimental Exact identity of either a portable policy or an opaque policy capability. */
+/** Exact identity of either a portable policy or an opaque policy capability. */
 export type PolicyIdentity =
   | { readonly _tag: "Portable"; readonly policy: PortablePolicy }
   | { readonly _tag: "Pinned"; readonly pin: CapabilityPin }
 
-/** @experimental Exact identity and token limits of one reconstructable compaction capability. */
+/** Exact identity and token limits of one reconstructable compaction capability. */
 export interface CompactionIdentity {
   readonly service: CapabilityPin
   readonly summaryModel: ModelPin
@@ -46,7 +46,7 @@ export interface CompactionIdentity {
   readonly summaryPromptIdentity: string
 }
 
-/** @experimental Maximum Program authority an Agent may narrow for one dynamic child. */
+/** Maximum Program authority an Agent may narrow for one dynamic child. */
 export interface ProgramAuthority {
   readonly sandbox: CapabilityPin
   readonly input: CapabilityPin
@@ -58,7 +58,7 @@ export interface ProgramAuthority {
   readonly budget: ProgramBudget
 }
 
-/** @experimental Closed, reconstructable identity contract for one Agent. */
+/** Closed, reconstructable identity contract for one Agent. */
 export interface AgentManifest {
   readonly version: "2"
   readonly name: string
@@ -109,12 +109,12 @@ interface AgentManifestEncoded
   readonly children: ReadonlyArray<ChildSelection>
 }
 
-/** @experimental One child profile name this Agent may select from its executable registry. */
+/** One child profile name this Agent may select from its executable registry. */
 export const ChildSelection: Schema.Codec<ChildSelection, ChildSelection> = Schema.Struct({
   selection: Schema.String,
 })
 
-/** @experimental Closed portable turn-policy constructor data. */
+/** Closed portable turn-policy constructor data. */
 export const PortablePolicy: Schema.Codec<PortablePolicy, PortablePolicy> = Schema.suspend(() =>
   Schema.Union([
     Schema.TaggedStruct("Forever", {}),
@@ -124,7 +124,7 @@ export const PortablePolicy: Schema.Codec<PortablePolicy, PortablePolicy> = Sche
   ]),
 )
 
-/** @experimental Exact identity of either a portable policy or an opaque policy capability. */
+/** Exact identity of either a portable policy or an opaque policy capability. */
 export const PolicyIdentity: Schema.Codec<PolicyIdentity, PolicyIdentityEncoded> = Schema.Union([
   Schema.TaggedStruct("Portable", { policy: PortablePolicy }),
   Schema.TaggedStruct("Pinned", { pin: CapabilityPin }),
@@ -133,7 +133,7 @@ const ToolSchedulingPolicySchema = Schema.Struct({
   maxConcurrency: Schema.Int.check(Schema.isGreaterThan(0)),
   parallelSafe: Schema.Array(Schema.String),
 })
-/** @experimental Exact identity and token limits of one reconstructable compaction capability. */
+/** Exact identity and token limits of one reconstructable compaction capability. */
 export const CompactionIdentity: Schema.Codec<CompactionIdentity, CompactionIdentityEncoded> = Schema.Struct({
   service: CapabilityPin,
   summaryModel: ModelPin,
@@ -151,7 +151,7 @@ const ProgramAuthorityAgentCapability = Schema.Struct({
   input: CapabilityPin,
 })
 
-/** @experimental Maximum Program authority an Agent may narrow for one dynamic child. */
+/** Maximum Program authority an Agent may narrow for one dynamic child. */
 export const ProgramAuthority = Schema.Struct({
   sandbox: CapabilityPin,
   input: CapabilityPin,
@@ -162,7 +162,7 @@ export const ProgramAuthority = Schema.Struct({
   steps: Schema.Array(ProgramAuthorityNamedCapability).pipe(Schema.check(Schema.isMaxLength(64))),
   budget: ProgramBudget,
 })
-/** @experimental Closed, reconstructable identity contract for one Agent. */
+/** Closed, reconstructable identity contract for one Agent. */
 export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = Schema.Struct({
   version: Schema.Literal("2"),
   name: Schema.String,
@@ -179,7 +179,7 @@ export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = 
   budget: BudgetLimits,
   children: Schema.Array(ChildSelection),
 })
-/** @experimental An Agent manifest paired with its constructor-owned digest. */
+/** An Agent manifest paired with its constructor-owned digest. */
 export interface PinnedAgent {
   readonly pin: AgentPin
   readonly manifest: AgentManifest
@@ -209,7 +209,7 @@ const capabilityOrder = (value: NamedCapability): string => value.name
 const capabilityIdentity = (value: NamedCapability): string => value.pin
 const childOrder = (value: ChildSelection): string => value.selection
 
-/** @experimental Construct and pin a canonical closed Agent manifest. */
+/** Construct and pin a canonical closed Agent manifest. */
 export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "2" }): PinnedAgent => {
   const invalidToolScheduling = toolSchedulingFailure(
     input.toolScheduling,
@@ -260,7 +260,7 @@ export const make = (input: Omit<AgentManifest, "version"> & { readonly version?
   return { manifest, pin: makeAgent(manifest) }
 }
 
-/** @experimental Build an exact manifest for a live Agent using explicitly supplied opaque dependencies. */
+/** Build an exact manifest for a live Agent using explicitly supplied opaque dependencies. */
 export const fromLiveAgent: {
   <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(identity: {
     readonly model: ModelPin

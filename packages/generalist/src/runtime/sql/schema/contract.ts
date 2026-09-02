@@ -8,10 +8,10 @@ import {
   SchemaVersionUnsupported,
 } from "../errors.js"
 
-/** @experimental The single logical SQL Runtime schema identity. */
+/** The single logical SQL Runtime schema identity. */
 export const SQL_SCHEMA_NAME = "generalist_runtime"
 
-/** @experimental The single logical SQL Runtime schema version. */
+/** The single logical SQL Runtime schema version. */
 export const SQL_SCHEMA_VERSION = 5
 
 export interface SqlLogicalTable {
@@ -59,7 +59,7 @@ interface SqlLogicalSchemaContract {
 }
 
 /**
- * @experimental Dialect-neutral lifecycle inventory. Physical claim/lock indexes, MySQL's lock
+ * Dialect-neutral lifecycle inventory. Physical claim/lock indexes, MySQL's lock
  * table, and Cloudflare activation tables are deliberately adapter or host mechanics.
  */
 export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
@@ -408,7 +408,7 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
   ],
 }
 
-/** @experimental Stable checksum of the logical contract, independent of physical dialect DDL. */
+/** Stable checksum of the logical contract, independent of physical dialect DDL. */
 export const sqlSchemaChecksum = (): string =>
   sha256Text(
     JSON.stringify({
@@ -418,7 +418,7 @@ export const sqlSchemaChecksum = (): string =>
     }),
   )
 
-/** @experimental Derive the one logical migration plan from physical metadata and dialect DDL. */
+/** Derive the one logical migration plan from physical metadata and dialect DDL. */
 export const planSqlSchema: {
   (meta: SqlSchemaMeta, statements: ReadonlyArray<string>): SqlSchemaPlan
   (statements: ReadonlyArray<string>): (meta: SqlSchemaMeta) => SqlSchemaPlan
@@ -433,7 +433,7 @@ export const planSqlSchema: {
   }),
 )
 
-/** @experimental Check the shared version/checksum/dirty state before dialect-owned verification. */
+/** Check the shared version/checksum/dirty state before dialect-owned verification. */
 export const checkSqlSchemaMeta: {
   (
     meta: SqlSchemaMeta,
@@ -463,7 +463,7 @@ export const checkSqlSchemaMeta: {
   return Effect.void
 })
 
-/** @experimental Check the single greenfield baseline migration identity. */
+/** Check the single greenfield baseline migration identity. */
 export const checkSqlMigrationIdentity: {
   (migrations: ReadonlyArray<SqlMigrationRecord>, source: string): Effect.Effect<void, SchemaMigrationFailed>
   (source: string): (migrations: ReadonlyArray<SqlMigrationRecord>) => Effect.Effect<void, SchemaMigrationFailed>

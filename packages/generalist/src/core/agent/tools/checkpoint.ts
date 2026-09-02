@@ -4,7 +4,7 @@ import { ReplayPolicy } from "../../durable/driver/contract.js"
 import type { ResumeResolution } from "../lifecycle/resume.js"
 import type { PendingToolResult } from "./result.js"
 
-/** @experimental Canonical model-authored framework call persisted in one tool-batch checkpoint. */
+/** Canonical model-authored framework call persisted in one tool-batch checkpoint. */
 export const CanonicalToolCall = Schema.Struct({
   type: Schema.Literal("tool-call"),
   id: Schema.String,
@@ -15,7 +15,7 @@ export const CanonicalToolCall = Schema.Struct({
 })
 export type CanonicalToolCall = typeof CanonicalToolCall.Type
 
-/** @experimental The one current state of a model-authored framework call. */
+/** The one current state of a model-authored framework call. */
 export const ToolCallCheckpointState = Schema.Union([
   Schema.TaggedStruct("Ready", { stage: Schema.Literals(["authorization", "execution"]) }),
   Schema.TaggedStruct("Scheduled", {
@@ -33,7 +33,7 @@ export const ToolCallCheckpointState = Schema.Union([
 ])
 export type ToolCallCheckpointState = typeof ToolCallCheckpointState.Type
 
-/** @experimental One call and its exact state, retained in model-authored order. */
+/** One call and its exact state, retained in model-authored order. */
 export const ToolCallCheckpoint = Schema.Struct({
   call: CanonicalToolCall,
   operationKey: Schema.String,
@@ -41,7 +41,7 @@ export const ToolCallCheckpoint = Schema.Struct({
 })
 export type ToolCallCheckpoint = typeof ToolCallCheckpoint.Type
 
-/** @experimental The sole reconstruction authority for one authored framework tool batch. */
+/** The sole reconstruction authority for one authored framework tool batch. */
 export const ToolBatchCheckpoint = Schema.Struct({
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   calls: Schema.Array(ToolCallCheckpoint),
@@ -52,7 +52,7 @@ export const ToolBatchCheckpoint = Schema.Struct({
 })
 export type ToolBatchCheckpoint = typeof ToolBatchCheckpoint.Type
 
-/** @experimental One exact open wait exposed by an Agent suspension. */
+/** One exact open wait exposed by an Agent suspension. */
 export const ToolBatchWait = Schema.Struct({
   waitId: Schema.String,
   token: Schema.String,
@@ -62,7 +62,7 @@ export const ToolBatchWait = Schema.Struct({
 })
 export type ToolBatchWait = typeof ToolBatchWait.Type
 
-/** @experimental One targeted resolution supplied when re-entering a suspended batch. */
+/** One targeted resolution supplied when re-entering a suspended batch. */
 export class ToolBatchResolution extends Schema.Class<ToolBatchResolution>("ToolBatchResolution")({
   waitId: Schema.String,
   resolution: Schema.Union([

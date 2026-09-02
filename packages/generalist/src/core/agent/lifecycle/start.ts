@@ -18,7 +18,7 @@ import type { RunHandle } from "./run-handle.js"
 import { encode as encodeInput } from "./input.js"
 
 /**
- * @experimental Durable start parameters required until typed Agent registration lands.
+ * Durable start parameters required until typed Agent registration lands.
  *
  * The Runtime must already have the exact closed Agent and its services registered for
  * `executable`; the in-memory Agent value supplies only the typed input/output contract.
@@ -32,7 +32,7 @@ export interface StartOptions {
 
 type StartedAgentResult<OutputValue> = Omit<AgentExecutionResult, "output"> & { readonly output: OutputValue }
 
-/** @experimental Durable Runtime event with an Agent completion decoded through its output Schema. */
+/** Durable Runtime event with an Agent completion decoded through its output Schema. */
 export type StartEvent<OutputValue> =
   | Exclude<RuntimeRunEvent, RuntimeRunCompleted>
   | (Omit<RuntimeRunCompleted, "result"> & {
@@ -92,7 +92,7 @@ interface StartFunction {
 
 const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)
 
-/** @experimental Start a registered Agent through the durable Runtime. */
+/** Start a registered Agent through the durable Runtime. */
 export const start: StartFunction = dual(
   isDataFirst,
   <

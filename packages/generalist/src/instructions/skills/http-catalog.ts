@@ -3,14 +3,14 @@ import { Url } from "effect/unstable/http"
 import { SkillCatalogError, layer as SkillCatalogLayer } from "../../core/context/skill-catalog.js"
 import { type Limits, make as makeHostedCatalog, resolveRelative } from "./hosted-catalog.js"
 
-/** @experimental Generic HTTP skill catalog options. */
+/** Generic HTTP skill catalog options. */
 export interface Options extends Limits {
   readonly manifestUrl: string
 }
 
 const invalidUrl = () => SkillCatalogError.make({ source: "http-skill-catalog", message: "Invalid manifest URL" })
 
-/** @experimental Build a generic HTTP catalog. */
+/** Build a generic HTTP catalog. */
 export const make = (options: Options) =>
   Effect.gen(function* () {
     const parsed = yield* Effect.fromResult(Url.fromString(options.manifestUrl)).pipe(Effect.mapError(invalidUrl))
@@ -23,5 +23,5 @@ export const make = (options: Options) =>
     })
   })
 
-/** @experimental Build a generic HTTP catalog layer. */
+/** Build a generic HTTP catalog layer. */
 export const layer = (options: Options): ReturnType<typeof SkillCatalogLayer> => SkillCatalogLayer([make(options)])

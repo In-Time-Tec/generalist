@@ -28,24 +28,22 @@ const uniqueSorted = <A>(
   return sorted
 }
 
-/** @experimental Sandboxed source pinned as part of one Agent Program. */
+/** Sandboxed source pinned as part of one Agent Program. */
 export const ProgramSource = Schema.Struct({
   language: Schema.Literal("javascript"),
   text: Schema.String,
 })
-/** @experimental */
 export type ProgramSource = typeof ProgramSource.Type
 
-/** @experimental Exact Agent and input schema callable by one Program selection. */
+/** Exact Agent and input schema callable by one Program selection. */
 export const ProgramAgentCapability = Schema.Struct({
   selection: Schema.String,
   agent: AgentPin,
   input: CapabilityPin,
 })
-/** @experimental */
 export type ProgramAgentCapability = typeof ProgramAgentCapability.Type
 
-/** @experimental Bounded resources available to one Agent Program. */
+/** Bounded resources available to one Agent Program. */
 export const ProgramBudget = Schema.Struct({
   agentRuns: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   concurrency: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
@@ -55,19 +53,17 @@ export const ProgramBudget = Schema.Struct({
   logBytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   outputBytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 })
-/** @experimental */
 export type ProgramBudget = typeof ProgramBudget.Type
 
-/** @experimental Exact host capabilities visible inside one Agent Program sandbox. */
+/** Exact host capabilities visible inside one Agent Program sandbox. */
 export const ProgramCapabilityManifest = Schema.Struct({
   tools: Schema.Array(NamedCapability),
   agents: Schema.Array(ProgramAgentCapability),
   steps: Schema.Array(NamedCapability),
 })
-/** @experimental */
 export type ProgramCapabilityManifest = typeof ProgramCapabilityManifest.Type
 
-/** @experimental Closed reconstructable identity contract for one Agent Program. */
+/** Closed reconstructable identity contract for one Agent Program. */
 export const ProgramManifest = Schema.Struct({
   version: Schema.Literal("1"),
   name: Schema.String,
@@ -78,16 +74,15 @@ export const ProgramManifest = Schema.Struct({
   capabilities: ProgramCapabilityManifest,
   budget: ProgramBudget,
 })
-/** @experimental */
 export type ProgramManifest = typeof ProgramManifest.Type
 
-/** @experimental An Agent Program manifest paired with its constructor-owned digest. */
+/** An Agent Program manifest paired with its constructor-owned digest. */
 export interface PinnedProgram {
   readonly pin: ProgramPin
   readonly manifest: ProgramManifest
 }
 
-/** @experimental Construct and pin one canonical Agent Program manifest. */
+/** Construct and pin one canonical Agent Program manifest. */
 export const make = (input: Omit<ProgramManifest, "version"> & { readonly version?: "1" }): PinnedProgram => {
   const manifest = Schema.decodeSync(ProgramManifest, { onExcessProperty: "error" })({
     ...input,

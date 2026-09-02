@@ -19,8 +19,8 @@ const makePromptDigestValue = (prompt: Prompt.Prompt) => {
   }
 }
 
-/** @experimental Closed-JSON prompt value for durable identity. */
+/** Closed-JSON prompt value for durable identity. */
 export type PromptDigestValue = ReturnType<typeof makePromptDigestValue>
 
-/** @experimental Closed-JSON prompt value for durable identity. */
+/** Closed-JSON prompt value for durable identity. */
 export const promptDigestValue = (prompt: Prompt.Prompt): PromptDigestValue => makePromptDigestValue(prompt)

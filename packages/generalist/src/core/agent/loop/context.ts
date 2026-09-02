@@ -35,14 +35,14 @@ export interface StructuredRunConfig<S extends ObjectSchema, OutputValue> {
   readonly objectPrompt: Prompt.RawInput
   readonly output: (value: S["Type"]) => OutputValue
 }
-/** @experimental Decoding services a structured-output schema requires, with an unconstrained schema contributing none. */
+/** Decoding services a structured-output schema requires, with an unconstrained schema contributing none. */
 export type SchemaServicesD<S extends ObjectSchema> = S["DecodingServices"]
 export type SchemaServicesE<S extends ObjectSchema> = S["EncodingServices"]
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
 
-/** @experimental Every service one run loop turn requires. */
+/** Every service one run loop turn requires. */
 export type LoopServices<Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema> =
   | R
   | StaticToolServices<Tools>
@@ -50,7 +50,7 @@ export type LoopServices<Tools extends Record<string, Tool.Any>, R, S extends Ob
   | SchemaServicesE<S>
   | DriverInterpreter
 
-/** @experimental Every service one model turn requires. */
+/** Every service one model turn requires. */
 export type TurnServices<R, S extends ObjectSchema> = R | SchemaServicesD<S> | SchemaServicesE<S> | DriverInterpreter
 
 export type ToolState = {

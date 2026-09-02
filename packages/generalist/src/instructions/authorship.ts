@@ -3,12 +3,11 @@ import { AuthoredProposal, type AuthoredRefinementProposal } from "./entry.js"
 
 export { isAuthored } from "./refinement.js"
 
-/** @experimental Why untrusted proposal input was refused before it could reach the engine. */
+/** Why untrusted proposal input was refused before it could reach the engine. */
 export const AuthorshipRejection = Schema.Literals(["pinned-revision", "malformed"])
-/** @experimental */
 export type AuthorshipRejection = typeof AuthorshipRejection.Type
 
-/** @experimental Untrusted proposal input was refused and no state was inspected or changed. */
+/** Untrusted proposal input was refused and no state was inspected or changed. */
 export class AuthorshipRejected extends Schema.TaggedError<AuthorshipRejected>()(
   "generalist/instructions/AuthorshipRejected",
   { reason: AuthorshipRejection, message: Schema.String },
@@ -29,7 +28,7 @@ const carriesRevision = (value: typeof Schema.Unknown.Type): boolean =>
   Schema.is(ProposalEdits)(value) && value.edits.some((edit) => Schema.is(RevisionCarrier)(edit) && "revision" in edit)
 
 /**
- * @experimental Accept one proposal from an untrusted author. A pinned `revision` is refused rather than trusted or
+ * Accept one proposal from an untrusted author. A pinned `revision` is refused rather than trusted or
  * silently dropped, so model-originated input can never choose an entry's createdAt, updatedAt, or version.
  */
 export const author = Function.flow(

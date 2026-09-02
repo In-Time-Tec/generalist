@@ -63,7 +63,7 @@ const word = (value: number): string => (value >>> 0).toString(16).padStart(8, "
 /** Inputs below this size hash faster than a cache probe pays for itself. */
 const cacheMinimumLength = 256
 
-/** @experimental Synchronous cross-runtime SHA-256 over UTF-8 text. */
+/** Synchronous cross-runtime SHA-256 over UTF-8 text. */
 export const sha256Text = (text: string): string => {
   const cached = text.length < cacheMinimumLength ? undefined : cache.get(text)
   if (cached !== undefined) {
@@ -148,5 +148,5 @@ const canonicalize = (value: Schema.Json): Schema.Json => {
   )
 }
 
-/** @experimental Canonical SHA-256 identity for closed JSON values. */
+/** Canonical SHA-256 identity for closed JSON values. */
 export const digest = Function.flow(Schema.decodeUnknownSync(Schema.Json), canonicalize, JSON.stringify, sha256Text)

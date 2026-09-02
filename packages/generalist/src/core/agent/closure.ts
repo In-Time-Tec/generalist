@@ -10,7 +10,7 @@ import { ClosedTypeId, isClosed as hasClosedIdentity } from "./lifecycle/closure
 
 export { ClosedTypeId } from "./lifecycle/closure-identity.js"
 
-/** @experimental One Agent observed where its tool and requirement types are not available. */
+/** One Agent observed where its tool and requirement types are not available. */
 export interface Any<PolicyServices = unknown> {
   readonly [AgentTypeId]: unknown
   readonly name: string
@@ -26,7 +26,7 @@ export interface Any<PolicyServices = unknown> {
 }
 
 /**
- * @experimental Every service one Agent needs to run: its declared requirements, its tool handlers, and the handler
+ * Every service one Agent needs to run: its declared requirements, its tool handlers, and the handler
  * services other than the per-call `ToolContext` that tool execution supplies.
  */
 export type ClosedServices<Tools extends Record<string, Tool.Any>, R> =
@@ -34,7 +34,7 @@ export type ClosedServices<Tools extends Record<string, Tool.Any>, R> =
   | Tool.HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
 
-/** @experimental Consumer of one hidden Agent identity together with the exact environment that satisfies it. */
+/** Consumer of one hidden Agent identity together with the exact environment that satisfies it. */
 export interface Opened<A> {
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R>,
@@ -42,7 +42,7 @@ export interface Opened<A> {
   ): A
 }
 
-/** @experimental One Agent closed over the exact environment it requires; both type arguments stay hidden. */
+/** One Agent closed over the exact environment it requires; both type arguments stay hidden. */
 export interface Closed extends Any<never> {
   readonly [ClosedTypeId]: true
   readonly open: <A>(f: Opened<A>) => A
@@ -59,7 +59,7 @@ interface ClosedPolicyAgent extends Omit<Any, "policy"> {
 export const hasClosedPolicy = (agent: Any): agent is Closed | ClosedPolicyAgent =>
   isClosed(agent) || agent.policy.snapshot !== undefined
 
-/** @experimental Close one Agent over the exact environment it requires. */
+/** Close one Agent over the exact environment it requires. */
 export const close: {
   <Tools extends Record<string, Tool.Any>, R>(
     environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,

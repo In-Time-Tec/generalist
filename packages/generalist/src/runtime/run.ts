@@ -42,7 +42,7 @@ export const RunStatus = Schema.Literals([
 ])
 export type RunStatus = typeof RunStatus.Type
 
-/** @experimental Runtime uses Core's canonical Agent execution identity. */
+/** Runtime uses Core's canonical Agent execution identity. */
 export const RunId = CoreRunId
 export type RunId = CoreRunIdType
 
@@ -53,7 +53,7 @@ export interface RunReceipt {
   readonly duplicate: boolean
 }
 
-/** @experimental Encoded durable Run receipt. */
+/** Encoded durable Run receipt. */
 interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
   readonly runId: typeof RunId.Encoded
 }
@@ -79,7 +79,7 @@ export interface RunInspection {
   readonly durability: "ephemeral" | "durable"
 }
 
-/** @experimental Encoded durable Run inspection. */
+/** Encoded durable Run inspection. */
 interface RunInspectionEncoded extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "waits"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
@@ -290,7 +290,7 @@ export interface RunSnapshot {
   readonly compactions: ReadonlyArray<CompactionInspection>
 }
 
-/** @experimental Encoded durable Run snapshot. */
+/** Encoded durable Run snapshot. */
 interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions"> {
   readonly run: RunInspectionEncoded
   readonly cursor: typeof Cursor.Encoded
@@ -323,7 +323,7 @@ export interface Run {
   readonly attempt: number
 }
 
-/** @experimental Encoded durable Run state. */
+/** Encoded durable Run state. */
 interface RunEncoded extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "waits"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded

@@ -8,7 +8,7 @@ const Details = Schema.Struct({
 })
 type RuntimeValue = typeof Schema.Unknown.Type
 
-/** @experimental Read error fields across the worker's VM realm boundary. */
+/** Read error fields across the worker's VM realm boundary. */
 export const details = (error: RuntimeValue): typeof Details.Type | undefined =>
   Error.isError(error)
     ? {

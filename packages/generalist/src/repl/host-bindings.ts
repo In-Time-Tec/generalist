@@ -1,12 +1,12 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { ToolContext, type Service as ToolContextService } from "../core/tools/tool-context.js"
 
-/** @experimental Every host operation failure is tagged, so a cell can discriminate it as data. */
+/** Every host operation failure is tagged, so a cell can discriminate it as data. */
 export interface Tagged {
   readonly _tag: string
 }
 
-/** @experimental One Schema-typed operation a host mounts into the kernel namespace. */
+/** One Schema-typed operation a host mounts into the kernel namespace. */
 export interface Operation<
   Input extends Schema.Constraint = Schema.Constraint,
   Output extends Schema.Constraint = Schema.Constraint,
@@ -19,47 +19,45 @@ export interface Operation<
   readonly failure: Failure
   readonly handle: (input: Input["Type"]) => Effect.Effect<Output["Type"], Failure["Type"] & Tagged, R>
 }
-
-/** @experimental */
 type BoundarySchema = Schema.Codec<unknown, unknown, never, never>
 
 export type AnyOperation<R = never> = Operation<BoundarySchema, BoundarySchema, BoundarySchema, R>
 
-/** @experimental One named module of operations, mounted as a single kernel binding. */
+/** One named module of operations, mounted as a single kernel binding. */
 export interface Module<R = never> {
   readonly name: string
   readonly operations: ReadonlyArray<AnyOperation<R>>
 }
 
-/** @experimental A request from an executing cell to a mounted host module. */
+/** A request from an executing cell to a mounted host module. */
 export interface Request {
   readonly module: string
   readonly operation: string
   readonly input: unknown
-  /** @experimental The Session whose cell raised this request. */
+  /** The Session whose cell raised this request. */
   readonly sessionId?: string
-  /** @experimental The cell that raised this request. */
+  /** The cell that raised this request. */
   readonly cellId?: string
 }
 
-/** @experimental Encoded outcome returned to the cell that issued the request. */
+/** Encoded outcome returned to the cell that issued the request. */
 export type Response =
   | { readonly _tag: "Success"; readonly output: unknown }
   | { readonly _tag: "Failure"; readonly failure: unknown }
 
-/** @experimental The cell addressed a module or operation that is not mounted. */
+/** The cell addressed a module or operation that is not mounted. */
 export class HostModuleNotFound extends Schema.TaggedError<HostModuleNotFound>()("generalist/repl/HostModuleNotFound", {
   module: Schema.String,
   operation: Schema.optionalKey(Schema.String),
 }) {}
 
-/** @experimental Two modules or two operations claimed the same mounted name. */
+/** Two modules or two operations claimed the same mounted name. */
 export class HostModuleConflict extends Schema.TaggedError<HostModuleConflict>()("generalist/repl/HostModuleConflict", {
   module: Schema.String,
   operation: Schema.optionalKey(Schema.String),
 }) {}
 
-/** @experimental A host request or reply did not match the operation's declared schema. */
+/** A host request or reply did not match the operation's declared schema. */
 export class HostModuleSchemaFailure extends Schema.TaggedError<HostModuleSchemaFailure>()(
   "generalist/repl/HostModuleSchemaFailure",
   {
@@ -70,17 +68,17 @@ export class HostModuleSchemaFailure extends Schema.TaggedError<HostModuleSchema
   },
 ) {}
 
-/** @experimental Closed union of host-module boundary failures. */
+/** Closed union of host-module boundary failures. */
 export type BindingFailure = HostModuleNotFound | HostModuleSchemaFailure
 
-/** @experimental The mounted surface a cell can see, without any handler. */
+/** The mounted surface a cell can see, without any handler. */
 export interface Descriptor {
   readonly module: string
   readonly operations: ReadonlyArray<string>
 }
 
 /**
- * @experimental The seam by which a host mounts named Schema-typed modules into the kernel
+ * The seam by which a host mounts named Schema-typed modules into the kernel
  * namespace and answers requests from an executing cell.
  */
 export interface Service {
@@ -88,8 +86,6 @@ export interface Service {
   readonly resolve: (request: Request) => Effect.Effect<AnyOperation, HostModuleNotFound>
   readonly invoke: (request: Request) => Effect.Effect<Response, BindingFailure>
 }
-
-/** @experimental */
 export class HostBindings extends Context.Service<HostBindings, Service>()(
   "generalist/repl/host-bindings/HostBindings",
 ) {}
@@ -123,7 +119,7 @@ const callContext = <R>(request: Request, base: Context.Context<R>): Context.Con
   return Context.add(base, ToolContext, ToolContext.of(toolContext))
 }
 
-/** @experimental Mount modules and reject duplicate module or operation names. */
+/** Mount modules and reject duplicate module or operation names. */
 export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Service, HostModuleConflict, R> =>
   Effect.contextWith((context: Context.Context<R>) =>
     Effect.try({
@@ -211,11 +207,7 @@ export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Servic
       }),
     ),
   )
-
-/** @experimental */
 export const layer = <R>(modules: ReadonlyArray<Module<R>>): Layer.Layer<HostBindings, HostModuleConflict, R> =>
   Layer.effect(HostBindings, make(modules))
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<HostBindings> =>
   Layer.succeed(HostBindings, HostBindings.of(implementation))

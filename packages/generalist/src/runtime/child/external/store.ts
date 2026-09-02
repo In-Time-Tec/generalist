@@ -19,7 +19,7 @@ import type { AdmitStartInput } from "../../run/store.js"
 import type { StartError } from "../../service.js"
 import type { StaleClaim, StaleSessionClaim } from "../../sql/errors.js"
 
-/** @experimental Cross-partition child placement operations supported by single-partition stores. */
+/** Cross-partition child placement operations supported by single-partition stores. */
 export interface Service {
   readonly reserve: (
     input: ReserveInput,
@@ -75,7 +75,7 @@ export interface Service {
   >
 }
 
-/** @experimental Atomic cross-partition child placement capability. */
+/** Atomic cross-partition child placement capability. */
 export class ExternalChildStore extends Context.Service<ExternalChildStore, Service>()(
   "generalist/runtime/child/external/store/ExternalChildStore",
 ) {}

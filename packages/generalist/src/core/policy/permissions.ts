@@ -16,38 +16,30 @@ export {
 export { layerRuleStoreFile, type RuleStoreFileOptions } from "./rule-store-file.js"
 export { layerRuleStoreSql, type RuleStoreSqlOptions } from "./rule-store-sql.js"
 
-/** @experimental Ordered permission ruleset. */
+/** Ordered permission ruleset. */
 export interface Ruleset {
   readonly rules: ReadonlyArray<Rule>
   readonly fallback?: Level
 }
-
-/** @experimental */
 export interface Allow {
   readonly _tag: "Allow"
 }
-
-/** @experimental */
 export interface Deny {
   readonly _tag: "Deny"
   readonly reason?: string
 }
-
-/** @experimental */
 export interface Ask {
   readonly _tag: "Ask"
   readonly token: string
 }
 
-/** @experimental Resolved policy decision for one tool call. */
+/** Resolved policy decision for one tool call. */
 export type Decision = Allow | Deny | Ask
 
-/** @experimental Permission policy service boundary. */
+/** Permission policy service boundary. */
 export interface Service {
   readonly evaluate: (request: AccessRequest) => Effect.Effect<Decision, PermissionError>
 }
-
-/** @experimental */
 export class Permissions extends Context.Service<Permissions, Service>()("generalist/core/policy/permissions") {}
 
 const escapeRegExp = (value: string): string => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
@@ -129,7 +121,7 @@ const matchesProjection = (pattern: string, tool: string, projection: Projection
   return projection.candidates.some((candidate) => paramsPattern.test(candidate))
 }
 
-/** @experimental Match a permission pattern against a tool call. */
+/** Match a permission pattern against a tool call. */
 export const matches: {
   (tool: string, params: PolicyParameters): (pattern: string) => boolean
   (pattern: string, tool: string, params: PolicyParameters): boolean
@@ -146,7 +138,7 @@ const matchingRule = (ruleset: Ruleset, tool: string, params: PolicyParameters):
   return matched
 }
 
-/** @experimental Find the last matching rule without applying a fallback. */
+/** Find the last matching rule without applying a fallback. */
 export const matchRule: {
   (tool: string, params: PolicyParameters): (ruleset: Ruleset) => Option.Option<Rule>
   (ruleset: Ruleset, tool: string, params: PolicyParameters): Option.Option<Rule>
@@ -156,7 +148,7 @@ export const matchRule: {
     Option.fromNullishOr(matchingRule(ruleset, tool, params)),
 )
 
-/** @experimental Evaluate a ruleset with last-match semantics. */
+/** Evaluate a ruleset with last-match semantics. */
 export const evaluate: {
   (tool: string, params: PolicyParameters): (ruleset: Ruleset) => Level
   (ruleset: Ruleset, tool: string, params: PolicyParameters): Level
@@ -181,7 +173,7 @@ const decisionFor = (ruleset: Ruleset, request: AccessRequest): Decision => {
   }
 }
 
-/** @experimental Evaluate a base policy with remembered rules as a last-match overlay. */
+/** Evaluate a base policy with remembered rules as a last-match overlay. */
 export const evaluateWithRules: {
   (store: RuleStore["Service"], request: AccessRequest): (base: Service) => Effect.Effect<Decision, RuleStoreError>
   (base: Service, store: RuleStore["Service"], request: AccessRequest): Effect.Effect<Decision, RuleStoreError>
@@ -205,7 +197,7 @@ export const evaluateWithRules: {
     }),
 )
 
-/** @experimental Policy from a static ruleset. */
+/** Policy from a static ruleset. */
 export const layerRuleset = (ruleset: Ruleset): Layer.Layer<Permissions> =>
   Layer.succeed(
     Permissions,
@@ -214,11 +206,11 @@ export const layerRuleset = (ruleset: Ruleset): Layer.Layer<Permissions> =>
     }),
   )
 
-/** @experimental Permission policy that asks before every unmatched call. */
+/** Permission policy that asks before every unmatched call. */
 export const layerFailClosed = (rules: ReadonlyArray<Rule> = []): Layer.Layer<Permissions> =>
   layerRuleset({ rules, fallback: "ask" })
 
-/** @experimental Permission policy that allows every call. */
+/** Permission policy that allows every call. */
 export const layerAllowAll: Layer.Layer<Permissions> = Layer.succeed(
   Permissions,
   Permissions.of({
@@ -226,7 +218,7 @@ export const layerAllowAll: Layer.Layer<Permissions> = Layer.succeed(
   }),
 )
 
-/** @experimental Non-durable in-memory remembered-rule store. */
+/** Non-durable in-memory remembered-rule store. */
 export const layerRuleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): Layer.Layer<RuleStore> =>
   Layer.effect(
     RuleStore,
@@ -240,11 +232,7 @@ export const layerRuleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): La
       ),
     ),
   )
-
-/** @experimental */
 export const layerRuleStoreTest = (implementation: RuleStore["Service"]): Layer.Layer<RuleStore> =>
   Layer.succeed(RuleStore, RuleStore.of(implementation))
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Permissions> =>
   Layer.succeed(Permissions, Permissions.of(implementation))

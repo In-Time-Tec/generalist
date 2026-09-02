@@ -80,7 +80,7 @@ export function decodeTreeEvent(
   return Schema.decodeEffect(TreeEvent)(input, options)
 }
 
-/** @experimental One bounded, ordered page read strictly after the requested cursor. */
+/** One bounded, ordered page read strictly after the requested cursor. */
 export interface ReplayPage {
   readonly events: ReadonlyArray<TreeEvent>
   readonly cursor: TreeCursorType
@@ -91,15 +91,11 @@ interface ReplayPageEncoded extends Omit<ReplayPage, "events" | "cursor"> {
   readonly events: ReadonlyArray<TreeEventEncoded>
   readonly cursor: typeof TreeCursor.Encoded
 }
-
-/** @experimental */
 export const ReplayPage: Schema.Codec<ReplayPage, ReplayPageEncoded> = Schema.Struct({
   events: Schema.Array(TreeEvent),
   cursor: TreeCursor,
   hasMore: Schema.Boolean,
 })
-
-/** @experimental */
 export const encodeReplayPage: {
   (
     input: ReplayPage,
@@ -113,8 +109,6 @@ export const encodeReplayPage: {
   (input: ReplayPage, options?: import("effect/SchemaAST").ParseOptions) =>
     Schema.encodeEffect(ReplayPage)(input, options),
 )
-
-/** @experimental */
 export function decodeReplayPage(
   input: ReplayPageEncoded,
   options?: import("effect/SchemaAST").ParseOptions,
@@ -131,7 +125,7 @@ export function decodeReplayPage(
   return Schema.decodeEffect(ReplayPage)(input, options)
 }
 
-/** @experimental Bounded replay strictly after an optional root-bound cursor. */
+/** Bounded replay strictly after an optional root-bound cursor. */
 export interface ReplayInput {
   readonly rootRunId: string
   readonly cursor?: TreeCursorType
@@ -229,7 +223,7 @@ export function decodeInspection(
   return Schema.decodeEffect(Inspection)(input, options)
 }
 
-/** @experimental Atomic point-in-time tree inspection and exclusive replay cursor. */
+/** Atomic point-in-time tree inspection and exclusive replay cursor. */
 export interface Checkpoint {
   readonly inspection: Inspection
   readonly cursor: TreeCursorType
@@ -239,14 +233,10 @@ interface CheckpointEncoded extends Omit<Checkpoint, "inspection" | "cursor"> {
   readonly inspection: InspectionEncoded
   readonly cursor: typeof TreeCursor.Encoded
 }
-
-/** @experimental */
 export const Checkpoint: Schema.Codec<Checkpoint, CheckpointEncoded> = Schema.Struct({
   inspection: Inspection,
   cursor: TreeCursor,
 })
-
-/** @experimental */
 export const encodeCheckpoint: {
   (
     input: Checkpoint,
@@ -260,8 +250,6 @@ export const encodeCheckpoint: {
   (input: Checkpoint, options?: import("effect/SchemaAST").ParseOptions) =>
     Schema.encodeEffect(Checkpoint)(input, options),
 )
-
-/** @experimental */
 export function decodeCheckpoint(
   input: CheckpointEncoded,
   options?: import("effect/SchemaAST").ParseOptions,
@@ -278,10 +266,10 @@ export function decodeCheckpoint(
   return Schema.decodeEffect(Checkpoint)(input, options)
 }
 
-/** @experimental Read one bounded, ordered page strictly after the supplied cursor. */
+/** Read one bounded, ordered page strictly after the supplied cursor. */
 export const replay = (input: ReplayInput) => Runtime.use((runtime) => runtime.treeReplay(input))
 
-/** @experimental Atomically inspect one root Run tree and bind the inspection to its replay cursor. */
+/** Atomically inspect one root Run tree and bind the inspection to its replay cursor. */
 export const checkpoint = (rootRunId: string) => Runtime.use((runtime) => runtime.treeCheckpoint(rootRunId))
 
 export const awaitTerminal = (

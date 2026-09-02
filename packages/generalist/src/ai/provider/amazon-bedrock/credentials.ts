@@ -1,8 +1,6 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node"
 import type { AwsCredentialIdentity } from "@smithy/types"
 import { Effect, Redacted, Schema } from "effect"
-
-/** @experimental */
 export interface Credential {
   readonly accessKeyId: string
   readonly secretAccessKey: Redacted.Redacted<string>
@@ -12,14 +10,10 @@ export interface Credential {
 }
 
 type CredentialBuilder = { -readonly [Key in keyof Credential]: Credential[Key] }
-
-/** @experimental */
 export class CredentialFailure extends Schema.TaggedError<CredentialFailure>()(
   "generalist/ai/AmazonBedrockCredentialFailure",
   { operation: Schema.Literals(["acquire", "refreshRejected"]) },
 ) {}
-
-/** @experimental */
 export interface Credentials {
   readonly acquire: Effect.Effect<Credential, CredentialFailure>
   readonly refreshRejected: (generation: string) => Effect.Effect<Credential, CredentialFailure>
@@ -47,7 +41,6 @@ const sameIdentity = (credential: Credential, identity: AwsCredentialIdentity): 
  * AWS SDK v3's Node default chain. It supports environment variables, shared
  * profiles (including SSO, roles, credential_process and CLI login), web
  * identity, ECS and EC2 instance metadata. Values are resolved for every call.
- * @experimental
  */
 export const defaultChain = (options?: Parameters<typeof defaultProvider>[0]): Credentials => {
   const provider = defaultProvider(options)

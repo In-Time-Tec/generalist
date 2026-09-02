@@ -6,14 +6,10 @@ import type {
   ModelInvocationFailed,
   ModelInvocationStarted,
 } from "./events.js"
-
-/** @experimental */
 export class InvocationLifecycleFailed extends Schema.TaggedError<InvocationLifecycleFailed>()(
   "generalist/core/InvocationLifecycleFailed",
   { message: Schema.String },
 ) {}
-
-/** @experimental */
 export class InvocationLifecycle extends Context.Service<
   InvocationLifecycle,
   {
@@ -22,8 +18,6 @@ export class InvocationLifecycle extends Context.Service<
     readonly failAttempt: (input: ModelInvocationFailed) => Effect.Effect<void, InvocationLifecycleFailed>
   }
 >()("generalist/core/model/telemetry/services/InvocationLifecycle") {}
-
-/** @experimental */
 export const layerInvocationLifecycleNoop: Layer.Layer<InvocationLifecycle> = Layer.succeed(
   InvocationLifecycle,
   InvocationLifecycle.of({
@@ -32,17 +26,15 @@ export const layerInvocationLifecycleNoop: Layer.Layer<InvocationLifecycle> = La
     failAttempt: () => Effect.void,
   }),
 )
-
-/** @experimental */
 export const isInvocationLifecycleFailed = Schema.is(InvocationLifecycleFailed)
 
-/** @experimental Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
+/** Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
 export class SinkFailed extends Schema.TaggedError<SinkFailed>()("generalist/core/SinkFailed", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-/** @experimental Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`. */
+/** Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`. */
 export class Sink extends Context.Service<
   Sink,
   {
@@ -50,10 +42,10 @@ export class Sink extends Context.Service<
   }
 >()("generalist/core/model/telemetry/services/Sink") {}
 
-/** @experimental No-op host delivery sink. */
+/** No-op host delivery sink. */
 export const layerSinkNoop: Layer.Layer<Sink> = Layer.succeed(Sink, Sink.of({ deliver: () => Effect.void }))
 
-/** @experimental Generate one telemetry identifier via `IdGenerator`, defaulting when absent. */
+/** Generate one telemetry identifier via `IdGenerator`, defaulting when absent. */
 export const generateId: Effect.Effect<string> = Effect.flatMap(
   Effect.serviceOption(IdGenerator.IdGenerator),
   (service) => Option.getOrElse(service, () => IdGenerator.defaultIdGenerator).generateId(),

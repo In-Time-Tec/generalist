@@ -6,10 +6,10 @@ import { promptBytes, type MailboxEntry } from "../messaging/mailbox.js"
 import type { Metadata } from "../messaging/message.js"
 import type { RunEvent } from "../run/event.js"
 
-/** @experimental Maximum UTF-8 result size carried inline by one settlement notification. */
+/** Maximum UTF-8 result size carried inline by one settlement notification. */
 export const maxResultBytes = 16_384
 
-/** @experimental Durable payload written when a child Run reaches a terminal state. */
+/** Durable payload written when a child Run reaches a terminal state. */
 export const Payload = Schema.TaggedStruct("ChildSettlement", {
   notificationId: Schema.String,
   parentRunId: Schema.String,
@@ -27,16 +27,14 @@ export const Payload = Schema.TaggedStruct("ChildSettlement", {
    */
   joined: Schema.optionalKey(Schema.Boolean),
 })
-/** @experimental */
 export type Payload = typeof Payload.Type
 
-/** @experimental One ordered durable child settlement notification. */
+/** One ordered durable child settlement notification. */
 export const Notification = Schema.Struct({
   ...Payload.fields,
   sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   admittedAtMillis: Schema.Finite,
 })
-/** @experimental */
 export type Notification = typeof Notification.Type
 
 const metadataKey = "generalist.childSettlement"
@@ -70,10 +68,10 @@ const boundedResult = (childRunId: string, text: string) => {
   } as const
 }
 
-/** @experimental Stable identity shared by retries of one child's settlement. */
+/** Stable identity shared by retries of one child's settlement. */
 export const notificationIdFor = (childRunId: string): string => `child-settled:${childRunId}`
 
-/** @experimental Build the typed notification payload from the authoritative terminal event. */
+/** Build the typed notification payload from the authoritative terminal event. */
 export const payloadFromEvent = (input: {
   readonly parentRunId: string
   readonly childRunId: string
@@ -108,7 +106,7 @@ export const payloadFromEvent = (input: {
 }
 
 /**
- * @experimental Encode one settlement payload as a durable observation.
+ * Encode one settlement payload as a durable observation.
  *
  * A settlement carries no model-facing content. The parent receives a child's outcome as the tool
  * result of the call that started it; hosts read settlements through the child-settlement
@@ -139,7 +137,7 @@ export const observationEntry = (input: {
   }
 }
 
-/** @experimental Decode a typed settlement notification from mailbox metadata. */
+/** Decode a typed settlement notification from mailbox metadata. */
 export const fromMetadata = (input: {
   readonly metadata: Metadata
   readonly sequence: number
@@ -150,6 +148,6 @@ export const fromMetadata = (input: {
   return { ...payload, sequence: input.sequence, admittedAtMillis: input.admittedAtMillis }
 }
 
-/** @experimental Decode a typed settlement notification from a mailbox row. */
+/** Decode a typed settlement notification from a mailbox row. */
 export const fromMailboxEntry = (entry: MailboxEntry): Notification | undefined =>
   fromMetadata({ metadata: entry.metadata, sequence: entry.sequence, admittedAtMillis: entry.admittedAtMillis })

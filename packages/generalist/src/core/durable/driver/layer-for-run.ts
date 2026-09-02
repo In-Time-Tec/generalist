@@ -9,7 +9,7 @@ import { DriverInterpreter, layerInline } from "./interpreter.js"
 
 const AgentInput = Schema.Struct({ toolkit: Schema.Unknown })
 
-/** @experimental Construct the inline driver Layer for one Agent run. */
+/** Construct the inline driver Layer for one Agent run. */
 export const layerForRun: {
   <Tools extends Record<string, Tool.Any>, R, P, A>(
     options: RunOptions,

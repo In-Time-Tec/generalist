@@ -27,7 +27,7 @@ import { Rejected } from "../../policy/handoff-rejected.js"
 import { PolicyError } from "../../turn/policy.js"
 import { PolicyInvalid } from "../../turn/steering.js"
 
-/** @experimental The error channel and durable codec of `Agent.run` and `Agent.stream`. */
+/** The error channel and durable codec of `Agent.run` and `Agent.stream`. */
 export const RunError = Schema.Union([
   SinkFailed,
   InvocationLifecycleFailed,
@@ -60,6 +60,4 @@ export const RunError = Schema.Union([
   Rejected,
   PolicyInvalid,
 ])
-
-/** @experimental */
 export type RunError = typeof RunError.Type

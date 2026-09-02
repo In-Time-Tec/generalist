@@ -3,14 +3,14 @@ import { Cursor } from "./cursor.js"
 import { AckBeyondCommitted, AckInvalid } from "./errors.js"
 import { RunId } from "./run.js"
 
-/** @experimental One durable host processed-through point on the Run event sequence. */
+/** One durable host processed-through point on the Run event sequence. */
 export const Point = Schema.Struct({
   runId: RunId,
   sequence: Cursor,
   acknowledgedAt: Schema.optionalKey(Schema.String),
 })
 
-/** @experimental One durable host processed-through point on the Run event sequence. */
+/** One durable host processed-through point on the Run event sequence. */
 export type Point = typeof Point.Type
 
 /** @internal */

@@ -19,7 +19,7 @@ import {
   type Result,
 } from "../core/program/code-executor.js"
 
-/** @experimental Small provider seam used by the public CodeExecutor conformance suite. */
+/** Small provider seam used by the public CodeExecutor conformance suite. */
 export interface Options {
   readonly name: string
   readonly layer: Layer.Layer<CodeExecutor>
@@ -72,7 +72,7 @@ const execute = (options: Options, input: Request): Effect.Effect<Result, Execut
   provide(options, (executor) => executor.execute(input).pipe(Effect.provideService(ProgramCapabilities, capabilities)))
 
 /**
- * @experimental Register protocol and observable isolation requirements against a provider's public execute boundary.
+ * Register protocol and observable isolation requirements against a provider's public execute boundary.
  *
  * These tests prove request/result semantics and provider behavior observable through that boundary. They do not prove
  * a vendor's physical isolate, microVM, or hypervisor implementation; providers must document that evidence separately.

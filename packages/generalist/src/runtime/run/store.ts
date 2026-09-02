@@ -120,9 +120,9 @@ export type PendingRunOutcome = typeof PendingRunOutcome.Type
 
 export interface Service {
   readonly info: Effect.Effect<StoreInfo>
-  /** @experimental Read-only durable conversation history for one Session identity. */
+  /** Read-only durable conversation history for one Session identity. */
   readonly sessionReader: (sessionId: string) => Effect.Effect<Option.Option<SessionReader>>
-  /** @experimental Session writer bound to one storage-issued execution claim. */
+  /** Session writer bound to one storage-issued execution claim. */
   readonly claimedSessionStore: (claim: ExecutionClaim) => Effect.Effect<Option.Option<SessionService>>
   readonly hasAdmission: (input: {
     readonly address: Address
@@ -225,22 +225,22 @@ export interface Service {
   ) => Effect.Effect<SteeringReceipt, RunNotFound | RunTerminal | SteeringConflict | InboxFull | RuntimeUnavailable>
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
   /**
-   * @experimental The authoritative directory record for one Run.
+   * The authoritative directory record for one Run.
    *
    * Identity, parentage, and session membership are read from the durable Run record. Nothing is
    * derived by parsing an Address or a Run id.
    */
   readonly directory: (runId: string) => Effect.Effect<DirectoryEntry, DirectoryLookupError>
   readonly resolveAddress: (address: Address) => Effect.Effect<DirectoryEntry, ResolveAddressError>
-  /** @experimental Bind one host-assigned name, unique inside the naming scope that owns the Run. */
+  /** Bind one host-assigned name, unique inside the naming scope that owns the Run. */
   readonly registerAgentName: (input: {
     readonly runId: string
     readonly name: AgentName
   }) => Effect.Effect<DirectoryEntry, RunNotFound | AgentNameConflict | RuntimeUnavailable>
-  /** @experimental Parent, direct children, and siblings under one parent, from durable links only. */
+  /** Parent, direct children, and siblings under one parent, from durable links only. */
   readonly listRelated: (runId: string) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryLookupError>
   /**
-   * @experimental Admit one message into a target's durable inbox.
+   * Admit one message into a target's durable inbox.
    *
    * Admission is idempotent on (target, messageId, idempotencyKey) and rejects a divergent payload
    * under the same identity. An entry admitted while the target Run is live is bound to that Run's
@@ -248,30 +248,30 @@ export interface Service {
    * for the target's next Run.
    */
   readonly admitMessage: (input: AdmitMessageInput) => Effect.Effect<MessageReceipt, AdmitMessageError>
-  /** @experimental Messages admitted for one session that no Run has taken yet. */
+  /** Messages admitted for one session that no Run has taken yet. */
   readonly pendingMessages: (input: {
     readonly sessionId: string
     readonly runId?: string
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RuntimeUnavailable>
-  /** @experimental Ordered durable child settlements addressed to one exact parent Run. */
+  /** Ordered durable child settlements addressed to one exact parent Run. */
   readonly settlementNotifications: (input: {
     readonly parentRunId: string
     readonly afterSequence: number
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<ChildSettlementNotification>, RunNotFound | RuntimeUnavailable>
-  /** @experimental Bind every pending message for a Run's session to that Run's steering inbox. */
+  /** Bind every pending message for a Run's session to that Run's steering inbox. */
   readonly deliverPendingMessages: (input: {
     readonly runId: string
   }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RunNotFound | RuntimeUnavailable>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable>
-  /** @experimental Durably advance the host processed-through point to an exact committed model cycle. */
+  /** Durably advance the host processed-through point to an exact committed model cycle. */
   readonly acknowledge: (input: {
     readonly runId: string
     readonly sequence: number
   }) => Effect.Effect<void, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable>
-  /** @experimental Read the durable host processed-through point; -1 means no cycle is acknowledged. */
+  /** Read the durable host processed-through point; -1 means no cycle is acknowledged. */
   readonly acknowledged: (runId: string) => Effect.Effect<AcknowledgementPoint, RunNotFound | RuntimeUnavailable>
   readonly treeCheckpoint: (
     rootRunId: string,
@@ -361,7 +361,7 @@ export interface Service {
     { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
     WorkerMutationError
   >
-  /** @experimental Reconcile operations left running by the prior owner before execution resumes. */
+  /** Reconcile operations left running by the prior owner before execution resumes. */
   readonly recoverRunningOperations: (input: ExecutionClaim) => Effect.Effect<"ready" | "blocked", WorkerMutationError>
   readonly getOperation: (input: {
     readonly runId: string
@@ -371,11 +371,11 @@ export interface Service {
     readonly runId: string
     readonly operationKey: string
   }) => Effect.Effect<OperationRecord | undefined, RunNotFound | RuntimeUnavailable>
-  /** @experimental Cancellable tool operations awaiting a definitive concrete-executor acknowledgement. */
+  /** Cancellable tool operations awaiting a definitive concrete-executor acknowledgement. */
   readonly operationCancellations: (
     input: ExecutionClaim,
   ) => Effect.Effect<ReadonlyArray<OperationRecord>, WorkerMutationError>
-  /** @experimental Persist one definitive semantic cancellation acknowledgement under the current claim. */
+  /** Persist one definitive semantic cancellation acknowledgement under the current claim. */
   readonly acknowledgeOperationCancellation: (
     input: ExecutionClaim & {
       readonly operationId: string

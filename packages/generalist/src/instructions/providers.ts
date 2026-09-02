@@ -1,29 +1,27 @@
 import { Context, Effect, Layer, Option } from "effect"
 import { dual } from "effect/Function"
 import { AgentError } from "../core/agent/event.js"
-/** @experimental Context available while rendering instruction providers. */
+/** Context available while rendering instruction providers. */
 export interface RenderContext {
   readonly agentName: string
   readonly turn: number
 }
 
-/** @experimental Ordered provider of model instructions or contextual updates. */
+/** Ordered provider of model instructions or contextual updates. */
 export interface Provider<R = never> {
   readonly id: string
   readonly render: (context: RenderContext) => Effect.Effect<Option.Option<string>, AgentError, R>
 }
 
-/** @experimental Instructions registry service boundary. */
+/** Instructions registry service boundary. */
 export interface Service {
   readonly providers: ReadonlyArray<Provider>
 }
-
-/** @experimental */
 export class Instructions extends Context.Service<Instructions, Service>()(
   "generalist/instructions/providers/Instructions",
 ) {}
 
-/** @experimental A static baseline provider. */
+/** A static baseline provider. */
 export const fromText: {
   (text: string): (id: string) => Provider
   (id: string, text: string): Provider
@@ -35,7 +33,7 @@ export const fromText: {
   }),
 )
 
-/** @experimental Render every provider once for a run's instruction baseline. */
+/** Render every provider once for a run's instruction baseline. */
 export const render: {
   (context: RenderContext): (instructions: Service) => Effect.Effect<string, AgentError>
   (instructions: Service, context: RenderContext): Effect.Effect<string, AgentError>
@@ -52,7 +50,7 @@ export const render: {
     }),
 )
 
-/** @experimental Provide an explicit ordered instructions registry. */
+/** Provide an explicit ordered instructions registry. */
 export const layer = <R>(providers: ReadonlyArray<Provider<R>>): Layer.Layer<Instructions, never, R> =>
   Layer.effect(
     Instructions,
@@ -66,7 +64,5 @@ export const layer = <R>(providers: ReadonlyArray<Provider<R>>): Layer.Layer<Ins
       })
     }),
   )
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Instructions> =>
   Layer.succeed(Instructions, Instructions.of(implementation))

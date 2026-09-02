@@ -2,15 +2,11 @@ import { Effect, HashMap, Layer, SynchronizedRef } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { type Item, type Key, Memory, MemoryError, type Service as MemoryService } from "../core/context/memory.js"
 import { make as makeSummaryModelProvider } from "../core/model/result/summary-model.js"
-
-/** @experimental */
 export interface SummarizeOptions {
   readonly prompt?: string
   /** Model layer for summary calls; omit to use the model provided where this layer is built. */
   readonly model?: Layer.Layer<LanguageModel.LanguageModel>
 }
-
-/** @experimental */
 export interface Options {
   readonly maxMessages?: number
   readonly summarize?: SummarizeOptions
@@ -235,18 +231,12 @@ const makeImpl = (options: Options): Effect.Effect<MemoryService, never, Languag
         }),
     }
   })
-
-/** @experimental */
 export function make(): Effect.Effect<MemoryService>
-/** @experimental */
 export function make<O extends Options>(options: O): Effect.Effect<MemoryService, never, SummaryRequirement<O>>
 export function make(options: Options = {}): Effect.Effect<MemoryService, never, LanguageModel.LanguageModel> {
   return makeImpl(options)
 }
-
-/** @experimental */
 export function layer(): Layer.Layer<Memory>
-/** @experimental */
 export function layer<O extends Options>(options: O): Layer.Layer<Memory, never, SummaryRequirement<O>>
 export function layer(options: Options = {}): Layer.Layer<Memory, never, LanguageModel.LanguageModel> {
   return Layer.effect(Memory, makeImpl(options).pipe(Effect.map(Memory.of)))

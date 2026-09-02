@@ -37,6 +37,6 @@ const evidence = (cause: unknown, depth: number): string => {
   return parts.join(" ")
 }
 
-/** @experimental Classify every model failure as a context-window overflow by its semantic evidence, independent of provider, error shape, or decode success. */
+/** Classify every model failure as a context-window overflow by its semantic evidence, independent of provider, error shape, or decode success. */
 export const classify = (cause: unknown): FailureClassification =>
   overflowEvidence.test(evidence(cause, 0)) ? "context-overflow" : "other"

@@ -16,14 +16,14 @@ import { type CheckpointKind, type KernelProfile, digest } from "../kernel-profi
 import { type Kernel, make as makeKernel } from "./kernel.js"
 import { toSnapshot, unavailable } from "./runtime.js"
 
-/** @experimental How the pool boots and retires the one kernel that owns each Session. */
+/** How the pool boots and retires the one kernel that owns each Session. */
 export interface Options {
   readonly profile: KernelProfile
   readonly runtimeCommand: string
   readonly workerModule: string
   readonly startTimeoutMillis: number
   readonly interruptGraceMillis: number
-  /** @experimental Host source evaluated on every worker start, after restore, before any cell. */
+  /** Host source evaluated on every worker start, after restore, before any cell. */
   readonly bootstrap?: string
   readonly captureTimeoutMillis?: number | undefined
   readonly maxConcurrentBoots: number
@@ -45,7 +45,7 @@ interface SessionState {
 const initialState: SessionState = { epoch: 0, recovery: "restart-only", lease: undefined }
 
 /**
- * @experimental One live Bun kernel per Session, owned by a Server-scoped reference-counted map.
+ * One live Bun kernel per Session, owned by a Server-scoped reference-counted map.
  * A Session reuses its kernel across Runs, and the map's own scope releases every kernel on Server
  * shutdown. The pool adds no poll, no keepalive, and no timer that survives a completed cell: a
  * kernel's reference is held for exactly the duration of a cell, and idle eviction is the map's
@@ -312,6 +312,6 @@ export const make = (options: Options): Effect.Effect<KernelPoolService, never, 
     }
   })
 
-/** @experimental One Server-scoped pool of live Bun kernels, one per Session. */
+/** One Server-scoped pool of live Bun kernels, one per Session. */
 export const layer = (options: Options): Layer.Layer<KernelPool, never, KernelSnapshotStore> =>
   Layer.effect(KernelPool, make(options).pipe(Effect.map(KernelPool.of)))

@@ -27,9 +27,9 @@ export { cacheAware } from "./compaction-cache-aware.js"
 export type { Options as CacheAwareOptions } from "./compaction-cache-aware.js"
 export { layerTruncate, layerTruncateEstimated } from "./compaction-truncate.js"
 
-/** @experimental Default headroom kept for the next model response. */
+/** Default headroom kept for the next model response. */
 export const defaultReserveTokens = 16_384
-/** @experimental Fixed prompt used for dedicated summary calls. */
+/** Fixed prompt used for dedicated summary calls. */
 export const summaryTemplate = `Summarize the conversation so another agent can continue seamlessly.
 
 Use Markdown with these sections:
@@ -46,7 +46,7 @@ Use Markdown with these sections:
 
 Do not mention that context was compacted.`
 
-/** @experimental Structured checkpoint schema used by structuredSummary. */
+/** Structured checkpoint schema used by structuredSummary. */
 export const AgentSummary = Schema.Struct({
   goal: Schema.String,
   facts: Schema.Array(Schema.String),
@@ -55,10 +55,9 @@ export const AgentSummary = Schema.Struct({
   toolFindings: Schema.Array(Schema.String),
 })
 
-/** @experimental */
 export type AgentSummary = typeof AgentSummary.Type
 
-/** @experimental Compaction strategy: decide, cut, summarize. */
+/** Compaction strategy: decide, cut, summarize. */
 export interface Strategy {
   readonly shouldCompact: (input: { readonly tokens: number; readonly contextWindow: number }) => boolean
   readonly cut: (prompt: Prompt.Prompt, keepRecentTokens: number) => Option.Option<Plan>
@@ -70,7 +69,7 @@ export interface Strategy {
   readonly keepRecentTokens?: number
 }
 
-/** @experimental One independently composable compaction capability. */
+/** One independently composable compaction capability. */
 export interface StrategyPart {
   readonly shouldCompact?: Strategy["shouldCompact"]
   readonly cut?: Strategy["cut"]
@@ -79,7 +78,7 @@ export interface StrategyPart {
   readonly keepRecentTokens?: number
 }
 
-/** @experimental Options for the default compaction implementation. */
+/** Options for the default compaction implementation. */
 export interface DefaultOptions {
   readonly reserveTokens?: number
   readonly keepRecentTokens?: number
@@ -88,29 +87,29 @@ export interface DefaultOptions {
   readonly summaryPrompt?: string
 }
 
-/** @experimental Options accepted by the Compaction layer. */
+/** Options accepted by the Compaction layer. */
 export interface LayerOptions extends DefaultOptions {
   readonly strategy?: Strategy
 }
 
-/** @experimental Options for lossless tool-output bounding. */
+/** Options for lossless tool-output bounding. */
 export interface OutputBoundOptions {
   readonly maxBytes: number
 }
 
-/** @experimental Options for token-denominated recent retention. */
+/** Options for token-denominated recent retention. */
 export interface KeepRecentOptions {
   readonly tokens: number
 }
 
-/** @experimental Options for schema-validated structured summaries. */
+/** Options for schema-validated structured summaries. */
 export interface StructuredSummaryOptions {
   readonly objectName?: string
   readonly summaryModel?: Layer.Layer<LanguageModel.LanguageModel>
   readonly summaryPrompt?: string
 }
 
-/** @experimental Options for model-backed text summaries. */
+/** Options for model-backed text summaries. */
 export interface SummarizeWithModelOptions {
   /** Closed model layer for summary calls; omit to use the ambient LanguageModel. */
   readonly model?: Layer.Layer<LanguageModel.LanguageModel>
@@ -248,7 +247,7 @@ const summaryEffect = (
     )
   })
 
-/** @experimental Summarize compacted context with an ambient or dedicated LanguageModel. */
+/** Summarize compacted context with an ambient or dedicated LanguageModel. */
 export const summarizeWithModel = (options: SummarizeWithModelOptions = {}): Strategy["summarize"] => {
   const provideSummaryModel = options.model === undefined ? undefined : makeSummaryModelProvider(options.model)
   return (plan, request) => {
@@ -257,7 +256,7 @@ export const summarizeWithModel = (options: SummarizeWithModelOptions = {}): Str
   }
 }
 
-/** @experimental The default two-stage compaction strategy. */
+/** The default two-stage compaction strategy. */
 export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
   const summarizeOptions: Types.Mutable<SummarizeWithModelOptions> = {}
   if (options.summaryModel !== undefined) summarizeOptions.model = options.summaryModel
@@ -279,7 +278,7 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
   }
 }
 
-/** @experimental Compile ordered strategy parts onto a complete strategy. */
+/** Compile ordered strategy parts onto a complete strategy. */
 export const strategy: {
   (base?: Strategy): (parts: ReadonlyArray<StrategyPart>) => Strategy
   (parts: ReadonlyArray<StrategyPart>, base?: Strategy): Strategy
@@ -299,17 +298,17 @@ export const strategy: {
     }, base),
 )
 
-/** @experimental Configure lossless successful-tool-result bounding. */
+/** Configure lossless successful-tool-result bounding. */
 export const toolOutputBound = (options: OutputBoundOptions): StrategyPart => ({
   toolOutputMaxBytes: safeNonNegativeInteger("OutputBoundOptions.maxBytes", options.maxBytes),
 })
 
-/** @experimental Configure the token target retained verbatim after a summary cut. */
+/** Configure the token target retained verbatim after a summary cut. */
 export const keepRecent = (options: KeepRecentOptions): StrategyPart => ({
   keepRecentTokens: safeNonNegativeInteger("KeepRecentOptions.tokens", options.tokens),
 })
 
-/** @experimental Summarize through Effect AI structured output and render a string checkpoint. */
+/** Summarize through Effect AI structured output and render a string checkpoint. */
 export const structuredSummary = (options: StructuredSummaryOptions = {}): StrategyPart => {
   const provideSummaryModel =
     options.summaryModel === undefined ? undefined : makeSummaryModelProvider(options.summaryModel)
@@ -339,7 +338,7 @@ export const structuredSummary = (options: StructuredSummaryOptions = {}): Strat
   }
 }
 
-/** @experimental Build a compaction service from a strategy. */
+/** Build a compaction service from a strategy. */
 export const make: {
   (options?: DefaultOptions): (compactionStrategy: Strategy) => Service
   (compactionStrategy: Strategy, options?: DefaultOptions): Service
@@ -433,19 +432,18 @@ const compact = (
     })
   })
 
-/** @experimental Layer wiring the default or provided strategy. */
+/** Layer wiring the default or provided strategy. */
 export interface LayerConstructor {
   (options?: LayerOptions): Layer.Layer<Compaction>
   (providedStrategy: Strategy): Layer.Layer<Compaction>
 }
 
-/** @experimental Layer wiring the default or provided strategy. */
+/** Layer wiring the default or provided strategy. */
 export const layer: LayerConstructor = (input: LayerOptions | Strategy = {}): Layer.Layer<Compaction> => {
   const options = "shouldCompact" in input ? {} : input
   const providedStrategy = "shouldCompact" in input ? input : (input.strategy ?? defaultStrategy(input))
   return Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options)))
 }
 
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Compaction> =>
   Layer.succeed(Compaction, Compaction.of(implementation))

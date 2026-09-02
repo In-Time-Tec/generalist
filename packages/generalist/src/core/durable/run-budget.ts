@@ -1,7 +1,7 @@
 import { Effect, Function, Schema } from "effect"
 import type { ParseOptions } from "effect/SchemaAST"
 
-/** @experimental Finite resource limits for one run or child grant. */
+/** Finite resource limits for one run or child grant. */
 const Count = Schema.Finite.check(
   Schema.isInt(),
   Schema.isGreaterThanOrEqualTo(0),
@@ -17,29 +17,21 @@ export const BudgetLimits = Schema.Struct({
   depth: Schema.optionalKey(Count),
   deadline: Schema.optionalKey(Schema.String),
 })
-
-/** @experimental */
 export type BudgetLimits = typeof BudgetLimits.Type
 
-/** @experimental Portable run budget with allocation, remaining capacity, and tree depth. */
+/** Portable run budget with allocation, remaining capacity, and tree depth. */
 export const RunBudget = Schema.Struct({
   allocation: BudgetLimits,
   remaining: BudgetLimits,
   depth: Count,
 })
-
-/** @experimental */
 export type RunBudget = typeof RunBudget.Type
-
-/** @experimental */
 export class Exhausted extends Schema.TaggedError<Exhausted>()("generalist/core/RunBudgetExhausted", {
   dimension: Schema.Literals(["modelCalls", "toolCalls", "totalTokens", "childRuns", "handoffs", "depth", "deadline"]),
   requested: Schema.Finite,
   remaining: Schema.optionalKey(Schema.Finite),
   message: Schema.optionalKey(Schema.String),
 }) {}
-
-/** @experimental */
 export class GrantWidened extends Schema.TaggedError<GrantWidened>()("generalist/core/RunBudgetGrantWidened", {
   dimension: Schema.Literals(["modelCalls", "toolCalls", "totalTokens", "childRuns", "handoffs", "depth"]),
   grant: Schema.Finite,
@@ -170,8 +162,6 @@ const subtractLimits = (
     if (grant.deadline !== undefined) next = withDeadline(next, grant.deadline)
     return next
   })
-
-/** @experimental */
 export const make: {
   (depth?: number): (allocation: BudgetLimits) => RunBudget
   (allocation: BudgetLimits, depth?: number): RunBudget
@@ -185,13 +175,11 @@ export const make: {
 )
 
 /**
- * @experimental The allocation that charges nothing. Every dimension is undefined, so `charge`
+ * The allocation that charges nothing. Every dimension is undefined, so `charge`
  * short-circuits on an undefined remaining and no usage can exhaust it. Naming it keeps an
  * unbounded run from reading like a forgotten argument.
  */
 export const unbounded: BudgetLimits = {}
-
-/** @experimental */
 export const charge: {
   (usage: BudgetLimits): (budget: RunBudget) => Effect.Effect<RunBudget, Exhausted>
   (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, Exhausted>
@@ -225,13 +213,13 @@ export const charge: {
     }),
 )
 
-/** @experimental Result of settling a paid model response against its token allocation. */
+/** Result of settling a paid model response against its token allocation. */
 interface ModelTokenSettlement {
   readonly budget: RunBudget
   readonly exhausted: Exhausted | undefined
 }
 
-/** @experimental Settle paid model tokens without discarding an already completed provider response. */
+/** Settle paid model tokens without discarding an already completed provider response. */
 export const settleModelTokens: {
   (requested: number): (budget: RunBudget) => ModelTokenSettlement
   (budget: RunBudget, requested: number): ModelTokenSettlement
@@ -249,8 +237,6 @@ export const settleModelTokens: {
     exhausted: Exhausted.make({ dimension: "totalTokens", requested, remaining }),
   }
 })
-
-/** @experimental */
 export const reserveChild: {
   (
     grant: BudgetLimits,
@@ -333,8 +319,6 @@ const intersectLimits = (current: BudgetLimits, cap: BudgetLimits): BudgetLimits
   if (cap.deadline !== undefined) next = withDeadline(next, cap.deadline)
   return next
 }
-
-/** @experimental */
 export const narrowChild: {
   (
     child: RunBudget,
@@ -381,8 +365,6 @@ export const narrowChild: {
       }
     }),
 )
-
-/** @experimental */
 export const refundUnused: {
   (child: RunBudget): (parent: RunBudget) => RunBudget
   (parent: RunBudget, child: RunBudget): RunBudget
@@ -393,8 +375,6 @@ export const refundUnused: {
     remaining: mergeRemaining(parent.remaining, child.remaining),
   }),
 )
-
-/** @experimental */
 export const isDeadlineExpired: {
   (nowIso: string): (budget: RunBudget) => boolean
   (budget: RunBudget, nowIso: string): boolean
@@ -402,8 +382,6 @@ export const isDeadlineExpired: {
   const deadline = budget.remaining.deadline ?? budget.allocation.deadline
   return deadline !== undefined && nowIso >= deadline
 })
-
-/** @experimental */
 export const assertNotExpired: {
   (nowIso: string): (budget: RunBudget) => Effect.Effect<void, Exhausted>
   (budget: RunBudget, nowIso: string): Effect.Effect<void, Exhausted>
@@ -414,8 +392,6 @@ export const assertNotExpired: {
       ? Effect.fail(Exhausted.make({ dimension: "deadline", requested: 1 }))
       : Effect.void,
 )
-
-/** @experimental */
 export const resolve: {
   (runOverride?: BudgetLimits): (agentDefault?: BudgetLimits) => RunBudget
   (agentDefault?: BudgetLimits, runOverride?: BudgetLimits): RunBudget
@@ -425,7 +401,7 @@ export const resolve: {
     make(runOverride === undefined ? (agentDefault ?? {}) : narrowLimits(agentDefault ?? {}, runOverride)),
 )
 
-/** @experimental Narrow a base budget with optional per-run overrides; omitted dimensions stay unchanged. */
+/** Narrow a base budget with optional per-run overrides; omitted dimensions stay unchanged. */
 export const narrowLimits: {
   (override?: BudgetLimits): (base?: BudgetLimits) => BudgetLimits
   (base?: BudgetLimits, override?: BudgetLimits): BudgetLimits
@@ -434,8 +410,6 @@ export const narrowLimits: {
   (base: BudgetLimits | undefined, override: BudgetLimits | undefined): BudgetLimits =>
     override === undefined ? (base ?? {}) : intersectLimits(base ?? {}, override),
 )
-
-/** @experimental */
 export const encode: {
   (input: RunBudget, options?: ParseOptions): Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never>
   (options?: ParseOptions): (input: RunBudget) => Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never>
@@ -444,8 +418,6 @@ export const encode: {
   (input: RunBudget, options?: ParseOptions): Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never> =>
     Schema.encodeEffect(RunBudget)(input, options),
 )
-
-/** @experimental */
 export const decode: {
   (input: typeof RunBudget.Encoded, options?: ParseOptions): Effect.Effect<RunBudget, Schema.SchemaError, never>
   (options?: ParseOptions): (input: typeof RunBudget.Encoded) => Effect.Effect<RunBudget, Schema.SchemaError, never>

@@ -14,17 +14,16 @@ import type { Route } from "../core/tools/tool-placement.js"
 import { CellEvent, CellFailure, CellResult, KernelProtocolViolation, KernelUnavailable } from "./cell.js"
 import { ExecutionFailed, LimitExceeded, type SandboxError, SandboxProvider } from "../sandbox/service.js"
 
-/** @experimental The only name a Generalist REPL host advertises to a model. */
+/** The only name a Generalist REPL host advertises to a model. */
 export const name = "typescript"
 
-/** @experimental Maximum authored source accepted in one cell. */
+/** Maximum authored source accepted in one cell. */
 export const maxSourceBytes = 65_536
 
-/** @experimental The cell source parameter. */
+/** The cell source parameter. */
 export const Parameters = Schema.Struct({
   code: Schema.String.check(Schema.isMaxLength(maxSourceBytes)),
 })
-/** @experimental */
 export type Parameters = typeof Parameters.Type
 
 const description = [
@@ -33,7 +32,7 @@ const description = [
   "Top-level await is available; a thrown error is an observation, not a run failure.",
 ].join(" ")
 
-/** @experimental The one Effect AI tool a conversational Generalist agent advertises. */
+/** The one Effect AI tool a conversational Generalist agent advertises. */
 export const tool = Tool.make(name, {
   description,
   parameters: Parameters,
@@ -41,12 +40,10 @@ export const tool = Tool.make(name, {
   failure: CellFailure,
   failureMode: "return",
 })
-
-/** @experimental */
 export const toolkit = Toolkit.make(tool)
 
 /**
- * @experimental One shared namespace means one cell at a time: the cell tool is never parallel-safe
+ * One shared namespace means one cell at a time: the cell tool is never parallel-safe
  * and every call is an authored-order exclusive barrier.
  */
 export const scheduling: ToolSchedulingPolicy = {
@@ -59,7 +56,7 @@ const frameworkFailure = (stage: FrameworkStage, message: string): FrameworkFail
 
 const schemaMessage = (error: { readonly message: string }): string => error.message
 
-/** @experimental Largest encoded cell event carried in one progress record. */
+/** Largest encoded cell event carried in one progress record. */
 export const maxProgressBytes = 16_384
 
 const encodeEvent = Schema.encodeUnknownEffect(CellEvent)
@@ -74,7 +71,7 @@ const encodedSize = (encoded: typeof CellEvent.Encoded): number =>
   new TextEncoder().encode(JSON.stringify(encoded)).byteLength
 
 /**
- * @experimental One progress record per cell event, carrying the whole encoded event so a host can
+ * One progress record per cell event, carrying the whole encoded event so a host can
  * render streamed cell output. An event that cannot be encoded, or that exceeds the bound, still
  * emits its identity, so the cell-local sequence a consumer verifies stays contiguous.
  */
@@ -182,7 +179,7 @@ const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, Too
     }),
   )
 
-/** @experimental The cell route: one tool, ToolContext progress and interruption, typed cell outcomes. */
+/** The cell route: one tool, ToolContext progress and interruption, typed cell outcomes. */
 export const route: Route<ToolContext | SandboxProvider> = toolExecutorRoute<ToolContext | SandboxProvider>({
   tools: [name],
   execute,
@@ -198,8 +195,6 @@ const executeRouted = (request: Request): ReturnType<typeof execute> =>
           message: `Tool ${request.call.name} has no matching route`,
         }),
       )
-
-/** @experimental */
 export const layer: Layer.Layer<ToolExecutor, never, SandboxProvider> = Layer.effect(
   ToolExecutor,
   Effect.map(SandboxProvider, (provider) =>

@@ -74,8 +74,6 @@ const defaultParameters = Schema.Struct({ prompt: Schema.String })
 type DefaultParameters = typeof defaultParameters
 type DefaultSuccess = typeof Schema.String
 type ToolInput = typeof Schema.Unknown.Type
-
-/** @experimental */
 export interface AsToolOptions<
   Name extends string = string,
   Parameters extends Schema.Top = DefaultParameters,
@@ -92,7 +90,7 @@ export interface AsToolOptions<
   readonly model?: Layer.Layer<LanguageModel.LanguageModel, never, ModelR>
 }
 
-/** @experimental A schema-backed tool with a stable name and closed invocation. */
+/** A schema-backed tool with a stable name and closed invocation. */
 type AgentToolTool<Parameters extends Schema.Top, Success extends Schema.Top> = Tool.Tool<
   string,
   {
@@ -103,8 +101,6 @@ type AgentToolTool<Parameters extends Schema.Top, Success extends Schema.Top> = 
   },
   never
 >
-
-/** @experimental */
 export interface AgentToolToolkit<_Name extends string, Parameters extends Schema.Top, Success extends Schema.Top, R> {
   readonly name: string
   readonly tool: AgentToolTool<Parameters, Success>
@@ -227,8 +223,6 @@ const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success
   invoke,
   requirements: (value) => value,
 })
-
-/** @experimental */
 export const asTool: {
   <
     const Name extends string = string,

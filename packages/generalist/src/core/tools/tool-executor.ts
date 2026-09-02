@@ -37,8 +37,6 @@ type AgentToolSchemaServices<Parameters extends Schema.Top, SuccessSchema extend
   | Parameters["EncodingServices"]
   | SuccessSchema["DecodingServices"]
   | SuccessSchema["EncodingServices"]
-
-/** @experimental */
 export interface Service<R = ToolContext> {
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly cancellable?: ((request: Request) => boolean) | undefined
@@ -47,8 +45,6 @@ export interface Service<R = ToolContext> {
     | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
     | undefined
 }
-
-/** @experimental */
 export class ToolExecutor extends Context.Service<ToolExecutor, Service<ToolContext>>()(
   "generalist/core/tools/tool-executor/ToolExecutor",
 ) {}
@@ -183,8 +179,6 @@ function executeToolkitUncurried<
   const unhandled: Toolkit.Toolkit<Tools> = toolkit
   return Effect.flatMap(unhandled, (handled) => executeWithToolkit(handled, request))
 }
-
-/** @experimental */
 export const executeToolkit: typeof executeToolkitUncurried & {
   <R, T extends SchemaTool>(
     request: Request,
@@ -238,8 +232,6 @@ const layerClosedToolSet = <R, T extends SchemaTool>(
       ),
     ),
   )
-
-/** @experimental */
 export function layerToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
 ): Layer.Layer<ToolExecutor, never, R | AgentToolSchemaServices<Parameters, SuccessSchema>>
@@ -307,8 +299,6 @@ export function layerToolkit<
     ),
   )
 }
-
-/** @experimental */
 export function routeToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
 ): Route<R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
@@ -363,8 +353,6 @@ const routeInputEffect = <R>(input: RouteInput<R>): Effect.Effect<Route<R>, neve
 
 const firstMatchingRoute = <R>(routes: ReadonlyArray<Route<R>>, request: Request): Route<R> | undefined =>
   routes.find((candidate) => candidate.matches(request))
-
-/** @experimental */
 export function layerRouter(routes: Iterable<Route<ToolContext>>): Layer.Layer<ToolExecutor, never, ToolContext>
 export function layerRouter<R>(
   routes: Iterable<Route<ToolContext> | Effect.Effect<Route<ToolContext>, never, R>>,
@@ -414,7 +402,5 @@ export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<Too
     ),
   )
 }
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<ToolExecutor> =>
   Layer.succeed(ToolExecutor, ToolExecutor.of(implementation))

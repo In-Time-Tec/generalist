@@ -24,7 +24,7 @@ import {
 } from "./service.js"
 import { rootedFileSystem } from "./file-system.js"
 
-/** @experimental Bun kernel provider configuration. */
+/** Bun kernel provider configuration. */
 export interface BunKernelOptions {
   readonly image: string
   readonly workspaceRoot: string
@@ -88,7 +88,7 @@ const restoreSnapshot = (
       .pipe(Effect.mapError((cause) => snapshotFailure(`BunKernel fork failed for ${snapshotId}`, cause)))
   })
 
-/** @experimental Construct a provider over an existing BunKernelPool and BunKernelSnapshotStore. */
+/** Construct a provider over an existing BunKernelPool and BunKernelSnapshotStore. */
 export const makeBunKernelProvider = (
   options: BunKernelOptions,
 ): Effect.Effect<SandboxProviderService, never, FileSystem.FileSystem | KernelPool | KernelSnapshotStore | Path.Path> =>
@@ -208,7 +208,7 @@ export const makeBunKernelProvider = (
     })
   })
 
-/** @experimental Provide the process-isolated BunKernel Sandbox leaf. */
+/** Provide the process-isolated BunKernel Sandbox leaf. */
 export const layerBunKernel = (
   options: BunKernelOptions,
 ): Layer.Layer<SandboxProvider, never, FileSystem.FileSystem | KernelPool | KernelSnapshotStore | Path.Path> =>

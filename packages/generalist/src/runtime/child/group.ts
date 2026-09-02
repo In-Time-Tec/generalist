@@ -6,7 +6,7 @@ import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
 import type { RunEvent } from "../run/event.js"
 import { ChildReadiness } from "./readiness.js"
 
-/** @experimental Exact declared child authority used to constrain model-visible selections. */
+/** Exact declared child authority used to constrain model-visible selections. */
 export interface Authority {
   readonly children: ReadonlyArray<{ readonly selection: string }>
 }
@@ -16,9 +16,8 @@ const Key = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
 const PromptText = Schema.String.check(Schema.isNonEmpty())
 const Label = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(256))
 
-/** @experimental Typed policy failures preserved through model-facing child tools. */
+/** Typed policy failures preserved through model-facing child tools. */
 export const Failure = Schema.Union([ChildDepthExceeded, ChildLimitExceeded, Schema.Struct({ message: Schema.String })])
-/** @experimental */
 export type Failure = typeof Failure.Type
 
 const selectionFor = (authority?: Authority): Schema.Codec<string> =>
@@ -48,9 +47,9 @@ const startGroupParametersFor = (selection: Schema.Codec<string>) =>
     ),
   })
 
-/** @experimental Parameters for one dependent child Run. */
+/** Parameters for one dependent child Run. */
 export const Parameters = parametersFor(Selection)
-/** @experimental Result of one dependent child Run. */
+/** Result of one dependent child Run. */
 export const Result = Schema.Union([
   Schema.TaggedStruct("Succeeded", {
     childRunId: Schema.String,
@@ -70,7 +69,7 @@ export const Result = Schema.Union([
   }),
 ])
 
-/** @experimental Stable receipt for one member of an admitted child group. */
+/** Stable receipt for one member of an admitted child group. */
 export const GroupChildReceipt = Schema.Struct({
   key: Key,
   selection: Selection,
@@ -79,28 +78,24 @@ export const GroupChildReceipt = Schema.Struct({
   depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   readiness: ChildReadiness,
 })
-/** @experimental */
 export type GroupChildReceipt = typeof GroupChildReceipt.Type
 
-/** @experimental Stable receipt returned without waiting for a child group. */
+/** Stable receipt returned without waiting for a child group. */
 export const GroupReceipt = Schema.Struct({
   groupId: Schema.String,
   children: Schema.Array(GroupChildReceipt),
 })
-/** @experimental */
 export type GroupReceipt = typeof GroupReceipt.Type
 
-/** @experimental Parameters for atomically starting one bounded child group. */
+/** Parameters for atomically starting one bounded child group. */
 export const StartGroupParameters = startGroupParametersFor(Selection)
-/** @experimental */
 export type StartGroupParameters = typeof StartGroupParameters.Type
 
-/** @experimental Parameters for durably joining one previously admitted child group. */
+/** Parameters for durably joining one previously admitted child group. */
 export const AwaitGroupParameters = Schema.Struct({ groupId: Schema.String })
-/** @experimental */
 export type AwaitGroupParameters = typeof AwaitGroupParameters.Type
 
-/** @experimental Ordered terminal or remainder state for one child group member. */
+/** Ordered terminal or remainder state for one child group member. */
 export const GroupChildResult = Schema.Struct({
   key: Key,
   selection: Selection,
@@ -114,25 +109,23 @@ export const GroupChildResult = Schema.Struct({
   message: Schema.optionalKey(Schema.String),
   reason: Schema.optionalKey(Schema.String),
 })
-/** @experimental */
 export type GroupChildResult = typeof GroupChildResult.Type
 
-/** @experimental Ordered durable join result for one child group. */
+/** Ordered durable join result for one child group. */
 export const GroupResult = Schema.Struct({
   groupId: Schema.String,
   status: FanOutStatus,
   children: Schema.Array(GroupChildResult),
 })
-/** @experimental */
 export type GroupResult = typeof GroupResult.Type
 
-/** @experimental Name of the blocking dependent-child tool. */
+/** Name of the blocking dependent-child tool. */
 export const toolName = "run_child"
-/** @experimental Name of the non-blocking child-group admission tool. */
+/** Name of the non-blocking child-group admission tool. */
 export const startGroupToolName = "start_child_group"
-/** @experimental Name of the durable child-group join tool. */
+/** Name of the durable child-group join tool. */
 export const awaitGroupToolName = "await_child_group"
-/** @experimental Name of the blocking atomic child-group tool. */
+/** Name of the blocking atomic child-group tool. */
 export const runGroupToolName = "run_child_group"
 
 const makeRunChildTool = (selection: Schema.Codec<string>): Tool.Any =>
@@ -161,13 +154,13 @@ const makeRunGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
     failure: Failure,
   })
 
-/** @experimental Blocking tool for dependent singleton child work. */
+/** Blocking tool for dependent singleton child work. */
 export const tool = makeRunChildTool(Selection)
-/** @experimental Non-blocking tool for bounded independent child work. */
+/** Non-blocking tool for bounded independent child work. */
 export const startGroupTool = makeStartGroupTool(Selection)
-/** @experimental Blocking tool for one exact all-settled child group. */
+/** Blocking tool for one exact all-settled child group. */
 export const runGroupTool = makeRunGroupTool(Selection)
-/** @experimental Durable join tool for a previously admitted child group. */
+/** Durable join tool for a previously admitted child group. */
 export const awaitGroupTool = Tool.make(awaitGroupToolName, {
   description: "Wait for a child group through one durable suspension and return results in admission order.",
   parameters: AwaitGroupParameters,
@@ -175,7 +168,7 @@ export const awaitGroupTool = Tool.make(awaitGroupToolName, {
   failure: Failure,
 })
 
-/** @experimental Model-facing child tools narrowed to the active Agent's declared child selections. */
+/** Model-facing child tools narrowed to the active Agent's declared child selections. */
 const makeTools = (authority: Authority) => {
   const selection = selectionFor(authority)
   return {
@@ -186,7 +179,7 @@ const makeTools = (authority: Authority) => {
   }
 }
 
-/** @experimental Runtime-owned child-group tool declarations. */
+/** Runtime-owned child-group tool declarations. */
 export const Tools = { make: makeTools }
 
 const MessagePayload = Schema.Struct({ message: Schema.String })
@@ -222,7 +215,7 @@ const messageOf = <Value>(value: Value): string | undefined =>
 
 type ChildTerminalEvent = Extract<RunEvent, { readonly _tag: "RunCompleted" | "RunFailed" | "RunCancelled" }>
 
-/** @experimental Project one canonical child terminal event into its blocking parent handoff. */
+/** Project one canonical child terminal event into its blocking parent handoff. */
 export const resultFromChildEvent = (input: {
   readonly childRunId: string
   readonly metadata: SerializedMetadata
@@ -270,7 +263,7 @@ export const resultFromChildEvent = (input: {
   return result
 }
 
-/** @experimental Whether persisted child metadata and suspension authorize one direct blocking handoff. */
+/** Whether persisted child metadata and suspension authorize one direct blocking handoff. */
 export const ownsChildSuspension = (input: {
   readonly parentRunId: string
   readonly waitId: string
@@ -294,7 +287,7 @@ export const ownsChildSuspension = (input: {
   )
 }
 
-/** @experimental Return the exact aggregate wait owned by one direct child. */
+/** Return the exact aggregate wait owned by one direct child. */
 export const waitIdForChild = (input: {
   readonly parentRunId: string
   readonly childRunId: string
@@ -321,7 +314,7 @@ export const waitIdForChild = (input: {
   )?.waitId
 }
 
-/** @experimental Project one persisted fan-out inspection into the model-facing ordered child-group result. */
+/** Project one persisted fan-out inspection into the model-facing ordered child-group result. */
 export const resultFromInspection = (inspection: FanOutInspection): GroupResult => ({
   groupId: inspection.fanOutId,
   status: inspection.status,
@@ -347,7 +340,7 @@ export const resultFromInspection = (inspection: FanOutInspection): GroupResult 
   }),
 })
 
-/** @experimental Return the owned group named by an await-child-group suspension, if any. */
+/** Return the owned group named by an await-child-group suspension, if any. */
 export const groupIdFromSuspension = <Suspension>(suspension: Suspension): string | undefined => {
   const decodedSuspension = Schema.decodeUnknownOption(AgentWaits)(suspension)
   if (decodedSuspension._tag === "None") return undefined
@@ -360,7 +353,7 @@ export const groupIdFromSuspension = <Suspension>(suspension: Suspension): strin
   return undefined
 }
 
-/** @experimental Every exact aggregate wait that owns one child group, in authored order. */
+/** Every exact aggregate wait that owns one child group, in authored order. */
 export const groupWaitsFromSuspension = <Suspension>(
   suspension: Suspension,
 ): ReadonlyArray<{ readonly groupId: string; readonly waitId: string }> => {
@@ -376,7 +369,7 @@ export const groupWaitsFromSuspension = <Suspension>(
   })
 }
 
-/** @experimental Return the exact wait that owns one child group in an aggregate Agent suspension. */
+/** Return the exact wait that owns one child group in an aggregate Agent suspension. */
 export const waitIdForGroup: {
   (groupId: string): <Suspension>(suspension: Suspension) => string | undefined
   <Suspension>(suspension: Suspension, groupId: string): string | undefined

@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { SkillCatalogError, layer as SkillCatalogLayer } from "../../core/context/skill-catalog.js"
 import { type Limits, make as makeHostedCatalog, resolveRelative, validateSkillPath } from "./hosted-catalog.js"
 
-/** @experimental Manifest-backed S3 catalog options. */
+/** Manifest-backed S3 catalog options. */
 export interface Options extends Limits {
   readonly bucket: string
   readonly region: string
@@ -17,7 +17,7 @@ const segments = (value: string): string =>
     .map(encodeURIComponent)
     .join("/")
 
-/** @experimental Build a manifest-backed S3 catalog. */
+/** Build a manifest-backed S3 catalog. */
 export const make = (options: Options) => {
   const validationSource = "s3-skill-catalog"
   if (
@@ -47,5 +47,5 @@ export const make = (options: Options) => {
   })
 }
 
-/** @experimental Build a manifest-backed S3 catalog layer. */
+/** Build a manifest-backed S3 catalog layer. */
 export const layer = (options: Options): ReturnType<typeof SkillCatalogLayer> => SkillCatalogLayer([make(options)])

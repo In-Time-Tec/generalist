@@ -13,13 +13,13 @@ import type { Service as HostBindingsService, Request as HostRequest } from "../
 import type { WorkerFrame } from "./protocol.js"
 import type { Worker } from "./session.js"
 
-/** @experimental One cell's frames folded into cell events and one terminal outcome. */
+/** One cell's frames folded into cell events and one terminal outcome. */
 export interface CellOutcome {
   readonly result: CellResult | undefined
   readonly failure: CellFailure | undefined
 }
 
-/** @experimental Everything a session needs to answer host requests raised by a running cell. */
+/** Everything a session needs to answer host requests raised by a running cell. */
 export interface HostAnswerOptions {
   readonly bindings: HostBindingsService | undefined
   readonly worker: Worker
@@ -28,7 +28,7 @@ export interface HostAnswerOptions {
   readonly emitHostCall?: (event: HostCallUpdate) => Effect.Effect<void>
 }
 
-/** @experimental One request an executing cell raised against a mounted host module. */
+/** One request an executing cell raised against a mounted host module. */
 export interface HostAsk {
   readonly requestId: string
   readonly module: string
@@ -36,7 +36,7 @@ export interface HostAsk {
   readonly input?: unknown
 }
 
-/** @experimental Host call data before the kernel assigns its cell identity and sequence. */
+/** Host call data before the kernel assigns its cell identity and sequence. */
 export interface HostCallUpdate {
   readonly requestId: string
   readonly module: string
@@ -78,7 +78,7 @@ const hostRequest = (options: HostAnswerOptions, request: HostAsk): HostRequest 
     : { ...base, sessionId: options.sessionId, cellId: options.cellId }
 }
 
-/** @experimental Answer one host request from an executing cell without blocking the frame reader. */
+/** Answer one host request from an executing cell without blocking the frame reader. */
 export const answerHostRequest: {
   (request: HostAsk): (options: HostAnswerOptions) => Effect.Effect<void, KernelUnavailable>
   (options: HostAnswerOptions, request: HostAsk): Effect.Effect<void, KernelUnavailable>
@@ -147,12 +147,12 @@ export const answerHostRequest: {
     }),
 )
 
-/** @experimental One accumulated output channel of one cell. */
+/** One accumulated output channel of one cell. */
 export interface ChannelState {
   readonly text: string
 }
 
-/** @experimental Every channel one cell has produced so far. */
+/** Every channel one cell has produced so far. */
 export interface Accumulator {
   readonly stdout: ChannelState
   readonly stderr: ChannelState
@@ -161,22 +161,22 @@ export interface Accumulator {
 
 const emptyChannel: ChannelState = { text: "" }
 
-/** @experimental The empty channel accumulator one cell starts from. */
+/** The empty channel accumulator one cell starts from. */
 export const emptyAccumulator: Accumulator = { stdout: emptyChannel, stderr: emptyChannel, display: emptyChannel }
 
-/** @experimental One write offered to one channel. */
+/** One write offered to one channel. */
 export interface IngestRequest {
   readonly channel: Exclude<Channel, "result">
   readonly text: string
 }
 
-/** @experimental One accumulated channel write. */
+/** One accumulated channel write. */
 export interface Ingested {
   readonly channels: Accumulator
   readonly text: string
 }
 
-/** @experimental Accumulate one output write without altering it. */
+/** Accumulate one output write without altering it. */
 export const ingest: {
   (input: IngestRequest): (previous: Accumulator) => Ingested
   (previous: Accumulator, input: IngestRequest): Ingested
@@ -188,7 +188,7 @@ export const ingest: {
   }
 })
 
-/** @experimental One output write folded into the events a host streams for it. */
+/** One output write folded into the events a host streams for it. */
 export const outputEvents = (input: {
   readonly cellId: string
   readonly channel: Exclude<Channel, "result">
@@ -205,7 +205,7 @@ export const outputEvents = (input: {
   return []
 }
 
-/** @experimental Fold one worker frame into the cell event a host streams, if it produces one. */
+/** Fold one worker frame into the cell event a host streams, if it produces one. */
 export const toCellEvent: {
   (sequence: number): (frame: WorkerFrame) => CellEvent | undefined
   (frame: WorkerFrame, sequence: number): CellEvent | undefined
@@ -222,7 +222,7 @@ export const toCellEvent: {
   return undefined
 })
 
-/** @experimental Everything a terminal frame needs to become one cell outcome. */
+/** Everything a terminal frame needs to become one cell outcome. */
 export interface TerminalContext {
   readonly sessionId: string
   readonly epoch: number
@@ -230,7 +230,7 @@ export interface TerminalContext {
   readonly channels: Accumulator
 }
 
-/** @experimental Turn a terminal worker frame into the cell's success or typed domain failure. */
+/** Turn a terminal worker frame into the cell's success or typed domain failure. */
 export const terminal: {
   (input: TerminalContext): (frame: WorkerFrame) => CellOutcome | undefined
   (frame: WorkerFrame, input: TerminalContext): CellOutcome | undefined
@@ -271,7 +271,7 @@ export const terminal: {
   return undefined
 })
 
-/** @experimental The cell outcome when a kernel dies mid-cell: uncertain, and never replayed. */
+/** The cell outcome when a kernel dies mid-cell: uncertain, and never replayed. */
 export const outcomeUnknown = (input: {
   readonly sessionId: string
   readonly cellId: string
@@ -280,7 +280,7 @@ export const outcomeUnknown = (input: {
   readonly message: string
 }): CellOutcomeUnknown => CellOutcomeUnknown.make(input)
 
-/** @experimental Encode one captured namespace as a snapshot the KernelSnapshotStore can persist. */
+/** Encode one captured namespace as a snapshot the KernelSnapshotStore can persist. */
 export const toSnapshot = (input: {
   readonly sessionId: string
   readonly epoch: number
@@ -301,7 +301,7 @@ export const toSnapshot = (input: {
   payload: new TextEncoder().encode(input.payload),
 })
 
-/** @experimental A session that has no live kernel and cannot get one. */
+/** A session that has no live kernel and cannot get one. */
 export const unavailable = (input: {
   readonly sessionId: string
   readonly reason: KernelUnavailable["reason"]

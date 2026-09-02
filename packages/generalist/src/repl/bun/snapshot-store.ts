@@ -12,7 +12,7 @@ import {
 const DIRECTORY_MODE = 0o700
 const FILE_MODE = 0o600
 
-/** @experimental Where one Session's best-effort namespace snapshot is written. */
+/** Where one Session's best-effort namespace snapshot is written. */
 export interface Options {
   readonly dataRoot: string
 }
@@ -31,7 +31,7 @@ const encodeManifest = Schema.encodeEffect(Schema.fromJsonString(Manifest))
 const safeName = (sessionId: string): string => sessionId.replace(/[^A-Za-z0-9_-]/g, "_")
 
 /**
- * @experimental Best-effort namespace persistence on the Effect filesystem. Snapshots are
+ * Best-effort namespace persistence on the Effect filesystem. Snapshots are
  * owner-only, written through a same-directory temporary file plus rename so a reader never
  * observes a partial capture, and a corrupt manifest fails typed instead of being restored.
  */
@@ -159,6 +159,6 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
     }
   })
 
-/** @experimental One durable filesystem-backed kernel snapshot store. */
+/** One durable filesystem-backed kernel snapshot store. */
 export const layer = (options: Options): Layer.Layer<KernelSnapshotStore, never, FileSystem.FileSystem | Path.Path> =>
   Layer.effect(KernelSnapshotStore, make(options).pipe(Effect.map(KernelSnapshotStore.of)))

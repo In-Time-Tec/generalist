@@ -11,7 +11,7 @@ interface ActivationRow {
   readonly attempt_fence: number
 }
 
-/** @experimental Read final activation state for only the Runs touched by the current transaction. */
+/** Read final activation state for only the Runs touched by the current transaction. */
 export const readRunActivations = (runIds: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     if (runIds.length === 0) return new Map<string, RunActivation>()

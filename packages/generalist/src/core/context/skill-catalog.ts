@@ -2,17 +2,17 @@ import { Context, Effect, Function, Layer, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { listing } from "./skill-catalog-internal.js"
 
-/** @experimental Per-entry description character cap. */
+/** Per-entry description character cap. */
 export { descriptionLimit } from "./skill-catalog-internal.js"
 
-/** @experimental Skill catalog operation failed. */
+/** Skill catalog operation failed. */
 export class SkillCatalogError extends Schema.TaggedError<SkillCatalogError>()("generalist/core/SkillCatalogError", {
   source: Schema.String,
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-/** @experimental A discovered skill. */
+/** A discovered skill. */
 export interface Skill {
   readonly name: string
   readonly description: string
@@ -32,18 +32,16 @@ export interface Skill {
   readonly location?: string
 }
 
-/** @experimental Skill registry seam. */
+/** Skill registry seam. */
 export interface Service {
   readonly all: Effect.Effect<ReadonlyArray<Skill>, SkillCatalogError>
   readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError>
 }
-
-/** @experimental */
 export class SkillCatalog extends Context.Service<SkillCatalog, Service>()(
   "generalist/core/context/skill-catalog/SkillCatalog",
 ) {}
 
-/** @experimental A catalog built from in-memory skills. */
+/** A catalog built from in-memory skills. */
 export const layerSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillCatalog> => {
   const all = [...skills]
   const byName = new Map(all.map((skill) => [skill.name, skill]))
@@ -56,10 +54,8 @@ export const layerSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillCata
   )
 }
 
-/** @experimental Empty skill catalog. */
+/** Empty skill catalog. */
 export const layerEmpty: Layer.Layer<SkillCatalog> = layerSkills([])
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<SkillCatalog> =>
   Layer.succeed(SkillCatalog, SkillCatalog.of(implementation))
 
@@ -68,7 +64,7 @@ const emptyCatalog: Service = {
   get: () => Effect.void.pipe(Effect.as(undefined)),
 }
 
-/** @experimental Merge two catalogs with the second catalog winning duplicate names. */
+/** Merge two catalogs with the second catalog winning duplicate names. */
 export const merge: {
   (second: Service): (first: Service) => Service
   (first: Service, second: Service): Service
@@ -89,7 +85,7 @@ export const merge: {
   }),
 )
 
-/** @experimental Build one layer from composable catalogs. */
+/** Build one layer from composable catalogs. */
 export const layer = <R>(
   catalogs: ReadonlyArray<Effect.Effect<Service, SkillCatalogError, R>>,
 ): Layer.Layer<SkillCatalog, SkillCatalogError, R> =>
@@ -107,7 +103,7 @@ const usageRank = (skill: Skill, recentlyUsed: ReadonlyArray<string>): number =>
   return index === -1 ? -1 : index
 }
 
-/** @experimental Select startup listings within a token budget. */
+/** Select startup listings within a token budget. */
 export const selectListings: {
   (budgetTokens: number, recentlyUsed: ReadonlyArray<string>): (skills: ReadonlyArray<Skill>) => ReadonlyArray<Skill>
   (skills: ReadonlyArray<Skill>, budgetTokens: number, recentlyUsed: ReadonlyArray<string>): ReadonlyArray<Skill>

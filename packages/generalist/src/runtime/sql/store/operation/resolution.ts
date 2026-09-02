@@ -33,7 +33,7 @@ const resolvedRunStatus = (
   return sql`CASE WHEN ${cancellationRequested} THEN 'cancelling' ELSE ${claimableStatus} END`
 }
 
-/** @experimental Resolve one unknown operation without making its Run claimable while another remains unknown. */
+/** Resolve one unknown operation without making its Run claimable while another remains unknown. */
 export const resolveOperation: {
   (
     claimableStatus?: "queued" | "running",

@@ -11,35 +11,34 @@ const compareText = (left: string, right: string): number => {
   return 0
 }
 
-/** @experimental One complete pinned Agent entry in an executable closure. */
+/** One complete pinned Agent entry in an executable closure. */
 export interface AgentEntry {
   readonly _tag: "Agent"
   readonly pin: AgentPin
   readonly manifest: AgentManifest
 }
 
-/** @experimental One complete pinned Agent Program entry in an executable closure. */
+/** One complete pinned Agent Program entry in an executable closure. */
 export interface ProgramEntry {
   readonly _tag: "Program"
   readonly pin: ProgramPin
   readonly manifest: ProgramManifest
 }
 
-/** @experimental One exact executable definition in a closed closure. */
+/** One exact executable definition in a closed closure. */
 export type ExecutableEntry = AgentEntry | ProgramEntry
 
-/** @experimental One globally pinned child profile available by selection name. */
+/** One globally pinned child profile available by selection name. */
 export interface ProfileBinding {
   readonly selection: string
   readonly agent: AgentPin
 }
 
-/** @experimental Exact active executable within one closed closure. */
+/** Exact active executable within one closed closure. */
 export const ExecutableTarget = Schema.Union([AgentPin, ProgramPin])
-/** @experimental */
 export type ExecutableTarget = typeof ExecutableTarget.Type
 
-/** @experimental Complete closed executable profile registry and entry closure. */
+/** Complete closed executable profile registry and entry closure. */
 export interface ExecutableManifest {
   readonly version: "2"
   readonly root: ExecutableTarget
@@ -47,12 +46,11 @@ export interface ExecutableManifest {
   readonly entries: ReadonlyArray<ExecutableEntry>
 }
 
-/** @experimental Durable reference to one exact executable closure and active Agent. */
+/** Durable reference to one exact executable closure and active Agent. */
 export const ExecutableRef = Schema.Struct({ executable: ExecutablePin, active: ExecutableTarget })
-/** @experimental */
 export type ExecutableRef = typeof ExecutableRef.Type
 
-/** @experimental Executable closure paired with its constructor-owned reference. */
+/** Executable closure paired with its constructor-owned reference. */
 export interface PinnedExecutable {
   readonly ref: ExecutableRef
   readonly manifest: ExecutableManifest
@@ -85,31 +83,31 @@ interface PinnedExecutableEncoded extends Omit<PinnedExecutable, "ref" | "manife
   readonly manifest: ExecutableManifestEncoded
 }
 
-/** @experimental One complete pinned Agent entry in an executable closure. */
+/** One complete pinned Agent entry in an executable closure. */
 export const AgentEntry: Schema.Codec<AgentEntry, AgentEntryEncoded> = Schema.TaggedStruct("Agent", {
   pin: AgentPin,
   manifest: AgentManifest,
 })
 
-/** @experimental One complete pinned Agent Program entry in an executable closure. */
+/** One complete pinned Agent Program entry in an executable closure. */
 export const ProgramEntry: Schema.Codec<ProgramEntry, ProgramEntryEncoded> = Schema.TaggedStruct("Program", {
   pin: ProgramPin,
   manifest: ProgramManifest,
 })
 
-/** @experimental One exact executable definition in a closed closure. */
+/** One exact executable definition in a closed closure. */
 export const ExecutableEntry: Schema.Codec<ExecutableEntry, ExecutableEntryEncoded> = Schema.Union([
   AgentEntry,
   ProgramEntry,
 ])
 
-/** @experimental One globally pinned child profile available by selection name. */
+/** One globally pinned child profile available by selection name. */
 export const ProfileBinding: Schema.Codec<ProfileBinding, ProfileBindingEncoded> = Schema.Struct({
   selection: Schema.String,
   agent: AgentPin,
 })
 
-/** @experimental Complete closed executable profile registry and entry closure. */
+/** Complete closed executable profile registry and entry closure. */
 export const ExecutableManifest: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> = Schema.Struct({
   version: Schema.Literal("2"),
   root: ExecutableTarget,
@@ -181,7 +179,7 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
   return pinned
 }
 
-/** @experimental Construct, validate, canonicalize, and pin a complete executable closure. */
+/** Construct, validate, canonicalize, and pin a complete executable closure. */
 export const make = (input: {
   readonly root: ExecutableTarget
   readonly active?: ExecutableTarget
@@ -207,7 +205,7 @@ export const make = (input: {
   return validate({ manifest, ref: { executable: makeExecutable(manifest), active } })
 }
 
-/** @experimental Canonical executable fixture for tests and non-running documentation examples. */
+/** Canonical executable fixture for tests and non-running documentation examples. */
 export const makeTest: {
   (revision?: string): (name: string) => PinnedExecutable
   (name: string, revision?: string): PinnedExecutable
@@ -226,7 +224,7 @@ export const makeTest: {
   return make({ root: agent.pin, profiles: [], entries: [{ _tag: "Agent", ...agent }] })
 })
 
-/** @experimental Verify that a durable reference is exactly owned by a closure. */
+/** Verify that a durable reference is exactly owned by a closure. */
 export const validateRef: {
   (manifest: ExecutableManifest): (ref: ExecutableRef) => void
   (ref: ExecutableRef, manifest: ExecutableManifest): void
@@ -239,7 +237,7 @@ const PinnedExecutableSchema: Schema.Codec<PinnedExecutable, PinnedExecutableEnc
   manifest: ExecutableManifest,
 })
 
-/** @experimental Encode one constructor-validated executable authority. */
+/** Encode one constructor-validated executable authority. */
 export const encode: {
   (input: PinnedExecutable, options?: ParseOptions): Effect.Effect<PinnedExecutableEncoded, Schema.SchemaError, never>
   (
@@ -254,7 +252,7 @@ export const encode: {
     Schema.encodeEffect(PinnedExecutableSchema)(input, options),
 )
 
-/** @experimental Decode and verify one complete pinned executable authority. */
+/** Decode and verify one complete pinned executable authority. */
 const decodePinned = Schema.decodeUnknownEffect(PinnedExecutableSchema, { onExcessProperty: "error" })
 export const decode = Function.flow(
   decodePinned,
