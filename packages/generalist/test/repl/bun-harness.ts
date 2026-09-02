@@ -5,7 +5,10 @@ import { layer as bunLayer, type BunServices } from "@effect/platform-bun/BunSer
 import { Context, Duration, Effect, FileSystem, Layer, Path, type PlatformError, Scope, Stream } from "effect"
 import type { CellEvent, CellFailure, CellResult } from "../../src/repl/cell.js"
 import type { Execution, Service as KernelPoolService } from "../../src/repl/kernel-pool.js"
-import { KernelSnapshotStore } from "../../src/repl/kernel-snapshot-store.js"
+import {
+  KernelSnapshotStore,
+  type Service as KernelSnapshotStoreService,
+} from "../../src/repl/kernel-snapshot-store.js"
 import { HostBindings, KernelProfile } from "../../src/repl/index.js"
 import { BunKernelPool, BunKernelSnapshotStore } from "../../src/repl/bun/index.js"
 
@@ -47,6 +50,7 @@ export interface PoolOverrides {
 /** What one real-worker test is handed. */
 export interface Harness {
   readonly pool: KernelPoolService
+  readonly store: KernelSnapshotStoreService
   readonly dataRoot: string
   readonly profile: KernelProfile.KernelProfile
   /** How many kernel workers this test process currently owns. */
@@ -137,7 +141,7 @@ export const makeHarness = (
       Effect.provideService(KernelSnapshotStore, store),
       Effect.provideContext(yield* registryContext(overrides?.modules)),
     )
-    return { pool, dataRoot, profile, ownWorkers }
+    return { pool, store, dataRoot, profile, ownWorkers }
   })
 
 /**

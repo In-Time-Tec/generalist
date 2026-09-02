@@ -70,6 +70,17 @@ export const minimumConsumerProfiles = [
     imports: [{ specifier: "generalist/runtime/sqlite-bun", runtimes: bunOnly, exports: ["Runtime", "RunStore"] }],
   },
   {
+    name: "sandbox",
+    peers: ["es-module-lexer"],
+    imports: [
+      {
+        specifier: "generalist/sandbox",
+        runtimes: nodeAndBun,
+        exports: ["Sandbox", "SandboxProvider", "layerBunKernel", "layerWorkerLoader"],
+      },
+    ],
+  },
+  {
     name: "mcp",
     peers: ["@modelcontextprotocol/sdk"],
     imports: [
@@ -175,6 +186,7 @@ export const workerSafePackageExports = [
   "generalist/ai/openrouter",
   "generalist/runtime",
   "generalist/runtime/sql-driver",
+  "generalist/sandbox",
 ] as const
 
 export const wildcardExportExamples = [] as const
@@ -231,6 +243,7 @@ export const exactPackageExports = [
   "./runtime/external-child-store",
   "./runtime/sql-driver",
   "./runtime/sqlite-bun",
+  "./sandbox",
   "./testing",
   "./testing/runtime-driver",
   "./transport",

@@ -3,6 +3,7 @@ import { layer as bunServices } from "@effect/platform-bun/BunServices"
 import { ToolContext, ToolExecutor } from "generalist"
 import { CellTool, HostBindings, KernelProfile } from "generalist/repl"
 import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "generalist/repl/bun"
+import { layerBunKernel } from "generalist/sandbox"
 
 declare const workspace: HostBindings.Module
 declare const dataRoot: string
@@ -19,6 +20,8 @@ const profile = KernelProfile.make({
   limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
 })
 
+const snapshotStore = BunKernelSnapshotStore.layer({ dataRoot })
+
 const kernelPool = BunKernelPool.layer({
   profile,
   runtimeCommand: "bun",
@@ -31,11 +34,19 @@ const kernelPool = BunKernelPool.layer({
   // zero time to live gives every cell a fresh worker and silently loses module bindings.
   idleTimeToLive: Duration.minutes(5),
   environment: {},
-}).pipe(Layer.provide(BunKernelSnapshotStore.layer({ dataRoot })), Layer.provide(bunServices))
+}).pipe(Layer.provide(snapshotStore), Layer.provide(bunServices))
+
+const sandbox = layerBunKernel({ image: profile.image.reference, workspaceRoot: profile.workspace.root }).pipe(
+  Layer.provide(kernelPool),
+  Layer.provide(snapshotStore),
+  Layer.provide(bunServices),
+)
 
 export const cellLayer: Layer.Layer<
   ToolExecutor.ToolExecutor | ToolContext.ToolContext,
   HostBindings.HostModuleConflict
 > = CellTool.layer.pipe(
-  Layer.provideMerge(Layer.mergeAll(ToolContext.layerDefault, HostBindings.layer([workspace]), kernelPool)),
+  Layer.provide(sandbox),
+  Layer.provide(HostBindings.layer([workspace])),
+  Layer.provideMerge(ToolContext.layerDefault),
 )
