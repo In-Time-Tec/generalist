@@ -8,7 +8,7 @@ export const foldkitReference = definePage({
   description: "FoldKit connection and headless Chat projections over Runtime RunEvents.",
   content: [
     lead(
-      "generalist/unstable/foldkit adapts Runtime RunEvents and explicit commands to FoldKit's Elm architecture without owning run lifecycle state.",
+      "generalist/unstable/foldkit adapts Server HostEvents and explicit commands to FoldKit's Elm architecture without owning run lifecycle state.",
     ),
     command("Install", "bun add effect@4.0.0-rc.112 generalist foldkit@0.148.2"),
     p(code("generalist/unstable/foldkit"), " is an import subpath; foldkit is its optional peer dependency."),
@@ -23,18 +23,14 @@ export const foldkitReference = definePage({
     h2("connection", "Connection"),
     p(
       code("Connection.layerWebSocket"),
-      " uses the transport reconnecting client. A scoped session observes one run from an exclusive cursor and sends explicit Runtime commands. ",
+      " uses the Server reconnecting client. A scoped connection observes one Host Session from an exclusive cursor and sends explicit cancellation. ",
       code("Connection.layerTest"),
       " provides a deterministic seam for tests.",
     ),
     h2("chat", "Chat"),
     p(
       code("Chat.update(model, action)"),
-      " folds connection status and canonical RunEvents into semantic assistant and tool entries, explicit run state, approvals, and terminal output. Assistant entries come from normalized ",
-      code("ModelResponseCommitted"),
-      " and ",
-      code("ModelResponseInterrupted"),
-      " events; Chat does not assemble or own provider fragments. ",
+      " folds connection status and HostEvents into tool entries, explicit run state, approvals, and terminal output. Host filters model-response records, so the Server projection does not reconstruct assistant response entries. ",
       code("Chat.subscriptions"),
       " owns scoped durable observation; command failures return through typed Chat actions. ",
       code("Chat.Model"),
@@ -46,7 +42,7 @@ export const foldkitReference = definePage({
       "See ",
       link("/docs/reference/runtime", "generalist/runtime"),
       " and ",
-      link("/docs/reference/transport", "generalist/unstable/transport"),
+      link("/docs/reference/transport", "generalist/server"),
       ".",
     ),
   ],

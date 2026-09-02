@@ -1,8 +1,9 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { Generalist } from "generalist/host"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
-import { SSE } from "generalist/unstable/transport"
+import { Server } from "generalist/server"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -66,26 +67,22 @@ const runtimeLayer = Layer.merge(
 )
 
 const program = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
-  const handle = yield* runtime.start(agent, "Deploy api", {
-    sessionId: "release-1",
-    idempotencyKey: "deploy-api-1",
-  })
-  const events = yield* handle.events.pipe(
+  const host = yield* Generalist.create({ agents: [agent] })
+  const session = yield* host.sessions.create({ id: "release-1" })
+  yield* host.runs.start(session.id, agent, "Deploy api", { idempotencyKey: "deploy-api-1" })
+  const events = yield* host.events.subscribe(session.id).pipe(
     Stream.takeUntil(
       (event) =>
-        event._tag === "RunWaiting" ||
-        event._tag === "RunCompleted" ||
-        event._tag === "RunFailed" ||
-        event._tag === "RunCancelled",
+        (event._tag === "ToolCall" && event.event._tag === "ToolExecutionWaiting") || event._tag === "Completed",
     ),
     Stream.runCollect,
   )
+  const collected = Array.from(events)
+  const final = collected.at(-1)
+  if (final === undefined) return yield* Effect.die("expected one Host event")
+  const encoded = yield* Server.eventCodec.encode(final)
   yield* Console.log(
-    `${SSE.streamSuccess._tag}: ${Array.from(events)
-      .map((event) => event._tag)
-      .join(" -> ")}`,
+    `Server HostEvents: ${collected.map((event) => event._tag).join(" -> ")}; final wire bytes: ${encoded.length}`,
   )
 })
 

@@ -19,7 +19,7 @@ import {
 } from "./service.js"
 import { chatUpdateRuntime } from "./update.js"
 
-const { applyRunEvent, applyUnknownObserverEvent, isObserverEvent, isResolvedRunEvent } = chatUpdateRuntime
+const { applyHostEvent, isHostEvent } = chatUpdateRuntime
 
 type UpdateResult = readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<Output>]
 
@@ -34,10 +34,8 @@ const changeModel = (model: Model, changes: Partial<Model>): Model =>
   })
 
 const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): UpdateResult => {
-  if (isObserverEvent(action.event)) {
-    const [next, output] = isResolvedRunEvent(action.event)
-      ? applyRunEvent(model, action.event)
-      : applyUnknownObserverEvent(model, action.event)
+  if (isHostEvent(action.event)) {
+    const [next, output] = applyHostEvent(model, action.event)
     return [next, [], output]
   }
   if (Schema.is(ConnectionOpened)(action.event)) {

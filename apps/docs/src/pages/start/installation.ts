@@ -46,7 +46,7 @@ export const installation = definePage({
     p(
       code("generalist/runtime"),
       ", ",
-      code("generalist/unstable/transport"),
+      code("generalist/server"),
       ", ",
       code("generalist/memory"),
       ", ",

@@ -5,8 +5,6 @@ import type { ExternalChildStore } from "../../../runtime/child/external/store.j
 import type { RunStore } from "../../../runtime/run/store.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "../../../runtime/sql-driver.js"
 
-export * as HibernatingWebSocket from "./hibernating-websocket.js"
-
 /** @experimental */
 export type DurableObjectStorage = NonNullable<Parameters<typeof SqliteClient.make>[0]["storage"]>
 

@@ -1,6 +1,6 @@
 # Testing adapters
 
-`generalist/testing` gives adapter authors the same conformance suites and deterministic fault injection used by Generalist itself. It also exports `TestModel`, the scripted Effect AI model fixture. The old `generalist/test` subpath does not exist.
+`generalist/testing` gives adapter authors the same conformance suites used by Generalist itself. It also exports `TestModel`, the scripted Effect AI model fixture. The old `generalist/test` subpath does not exist.
 
 ## Register conformance suites
 
@@ -60,30 +60,6 @@ Testing.sandbox({
 ```
 
 The suite checks command round-trip and streaming, files, pause/resume retention, snapshot/fork isolation, limit enforcement, and typed `Unsupported` failures. It never treats an absent capability as a skipped test.
-
-## Inject deterministic failures
-
-The chaos Layers count only the boundary named by the helper. Invalid counts fail immediately with `TypeError`.
-
-```ts
-import { Effect, Layer } from "effect"
-import { LanguageModel } from "effect/unstable/ai"
-import { Chaos, RunClient } from "generalist/unstable/transport"
-import { MyDriver } from "my-generalist-driver"
-
-// Interrupt the active run after its third operation has been durably journaled.
-const interruptedRuntime = MyDriver.testLayer.pipe(Layer.provide(Chaos.layerInterruptAfter(3)))
-
-// Force RunClient's reconnect path after its second admitted event.
-const reconnectingClient = RunClient.layerWebSocket.pipe(Layer.provide(Chaos.layerDropConnection(2)))
-
-// The deterministic provider succeeds twice, fails the third request, then repeats.
-const modelProgram = LanguageModel.generateText({ prompt: "test" }).pipe(
-  Effect.provide(Chaos.layerFlakyModel({ failEvery: 3 })),
-)
-```
-
-`interruptAfter` fires after persistence and before the Runtime advances its in-memory completion state. `dropConnection` advances the replay cursor for the Nth event before producing a retryable socket failure. `flakyModel` shares one counter across text, object, and streaming requests.
 
 ## Write certification evidence
 

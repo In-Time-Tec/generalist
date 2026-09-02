@@ -1,16 +1,11 @@
 import { Cause, Effect, Option, Result, Schema } from "effect"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { CompletedModelResponse, RunEvent } from "../../../runtime/run/event.js"
-import {
-  ObserverRunEvent,
-  type ObserverRunEvent as ObserverEvent,
-  type ResolvedRunEvent,
-} from "../../transport/wire.js"
+import { HostEvent } from "../../../host/event.js"
+import type { RunEvent } from "../../../runtime/run/event.js"
 import { AgentCommandError, type CommandOperation, type Connection, type Incoming, SendFailed } from "./connection.js"
 import {
   ApprovalRequired,
-  AssistantEntry,
   AwaitingApproval,
   Failed,
   FailedAgentCommand,
@@ -72,13 +67,8 @@ const catchCommandFailure = <A>(operation: CommandOperation, effect: Effect.Effe
     ),
   )
 
-type ModelResponseEvent = Extract<
-  ResolvedRunEvent,
-  { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }
->
-type SemanticPart = ModelResponseEvent["response"]["content"][number]
-type ToolCallLike = Extract<SemanticPart, { readonly type: "tool-call" }>
-type ToolResultLike = Extract<SemanticPart, { readonly type: "tool-result" }>
+type ToolCallLike = Extract<RunEvent, { readonly _tag: "ToolExecutionStarted" }>["call"]
+type ToolResultLike = Extract<RunEvent, { readonly _tag: "ToolExecutionCompleted" }>["result"]
 
 const upsertToolCall = (
   entries: ReadonlyArray<ChatEntry>,
@@ -134,34 +124,10 @@ const addProgress = (entries: ReadonlyArray<ChatEntry>, callId: string, message:
       : entry,
   )
 
-const applyModelResponse = (model: Model, event: ModelResponseEvent): Model => {
-  let entries = model.entries
-  let text = ""
-  let reasoning = ""
-  for (const part of event.response.content) {
-    switch (part.type) {
-      case "text":
-        text += part.text
-        break
-      case "reasoning":
-        reasoning += part.text
-        break
-      case "tool-call":
-        entries = upsertToolCall(entries, part)
-        break
-      case "tool-result":
-        entries = resolveTool(entries, part)
-        break
-    }
-  }
-  if (text.length > 0 || reasoning.length > 0) {
-    entries = [...entries, AssistantEntry({ text, reasoning: reasoning || null })]
-  }
-  return changeModel(model, { entries })
-}
-
 const ignoredEventTags = new Set<string>([
   "SteeringDrained",
+  "ModelResponseCommitted",
+  "ModelResponseInterrupted",
   "ModelCallStarted",
   "ModelAttemptStarted",
   "ModelAttemptFirstOutput",
@@ -176,18 +142,13 @@ const ignoredEventTags = new Set<string>([
   "TurnCompleted",
 ])
 
-const applyEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, Option.Option<Output>] => {
+const applyEvent = (model: Model, event: RunEvent): readonly [Model, Option.Option<Output>] => {
   if (ignoredEventTags.has(event._tag)) return [model, Option.none()]
   switch (event._tag) {
     case "TurnStarted":
       return [changeModel(model, { run: Running({ turn: event.turn }) }), Option.none()]
-    case "ModelResponseCommitted":
-    case "ModelResponseInterrupted":
-      return [applyModelResponse(model, event), Option.none()]
     case "ToolExecutionStarted":
       return [changeModel(model, { entries: upsertToolCall(model.entries, event.call, "executing") }), Option.none()]
-    case "ApprovalRequested":
-      return [changeModel(model, { entries: upsertToolCall(model.entries, event.call) }), Option.none()]
     case "ToolProgress":
       return event.message === undefined
         ? [model, Option.none()]
@@ -204,23 +165,23 @@ const applyEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, Opt
   }
 }
 
-const applyRunEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, Option.Option<Output>] => {
-  if (event.sequence <= model.lastSeq) return [model, Option.none()]
-  const withSequence = changeModel(model, { lastSeq: event.sequence })
+const applyHostEvent = (model: Model, hostEvent: HostEvent): readonly [Model, Option.Option<Output>] => {
+  if (hostEvent.cursor <= model.lastSeq) return [model, Option.none()]
+  const event = hostEvent.event
+  const withSequence = changeModel(model, { lastSeq: hostEvent.cursor })
   switch (event._tag) {
-    case "RunWaiting":
-      return event.wait.reason._tag === "Approval"
-        ? [
-            changeModel(withSequence, {
-              run: AwaitingApproval({
-                token: event.wait.reason.request.approvalId,
-                toolName: event.wait.reason.request.capability,
-                params: event.wait.reason.request.input,
-              }),
-            }),
-            Option.some(ApprovalRequired()),
-          ]
-        : [withSequence, Option.none()]
+    case "ApprovalRequested":
+      return [
+        changeModel(withSequence, {
+          run: AwaitingApproval({
+            token: event.request.approvalId,
+            toolName: event.request.capability,
+            params: event.request.input,
+          }),
+          entries: upsertToolCall(model.entries, event.call),
+        }),
+        Option.some(ApprovalRequired()),
+      ]
     case "RunCompleted": {
       const text = "_tag" in event.result ? (JSON.stringify(event.result.value) ?? "null") : event.result.text
       return [changeModel(withSequence, { run: Idle() }), Option.some(RunCompleted({ text }))]
@@ -236,25 +197,12 @@ const applyRunEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, 
   }
 }
 
-const isObserverEvent = (event: Incoming): event is ObserverEvent => Schema.is(ObserverRunEvent)(event)
-
-const isResolvedRunEvent = (event: ObserverEvent): event is ResolvedRunEvent => {
-  if (!Schema.is(RunEvent)(event)) return false
-  if (event._tag !== "ModelResponseCommitted" && event._tag !== "ModelResponseInterrupted") return true
-  return "response" in event && Schema.is(CompletedModelResponse)(event.response)
-}
-
-const applyUnknownObserverEvent = (model: Model, event: ObserverEvent): readonly [Model, Option.Option<Output>] =>
-  event.sequence <= model.lastSeq
-    ? [model, Option.none()]
-    : [changeModel(model, { lastSeq: event.sequence }), Option.none()]
+const isHostEvent = (event: Incoming): event is HostEvent => Schema.is(HostEvent)(event)
 
 export const chatUpdateRuntime = {
   Pending,
   Completed,
   catchCommandFailure,
-  applyRunEvent,
-  applyUnknownObserverEvent,
-  isObserverEvent,
-  isResolvedRunEvent,
+  applyHostEvent,
+  isHostEvent,
 }

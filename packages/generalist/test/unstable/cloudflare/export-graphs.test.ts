@@ -8,7 +8,7 @@ const entries = [
   ["dynamic-workers", "packages/generalist/src/unstable/cloudflare/dynamic-workers/index.ts"],
   ["core", "packages/generalist/src/index.ts"],
   ["foldkit", "packages/generalist/src/unstable/foldkit/index.ts"],
-  ["transport client", "packages/generalist/src/unstable/transport/run-client.ts"],
+  ["server client", "packages/generalist/src/server/client.ts"],
   ["injected SQL store", "packages/generalist/src/runtime/sql/store.ts"],
 ] as const
 const forbidden = [

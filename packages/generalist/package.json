@@ -73,6 +73,10 @@
       "types": "./dist/host/index.d.ts",
       "import": "./dist/host/index.js"
     },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
     "./permissions": {
       "types": "./dist/core/policy/permissions.d.ts",
       "import": "./dist/core/policy/permissions.js"
@@ -212,38 +216,6 @@
     "./unstable/mcp/tools": {
       "types": "./dist/unstable/mcp/tools.d.ts",
       "import": "./dist/unstable/mcp/tools.js"
-    },
-    "./unstable/transport": {
-      "types": "./dist/unstable/transport/index.d.ts",
-      "import": "./dist/unstable/transport/index.js"
-    },
-    "./unstable/transport/run-client": {
-      "types": "./dist/unstable/transport/run-client.d.ts",
-      "import": "./dist/unstable/transport/run-client.js"
-    },
-    "./unstable/transport/errors": {
-      "types": "./dist/unstable/transport/errors.d.ts",
-      "import": "./dist/unstable/transport/errors.js"
-    },
-    "./unstable/transport/sse": {
-      "types": "./dist/unstable/transport/sse.d.ts",
-      "import": "./dist/unstable/transport/sse.js"
-    },
-    "./unstable/transport/websocket": {
-      "types": "./dist/unstable/transport/websocket.d.ts",
-      "import": "./dist/unstable/transport/websocket.js"
-    },
-    "./unstable/transport/wire": {
-      "types": "./dist/unstable/transport/wire.d.ts",
-      "import": "./dist/unstable/transport/wire.js"
-    },
-    "./unstable/transport/snapshot": {
-      "types": "./dist/unstable/transport/snapshot.d.ts",
-      "import": "./dist/unstable/transport/snapshot.js"
-    },
-    "./unstable/transport/replay": {
-      "types": "./dist/unstable/transport/replay.d.ts",
-      "import": "./dist/unstable/transport/replay.js"
     },
     "./unstable/foldkit": {
       "types": "./dist/unstable/foldkit/index.d.ts",

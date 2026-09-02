@@ -47,6 +47,8 @@ host.sessions.fork(runId, { atSequence, substitute? }) -> HostRun<unknown>
 
 host.runs.start(sessionId, agent, typedInput, { idempotencyKey? })
   -> { id, await, events, steer, followUp }
+host.runs.startByName(sessionId, agentName, untrustedInput, { idempotencyKey? })
+  -> { id, await, events, steer, followUp }
 host.runs.list(sessionId)             -> root Run inspections
 host.runs.inspect(runId)              -> Run inspection
 host.runs.cancel(runId, reason?)       -> void
@@ -54,9 +56,19 @@ host.runs.rewind(runId, { toSequence }) -> void
 
 host.events.subscribe(sessionId, cursor?)
   -> Stream<RunStarted | Turn | ToolCall | ApprovalRequested | Compacted | Completed>
+
+host.approvals.resolve(runId, token, decision, operator) -> void
+
+host.operator.explain(runId) -> Explanation
+host.operator.retry(runId, operator) -> void
+host.operator.wake(runId, operator) -> void
+host.operator.resolveUnknown(runId, operationId, resolution, operator) -> void
+host.operator.extendBudget(runId, delta, operator) -> void
 ```
 
 `runs.start` accepts only the exact Agent values passed to `Generalist.create`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
+
+`runs.startByName` is the serialized-host boundary used by `generalist/server`. It finds one configured Agent by name and decodes the unknown input with that Agent's input Schema before starting it. Unknown names and invalid inputs remain typed Host failures. Approval and operator methods are the same Runtime operations with no second decision or recovery authority; every mutation requires the caller identity recorded by Runtime.
 
 Session run lists contain root Runs only. Runtime child Runs contribute events to their root Run's product Session but do not appear as separate entries in that list.
 
@@ -105,4 +117,4 @@ Plugins load and log sequentially in caller order. Existing ambient instructions
 ## Related
 
 - Source: `packages/generalist/src/host/index.ts`, `packages/generalist/src/runtime/session/host.ts`
-- Sibling feature docs: [`runtime.md`](./runtime.md), [`durable-stores.md`](./durable-stores.md), [`testing.md`](./testing.md)
+- Sibling feature docs: [`server.md`](./server.md), [`runtime.md`](./runtime.md), [`durable-stores.md`](./durable-stores.md), [`testing.md`](./testing.md)

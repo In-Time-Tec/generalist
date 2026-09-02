@@ -109,7 +109,7 @@ export interface ToolExecutionCompleted {
 }
 
 /** A tool reached a durable wait without disturbing admitted siblings. */
-interface ToolExecutionWaiting {
+export interface ToolExecutionWaiting {
   readonly _tag: "ToolExecutionWaiting"
   readonly turn: number
   readonly call: Response.ToolCallPart<string, unknown>

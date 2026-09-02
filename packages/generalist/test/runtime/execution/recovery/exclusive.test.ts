@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest"
-import { Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
+import { Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
@@ -11,7 +11,7 @@ import { operationRecoverySuite } from "../../operation/suites/recovery.js"
 import { tempDbPath } from "../../sql/scenario.js"
 import { toolCancellationSuite } from "../../operation/suites/tool-cancellation.js"
 import { allowAllAuthorization } from "../../../authorization.js"
-import { Chaos } from "../../../../src/unstable/transport/index.js"
+import { JournalFault } from "../../../../src/runtime/operation/journal-fault.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -26,6 +26,20 @@ const scopedWith =
   <A, E>(layer: Layer.Layer<A, E, never>) =>
   <B, E2, R extends A>(effect: Effect.Effect<B, E2, R>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Layer.build(layer).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))))
+
+const layerInterruptAfter = (operationCount: number): Layer.Layer<JournalFault> =>
+  Layer.effect(
+    JournalFault,
+    Ref.make(0).pipe(
+      Effect.map((count) =>
+        JournalFault.of({
+          afterJournaledOperation: Ref.updateAndGet(count, (current) => current + 1).pipe(
+            Effect.flatMap((current) => (current === operationCount ? Effect.interrupt : Effect.void)),
+          ),
+        }),
+      ),
+    ),
+  )
 
 operationRecoverySuite({
   name: "sqlite",
@@ -85,7 +99,7 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
     )
     const firstEnvironment = Layer.mergeAll(allowAllAuthorization, firstModel, handlers)
     const firstLayer = Layer.merge(
-      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(Layer.merge(resolver, Chaos.layerInterruptAfter(5)))),
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(Layer.merge(resolver, layerInterruptAfter(5)))),
       firstEnvironment,
     )
 

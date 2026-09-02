@@ -9,12 +9,13 @@ import {
   Permissions,
   SkillCatalog,
 } from "generalist"
-import { Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
 import { Chat, Connection } from "generalist/unstable/foldkit"
 import { WorkingMemory } from "generalist/memory"
 import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { FileSystemCatalog } from "generalist/instructions/skills"
-import { ExecutableManifest } from "generalist/runtime"
+import { HostEvent } from "generalist/host"
+import { ExecutableManifest, RunEvent } from "generalist/runtime"
 
 const researchSkill: SkillCatalog.Skill = {
   name: "research",
@@ -48,49 +49,43 @@ const filesystemSkillLayer = FileSystemCatalog.layer({ cwd: ".", roots: ["fixtur
 const compactionLayer = Compaction.layer({ contextWindow: 64_000, reserveTokens: 1_024, keepRecentTokens: 8_000 })
 
 const chatAgent = ExecutableManifest.makeTest("capstone-assistant", "1").ref
-const runEvent = (sequence: number, fields: Partial<Connection.Incoming>): Connection.Incoming => {
-  const candidate = Object.assign(
-    {
-      specVersion: "1",
-      eventId: `capstone-run:${sequence}`,
-      runId: "capstone-run",
-      sequence,
-      executableRef: chatAgent,
-      rootRunId: "capstone-run",
-      depth: 0,
-      occurredAt: "2026-08-03T00:00:00.000Z",
-    },
-    fields,
-  )
-  if (!Schema.is(Connection.Incoming)(candidate)) throw new Error("invalid test transport event")
-  return candidate
-}
+const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunEvent.RunEvent =>
+  Schema.decodeUnknownSync(RunEvent.RunEvent)({
+    specVersion: "1",
+    eventId: `capstone-run:${sequence}`,
+    runId: "capstone-run",
+    sequence,
+    executableRef: chatAgent,
+    rootRunId: "capstone-run",
+    depth: 0,
+    occurredAt: "2026-08-03T00:00:00.000Z",
+    ...fields,
+  })
+
+const hostEvent = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
+  Schema.decodeUnknownSync(HostEvent)({
+    _tag: tag,
+    sessionId: "capstone-session",
+    cursor,
+    runId: "capstone-run",
+    event,
+  })
 
 const chatFrames: ReadonlyArray<Connection.Incoming> = [
-  runEvent(0, { _tag: "TurnStarted", turn: 0 }),
-  runEvent(1, {
-    _tag: "ModelResponseCommitted",
-    turn: 0,
-    operationKey: "capstone-run:model:0",
-    modelCallId: "model-call-0",
-    modelAttemptId: "model-attempt-0",
-    attempt: 0,
-    sessionId: "capstone-session",
-    sessionParentId: null,
-    sessionEntryId: "entry-response-0",
-    budgetCharge: 0,
-    digest: "response-digest-0",
-    response: { content: [Response.makePart("text", { text: "deterministic response" })], finishReason: "stop" },
-  }),
-  runEvent(2, { _tag: "TurnCompleted", turn: 0 }),
-  runEvent(3, {
-    _tag: "RunCompleted",
-    result: {
-      text: "deterministic response",
-      turns: 1,
-      session: { sessionId: "capstone-session", leafId: "entry-response-0" },
-    },
-  }),
+  hostEvent(0, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
+  hostEvent(2, "Turn", runEvent(2, { _tag: "TurnCompleted", turn: 0 })),
+  hostEvent(
+    3,
+    "Completed",
+    runEvent(3, {
+      _tag: "RunCompleted",
+      result: {
+        text: "deterministic response",
+        turns: 1,
+        session: { sessionId: "capstone-session", leafId: "entry-response-0" },
+      },
+    }),
+  ),
 ]
 
 const [chatModel] = Chat.update(

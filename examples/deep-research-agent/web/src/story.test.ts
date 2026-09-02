@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 
 import { Response } from "effect/unstable/ai"
+import { HostEvent } from "generalist/host"
 import { Chat, Connection } from "generalist/unstable/foldkit"
-import { Errors, ExecutableManifest } from "generalist/runtime"
+import { Errors, ExecutableManifest, RunEvent } from "generalist/runtime"
 import { Schema } from "effect"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
@@ -11,23 +12,21 @@ import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } 
 const sessionId = "deep-research-story"
 
 const agent = ExecutableManifest.makeTest("deep-research", "1").ref
-const eventFrame = (sequence: number, fields: Partial<Connection.Incoming>): Connection.Incoming => {
-  const candidate = Object.assign(
-    {
-      specVersion: "1",
-      eventId: `${sessionId}:${sequence}`,
-      runId: sessionId,
-      sequence,
-      executableRef: agent,
-      rootRunId: sessionId,
-      depth: 0,
-      occurredAt: "2026-08-03T00:00:00.000Z",
-    },
-    fields,
-  )
-  if (!Schema.is(Connection.Incoming)(candidate)) throw new Error("invalid test transport event")
-  return candidate
-}
+const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunEvent.RunEvent =>
+  Schema.decodeUnknownSync(RunEvent.RunEvent)({
+    specVersion: "1",
+    eventId: `${sessionId}:${sequence}`,
+    runId: sessionId,
+    sequence,
+    executableRef: agent,
+    rootRunId: sessionId,
+    depth: 0,
+    occurredAt: "2026-08-03T00:00:00.000Z",
+    ...fields,
+  })
+
+const eventFrame = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
+  Schema.decodeUnknownSync(HostEvent)({ _tag: tag, sessionId, cursor, runId: sessionId, event })
 
 const agentAction = (event: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedConnection({ event }) })
 
@@ -86,54 +85,26 @@ const toolResult = Response.makePart("tool-result", {
 })
 
 const completionFrames: ReadonlyArray<Connection.Incoming> = [
-  eventFrame(0, { _tag: "TurnStarted", turn: 0 }),
-  eventFrame(1, {
-    _tag: "ModelResponseCommitted",
-    turn: 0,
-    operationKey: `${sessionId}:model:0`,
-    modelCallId: "model-call-0",
-    modelAttemptId: "model-attempt-0",
-    attempt: 0,
-    sessionId,
-    sessionParentId: null,
-    sessionEntryId: "model-response-entry-0",
-    budgetCharge: 0,
-    response: { content: [toolCall], finishReason: "tool-calls" },
-    digest: "model-response-0",
-  }),
-  eventFrame(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall }),
-  eventFrame(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
-  eventFrame(4, { _tag: "TurnCompleted", turn: 0 }),
-  eventFrame(5, { _tag: "TurnStarted", turn: 1 }),
-  eventFrame(6, {
-    _tag: "ModelResponseCommitted",
-    turn: 1,
-    operationKey: `${sessionId}:model:1`,
-    modelCallId: "model-call-1",
-    modelAttemptId: "model-attempt-1",
-    attempt: 0,
-    sessionId,
-    sessionParentId: "model-response-entry-0",
-    sessionEntryId: "model-response-entry-1",
-    budgetCharge: 0,
-    response: {
-      content: [
-        Response.makePart("reasoning", { text: "Compare transport frames." }),
-        Response.makePart("text", { text: "Final cited answer" }),
-      ],
-      finishReason: "stop",
-    },
-    digest: "model-response-1",
-  }),
-  eventFrame(7, { _tag: "TurnCompleted", turn: 1 }),
-  eventFrame(8, {
-    _tag: "RunCompleted",
-    result: {
-      turns: 2,
-      text: "Final cited answer\n\nSources:\n[1] Generalist docs",
-      session: { sessionId, leafId: "model-response-entry-1" },
-    },
-  }),
+  eventFrame(0, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
+  eventFrame(2, "ToolCall", runEvent(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall })),
+  eventFrame(
+    3,
+    "ToolCall",
+    runEvent(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
+  ),
+  eventFrame(5, "Turn", runEvent(5, { _tag: "TurnStarted", turn: 1 })),
+  eventFrame(
+    8,
+    "Completed",
+    runEvent(8, {
+      _tag: "RunCompleted",
+      result: {
+        turns: 2,
+        text: "Final cited answer\n\nSources:\n[1] Generalist docs",
+        session: { sessionId, leafId: "model-response-entry-1" },
+      },
+    }),
+  ),
 ]
 
 describe("deep-research-agent web update", () => {
@@ -145,12 +116,11 @@ describe("deep-research-agent web update", () => {
       Story.model((model) => {
         expect(model.chat.run._tag).toBe("Idle")
         expect(model.chat.connection).toBe("open")
-        expect(model.chat.entries.map((entry) => entry._tag)).toEqual(["UserEntry", "ToolEntry", "AssistantEntry"])
+        expect(model.chat.entries.map((entry) => entry._tag)).toEqual(["UserEntry", "ToolEntry"])
 
         const user = model.chat.entries[0]
         const tool = model.chat.entries[1]
-        const assistant = model.chat.entries[2]
-        if (user?._tag !== "UserEntry" || tool?._tag !== "ToolEntry" || assistant?._tag !== "AssistantEntry") {
+        if (user?._tag !== "UserEntry" || tool?._tag !== "ToolEntry") {
           throw new Error("successful transport stream projected an unexpected chat entry shape")
         }
 
@@ -176,9 +146,6 @@ describe("deep-research-agent web update", () => {
             },
             progress: [],
           }),
-        )
-        expect(assistant).toEqual(
-          Chat.AssistantEntry({ text: "Final cited answer", reasoning: "Compare transport frames." }),
         )
       }),
     )
@@ -223,10 +190,14 @@ describe("deep-research-agent web update", () => {
       }),
       Story.message(
         agentAction(
-          eventFrame(9, {
-            _tag: "RunFailed",
-            error: Errors.AgentExecutionFailure.make({ message: "model unavailable" }),
-          }),
+          eventFrame(
+            9,
+            "Completed",
+            runEvent(9, {
+              _tag: "RunFailed",
+              error: Errors.AgentExecutionFailure.make({ message: "model unavailable" }),
+            }),
+          ),
         ),
       ),
       Story.model((model) => {
