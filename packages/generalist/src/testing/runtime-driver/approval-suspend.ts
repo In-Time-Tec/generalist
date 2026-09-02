@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { make as makeAgent } from "../../core/agent/service.js"
-import { layerDurable, resolve as resolveApproval, type DurableRequest } from "../../approvals.js"
+import { Approved, layerDurable, type DurableRequest } from "../../approvals.js"
 import { layerAllowAll, layerRuleStoreMemory, RuleStore } from "../../core/policy/permissions.js"
 import { Runtime } from "../../runtime/service.js"
 import type { ApprovalSuspendCapability, Options, Services } from "./contract.js"
@@ -121,20 +121,29 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
           return yield* Effect.die(`${options.name} approval recovery requires RunExecutor`)
         // Registrations live in the Runtime instance, so a rebuilt Runtime registers before recovering.
         if (rebuilt) yield* register(services.runtime)
-        yield* resolveApproval(suspended.token, {
-          _tag: "Approved",
-          remember: { pattern: "approval_write:*", level: "allow" },
-        }).pipe(
-          Effect.provideService(Runtime, services.runtime),
-          Effect.provideService(
-            RuleStore,
-            RuleStore.of({
-              rules: Effect.succeed([]),
-              remember: () => Effect.sync(() => (remembered = true)),
-            }),
-          ),
-        )
+        expect((yield* services.runtime.operator.explain(suspended.runId)).decision).toEqual({
+          _tag: "AwaitApproval",
+          token: suspended.token,
+        })
+        yield* services.runtime.operator
+          .resolveApproval(
+            suspended.token,
+            Approved({ remember: { pattern: "approval_write:*", level: "allow" } }),
+            "operator:approval-conformance",
+          )
+          .pipe(
+            Effect.provideService(
+              RuleStore,
+              RuleStore.of({
+                rules: Effect.succeed([]),
+                remember: () => Effect.sync(() => (remembered = true)),
+              }),
+            ),
+          )
         expect(remembered).toBe(true)
+        const [operatorAction] = (yield* services.store.recoveryJournal(suspended.runId)).actions
+        expect(operatorAction?.operator).toBe("operator:approval-conformance")
+        expect(operatorAction?.action).toMatchObject({ _tag: "ResolveApproval", token: suspended.token })
         const claim = yield* capability.claim(services, {
           runId: suspended.runId,
           workerId: "approval-after",

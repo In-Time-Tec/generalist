@@ -212,7 +212,20 @@ export const resolveProgramOperation: {
     programOperations.set(mapKey, record)
     const runs = new Map(state.runs)
     const { ownerId: _, ...withoutOwner } = run
-    runs.set(run.runId, { ...withoutOwner, status: run.cancellationRequested ? "cancelling" : "running" })
+    const hasUnknown =
+      [...programOperations.values()].some(
+        (operation) => operation.runId === input.runId && operation.status === "unknown",
+      ) ||
+      [...state.operations.values()].some(
+        (operation) => operation.runId === input.runId && operation.status === "unknown",
+      )
+    let status: "needs-resolution" | "cancelling" | "running" = "running"
+    if (hasUnknown) status = "needs-resolution"
+    else if (run.cancellationRequested) status = "cancelling"
+    runs.set(run.runId, {
+      ...withoutOwner,
+      status,
+    })
     return { ...revokeRunSession(state, run.runId), programOperations, runs }
   }),
 )

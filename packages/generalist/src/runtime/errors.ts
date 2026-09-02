@@ -6,6 +6,7 @@ import { Cursor } from "./cursor.js"
 import { ExecutableRef } from "./executable/manifest.js"
 import { TreeCursor, TreeCursorInvalid, TreeCursorRootMismatch } from "./tree/cursor.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
+import { RecoveryDecision } from "./execution/recovery/operator.js"
 
 export { TreeCursorInvalid, TreeCursorRootMismatch }
 export {
@@ -107,6 +108,16 @@ export class RunNotFound extends ActionableTaggedError<RunNotFound>()("generalis
   runId: Schema.String,
   hint: errorHint("Check the Run ID and inspect the Runtime instance that admitted it."),
 }) {}
+
+export class IllegalOperatorAction extends ActionableTaggedError<IllegalOperatorAction>()(
+  "generalist/runtime/IllegalOperatorAction",
+  {
+    runId: Schema.String,
+    decision: RecoveryDecision,
+    action: Schema.String,
+    hint: errorHint("Re-run runtime.operator.explain and choose an action legal for the reported decision."),
+  },
+) {}
 
 /** An Agent name is already registered in this Runtime process. */
 export class DuplicateAgent extends ActionableTaggedError<DuplicateAgent>()("generalist/runtime/DuplicateAgent", {

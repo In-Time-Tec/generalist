@@ -294,6 +294,10 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
         expect((yield* store.getOperation({ runId: first.runId, operationId: first.operationId })).status).toBe(
           "unknown",
         )
+        expect((yield* runtime.operator.explain(first.runId)).decision).toMatchObject({
+          _tag: "Unknown",
+          operationId: first.operationId,
+        })
         const blockedHistory = yield* runtime.history({ runId: first.runId, limit: 100 })
         expect(blockedHistory.filter((event) => event._tag === "OperationUnknown")).toHaveLength(1)
         expect(blockedHistory.filter((event) => event._tag === "TurnStarted")).toHaveLength(first.turnStarted)
@@ -301,19 +305,19 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
         expect(recoveredModelCalls).toBe(0)
         expect(recoveredToolCalls).toBe(0)
 
-        yield* runtime.resolveOperation({
-          runId: first.runId,
-          operationId: first.operationId,
-          idempotencyKey: "resolve-after-crash",
-          resolution: {
-            _tag: "Succeeded",
-            value: {
+        yield* runtime.operator.resolveUnknown(
+          first.runId,
+          first.operationId,
+          {
+            outcome: "succeeded",
+            result: {
               _tag: "Success",
               result: "resolved external write",
               encodedResult: "resolved external write",
             },
           },
-        })
+          "operator:crash-recovery",
+        )
         yield* host.execute(yield* store.claimExecution({ runId: first.runId, ownerId: "recovery-resume" }))
 
         const completedHistory = yield* runtime.history({ runId: first.runId, limit: 100 })

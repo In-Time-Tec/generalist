@@ -9,6 +9,7 @@ import {
   RunTerminal,
   StartInvalid,
   RuntimeUnavailable,
+  IllegalOperatorAction,
 } from "../../errors.js"
 import { make as makeAddress, type Address } from "../../address.js"
 import { origin as cursorOrigin } from "../../cursor.js"
@@ -44,7 +45,9 @@ import { parseAddress, runAddress } from "../../execution/agent/directory.js"
 import { authorize, Policy as MessagingPolicy, reachable } from "../../messaging/service.js"
 import { defaultBounds, digest as messageDigest, promptBytes } from "../../messaging/mailbox.js"
 import { defaultTreePolicy } from "../../tree/policy.js"
-import { isTerminal } from "../../run.js"
+import { isTerminal, type RunInspection } from "../../run.js"
+import { explain as explainRecovery, verify as verifyRecovery } from "../../execution/recovery/operator.js"
+import { resolveWith as resolveDurableApproval } from "../../operation/approval.js"
 import { awaitSessionTerminal } from "../../session/lifecycle.js"
 import { make as makeAgentStart } from "./agent-start.js"
 import { normalizer as fanOutNormalizer } from "./fan-out.js"
@@ -289,7 +292,93 @@ const makeRuntimeWith = (
         return yield* store.admitStart(admission, { activate })
       })
     const agentStart = makeAgentStart({ agents, store, admitStart })
-    return Runtime.of({
+    const operatorExplain: RuntimeService["operator"]["explain"] = (runId) =>
+      store.recoveryJournal(runId).pipe(Effect.map(explainRecovery))
+    const normalizeBudgetDelta = (delta: Parameters<RuntimeService["extendBudget"]>[1]) =>
+      Effect.try({
+        try: () => makeBudget(delta).allocation,
+        catch: (error) => BudgetInvalid.make({ message: String(error), hint: "Use finite non-negative budget values" }),
+      })
+    const extendRunBudget: RuntimeService["extendBudget"] = (runId, delta) =>
+      normalizeBudgetDelta(delta).pipe(Effect.flatMap((normalized) => store.extendBudget(runId, normalized)))
+    const operatorRuns = Stream.paginate<string | undefined, RunInspection, RuntimeUnavailable>(
+      undefined,
+      (afterRunId) =>
+        store
+          .list({
+            limit: 100,
+            order: "oldest",
+            ...(afterRunId === undefined ? undefined : { afterRunId }),
+          })
+          .pipe(
+            Effect.map((runs) => {
+              const last = runs.at(-1)
+              return [
+                runs,
+                runs.length === 100 && last !== undefined ? Option.some(last.runId) : Option.none(),
+              ] as const
+            }),
+          ),
+    )
+    const operator: RuntimeService["operator"] = {
+      explain: operatorExplain,
+      verify: (runId) => store.recoveryJournal(runId).pipe(Effect.map(verifyRecovery)),
+      retry: (runId, operatorIdentity) =>
+        Effect.gen(function* () {
+          const explanation = yield* operatorExplain(runId)
+          if (explanation.decision._tag !== "RetryOperation") {
+            return yield* IllegalOperatorAction.make({
+              runId,
+              decision: explanation.decision,
+              action: "retry",
+            })
+          }
+          yield* store.retryRecovery({
+            runId,
+            operationId: explanation.decision.operationId,
+            operator: operatorIdentity,
+          })
+        }),
+      wake: (runId, operatorIdentity) => store.wakeRecovery({ runId, operator: operatorIdentity }),
+      scanObligations: () =>
+        operatorRuns.pipe(
+          Stream.mapEffect((run) =>
+            operatorExplain(run.runId).pipe(Effect.map((explanation) => ({ runId: run.runId, explanation }))),
+          ),
+          Stream.filter(({ explanation }) => explanation.decision._tag !== "Resume"),
+          Stream.map(({ runId, explanation }) => ({
+            runId,
+            decision: explanation.decision,
+          })),
+        ),
+      resolveUnknown: (runId, operationId, resolution, operatorIdentity) =>
+        store.resolveUnknown({
+          runId,
+          operationId,
+          operator: operatorIdentity,
+          resolution:
+            resolution.outcome === "succeeded"
+              ? { _tag: "Succeeded", value: resolution.result }
+              : { _tag: "Failed", error: resolution.error },
+        }),
+      resolveApproval: (token, decision, operatorIdentity) =>
+        Effect.suspend(() => resolveDurableApproval(service, token, decision, { operator: operatorIdentity })),
+      extendBudget: (runId, delta, operatorIdentity) =>
+        Effect.gen(function* () {
+          const explanation = yield* operatorExplain(runId)
+          if (!explanation.obligations.some((decision) => decision._tag === "AwaitBudget")) {
+            return yield* IllegalOperatorAction.make({
+              runId,
+              decision: explanation.decision,
+              action: "extendBudget",
+            })
+          }
+          const normalized = yield* normalizeBudgetDelta(delta)
+          yield* store.extendBudgetRecovery({ runId, delta: normalized, operator: operatorIdentity })
+        }),
+    }
+    const service: RuntimeService = {
+      operator,
       register: agentStart.register,
       start: agentStart.start,
       startExecution: (input) => admitStart(input, true),
@@ -472,12 +561,7 @@ const makeRuntimeWith = (
       directory: (runId) => reachable({ store, policy, runId }),
       registerAgentName: store.registerAgentName,
       resolveOperation: store.resolveOperation,
-      extendBudget: (runId, delta) =>
-        Effect.try({
-          try: () => makeBudget(delta).allocation,
-          catch: (error) =>
-            BudgetInvalid.make({ message: String(error), hint: "Use finite non-negative budget values" }),
-        }).pipe(Effect.flatMap((normalized) => store.extendBudget(runId, normalized))),
+      extendBudget: extendRunBudget,
       inspect: (runId) =>
         Effect.all([store.snapshot(runId), store.loadExecution(runId)]).pipe(
           Effect.map(([snapshot, execution]) => {
@@ -496,7 +580,8 @@ const makeRuntimeWith = (
         }),
       inspectFanOut: store.inspectFanOut,
       awaitFanOut,
-    })
+    }
+    return Runtime.of(service)
   })
 
 export const makeRuntime = (options: LayerOptions) => makeRuntimeWith(options, makeRegisteredAgents())

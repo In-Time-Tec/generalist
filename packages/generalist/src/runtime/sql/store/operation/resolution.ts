@@ -12,26 +12,13 @@ import type { OperationRow } from "../../codec/rows.js"
 import { loadRun, nowIso } from "../statements.js"
 import { revokeRunSessionWriteClaim } from "../../session/claim.js"
 import { markSqlTransitionExactRetry } from "../kernel/observability.js"
+import { resolvedRunStatus } from "./resolution-status.js"
 
 type ResolveOperationEffect = Effect.Effect<
   undefined,
   OperationResolutionConflict | RunNotFound | RuntimeUnavailable | SqlError,
   SqlClient.SqlClient
 >
-
-const resolvedRunStatus = (
-  sql: SqlClient.SqlClient,
-  unresolved: number,
-  claimableStatus: "queued" | "running" | undefined,
-) => {
-  if (unresolved > 0) return sql`'needs-resolution'`
-  const cancellationRequested = sql.onDialectOrElse({
-    pg: () => sql`cancellation_requested`,
-    mysql: () => sql`cancellation_requested = 1`,
-    orElse: () => sql`cancellation_requested IN (1, 'true')`,
-  })
-  return sql`CASE WHEN ${cancellationRequested} THEN 'cancelling' ELSE ${claimableStatus} END`
-}
 
 /** Resolve one unknown operation without making its Run claimable while another remains unknown. */
 export const resolveOperation: {
@@ -102,11 +89,7 @@ const resolveOperationEffect = (
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
       `
     }
-    const unresolved = yield* sql<{ readonly unresolved: number }>`
-      SELECT COUNT(*) AS unresolved FROM generalist_run_operations
-      WHERE run_id = ${input.runId} AND status = 'unknown'
-    `
-    const runStatus = resolvedRunStatus(sql, unresolved[0]?.unresolved ?? 0, claimableStatus)
+    const runStatus = yield* resolvedRunStatus(input.runId, claimableStatus)
     yield* revokeRunSessionWriteClaim({
       sessionId: run.sessionId,
       runId: run.runId,

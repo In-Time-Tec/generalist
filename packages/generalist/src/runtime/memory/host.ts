@@ -2,6 +2,7 @@
 export { Runtime } from "../service.js"
 export type {
   Service,
+  OperatorService,
   LayerOptions,
   AddressBinding,
   SendInput,
@@ -55,6 +56,10 @@ export type {
   CancelError,
   SteerError,
   InspectError,
+  ExtendBudgetError,
+  OperatorActionError,
+  OperatorApprovalError,
+  OperatorExtendBudgetError,
   FanOutError,
   InspectFanOutError,
 } from "../service.js"
@@ -68,6 +73,13 @@ export type {
   SessionEventsError,
 } from "../session/host.js"
 export { SessionNotFound, SessionConflict, SessionCursorExpired, SessionSubscriberLagged } from "../session/host.js"
+export type {
+  RecoveryDecision,
+  Explanation as RecoveryExplanation,
+  Verification as RecoveryVerification,
+  Obligation as RecoveryObligation,
+  UnknownResolution,
+} from "../execution/recovery/operator.js"
 export type { FanOutInput, FanOutMemberInput } from "../child/fan-out-internal.js"
 export type { Point as AckPoint } from "../acknowledgement.js"
 export type { RespondInput as RespondApprovalInput } from "../operation/approval.js"

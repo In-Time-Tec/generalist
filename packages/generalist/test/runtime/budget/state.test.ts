@@ -79,13 +79,35 @@ it.effect("suspends on exhaustion, journals extension, and resumes", () =>
         budget: { tokens: 0 },
         suspension: { _tag: "BudgetExhausted", budget: "tokens" },
       })
+      expect((yield* runtime.operator.explain(handle.runId)).decision).toEqual({
+        _tag: "AwaitBudget",
+        budget: "tokens",
+      })
 
-      yield* runtime.extendBudget(handle.runId, { usd: 1 })
+      yield* runtime.operator.extendBudget(handle.runId, { usd: 1 }, "operator:budget")
       expect(yield* runtime.inspect(handle.runId)).toMatchObject({
         status: "waiting",
         suspension: { _tag: "BudgetExhausted", budget: "tokens" },
       })
-      yield* runtime.extendBudget(handle.runId, { tokens: 10 })
+      yield* runtime.operator.extendBudget(handle.runId, { tokens: 10 }, "operator:budget")
+      expect((yield* store.recoveryJournal(handle.runId)).actions).toEqual([
+        expect.objectContaining({
+          operator: "operator:budget",
+          action: { _tag: "ExtendBudget", delta: { usd: 1 } },
+        }),
+        expect.objectContaining({
+          operator: "operator:budget",
+          action: { _tag: "ExtendBudget", delta: { tokens: 10 } },
+        }),
+      ])
+      expect(
+        yield* runtime.operator.extendBudget(handle.runId, { tokens: 1 }, "operator:budget").pipe(Effect.flip),
+      ).toMatchObject({
+        _tag: "generalist/runtime/IllegalOperatorAction",
+        decision: { _tag: "Resume" },
+        action: "extendBudget",
+      })
+      expect((yield* store.recoveryJournal(handle.runId)).actions).toHaveLength(2)
       yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget-test-resume" }))
       expect(yield* handle.await).toBe("done")
       const inspection = yield* runtime.inspect(handle.runId)
@@ -294,7 +316,13 @@ it.effect("recomputes spend after SQLite reopen and resumes without redispatch",
         const store = yield* RunStore.RunStore
         expect(yield* runtime.inspect(runId)).toMatchObject({ status: "waiting", budget: { tokens: 0 } })
         yield* runtime.register(agent)
-        yield* runtime.extendBudget(runId, { tokens: 10 })
+        yield* runtime.operator.extendBudget(runId, { tokens: 10 }, "operator:budget-reopen")
+        expect((yield* store.recoveryJournal(runId)).actions).toEqual([
+          expect.objectContaining({
+            operator: "operator:budget-reopen",
+            action: { _tag: "ExtendBudget", delta: { tokens: 10 } },
+          }),
+        ])
         yield* executor.execute(yield* store.claimExecution({ runId, ownerId: "budget:after-reopen" }))
         expect(yield* runtime.inspect(runId)).toMatchObject({ status: "succeeded", budget: { tokens: 9 } })
       }).pipe((effect) => provideScoped(layer(), effect)),

@@ -31,6 +31,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "Messaging",
       "ModelPreview",
       "OperationResolution",
+      "Recovery",
       "Run",
       "RunEvent",
       "RunExecutor",

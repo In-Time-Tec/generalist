@@ -28,6 +28,16 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
   Layer.succeed(
     Runtime.Runtime,
     Runtime.Runtime.of({
+      operator: {
+        explain: () => Effect.die("unused operator.explain"),
+        verify: () => Effect.die("unused operator.verify"),
+        retry: () => Effect.die("unused operator.retry"),
+        wake: () => Effect.die("unused operator.wake"),
+        scanObligations: () => Stream.die("unused operator.scanObligations"),
+        resolveUnknown: () => Effect.die("unused operator.resolveUnknown"),
+        resolveApproval: () => Effect.die("unused operator.resolveApproval"),
+        extendBudget: () => Effect.die("unused operator.extendBudget"),
+      },
       register: () => Effect.die("unused register"),
       start: () => Effect.die("unused start"),
       startExecution: () => Effect.die("unused startExecution"),

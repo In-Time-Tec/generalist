@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- the memory store wires one storage service contract. */
 import { Context, Effect, Layer, Option, Ref, SynchronizedRef } from "effect"
 import {
   AddressNotFound,
   CursorExpired,
+  IllegalOperatorAction,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
@@ -76,6 +78,14 @@ import type { RunActivation } from "../run/activation.js"
 import { acknowledge, loadAcknowledged } from "./store/acknowledgement.js"
 import { make as makeHostSessionStore } from "./store/host-session.js"
 import { publish } from "./store/event/publications.js"
+import {
+  appendAction as appendOperatorAction,
+  journal as recoveryJournal,
+  resolveUnknown as resolveUnknownOperation,
+  retry as retryRecovery,
+  wake as wakeRecovery,
+} from "./store/operation/operator.js"
+import { explain as explainRecovery } from "../execution/recovery/operator.js"
 
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
@@ -164,7 +174,20 @@ const makeStoreServices = (options: LayerOptions) =>
         fencedModify(input, (state) => admitProgramChildrenAndSuspend(state, input)),
       events: (input) => followEvents(stateRef, input),
       respond: (input) => update((state) => respond(state, input)),
-      respondApproval: (input) => update((state) => respondApproval(state, input)),
+      respondApproval: (input) =>
+        update((state) =>
+          respondApproval(state, input).pipe(
+            Effect.flatMap((responded) =>
+              input.operator === undefined
+                ? Effect.succeed(responded)
+                : appendOperatorAction(responded, input.runId, input.operator, {
+                    _tag: "ResolveApproval",
+                    token: input.approvalId,
+                    decision: input.decision,
+                  }),
+            ),
+          ),
+        ),
       signal: (input) => update((state) => signal(state, input)),
       cancel: (input) => update((state) => cancel(state, input)),
       cancelSession: (input) => modifyState((state) => cancelSession(state, input)),
@@ -409,6 +432,30 @@ const makeStoreServices = (options: LayerOptions) =>
             }),
           ),
         ),
+      recoveryJournal: (runId) =>
+        SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => recoveryJournal(state, runId))),
+      retryRecovery: (input) => update((state) => retryRecovery(state, input)),
+      wakeRecovery: (input) => update((state) => wakeRecovery(state, input)),
+      extendBudgetRecovery: (input) =>
+        modifyState((state) =>
+          Effect.gen(function* () {
+            const explanation = explainRecovery(yield* recoveryJournal(state, input.runId))
+            if (!explanation.obligations.some((decision) => decision._tag === "AwaitBudget")) {
+              return yield* IllegalOperatorAction.make({
+                runId: input.runId,
+                decision: explanation.decision,
+                action: "extendBudget",
+              })
+            }
+            const [result, extended] = yield* extendBudget(state, input.runId, input.delta)
+            const recorded = yield* appendOperatorAction(extended, input.runId, input.operator, {
+              _tag: "ExtendBudget",
+              delta: input.delta,
+            })
+            return [result, recorded] as const
+          }),
+        ),
+      resolveUnknown: (input) => update((state) => resolveUnknownOperation(state, input)),
       claimExecution: (input) => modifyState((state) => claimExecution(state, input)),
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),

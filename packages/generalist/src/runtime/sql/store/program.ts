@@ -38,6 +38,7 @@ import {
 import type { WorkerMutationError } from "../../run/store.js"
 import { revokeRunSessionWriteClaim } from "../session/claim.js"
 import { markSqlTransitionExactRetry } from "./kernel/observability.js"
+import { resolvedRunStatus } from "./operation/resolution-status.js"
 
 interface StateRow {
   readonly run_id: string
@@ -363,11 +364,7 @@ const resolveProgramOperationEffect = (
         resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operationId} AND status = 'unknown'
     `
-    const cancellationRequested = sql.onDialectOrElse({
-      pg: () => sql`cancellation_requested`,
-      mysql: () => sql`cancellation_requested = 1`,
-      orElse: () => sql`cancellation_requested IN (1, 'true')`,
-    })
+    const runStatus = yield* resolvedRunStatus(input.runId, claimableStatus)
     yield* revokeRunSessionWriteClaim({
       sessionId: run.sessionId,
       runId: run.runId,
@@ -376,12 +373,12 @@ const resolveProgramOperationEffect = (
     })
     if (clearLease) {
       yield* sql`
-        UPDATE generalist_runs SET status = CASE WHEN ${cancellationRequested} THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL
+        UPDATE generalist_runs SET status = ${runStatus}, owner_worker_id = NULL, lease_expires_at = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     } else {
       yield* sql`
-        UPDATE generalist_runs SET status = CASE WHEN ${cancellationRequested} THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL
+        UPDATE generalist_runs SET status = ${runStatus}, owner_worker_id = NULL
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     }
