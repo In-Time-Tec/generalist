@@ -412,9 +412,14 @@ export const withTool: {
 )
 
 /** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
-const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
-  readonly agent: Agent<Tools, R>
-  readonly environment: Layer.Layer<ClosedServices<Tools, R>>
+const makeExecutor = <
+  Tools extends Record<string, Tool.Any>,
+  R,
+  InputSchema extends Schema.Top,
+  OutputSchema extends Schema.Top,
+>(options: {
+  readonly agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>
+  readonly environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>
   readonly implementation: Service
   readonly upstream: Option.Option<ToolExecutorService>
 }): ToolExecutorService => {

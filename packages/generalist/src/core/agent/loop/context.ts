@@ -1,4 +1,4 @@
-import type { Effect, Option, Ref, Schema, Stream } from "effect"
+import { Schema, type Effect, type Option, type Ref, type Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import type { AgentSuspended, Event, SteeringDrained } from "../event.js"
 import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
@@ -21,11 +21,19 @@ import type { Input } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 
 export type ObjectSchema = Schema.Codec<Record<string, Schema.Top["Type"]>, object, unknown, unknown>
-export interface StructuredRunConfig<S extends ObjectSchema> {
+export interface RequiredFieldCodec<out T, out E, out RD, out RE> extends Schema.Codec<T, E, RD, RE> {
+  readonly "~type.optionality": "required"
+  readonly "~type.mutability": "readonly"
+  readonly "~encoded.optionality": "required"
+  readonly "~encoded.mutability": "readonly"
+}
+export const requiredField = <T, E, RD, RE>(schema: Schema.Codec<T, E, RD, RE>): RequiredFieldCodec<T, E, RD, RE> =>
+  Schema.make<RequiredFieldCodec<T, E, RD, RE>>(schema.ast, { schema })
+export interface StructuredRunConfig<S extends ObjectSchema, OutputValue> {
   readonly schema: S
   readonly objectName: string
   readonly objectPrompt: Prompt.RawInput
-  readonly output: (value: S["Type"]) => unknown
+  readonly output: (value: S["Type"]) => OutputValue
 }
 /** @experimental Decoding services a structured-output schema requires, with an unconstrained schema contributing none. */
 export type SchemaServicesD<S extends ObjectSchema> = S["DecodingServices"]
@@ -49,8 +57,15 @@ export type ToolState = {
   readonly registry: Registry
   readonly activatedSkillBodies: Map<string, string>
 }
-export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema> {
-  readonly agent: Agent<Tools, R>
+export interface RunLoopContext<
+  Tools extends Record<string, Tool.Any>,
+  R,
+  PolicyServices extends R,
+  AuthorizationServices extends R,
+  S extends ObjectSchema,
+  OutputValue,
+> {
+  readonly agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>
   readonly options: import("../service.js").RunOptions
   readonly state: import("../run-state.js").AgentRunState
   readonly chat: Chat.Service
@@ -58,7 +73,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly activeSession: Option.Option<SessionStore>
   readonly memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined
   readonly inbox: RunInbox
-  readonly structured: StructuredRunConfig<S> | undefined
+  readonly structured: StructuredRunConfig<S, OutputValue> | undefined
   readonly validatedResume: SuspensionCheckpoint | undefined
   readonly recoveredToolCheckpoint: ToolCheckpoint | undefined
   readonly seedSystem: string | undefined

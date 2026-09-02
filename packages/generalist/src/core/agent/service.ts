@@ -1,7 +1,7 @@
-import { Effect, type Layer, Option, Predicate, Schema, Stream, Types } from "effect"
+import { Effect, Option, Predicate, Schema, Stream } from "effect"
 import { dual } from "effect/Function"
 import { LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentError, type AgentSuspended, type Event, type ToolOrigin } from "./event.js"
+import { AgentError, type AgentSuspended, type Event } from "./event.js"
 import type { BudgetLimits, RunBudget } from "../durable/run-budget.js"
 import type { DriverCheckpoint } from "../durable/driver/contract.js"
 import { type Key, Memory } from "../context/memory.js"
@@ -12,12 +12,37 @@ import { defaultPolicy, type Policy } from "../turn/policy.js"
 import type { RunId as RunIdType } from "../durable/run-id.js"
 import { RunError } from "./run/error.js"
 
+import {
+  AgentTypeId,
+  type Agent,
+  type AgentMetadata,
+  type HandoffAgent,
+  type ToolDeclaration,
+  type ToolSchedulingPolicy,
+} from "./lifecycle/definition.js"
 import { allocateRun, defaultObjectPrompt, type RunHandle } from "./lifecycle/run-handle.js"
 import { encode as encodeInput } from "./lifecycle/input.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
 import type { ToolBatchResolution } from "./tools/checkpoint.js"
 
-export { close, withTools } from "./lifecycle/definition.js"
+export {
+  AgentTypeId,
+  close,
+  withTools,
+  type Agent,
+  type Any,
+  type Closed,
+  type ClosedServices,
+  type EncodedInput,
+  type EncodedOutput,
+  type HandoffAgent,
+  type Input,
+  type Opened,
+  type Output,
+  type Requirements,
+  type ToolDeclaration,
+  type ToolSchedulingPolicy,
+} from "./lifecycle/definition.js"
 export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
 export { start, type StartEvent, type StartOptions } from "./lifecycle/start.js"
 export { streamToolCalls } from "./tool-calls.js"
@@ -25,106 +50,6 @@ export { defaultObjectPrompt, type RunHandle }
 /** @experimental Allocate one scoped Run and its producer handle before consuming its event stream. */
 export { allocateRun }
 export type * from "./tool-calls.js"
-export const AgentTypeId = "generalist/core/Agent"
-/** @experimental Agent-owned metadata values. */
-type AgentMetadata = Readonly<Record<string, Schema.Json>>
-/** @experimental An agent definition: a plain value, not a service. */
-export interface HandoffAgent<R> {
-  readonly name: string
-  readonly description?: string
-  readonly requirements: (value: R) => R
-}
-
-export interface Agent<
-  Tools extends Record<string, Tool.Any> = Record<never, never>,
-  R = LanguageModel.LanguageModel,
-  PolicyServices extends R = R,
-  AuthorizationServices extends R = R,
-  InputSchema extends Schema.Top = Schema.Top,
-  OutputSchema extends Schema.Top = Schema.Top,
-> {
-  readonly handoff: <A>(f: (agent: HandoffAgent<R>) => A) => A
-  readonly [AgentTypeId]: {
-    readonly tools: Types.Invariant<Tools>
-    readonly requirements: Types.Invariant<R>
-  }
-  readonly name: string
-  readonly input: InputSchema
-  readonly output: OutputSchema
-  readonly instructions?: string
-  readonly supplemental?: string
-  readonly toolkit: Toolkit.Toolkit<Tools>
-  readonly policy: Policy<PolicyServices>
-  readonly model?: ModelSelection
-  readonly memory?: Key
-  readonly authorization?: Authorizer<AuthorizationServices>
-  readonly toolScheduling: ToolSchedulingPolicy
-  readonly metadata?: AgentMetadata
-  readonly budget?: BudgetLimits
-  readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
-}
-
-/**
- * @experimental Safe scheduling policy for framework-executed calls emitted by one model turn. Tools not explicitly
- * listed as parallel-safe execute as authored-order exclusive barriers.
- */
-export interface ToolSchedulingPolicy {
-  readonly maxConcurrency: number
-  readonly parallelSafe: ReadonlyArray<string>
-}
-
-/** @experimental One origin-preserving static or Handoff tool declaration. */
-export interface ToolDeclaration {
-  readonly tool: Tool.Any
-  readonly origin: Extract<ToolOrigin, { readonly _tag: "Static" | "Handoff" }>
-}
-
-/** @experimental One Agent observed where its tool and requirement types are hidden. */
-export interface Any {
-  readonly [AgentTypeId]: unknown
-  readonly name: string
-  readonly input: Schema.Top
-  readonly output: Schema.Top
-  readonly instructions?: string
-  readonly toolkit: Toolkit.Any
-  readonly policy: Policy<unknown>
-  readonly model?: ModelSelection
-  readonly memory?: Key
-  readonly toolScheduling: ToolSchedulingPolicy
-  readonly metadata?: AgentMetadata
-  readonly budget?: BudgetLimits
-  readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
-}
-/** @experimental Services closed over with an Agent. */
-export type ClosedServices<Tools extends Record<string, Tool.Any>, R> =
-  | R
-  | Tool.HandlersFor<Tools>
-  | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
-/** @experimental Consumer of a hidden Agent identity and its environment. */
-export interface Opened<A> {
-  <Tools extends Record<string, Tool.Any>, R, InputSchema extends Schema.Top, OutputSchema extends Schema.Top>(
-    agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>,
-    environment: Layer.Layer<ClosedServices<Tools, R>>,
-  ): A
-}
-/** @experimental An Agent closed over its exact environment. */
-export interface Closed extends Any {
-  readonly open: <A>(f: Opened<A>) => A
-}
-/** @experimental Extract an agent's runtime requirements. */
-export type Requirements<A> = A extends Agent<infer _Tools, infer R> ? R : never
-/** @experimental Extract an Agent's decoded input type. */
-export type Input<A> = A extends { readonly input: infer InputCodec extends Schema.Top } ? InputCodec["Type"] : never
-/** @experimental Extract an Agent's encoded input type. */
-export type EncodedInput<A> =
-  A extends { readonly input: infer InputCodec extends Schema.Top } ? InputCodec["Encoded"] : never
-/** @experimental Extract an Agent's decoded output type. */
-export type Output<A> =
-  A extends { readonly output: infer OutputCodec extends Schema.Top } ? OutputCodec["Type"] : never
-/** @experimental Extract an Agent's encoded output type. */
-export type EncodedOutput<A> =
-  A extends { readonly output: infer OutputCodec extends Schema.Top } ? OutputCodec["Encoded"] : never
-
 /** @experimental */
 export interface MakeOptions<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
@@ -366,10 +291,23 @@ export { RunError }
 export type InvocationOptions = Omit<RunOptions, "prompt">
 
 /** @experimental Services required by one run option set. */
-export type RunRequirements<Tools extends Record<string, Tool.Any>, R, O> =
+export type RunRequirements<
+  Tools extends Record<string, Tool.Any>,
+  R,
+  O,
+  InputCodec extends Schema.Top = typeof Schema.String,
+  OutputCodec extends Schema.Top = typeof Schema.String,
+  PolicyServices = R,
+  AuthorizationServices = R,
+> =
   | R
+  | PolicyServices
+  | AuthorizationServices
   | StaticToolServices<Tools>
   | OperationRequirements<O>
+  | InputCodec["EncodingServices"]
+  | OutputCodec["DecodingServices"]
+  | OutputCodec["EncodingServices"]
 
 const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)
 
@@ -388,7 +326,11 @@ interface StreamFunction {
     agent: InputValue extends InputCodec["Type"]
       ? Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>
       : never,
-  ) => Stream.Stream<Event<OutputCodec["Type"]>, RunError, RunRequirements<Tools, R, O>>
+  ) => Stream.Stream<
+    Event<OutputCodec["Type"]>,
+    RunError,
+    RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
+  >
   <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -401,7 +343,11 @@ interface StreamFunction {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
     input: InputCodec["Type"],
     options?: O,
-  ): Stream.Stream<Event<OutputCodec["Type"]>, RunError, RunRequirements<Tools, R, O>>
+  ): Stream.Stream<
+    Event<OutputCodec["Type"]>,
+    RunError,
+    RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
+  >
 }
 
 /** @experimental Stream an Agent run as Events ending in `Completed { output }`. */
@@ -445,7 +391,11 @@ interface RunFunction {
     agent: InputValue extends InputCodec["Type"]
       ? Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>
       : never,
-  ) => Effect.Effect<OutputCodec["Type"], RunError, RunRequirements<Tools, R, O>>
+  ) => Effect.Effect<
+    OutputCodec["Type"],
+    RunError,
+    RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
+  >
   <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -458,7 +408,11 @@ interface RunFunction {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
     input: InputCodec["Type"],
     options?: O,
-  ): Effect.Effect<OutputCodec["Type"], RunError, RunRequirements<Tools, R, O>>
+  ): Effect.Effect<
+    OutputCodec["Type"],
+    RunError,
+    RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
+  >
 }
 
 /** @experimental Run an Agent to its schema-decoded output. */

@@ -15,9 +15,11 @@ export const layerForRun: {
     options: RunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,
-  ): (agent: Agent<Tools, R, P, A>) => Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
+  ): (
+    agent: Agent<Tools, R, P, A, Schema.Top, Schema.Top>,
+  ) => Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
   <Tools extends Record<string, Tool.Any>, R, P, A>(
-    agent: Agent<Tools, R, P, A>,
+    agent: Agent<Tools, R, P, A, Schema.Top, Schema.Top>,
     options: RunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,
@@ -25,7 +27,7 @@ export const layerForRun: {
 } = Function.dual(
   (args) => args.length >= 1 && Schema.is(AgentInput)(args[0]),
   <Tools extends Record<string, Tool.Any>, R, P, A>(
-    agent: Agent<Tools, R, P, A>,
+    agent: Agent<Tools, R, P, A, Schema.Top, Schema.Top>,
     options: RunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,

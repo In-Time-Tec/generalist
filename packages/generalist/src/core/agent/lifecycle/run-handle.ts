@@ -7,7 +7,8 @@ import { allocateRunInbox, type RunInbox } from "../../turn/steering-inbox.js"
 import type { InboxFull, Input as SteeringInput, PolicyInvalid, RunClosed } from "../../turn/steering.js"
 import { streamInternal } from "../run.js"
 import type { Agent, RunError, RunOptions, RunRequirements } from "../service.js"
-import { AgentError, type Event } from "../event.js"
+import { AgentError, type Event, InvalidOutput } from "../event.js"
+import { requiredField, type StructuredRunConfig } from "../loop/context.js"
 
 /** @experimental Default prompt for the terminal structured-output turn. */
 export const defaultObjectPrompt = "Return the final structured output for the task above."
@@ -26,9 +27,19 @@ export interface RunHandle<
   readonly followUp: (input: SteeringInput) => Effect.Effect<ControlReceipt, ControlError>
 }
 
-const structuredOutput = (agent: Agent<any, any>) => {
-  if (agent.output === Schema.String) return undefined
-  const schema = Schema.Struct({ output: agent.output })
+type WrappedOutputCodec<OutputCodec extends Schema.Top> = Schema.Codec<
+  { readonly output: OutputCodec["Type"] },
+  { readonly output: OutputCodec["Encoded"] },
+  OutputCodec["DecodingServices"],
+  OutputCodec["EncodingServices"]
+>
+
+const structuredOutput = <OutputCodec extends Schema.Top>(agent: {
+  readonly output: OutputCodec
+}): StructuredRunConfig<WrappedOutputCodec<OutputCodec>, OutputCodec["Type"]> | undefined => {
+  const outputSchema: Schema.Top = agent.output
+  if (outputSchema === Schema.String) return undefined
+  const schema = Schema.Struct({ output: requiredField(agent.output) })
   return {
     schema,
     objectName: "submit",
@@ -37,6 +48,23 @@ const structuredOutput = (agent: Agent<any, any>) => {
   }
 }
 
+const decodeEvent = <OutputCodec extends Schema.Top>(
+  schema: OutputCodec,
+  event: Event,
+): Effect.Effect<Event<OutputCodec["Type"]>, InvalidOutput> => {
+  if (event._tag !== "Completed") return Effect.succeed(event)
+  return Schema.decodeUnknownEffect(Schema.toType(schema))(event.output).pipe(
+    Effect.map((output) => ({ ...event, output })),
+    Effect.mapError((error) => InvalidOutput.make({ issues: [error.message] })),
+  )
+}
+
+const typedEvents = <OutputCodec extends Schema.Top, E, R>(
+  schema: OutputCodec,
+  events: Stream.Stream<Event, E, R>,
+): Stream.Stream<Event<OutputCodec["Type"]>, E | InvalidOutput, R> =>
+  events.pipe(Stream.mapEffect((event) => decodeEvent(schema, event)))
+
 /** @internal Allocate one scoped Run and its producer handle before consuming its event stream. */
 export const allocateRun: {
   <O extends RunOptions>(
@@ -44,22 +72,26 @@ export const allocateRun: {
   ): <
     Tools extends Record<string, Tool.Any>,
     R,
-    PolicyServices,
-    AuthorizationServices,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
   ) => Effect.Effect<
-    RunHandle<Event<OutputSchema["Type"]>, RunError, RunRequirements<Tools, R, O>>,
+    RunHandle<
+      Event<OutputSchema["Type"]>,
+      RunError,
+      RunRequirements<Tools, R, O, typeof Schema.String, OutputSchema, PolicyServices, AuthorizationServices>
+    >,
     PolicyInvalid,
     Scope.Scope
   >
   <
     Tools extends Record<string, Tool.Any>,
     R,
-    PolicyServices,
-    AuthorizationServices,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
     O extends RunOptions,
@@ -67,7 +99,11 @@ export const allocateRun: {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     options: O,
   ): Effect.Effect<
-    RunHandle<Event<OutputSchema["Type"]>, RunError, RunRequirements<Tools, R, O>>,
+    RunHandle<
+      Event<OutputSchema["Type"]>,
+      RunError,
+      RunRequirements<Tools, R, O, typeof Schema.String, OutputSchema, PolicyServices, AuthorizationServices>
+    >,
     PolicyInvalid,
     Scope.Scope
   >
@@ -76,8 +112,8 @@ export const allocateRun: {
   <
     Tools extends Record<string, Tool.Any>,
     R,
-    PolicyServices,
-    AuthorizationServices,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
     O extends RunOptions,
@@ -96,15 +132,16 @@ export const allocateRun: {
             : AgentError.make({ message: `Agent Run ${runId} event stream was already consumed or closed`, turn: 0 }),
         ),
       )
-      const events = Stream.unwrap(
-        start.pipe(
-          Effect.as(
-            streamInternal(agent as unknown as Agent<Tools, R>, options, structured, inbox).pipe(
-              Stream.ensuring(inbox.close("execution-exit")),
+      const events = typedEvents(
+        agent.output,
+        Stream.unwrap(
+          start.pipe(
+            Effect.as(
+              streamInternal(agent, options, structured, inbox).pipe(Stream.ensuring(inbox.close("execution-exit"))),
             ),
           ),
         ),
-      ) as Stream.Stream<Event<OutputSchema["Type"]>, RunError, RunRequirements<Tools, R, O>>
+      )
       return { runId, events, ...producer }
     }),
 )
@@ -114,8 +151,8 @@ export const HostedRun = {
   stream: <
     Tools extends Record<string, Tool.Any>,
     R,
-    PolicyServices,
-    AuthorizationServices,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
     O extends Omit<RunOptions, "steering">,
@@ -123,10 +160,11 @@ export const HostedRun = {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     options: O,
     inbox: RunInbox,
-  ): Stream.Stream<Event<OutputSchema["Type"]>, RunError, RunRequirements<Tools, R, O>> =>
-    streamInternal(agent as unknown as Agent<Tools, R>, options, structuredOutput(agent), inbox) as Stream.Stream<
-      Event<OutputSchema["Type"]>,
-      RunError,
-      RunRequirements<Tools, R, O>
-    >,
+  ): Stream.Stream<
+    Event<OutputSchema["Type"]>,
+    RunError,
+    | RunRequirements<Tools, R, O, typeof Schema.String, OutputSchema, PolicyServices, AuthorizationServices>
+    | OutputSchema["DecodingServices"]
+    | OutputSchema["EncodingServices"]
+  > => typedEvents(agent.output, streamInternal(agent, options, structuredOutput(agent), inbox)),
 }

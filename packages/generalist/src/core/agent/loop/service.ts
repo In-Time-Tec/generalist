@@ -17,7 +17,14 @@ import { pendingResult, projectableResults } from "../tools/checkpoint.js"
 import type { RunError } from "../service.js"
 import type { Input } from "../../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "../message.js"
-import type { LoopServices, ObjectSchema, RunLoopContext, StructuredRunConfig, TurnServices } from "./context.js"
+import {
+  type LoopServices,
+  type ObjectSchema,
+  requiredField,
+  type RunLoopContext,
+  type StructuredRunConfig,
+  type TurnServices,
+} from "./context.js"
 import { select } from "../../tools/tool-registry.js"
 import {
   checkpoint as driverCheckpoint,
@@ -36,14 +43,6 @@ import { afterTurnFor } from "./after-turn.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
-interface RequiredFieldCodec<out T, out E, out RD, out RE> extends Schema.Codec<T, E, RD, RE> {
-  readonly "~type.optionality": "required"
-  readonly "~type.mutability": "readonly"
-  readonly "~encoded.optionality": "required"
-  readonly "~encoded.mutability": "readonly"
-}
-const requiredField = <T, E, RD, RE>(schema: Schema.Codec<T, E, RD, RE>): RequiredFieldCodec<T, E, RD, RE> =>
-  Schema.make<RequiredFieldCodec<T, E, RD, RE>>(schema.ast, { schema })
 const StructuredOutputError = Schema.Union([AgentError, InvalidOutput, AiError.AiError, LanguageModelNotRegistered])
 const structuredResponseSchema = <S extends ObjectSchema>(
   schema: S,
@@ -59,9 +58,12 @@ const hasClosedPolicy = (agent: ActiveAgent): agent is ClosedPolicyAgent =>
 export const make = <
   Tools extends Record<string, Tool.Any>,
   R,
+  PolicyServices extends R,
+  AuthorizationServices extends R,
   StructuredOutputSchema extends ObjectSchema = ObjectSchema,
+  OutputValue = never,
 >(
-  context: RunLoopContext<Tools, R, StructuredOutputSchema>,
+  context: RunLoopContext<Tools, R, PolicyServices, AuthorizationServices, StructuredOutputSchema, OutputValue>,
 ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
   const {
     agent,
@@ -91,7 +93,7 @@ export const make = <
   } = context
   const structuredFinalEvents = (
     structuredTurn: number,
-    config: StructuredRunConfig<StructuredOutputSchema>,
+    config: StructuredRunConfig<StructuredOutputSchema, OutputValue>,
     onPending: (input: { readonly prompt: Prompt.RawInput }) => void,
   ): Stream.Stream<Event, RunError, TurnServices<R, StructuredOutputSchema>> =>
     Stream.fromEffect(

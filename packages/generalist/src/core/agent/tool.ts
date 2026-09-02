@@ -20,28 +20,26 @@ import { RegistrationError, type Registration } from "./tool/registration.js"
 
 export { RegistrationError }
 
-type TextAgent<Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices> = Agent<
-  Tools,
+type TextAgent<
+  Tools extends Record<string, Tool.Any>,
   R,
-  PolicyServices,
-  AuthorizationServices,
-  typeof Schema.String,
-  typeof Schema.String
->
+  PolicyServices extends R,
+  AuthorizationServices extends R,
+> = Agent<Tools, R, PolicyServices, AuthorizationServices, typeof Schema.String, typeof Schema.String>
 
 export const register: {
   <R, E>(
     layer: Layer.Layer<R, E, never>,
-  ): <Tools extends Record<string, Tool.Any>, PolicyServices, AuthorizationServices>(
+  ): <Tools extends Record<string, Tool.Any>, PolicyServices extends R, AuthorizationServices extends R>(
     agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices>,
   ) => Registration<Tools, R>
-  <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices, E>(
+  <Tools extends Record<string, Tool.Any>, R, PolicyServices extends R, AuthorizationServices extends R, E>(
     agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices>,
     layer: Layer.Layer<R, E, never>,
   ): Registration<Tools, R>
 } = Function.dual(
   2,
-  <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices, E>(
+  <Tools extends Record<string, Tool.Any>, R, PolicyServices extends R, AuthorizationServices extends R, E>(
     agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices>,
     layer: Layer.Layer<R, E, never>,
   ): Registration<Tools, R> => {
@@ -239,7 +237,7 @@ export const asTool: {
     ModelR = never,
   >(
     options?: AsToolOptions<Name, Parameters, Success, ModelR>,
-  ): <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
+  ): <Tools extends Record<string, Tool.Any>, R, PolicyServices extends R, AuthorizationServices extends R>(
     agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices> | Registration<Tools, R>,
   ) => AgentToolToolkit<
     Name,
@@ -250,8 +248,8 @@ export const asTool: {
   <
     Tools extends Record<string, Tool.Any>,
     R,
-    PolicyServices,
-    AuthorizationServices,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
@@ -270,8 +268,8 @@ export const asTool: {
   <
     Tools extends Record<string, Tool.Any>,
     R,
-    PolicyServices,
-    AuthorizationServices,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,

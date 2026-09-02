@@ -112,7 +112,7 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
               OutputSchema extends Schema.Top,
             >(
               agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>,
-              environment: Layer.Layer<ClosedServices<Tools, R>>,
+              environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>,
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
                 const nested = yield* makeOperations({ claim, claimed, store })
@@ -355,7 +355,7 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
                                   cause: error,
                                 }),
                               ),
-                            ) as Effect.Effect<unknown, AgentError, R>
+                            )
                             const leafId = yield* Option.match(boundSession.session, {
                               onNone: () => Effect.succeed(null),
                               onSome: (service) => service.leaf.pipe(Effect.orDie),

@@ -13,8 +13,7 @@ import type { SteeringReceipt } from "../../../runtime/run/steering.js"
 import { Runtime, type EventsError, type StartError, type SteerError } from "../../../runtime/service.js"
 import { generateId } from "../../model/telemetry/events.js"
 import { AgentError, InvalidOutput } from "../event.js"
-import type { Agent } from "../service.js"
-import { AgentTypeId } from "../service.js"
+import { AgentTypeId, type Agent } from "./definition.js"
 import type { RunHandle } from "./run-handle.js"
 import { encode as encodeInput } from "./input.js"
 
@@ -45,7 +44,7 @@ const decodeEvent = <OutputCodec extends Schema.Top>(
   event: RuntimeRunEvent,
 ): Effect.Effect<StartEvent<OutputCodec["Type"]>, InvalidOutput, OutputCodec["DecodingServices"]> => {
   if (event._tag !== "RunCompleted") return Effect.succeed(event)
-  if (Schema.is(ProgramExecutionResult)(event.result)) return Effect.succeed(event)
+  if (Schema.is(ProgramExecutionResult)(event.result)) return Effect.succeed({ ...event, result: event.result })
   return Schema.decodeEffect(schema)(event.result.output ?? event.result.text).pipe(
     Effect.map((output) => ({ ...event, result: { ...event.result, output } })),
     Effect.mapError((error) => InvalidOutput.make({ issues: [error.message] })),
