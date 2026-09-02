@@ -1,9 +1,9 @@
 import { Effect, Function, Schema } from "effect"
-import { BudgetExhausted, type BudgetLimits } from "../../../core/durable/run-budget.js"
-import { RunNotFound, RuntimeUnavailable } from "../../errors.js"
-import { appendLifecycle, attemptStartedEvent } from "../append.js"
-import type { MemoryState } from "../state.js"
-import { budgetForEvents } from "../../execution/inspection.js"
+import { BudgetExhausted, type BudgetLimits } from "../../../../core/durable/run-budget.js"
+import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
+import { appendLifecycle, attemptStartedEvent } from "../../append.js"
+import type { MemoryState } from "../../state.js"
+import { budgetForEvents } from "../../../execution/inspection.js"
 
 export const extendBudget: {
   (

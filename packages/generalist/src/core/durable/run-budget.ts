@@ -115,9 +115,8 @@ export const charge: {
   (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, Exhausted>
 } = Function.dual(2, (budget: RunBudget, usage: BudgetLimits) =>
   Effect.gen(function* () {
-    const valid = yield* Schema.decodeEffect(BudgetLimits, { onExcessProperty: "error" })(usage).pipe(
-      Effect.mapError(() => Exhausted.make({ budget: "tokens", requested: 0 })),
-    )
+    // Usage is already typed BudgetLimits; a value that fails its own schema is a defect, not exhaustion.
+    const valid = yield* Schema.decodeEffect(BudgetLimits, { onExcessProperty: "error" })(usage).pipe(Effect.orDie)
     let remaining = budget.remaining
     for (const dimension of dimensions) {
       const requested = valid[dimension]
