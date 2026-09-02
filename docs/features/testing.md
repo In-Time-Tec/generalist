@@ -24,12 +24,18 @@ Testing.runtimeDriver({
     runtime: { claim },
     "approval-suspend": { claim, recovery: "rebuild" },
     "host-sessions": { claim },
+    "operator-explain": true,
+    "operator-retry": { claim },
+    "operator-resolve-unknown": { claim },
+    "operator-scan": { claim },
     runTree: { claim },
   },
 })
 ```
 
 `approval-suspend` runs the shared durable human-approval scenario: notify, suspend, recover the same store, resolve by token, finish, and prove the tool dispatched once. Persistent drivers use `recovery: "rebuild"`; process-memory drivers use `"reclaim"` to exercise the same owner handoff without pretending their store survives process exit.
+
+The four `operator-*` capabilities check journal-derived explanations and verification, explicit replay of safe operations, human resolution of unknown outcomes, persisted operator identity, illegal-action rejection, and store-wide obligation scans. Advertise only the actions the driver implements.
 
 Memory and permission rule stores have smaller service contracts:
 

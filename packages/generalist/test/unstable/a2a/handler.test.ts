@@ -116,6 +116,16 @@ const makeRuntime = (acceptedSequence = 0) => {
   }
 
   const runtime: Runtime.Service = {
+    operator: {
+      explain: () => Effect.die("not used"),
+      verify: () => Effect.die("not used"),
+      retry: () => Effect.die("not used"),
+      wake: () => Effect.die("not used"),
+      scanObligations: () => Stream.die("not used"),
+      resolveUnknown: () => Effect.die("not used"),
+      resolveApproval: () => Effect.die("not used"),
+      extendBudget: () => Effect.die("not used"),
+    },
     register: () => Effect.die("not used"),
     start: () => Effect.die("not used"),
     startExecution: () => Effect.die("not used"),

@@ -22,6 +22,7 @@ export const RespondInput = Schema.Struct({
   runId: Schema.String,
   approvalId: ApprovalId,
   decision: Decision,
+  operator: Schema.optionalKey(Schema.String),
 })
 export type RespondInput = typeof RespondInput.Type
 

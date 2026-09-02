@@ -53,6 +53,7 @@ import type {
   AckBeyondCommitted,
   DuplicateAgent,
   UnknownAgent,
+  IllegalOperatorAction,
 } from "./errors.js"
 import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
@@ -79,6 +80,15 @@ import type {
   Input as BudgetDelta,
   Invalid as BudgetInvalid,
 } from "../core/durable/run-budget.js"
+import type { RuleStore } from "../core/policy/permissions.js"
+import type {
+  Explanation as RecoveryExplanation,
+  Obligation as RecoveryObligation,
+  ResolveApprovalDecision,
+  UnknownResolution,
+  Verification as RecoveryVerification,
+} from "./execution/recovery/operator.js"
+import type { ResolveError as ResolveDurableApprovalError } from "../approvals.js"
 
 export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
@@ -387,6 +397,9 @@ export type SteerError =
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
 export type ExtendBudgetError = InspectError | BudgetInvalid
+export type OperatorActionError = InspectError | IllegalOperatorAction
+export type OperatorApprovalError = ResolveDurableApprovalError | IllegalOperatorAction
+export type OperatorExtendBudgetError = ExtendBudgetError | IllegalOperatorAction
 export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable
 export type ResolveModelResponseError = SessionEntryError
 export type FanOutError =
@@ -403,7 +416,33 @@ export type FanOutError =
 export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
 
+export interface OperatorService {
+  readonly explain: (runId: string) => Effect.Effect<RecoveryExplanation, InspectError>
+  readonly verify: (runId: string) => Effect.Effect<RecoveryVerification, InspectError>
+  readonly retry: (runId: string, operator: string) => Effect.Effect<void, OperatorActionError>
+  readonly wake: (runId: string, operator: string) => Effect.Effect<void, OperatorActionError>
+  // oxlint-disable-next-line effecttsgo/lazy-effect -- Issue #320 specifies a method so callers explicitly begin each store-wide scan.
+  readonly scanObligations: () => Stream.Stream<RecoveryObligation, InspectError>
+  readonly resolveUnknown: (
+    runId: string,
+    operationId: string,
+    resolution: UnknownResolution,
+    operator: string,
+  ) => Effect.Effect<void, OperatorActionError>
+  readonly resolveApproval: (
+    token: string,
+    decision: ResolveApprovalDecision,
+    operator: string,
+  ) => Effect.Effect<void, OperatorApprovalError, Runtime | RuleStore>
+  readonly extendBudget: (
+    runId: string,
+    delta: BudgetDelta,
+    operator: string,
+  ) => Effect.Effect<void, OperatorExtendBudgetError>
+}
+
 export interface Service extends RuntimeHostSessions {
+  readonly operator: OperatorService
   /** Register one Agent name and its exact environment for start and recovery. */
   readonly register: <
     Tools extends Record<string, Tool.Any>,

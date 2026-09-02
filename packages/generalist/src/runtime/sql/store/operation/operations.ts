@@ -40,12 +40,11 @@ const isCompletedStatus = (status: OperationRow["status"]): boolean =>
 const sameEntries = (rows: ReadonlyArray<{ readonly entry_id: string }>, expected: ReadonlyArray<string>): boolean =>
   rows.length === expected.length && rows.every((entry, index) => entry.entry_id === expected[index])
 
-const nextId = (prefix: string): Effect.Effect<string> =>
-  Effect.gen(function* () {
-    const now = yield* Clock.currentTimeMillis
-    const random = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
-    return `${prefix}_${now.toString(36)}_${random.toString(36)}`
-  })
+export const nextOperationId: Effect.Effect<string> = Effect.gen(function* () {
+  const now = yield* Clock.currentTimeMillis
+  const random = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
+  return `op_${now.toString(36)}_${random.toString(36)}`
+})
 
 const priorOperation = (sql: SqlClient.SqlClient, input: RecordOperationInput, prior: OperationRow) =>
   Effect.gen(function* () {
@@ -170,7 +169,7 @@ export const recordOperation: {
     if (!sameEntries(selected, steeringEntryIds)) {
       return yield* RuntimeUnavailable.make({ message: "steering entries are not the pending prefix" })
     }
-    const operationId = yield* nextId("op")
+    const operationId = yield* nextOperationId
     const executableRef = yield* Effect.try({
       try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),

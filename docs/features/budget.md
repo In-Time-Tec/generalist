@@ -27,4 +27,4 @@ Budget exhaustion is not a run failure. The run enters `waiting` with the suspen
 
 Children inherit a reservation from the parent's remaining budget before admission. Active reservations are unavailable to the parent. Settlement releases the unused reservation; consumed child resources remain charged to the parent. Fan-out placement, rather than the child agent, chooses each reservation.
 
-`runtime.extendBudget(runId, delta)` is the low-level top-up primitive. It journals the delta and resumes a run waiting specifically on budget exhaustion. The operator API will wrap this primitive; callers should prefer that API when it is available.
+`runtime.extendBudget(runId, delta)` is the low-level top-up primitive. It journals the delta and resumes a run waiting specifically on budget exhaustion. `runtime.operator.extendBudget(runId, delta, operator)` wraps that primitive with recovery-decision validation and a journaled operator identity; operator tooling should prefer it.

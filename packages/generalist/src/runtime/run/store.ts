@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- RunStore keeps one storage service contract. */
 import { Context, Effect, Schema, Stream, Option } from "effect"
 import type { BudgetLimits, Exhausted as RunBudgetExhausted } from "../../core/durable/run-budget.js"
 import type { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
@@ -37,6 +38,7 @@ import type {
   TreePolicyInvalid,
   AckInvalid,
   AckBeyondCommitted,
+  IllegalOperatorAction,
 } from "../errors.js"
 import type { Message } from "../messaging/message.js"
 import type { AgentName, DirectoryEntry } from "../execution/agent/directory.js"
@@ -98,6 +100,12 @@ import type {
   SessionNotFound,
   SessionSubscriberLagged,
 } from "../session/host.js"
+import type {
+  Journal as RecoveryJournal,
+  ResolveUnknownInput,
+  RetryInput,
+  WakeInput,
+} from "../execution/recovery/operator.js"
 export type {
   AdmitMessageError,
   AdmitMessageInput,
@@ -420,6 +428,22 @@ export interface Service {
   readonly resolveOperation: (
     input: ResolveOperationInput,
   ) => Effect.Effect<void, RunNotFound | OperationResolutionConflict | RuntimeUnavailable>
+  /** Read the normalized durable facts from which operator recovery is derived. */
+  readonly recoveryJournal: (runId: string) => Effect.Effect<RecoveryJournal, RunNotFound | RuntimeUnavailable>
+  readonly retryRecovery: (
+    input: RetryInput,
+  ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable>
+  readonly wakeRecovery: (
+    input: WakeInput,
+  ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable>
+  readonly extendBudgetRecovery: (input: {
+    readonly runId: string
+    readonly delta: BudgetLimits
+    readonly operator: string
+  }) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable>
+  readonly resolveUnknown: (
+    input: ResolveUnknownInput,
+  ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable>
   readonly claimExecution: (input: {
     readonly runId: string
     readonly ownerId: string

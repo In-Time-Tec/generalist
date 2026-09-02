@@ -1,8 +1,8 @@
-import { Effect, Layer, Schema } from "effect"
-import { dual } from "effect/Function"
+import { Effect, Function, Layer, Schema } from "effect"
 import { ActionableTaggedError, errorHint } from "./core/error-hint.js"
 import { Approvals, type Approved, type Denied } from "./core/policy/approvals.js"
 import { RuleStore, type Level, type RuleStoreError } from "./core/policy/permissions.js"
+import { IllegalOperatorAction } from "./runtime/errors.js"
 import { Runtime, type RespondApprovalError } from "./runtime/service.js"
 
 export {
@@ -96,34 +96,55 @@ export const layerDurable = <R>(options: DurableOptions<R>): Layer.Layer<Approva
     }),
   )
 
-export type ResolveError = ApprovalTokenInvalid | RespondApprovalError | RuleStoreError
+export type ResolveError = ApprovalTokenInvalid | RespondApprovalError | RuleStoreError | IllegalOperatorAction
 
 /** Resolve one exact durable approval through the active Runtime. */
 type ResolveEffect = Effect.Effect<void, ResolveError, Runtime | RuleStore>
 
-const resolveImpl = (token: string, decision: Approved | Denied): ResolveEffect =>
+const resolveImpl = (token: string, decision: Approved | Denied, operator?: string): ResolveEffect =>
   Effect.gen(function* () {
     const runId = yield* runIdFromToken(token)
+    const runtime = yield* Runtime
+    if (operator !== undefined) {
+      const explanation = yield* runtime.operator.explain(runId)
+      const legal = explanation.obligations.some(
+        (obligation) => obligation._tag === "AwaitApproval" && obligation.token === token,
+      )
+      if (!legal) {
+        return yield* IllegalOperatorAction.make({
+          runId,
+          decision: explanation.decision,
+          action: "resolveApproval",
+        })
+      }
+    }
     if (decision._tag === "Approved" && decision.remember !== undefined) {
       const rules = yield* RuleStore
       yield* rules.remember(decision.remember)
     }
-    const runtime = yield* Runtime
     if (decision._tag === "Approved") {
       return yield* runtime.respondApproval({
         runId,
         approvalId: token,
         decision: { _tag: "Approved" },
+        ...(operator === undefined ? undefined : { operator }),
       })
     }
     return yield* runtime.respondApproval({
       runId,
       approvalId: token,
       decision: decision.reason === undefined ? { _tag: "Denied" } : { _tag: "Denied", reason: decision.reason },
+      ...(operator === undefined ? undefined : { operator }),
     })
   })
 
 export const resolve: {
-  (decision: Approved | Denied): (token: string) => ResolveEffect
   (token: string, decision: Approved | Denied): ResolveEffect
-} = dual(2, resolveImpl)
+  (token: string, decision: Approved | Denied, options: { readonly operator: string }): ResolveEffect
+  (decision: Approved | Denied): (token: string) => ResolveEffect
+  (decision: Approved | Denied, options: { readonly operator: string }): (token: string) => ResolveEffect
+} = Function.dual(
+  (args) => Schema.is(Schema.String)(args[0]),
+  (token: string, decision: Approved | Denied, options?: { readonly operator: string }) =>
+    resolveImpl(token, decision, options?.operator),
+)

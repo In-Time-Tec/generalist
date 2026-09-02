@@ -71,6 +71,10 @@ Testing.runtimeDriver({
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
     "approval-suspend": { claim, recovery: "reclaim" },
+    "operator-explain": true,
+    "operator-retry": { claim },
+    "operator-resolve-unknown": { claim },
+    "operator-scan": { claim },
     runTree: { claim },
   },
 })
@@ -87,6 +91,10 @@ Testing.runtimeDriver({
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
     "approval-suspend": { claim, recovery: "rebuild" },
+    "operator-explain": true,
+    "operator-retry": { claim },
+    "operator-resolve-unknown": { claim },
+    "operator-scan": { claim },
     runTree: { claim },
   },
 })

@@ -80,6 +80,24 @@ export interface ApprovalSuspendCapability {
   readonly recovery: "rebuild" | "reclaim"
 }
 
+/** Read-only recovery projection conformance capability. */
+export type OperatorExplainCapability = true
+
+/** Safe-operation operator retry conformance capability. */
+export interface OperatorRetryCapability {
+  readonly claim: ClaimExecution
+}
+
+/** Unknown-outcome operator resolution conformance capability. */
+export interface OperatorResolveUnknownCapability {
+  readonly claim: ClaimExecution
+}
+
+/** Store-wide operator obligation scan conformance capability. */
+export interface OperatorScanCapability {
+  readonly claim: ClaimExecution
+}
+
 /** Multi-worker claim and fencing conformance capability. */
 export interface MultiWorkerClaimCapability<E = never> {
   readonly layer: Layer.Layer<Runtime | RunStore | RunClaims, E, never>
@@ -99,6 +117,10 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>
   readonly notificationRecovery?: NotificationRecoveryCapability
   readonly "approval-suspend"?: ApprovalSuspendCapability
+  readonly "operator-explain"?: OperatorExplainCapability
+  readonly "operator-retry"?: OperatorRetryCapability
+  readonly "operator-resolve-unknown"?: OperatorResolveUnknownCapability
+  readonly "operator-scan"?: OperatorScanCapability
 }
 
 /** Configuration for the authoritative Runtime driver conformance suites. */

@@ -55,9 +55,11 @@ export const resolveOperation: {
     operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
     const runs = new Map(state.runs)
     const { ownerId: _, ...withoutOwner } = run
-    const hasUnknown = [...operations.values()].some(
-      (operation) => operation.runId === input.runId && operation.status === "unknown",
-    )
+    const hasUnknown =
+      [...operations.values()].some((operation) => operation.runId === input.runId && operation.status === "unknown") ||
+      [...state.programOperations.values()].some(
+        (operation) => operation.runId === input.runId && operation.status === "unknown",
+      )
     let status: OperationRecord["status"] | "needs-resolution" | "cancelling" | "running" = "running"
     if (hasUnknown) status = "needs-resolution"
     else if (run.cancellationRequested) status = "cancelling"

@@ -12,6 +12,7 @@ import { registerAgentStart } from "./agent-start.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
 import { registerApprovalSuspend } from "./approval-suspend.js"
 import { registerHostSessions } from "./host-sessions.js"
+import { registerOperator } from "./operator.js"
 import { Suite, record } from "../report.js"
 import type {
   MultiWorkerClaimCapability,
@@ -470,5 +471,6 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
         open: (use) => provideLayer(options.layer, use),
       })
     }
+    registerOperator({ options, open: (use) => provide(options, use) })
   })
 }

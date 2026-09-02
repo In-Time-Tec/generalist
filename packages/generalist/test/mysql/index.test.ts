@@ -126,6 +126,10 @@ Testing.runtimeDriver({
     "start-by-agent": { claim: conformanceClaim },
     "idempotent-start": { claim: conformanceClaim },
     "unknown-agent-on-recovery": { claim: conformanceClaim },
+    "operator-explain": true,
+    "operator-retry": { claim: conformanceClaim },
+    "operator-resolve-unknown": { claim: conformanceClaim },
+    "operator-scan": { claim: conformanceClaim },
   },
 })
 

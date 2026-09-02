@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- the SQL store wires one storage service contract. */
 import { Context, Effect, Layer, Option, Semaphore, type Scope } from "effect"
 import { listRuns } from "./store/list.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { CursorExpired, RunNotFound } from "../errors.js"
+import { CursorExpired, IllegalOperatorAction, RunNotFound } from "../errors.js"
 import { RunStore, type Service as RunStoreService } from "../run/store.js"
+import { mapSqlError } from "./effect.js"
 import { SchemaMigrationFailed } from "./errors.js"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store/admit.js"
 import { extendBudget } from "./store/budget/index.js"
@@ -87,6 +89,14 @@ import {
 import { ExternalChildStore } from "../child/external/store.js"
 import { acknowledge, loadAcknowledged } from "./acknowledgement.js"
 import { make as makeHostSessionStore } from "./session/host.js"
+import {
+  appendAction as appendOperatorAction,
+  journal as recoveryJournal,
+  resolveUnknown as resolveUnknownOperation,
+  retry as retryRecovery,
+  wake as wakeRecovery,
+} from "./store/operation/operator.js"
+import { explain as explainRecovery } from "../execution/recovery/operator.js"
 import { RunClaims } from "./run/claims.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
@@ -246,7 +256,21 @@ const makeSqlStoreServices = <DriverError>(
           })
         },
         respond: (input) => locked(locks.run(input.runId), respond(transactionHub, input)),
-        respondApproval: (input) => locked(locks.run(input.runId), respondApproval(transactionHub, input)),
+        respondApproval: (input) =>
+          locked(
+            locks.run(input.runId),
+            respondApproval(transactionHub, input).pipe(
+              Effect.andThen(
+                input.operator === undefined
+                  ? Effect.void
+                  : appendOperatorAction(input.runId, input.operator, {
+                      _tag: "ResolveApproval",
+                      token: input.approvalId,
+                      decision: input.decision,
+                    }),
+              ),
+            ),
+          ),
         signal: (input) => locked(locks.run(input.runId), signal(transactionHub, input)),
         cancel: (input) => locked(locks.hierarchy(input.runId), cancel(transactionHub, input)),
         cancelSession: (input) =>
@@ -365,6 +389,60 @@ const makeSqlStoreServices = <DriverError>(
                   : resolveProgramOperation(input, driver.multiWorker ? "queued" : "running", driver.multiWorker),
               ),
               Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
+            ),
+          ),
+        recoveryJournal: (runId) => mapSqlError(run(recoveryJournal(runId))),
+        retryRecovery: (input) =>
+          mapSqlError(
+            locked(
+              locks.hierarchy(input.runId),
+              transactionHub
+                .touchRun(input.runId)
+                .pipe(
+                  Effect.andThen(retryRecovery(input, driver.multiWorker ? "queued" : "running", driver.multiWorker)),
+                ),
+            ),
+          ),
+        wakeRecovery: (input) =>
+          mapSqlError(
+            locked(
+              locks.hierarchy(input.runId),
+              transactionHub.touchRun(input.runId).pipe(Effect.andThen(wakeRecovery(transactionHub, input))),
+            ),
+          ),
+        extendBudgetRecovery: (input) =>
+          mapSqlError(
+            locked(
+              locks.run(input.runId),
+              Effect.gen(function* () {
+                const explanation = explainRecovery(yield* recoveryJournal(input.runId))
+                if (!explanation.obligations.some((decision) => decision._tag === "AwaitBudget")) {
+                  return yield* IllegalOperatorAction.make({
+                    runId: input.runId,
+                    decision: explanation.decision,
+                    action: "extendBudget",
+                  })
+                }
+                yield* extendBudget(transactionHub, input.runId, input.delta)
+                yield* appendOperatorAction(input.runId, input.operator, {
+                  _tag: "ExtendBudget",
+                  delta: input.delta,
+                })
+              }),
+            ),
+          ),
+        resolveUnknown: (input) =>
+          mapSqlError(
+            locked(
+              locks.hierarchy(input.runId),
+              transactionHub
+                .touchRun(input.runId)
+                .pipe(
+                  Effect.andThen(
+                    resolveUnknownOperation(input, driver.multiWorker ? "queued" : "running", driver.multiWorker),
+                  ),
+                  Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
+                ),
             ),
           ),
         claimExecution: (input) =>
