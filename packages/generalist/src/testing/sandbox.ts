@@ -82,21 +82,60 @@ const expectUnsupported = <A, R>(effect: Effect.Effect<A, SandboxError, R>, oper
     if (Schema.is(Unsupported)(failure)) expect(failure.operation).toBe(operation)
   })
 
+/** The command kind the suite drives a leaf through, chosen from its declared capabilities. */
+const primaryCommand = (sandbox: SandboxService): Command["_tag"] => {
+  if (sandbox.capabilities.commands.includes("TypeScript")) return "TypeScript"
+  if (sandbox.capabilities.commands.includes("JavaScriptModule")) return "JavaScriptModule"
+  return "Process"
+}
+
 const executeValue = (sandbox: SandboxService, source: string) =>
   Effect.gen(function* () {
-    if (sandbox.capabilities.commands.includes("TypeScript")) {
-      const result = yield* sandbox.exec({ _tag: "TypeScript", cellId: `cell-${++nextRequest}`, source })
-      return (yield* Schema.decodeUnknownEffect(CellResult)(result.value)).value
+    switch (primaryCommand(sandbox)) {
+      case "TypeScript": {
+        const result = yield* sandbox.exec({ _tag: "TypeScript", cellId: `cell-${++nextRequest}`, source })
+        return (yield* Schema.decodeUnknownEffect(CellResult)(result.value)).value
+      }
+      case "JavaScriptModule": {
+        const now = yield* Clock.currentTimeMillis
+        const request = moduleRequest(`export default () => (${source})`, now + 5_000)
+        const result = yield* sandbox.exec({ _tag: "JavaScriptModule", request, capabilities })
+        return (yield* Schema.decodeUnknownEffect(ProgramResult)(result.value)).output
+      }
+      case "Process": {
+        const result = yield* sandbox.exec({ _tag: "Process", command: "printf", arguments: [source] })
+        return result.stdout
+      }
     }
-    if (sandbox.capabilities.commands.includes("JavaScriptModule")) {
-      const now = yield* Clock.currentTimeMillis
-      const request = moduleRequest(`export default () => (${source})`, now + 5_000)
-      const result = yield* sandbox.exec({ _tag: "JavaScriptModule", request, capabilities })
-      return (yield* Schema.decodeUnknownEffect(ProgramResult)(result.value)).output
-    }
-    const result = yield* sandbox.exec({ _tag: "Process", command: "printf", arguments: [source] })
-    return result.stdout
   })
+
+/** A command that writes `alpha` to stdout, or `undefined` when the leaf's kind cannot stream output. */
+const streamingCommand = (sandbox: SandboxService): Command | undefined => {
+  switch (primaryCommand(sandbox)) {
+    case "TypeScript":
+      return { _tag: "TypeScript", cellId: `stream-${++nextRequest}`, source: "console.log('alpha'); 42" }
+    case "Process":
+      return { _tag: "Process", command: "printf", arguments: ["alpha\n"] }
+    case "JavaScriptModule":
+      return undefined
+  }
+}
+
+/** A command that never completes on its own, used to trip the wall-clock limit. */
+const hangingCommand = (sandbox: SandboxService, deadlineMillis: number): Command => {
+  switch (primaryCommand(sandbox)) {
+    case "TypeScript":
+      return { _tag: "TypeScript", cellId: `limit-${++nextRequest}`, source: "await new Promise(() => {})" }
+    case "Process":
+      return { _tag: "Process", command: "sleep", arguments: ["30"] }
+    case "JavaScriptModule":
+      return {
+        _tag: "JavaScriptModule",
+        request: moduleRequest("export default () => new Promise(() => {})", deadlineMillis),
+        capabilities,
+      }
+  }
+}
 
 const command = (tag: Command["_tag"]): Effect.Effect<Command> =>
   Effect.gen(function* () {
@@ -158,7 +197,8 @@ export const sandbox = <E>(options: Options<E>): void => {
       withProvider(options, (provider) =>
         Effect.gen(function* () {
           const service = yield* provider.acquire()
-          if (!service.capabilities.commands.includes("TypeScript")) {
+          const streaming = streamingCommand(service)
+          if (streaming === undefined) {
             const now = yield* Clock.currentTimeMillis
             const events = yield* Stream.runCollect(
               service.stream({
@@ -170,13 +210,7 @@ export const sandbox = <E>(options: Options<E>): void => {
             expect(Array.from(events)).toEqual([])
             return
           }
-          const events = yield* Stream.runCollect(
-            service.stream({
-              _tag: "TypeScript",
-              cellId: `stream-${++nextRequest}`,
-              source: "console.log('alpha'); 42",
-            }),
-          )
+          const events = yield* Stream.runCollect(service.stream(streaming))
           expect(Array.from(events).some((event) => event._tag === "Output" && event.text.includes("alpha"))).toBe(true)
         }),
       ),
@@ -223,12 +257,25 @@ export const sandbox = <E>(options: Options<E>): void => {
             yield* expectUnsupported(service.fork("missing"), "fork")
             return
           }
-          expect(service.capabilities.commands).toContain("TypeScript")
-          expect(yield* executeValue(service, "let sandboxCounter = 41; sandboxCounter")).toBe("41")
+          if (primaryCommand(service) === "TypeScript") {
+            expect(yield* executeValue(service, "let sandboxCounter = 41; sandboxCounter")).toBe("41")
+            const snapshotId = yield* service.snapshot
+            const fork = yield* service.fork(snapshotId)
+            expect(yield* executeValue(fork, "sandboxCounter += 1")).toBe("42")
+            expect(yield* executeValue(service, "sandboxCounter")).toBe("41")
+            return
+          }
+          // Without a stateful namespace, the filesystem is the state a snapshot must capture and a fork must isolate.
+          expect(service.capabilities.files).toBe(true)
+          const files = yield* service.files
+          yield* files.makeDirectory("conformance", { recursive: true })
+          yield* files.writeFileString("conformance/counter.txt", "41")
           const snapshotId = yield* service.snapshot
           const fork = yield* service.fork(snapshotId)
-          expect(yield* executeValue(fork, "sandboxCounter += 1")).toBe("42")
-          expect(yield* executeValue(service, "sandboxCounter")).toBe("41")
+          const forkFiles = yield* fork.files
+          expect(yield* forkFiles.readFileString("conformance/counter.txt")).toBe("41")
+          yield* forkFiles.writeFileString("conformance/counter.txt", "42")
+          expect(yield* files.readFileString("conformance/counter.txt")).toBe("41")
         }),
       ),
     )
@@ -251,21 +298,7 @@ export const sandbox = <E>(options: Options<E>): void => {
           if (!baseline.capabilities.limits.includes("wall-clock")) return
           const service = yield* provider.acquire({ limits: { wallClock: Duration.millis(25) } })
           const now = yield* Clock.currentTimeMillis
-          const failure = service.capabilities.commands.includes("TypeScript")
-            ? yield* service
-                .exec({
-                  _tag: "TypeScript",
-                  cellId: `limit-${++nextRequest}`,
-                  source: "await new Promise(() => {})",
-                })
-                .pipe(Effect.flip)
-            : yield* service
-                .exec({
-                  _tag: "JavaScriptModule",
-                  request: moduleRequest("export default () => new Promise(() => {})", now + 25),
-                  capabilities,
-                })
-                .pipe(Effect.flip)
+          const failure = yield* service.exec(hangingCommand(service, now + 25)).pipe(Effect.flip)
           expect(Schema.is(LimitExceeded)(failure)).toBe(true)
           if (Schema.is(LimitExceeded)(failure)) expect(failure.resource).toBe("wall-clock")
         }),
