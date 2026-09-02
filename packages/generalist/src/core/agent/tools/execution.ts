@@ -24,7 +24,7 @@ import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activa
 import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
 import { intercept } from "../../durable/driver/run.js"
-import { operationKey as makeOperationKey } from "../../durable/driver/interpreter.js"
+import { type DriverInterpreter, operationKey as makeOperationKey } from "../../durable/driver/interpreter.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
 import { applyToolOutcome } from "./checkpoint-operation.js"
 import { Exhausted } from "../../durable/run-budget.js"
@@ -212,11 +212,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     handoffExecution: ReturnType<typeof handoffDispatch> | undefined,
     requestExecutor: typeof ToolExecutor.Service | undefined,
     skillActivation: boolean,
-  ): Effect.Effect<
-    Outcome,
-    RunError,
-    ClosedServices<T, never> | ToolContext | import("../../durable/driver/interpreter.js").DriverInterpreter
-  > => {
+  ): Effect.Effect<Outcome, RunError, ClosedServices<T, never> | ToolContext | DriverInterpreter> => {
     if (skillActivation) return activateSkillOutcome(turn, call)
     if (handoffExecution !== undefined) return handoffExecution
     if (requestExecutor === undefined) return defaultExecute(request, registry)
@@ -252,29 +248,47 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     turn: number,
     call: AnyToolCall,
     outcome: Outcome,
-  ): Effect.Effect<Outcome, RunError, import("../../durable/driver/interpreter.js").DriverInterpreter> => {
+  ): Effect.Effect<Outcome, RunError, DriverInterpreter> => {
     if (outcome._tag === "Suspend") return Effect.succeed(outcome)
     const result = outcome._tag === "Success" ? outcome.result : outcome.failure
-    return applyToolResult({
-      runId,
-      agentName,
-      turn,
-      tool: call.name,
-      args: call.params,
-      call,
-      result,
-    }).pipe(
+    const input = { runId, agentName, turn, tool: call.name, args: call.params, call, result }
+    return applyToolResult(input).pipe(
       Effect.map((hook) => {
         if (hook.blocked !== undefined) return hookBlockedOutcome("ToolResult", hook.blocked)
-        const replaced = hook.decisions.some((decision) => decision._tag === "Replace")
-        if (!replaced) return outcome
-        if (outcome._tag === "Success") {
-          return { ...outcome, result: hook.input.result, encodedResult: hook.input.result }
-        }
-        return { ...outcome, failure: hook.input.result, encodedFailure: hook.input.result }
+        if (!hook.decisions.some((decision) => decision._tag === "Replace")) return outcome
+        const value = hook.input.result
+        return outcome._tag === "Success"
+          ? { ...outcome, result: value, encodedResult: value }
+          : { ...outcome, failure: value, encodedFailure: value }
       }),
     )
   }
+
+  const toolOutcome = (
+    turn: number,
+    call: AnyToolCall,
+    request: Request,
+    registry: Registry,
+    handoffExecution: ReturnType<typeof handoffDispatch> | undefined,
+    requestExecutor: typeof ToolExecutor.Service | undefined,
+    skillActivation: boolean,
+    operation: string,
+    blockedReason: string | undefined,
+  ) =>
+    blockedReason === undefined
+      ? memoizeRegistered({
+          registry,
+          name: call.name,
+          skillActivation,
+          handoff: handoffExecution !== undefined,
+          params: call.params,
+          run: options.invocation?.runId ?? sessionId,
+          operation,
+          execute: executionFor(turn, call, request, registry, handoffExecution, requestExecutor, skillActivation).pipe(
+            Effect.flatMap((outcome) => boundOutcome(call, outcome)),
+          ),
+        })
+      : Effect.succeed(hookBlockedOutcome("ToolCall", blockedReason))
 
   const executeApproved = (
     turn: number,
@@ -282,11 +296,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     request: Request,
     registry: Registry,
     blockedReason?: string,
-  ): Stream.Stream<
-    Event,
-    RunError,
-    ClosedServices<T, never> | import("../../durable/driver/interpreter.js").DriverInterpreter
-  > =>
+  ): Stream.Stream<Event, RunError, ClosedServices<T, never> | DriverInterpreter> =>
     Stream.concat(
       Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
       Stream.unwrap(
@@ -324,27 +334,16 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
           const invocationPath =
             handoffState === undefined ? [] : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-          const executionBase = (
-            blockedReason === undefined
-              ? memoizeRegistered({
-                  registry,
-                  name: call.name,
-                  skillActivation,
-                  handoff: handoffExecution !== undefined,
-                  params: call.params,
-                  run: options.invocation?.runId ?? sessionId,
-                  operation: durableOperationKey,
-                  execute: executionFor(
-                    turn,
-                    call,
-                    request,
-                    registry,
-                    handoffExecution,
-                    requestExecutor,
-                    skillActivation,
-                  ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome))),
-                })
-              : Effect.succeed(hookBlockedOutcome("ToolCall", blockedReason))
+          const executionBase = toolOutcome(
+            turn,
+            call,
+            request,
+            registry,
+            handoffExecution,
+            requestExecutor,
+            skillActivation,
+            durableOperationKey,
+            blockedReason,
           ).pipe(Effect.flatMap((outcome) => hookToolResult(request.agentName, turn, call, outcome)))
           const execution = intercept(
             {
@@ -415,11 +414,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     toolCallIndex: number,
     call: AnyToolCall,
     registry: Registry,
-  ): Stream.Stream<
-    Event,
-    RunError,
-    ClosedServices<T, never> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
-  > =>
+  ): Stream.Stream<Event, RunError, ClosedServices<T, never> | AuthorizationR | DriverInterpreter> =>
     Stream.unwrap(
       activeAgentName().pipe(
         Effect.map((agentName) =>
@@ -434,11 +429,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     toolCallIndex: number,
     call: AnyToolCall,
     result: PendingToolResult,
-  ): Effect.Effect<
-    PendingToolResult,
-    RunError,
-    ClosedServices<T, never> | import("../../durable/driver/interpreter.js").DriverInterpreter
-  > =>
+  ): Effect.Effect<PendingToolResult, RunError, ClosedServices<T, never> | DriverInterpreter> =>
     Effect.gen(function* () {
       const agentName = yield* activeAgentName()
       const request = { call, toolCallBatch, turn, toolCallIndex, agentName, sessionId }
