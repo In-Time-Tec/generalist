@@ -3,7 +3,7 @@ import { Effect, Schema, Stream } from "effect"
 import { LanguageModel, Prompt } from "effect/unstable/ai"
 import { make as makeAgent } from "../../core/agent/service.js"
 import { make as makeAddress } from "../../runtime/address.js"
-import { DuplicateAgent, UnknownAgent } from "../../runtime/errors.js"
+import { DuplicateAgent, IdempotencyConflict, RunIdConflict, UnknownAgent } from "../../runtime/errors.js"
 import { durableIdentity } from "../../runtime/executable/registered-agent.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { make as makeMessage } from "../../runtime/messaging/message.js"
@@ -25,6 +25,7 @@ const identity = (name: string, test: string) => {
   return {
     sessionId: `session:${prefix}`,
     idempotencyKey: prefix,
+    runId: `run:${prefix}`,
   }
 }
 
@@ -33,6 +34,70 @@ const completedResult = (sessionId: string, text: string): ExecutionResult => ({
   turns: 1,
   session: { sessionId, leafId: null },
 })
+
+/** Admission conformance: exact idempotent replay and caller-supplied Run identity. */
+export const registerAdmission = <LayerError, ClaimsLayerError>(input: {
+  readonly options: Options<LayerError, ClaimsLayerError>
+  readonly provide: Provide<LayerError>
+}) => {
+  const { options, provide } = input
+  it.effect("replays exact admission and rejects divergent idempotency", () =>
+    provide(({ runtime }) =>
+      Effect.gen(function* () {
+        const id = identity(options.name, "admission-idempotency")
+        const first = yield* runtime.send({
+          to: options.address,
+          sessionId: id.sessionId,
+          idempotencyKey: id.idempotencyKey,
+          prompt: "same payload",
+        })
+        const duplicate = yield* runtime.send({
+          to: options.address,
+          sessionId: id.sessionId,
+          idempotencyKey: id.idempotencyKey,
+          prompt: "same payload",
+        })
+        expect(duplicate).toEqual({ ...first, duplicate: true })
+        const conflict = yield* runtime
+          .send({
+            to: options.address,
+            sessionId: id.sessionId,
+            idempotencyKey: id.idempotencyKey,
+            prompt: "changed payload",
+          })
+          .pipe(Effect.flip)
+        expect(conflict).toBeInstanceOf(IdempotencyConflict)
+        if (Schema.is(IdempotencyConflict)(conflict)) expect(conflict.existingRunId).toBe(first.runId)
+      }),
+    ),
+  )
+
+  it.effect("preserves caller Run identity and rejects conflicting admission", () =>
+    provide(({ runtime }) =>
+      Effect.gen(function* () {
+        const id = identity(options.name, "admission-run-id")
+        const first = yield* runtime.send({
+          runId: id.runId,
+          to: options.address,
+          sessionId: id.sessionId,
+          idempotencyKey: id.idempotencyKey,
+          prompt: "caller identity",
+        })
+        expect(first.runId).toBe(id.runId)
+        const conflict = yield* runtime
+          .send({
+            runId: `${id.runId}:other`,
+            to: options.address,
+            sessionId: id.sessionId,
+            idempotencyKey: id.idempotencyKey,
+            prompt: "caller identity",
+          })
+          .pipe(Effect.flip)
+        expect(conflict).toBeInstanceOf(RunIdConflict)
+      }),
+    ),
+  )
+}
 
 const testModel = LanguageModel.make({
   generateText: () => Effect.succeed([{ type: "text" as const, text: "unused" }]),

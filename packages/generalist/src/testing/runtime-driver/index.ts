@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it } from "@effect/vitest"
-import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
-import { IdempotencyConflict, RunIdConflict } from "../../runtime/errors.js"
+import { Context, Effect, Layer, Option, Stream } from "effect"
 import { RunExecutor } from "../../runtime/execution/run-executor.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { RunStore } from "../../runtime/run/store.js"
@@ -8,7 +7,7 @@ import { Runtime } from "../../runtime/service.js"
 import { StaleClaim } from "../../runtime/sql/errors.js"
 import { RunClaims } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
-import { registerAgentStart } from "./agent-start.js"
+import { registerAdmission, registerAgentStart } from "./agent-start.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
 import { registerApprovalSuspend } from "./approval-suspend.js"
 import { registerHostSessions } from "./host-sessions.js"
@@ -112,65 +111,6 @@ const completedResult = (sessionId: string, text: string): ExecutionResult => ({
   turns: 1,
   session: { sessionId, leafId: null },
 })
-
-const registerAdmission = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>) => {
-  it.effect("replays exact admission and rejects divergent idempotency", () =>
-    provide(options, ({ runtime }) =>
-      Effect.gen(function* () {
-        const id = identity(options.name, "admission-idempotency")
-        const first = yield* runtime.send({
-          to: options.address,
-          sessionId: id.sessionId,
-          idempotencyKey: id.idempotencyKey,
-          prompt: "same payload",
-        })
-        const duplicate = yield* runtime.send({
-          to: options.address,
-          sessionId: id.sessionId,
-          idempotencyKey: id.idempotencyKey,
-          prompt: "same payload",
-        })
-        expect(duplicate).toEqual({ ...first, duplicate: true })
-        const conflict = yield* runtime
-          .send({
-            to: options.address,
-            sessionId: id.sessionId,
-            idempotencyKey: id.idempotencyKey,
-            prompt: "changed payload",
-          })
-          .pipe(Effect.flip)
-        expect(conflict).toBeInstanceOf(IdempotencyConflict)
-        if (Schema.is(IdempotencyConflict)(conflict)) expect(conflict.existingRunId).toBe(first.runId)
-      }),
-    ),
-  )
-
-  it.effect("preserves caller Run identity and rejects conflicting admission", () =>
-    provide(options, ({ runtime }) =>
-      Effect.gen(function* () {
-        const id = identity(options.name, "admission-run-id")
-        const first = yield* runtime.send({
-          runId: id.runId,
-          to: options.address,
-          sessionId: id.sessionId,
-          idempotencyKey: id.idempotencyKey,
-          prompt: "caller identity",
-        })
-        expect(first.runId).toBe(id.runId)
-        const conflict = yield* runtime
-          .send({
-            runId: `${id.runId}:other`,
-            to: options.address,
-            sessionId: id.sessionId,
-            idempotencyKey: id.idempotencyKey,
-            prompt: "caller identity",
-          })
-          .pipe(Effect.flip)
-        expect(conflict).toBeInstanceOf(RunIdConflict)
-      }),
-    ),
-  )
-}
 
 const registerRuntime = <LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
@@ -454,7 +394,7 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
     beforeAll(({}, task) => {
       Object.assign(task.meta, { generalistCertification: certification(options) })
     })
-    if (options.capabilities.admission === true) registerAdmission(options)
+    if (options.capabilities.admission === true) registerAdmission({ options, provide: (use) => provide(options, use) })
     if (options.capabilities.runtime !== undefined) registerRuntime(options, options.capabilities.runtime)
     if (options.capabilities["host-sessions"] !== undefined) {
       registerHostSessions({
