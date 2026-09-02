@@ -27,7 +27,7 @@ import type {
 } from "./contract.js"
 import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 import { registerChildRuns } from "./children/runs.js"
-import { registerSteering } from "./steering.js"
+import { registerSteering } from "./steering/recovery.js"
 
 export type * from "./contract.js"
 export * from "./model-response-fault.js"

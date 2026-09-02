@@ -12,7 +12,7 @@ import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../run/errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
 import { make as makeRegisteredAgents, type RegisteredAgents } from "../executable/registered-agent.js"
-import type { ExecutionContinuation } from "../run/steering.js"
+import type { ExecutionContinuation, SteeringEntry } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode.js"
@@ -55,6 +55,14 @@ import { RuntimeUnavailable } from "../errors.js"
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
+
+type SteeringQueue = NonNullable<ExecutionContinuation["queue"]>
+
+const continuationQueue = (continuation: ExecutionContinuation | undefined): SteeringQueue | undefined =>
+  continuation === undefined ? undefined : (continuation.queue ?? "steering")
+
+const belongsToQueue = (queue: SteeringQueue, policy: SteeringEntry["policy"]): boolean =>
+  queue === "followUp" ? policy === "enqueue" : policy !== "enqueue"
 
 const makeFor = (
   agents: RegisteredAgents,
@@ -174,9 +182,7 @@ const makeFor = (
                       if (budget === undefined) return
                       const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
                       const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuation?.prompt)
-                      const observedQueue = yield* Ref.make<"steering" | "followUp" | undefined>(
-                        continuation === undefined ? undefined : (continuation.queue ?? "steering"),
-                      )
+                      const observedQueue = yield* Ref.make(continuationQueue(continuation))
                       const activeContinuation = yield* Ref.make(continuation)
                       const bufferedEvents = yield* Ref.make<ReadonlyArray<DurableAgentLoopEvent>>(
                         continuation === undefined
@@ -195,9 +201,7 @@ const makeFor = (
                           const current = yield* Ref.get(observed)
                           if (current.length > 0) return []
                           const pending = yield* store.readSteering(claim)
-                          const entries = pending.filter((entry) =>
-                            queue === "followUp" ? entry.policy === "enqueue" : entry.policy !== "enqueue",
-                          )
+                          const entries = pending.filter((entry) => belongsToQueue(queue, entry.policy))
                           if (entries.length === 0) return []
                           yield* Ref.set(
                             observed,

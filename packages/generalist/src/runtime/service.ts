@@ -218,6 +218,12 @@ export interface RunHandle<Output> {
   ) => Effect.Effect<SteeringReceipt, RunSendError>
 }
 
+/** Durable admission for one existing Run. */
+export type RunSend = (
+  runId: string,
+  ...input: Parameters<RunHandle<unknown>["send"]>
+) => ReturnType<RunHandle<unknown>["send"]>
+
 /** Authoritative Runtime inspection with the latest zero-based turn and raw provider usage facts. */
 export interface RuntimeInspection extends RunInspection {
   readonly turn: number

@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import type { Options, Services, SteeringCapability } from "./contract.js"
+import type { Options, Services, SteeringCapability } from "../contract.js"
 
 type Prepare = <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<A, E>
 type Open<LayerError> = <A, E>(use: (services: Services) => Effect.Effect<A, E>) => Effect.Effect<A, E | LayerError>

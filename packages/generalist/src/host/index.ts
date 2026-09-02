@@ -1,6 +1,6 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context, typescript/no-unsafe-return -- Agent.Any intentionally hides invariant Agent parameters at the heterogeneous Host registry boundary; the distributive AgentDefinition/AgentServices types restore each configured Agent's exact contract. */
 import { Effect, Filter, Option, Schema, Stream, Types } from "effect"
-import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
+import { LanguageModel, Tool } from "effect/unstable/ai"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
 import { Hooks, type Declaration as HookDeclaration, type Service as HooksService } from "../hooks/index.js"
 import {
@@ -29,7 +29,6 @@ import {
 import type { Cursor } from "../runtime/cursor.js"
 import type { CreateSessionError, HostSession, SessionError, SessionEventsError } from "../runtime/session/host.js"
 import type { RunInspection } from "../runtime/run.js"
-import type { SteeringReceipt } from "../runtime/run/steering.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
 import type { Decision as ApprovalDecision } from "../runtime/operation/approval.js"
 import type { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
@@ -43,8 +42,7 @@ import {
   type RewindError,
   type RespondApprovalError,
   type RunHandle,
-  type RunSendError,
-  type RunSendOptions,
+  type RunSend,
   type StartError,
   type StartOptions,
 } from "../runtime/service.js"
@@ -131,11 +129,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     ) => Effect.Effect<HostRun<unknown>, StartError | SessionError | AgentNotRegistered | AgentInputInvalid>
     readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
     readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
-    readonly send: (
-      runId: string,
-      prompt: Prompt.Prompt | string,
-      options?: RunSendOptions,
-    ) => Effect.Effect<SteeringReceipt, RunSendError>
+    readonly send: RunSend
     readonly cancel: (runId: string, reason?: string) => Effect.Effect<void, CancelError>
     readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   }
