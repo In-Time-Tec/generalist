@@ -29,6 +29,20 @@ const program = Effect.gen(function* () {
 }).pipe(Effect.provide(AGUI.layer({ address: Address.make("agent:assistant") })), Effect.provide(runtimeLayer))
 ```
 
+See the runnable offline [plain-fetch AG-UI example](../../examples/ag-ui).
+
+## Implemented from the spec
+
+- `RunAgentInput` admission and exact-wait resume handling.
+- Run, step, text, reasoning, tool, result, custom progress, interrupt, error, and state snapshot events.
+- Schema validation for every projected event and subscriber recovery from an authoritative Runtime cursor.
+
+## Not implemented
+
+- A built-in AG-UI HTTP transport or CopilotKit client; the example owns a minimal SSE route and uses plain `fetch`.
+- Client-provided tools or system and developer authority.
+- Multimodal input, activities, message snapshots, state deltas, WebSocket, and binary transports.
+
 ## What runs
 
 ```text
@@ -75,6 +89,7 @@ TEXT_MESSAGE_END     messageId "run-1:1:text:0"
 - Interrupted normalized model content is projected before the later `RUN_ERROR`.
 - `RunWaiting` projects to `RUN_FINISHED` with an `interrupt` outcome; it is not a success.
 - `RunFailed`, `RunCancelled`, and `OperationUnknown` project to `RUN_ERROR` with distinct codes.
+- Each stream ends after emitting a wait, terminal Run event, or unresolved-operation error boundary.
 - Tool progress projects as a `CUSTOM` event named `generalist.tool.progress`.
 - Every projected event is validated by the AG-UI event schema.
 - Subscriber lag or an expired cursor emits `STATE_SNAPSHOT`, then resumes after the snapshot cursor.
@@ -82,5 +97,6 @@ TEXT_MESSAGE_END     messageId "run-1:1:text:0"
 
 ## Related
 
-- Source: `packages/generalist/src/interoperability/ag-ui/...`
+- Example: `examples/ag-ui`
+- Source: `packages/generalist/src/unstable/ag-ui/...`
 - Site: `/docs/reference/ag-ui`

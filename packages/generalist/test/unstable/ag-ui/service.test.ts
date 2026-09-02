@@ -45,6 +45,32 @@ const accepted = {
   address,
 }
 
+const waiting = {
+  ...accepted,
+  eventId: "client-run-1:1",
+  sequence: 1,
+  _tag: "RunWaiting" as const,
+  wait: {
+    waitId: "wait-1",
+    reason: { _tag: "ToolWait" as const },
+    status: "open" as const,
+    openedAt: "2026-08-03T00:00:01.000Z",
+  },
+}
+
+const runningInspection = (runId: string): Run.RunInspection => ({
+  runId,
+  status: "running",
+  executableRef: agent,
+  executableManifest: executable.manifest,
+  depth: 0,
+  treePolicy: TreePolicy.defaultTreePolicy,
+  waits: [],
+  lastSequence: 0,
+  durability: "ephemeral",
+  branches: [],
+})
+
 const runtimeLayer = (runtime: Runtime.Service) => Layer.succeed(Runtime.Runtime, runtime)
 
 const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime method")
@@ -85,7 +111,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     schedule: () => unused(),
     startExecution: () => unused(),
     admit: () => unused(),
-    activate: () => unused(),
+    activate: ({ runId }) => Effect.succeed(runningInspection(runId)),
     fork: () => unused(),
     rewind: () => unused(),
     send: rootSend(() => unused()),
@@ -133,6 +159,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
 describe("AGUI", () => {
   {
     let sent: Runtime.SendInput | undefined
+    let activatedRunId: string | undefined
     const runtime = mockRuntime({
       send: rootSend((value) => {
         sent = value
@@ -143,6 +170,10 @@ describe("AGUI", () => {
           duplicate: false,
         })
       }),
+      activate: ({ runId }) => {
+        activatedRunId = runId
+        return Effect.succeed(runningInspection(runId))
+      },
       events: () => Stream.make(accepted),
     })
     layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
@@ -160,6 +191,7 @@ describe("AGUI", () => {
               prompt: "hello",
               to: address,
             })
+            expect(activatedRunId).toBe("client-run-1")
             expect([...events].map((event) => event.type)).toEqual(["RUN_STARTED"])
           }),
         )
@@ -199,6 +231,27 @@ describe("AGUI", () => {
             Reflect.deleteProperty(malformedInput, "threadId")
             const malformedFailure = yield* service.run(malformedInput).pipe(Stream.runCollect, Effect.flip)
             expect(malformedFailure._tag).toBe("generalist/ag-ui/InputMalformed")
+          }),
+        )
+      },
+    )
+  }
+
+  {
+    const runtime = mockRuntime({
+      send: rootSend(() =>
+        Effect.succeed({ runId: "client-run-1", messageId: "message-1", acceptedSequence: 0, duplicate: false }),
+      ),
+      events: () => Stream.make(accepted, waiting).pipe(Stream.concat(Stream.never)),
+    })
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+      "ends each stream at an interaction or terminal boundary",
+      (it) => {
+        it.effect("ends each stream at an interaction or terminal boundary", () =>
+          Effect.gen(function* () {
+            const service = yield* AGUI.AGUI
+            const events = yield* service.run(input()).pipe(Stream.runCollect, Effect.timeout("1 second"))
+            expect([...events].map((event) => event.type)).toEqual(["RUN_STARTED", "RUN_FINISHED"])
           }),
         )
       },

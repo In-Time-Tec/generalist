@@ -22,6 +22,20 @@ const handler = Effect.gen(function* () {
 }).pipe(Effect.provide(A2A.layer(deployment)), Effect.provide(runtimeLayer))
 ```
 
+See the runnable offline [two-host A2A example](../../examples/a2a).
+
+## Implemented from the spec
+
+- A2A v1 message send and streaming through the SDK `DefaultRequestHandler`.
+- Runtime-backed task get, list, cancel, and resubscribe behavior.
+- Text and JSON user input, task statuses, completion artifacts, waits, and approval responses.
+
+## Not implemented
+
+- A built-in HTTP transport mount; applications mount the handler in their chosen A2A SDK transport.
+- Push notification delivery and authenticated extended agent cards.
+- File, URL, audio, video, and other non-text input parts.
+
 ## What runs
 
 ```text
@@ -83,5 +97,6 @@ cancelled → CANCELED
 
 ## Related
 
-- Source: `packages/generalist/src/interoperability/a2a/...`
+- Example: `examples/a2a`
+- Source: `packages/generalist/src/unstable/a2a/...`
 - Site: `/docs/reference/a2a`

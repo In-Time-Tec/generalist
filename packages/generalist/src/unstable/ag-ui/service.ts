@@ -4,6 +4,7 @@ import { origin, type Cursor } from "../../runtime/cursor.js"
 import type { Address } from "../../runtime/address.js"
 import {
   Runtime,
+  type ActivateError,
   type EventsError,
   type InspectError,
   type Service as RuntimeService,
@@ -13,6 +14,7 @@ import {
   type SessionEntryError,
 } from "../../runtime/service.js"
 import { CursorExpired, SubscriberLagged } from "../../runtime/errors.js"
+import type { RunEvent } from "../../runtime/run/event.js"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
 import { project, projectModelResponse, stateSnapshot } from "./projection.js"
 
@@ -29,6 +31,7 @@ export type RunError =
   | EventInvalid
   | ValueNotSerializable
   | SendError
+  | ActivateError
   | EventsError
   | RespondError
   | RespondApprovalError
@@ -73,6 +76,13 @@ const finalPrompt = (
   )
 }
 
+const isBoundary = (event: RunEvent): boolean =>
+  event._tag === "RunWaiting" ||
+  event._tag === "RunCompleted" ||
+  event._tag === "RunFailed" ||
+  event._tag === "RunCancelled" ||
+  event._tag === "OperationUnknown"
+
 const recover = (
   runtime: RuntimeService,
   runId: string,
@@ -80,6 +90,7 @@ const recover = (
   cursor: Cursor,
 ): Stream.Stream<AGUIEvent, RunError> =>
   runtime.events({ runId, cursor }).pipe(
+    Stream.takeUntil(isBoundary),
     Stream.mapEffect((event) =>
       event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted"
         ? runtime
@@ -161,7 +172,7 @@ export const layer = (options: LayerOptions): Layer.Layer<AGUI, never, Runtime> 
               }
             } else {
               const final = yield* finalPrompt(input)
-              yield* runtime.send({
+              const receipt = yield* runtime.send({
                 runId: input.runId,
                 to: options.address,
                 sessionId: input.threadId,
@@ -169,6 +180,7 @@ export const layer = (options: LayerOptions): Layer.Layer<AGUI, never, Runtime> 
                 messageId: final.messageId,
                 prompt: final.prompt,
               })
+              yield* runtime.activate({ runId: receipt.runId })
             }
             return recover(runtime, input.runId, input.threadId, cursor)
           }),
