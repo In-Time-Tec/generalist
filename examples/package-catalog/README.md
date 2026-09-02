@@ -1,9 +1,9 @@
 # Package catalog
 
-This example shows how to resolve the workspace reference package through an npm-compatible local registry. The repository tests serve `@in-time-tec/generalist-skills-example` from an in-memory local registry fixture and exercise the same catalog configuration.
+This example installs `@in-time-tec/generalist-skills-example` from npm, locks the exact version and archive integrity under `.generalist/`, and runs an agent whose toolkit comes from the installed package. A scripted language model calls the package's `package_echo` tool so the run is deterministic.
 
-```sh
-bun run typecheck
+```bash
+bun --cwd examples/package-catalog start
 ```
 
-The catalog installs package instructions and skills, opts into its tools, and uses the package toolkit with a typed agent.
+The reference package source lives at `examples/packages/generalist-skills-example`. Until it is published, point `npmRegistryUrl` at a local registry that serves it.

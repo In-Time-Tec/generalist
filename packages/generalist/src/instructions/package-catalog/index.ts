@@ -2,7 +2,6 @@ import { Context, Crypto, Effect, Encoding, FileSystem, Layer, Path, PlatformErr
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import type { Service as SkillService, Skill } from "../../core/context/skill-catalog.js"
-import { type ToolExecutor, layerToolkit as toolExecutorLayerToolkit } from "../../core/tools/tool-executor.js"
 import type { Provider } from "../providers.js"
 import { parseDocument } from "../skills/document.js"
 import { extractArchive } from "./archive.js"
@@ -46,7 +45,8 @@ export interface Service {
   readonly instructions: ReadonlyArray<Provider>
   readonly skills: SkillService
   readonly toolkit: Toolkit.Toolkit<Record<string, PackageTool>>
-  readonly executorLayer: Layer.Layer<ToolExecutor>
+  /** Every installed package's tool handlers; provide it wherever the toolkit runs. */
+  readonly handlers: Layer.Layer<Tool.Handler<string>>
 }
 
 /** @experimental */
@@ -270,21 +270,28 @@ const cachePackage = Effect.fn("PackageCatalog.cachePackage")(function* (
     yield* fs.writeFile(archivePath, archive).pipe(Effect.mapError((error) => platformError(archivePath, error)))
   }
   if (!(yield* fs.exists(packageDir).pipe(Effect.mapError((error) => platformError(packageDir, error))))) {
-    const temporary = yield* Effect.acquireRelease(
-      fs
-        .makeTempDirectory({ directory: cacheDir, prefix: "extract-" })
-        .pipe(Effect.mapError((error) => platformError(cacheDir, error))),
-      (directory) =>
-        fs.exists(directory).pipe(
-          Effect.flatMap((exists) => (exists ? fs.remove(directory, { recursive: true }) : Effect.void)),
-          Effect.ignore,
-        ),
-    )
-    yield* extractArchive(fs, path, entry.specifier, temporary, archive)
-    yield* fs.rename(temporary, packageDir).pipe(Effect.mapError((error) => platformError(packageDir, error)))
+    yield* extractInto(fs, path, cacheDir, packageDir, entry.specifier, archive)
   }
   return packageDir
 })
+
+const extractInto = Effect.fn("PackageCatalog.extractInto")(function* (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  cacheDir: string,
+  packageDir: string,
+  specifier: string,
+  archive: Uint8Array,
+) {
+  const temporary = yield* Effect.acquireRelease(
+    fs
+      .makeTempDirectory({ directory: cacheDir, prefix: "extract-" })
+      .pipe(Effect.mapError((error) => platformError(cacheDir, error))),
+    (directory) => fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
+  )
+  yield* extractArchive(fs, path, specifier, temporary, archive)
+  yield* fs.rename(temporary, packageDir).pipe(Effect.mapError((error) => platformError(packageDir, error)))
+}, Effect.scoped)
 
 const globExpression = (pattern: string): RegExp => {
   let expression = "^"
@@ -437,12 +444,7 @@ const make = Effect.fn("PackageCatalog.make")(function* (options: Options) {
   }
   const byName = new Map(skills.map((skill) => [skill.name, skill]))
   const toolkit = Toolkit.make(...tools)
-  const [firstHandler, ...remainingHandlers] = handlerLayers
-  const executor: Layer.Layer<ToolExecutor, never, Tool.Handler<string>> = toolExecutorLayerToolkit(toolkit)
-  const executorLayer =
-    firstHandler === undefined
-      ? toolExecutorLayerToolkit(Toolkit.empty)
-      : executor.pipe(Layer.provide(remainingHandlers.reduce((left, right) => Layer.merge(left, right), firstHandler)))
+  const handlers: Layer.Layer<Tool.Handler<string>> = Layer.mergeAll(Layer.empty, ...handlerLayers)
   if (writeLock) {
     yield* fs.makeDirectory(path.dirname(lockPath), { recursive: true }).pipe(
       Effect.flatMap(() => Schema.encodeEffect(lockCodec)({ version: 1, packages: entries })),
@@ -457,7 +459,7 @@ const make = Effect.fn("PackageCatalog.make")(function* (options: Options) {
       get: (name) => Effect.succeed(byName.get(name)),
     },
     toolkit,
-    executorLayer,
+    handlers,
   })
 })
 

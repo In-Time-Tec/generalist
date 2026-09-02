@@ -135,10 +135,14 @@ describe("PackageCatalog", () => {
         expect(catalog.instructions.map((provider) => provider.id)).toEqual([`${packageName}:AGENTS.md`])
         expect((yield* catalog.skills.all).map((skill) => skill.name)).toEqual(["review"])
         expect(Object.keys(catalog.toolkit.tools)).toEqual(["package_echo"])
-        expect(Layer.isLayer(catalog.executorLayer)).toBe(true)
         expect(requests).toEqual([`${registry}/${encodeURIComponent(packageName)}`, tarball])
 
-        const toolContext = yield* Layer.build(Layer.merge(catalog.executorLayer, ToolContext.layerDefault))
+        const toolContext = yield* Layer.build(
+          Layer.merge(
+            ToolExecutor.layerToolkit(catalog.toolkit).pipe(Layer.provide(catalog.handlers)),
+            ToolContext.layerDefault,
+          ),
+        )
         const executor = Context.get(toolContext, ToolExecutor.ToolExecutor)
         const call = AiResponse.toolCallPart<"package_echo", { readonly text: string }>({
           id: "package-echo-1",

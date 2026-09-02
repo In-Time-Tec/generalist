@@ -13,7 +13,7 @@ const packages = PackageCatalog.layer({
 })
 ```
 
-The service exposes `instructions`, `skills`, `toolkit`, and `executorLayer`. Compose the instruction and skill values with `Instructions.layer` and `SkillCatalog.layer`, provide `executorLayer` to the agent runtime, and pass `catalog.toolkit` to `Agent.make`. Tool calls then follow the normal Generalist authorization path through `Permissions` and `Approvals`.
+The service exposes `instructions`, `skills`, `toolkit`, and `handlers`. Compose the instruction and skill values with `Instructions.layer` and `SkillCatalog.layer`, pass `catalog.toolkit` to `Agent.make`, and provide `catalog.handlers` where the agent runs. Tool calls then follow the normal Generalist authorization path through `Permissions` and `Approvals`.
 
 Tools are disabled by default. Both the package manifest's `tools` path and `allowTools: true` are required before Generalist imports executable package code.
 
