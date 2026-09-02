@@ -75,7 +75,9 @@ layer(Layer.merge(bunLayer, FetchHttpClient.layer), { excludeTestServices: true,
           yield* fileSystem.makeDirectory(storage)
           yield* Effect.tryPromise(() =>
             build({
-              entryPoints: [path.join(repositoryRoot, "packages/generalist/test/unstable/cloudflare/workerd/worker.ts")],
+              entryPoints: [
+                path.join(repositoryRoot, "packages/generalist/test/unstable/cloudflare/workerd/worker.ts"),
+              ],
               bundle: true,
               format: "esm",
               logLevel: "silent",
