@@ -315,6 +315,14 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 )`,
   `CREATE INDEX IF NOT EXISTS generalist_external_child_placements_parent_idx
     ON generalist_external_child_placements(parent_run_id, settlement_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS generalist_permission_rules (
+  scope TEXT NOT NULL,
+  pattern TEXT NOT NULL,
+  level TEXT NOT NULL,
+  reason TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (scope, pattern)
+)`,
 ]
 
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(

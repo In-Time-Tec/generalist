@@ -1,7 +1,7 @@
 import { Cause, Context, Effect, Layer, Schema } from "effect"
 import type { Prompt, Response, Tool } from "effect/unstable/ai"
 import type { ApprovalRequest } from "../agent/event.js"
-import { PermissionError, RuleStore, evaluateWithRules } from "../policy/permissions.js"
+import { RuleStore, evaluateWithRules, type RuleStoreError } from "../policy/permissions.js"
 
 type Approvals = import("../policy/approvals.js").Service
 type PendingApproval = import("../policy/approvals.js").Pending
@@ -71,8 +71,14 @@ export interface Options {
 }
 
 const deny = (message: string): Deny => ({ _tag: "Deny", error: PermissionDenied.make({ message }) })
-const authorizationError = (error: PermissionError): AuthorizationError =>
-  AuthorizationError.make({ message: error.message, cause: error })
+const authorizationError = (error: RuleStoreError): AuthorizationError =>
+  AuthorizationError.make({
+    message:
+      error._tag === "generalist/core/PermissionError"
+        ? error.message
+        : `Invalid permission rule file at ${error.path}: ${error.issues}`,
+    cause: error,
+  })
 
 const approvalRequired = (request: Request): Effect.Effect<boolean> => {
   const needsApproval = request.tool?.needsApproval

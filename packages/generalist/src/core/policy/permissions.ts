@@ -1,16 +1,20 @@
 import { Context, Effect, Layer, Option, Ref, Schema } from "effect"
 import { dual } from "effect/Function"
 import type { AccessRequest } from "../tools/tool-authorization.js"
+import { PermissionError, RuleStore, type Level, type Rule, type RuleStoreError } from "./rule-store.js"
 
-/** @experimental What a matched permission rule grants. */
-export type Level = "allow" | "deny" | "ask"
-
-/** @experimental One ordered permission rule. */
-export interface Rule {
-  readonly pattern: string
-  readonly level: Level
-  readonly reason?: string
-}
+export {
+  InvalidRuleFile,
+  PermissionError,
+  RuleFile,
+  RuleSchema,
+  RuleStore,
+  type Level,
+  type Rule,
+  type RuleStoreError,
+} from "./rule-store.js"
+export { layerRuleStoreFile, type RuleStoreFileOptions } from "./rule-store-file.js"
+export { layerRuleStoreSql, type RuleStoreSqlOptions } from "./rule-store-sql.js"
 
 /** @experimental Ordered permission ruleset. */
 export interface Ruleset {
@@ -38,11 +42,6 @@ export interface Ask {
 /** @experimental Resolved policy decision for one tool call. */
 export type Decision = Allow | Deny | Ask
 
-/** @experimental Permission service failure. */
-export class PermissionError extends Schema.TaggedError<PermissionError>()("generalist/core/PermissionError", {
-  message: Schema.String,
-}) {}
-
 /** @experimental Permission policy service boundary. */
 export interface Service {
   readonly evaluate: (request: AccessRequest) => Effect.Effect<Decision, PermissionError>
@@ -50,15 +49,6 @@ export interface Service {
 
 /** @experimental */
 export class Permissions extends Context.Service<Permissions, Service>()("generalist/core/policy/permissions") {}
-
-/** @experimental */
-export class RuleStore extends Context.Service<
-  RuleStore,
-  {
-    readonly remember: (rule: Rule) => Effect.Effect<void, PermissionError>
-    readonly rules: Effect.Effect<ReadonlyArray<Rule>, PermissionError>
-  }
->()("generalist/core/policy/permissions/RuleStore") {}
 
 const escapeRegExp = (value: string): string => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
 
@@ -193,11 +183,11 @@ const decisionFor = (ruleset: Ruleset, request: AccessRequest): Decision => {
 
 /** @experimental Evaluate a base policy with remembered rules as a last-match overlay. */
 export const evaluateWithRules: {
-  (store: RuleStore["Service"], request: AccessRequest): (base: Service) => Effect.Effect<Decision, PermissionError>
-  (base: Service, store: RuleStore["Service"], request: AccessRequest): Effect.Effect<Decision, PermissionError>
+  (store: RuleStore["Service"], request: AccessRequest): (base: Service) => Effect.Effect<Decision, RuleStoreError>
+  (base: Service, store: RuleStore["Service"], request: AccessRequest): Effect.Effect<Decision, RuleStoreError>
 } = dual(
   3,
-  (base: Service, store: RuleStore["Service"], request: AccessRequest): Effect.Effect<Decision, PermissionError> =>
+  (base: Service, store: RuleStore["Service"], request: AccessRequest): Effect.Effect<Decision, RuleStoreError> =>
     Effect.gen(function* () {
       const baseDecision = yield* base.evaluate(request)
       if (baseDecision._tag === "Deny") return baseDecision
