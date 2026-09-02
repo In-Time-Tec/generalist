@@ -92,7 +92,9 @@ export interface Service {
     readonly key: string
     readonly origin?: ChildOrigin
   }) => Effect.Effect<AdmitReceipt, AdmitChildError>
-  readonly listDirect: (parentRunId: string) => Effect.Effect<ReadonlyArray<ChildInspection>, ChildLookupError>
+  readonly listDirect: (
+    parentRunId: string,
+  ) => Effect.Effect<ReadonlyArray<ChildInspection>, RunNotFound | RuntimeUnavailable>
   readonly inspect: (input: {
     readonly parentRunId: string
     readonly childRunId: string

@@ -21,8 +21,15 @@ import { DriverError, DriverStateInvalid } from "../durable/service.js"
 import { childEnd as applyChildEnd, childStart as applyChildStart } from "./lifecycle/hooks.js"
 import type { HookFailed } from "../../hooks/index.js"
 import { ToolContext } from "../tools/tool-context.js"
+import { make as makeFanOut } from "./tool/fan-out.js"
 
 export { RegistrationError }
+export {
+  type FanOutTool,
+  type Member as FanOutMember,
+  type Options as FanOutOptions,
+  type Parameters as FanOutParameters,
+} from "./tool/fan-out.js"
 
 type TextAgent<
   Tools extends Record<string, Tool.Any>,
@@ -382,3 +389,6 @@ export const asTool: {
     >(tool, name, parameters, handler)
   },
 )
+
+/** Declare a model-callable fan-out over an exact set of child Agents. */
+export const fanOut: typeof makeFanOut = makeFanOut

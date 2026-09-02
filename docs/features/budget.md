@@ -25,7 +25,7 @@ const program = Effect.gen(function* () {
 
 Budget exhaustion is not a run failure. The run enters `waiting` with the suspension `{ _tag: "BudgetExhausted", budget }`. `TurnPolicy` receives the same remaining numeric limits as `info.budget` before a follow-up turn.
 
-Children inherit a reservation from the parent's remaining budget before admission. Active reservations are unavailable to the parent. Settlement releases the unused reservation; consumed child resources remain charged to the parent. Fan-out placement, rather than the child agent, chooses each reservation.
+Children inherit a reservation from the parent's remaining budget before admission. Active reservations are unavailable to the parent. Settlement releases the unused reservation; consumed child resources remain charged to the parent. For `AgentTool.fanOut`, each admitted member reserves one child slot and a share of every available resource divided by the tool's `maxChildren`, even when a call starts fewer members. A member's optional `budget` may narrow but never widen that share. The reservation, usage, and refund are all projected from journal facts after restart.
 
 `runtime.extendBudget(runId, delta)` is the low-level top-up primitive. It journals the delta and resumes a run waiting specifically on budget exhaustion. `runtime.operator.extendBudget(runId, delta, operator)` wraps that primitive with recovery-decision validation and a journaled operator identity; operator tooling should prefer it.
 

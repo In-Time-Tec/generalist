@@ -36,6 +36,7 @@ import { make as makeMessage } from "./messaging/message.js"
 import { narrow as narrowRegistrations } from "./executable/registration.js"
 import { normalizePrompt } from "./memory/prompt.js"
 import { supportsCancellation } from "../core/tools/tool-executor-cancellation.js"
+import { withoutFanOut } from "../core/agent/tool/fan-out.js"
 
 const SelectionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
 const SelectionIds = Schema.Array(SelectionId).pipe(Schema.check(Schema.isMaxLength(64)))
@@ -457,7 +458,7 @@ const makeExecutor = <
     return Effect.flatMap(Effect.context<ToolContext>(), (context) =>
       Effect.scoped(
         Effect.flatMap(Layer.build(options.environment), (environment) =>
-          executeToolkit(options.agent.toolkit, request).pipe(
+          executeToolkit(withoutFanOut(options.agent.toolkit), request).pipe(
             Effect.provideContext(context),
             Effect.provideContext(environment),
           ),

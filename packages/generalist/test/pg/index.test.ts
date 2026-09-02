@@ -179,6 +179,7 @@ Testing.runtimeDriver({
     "approval-suspend": { claim, recovery: "rebuild" },
     "await-event": { claim, recovery: "rebuild" },
     schedules: { definition: scheduleDefinition, recovery: "rebuild" },
+    "child-runs": { claim, recovery: "rebuild" },
     "operator-explain": true,
     "operator-retry": { claim },
     "operator-resolve-unknown": { claim },

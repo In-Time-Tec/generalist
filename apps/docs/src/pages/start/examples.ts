@@ -45,7 +45,7 @@ export const examples = definePage({
         ],
         [
           [code("multi-agent")],
-          ["Same-process ", code("Handoff.fanOut"), " with two child agents sharing a local model layer"],
+          ["Typed ", code("Agent.fanOut"), " with two child agents and the deterministic provider"],
           [code("bun --cwd examples/multi-agent start")],
         ],
         [

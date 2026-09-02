@@ -1,2 +1,2 @@
-finished: Plan the work
-finished: Review the work
+deterministic child result
+deterministic child result

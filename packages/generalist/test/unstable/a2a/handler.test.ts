@@ -257,7 +257,14 @@ const makeRuntime = (acceptedSequence = 0) => {
     cancelSession: () => Effect.die("not used"),
     awaitSessionTerminal: () => Effect.die("not used"),
     inspect: (runId) =>
-      Effect.succeed({ ...inspection(runId, runs.get(runId)!), turn: 0, usage: [], budget: {}, gates: [] }),
+      Effect.succeed({
+        ...inspection(runId, runs.get(runId)!),
+        turn: 0,
+        usage: [],
+        budget: {},
+        gates: [],
+        children: [],
+      }),
     extendBudget: () => Effect.die("not used"),
   }
   return { runtime, runs, sentRunIds, observedCursors }

@@ -27,7 +27,7 @@ import { narrow } from "../../../executable/registration.js"
 import { activeChildCount } from "../child/capacity.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted, type BudgetLimits } from "../../../../core/durable/run-budget.js"
-import { split } from "../../../budget/state.js"
+import { narrowGrant, split } from "../../../budget/state.js"
 const fanOutAdmittedEvent = (input: {
   readonly fanOutId: string
   readonly memberCount: number
@@ -290,11 +290,29 @@ export const admitFanOut: {
     if (available.children !== undefined && available.children < members.length) {
       return yield* Exhausted.make({ budget: "children", requested: members.length, remaining: available.children })
     }
-    const memberBudget = split(members.length)(childGrant(available, members.length))
+    const memberBudget = split(input.budgetDivisor ?? members.length)(childGrant(available, members.length))
+    const memberBudgets: Array<BudgetLimits> = []
+    for (const member of members) {
+      const narrowed = narrowGrant(memberBudget, member.budget)
+      if (narrowed === undefined) {
+        return yield* FanOutInvalid.make({
+          message: `fan-out member '${member.key}' budget exceeds its reserved share`,
+        })
+      }
+      memberBudgets.push(narrowed)
+    }
     let next: MemoryState = state
     const memberResults: Array<FanOutMemberResult> = []
     for (const member of members) {
-      const [memberResult, memberState] = yield* addMember(next, parent, member, input, depth, readyCount, memberBudget)
+      const [memberResult, memberState] = yield* addMember(
+        next,
+        parent,
+        member,
+        input,
+        depth,
+        readyCount,
+        memberBudgets[member.ordinal]!,
+      )
       memberResults.push(memberResult)
       next = memberState
     }

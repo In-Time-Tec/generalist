@@ -1,6 +1,6 @@
 # Multi-Agent
 
-Run same-process `Handoff.fanOut` with two child agents and a shared local model layer.
+Run two typed child agents concurrently with `Agent.fanOut` and the credential-free deterministic provider.
 
 ```bash
 bun --cwd examples/multi-agent start

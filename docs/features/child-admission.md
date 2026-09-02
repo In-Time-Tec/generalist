@@ -1,6 +1,6 @@
 # Child admission
 
-Child admission durably creates a direct child Run and immediately returns its handle, never its outcome. The admission identity combines parent, tool call, optional origin, and key so retries recover the same child.
+Child admission durably creates a direct child Run and immediately returns its handle, never its outcome. The admission identity combines parent, tool call, optional origin, and key so retries recover the same child. `AgentTool.fanOut` uses the existing grouped admission and settlement journal rather than introducing another child representation.
 
 ## Usage
 

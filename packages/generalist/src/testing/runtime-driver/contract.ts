@@ -98,6 +98,13 @@ export interface SchedulesCapability {
   readonly recovery: "rebuild" | "reclaim"
 }
 
+/** Durable Agent fan-out recovery and journal-budget conformance capability. */
+export interface ChildRunsCapability {
+  readonly claim: ClaimExecution
+  /** Persistent drivers rebuild their Runtime; process-memory drivers reclaim through a fresh owner. */
+  readonly recovery: "rebuild" | "reclaim"
+}
+
 /** Read-only recovery projection conformance capability. */
 export type OperatorExplainCapability = true
 
@@ -138,6 +145,7 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly "approval-suspend"?: ApprovalSuspendCapability
   readonly "await-event"?: AwaitEventCapability
   readonly schedules?: SchedulesCapability
+  readonly "child-runs"?: ChildRunsCapability
   readonly "operator-explain"?: OperatorExplainCapability
   readonly "operator-retry"?: OperatorRetryCapability
   readonly "operator-resolve-unknown"?: OperatorResolveUnknownCapability

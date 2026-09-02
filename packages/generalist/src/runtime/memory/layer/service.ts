@@ -56,6 +56,7 @@ import { Invalid as BudgetInvalid, make as makeBudget } from "../../../core/dura
 import { generateId } from "../../../core/model/telemetry/events.js"
 import { WakeEvent } from "../../../core/agent/tools/wake-event.js"
 import { WakeEventInvalid } from "../../execution/trigger/wake.js"
+import { make as makeChildAdmission } from "../../child/admission.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
@@ -71,6 +72,7 @@ const makeRuntimeWith = (
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
+    const childAdmission = makeChildAdmission(store)
     const policy = MessagingPolicy.make(options.messagingPolicy ?? {})
     const bounds = { ...defaultBounds, ...options.mailboxBounds }
     const addresses = new Map<
@@ -574,14 +576,15 @@ const makeRuntimeWith = (
       resolveOperation: store.resolveOperation,
       extendBudget: extendRunBudget,
       inspect: (runId) =>
-        Effect.all([store.snapshot(runId), store.loadExecution(runId)]).pipe(
-          Effect.map(([snapshot, execution]) => {
+        Effect.all([store.snapshot(runId), store.loadExecution(runId), childAdmission.listDirect(runId)]).pipe(
+          Effect.map(([snapshot, execution, children]) => {
             const inspection = {
               ...snapshot.run,
               turn: snapshot.turn,
               usage: snapshot.usage,
               budget: snapshot.budget,
               gates: snapshot.gates,
+              children,
             }
             return execution.suspension === undefined ? inspection : { ...inspection, suspension: execution.suspension }
           }),

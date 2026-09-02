@@ -119,6 +119,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
           usage: [],
           budget: {},
           gates: [],
+          children: [],
         }),
       extendBudget: () => Effect.die("unused extendBudget"),
       fanOut: () => Effect.die("unused fanOut"),

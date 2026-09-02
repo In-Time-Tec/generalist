@@ -1,4 +1,4 @@
-import { DateTime, Effect, Option, Schema, type Types } from "effect"
+import { DateTime, Effect, Function, Option, Schema, type Types } from "effect"
 import {
   BudgetLimits,
   Exhausted,
@@ -27,6 +27,20 @@ export const split =
     if (limits.children !== undefined) result.children = Math.floor(limits.children / divisor)
     return Schema.decodeSync(BudgetLimits)(result)
   }
+
+/** Apply an optional per-member fan-out limit without widening its reserved share. */
+export const narrowGrant: {
+  (requested: BudgetLimits | undefined): (grant: BudgetLimits) => BudgetLimits | undefined
+  (grant: BudgetLimits, requested: BudgetLimits | undefined): BudgetLimits | undefined
+} = Function.dual(2, (grant: BudgetLimits, requested: BudgetLimits | undefined): BudgetLimits | undefined => {
+  if (requested === undefined) return grant
+  for (const dimension of ["tokens", "usd", "duration", "toolCalls", "children"] as const) {
+    const limit = grant[dimension]
+    const value = requested[dimension]
+    if (limit !== undefined && value !== undefined && value > limit) return undefined
+  }
+  return Schema.decodeSync(BudgetLimits)({ ...grant, ...requested })
+})
 
 export const firstExhausted = (remaining: Remaining): Dimension | undefined => {
   for (const dimension of ["tokens", "usd", "duration"] as const) {
