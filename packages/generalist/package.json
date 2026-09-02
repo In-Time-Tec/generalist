@@ -265,6 +265,10 @@
       "types": "./dist/unstable/providers/model-route.d.ts",
       "import": "./dist/unstable/providers/model-route.js"
     },
+    "./unstable/rlm": {
+      "types": "./dist/unstable/rlm/index.d.ts",
+      "import": "./dist/unstable/rlm/index.js"
+    },
     "./unstable/providers/openai-account-auth": {
       "types": "./dist/unstable/providers/openai-account-auth.d.ts",
       "import": "./dist/unstable/providers/openai-account-auth.js"
