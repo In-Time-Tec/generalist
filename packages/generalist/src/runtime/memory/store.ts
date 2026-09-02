@@ -46,16 +46,14 @@ import {
 } from "./store/execution.js"
 import { admitSteering, readSteering } from "./store/steering.js"
 import {
-  admitMessage,
-  deliverPendingMessages,
   directory,
   listRelated,
-  pendingMessages,
   settlementNotifications,
   registerAgentName,
   resolveAddress,
 } from "./store/directory.js"
 import { Prompt } from "effect/unstable/ai"
+import type { RunEvent } from "../run/event.js"
 import { claimedStore as memorySessionStore, reader as memorySessionReader } from "./session-store.js"
 import { admitFanOut } from "./store/fan-out/service.js"
 import { inspectFanOut } from "./store/fan-out/inspection.js"
@@ -208,6 +206,40 @@ const makeStoreServices = (options: LayerOptions) =>
       cancel: (input) => update((state) => cancel(state, input)),
       cancelSession: (input) => modifyState((state) => cancelSession(state, input)),
       admitSteering: (input) => modifyState((state) => admitSteering(state, input)),
+      admitRollback: (input) =>
+        modifyState((state) =>
+          Effect.gen(function* () {
+            const source = state.runs.get(input.runId)
+            if (source === undefined) return yield* RunNotFound.make({ runId: input.runId })
+            const prior = source.events.some(
+              (event) => event._tag === "Inbox" && event.idempotencyKey === input.idempotencyKey,
+            )
+            if (prior) return yield* admitSteering(state, input)
+            const [, rewound] = yield* rewind(state, {
+              runId: input.runId,
+              branchRunId: input.branchRunId,
+              toSequence: Math.max(0, source.lastTurnCompletedSequence),
+            })
+            const [admission, admitted] = yield* admitSteering(rewound, input)
+            const run = admitted.runs.get(input.runId)
+            if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
+            const previousTurn = run.events.findLast(
+              (event): event is Extract<RunEvent, { readonly _tag: "TurnCompleted" }> => event._tag === "TurnCompleted",
+            )
+            const continuation = {
+              schemaVersion: 1 as const,
+              prompt: input.prompt,
+              nextTurn: (previousTurn?.turn ?? -1) + 1,
+              steeringEntryIds: [admission.receipt.entryId],
+            }
+            const prepared = {
+              ...admitted,
+              runs: new Map(admitted.runs).set(input.runId, { ...run, continuation }),
+            }
+            const [, activated] = yield* activateRoot(prepared, input.runId)
+            return [admission, activated] as const
+          }),
+        ),
       readSteering: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>
@@ -217,23 +249,18 @@ const makeStoreServices = (options: LayerOptions) =>
             }),
           ),
         ),
+      pendingSteering: (input) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) => readSteering(state, input)),
+          Effect.map((entries) => entries.slice(0, input.limit)),
+        ),
       directory: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => directory(state, runId))),
       resolveAddress: (address) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => resolveAddress(state, address))),
       registerAgentName: (input) => modifyState((state) => registerAgentName(state, input)),
       listRelated: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => listRelated(state, runId))),
-      admitMessage: (input) => modifyState((state) => admitMessage(state, input)),
-      pendingMessages: (input) =>
-        SynchronizedRef.get(stateRef).pipe(
-          Effect.flatMap((state) =>
-            state.closed
-              ? RuntimeUnavailable.make({ message: "runtime store released" })
-              : Effect.succeed(pendingMessages(state, input)),
-          ),
-        ),
       settlementNotifications: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => settlementNotifications(state, input))),
-      deliverPendingMessages: (input) => modifyState((state) => deliverPendingMessages(state, input)),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
       fork: (input) => modifyState((state) => fork(state, input)),
       rewind: (input) => modifyState((state) => rewind(state, input)),
@@ -383,14 +410,17 @@ const makeStoreServices = (options: LayerOptions) =>
                     (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
                   )
                   if (!run.cancellationRequested && pending.length > 0 && "session" in input.result) {
+                    const followUp = pending.filter((entry) => entry.policy === "enqueue")
+                    const selected =
+                      followUp.length > 0 ? followUp : pending.filter((entry) => entry.policy !== "enqueue")
                     const continuation = {
                       schemaVersion: 1 as const,
-                      prompt: pending.reduce<Prompt.Prompt>(
+                      prompt: selected.reduce<Prompt.Prompt>(
                         (prompt, entry) => Prompt.concat(prompt, entry.prompt),
                         Prompt.empty,
                       ),
                       nextTurn: input.result.turns,
-                      steeringEntryIds: pending.map((entry) => entry.entryId),
+                      steeringEntryIds: selected.map((entry) => entry.entryId),
                     }
                     const runs = new Map(state.runs)
                     const { suspension: _, ...withoutSuspension } = run

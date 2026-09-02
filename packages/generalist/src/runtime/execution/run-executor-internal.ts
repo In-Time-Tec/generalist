@@ -49,6 +49,9 @@ import { make as makeRegisteredResolution } from "./agent/registered-resolution.
 import type { Service } from "./run-executor.js"
 import { requireRunAvailable } from "../budget/state.js"
 import { prepare as prepareBudget } from "../budget/suspend.js"
+import { Runtime } from "../service.js"
+import { make as makeMessaging, Policy as MessagingPolicy } from "../messaging/service.js"
+import { RuntimeUnavailable } from "../errors.js"
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
@@ -60,6 +63,15 @@ const makeFor = (
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
+    const runtime = yield* Effect.serviceOption(Runtime)
+    const messaging = makeMessaging({
+      store,
+      policy: MessagingPolicy.make(),
+      sendMessage: (request) =>
+        Option.isSome(runtime)
+          ? runtime.value.sendMessage(request)
+          : Effect.fail(RuntimeUnavailable.make({ message: "RunExecutor requires Runtime for in-agent messaging" })),
+    })
     const registered = makeRegisteredResolution({ agents, resolver, store })
     const journalFault = yield* Effect.serviceOption(JournalFault)
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
@@ -141,7 +153,7 @@ const makeFor = (
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
                 const boundSession = yield* sessionBinding({ store, claim })
                 const baseContext = Context.mergeAll(
-                  yield* hostContext({ agent, environment, store, codeMode, nested }),
+                  yield* hostContext({ agent, environment, store, codeMode, nested, messaging }),
                   boundSession.context,
                   interruption.context,
                 )
@@ -175,28 +187,32 @@ const makeFor = (
                               },
                             ],
                       )
-                      const take = Effect.gen(function* () {
-                        const current = yield* Ref.get(observed)
-                        if (current.length > 0) return []
-                        yield* store.deliverPendingMessages({ runId })
-                        const entries = yield* store.readSteering(claim)
-                        yield* Ref.set(
-                          observed,
-                          entries.map((entry) => entry.entryId),
-                        )
-                        yield* Ref.set(
-                          observedPrompt,
-                          entries.reduce<Prompt.Prompt>(
-                            (accumulated, entry) => Prompt.concat(accumulated, entry.prompt),
-                            Prompt.empty,
-                          ),
-                        )
-                        return entries.map((entry) => ({ prompt: entry.prompt }))
-                      }).pipe(Effect.orDie)
+                      const take = (queue: "steering" | "followUp") =>
+                        Effect.gen(function* () {
+                          const current = yield* Ref.get(observed)
+                          if (current.length > 0) return []
+                          const pending = yield* store.readSteering(claim)
+                          const entries = pending.filter((entry) =>
+                            queue === "followUp" ? entry.policy === "enqueue" : entry.policy !== "enqueue",
+                          )
+                          if (entries.length === 0) return []
+                          yield* Ref.set(
+                            observed,
+                            entries.map((entry) => entry.entryId),
+                          )
+                          yield* Ref.set(
+                            observedPrompt,
+                            entries.reduce<Prompt.Prompt>(
+                              (accumulated, entry) => Prompt.concat(accumulated, entry.prompt),
+                              Prompt.empty,
+                            ),
+                          )
+                          return entries.map((entry) => ({ prompt: entry.prompt }))
+                        }).pipe(Effect.orDie)
                       const inbox = externalRunInbox({
                         runId,
-                        takeSteering: take,
-                        takeFollowUp: take,
+                        takeSteering: take("steering"),
+                        takeFollowUp: take("followUp"),
                       })
                       const pendingCompletion = yield* Ref.make<ExecutionContinuation | undefined>(undefined)
                       const preparedCompletions = yield* Ref.make(

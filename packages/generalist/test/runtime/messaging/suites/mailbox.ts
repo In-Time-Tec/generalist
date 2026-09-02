@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
-import { AgentDirectory, Errors } from "../../../../src/runtime/index.js"
+import { Errors } from "../../../../src/runtime/index.js"
 import { completedResult, textPrompt } from "../../execution/fixtures.js"
 import { messagingBackend, type MessagingBackend } from "../scenario.js"
 
@@ -54,7 +54,7 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
           })
           .pipe(Effect.flip)
 
-        expect(error).toBeInstanceOf(Errors.MessageConflict)
+        expect(error).toBeInstanceOf(Errors.SteeringConflict)
         expect(yield* runtime.messages({ runId: first.runId, limit: 10 })).toHaveLength(1)
       }).pipe(provide()),
     )
@@ -196,183 +196,6 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
         ).toEqual(["one", "two"])
         expect(yield* runtime.messages({ runId: first.runId, limit: 10 })).toHaveLength(3)
       }).pipe(provide()),
-    )
-  })
-
-  describeBackend(`mailbox bounds (${backend.name})`, () => {
-    it.live("refuses admission past the pending bound", () =>
-      Effect.gen(function* () {
-        const { runtime, parent, first } = yield* familyFor(session("pending-bound"))
-        yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: first.address,
-          idempotencyKey: "one",
-          prompt: textPrompt("one"),
-        })
-        yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: first.address,
-          idempotencyKey: "two",
-          prompt: textPrompt("two"),
-        })
-
-        const error = yield* runtime
-          .sendMessage({
-            fromRunId: parent.runId,
-            to: first.address,
-            idempotencyKey: "three",
-            prompt: textPrompt("three"),
-          })
-          .pipe(Effect.flip)
-
-        expect(error).toBeInstanceOf(Errors.MailboxFull)
-        expect(Schema.is(Errors.MailboxFull)(error) ? error.dimension : undefined).toBe("pending")
-        expect(yield* runtime.messages({ runId: first.runId, limit: 10 })).toHaveLength(2)
-      }).pipe(provide({ mailboxBounds: { maxPending: 2 } })),
-    )
-
-    it.live("frees pending capacity once a live Run takes a message", () =>
-      Effect.gen(function* () {
-        const { runtime, store, parent, first } = yield* familyFor(session("pending-bound-delivered"))
-        for (const key of ["one", "two"]) {
-          yield* runtime.sendMessage({
-            fromRunId: parent.runId,
-            to: first.address,
-            idempotencyKey: key,
-            prompt: textPrompt(key),
-          })
-        }
-
-        const full = yield* runtime
-          .sendMessage({
-            fromRunId: parent.runId,
-            to: first.address,
-            idempotencyKey: "three",
-            prompt: textPrompt("three"),
-          })
-          .pipe(Effect.flip)
-        expect(full).toBeInstanceOf(Errors.MailboxFull)
-
-        // The bound counts what the session is still owed, and a live holder owes nothing back.
-        yield* store.deliverPendingMessages({ runId: first.runId })
-        const admitted = yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: first.address,
-          idempotencyKey: "three",
-          prompt: textPrompt("three"),
-        })
-        expect(admitted.duplicate).toBe(false)
-      }).pipe(provide({ mailboxBounds: { maxPending: 2 } })),
-    )
-
-    it.live("charges a message against the bound again when its holder dies without consuming it", () =>
-      Effect.gen(function* () {
-        const { runtime, store, parent, first } = yield* familyFor(session("pending-bound-restranded"))
-        for (const key of ["one", "two"]) {
-          yield* runtime.sendMessage({
-            fromRunId: parent.runId,
-            to: AgentDirectory.sessionAddress(first.sessionId),
-            idempotencyKey: key,
-            prompt: textPrompt(key),
-          })
-        }
-        yield* store.deliverPendingMessages({ runId: first.runId })
-        expect(yield* store.pendingMessages({ sessionId: first.sessionId, limit: 10 })).toHaveLength(0)
-
-        const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "doomed" })
-        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "worker died" }) })
-
-        // The holder never consumed them, so the session is owed both again and its bound is full.
-        expect(yield* store.pendingMessages({ sessionId: first.sessionId, limit: 10 })).toHaveLength(2)
-      }).pipe(provide({ mailboxBounds: { maxPending: 2 } })),
-    )
-
-    it.live("does not charge an undeliverable exact message after its Run terminates", () =>
-      Effect.gen(function* () {
-        const { runtime, store, parent, first } = yield* familyFor(session("exact-terminal-bound"))
-        yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: first.address,
-          idempotencyKey: "exact",
-          prompt: textPrompt("exact"),
-        })
-        const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "doomed" })
-        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "worker died" }) })
-        const admitted = yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: AgentDirectory.sessionAddress(first.sessionId),
-          idempotencyKey: "session",
-          prompt: textPrompt("session"),
-        })
-        expect(admitted.duplicate).toBe(false)
-      }).pipe(provide({ mailboxBounds: { maxPending: 1 } })),
-    )
-
-    it.live("refuses a message that would exceed the pending byte bound", () =>
-      Effect.gen(function* () {
-        const { runtime, parent, first } = yield* familyFor(session("byte-bound"))
-        const error = yield* runtime
-          .sendMessage({
-            fromRunId: parent.runId,
-            to: first.address,
-            idempotencyKey: "too-large",
-            prompt: textPrompt("this payload is far larger than one byte"),
-          })
-          .pipe(Effect.flip)
-
-        expect(error).toBeInstanceOf(Errors.MailboxFull)
-        expect(Schema.is(Errors.MailboxFull)(error) ? error.dimension : undefined).toBe("bytes")
-        expect(yield* runtime.messages({ runId: first.runId, limit: 10 })).toEqual([])
-      }).pipe(provide({ mailboxBounds: { maxPendingBytes: 1 } })),
-    )
-
-    it.live("rate limits a sender that exceeds the window allowance", () =>
-      Effect.gen(function* () {
-        const { runtime, parent, first } = yield* familyFor(session("rate-limit"))
-        yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: first.address,
-          idempotencyKey: "first",
-          prompt: textPrompt("first"),
-        })
-
-        const error = yield* runtime
-          .sendMessage({
-            fromRunId: parent.runId,
-            to: first.address,
-            idempotencyKey: "second",
-            prompt: textPrompt("second"),
-          })
-          .pipe(Effect.flip)
-
-        expect(error).toBeInstanceOf(Errors.MailboxRateLimited)
-        expect(Schema.is(Errors.MailboxRateLimited)(error) ? error.limit : undefined).toBe(1)
-        expect(yield* runtime.messages({ runId: first.runId, limit: 10 })).toHaveLength(1)
-      }).pipe(provide({ mailboxBounds: { maxPerWindow: 1 } })),
-    )
-
-    it.live("admits a duplicate of an existing message even at a full mailbox", () =>
-      Effect.gen(function* () {
-        const { runtime, parent, first } = yield* familyFor(session("duplicate-at-bound"))
-        const initial = yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: first.address,
-          idempotencyKey: "only",
-          messageId: "msg:only",
-          prompt: textPrompt("only"),
-        })
-
-        // Identity is answered before capacity, so a retry of an admitted message is never refused.
-        const replay = yield* runtime.sendMessage({
-          fromRunId: parent.runId,
-          to: first.address,
-          idempotencyKey: "only",
-          messageId: "msg:only",
-          prompt: textPrompt("only"),
-        })
-        expect(replay.duplicate).toBe(true)
-        expect(replay.entryId).toBe(initial.entryId)
-      }).pipe(provide({ mailboxBounds: { maxPending: 1 } })),
     )
   })
 }

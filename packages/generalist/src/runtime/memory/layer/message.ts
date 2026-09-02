@@ -3,7 +3,6 @@ import { childRunIdFor } from "../../child/fan-out-internal.js"
 import { fanOutMemberSessionId } from "../../child/session.js"
 import type { Address } from "../../address.js"
 import type { Metadata } from "../../messaging/message.js"
-import { digest as messageDigest } from "../../messaging/mailbox.js"
 import type { InitialFanOutInput } from "../../service.js"
 import { normalizeInitialFanOut } from "../start.js"
 import { normalizePrompt } from "../prompt.js"
@@ -37,30 +36,7 @@ type NormalizedFanOutMember = Omit<ReturnType<typeof normalizeInitialFanOut>["me
   readonly inherit: import("../../../core/agent/lifecycle/fan-out.js").Inheritance
 }
 
-type MessageDigestInput = Parameters<typeof messageDigest>[0]
-type MutableMessageDigestInput = { -readonly [Key in keyof MessageDigestInput]: MessageDigestInput[Key] }
 type MutableNormalizedFanOutMember = { -readonly [Key in keyof NormalizedFanOutMember]: NormalizedFanOutMember[Key] }
-
-export const messageDigestInput = (input: {
-  to: Address
-  from: Address
-  prompt: Prompt.Prompt
-  correlationId: string
-  metadata: Metadata
-  causationId: string | undefined
-  inReplyTo: string | undefined
-}): MessageDigestInput => {
-  const digestInput: MutableMessageDigestInput = {
-    to: input.to,
-    from: input.from,
-    prompt: input.prompt,
-    correlationId: input.correlationId,
-    metadata: input.metadata,
-  }
-  if (input.causationId !== undefined) digestInput.causationId = input.causationId
-  if (input.inReplyTo !== undefined) digestInput.inReplyTo = input.inReplyTo
-  return digestInput
-}
 
 export const messageDraft = (input: MessageDraftSource): MessageDraft => {
   const draft: MessageDraft = {

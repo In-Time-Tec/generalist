@@ -32,7 +32,7 @@ export const layerSqliteRuntime = (
     const agents = makeRegisteredAgents()
     const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
     const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
-    const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
+    const host = runExecutorLayer(agents).pipe(Layer.provide(Layer.merge(dependencies, runtime)))
     const scheduler = (
       input.schedulerMode === "external"
         ? Layer.effect(LocalScheduler, makeLocalScheduler({ workerId: input.workerId, ...input.options.scheduler }))

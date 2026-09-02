@@ -201,7 +201,7 @@ it.effect("carries the authoritative sender into the delivered prompt", () =>
   }),
 )
 
-it.effect("holds a message for an idle target until its next Run drains it", () =>
+it.effect("holds a message for an idle target until its next execution drains it", () =>
   Effect.gen(function* () {
     const requests: Array<string> = []
     const { agent, childAgent, ref, childRef, address } = scriptedAgent("idle-target")

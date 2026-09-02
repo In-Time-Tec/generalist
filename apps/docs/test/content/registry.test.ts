@@ -157,30 +157,29 @@ test("the composite-tool guide keeps nested identity, render provenance, and adm
   }
 })
 
-test("the messaging guide keeps the newest-Run rule and the consumption-ack contract", () => {
+test("the messaging guide keeps the unified inbox and family authorization contract", () => {
   for (const marker of [
+    "Runtime.sendMessage",
+    "same durable Run inbox",
     "runAddress",
     "sessionAddress",
     "nameAddress",
     "newest",
-    "keyed by session rather than by Run",
-    "never carries authority",
-    "MessagingUnauthorized",
-    "cross-session",
-    "only ever widens",
+    "never grants authority",
+    "NotInFamily",
+    "MessagingPolicy.allow",
+    "only widens",
     "directional",
     "fromRunId",
-    "duplicate: true",
-    "MessageConflict",
-    "MailboxFull",
-    "MailboxRateLimited",
-    "RunTerminal",
-    'replayPolicy: "never"',
-    "turn boundary",
-    "There is no ack call",
-    "at-least-once bind, exactly-once consume",
-    "deliveredRunId",
-    "attribution and diagnostics only",
+    "duplicate",
+    "SteeringConflict",
+    "InboxFull",
+    "Inbox { message, policy, from }",
+    "Reopening reconstructs",
+    "interrupt",
+    "rollback",
+    "reject",
+    "acknowledgement",
   ]) {
     expect(addressedMessaging.markdown, marker).toContain(marker)
   }

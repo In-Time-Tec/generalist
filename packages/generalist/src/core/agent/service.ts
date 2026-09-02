@@ -19,7 +19,7 @@ import {
   type ToolDeclaration,
   type ToolSchedulingPolicy,
 } from "./lifecycle/definition.js"
-import { allocateRun, defaultObjectPrompt, type RunHandle } from "./lifecycle/run-handle.js"
+import { allocateRun, defaultObjectPrompt, RunControlTypeId, type RunHandle } from "./lifecycle/run-handle.js"
 import { encode as encodeInput } from "./lifecycle/input.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
 import type { ToolBatchResolution } from "./tools/checkpoint.js"
@@ -33,6 +33,15 @@ import {
 import type { SandboxService } from "../../sandbox/service.js"
 import { make as makeFanOut, processRunner, ProcessRunner, recursiveAgentRunner } from "./lifecycle/fan-out.js"
 import type { HandlersFor } from "./tool/fan-out.js"
+import {
+  InboxFull,
+  RollbackRequiresRuntime,
+  RunClosed,
+  type AdmissionPolicy,
+  type Receipt as SteeringReceipt,
+  type RunBusy,
+} from "../turn/steering.js"
+
 export {
   AgentTypeId,
   close,
@@ -75,6 +84,38 @@ export { child, defaultInheritance, Inheritance, inheritance, type InheritanceOp
 /** Allocate one scoped Run and its producer handle before consuming its event stream. */
 export { allocateRun }
 export type * from "./tool-calls.js"
+
+export type SendError = InboxFull | RunClosed | RollbackRequiresRuntime | RunBusy
+
+const sendEffect = <EventValue, EventError, EventServices>(
+  handle: RunHandle<EventValue, EventError, EventServices>,
+  message: Prompt.Prompt | string,
+  policy: AdmissionPolicy,
+): Effect.Effect<SteeringReceipt, SendError> => {
+  if (policy === "rollback") return Effect.fail(RollbackRequiresRuntime.make({ runId: handle.runId }))
+  const input = { prompt: message }
+  if (policy === "enqueue") return handle.followUp(input)
+  if (policy === "interrupt") {
+    return handle.steer(input).pipe(Effect.tap(() => handle[RunControlTypeId].interruptTools))
+  }
+  if (policy === "steer") return handle.steer(input)
+  return handle[RunControlTypeId].reject(input)
+}
+
+/** Admit one message to a process-local Run under an explicit policy. */
+export const send: {
+  (
+    message: Prompt.Prompt | string,
+    policy: AdmissionPolicy,
+  ): <EventValue, EventError, EventServices>(
+    handle: RunHandle<EventValue, EventError, EventServices>,
+  ) => Effect.Effect<SteeringReceipt, SendError>
+  <EventValue, EventError, EventServices>(
+    handle: RunHandle<EventValue, EventError, EventServices>,
+    message: Prompt.Prompt | string,
+    policy: AdmissionPolicy,
+  ): Effect.Effect<SteeringReceipt, SendError>
+} = dual(3, sendEffect)
 export interface MakeOptions<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   PolicyServices = never,

@@ -25,7 +25,7 @@ export const layerMemory = (
     const agents = makeRegisteredAgents()
     const dependencies = Layer.mergeAll(store, active, modelPreviewLayer)
     const runtime = runtimeLayer(agents)(options).pipe(Layer.provide(dependencies))
-    const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
+    const host = runExecutorLayer(agents).pipe(Layer.provide(Layer.merge(dependencies, runtime)))
     const scheduler = localSchedulerLayer({ workerId: "memory", ...options.scheduler }).pipe(
       Layer.provide(Layer.mergeAll(store, active, host)),
     )

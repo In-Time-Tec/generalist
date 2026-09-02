@@ -16,7 +16,8 @@ import {
   type Runtime,
 } from "../../../src/runtime/index.js"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Option, Schema, Stream } from "effect"
+import { Effect, Option, Predicate, Schema, Stream } from "effect"
+import type { Prompt as AiPrompt } from "effect/unstable/ai"
 import { make as makeHandler } from "../../../src/unstable/a2a/handler.js"
 
 const address = Address.make("agent:test")
@@ -116,6 +117,33 @@ const makeRuntime = (acceptedSequence = 0) => {
     return common
   }
 
+  function send(
+    runId: string,
+    prompt: AiPrompt.Prompt | string,
+    options?: Runtime.RunSendOptions,
+  ): Effect.Effect<Runtime.SteeringReceipt, Runtime.RunSendError>
+  function send(input: Runtime.SendInput): Effect.Effect<Run.RunReceipt, Runtime.SendError>
+  function send(
+    input: Runtime.SendInput | string,
+    _prompt?: AiPrompt.Prompt | string,
+    _options?: Runtime.RunSendOptions,
+  ): Effect.Effect<Runtime.SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
+    if (Predicate.isString(input)) return Effect.die("existing-run send is not used")
+    sentRunIds.push(input.runId!)
+    const runId = input.runId!
+    const shouldWait = input.messageId === "wait"
+    const shouldRunProgram = input.messageId === "program"
+    runs.set(runId, {
+      status: "queued",
+      events: [accepted(runId)],
+      waits: [],
+      pending: shouldWait
+        ? [attempt(runId), waiting(runId)]
+        : [attempt(runId), shouldRunProgram ? completedProgram(runId, 2) : completed(runId, 2)],
+    })
+    return Effect.succeed({ runId, messageId: input.messageId!, acceptedSequence, duplicate: false })
+  }
+
   const runtime: Runtime.Service = {
     operator: {
       explain: () => Effect.die("not used"),
@@ -135,21 +163,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     activate: () => Effect.die("not used"),
     fork: () => Effect.die("not used"),
     rewind: () => Effect.die("not used"),
-    send: (input) => {
-      sentRunIds.push(input.runId!)
-      const runId = input.runId!
-      const shouldWait = input.messageId === "wait"
-      const shouldRunProgram = input.messageId === "program"
-      runs.set(runId, {
-        status: "queued",
-        events: [accepted(runId)],
-        waits: [],
-        pending: shouldWait
-          ? [attempt(runId), waiting(runId)]
-          : [attempt(runId), shouldRunProgram ? completedProgram(runId, 2) : completed(runId, 2)],
-      })
-      return Effect.succeed({ runId, messageId: input.messageId!, acceptedSequence, duplicate: false })
-    },
+    send,
     spawn: () => Effect.die("not used"),
     fanOut: () => Effect.die("not used"),
     inspectFanOut: () => Effect.die("not used"),
@@ -225,7 +239,6 @@ const makeRuntime = (acceptedSequence = 0) => {
     },
     signal: () => Effect.void,
     wake: () => Effect.die("not used"),
-    steer: () => Effect.succeed({ entryId: "steering:test", sequence: 0 }),
     sendMessage: () => Effect.die("not used"),
     messages: () => Effect.die("not used"),
     childSettlements: () => Effect.die("not used"),

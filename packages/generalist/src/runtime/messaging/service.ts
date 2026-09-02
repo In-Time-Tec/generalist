@@ -1,30 +1,25 @@
 import { Context, Effect, Layer, Schema } from "effect"
-import {
-  type DriverError,
-  type DriverInterpreter,
-  type DriverStateInvalid,
-  type DriverUnknownReplay,
-  intercept,
-  operationKey,
-} from "../../core/durable/driver.js"
-import type { Exhausted } from "../../core/durable/run-budget.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import { relationship, AddressInvalid, type DirectoryEntry, type Relationship } from "../execution/agent/directory.js"
 import {
   AddressNotFound,
-  MailboxFull,
-  MailboxRateLimited,
-  MessageConflict,
-  MessagingUnauthorized,
+  CursorExpired,
+  ForkSequenceInvalid,
+  NoSnapshot,
+  NotInFamily,
+  RunBusy,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
+  SteeringConflict,
 } from "../errors.js"
-import { type MailboxEntry, MessageReceipt } from "./mailbox.js"
+import { MessageReceipt } from "./mailbox.js"
 import type { Metadata } from "./message.js"
 import type { Service as RunStoreService } from "../run/store.js"
+import { InboxFull, type AdmissionPolicy } from "../../core/turn/steering.js"
+import type { SteeringEntry } from "../run/steering.js"
 
 /** One authorization question about one exact sender and target. */
 export interface PolicyInput {
@@ -78,16 +73,20 @@ export interface SendMessageInput {
   readonly correlationId?: string
   readonly inReplyTo?: string
   readonly metadata?: Metadata
+  readonly policy?: AdmissionPolicy
 }
 
 /** Durable send failure. */
 export const SendMessageError = Schema.Union([
   AddressNotFound,
   AddressInvalid,
-  MessagingUnauthorized,
-  MailboxFull,
-  MailboxRateLimited,
-  MessageConflict,
+  NotInFamily,
+  RunBusy,
+  SteeringConflict,
+  ForkSequenceInvalid,
+  NoSnapshot,
+  CursorExpired,
+  InboxFull,
   RunTerminal,
   RunNotFound,
   RuntimeUnavailable,
@@ -105,7 +104,7 @@ export const authorize = (input: {
   readonly sender: DirectoryEntry
   readonly target: DirectoryEntry
   readonly policy: MessagingPolicy.Service
-}): Effect.Effect<void, MessagingUnauthorized> =>
+}): Effect.Effect<void, NotInFamily> =>
   Effect.gen(function* () {
     const derived = relationship(input.sender, input.target)
     const crossSession = input.sender.sessionId !== input.target.sessionId
@@ -117,10 +116,9 @@ export const authorize = (input: {
       crossSession,
     })
     if (allowed) return
-    return yield* MessagingUnauthorized.make({
-      from: input.sender.address,
-      to: input.target.address,
-      reason: crossSession ? "cross-session" : "unrelated",
+    return yield* NotInFamily.make({
+      fromRunId: input.sender.runId,
+      targetRunId: input.target.runId,
     })
   })
 
@@ -167,16 +165,14 @@ export class AgentMessaging extends Context.Service<
       readonly to: Address
       readonly idempotencyKey: string
       readonly prompt: Prompt.Prompt | Prompt.RawInput
+      readonly policy?: AdmissionPolicy
       readonly inReplyTo?: string
       readonly metadata?: Metadata
-    }) => Effect.Effect<
-      MessageReceipt,
-      SendMessageError | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
-      DriverInterpreter | ToolContext
-    >
+    }) => Effect.Effect<MessageReceipt, SendMessageError, ToolContext>
     readonly inbox: (input: {
       readonly limit: number
-    }) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError, ToolContext>
+    }) => Effect.Effect<ReadonlyArray<SteeringEntry>, DirectoryError, ToolContext>
+    readonly identity: Effect.Effect<DirectoryEntry, DirectoryError, ToolContext>
     readonly directory: Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError, ToolContext>
   }
 >()("generalist/runtime/messaging/service/AgentMessaging") {}
@@ -190,9 +186,8 @@ const currentRunId = Effect.flatMap(ToolContext, (context) =>
 /**
  * Build in-execution messaging over one RunStore and host policy.
  *
- * Every send is one durable `send` driver operation with a `never` replay policy: a crash between
- * the journal record and the mailbox insert settles as an unknown operation for explicit resolution
- * instead of silently duplicating or losing the message.
+ * Every send delegates to Runtime's unified Inbox admission, which journals the message before it
+ * can become visible to the target Run.
  */
 export const make = (input: {
   readonly store: RunStoreService
@@ -202,34 +197,23 @@ export const make = (input: {
   send: (request) =>
     Effect.gen(function* () {
       const runId = yield* currentRunId
-      return yield* intercept(
-        {
-          kind: "send",
-          key: operationKey([runId, "send", request.idempotencyKey]),
-          input: { to: request.to, idempotencyKey: request.idempotencyKey },
-          replayPolicy: "never",
-          success: MessageReceipt,
-          failure: SendMessageError,
-        },
-        (() => {
-          const message: SendMessageInput = {
-            fromRunId: runId,
-            to: request.to,
-            idempotencyKey: request.idempotencyKey,
-            prompt: request.prompt,
-          }
-          if (request.inReplyTo !== undefined) Object.assign(message, { inReplyTo: request.inReplyTo })
-          if (request.metadata !== undefined) Object.assign(message, { metadata: request.metadata })
-          return input.sendMessage(message)
-        })(),
-      )
+      const message: SendMessageInput = {
+        fromRunId: runId,
+        to: request.to,
+        idempotencyKey: request.idempotencyKey,
+        prompt: request.prompt,
+      }
+      if (request.policy !== undefined) Object.assign(message, { policy: request.policy })
+      if (request.inReplyTo !== undefined) Object.assign(message, { inReplyTo: request.inReplyTo })
+      if (request.metadata !== undefined) Object.assign(message, { metadata: request.metadata })
+      return yield* input.sendMessage(message)
     }),
   inbox: (request) =>
     Effect.gen(function* () {
       const runId = yield* currentRunId
-      const entry = yield* input.store.directory(runId)
-      return yield* input.store.pendingMessages({ sessionId: entry.sessionId, runId, limit: request.limit })
+      return yield* input.store.pendingSteering({ runId, limit: request.limit })
     }),
+  identity: Effect.flatMap(currentRunId, input.store.directory),
   directory: Effect.gen(function* () {
     const runId = yield* currentRunId
     return yield* reachable({ store: input.store, policy: input.policy, runId })

@@ -14,6 +14,9 @@ import { requiredField, type StructuredRunConfig } from "../loop/context.js"
 /** Default prompt for the terminal structured-output turn. */
 export const defaultObjectPrompt = "Return the final structured output for the task above."
 
+/** @internal Process-local admission state carried without widening the public producer methods. */
+export const RunControlTypeId: unique symbol = Symbol.for("generalist/core/agent/RunControl")
+
 /** Producer capability and event stream owned by one scoped Agent Run. */
 export interface RunHandle<
   EventValue = Event,
@@ -26,6 +29,13 @@ export interface RunHandle<
   readonly events: Stream.Stream<EventValue, EventError, EventServices>
   readonly steer: (input: SteeringInput) => Effect.Effect<ControlReceipt, ControlError>
   readonly followUp: (input: SteeringInput) => Effect.Effect<ControlReceipt, ControlError>
+  readonly [RunControlTypeId]: {
+    readonly busy: Effect.Effect<boolean>
+    readonly interruptTools: Effect.Effect<void>
+    readonly reject: (
+      input: SteeringInput,
+    ) => Effect.Effect<ControlReceipt, ControlError | import("../../turn/steering.js").RunBusy>
+  }
 }
 
 type WrappedOutputCodec<OutputCodec extends Schema.Top> = Schema.Codec<
@@ -124,7 +134,7 @@ export const allocateRun: {
   ) =>
     Effect.gen(function* () {
       const runId: RunId = options.invocation === undefined ? `run_${yield* generateId}` : options.invocation.runId
-      const { inbox, producer } = yield* allocateRunInbox(runId, options.steering ?? {})
+      const { inbox, producer, reject } = yield* allocateRunInbox(runId, options.steering ?? {})
       const structured = structuredOutput(agent)
       const start = inbox.start.pipe(
         Effect.flatMap((started) =>
@@ -146,7 +156,12 @@ export const allocateRun: {
           ),
         ),
       )
-      return { runId, events, ...producer }
+      return {
+        runId,
+        events,
+        ...producer,
+        [RunControlTypeId]: { busy: inbox.busy, interruptTools: inbox.interruptTools, reject },
+      }
     }),
 )
 

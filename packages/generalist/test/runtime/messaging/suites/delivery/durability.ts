@@ -191,7 +191,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
               prompt: textPrompt("rewritten"),
             })
             .pipe(Effect.flip)
-          expect(error).toBeInstanceOf(Errors.MessageConflict)
+          expect(error).toBeInstanceOf(Errors.SteeringConflict)
           expect(yield* runtime.messages({ runId: parentRunId, limit: 10 })).toHaveLength(1)
         }),
       )
@@ -231,41 +231,6 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
           // Sequence is derived from what is already stored, so a reopen must not restart it.
           expect(entries.map((entry) => entry.sequence)).toEqual([0, 1])
           expect(entries.map((entry) => entry.idempotencyKey)).toEqual(["before", "after"])
-        }),
-      )
-
-      return admit.pipe(Effect.andThen(reopen))
-    })
-
-    it.live("still owes a message that was bound but never consumed before the reopen", () => {
-      const sessionId = session("bound-unconsumed")
-      let parentRunId = ""
-      let parentSessionId = ""
-
-      const admit = provide(
-        Effect.gen(function* () {
-          const { runtime, store, parent, child } = yield* familyIn(sessionId)
-          parentRunId = parent.runId
-          parentSessionId = parent.sessionId
-          yield* runtime.sendMessage({
-            fromRunId: child.runId,
-            to: parent.address,
-            idempotencyKey: "bound",
-            prompt: textPrompt("bound but unconsumed"),
-          })
-          const bound = yield* store.deliverPendingMessages({ runId: parent.runId })
-          expect(bound).toHaveLength(1)
-          const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "doomed" })
-          yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "worker died" }) })
-        }),
-      )
-
-      const reopen = provide(
-        Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
-          const owed = yield* store.pendingMessages({ sessionId: parentSessionId, limit: 10 })
-          expect(owed).toHaveLength(1)
-          expect(owed[0]?.deliveredRunId).toBe(parentRunId)
         }),
       )
 

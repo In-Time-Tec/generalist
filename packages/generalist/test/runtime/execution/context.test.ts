@@ -253,7 +253,7 @@ layer(memoryLayer)("in-execution sender authority", (it) => {
       const inbox = yield* messaging
         .inbox({ limit: 10 })
         .pipe(withAmbient({ runId: first.runId, toolCallId: "call:inbox" }))
-      expect(inbox.map((entry) => entry.fromRunId)).toEqual([parent.runId])
+      expect(inbox.flatMap((entry) => ("runId" in entry.from ? [entry.from.runId] : []))).toEqual([parent.runId])
 
       const reachable = yield* messaging.directory.pipe(withAmbient({ runId: first.runId, toolCallId: "call:dir" }))
       expect(reachable.map((entry) => entry.runId)).toContain(parent.runId)

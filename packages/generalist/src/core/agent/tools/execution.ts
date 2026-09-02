@@ -1,7 +1,7 @@
 import { Cause, Deferred, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
-import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./result.js"
+import { type AnyToolCall, domainFailureResult, interrupted, successResult, type PendingToolResult } from "./result.js"
 import type { Agent, ClosedServices, ProgressOverflowPolicy, RunOptions } from "../service.js"
 import { RunError } from "../run/error.js"
 import type { AgentRunState } from "../run-state.js"
@@ -34,9 +34,10 @@ import type { RunId } from "../../durable/run-id.js"
 import { make as makeToolAuthorization } from "./authorization.js"
 import { definition as fanOutDefinition, withoutFanOut } from "../tool/fan-out.js"
 import { execute as executeFanOut } from "./fan-out.js"
-
+import type { RunInbox } from "../../turn/steering-inbox.js"
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
+  readonly inbox?: RunInbox
   readonly options: RunOptions
   readonly state: AgentRunState
   readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
@@ -339,7 +340,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           Effect.andThen(Deferred.await(startPersisted)),
         )
         const executionBase = start.pipe(
-          Effect.andThen(liveOutcome),
+          Effect.andThen(inputContext.inbox?.interruptTool(liveOutcome, interrupted) ?? liveOutcome),
           Effect.flatMap((outcome) => hookToolResult(request.agentName, turn, call, outcome)),
         )
         const execution = intercept(
@@ -475,7 +476,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       }
       return hooked._tag === "Success" ? successResult(call, hooked) : domainFailureResult(call, hooked)
     })
-
   const toolCallEvents = makeToolAuthorization({
     runId,
     sessionId,

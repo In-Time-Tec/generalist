@@ -43,20 +43,16 @@ const withCheckpoint = (record: OperationRecord, checkpoint: RecordOperationInpu
 type StoredRun = MemoryState["runs"] extends ReadonlyMap<string, infer Run> ? Run : never
 
 const steeringProblem = (run: StoredRun, entryIds: ReadonlyArray<string>): string | undefined => {
-  const selected = run.steering
-    .filter((entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined)
+  const pending = run.steering.filter(
+    (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
+  )
+  const first = pending.find((entry) => entry.entryId === entryIds[0])
+  const lane = first?.policy === "enqueue" ? "enqueue" : "steering"
+  const selected = pending
+    .filter((entry) => (entry.policy === "enqueue" ? "enqueue" : "steering") === lane)
     .slice(0, entryIds.length)
     .map((entry) => entry.entryId)
-  if (selected.length !== entryIds.length || selected.some((entryId, index) => entryId !== entryIds[index])) {
-    return "steering entries are not in pending order"
-  }
-  for (const entryId of entryIds) {
-    const entry = run.steering.find((candidate) => candidate.entryId === entryId)
-    if (entry === undefined || entry.consumedOperationId !== undefined || entry.discardedReason !== undefined) {
-      return `steering entry ${entryId} is not pending`
-    }
-  }
-  return undefined
+  return sameEntries(selected, entryIds) ? undefined : `${lane} entries are not the pending lane prefix`
 }
 
 const completionSteeringProblem = (run: StoredRun, operationId: string, entryIds: ReadonlyArray<string>) => {

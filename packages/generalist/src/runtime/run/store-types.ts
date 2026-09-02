@@ -1,16 +1,7 @@
 import type { TreePolicy } from "../tree/policy.js"
-import type { Address } from "../address.js"
-import type {
-  RunNotFound,
-  RunTerminal,
-  RuntimeUnavailable,
-  MailboxFull,
-  MailboxRateLimited,
-  MessageConflict,
-} from "../errors.js"
-import type { Message, Metadata } from "../messaging/message.js"
+import type { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import type { Message } from "../messaging/message.js"
 import type { AddressInvalid } from "../execution/agent/directory.js"
-import type { MailboxBounds } from "../messaging/mailbox.js"
 import type { RunWait } from "./wait.js"
 import type { WaitResponse } from "./wait-internal.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
@@ -18,7 +9,7 @@ import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/stat
 import type { ExecutableManifest, ExecutableRef } from "../executable/manifest.js"
 import type { InitialChildInput } from "../service.js"
 import type { OperationKind, ReplayPolicy } from "../sql/operations.js"
-import type { ExecutionContinuation } from "./steering.js"
+import type { AdmissionPolicy, ExecutionContinuation, MessageSource, SteeringReceipt } from "./steering.js"
 import type { ExecutableRegistration } from "../executable/registration.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { InitialFanOutInput } from "../child/fan-out-internal.js"
@@ -102,24 +93,6 @@ export interface RecordOperationInput extends ExecutionClaim {
   readonly steeringEvents?: ReadonlyArray<DurableAgentLoopEvent>
 }
 
-/** Exact durable mailbox admission derived from authoritative sender identity. */
-export interface AdmitMessageInput {
-  readonly fromRunId: string
-  readonly fromAddress: Address
-  readonly to: Address
-  readonly targetSessionId: string
-  readonly messageId: string
-  readonly idempotencyKey: string
-  readonly digest: string
-  readonly bytes: number
-  readonly prompt: Prompt.Prompt
-  readonly correlationId: string
-  readonly causationId?: string
-  readonly inReplyTo?: string
-  readonly metadata: Metadata
-  readonly bounds: MailboxBounds
-}
-export type AdmitMessageError = MailboxFull | MailboxRateLimited | MessageConflict | RunNotFound | RuntimeUnavailable
 export type DirectoryLookupError = RunNotFound | RuntimeUnavailable
 export type ResolveAddressError = import("../errors.js").AddressNotFound | AddressInvalid | RuntimeUnavailable
 
@@ -128,6 +101,19 @@ export interface AdmitSteeringInput {
   readonly idempotencyKey: string
   readonly digest: string
   readonly prompt: Prompt.Prompt
+  readonly policy: AdmissionPolicy
+  readonly from: MessageSource
+  readonly addressed?: Message
+}
+
+/** Runtime-internal result distinguishing a new admission from an exact retry. */
+export interface SteeringAdmission {
+  readonly receipt: SteeringReceipt
+  readonly duplicate: boolean
+}
+
+export interface AdmitRollbackInput extends AdmitSteeringInput {
+  readonly branchRunId: string
 }
 
 export type CompletionOutcome =

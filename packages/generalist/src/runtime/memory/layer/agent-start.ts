@@ -1,4 +1,5 @@
-import { Clock, DateTime, Effect, Function, Option, Predicate, Schema, Stream } from "effect"
+import { Clock, DateTime, Effect, Option, Predicate, Schema, Stream } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { InvalidOutput } from "../../../core/agent/event.js"
 import { encode as encodeAgentInput } from "../../../core/agent/lifecycle/input.js"
 import { generateId } from "../../../core/model/telemetry/events.js"
@@ -7,9 +8,7 @@ import { RuntimeUnavailable, UnknownAgent } from "../../errors.js"
 import { capture, type RegisteredAgents } from "../../executable/registered-agent.js"
 import type { RunCancelled, RunEvent, RunFailed } from "../../run/event.js"
 import type { Service as RunStore } from "../../run/store.js"
-import { digest as steeringDigest } from "../../run/steering.js"
 import type { RunId } from "../../../core/durable/run-id.js"
-import type { Input as SteeringInput } from "../../../core/turn/steering.js"
 import type {
   EventsError,
   Service as RuntimeService,
@@ -17,8 +16,10 @@ import type {
   StartExecutionError,
   StartExecutionInput,
   StartReceipt,
+  RunSendError,
+  RunSendOptions,
 } from "../../service.js"
-import { normalizePrompt } from "../prompt.js"
+import type { SteeringReceipt } from "../../run/steering.js"
 import { make as makeBudget } from "../../../core/durable/run-budget.js"
 import { nextAt, parseRRule } from "../../execution/trigger/schedule.js"
 
@@ -51,27 +52,34 @@ const awaitOutput = <Output>(events: Stream.Stream<StartEvent<Output>, EventsErr
   )
 
 /** @internal Construct an untyped handle for a Run recovered by durable identity. */
-const makeUntypedHandle = (store: RunStore, runId: RunId) => {
+const makeUntypedHandle = (
+  store: RunStore,
+  runId: RunId,
+  send: (
+    runId: string,
+    message: Prompt.Prompt | string,
+    options?: RunSendOptions,
+  ) => Effect.Effect<SteeringReceipt, RunSendError>,
+) => {
   const events = store.events({ runId, cursor: cursorOrigin }).pipe(
     Stream.mapEffect((event) => decodeEvent(Schema.Unknown, event)),
     Stream.takeUntil(
       (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
     ),
   )
-  const steer = (input: SteeringInput) =>
-    generateId.pipe(
-      Effect.flatMap((idempotencyKey) => {
-        const prompt = normalizePrompt(input.prompt)
-        return store.admitSteering({ runId, idempotencyKey, prompt, digest: steeringDigest(prompt) })
-      }),
-    )
-  return { runId, await: awaitOutput(events), events, steer, followUp: steer }
+  return {
+    runId,
+    await: awaitOutput(events),
+    events,
+    send: (message: Prompt.Prompt | string, options?: RunSendOptions) => send(runId, message, options),
+  }
 }
 type UntypedHandle = ReturnType<typeof makeUntypedHandle>
-export const untypedHandle: {
-  (runId: RunId): (store: RunStore) => UntypedHandle
-  (store: RunStore, runId: RunId): UntypedHandle
-} = Function.dual(2, makeUntypedHandle)
+export const untypedHandle = (input: {
+  readonly store: RunStore
+  readonly runId: RunId
+  readonly send: Parameters<typeof makeUntypedHandle>[2]
+}): UntypedHandle => makeUntypedHandle(input.store, input.runId, input.send)
 
 /** @internal Construct typed Agent registration and start over one Runtime registry and store. */
 export const make = (options: {
@@ -81,6 +89,7 @@ export const make = (options: {
     input: StartExecutionInput,
     activate: boolean,
   ) => Effect.Effect<StartReceipt, StartExecutionError>
+  readonly send: Parameters<typeof makeUntypedHandle>[2]
 }) => {
   const register: RuntimeService["register"] = (agent) =>
     capture(agent).pipe(Effect.flatMap(options.agents.registerAll))
@@ -139,21 +148,6 @@ export const make = (options: {
         },
         true,
       )
-      const steer = (steering: SteeringInput) =>
-        generateId.pipe(
-          Effect.flatMap((steeringKey) =>
-            Effect.sync(() => normalizePrompt(steering.prompt)).pipe(
-              Effect.flatMap((steeringPrompt) =>
-                options.store.admitSteering({
-                  runId: receipt.runId,
-                  idempotencyKey: steeringKey,
-                  prompt: steeringPrompt,
-                  digest: steeringDigest(steeringPrompt),
-                }),
-              ),
-            ),
-          ),
-        )
       const events = options.store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
         Stream.mapEffect((event) => decodeEvent(agent.output, event)),
         Stream.takeUntil(
@@ -161,7 +155,13 @@ export const make = (options: {
         ),
         Stream.provideContext(registration.value.context),
       )
-      return { runId: receipt.runId, await: awaitOutput(events), events, steer, followUp: steer }
+      return {
+        runId: receipt.runId,
+        await: awaitOutput(events),
+        events,
+        send: (message: Prompt.Prompt | string, sendOptions?: RunSendOptions) =>
+          options.send(receipt.runId, message, sendOptions),
+      }
     })
   return { register, schedule, start }
 }

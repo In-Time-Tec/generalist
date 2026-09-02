@@ -16,6 +16,7 @@ import type {
   ApprovalStale,
   ApprovalMismatch,
   RunNotFound,
+  RunBusy,
   RunTerminal,
   RuntimeUnavailable,
   SubscriberLagged,
@@ -45,7 +46,6 @@ import type {
 } from "../errors.js"
 import type { Message } from "../messaging/message.js"
 import type { AgentName, DirectoryEntry } from "../execution/agent/directory.js"
-import type { MailboxEntry, MessageReceipt } from "../messaging/mailbox.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "../run.js"
 import type { RunWait, WaitResolution } from "./wait.js"
 import type { EmittableAgentLoopEvent } from "../execution/agent/event.js"
@@ -57,7 +57,7 @@ import type { CancelInput, RespondInput, SignalInput, SpawnInput, StartReceipt }
 import type { ResolveOperationInput } from "../operation/resolution.js"
 import type { RespondInput as RespondApprovalInput } from "../operation/approval.js"
 import type { OperationRecord, OperationStatus } from "../sql/operations.js"
-import type { ExecutionContinuation, SteeringEntry, SteeringReceipt } from "./steering.js"
+import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
 import type { FanOutInspection, FanOutReceipt } from "../child/fan-out.js"
 import type { AdmitFanOutInput } from "../child/fan-out-internal.js"
 import type { Notification as ChildSettlementNotification } from "../child/settlement.js"
@@ -73,12 +73,11 @@ import type {
   CommitProgramLogInput,
 } from "../program/store.js"
 import type {
-  AdmitMessageError,
-  AdmitMessageInput,
   AdmitProgramChildAndSuspendInput,
   AdmitProgramChildInput,
   AdmitSendInput,
   AdmitStartInput,
+  AdmitRollbackInput,
   AdmitSteeringInput,
   CompletionOutcome,
   DirectoryLookupError,
@@ -94,9 +93,10 @@ import type {
   SessionWriteClaim,
   StoreBackend,
   StoreInfo,
+  SteeringAdmission,
   WorkerMutationError,
 } from "./store-types.js"
-import type { Point as AcknowledgementPoint } from "../acknowledgement.js"
+import type { Point as AcknowledgementPoint } from "./acknowledgement.js"
 import type {
   HostSession,
   HostSessionEvent,
@@ -115,12 +115,11 @@ import type { WakeEvent } from "../../core/agent/tools/wake-event.js"
 import type { DueAwaitEvent, WakeDisposition } from "../execution/trigger/wake.js"
 import type { ClaimedSchedule, ScheduleReceipt, ScheduleRecord } from "../execution/trigger/schedule.js"
 export type {
-  AdmitMessageError,
-  AdmitMessageInput,
   AdmitProgramChildAndSuspendInput,
   AdmitProgramChildInput,
   AdmitSendInput,
   AdmitStartInput,
+  AdmitRollbackInput,
   AdmitSteeringInput,
   CompletionOutcome,
   DirectoryLookupError,
@@ -136,6 +135,7 @@ export type {
   SessionWriteClaim,
   StoreBackend,
   StoreInfo,
+  SteeringAdmission,
   WorkerMutationError,
 }
 
@@ -283,8 +283,29 @@ export interface Service {
   }) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable>
   readonly admitSteering: (
     input: AdmitSteeringInput,
-  ) => Effect.Effect<SteeringReceipt, RunNotFound | RunTerminal | SteeringConflict | InboxFull | RuntimeUnavailable>
+  ) => Effect.Effect<
+    SteeringAdmission,
+    RunNotFound | RunTerminal | RunBusy | SteeringConflict | InboxFull | RuntimeUnavailable
+  >
+  readonly admitRollback: (
+    input: AdmitRollbackInput,
+  ) => Effect.Effect<
+    SteeringAdmission,
+    | RunNotFound
+    | RunTerminal
+    | RunBusy
+    | SteeringConflict
+    | InboxFull
+    | ForkSequenceInvalid
+    | NoSnapshot
+    | RuntimeUnavailable
+  >
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
+  /** Read pending inbox entries without claiming execution ownership. */
+  readonly pendingSteering: (input: {
+    readonly runId: string
+    readonly limit: number
+  }) => Effect.Effect<ReadonlyArray<SteeringEntry>, RunNotFound | RuntimeUnavailable>
   /**
    * The authoritative directory record for one Run.
    *
@@ -300,31 +321,12 @@ export interface Service {
   }) => Effect.Effect<DirectoryEntry, RunNotFound | AgentNameConflict | RuntimeUnavailable>
   /** Parent, direct children, and siblings under one parent, from durable links only. */
   readonly listRelated: (runId: string) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryLookupError>
-  /**
-   * Admit one message into a target's durable inbox.
-   *
-   * Admission is idempotent on (target, messageId, idempotencyKey) and rejects a divergent payload
-   * under the same identity. An entry admitted while the target Run is live is bound to that Run's
-   * steering inbox, which the agent loop drains only at a turn boundary; otherwise it stays pending
-   * for the target's next Run.
-   */
-  readonly admitMessage: (input: AdmitMessageInput) => Effect.Effect<MessageReceipt, AdmitMessageError>
-  /** Messages admitted for one session that no Run has taken yet. */
-  readonly pendingMessages: (input: {
-    readonly sessionId: string
-    readonly runId?: string
-    readonly limit: number
-  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RuntimeUnavailable>
   /** Ordered durable child settlements addressed to one exact parent Run. */
   readonly settlementNotifications: (input: {
     readonly parentRunId: string
     readonly afterSequence: number
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<ChildSettlementNotification>, RunNotFound | RuntimeUnavailable>
-  /** Bind every pending message for a Run's session to that Run's steering inbox. */
-  readonly deliverPendingMessages: (input: {
-    readonly runId: string
-  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RunNotFound | RuntimeUnavailable>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly fork: (
     input: ForkRunInput,

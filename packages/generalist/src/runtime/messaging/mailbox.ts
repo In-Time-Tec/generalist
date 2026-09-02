@@ -1,33 +1,10 @@
-import { digest as pinDigest } from "../../core/durable/pin.js"
 import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Address } from "../address.js"
 import { Metadata } from "./message.js"
 
 /**
- * Bounds one durable inbox.
- *
- * Bounds are enforced at admission so a sender learns immediately that its message was refused
- * instead of discovering silent loss later.
- */
-export interface MailboxBounds {
-  readonly maxPending: number
-  readonly maxPendingBytes: number
-  readonly maxPerWindow: number
-  readonly windowMillis: number
-}
-export const defaultBounds: MailboxBounds = {
-  maxPending: 256,
-  maxPendingBytes: 1_048_576,
-  maxPerWindow: 64,
-  windowMillis: 60_000,
-}
-
-/**
- * One durable message admitted to a target inbox.
- *
- * `sequence` is the total order for the target. `deliveredRunId` records the Run that took the
- * entry; until then the entry is pending and survives Server restart.
+ * Addressed-message projection over one durable Run inbox entry.
  */
 export interface MailboxEntry {
   readonly entryId: string
@@ -90,37 +67,9 @@ export const MessageReceipt: Schema.Codec<MessageReceipt, MessageReceipt> = Sche
   duplicate: Schema.Boolean,
 })
 
-/**
- * Stable identity of one message payload.
- *
- * Two admissions carrying the same message id and idempotency key must carry the same digest, or
- * the second is a conflict rather than a duplicate.
- */
-export const digest = (input: {
-  readonly to: Address
-  readonly from: Address
-  readonly prompt: Prompt.Prompt
-  readonly correlationId: string
-  readonly causationId?: string
-  readonly inReplyTo?: string
-  readonly metadata: Metadata
-}): string =>
-  pinDigest({
-    to: input.to,
-    from: input.from,
-    prompt: Schema.encodeSync(Prompt.Prompt)(input.prompt),
-    correlationId: input.correlationId,
-    causationId: input.causationId ?? null,
-    inReplyTo: input.inReplyTo ?? null,
-    metadata: input.metadata,
-  })
-
 /** Encoded size charged against the inbox byte bound. */
 export const promptBytes = (prompt: Prompt.Prompt): number =>
   new TextEncoder().encode(JSON.stringify(Schema.encodeSync(Prompt.Prompt)(prompt))).length
-
-/** The steering idempotency key one mailbox entry delivers under. */
-export const steeringKey = (entryId: string): string => `message:${entryId}`
 
 /**
  * Render one entry as model-facing conversation carrying its authoritative sender.
@@ -137,7 +86,7 @@ const userParts = (message: Prompt.Message): ReadonlyArray<Prompt.UserMessagePar
   return parts
 }
 
-export const deliveryPrompt = (entry: MailboxEntry): Prompt.Prompt =>
+export const deliveryPrompt = (entry: Pick<MailboxEntry, "from" | "messageId" | "prompt">): Prompt.Prompt =>
   Prompt.fromMessages([
     Prompt.makeMessage("user", {
       content: entry.prompt.content.flatMap((message: Prompt.Message) => userParts(message)),

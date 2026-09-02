@@ -62,10 +62,9 @@ export const postgresLayer = (url: string) =>
   }).pipe(Layer.provide(resolverLayer))
 
 /**
- * A PostgreSQL Runtime whose mailbox bounds and messaging policy the test chooses.
+ * A PostgreSQL Runtime whose messaging policy the test chooses.
  *
- * Bounds and policy are Runtime construction options, so each variant is its own Runtime over the
- * one schema this file provisions.
+ * Each policy variant is its own Runtime over the one schema this file provisions.
  */
 export const postgresMessagingLayer = (database: PostgresDatabase) => (overrides: MessagingOverrides) =>
   database.provision(

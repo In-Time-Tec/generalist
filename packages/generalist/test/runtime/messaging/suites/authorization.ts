@@ -62,8 +62,7 @@ export const messagingAuthorizationSuite = <StoreError, Extra = never>(
           })
           .pipe(Effect.flip)
 
-        expect(error).toBeInstanceOf(Errors.MessagingUnauthorized)
-        expect(Schema.is(Errors.MessagingUnauthorized)(error) ? error.reason : undefined).toBe("cross-session")
+        expect(error).toBeInstanceOf(Errors.NotInFamily)
         expect(yield* runtime.messages({ runId: outsider.runId, limit: 10 })).toEqual([])
       }).pipe(provide()),
     )
@@ -82,7 +81,7 @@ export const messagingAuthorizationSuite = <StoreError, Extra = never>(
           })
           .pipe(Effect.flip)
 
-        expect(error).toBeInstanceOf(Errors.MessagingUnauthorized)
+        expect(error).toBeInstanceOf(Errors.NotInFamily)
         expect(yield* runtime.messages({ runId: otherFamilyChild.runId, limit: 10 })).toEqual([])
       }).pipe(provide()),
     )
@@ -247,7 +246,7 @@ export const messagingAuthorizationSuite = <StoreError, Extra = never>(
           })
           .pipe(Effect.flip)
 
-        expect(error).toBeInstanceOf(Errors.MessagingUnauthorized)
+        expect(error).toBeInstanceOf(Errors.NotInFamily)
         expect(yield* runtime.messages({ runId: outsider.runId, limit: 10 })).toEqual([])
       }).pipe(provide()),
     )

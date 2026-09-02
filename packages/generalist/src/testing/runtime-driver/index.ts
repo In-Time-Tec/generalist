@@ -27,6 +27,7 @@ import type {
 } from "./contract.js"
 import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 import { registerChildRuns } from "./children/runs.js"
+import { registerSteering } from "./steering.js"
 
 export type * from "./contract.js"
 export * from "./model-response-fault.js"
@@ -413,6 +414,14 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
         prepare: (effect) => prepare(options, effect),
         open: (use) => provideLayer(options.layer, use),
         provide: (use) => provide(options, use),
+      })
+    }
+    if (options.capabilities.steering !== undefined) {
+      registerSteering({
+        options,
+        capability: options.capabilities.steering,
+        prepare: (effect) => prepare(options, effect),
+        open: (use) => provideLayer(options.layer, use),
       })
     }
     if (options.capabilities.sqlTransactions !== undefined) {

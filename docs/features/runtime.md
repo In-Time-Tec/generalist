@@ -52,7 +52,7 @@ Runtime.start(agent, input, { sessionId: "session:42", idempotencyKey: "answer:1
 ```text
 RI  Agent<Input, Output> + Input + StartOptions
         │ Runtime.start()
-RO  RunHandle<Output> { runId, await, events, steer, followUp }
+RO  RunHandle<Output> { runId, await, events, send }
         │ Runtime.inspect(runId)
 { status: "queued" | "running" | ... , lastSequence: 0..n }
 ```
@@ -102,7 +102,7 @@ worker/process loss
 - `acknowledge` advances one Runtime-global durable processed-through point only to `-1` or an existing `TurnCompleted` sequence; equal/older valid points are no-ops, invalid boundaries fail `AckInvalid`, and future points fail `AckBeyondCommitted`. Default is `{ sequence: -1 }`; feed the stored sequence to `events` after restart.
 - `snapshot` atomically pairs inspection and exclusive cursor with terminal-event outcome, raw attempt usage, and compaction state. Usage comes only from `AttemptCompleted.usage` or `AttemptFailed.providerUsage`; agreeing attempt IDs deduplicate, disagreement is corruption, and Runtime computes no price.
 - `RunEvent` is a strict lifecycle/core-model schema. Completed/interrupted model responses store references; `resolveModelResponse` verifies Session parent and digest. Only intentionally dynamic tool values and metadata remain unknown.
-- `steer` admits an idempotent FIFO entry only for a nonterminal Run, bounded to 64 pending entries and 1 MiB canonical prompts. Exact duplicate precedes capacity checks; changed input is `SteeringConflict`, overload is `Steering.InboxFull`, and no durable request waits for backpressure. Acceptance, consumption with the next model operation/checkpoint, and terminal discard are atomic and reconstructable; `SteeringDrained` is separate telemetry.
+- `send(runId, prompt, options)` admits the unified durable Run inbox with `steer`, `enqueue`, `interrupt`, `rollback`, or `reject` policy. Each accepted message appends `Inbox` before delivery and remains pending until consumption commits with the next model operation/checkpoint or terminalization records its disposition. Exact duplicate precedes capacity checks; changed input is `SteeringConflict`, overload is `Steering.InboxFull`, and no durable request waits for backpressure. `SteeringDrained` is separate telemetry.
 - Each `(runId, waitId)` row is the sole authority for immutable identity/reason, status, decoded resolution, and timestamps. Open waits preserve model order; each close changes one open row before one event and leaves siblings open. Exact duplicate response is read-only success, conflict is `ResponseConflict`, and terminal waits never reopen.
 - Approval waits bind approval ID, operation, capability, and encoded input. Exact approve/deny replay is idempotent; mismatch is `ApprovalMismatch`, stale is `ApprovalStale`; generic `respond` and `resolveOperation` are separate controls.
 - `cancelSession` covers every root tree already admitted to the Session; `awaitSessionTerminal` snapshots those roots and durably reinspects. Hosts must fence new roots before closing a Session. Cancellation closes operation admission, recursively marks descendants, and settles descendants before ancestors.

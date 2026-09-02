@@ -325,6 +325,7 @@ const streamInternalImpl = <
       const { preparePrompt, applyCompactionResult, countTokens, syncSession } = compactionRuntime
       const toolContext = {
         runId: inbox.runId,
+        inbox,
         options,
         state,
         isSkillActivationCall,

@@ -8,6 +8,7 @@ import { ChildRuns, Executor as ChildRunsExecutor, make as makeChildRuns } from 
 import { Executor as CodeModeExecutor, type Service as CodeModeService } from "../code-mode.js"
 import type { Service as Operations } from "../operation/nested-operations.js"
 import type { Service as RunStoreService } from "../run/store.js"
+import { AgentMessaging } from "../messaging/service.js"
 
 /** Select the resolved executable's ToolExecutor before the ambient host executor. */
 export const selectToolExecutor: {
@@ -33,14 +34,25 @@ export const hostContext = <
   readonly store: RunStoreService
   readonly codeMode: CodeModeService | undefined
   readonly nested: Operations
+  readonly messaging: AgentMessaging["Service"]
 }): Effect.Effect<
-  | Context.Context<ClosedServices<Tools, R, InputSchema, OutputSchema> | ChildRuns | OperationsService>
-  | Context.Context<ClosedServices<Tools, R, InputSchema, OutputSchema> | ChildRuns | OperationsService | ToolExecutor>,
+  | Context.Context<
+      ClosedServices<Tools, R, InputSchema, OutputSchema> | ChildRuns | OperationsService | AgentMessaging
+    >
+  | Context.Context<
+      | ClosedServices<Tools, R, InputSchema, OutputSchema>
+      | ChildRuns
+      | OperationsService
+      | ToolExecutor
+      | AgentMessaging
+    >,
   never,
   Scope.Scope
 > =>
   Effect.gen(function* () {
-    const services = yield* Layer.build(options.environment)
+    const services = yield* Layer.build(options.environment).pipe(
+      Effect.provideService(AgentMessaging, options.messaging),
+    )
     const ambient = yield* Effect.serviceOption(ToolExecutor)
     const children = makeChildRuns(options.store)
     const resolvedOrAmbient = selectToolExecutor(services, ambient)
@@ -56,7 +68,7 @@ export const hostContext = <
             }),
           )
     return Context.merge(
-      services,
+      Context.add(services, AgentMessaging, options.messaging),
       Context.merge(
         Context.merge(
           Context.make(ChildRuns, children),

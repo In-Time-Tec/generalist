@@ -51,10 +51,9 @@ export const mysqlLayer = (url: string) =>
   }).pipe(Layer.provide(resolverLayer))
 
 /**
- * A MySQL Runtime whose mailbox bounds and messaging policy the test chooses.
+ * A MySQL Runtime whose messaging policy the test chooses.
  *
- * Bounds and policy are Runtime construction options, so each variant is its own Runtime over the
- * one database this file provisions.
+ * Each policy variant is its own Runtime over the one database this file provisions.
  */
 export const mysqlMessagingLayer = (database: MysqlDatabase) => (overrides: MessagingOverrides) =>
   database.provision(

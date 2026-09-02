@@ -38,6 +38,7 @@ import { recoverRunningOperations } from "./store/operation/recovery.js"
 import { resolveOperation } from "./store/operation/resolution.js"
 import { hasAdmission, loadEventsAfter, loadRun, loadRunWaitsByStatus } from "./store/statements.js"
 import { commitInterruptedModelResponse } from "./model-response/interrupted-model-response.js"
+import { encodeContinuation } from "../run/steering.js"
 import {
   claimExecution,
   loadExecution,
@@ -47,16 +48,13 @@ import {
   saveExecution,
 } from "./store/execution.js"
 import { claimedStore as sqliteClaimedSessionStore, reader as sqliteSessionReader } from "./session/store.js"
-import { admitSteering, readSteering, saveCompletionContinuation } from "./store/steering/service.js"
 import {
-  admitMessage,
-  deliverPendingMessages,
-  directory,
-  listRelated,
-  pendingMessages,
-  registerAgentName,
-  resolveAddress,
-} from "./store/directory.js"
+  admitSteering,
+  readPendingSteering,
+  readSteering,
+  saveCompletionContinuation,
+} from "./store/steering/service.js"
+import { directory, listRelated, registerAgentName, resolveAddress } from "./store/directory.js"
 import { forBackend } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store/fan-out/service.js"
 import { loadTreeReplay } from "./tree-replay.js"
@@ -291,22 +289,48 @@ const makeSqlStoreServices = <DriverError>(
             }),
           ),
         admitSteering: (input) => locked(locks.run(input.runId), admitSteering(transactionHub, input)),
+        admitRollback: (input) =>
+          locked(
+            locks.run(input.runId),
+            Effect.gen(function* () {
+              const stored = yield* loadRun(input.runId)
+              if (stored === undefined) return yield* RunNotFound.make({ runId: input.runId })
+              const prior = (yield* loadEventsAfter(input.runId, -1)).some(
+                (event) => event._tag === "Inbox" && event.idempotencyKey === input.idempotencyKey,
+              )
+              if (prior) return yield* admitSteering(transactionHub, input)
+              yield* rewind(transactionHub, {
+                runId: input.runId,
+                branchRunId: input.branchRunId,
+                toSequence: Math.max(0, stored.lastTurnCompletedSequence),
+              })
+              const admission = yield* admitSteering(transactionHub, input)
+              let nextTurn = 0
+              for (const event of yield* loadEventsAfter(input.runId, -1)) {
+                if (event._tag === "TurnCompleted") nextTurn = event.turn + 1
+              }
+              const database = yield* SqlClient.SqlClient
+              yield* database`
+                UPDATE generalist_runs SET continuation_json = ${encodeContinuation({
+                  schemaVersion: 1,
+                  prompt: input.prompt,
+                  nextTurn,
+                  steeringEntryIds: [admission.receipt.entryId],
+                })}
+                WHERE run_id = ${input.runId}
+              `
+              yield* activateRoot(transactionHub, input.runId)
+              return admission
+            }),
+          ),
         readSteering: (input) => fenced(input, readSteering(input)),
+        pendingSteering: (input) =>
+          runNoTxn(readPendingSteering(input.runId)).pipe(Effect.map((entries) => entries.slice(0, input.limit))),
         directory: (runId) => runNoTxn(directory(runId)),
         resolveAddress: (address) => runNoTxn(resolveAddress(address)),
         registerAgentName: (input) => locked(locks.run(input.runId), registerAgentName(input)),
         listRelated: (runId) => runNoTxn(listRelated(runId)),
-        admitMessage: (input) => locked(locks.mailbox(input.targetSessionId), admitMessage(input)),
-        pendingMessages: (input) => runNoTxn(pendingMessages(input)),
         settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
-        deliverPendingMessages: (input) =>
-          run(
-            locks.run(input.runId).pipe(
-              Effect.andThen(directory(input.runId)),
-              Effect.flatMap((entry) => locks.mailbox(entry.sessionId)),
-              Effect.andThen(deliverPendingMessages(transactionHub, input)),
-            ),
-          ),
         inspect: (runId) =>
           runNoTxn(
             Effect.gen(function* () {
@@ -569,7 +593,7 @@ export const layerSqlRuntime = (input: {
     const agents = makeRegisteredAgents()
     const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
     const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
-    const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
+    const host = runExecutorLayer(agents).pipe(Layer.provide(Layer.merge(dependencies, runtime)))
     const triggers = triggerSchedulerLayer(input.options.scheduler).pipe(Layer.provide(Layer.merge(runtime, services)))
     return Layer.mergeAll(runtime, host, services, triggers)
   })

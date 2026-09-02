@@ -5,23 +5,10 @@ import {
   nameScope,
   parseAddress,
   runAddress,
-  sessionAddress,
   type AgentName,
   type DirectoryEntry,
 } from "../../execution/agent/directory.js"
-import {
-  AddressNotFound,
-  AgentNameConflict,
-  MailboxFull,
-  MailboxRateLimited,
-  MessageConflict,
-  RunNotFound,
-  RuntimeUnavailable,
-} from "../../errors.js"
-import { deliveryPrompt, steeringKey, type MailboxEntry } from "../../messaging/mailbox.js"
-import type { AdmitMessageInput } from "../../run/store.js"
-import { digest as steeringDigest } from "../../run/steering.js"
-import { isTerminal } from "../../run.js"
+import { AddressNotFound, AgentNameConflict, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { agentNameKey, type MemoryState, type StoredRun } from "../state.js"
 import {
   fromMailboxEntry,
@@ -31,7 +18,6 @@ import {
   type Notification,
 } from "../../child/settlement.js"
 import type { RunEvent } from "../../run/event.js"
-import { appendLifecycle } from "../append.js"
 
 const requireRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -154,61 +140,6 @@ export const listRelated: {
 const messageKey = (input: { readonly sessionId: string; readonly messageId: string; readonly key: string }): string =>
   `${input.sessionId}\0${input.messageId}\0${input.key}`
 
-/**
- * One message still owed to this session.
- *
- * Pending-ness is derived from consumption, not from binding. A message bound to a Run that reached
- * a terminal state without consuming it was never seen by any model, so it returns to pending and
- * the session's next Run takes it. Binding alone must not strand a message on a dead Run.
- */
-const settlementEntry = (entry: MailboxEntry): boolean => entry.entryId.startsWith("child-settled:")
-
-const deliverable = (state: MemoryState, entry: MailboxEntry): boolean => {
-  if (entry.to === sessionAddress(entry.targetSessionId)) return true
-  const target = [...state.runs.values()].find((run) => runAddress(run.runId) === entry.to)
-  return target !== undefined && !isTerminal(target.status)
-}
-
-const owed = (state: MemoryState, entry: MailboxEntry): boolean => {
-  if (entry.deliveredRunId === undefined) return true
-  const holder = state.runs.get(entry.deliveredRunId)
-  if (holder === undefined || !isTerminal(holder.status)) return false
-  return !holder.steering.some(
-    (steering) => steering.entryId === entry.steeringEntryId && steering.consumedOperationId !== undefined,
-  )
-}
-
-export const pendingMessages: {
-  (input: {
-    readonly sessionId: string
-    readonly runId?: string
-    readonly limit: number
-  }): (state: MemoryState) => ReadonlyArray<MailboxEntry>
-  (
-    state: MemoryState,
-    input: { readonly sessionId: string; readonly runId?: string; readonly limit: number },
-  ): ReadonlyArray<MailboxEntry>
-} = Function.dual(
-  2,
-  (
-    state: MemoryState,
-    input: { readonly sessionId: string; readonly runId?: string; readonly limit: number },
-  ): ReadonlyArray<MailboxEntry> =>
-    [...state.messages.values()]
-      .filter(
-        (entry) =>
-          entry.targetSessionId === input.sessionId &&
-          !settlementEntry(entry) &&
-          (input.runId === undefined ||
-            entry.to === sessionAddress(input.sessionId) ||
-            (entry.to === runAddress(input.runId) &&
-              !isTerminal(state.runs.get(input.runId)?.status ?? "cancelled"))) &&
-          owed(state, entry),
-      )
-      .toSorted((left, right) => left.sequence - right.sequence)
-      .slice(0, input.limit),
-)
-
 export const settlementNotifications: {
   (input: {
     readonly parentRunId: string
@@ -291,164 +222,4 @@ export const admitChildSettlement: {
       messages.set(key, entry)
       return { ...state, messages }
     }),
-)
-
-export const admitMessage: {
-  (
-    input: AdmitMessageInput,
-  ): (
-    state: MemoryState,
-  ) => Effect.Effect<
-    readonly [import("../../messaging/mailbox.js").MessageReceipt, MemoryState],
-    MailboxFull | MailboxRateLimited | MessageConflict | RunNotFound | RuntimeUnavailable
-  >
-  (
-    state: MemoryState,
-    input: AdmitMessageInput,
-  ): Effect.Effect<
-    readonly [import("../../messaging/mailbox.js").MessageReceipt, MemoryState],
-    MailboxFull | MailboxRateLimited | MessageConflict | RunNotFound | RuntimeUnavailable
-  >
-} = Function.dual(2, (state: MemoryState, input: AdmitMessageInput) =>
-  Effect.gen(function* () {
-    if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
-    const key = messageKey({
-      sessionId: input.targetSessionId,
-      messageId: input.messageId,
-      key: input.idempotencyKey,
-    })
-    const prior = state.messages.get(key)
-    if (prior !== undefined) {
-      if (prior.digest !== input.digest) {
-        return yield* MessageConflict.make({
-          to: input.to,
-          messageId: input.messageId,
-          idempotencyKey: input.idempotencyKey,
-        })
-      }
-      return [
-        { messageId: prior.messageId, entryId: prior.entryId, sequence: prior.sequence, duplicate: true },
-        state,
-      ] as const
-    }
-    const now = yield* Clock.currentTimeMillis
-    const forSession = [...state.messages.values()].filter((entry) => entry.targetSessionId === input.targetSessionId)
-    const quotaEntries = forSession.filter((entry) => !settlementEntry(entry) && deliverable(state, entry))
-    const pending = quotaEntries.filter((entry) => owed(state, entry))
-    if (pending.length >= input.bounds.maxPending) {
-      return yield* MailboxFull.make({ to: input.to, dimension: "pending", limit: input.bounds.maxPending })
-    }
-    const pendingBytes = pending.reduce((total, entry) => total + entry.bytes, 0)
-    if (pendingBytes + input.bytes > input.bounds.maxPendingBytes) {
-      return yield* MailboxFull.make({ to: input.to, dimension: "bytes", limit: input.bounds.maxPendingBytes })
-    }
-    const windowStart = now - input.bounds.windowMillis
-    const recent = quotaEntries.filter((entry) => entry.admittedAtMillis > windowStart)
-    if (recent.length >= input.bounds.maxPerWindow) {
-      return yield* MailboxRateLimited.make({
-        to: input.to,
-        limit: input.bounds.maxPerWindow,
-        windowMillis: input.bounds.windowMillis,
-      })
-    }
-    const sequence = forSession.reduce((highest, entry) => Math.max(highest, entry.sequence + 1), 0)
-    let entry: MailboxEntry = {
-      entryId: `msg_${state.nextMessageCounter}`,
-      targetSessionId: input.targetSessionId,
-      sequence,
-      from: input.fromAddress,
-      fromRunId: input.fromRunId,
-      to: input.to,
-      messageId: input.messageId,
-      idempotencyKey: input.idempotencyKey,
-      digest: input.digest,
-      bytes: input.bytes,
-      admittedAtMillis: now,
-      prompt: input.prompt,
-      correlationId: input.correlationId,
-      metadata: input.metadata,
-    }
-    if (input.causationId !== undefined) entry = Object.assign({}, entry, { causationId: input.causationId })
-    if (input.inReplyTo !== undefined) entry = Object.assign({}, entry, { inReplyTo: input.inReplyTo })
-    const messages = new Map(state.messages)
-    messages.set(key, entry)
-    return [
-      { messageId: entry.messageId, entryId: entry.entryId, sequence, duplicate: false },
-      { ...state, nextMessageCounter: state.nextMessageCounter + 1, messages },
-    ] as const
-  }),
-)
-
-/**
- * Bind every pending message for a Run's session to that Run's steering inbox.
- *
- * Steering is already consumed atomically with the next model operation checkpoint, and the agent
- * loop drains it only at a turn boundary. Binding delivery to that one mechanism is what makes
- * delivery exactly-once from the consumer's view and keeps it out of an active model turn.
- */
-export const deliverPendingMessages: {
-  (input: {
-    readonly runId: string
-  }): (
-    state: MemoryState,
-  ) => Effect.Effect<readonly [ReadonlyArray<MailboxEntry>, MemoryState], RunNotFound | RuntimeUnavailable>
-  (
-    state: MemoryState,
-    input: { readonly runId: string },
-  ): Effect.Effect<readonly [ReadonlyArray<MailboxEntry>, MemoryState], RunNotFound | RuntimeUnavailable>
-} = Function.dual(2, (state: MemoryState, input: { readonly runId: string }) =>
-  Effect.gen(function* () {
-    const run = yield* requireRun(state, input.runId)
-    if (isTerminal(run.status) || run.pendingOutcome !== undefined) return [[], state] as const
-    const pending = pendingMessages(state, {
-      sessionId: run.message.sessionId,
-      runId: run.runId,
-      limit: Number.MAX_SAFE_INTEGER,
-    })
-    if (pending.length === 0) return [[], state] as const
-    const messages = new Map(state.messages)
-    const steering = [...run.steering]
-    const delivered: Array<MailboxEntry> = []
-    let counter = state.nextSteeringCounter
-    for (const entry of pending) {
-      const idempotencyKey = steeringKey(entry.entryId)
-      const prompt = deliveryPrompt(entry)
-      const steeringEntryId = `steer_${counter}`
-      counter += 1
-      steering.push({
-        entryId: steeringEntryId,
-        runId: run.runId,
-        sequence: steering.length,
-        idempotencyKey,
-        digest: steeringDigest(prompt),
-        prompt,
-      })
-      const bound: MailboxEntry = Object.assign({}, entry, { deliveredRunId: run.runId, steeringEntryId })
-      delivered.push(bound)
-      messages.set(
-        messageKey({
-          sessionId: entry.targetSessionId,
-          messageId: entry.messageId,
-          key: entry.idempotencyKey,
-        }),
-        bound,
-      )
-    }
-    if (delivered.length === 0) return [[], state] as const
-    const runs = new Map(state.runs)
-    runs.set(run.runId, { ...run, steering })
-    let next: MemoryState = { ...state, nextSteeringCounter: counter, messages, runs }
-    for (const entry of steering.slice(run.steering.length)) {
-      const [, accepted] = yield* appendLifecycle(next, run.runId, {
-        _tag: "SteeringAccepted",
-        entryId: entry.entryId,
-        steeringSequence: entry.sequence,
-        idempotencyKey: entry.idempotencyKey,
-        digest: entry.digest,
-        prompt: entry.prompt,
-      })
-      next = accepted
-    }
-    return [delivered, next] as const
-  }),
 )
