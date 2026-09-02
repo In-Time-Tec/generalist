@@ -127,6 +127,14 @@
       "types": "./dist/sandbox/index.d.ts",
       "import": "./dist/sandbox/index.js"
     },
+    "./unstable/sandbox/e2b": {
+      "types": "./dist/unstable/sandbox/e2b/index.d.ts",
+      "import": "./dist/unstable/sandbox/e2b/index.js"
+    },
+    "./unstable/sandbox/cloudflare": {
+      "types": "./dist/unstable/sandbox/cloudflare/index.d.ts",
+      "import": "./dist/unstable/sandbox/cloudflare/index.js"
+    },
     "./ai/model-catalog": {
       "types": "./dist/ai/model-catalog.d.ts",
       "import": "./dist/ai/model-catalog.js"

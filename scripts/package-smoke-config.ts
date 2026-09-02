@@ -78,6 +78,11 @@ export const minimumConsumerProfiles = [
         runtimes: nodeAndBun,
         exports: ["Sandbox", "SandboxProvider", "layerBunKernel", "layerWorkerLoader"],
       },
+      {
+        specifier: "generalist/unstable/sandbox/e2b",
+        runtimes: nodeAndBun,
+        exports: ["layer", "makeProvider"],
+      },
     ],
   },
   {
@@ -167,6 +172,11 @@ export const minimumConsumerProfiles = [
       },
       { specifier: "generalist/cloudflare/dynamic-workers", runtimes: workerOnly, exports: ["layer", "make"] },
       { specifier: "generalist/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
+      {
+        specifier: "generalist/unstable/sandbox/cloudflare",
+        runtimes: workerOnly,
+        exports: ["layer", "makeProvider"],
+      },
     ],
   },
   {
@@ -254,6 +264,8 @@ export const exactPackageExports = [
   "./transport/sse",
   "./transport/websocket",
   "./transport/wire",
+  "./unstable/sandbox/cloudflare",
+  "./unstable/sandbox/e2b",
 ] as const
 
 const sorted = <A>(values: Iterable<A>, compare: (left: A, right: A) => number): Array<A> =>
