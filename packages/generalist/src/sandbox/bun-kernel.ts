@@ -73,6 +73,7 @@ const restoreSnapshot = (
   store: KernelSnapshotStoreService,
   snapshotId: string,
   sessionId: string,
+  beforeSave: Effect.Effect<void> = Effect.void,
 ): Effect.Effect<void, SandboxError> =>
   Effect.gen(function* () {
     const snapshot = yield* store
@@ -83,6 +84,7 @@ const restoreSnapshot = (
       manifest: { ...snapshot.manifest, sessionId },
       payload: snapshot.payload,
     }
+    yield* beforeSave
     yield* store
       .save(restored)
       .pipe(Effect.mapError((cause) => snapshotFailure(`BunKernel fork failed for ${snapshotId}`, cause)))
@@ -183,10 +185,12 @@ export const makeBunKernelProvider = (
           .pipe(Effect.mapError(executionFailure), Effect.andThen(markPaused(sessionId, true))),
         resume: markPaused(sessionId, false),
         snapshot: immutableSnapshot(store, sessionId),
-        fork: (snapshotId) =>
+        fork: (snapshotId, request = {}) =>
           Effect.gen(function* () {
-            const forkId = yield* freshId
-            yield* restoreSnapshot(store, snapshotId, forkId)
+            const forkId = request.key ?? (yield* freshId)
+            const closeCurrent = request.key === undefined ? Effect.void : pool.close(forkId).pipe(Effect.ignore)
+            yield* restoreSnapshot(store, snapshotId, forkId, closeCurrent)
+            yield* markPaused(forkId, false)
             return sandbox(forkId, limits)
           }),
       })

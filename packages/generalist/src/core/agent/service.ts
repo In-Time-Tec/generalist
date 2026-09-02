@@ -1,4 +1,4 @@
-import { Effect, Option, Predicate, Schema, Stream } from "effect"
+import { Effect, Option, Predicate, type Ref, Schema, Stream } from "effect"
 import { dual } from "effect/Function"
 import { LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type AgentSuspended, type Event } from "./event.js"
@@ -303,6 +303,7 @@ export interface RunOptions {
     readonly rootRunId: RunIdType
     readonly attempt: number
     readonly admittedAt?: string
+    readonly inheritedSandboxSnapshot?: Ref.Ref<string | undefined>
   }
   /** First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number

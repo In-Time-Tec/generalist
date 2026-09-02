@@ -161,6 +161,7 @@ const sdkClient = (options: Omit<ProviderOptions, "client">): Client => {
 /** @experimental Construct the Modal provider over an injected SDK client. */
 export const makeProvider = (options: ProviderOptions): SandboxProviderService => {
   const client = options.client
+  const aliases = new Map<string, string>()
   const sandbox = (
     connection: Connection,
     limits: Limits,
@@ -260,14 +261,21 @@ export const makeProvider = (options: ProviderOptions): SandboxProviderService =
           try: () => connection.snapshot(),
           catch: (cause) => executionFailure(cause, undefined),
         }),
-        fork: (snapshotId) =>
+        fork: (snapshotId, request = {}) =>
           Effect.tryPromise({
             try: () => client.create(snapshotId, true),
             catch: (cause) =>
               cause instanceof NotFoundError
                 ? SnapshotNotFound.make({ snapshotId })
                 : unavailable(cause, "Modal could not restore the snapshot"),
-          }).pipe(Effect.flatMap((forked) => sandbox(forked, limits, scope, true))),
+          }).pipe(
+            Effect.tap((forked) =>
+              Effect.sync(() => {
+                if (request.key !== undefined) aliases.set(request.key, forked.id)
+              }),
+            ),
+            Effect.flatMap((forked) => sandbox(forked, limits, scope, request.key === undefined)),
+          ),
       })
     })
 
@@ -281,8 +289,10 @@ export const makeProvider = (options: ProviderOptions): SandboxProviderService =
           })
         const limits = yield* requestedLimits(request.limits)
         const scope = yield* Scope.Scope
+        const key = request.key
         const connection = yield* Effect.tryPromise({
-          try: () => (request.key === undefined ? client.create(options.image, false) : client.connect(request.key)),
+          try: () =>
+            key === undefined ? client.create(options.image, false) : client.connect(aliases.get(key) ?? key),
           catch: (cause) => unavailable(cause, "Modal Sandbox acquisition failed"),
         })
         return yield* sandbox(connection, limits, scope, request.key === undefined)

@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Ref, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import type { ToolSchedulingPolicy } from "../core/agent/service.js"
 import { type Progress, type Service, ToolContext } from "../core/tools/tool-context.js"
@@ -123,6 +123,17 @@ const sandboxFailure = (sessionId: string, cellId: string, failure: SandboxError
   return KernelProtocolViolation.make({ sessionId, cellId, message: failure.message })
 }
 
+const acquireSandbox = (provider: SandboxProvider["Service"], context: Service, sessionId: string) =>
+  Effect.gen(function* () {
+    if (context.inheritedSandboxSnapshot === undefined) return yield* provider.acquire({ key: sessionId })
+    const snapshotId = yield* Ref.get(context.inheritedSandboxSnapshot)
+    if (snapshotId === undefined) return yield* provider.acquire({ key: sessionId })
+    const source = yield* provider.acquire()
+    const sandbox = yield* source.fork(snapshotId, { key: sessionId })
+    yield* Ref.set(context.inheritedSandboxSnapshot, undefined)
+    return sandbox
+  })
+
 const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, ToolContext | SandboxProvider> =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -134,9 +145,9 @@ const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, Too
       const toolCallId = context.toolCallId ?? request.call.id
       const cellId = cellIdOf(request, context)
       return yield* Effect.gen(function* () {
-        const sandbox = yield* provider
-          .acquire({ key: request.sessionId })
-          .pipe(Effect.mapError((failure) => sandboxFailure(request.sessionId, cellId, failure)))
+        const sandbox = yield* acquireSandbox(provider, context, request.sessionId).pipe(
+          Effect.mapError((failure) => sandboxFailure(request.sessionId, cellId, failure)),
+        )
         const execution = yield* sandbox
           .start({ _tag: "TypeScript", cellId, source: params.code })
           .pipe(Effect.mapError((failure) => sandboxFailure(request.sessionId, cellId, failure)))

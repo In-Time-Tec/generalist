@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer, type Ref, Schema } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../agent/lifecycle/definition.js"
 
@@ -28,6 +28,8 @@ export interface Service {
   readonly history?: Effect.Effect<Prompt.Prompt>
   /** @internal Parent definition used to attenuate process-local children. */
   readonly agent?: AnyAgent
+  /** @internal One pending durable Sandbox image, cleared after the first successful restoration. */
+  readonly inheritedSandboxSnapshot?: Ref.Ref<string | undefined>
 }
 export class ToolContext extends Context.Service<ToolContext, Service>()(
   "generalist/core/tools/tool-context/ToolContext",
