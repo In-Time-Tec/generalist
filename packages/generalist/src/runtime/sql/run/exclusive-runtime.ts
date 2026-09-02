@@ -7,10 +7,11 @@ import { LocalScheduler } from "../../execution/local-scheduler.js"
 import { layer as localSchedulerLayer, make as makeLocalScheduler } from "../../execution/local-scheduler-internal.js"
 import { layer as modelPreviewLayer } from "../../execution/model-response/preview-internal.js"
 import { RunExecutor } from "../../execution/run-executor.js"
-import { make as makeRunExecutor } from "../../execution/run-executor-internal.js"
+import { makeWith as makeRunExecutor } from "../../execution/run-executor-internal.js"
 import { layer as runtimeLayer } from "../../memory/layer/service.js"
 import { RunStore } from "../../run/store.js"
 import { Runtime } from "../../service.js"
+import { make as makeRegisteredAgents } from "../../registered-agent.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "../store.js"
 
 /** Services constructed by an exclusive SQLite Runtime host. */
@@ -26,9 +27,10 @@ export const layerSqliteRuntime = (
   input: SqliteRuntimeOptions,
 ): Layer.Layer<SqliteRuntimeServices, SqliteStoreError, SqlClient.SqlClient | ExecutableResolver> => {
   const store = layerSqliteStore(input.options)
+  const agents = makeRegisteredAgents()
   const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = runtimeLayer(input.options).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(RunExecutor, makeRunExecutor).pipe(Layer.provide(dependencies))
+  const runtime = runtimeLayer(input.options, agents).pipe(Layer.provide(dependencies))
+  const host = Layer.effect(RunExecutor, makeRunExecutor(agents)).pipe(Layer.provide(dependencies))
   const scheduler = (
     input.schedulerMode === "external"
       ? Layer.effect(LocalScheduler, makeLocalScheduler({ workerId: input.workerId, ...input.options.scheduler }))

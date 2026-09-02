@@ -28,7 +28,9 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
   Layer.succeed(
     Runtime.Runtime,
     Runtime.Runtime.of({
+      register: () => Effect.die("unused register"),
       start: () => Effect.die("unused start"),
+      startExecution: () => Effect.die("unused startExecution"),
       admit: () => Effect.die("unused admit"),
       activate: () => Effect.die("unused activate"),
       send: () => Effect.die("unused send"),

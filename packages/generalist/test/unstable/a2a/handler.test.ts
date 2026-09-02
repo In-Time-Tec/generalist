@@ -116,7 +116,9 @@ const makeRuntime = (acceptedSequence = 0) => {
   }
 
   const runtime: Runtime.Service = {
+    register: () => Effect.die("not used"),
     start: () => Effect.die("not used"),
+    startExecution: () => Effect.die("not used"),
     admit: () => Effect.die("not used"),
     activate: () => Effect.die("not used"),
     send: (input) => {

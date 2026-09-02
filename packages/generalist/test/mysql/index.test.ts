@@ -120,7 +120,12 @@ Testing.runtimeDriver({
   address: assistantAddress,
   layer: conformanceLayer,
   skip,
-  capabilities: { runtime: { claim: conformanceClaim } },
+  capabilities: {
+    runtime: { claim: conformanceClaim },
+    "start-by-agent": { claim: conformanceClaim },
+    "idempotent-start": { claim: conformanceClaim },
+    "unknown-agent-on-recovery": { claim: conformanceClaim },
+  },
 })
 
 modelResponseFaultConformance({

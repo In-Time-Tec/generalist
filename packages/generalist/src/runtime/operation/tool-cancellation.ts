@@ -2,15 +2,26 @@ import { Clock, Effect, Layer, Option, Schema } from "effect"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import { CancellationFailure, type CancellationRequest, ToolExecutor } from "../../core/tools/tool-executor.js"
 import { decodeCancellableOperation, supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
-import { AgentExecutionFailure } from "../errors.js"
-import type { Service as ExecutableResolver } from "../executable/resolver.js"
+import { AgentExecutionFailure, type UnknownAgent } from "../errors.js"
 import { selectToolExecutor } from "../execution/context.js"
-import { ExecutionResolution } from "../execution/resolution/resolve.js"
-import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
+import { ExecutionResolution, type Resolver } from "../execution/resolution/resolve.js"
+import type {
+  ExecutionClaim,
+  ExecutionRecord,
+  Service as RunStore,
+  WorkerMutationError,
+} from "../run/store.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
 
-export const make = (options: { readonly store: RunStore; readonly resolver: ExecutableResolver }) =>
+export const make = (options: {
+  readonly store: RunStore
+  readonly resolver: Resolver
+  readonly suspendUnknown: (
+    claim: ExecutionClaim,
+    error: UnknownAgent,
+  ) => Effect.Effect<void, WorkerMutationError>
+}) =>
   Effect.gen(function* () {
     const ambient = yield* Effect.serviceOption(ToolExecutor)
     return (claim: ExecutionClaim, claimed: ExecutionRecord) =>
@@ -19,8 +30,11 @@ export const make = (options: { readonly store: RunStore; readonly resolver: Exe
           yield* options.store.recoverRunningOperations(claim)
           const operations = yield* options.store.operationCancellations(claim)
           if (operations.length > 0) {
-            const resolution = yield* ExecutionResolution.resolve(options.resolver, claimed, (error) =>
-              options.store.fail({ ...claim, error }),
+            const resolution = yield* ExecutionResolution.resolve(
+              options.resolver,
+              claimed,
+              (error) => options.store.fail({ ...claim, error }),
+              (error) => options.suspendUnknown(claim, error),
             )
             if (resolution === undefined) return
             if (resolution._tag !== "Agent") {

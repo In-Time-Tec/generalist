@@ -1,6 +1,8 @@
-import { Context, Effect, Stream, type Duration } from "effect"
+import { Context, Effect, Schema, Stream, type Duration } from "effect"
 import type { Entry as SessionEntry } from "../core/context/session.js"
-import { Prompt } from "effect/unstable/ai"
+import { Prompt, type Tool } from "effect/unstable/ai"
+import type { Agent, ClosedServices } from "../core/agent/lifecycle/definition.js"
+import type { AgentError, InvalidOutput } from "../core/agent/event.js"
 import type { TreePolicy } from "./tree/policy.js"
 import type { Address } from "./address.js"
 import type { PinnedExecutable } from "./executable/manifest.js"
@@ -48,13 +50,16 @@ import type {
   SessionEntryCorrupt,
   AckInvalid,
   AckBeyondCommitted,
+  DuplicateAgent,
+  UnknownAgent,
 } from "./errors.js"
 import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
 import type { MessagingPolicy } from "./messaging/service.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
-import type { CompletedModelResponse, RunEvent } from "./run/event.js"
+import type { CompletedModelResponse, RunCancelled, RunCompleted, RunEvent, RunFailed } from "./run/event.js"
+import type { AgentExecutionResult, ProgramExecutionResult } from "./execution/state.js"
 import type { WaitResolution } from "./run/wait.js"
 import type { FanOutInspection, FanOutReceipt } from "./child/fan-out.js"
 import type { FanOutInput, FanOutMemberOrigin, InitialFanOutInput } from "./child/fan-out-internal.js"
@@ -104,7 +109,8 @@ export interface SendInput {
   readonly metadata?: Metadata
 }
 
-export interface StartInput {
+/** @internal Exact root execution admission used below the typed Agent API. */
+export interface StartExecutionInput {
   readonly runId?: string
   readonly treePolicy?: TreePolicy
   readonly executable: PinnedExecutable
@@ -120,8 +126,8 @@ export interface StartInput {
   readonly initialFanOuts?: ReadonlyArray<InitialFanOutInput>
 }
 
-/** One exact root admission held behind Generalist's durable execution gate. */
-export type AdmitInput = Omit<StartInput, "initialChildren" | "initialFanOuts">
+/** @experimental One exact root admission held behind Generalist's durable execution gate. */
+export type AdmitInput = Omit<StartExecutionInput, "initialChildren" | "initialFanOuts">
 
 /** Release one admitted root's durable execution gate. */
 export interface ActivateInput {
@@ -142,6 +148,30 @@ export interface InitialChildInput {
 export interface StartReceipt extends RunReceipt {
   readonly childRunIds: ReadonlyArray<string>
   readonly fanOuts: ReadonlyArray<FanOutReceipt>
+}
+
+/** @experimental Typed durable start identity. Budget admission is reserved for the RunBudget contract. */
+export interface StartOptions {
+  readonly sessionId?: string
+  readonly idempotencyKey?: string
+}
+
+type StartedAgentResult<Output> = Omit<AgentExecutionResult, "output"> & { readonly output: Output }
+
+/** @experimental Durable Runtime event with Agent completion decoded through its output Schema. */
+export type StartEvent<Output> =
+  | Exclude<RunEvent, RunCompleted>
+  | (Omit<RunCompleted, "result"> & {
+      readonly result: StartedAgentResult<Output> | ProgramExecutionResult
+    })
+
+/** @experimental One typed durable Run and its replay-then-live event stream. */
+export interface RunHandle<Output> {
+  readonly runId: import("../core/durable/run-id.js").RunId
+  readonly await: Effect.Effect<Output, RunFailed | RunCancelled | EventsError | InvalidOutput>
+  readonly events: Stream.Stream<StartEvent<Output>, EventsError | InvalidOutput>
+  readonly steer: (input: import("../core/turn/steering.js").Input) => Effect.Effect<SteeringReceipt, SteerError>
+  readonly followUp: (input: import("../core/turn/steering.js").Input) => Effect.Effect<SteeringReceipt, SteerError>
 }
 
 export interface SpawnInput {
@@ -268,7 +298,7 @@ export type SendError =
   | ExecutableRegistrationMissing
   | TreePolicyInvalid
   | RuntimeUnavailable
-export type StartError =
+export type StartExecutionError =
   | ChildDepthExceeded
   | ChildLimitExceeded
   | IdempotencyConflict
@@ -285,9 +315,11 @@ export type StartError =
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
   | RuntimeUnavailable
-/** Exact-root staged admission failures. */
-export type AdmitError = StartError
-/** Staged root activation failures. */
+/** @experimental Typed Agent start failures before a Run handle exists. */
+export type StartError = StartExecutionError | UnknownAgent | AgentError
+/** @experimental Exact-root staged admission failures. */
+export type AdmitError = StartExecutionError
+/** @experimental Staged root activation failures. */
 export type ActivateError = RunNotFound | RuntimeUnavailable
 export type SpawnError =
   | RunNotFound
@@ -350,8 +382,39 @@ export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
 
 export interface Service {
-  readonly start: (input: StartInput) => Effect.Effect<StartReceipt, StartError>
-  /** Durably admit one exact root without making it executable. */
+  /** @experimental Register one Agent name and its exact environment for start and recovery. */
+  readonly register: <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
+  ) => Effect.Effect<void, DuplicateAgent, ClosedServices<Tools, R, InputCodec, OutputCodec>>
+  /** @experimental Start one registered Agent with Schema-derived input and output. */
+  readonly start: <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
+    input: InputCodec["Type"],
+    options?: StartOptions,
+  ) => Effect.Effect<
+    RunHandle<OutputCodec["Type"]>,
+    StartError,
+    never
+  >
+  /** @internal Begin one already-normalized pinned execution. */
+  readonly startExecution: (
+    input: StartExecutionInput,
+  ) => Effect.Effect<StartReceipt, StartExecutionError>
+  /** @experimental Durably admit one exact root without making it executable. */
   readonly admit: (input: AdmitInput) => Effect.Effect<RunReceipt, AdmitError>
   /** Idempotently activate an admitted root and return its authoritative current state. */
   readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>

@@ -42,7 +42,9 @@ const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime meth
 
 const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
   Runtime.Runtime.of({
+    register: () => unused(),
     start: () => unused(),
+    startExecution: () => unused(),
     admit: () => unused(),
     activate: () => unused(),
     send: () => unused(),

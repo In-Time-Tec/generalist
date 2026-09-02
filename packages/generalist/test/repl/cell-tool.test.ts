@@ -411,7 +411,7 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
           const store = yield* RunStore.RunStore
           const host = yield* RunExecutor.RunExecutor
           const recoverySessionId = "session:sandbox-snapshot-recovery"
-          const first = yield* runtime.start({
+          const first = yield* runtime.startExecution({
             executable,
             registrations: registrationsFor(executable),
             sessionId: recoverySessionId,
@@ -461,7 +461,7 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
               ),
             },
           ]).pipe(Layer.orDie)
-          const second = yield* runtime.start({
+          const second = yield* runtime.startExecution({
             executable,
             registrations: registrationsFor(executable),
             sessionId: recoverySessionId,

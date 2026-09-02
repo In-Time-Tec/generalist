@@ -158,7 +158,7 @@ const makeCodeMode = (authority: AgentManifest.ProgramAuthority) =>
     codeModeFixtureId += 1
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
-    const runId = (yield* runtime.start({
+    const runId = (yield* runtime.startExecution({
       executable,
       registrations,
       sessionId: `code-mode-fixture:${codeModeFixtureId}`,
@@ -194,7 +194,7 @@ describe("Runtime code_mode Program children", () => {
       const admit = Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const scheduler = yield* LocalScheduler.LocalScheduler
-        rootRunId = (yield* runtime.start({
+        rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
           sessionId: `code-mode:${backend}`,
@@ -242,7 +242,7 @@ describe("Runtime code_mode Program children", () => {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const scheduler = yield* LocalScheduler.LocalScheduler
-        const rootRunId = (yield* runtime.start({
+        const rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
           sessionId: `code-mode-plural:${backend}`,
@@ -320,7 +320,7 @@ describe("Runtime code_mode Program children", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const scheduler = yield* LocalScheduler.LocalScheduler
-            const rootRunId = (yield* runtime.start({
+            const rootRunId = (yield* runtime.startExecution({
               executable,
               registrations,
               sessionId: `code-mode-cancel:${backend}`,
@@ -353,7 +353,7 @@ describe("Runtime code_mode Program children", () => {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          rootRunId = (yield* runtime.start({
+          rootRunId = (yield* runtime.startExecution({
             executable,
             registrations,
             sessionId: `code-mode-crash:${crashPoint}`,
@@ -440,7 +440,7 @@ describe("Runtime code_mode Program children", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const scheduler = yield* LocalScheduler.LocalScheduler
-        rootRunId = (yield* runtime.start({
+        rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
           sessionId: "code-mode-child-complete",
@@ -489,7 +489,7 @@ describe("Runtime code_mode Program children", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const failure = yield* Effect.flip(
-              runtime.start({
+              runtime.startExecution({
                 executable,
                 registrations: registrations.filter((registration) => registration.pin !== sandboxPin),
                 sessionId: "code-mode-missing-sandbox",

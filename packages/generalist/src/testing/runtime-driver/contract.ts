@@ -7,6 +7,7 @@ import type {
   SessionWriteClaim,
 } from "../../runtime/run/store.js"
 import type { Runtime, Service as RuntimeService } from "../../runtime/service.js"
+import type { Service as RunExecutorService } from "../../runtime/execution/run-executor.js"
 import type { RunClaims } from "../../runtime/sql/run/claims.js"
 
 /** A multi-worker claim without the driver's decoded persisted Run representation. */
@@ -21,6 +22,7 @@ export interface WorkerClaim {
 export interface Services {
   readonly runtime: RuntimeService
   readonly store: RunStoreService
+  readonly executor?: RunExecutorService
   readonly claims?: RunClaims["Service"]
 }
 
@@ -35,7 +37,22 @@ export interface RuntimeCapability {
   readonly claim: ClaimExecution
 }
 
-/** RunTree finite replay conformance capability. */
+/** @experimental Typed Agent start capability exercised with one storage-issued execution claim. */
+export interface StartByAgentCapability {
+  readonly claim: ClaimExecution
+}
+
+/** @experimental Typed Agent idempotent-start capability exercised with one storage-issued execution claim. */
+export interface IdempotentStartCapability {
+  readonly claim: ClaimExecution
+}
+
+/** @experimental Missing-registration recovery capability exercised with one storage-issued execution claim. */
+export interface UnknownAgentOnRecoveryCapability {
+  readonly claim: ClaimExecution
+}
+
+/** @experimental RunTree finite replay conformance capability. */
 export interface RunTreeCapability {
   readonly claim: ClaimExecution
 }
@@ -61,6 +78,9 @@ export interface MultiWorkerClaimCapability<E = never> {
 export interface Capabilities<ClaimsLayerError = never> {
   readonly admission?: true
   readonly runtime?: RuntimeCapability
+  readonly "start-by-agent"?: StartByAgentCapability
+  readonly "idempotent-start"?: IdempotentStartCapability
+  readonly "unknown-agent-on-recovery"?: UnknownAgentOnRecoveryCapability
   readonly runTree?: RunTreeCapability
   readonly sqlTransactions?: SqlTransactionCapability
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>

@@ -322,7 +322,7 @@ describe("RunExecutor", () => {
           const runtime = yield* Runtime.Runtime
           const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
-          const receipt = yield* runtime.start({
+          const receipt = yield* runtime.startExecution({
             executable,
             registrations,
             sessionId: "session:pinned-compaction",
@@ -358,7 +358,7 @@ describe("RunExecutor", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             if (runId === undefined) {
-              runId = (yield* runtime.start({
+              runId = (yield* runtime.startExecution({
                 executable,
                 registrations: registrationsFor(executable),
                 sessionId: "thread:independence",
@@ -424,7 +424,7 @@ describe("RunExecutor", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             if (runId === undefined) {
-              runId = (yield* runtime.start({
+              runId = (yield* runtime.startExecution({
                 executable,
                 registrations: registrationsFor(executable),
                 sessionId: "thread:usage",
@@ -502,7 +502,7 @@ describe("RunExecutor", () => {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             if (runId === undefined) {
-              runId = (yield* runtime.start({
+              runId = (yield* runtime.startExecution({
                 executable,
                 registrations: registrationsFor(executable),
                 sessionId: "thread:direct",
@@ -587,7 +587,7 @@ describe("RunExecutor", () => {
         Effect.scoped(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const receipt = yield* runtime.start({
+            const receipt = yield* runtime.startExecution({
               executable,
               registrations,
               sessionId: "thread:durable-continuity",
@@ -764,7 +764,7 @@ describe("RunExecutor", () => {
       const receipt = yield* scopedWith(layerSqlite())(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          return yield* runtime.start({
+          return yield* runtime.startExecution({
             executable,
             registrations,
             sessionId: "session:sqlite-pinned-compaction",
@@ -1526,7 +1526,7 @@ describe("RunExecutor", () => {
       const host = yield* RunExecutor.RunExecutor
       let sequence = 0
       const root = (treePolicy: { readonly maxDepth: number; readonly maxSubagents: number }) =>
-        runtime.start({
+        runtime.startExecution({
           executable,
           registrations: registrationsFor(executable),
           sessionId: `recursive-tools:${sequence}`,

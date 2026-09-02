@@ -226,8 +226,8 @@ describeMysql("mysql run store", () => {
             },
           ],
         }
-        const first = yield* runtime.start(input)
-        const duplicate = yield* runtime.start(input)
+        const first = yield* runtime.startExecution(input)
+        const duplicate = yield* runtime.startExecution(input)
         const execution = yield* store.loadExecution(first.runId)
         expect(duplicate).toMatchObject({ runId: first.runId, duplicate: true })
         expect(duplicate.childRunIds).toEqual(first.childRunIds)
@@ -237,14 +237,14 @@ describeMysql("mysql run store", () => {
         )
         expect(
           yield* runtime
-            .start({
+            .startExecution({
               ...input,
               initialChildren: [{ ...input.initialChildren[0]!, prompt: textPrompt("changed") }],
             })
             .pipe(Effect.flip),
         ).toBeInstanceOf(Errors.IdempotencyConflict)
         const conflict = yield* runtime
-          .start({
+          .startExecution({
             ...input,
             idempotencyKey: "changed-registration",
             registrations: input.registrations.map((registration, index) =>

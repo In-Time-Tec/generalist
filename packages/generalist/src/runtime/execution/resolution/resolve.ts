@@ -1,26 +1,46 @@
 import { Effect } from "effect"
-import { ExecutableIdentityMismatch } from "../../errors.js"
-import { verifyAttestation, verifyInput, type Service as ExecutableResolverService } from "../../executable/resolver.js"
+import { ExecutableIdentityMismatch, UnknownAgent } from "../../errors.js"
+import {
+  verifyAttestation,
+  verifyInput,
+  type Input as ResolverInput,
+  type Resolution,
+  type ResolveError,
+} from "../../executable/resolver.js"
 import { decodePinned, equals } from "../../executable/manifest-internal.js"
 import type { ExecutionRecord, WorkerMutationError } from "../../run/store.js"
 import type { RunFailure } from "../../run/event.js"
 
+/** @internal Resolver used after process-local Agent registration is composed with the host resolver. */
+export interface Resolver {
+  readonly resolve: (
+    input: ResolverInput,
+  ) => Effect.Effect<Resolution, ResolveError | UnknownAgent, import("effect").Scope.Scope>
+}
+
 const resolveExecution = (
-  resolver: ExecutableResolverService,
+  resolver: Resolver,
   claimed: ExecutionRecord,
   fail: (error: RunFailure) => Effect.Effect<void, WorkerMutationError>,
+  suspendUnknown: (error: UnknownAgent) => Effect.Effect<void, WorkerMutationError>,
 ) =>
   Effect.gen(function* () {
-    const resolution = yield* resolver
-      .resolve(
-        verifyInput({
-          runId: claimed.runId,
-          ref: claimed.executableRef,
-          manifest: claimed.executableManifest,
-          registrations: claimed.registrations,
-        }),
-      )
-      .pipe(Effect.catch((error) => fail(error).pipe(Effect.as(undefined))))
+    const resolution = yield* resolver.resolve(
+      verifyInput({
+        runId: claimed.runId,
+        ref: claimed.executableRef,
+        manifest: claimed.executableManifest,
+        registrations: claimed.registrations,
+      }),
+    ).pipe(
+      Effect.matchEffect({
+        onFailure: (error) =>
+          error._tag === "generalist/runtime/UnknownAgent"
+            ? suspendUnknown(error).pipe(Effect.as(undefined))
+            : fail(error).pipe(Effect.as(undefined)),
+        onSuccess: Effect.succeed,
+      }),
+    )
     if (resolution === undefined) return undefined
     const identityMatches = yield* Effect.sync(() => {
       try {

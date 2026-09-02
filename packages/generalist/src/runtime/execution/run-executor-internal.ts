@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
 import { AgentError, type Event } from "../../core/agent/event.js"
@@ -9,6 +9,12 @@ import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
+import {
+  make as makeRegisteredAgents,
+  resolve as resolveRegisteredAgent,
+  type RegisteredAgents,
+} from "../registered-agent.js"
+import type { UnknownAgent } from "../errors.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
@@ -44,14 +50,42 @@ import {
 import { suspend as suspendAgent } from "./agent/suspend.js"
 import type { Service } from "./run-executor.js"
 
-export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> = Effect.gen(
+export const makeWith = (
+  agents: RegisteredAgents = makeRegisteredAgents(),
+): Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> =>
+  Effect.gen(
   function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
+    const registeredResolver = {
+      resolve: (input: Parameters<typeof resolver.resolve>[0]) => resolveRegisteredAgent(agents, resolver, input),
+    }
+    const suspendUnknown = (claim: ExecutionClaim, error: UnknownAgent) =>
+      DateTime.now.pipe(
+        Effect.map(DateTime.formatIso),
+        Effect.flatMap((openedAt) =>
+          store.suspend({
+            ...claim,
+            waits: [
+              {
+                waitId: `agent:${error.name}`,
+                reason: { _tag: "External", capability: "agent-registration" },
+                status: "open",
+                openedAt,
+              },
+            ],
+            suspension: error,
+          }),
+        ),
+      )
     const journalFault = yield* Effect.serviceOption(JournalFault)
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
-    const reconcileCancellation = yield* makeToolCancellation({ store, resolver })
+    const reconcileCancellation = yield* makeToolCancellation({
+      store,
+      resolver: registeredResolver,
+      suspendUnknown,
+    })
     const executeClaim = (claim: ExecutionClaim, afterExit: Ref.Ref<Effect.Effect<void>>): Effect.Effect<void> =>
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
@@ -84,7 +118,12 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
         })
         const scopedExecution = Effect.scoped(
           Effect.gen(function* () {
-            const resolved = yield* ExecutionResolution.resolve(resolver, claimed, deferProgramChildFailure)
+            const resolved = yield* ExecutionResolution.resolve(
+              registeredResolver,
+              claimed,
+              deferProgramChildFailure,
+              (error) => suspendUnknown(claim, error),
+            )
             if (resolved === undefined) return
             if (resolved._tag === "Program") {
               yield* executeProgram({ claim, claimed, store, resolution: resolved })
@@ -483,3 +522,5 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
     return { execute, interrupt: (runId) => active.interrupt(runId) }
   },
 )
+
+export const make = makeWith()

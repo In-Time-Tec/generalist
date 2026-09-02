@@ -317,7 +317,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
           const store = yield* RunStore.RunStore
           const initialId = `${options.name}:bounds:initial:${sequence++}`
           const initialFailure = yield* runtime
-            .start({
+            .startExecution({
               executable: assistantRef,
               registrations: registrationsFor(assistantRef),
               sessionId: initialId,

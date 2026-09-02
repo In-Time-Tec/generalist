@@ -172,6 +172,9 @@ Testing.runtimeDriver({
   capabilities: {
     admission: true,
     runtime: { claim },
+    "start-by-agent": { claim },
+    "idempotent-start": { claim },
+    "unknown-agent-on-recovery": { claim },
     runTree: { claim },
     sqlTransactions: { claim, forceRollback },
     multiWorkerClaims: { layer, expire },

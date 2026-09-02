@@ -1,15 +1,20 @@
-import { Clock, Effect, Layer, Option, Ref, Stream } from "effect"
+import { Clock, Effect, Layer, Option, Predicate, Ref, Schema, Stream } from "effect"
 import {
   AddressNotFound,
   ChildSelectionMissing,
   ExecutableIdentityMismatch,
+  ExecutablePinMissing,
   ExecutableRegistrationInvalid,
   FanOutInvalid,
   FanOutRemainderUnsupported,
   RunTerminal,
   StartInvalid,
   RuntimeUnavailable,
+  UnknownAgent,
 } from "../../errors.js"
+import { InvalidOutput } from "../../../core/agent/event.js"
+import { encode as encodeAgentInput } from "../../../core/agent/lifecycle/input.js"
+import { generateId } from "../../../core/model/telemetry/events.js"
 import { make as makeAddress, type Address } from "../../address.js"
 import { origin as cursorOrigin } from "../../cursor.js"
 import { make as makeMessage } from "../../messaging/message.js"
@@ -20,7 +25,8 @@ import {
   type InitialFanOutInput,
   type LayerOptions,
   type SendInput,
-  type StartInput,
+  type StartEvent,
+  type StartExecutionInput,
   type SpawnInput,
 } from "../../service.js"
 import { normalizePrompt } from "../prompt.js"
@@ -33,6 +39,14 @@ import { decodePinned, equals, resolveChild } from "../../executable/manifest-in
 import type { PinnedExecutable } from "../../executable/manifest.js"
 import { ExecutableResolver, type Input as ResolverInput } from "../../executable/resolver.js"
 import { validate as validateRegistrations, type ExecutableRegistration } from "../../executable/registration.js"
+import { AgentExecutionResult, ProgramExecutionResult } from "../../execution/state.js"
+import type { RunCompleted, RunEvent } from "../../run/event.js"
+import {
+  capture as captureRegisteredAgent,
+  make as makeRegisteredAgents,
+  resolve as resolveRegisteredAgent,
+  type RegisteredAgents,
+} from "../../registered-agent.js"
 import { ModelPreviewLane, previews as modelPreviews } from "../../execution/model-response/preview-internal.js"
 import { readEntry, resolveModelResponse } from "../../session/service.js"
 type Registrations = ReadonlyArray<ExecutableRegistration>
@@ -50,8 +64,46 @@ type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitSt
 type MutableSendAdmission = { -readonly [Key in keyof AdmitSendInput]: AdmitSendInput[Key] }
 type MutableMessageAdmission = { -readonly [Key in keyof AdmitMessageInput]: AdmitMessageInput[Key] }
 
+const decodeStartEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event: RunEvent) => {
+  if (event._tag !== "RunCompleted") return Effect.succeed<StartEvent<OutputCodec["Type"]>>(event)
+  if (Schema.is(ProgramExecutionResult)(event.result)) {
+    return Effect.succeed<StartEvent<OutputCodec["Type"]>>({ ...event, result: event.result })
+  }
+  const encoded = Predicate.hasProperty(event.result, "output") ? event.result.output : event.result.text
+  return Schema.decodeEffect(schema)(encoded).pipe(
+    Effect.map((output) => ({ ...event, result: { ...event.result, output } })),
+    Effect.mapError((error) => InvalidOutput.make({ issues: [error.message] })),
+  )
+}
+
+const awaitStart = <Output>(events: Stream.Stream<StartEvent<Output>, import("../../service.js").EventsError | InvalidOutput>) =>
+  events.pipe(
+    Stream.filter(
+      (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+    ),
+    Stream.runHead,
+    Effect.flatMap(
+      (
+        event,
+      ): Effect.Effect<
+        Output,
+        import("../../service.js").EventsError | import("../../run/event.js").RunFailed | import("../../run/event.js").RunCancelled | InvalidOutput
+      > => {
+        if (Option.isNone(event)) {
+          return Effect.fail(RuntimeUnavailable.make({ message: "Run event stream ended before a terminal event" }))
+        }
+        if (event.value._tag === "RunFailed" || event.value._tag === "RunCancelled") return Effect.fail(event.value)
+        if (Schema.is(AgentExecutionResult)(event.value.result)) {
+          return Effect.succeed(event.value.result.output as Output)
+        }
+        return Effect.fail(InvalidOutput.make({ issues: ["Registered Agent completed with a Program result"] }))
+      },
+    ),
+  )
+
 export const makeRuntime = (
   options: LayerOptions,
+  agents: RegisteredAgents = makeRegisteredAgents(),
 ): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions | ExecutableResolver> =>
   Effect.gen(function* () {
     const store = yield* RunStore
@@ -70,7 +122,7 @@ export const makeRuntime = (
         registrations: Object.freeze([...entry.registrations]),
       })
     }
-    type ExecutableInput = StartInput["executable"]
+    type ExecutableInput = StartExecutionInput["executable"]
     const decode = (executable: ExecutableInput) =>
       Effect.try({
         try: () => decodePinned(executable),
@@ -84,14 +136,21 @@ export const makeRuntime = (
       Effect.gen(function* () {
         const registrations = yield* validateRegistrations(input.executable, input.registrations)
         const attestation = yield* Effect.scoped(
-          resolver
-            .resolve({
+          resolveRegisteredAgent(
+            agents,
+            resolver,
+            {
               runId: input.runId,
               ref: input.executable.ref,
               manifest: input.executable.manifest,
               registrations,
-            } satisfies ResolverInput)
-            .pipe(Effect.map((resolution) => resolution.attestation)),
+            } satisfies ResolverInput,
+          ).pipe(
+            Effect.map((resolution) => resolution.attestation),
+            Effect.catchTag("generalist/runtime/UnknownAgent", () =>
+              Effect.fail(ExecutablePinMissing.make({ runId: input.runId, ref: input.executable.ref })),
+            ),
+          ),
         )
         if (!equals(attestation, input.executable)) {
           return yield* ExecutableIdentityMismatch.make({
@@ -205,9 +264,9 @@ export const makeRuntime = (
         }
       })
     const validateInitialChildren = (
-      input: StartInput,
+      input: StartExecutionInput,
       executable: PinnedExecutable,
-      initialChildren: NonNullable<StartInput["initialChildren"]>,
+      initialChildren: NonNullable<StartExecutionInput["initialChildren"]>,
     ) =>
       Effect.gen(function* () {
         if (initialChildren.length > 64) {
@@ -239,9 +298,9 @@ export const makeRuntime = (
       })
 
     const validateInitialFanOuts = (
-      input: StartInput,
+      input: StartExecutionInput,
       executable: PinnedExecutable,
-      initialFanOuts: NonNullable<StartInput["initialFanOuts"]>,
+      initialFanOuts: NonNullable<StartExecutionInput["initialFanOuts"]>,
     ) =>
       Effect.gen(function* () {
         if (initialFanOuts.length > 64) {
@@ -271,7 +330,7 @@ export const makeRuntime = (
         }
       })
 
-    const admitStart = (input: StartInput, activate: boolean) =>
+    const admitStart = (input: StartExecutionInput, activate: boolean) =>
       Effect.gen(function* () {
         const executable = yield* decode(input.executable)
         const registrations = yield* admissionRegistrations({
@@ -313,8 +372,66 @@ export const makeRuntime = (
         if (input.runId !== undefined) admission.runId = input.runId
         return yield* store.admitStart(admission, { activate })
       })
+    const register: RuntimeService["register"] = (agent) =>
+      captureRegisteredAgent(agent).pipe(Effect.flatMap(agents.register))
+    const start: RuntimeService["start"] = (agent, input, startOptions) =>
+      Effect.gen(function* () {
+        const registration = yield* agents.getFor(agent)
+        if (Option.isNone(registration)) {
+          return yield* UnknownAgent.make({ name: agent.name, runId: `run_${yield* generateId}` })
+        }
+        const prompt = yield* encodeAgentInput(agent.input, input).pipe(
+          Effect.provideContext(registration.value.context),
+        )
+        const identity = yield* generateId
+        const idempotencyKey = startOptions?.idempotencyKey ?? `start_${identity}`
+        const sessionId =
+          startOptions?.sessionId ??
+          (startOptions?.idempotencyKey === undefined ? `session_${identity}` : `agent:${agent.name}`)
+        const receipt = yield* admitStart(
+          {
+            executable: registration.value.executable,
+            registrations: registration.value.registrations,
+            sessionId,
+            idempotencyKey,
+            prompt,
+          },
+          true,
+        )
+        const steer = (steering: import("../../../core/turn/steering.js").Input) =>
+          generateId.pipe(
+            Effect.flatMap((idempotencyKey) =>
+              Effect.sync(() => normalizePrompt(steering.prompt)).pipe(
+                Effect.flatMap((prompt) =>
+                  store.admitSteering({
+                    runId: receipt.runId,
+                    idempotencyKey,
+                    prompt,
+                    digest: steeringDigest(prompt),
+                  }),
+                ),
+              ),
+            ),
+          )
+        const events = store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
+          Stream.mapEffect((event) => decodeStartEvent(agent.output, event)),
+          Stream.takeUntil(
+            (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+          ),
+          Stream.provideContext(registration.value.context),
+        )
+        return {
+          runId: receipt.runId,
+          await: awaitStart(events),
+          events,
+          steer,
+          followUp: steer,
+        }
+      })
     return Runtime.of({
-      start: (input) => admitStart(input, true),
+      register,
+      start,
+      startExecution: (input) => admitStart(input, true),
       admit: (input) =>
         admitStart({ ...input, initialChildren: [], initialFanOuts: [] }, false).pipe(
           Effect.map(({ runId, messageId, acceptedSequence, duplicate }) => ({
@@ -497,4 +614,5 @@ export const makeRuntime = (
       awaitFanOut,
     })
   })
-export const layer = (options: LayerOptions) => Layer.effect(Runtime, makeRuntime(options))
+export const layer = (options: LayerOptions, agents: RegisteredAgents = makeRegisteredAgents()) =>
+  Layer.effect(Runtime, makeRuntime(options, agents))
