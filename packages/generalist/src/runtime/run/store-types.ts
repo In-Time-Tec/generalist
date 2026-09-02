@@ -24,6 +24,7 @@ import type { Prompt } from "effect/unstable/ai"
 import type { InitialFanOutInput } from "../child/fan-out-internal.js"
 import type { SessionStore as SessionService } from "../../core/context/session.js"
 import type { BudgetLimits } from "../../core/durable/run-budget.js"
+import type { ForkOptions, RewindOptions } from "../fork.js"
 
 export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
@@ -75,6 +76,16 @@ export interface StoreInfo {
   readonly durability: Durability
   readonly backend: StoreBackend
   readonly multiWorker: boolean
+}
+
+export interface ForkRunInput extends ForkOptions {
+  readonly runId: string
+  readonly newRunId: string
+}
+
+export interface RewindRunInput extends RewindOptions {
+  readonly runId: string
+  readonly branchRunId: string
 }
 
 export interface RecordOperationInput extends ExecutionClaim {

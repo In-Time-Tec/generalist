@@ -183,6 +183,7 @@ const rootView = (state: MemoryState, stored: ExternalRoot) =>
       waits: openRunWaits(state, run.runId),
       lastSequence: run.lastSequence,
       durability: "ephemeral",
+      branches: [],
     }
     const projection: InspectionRun = {
       inspection,

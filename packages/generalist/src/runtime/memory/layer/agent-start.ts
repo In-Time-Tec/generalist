@@ -1,4 +1,4 @@
-import { Effect, Option, Predicate, Schema, Stream } from "effect"
+import { Effect, Function, Option, Predicate, Schema, Stream } from "effect"
 import { InvalidOutput } from "../../../core/agent/event.js"
 import { encode as encodeAgentInput } from "../../../core/agent/lifecycle/input.js"
 import { generateId } from "../../../core/model/telemetry/events.js"
@@ -57,6 +57,29 @@ const awaitOutput = <Output>(
       },
     ),
   )
+
+/** @internal Construct an untyped handle for a Run recovered by durable identity. */
+const makeUntypedHandle = (store: RunStore, runId: import("../../../core/durable/run-id.js").RunId) => {
+  const events = store.events({ runId, cursor: cursorOrigin }).pipe(
+    Stream.mapEffect((event) => decodeEvent(Schema.Unknown, event)),
+    Stream.takeUntil(
+      (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+    ),
+  )
+  const steer = (input: import("../../../core/turn/steering.js").Input) =>
+    generateId.pipe(
+      Effect.flatMap((idempotencyKey) => {
+        const prompt = normalizePrompt(input.prompt)
+        return store.admitSteering({ runId, idempotencyKey, prompt, digest: steeringDigest(prompt) })
+      }),
+    )
+  return { runId, await: awaitOutput(events), events, steer, followUp: steer }
+}
+type UntypedHandle = ReturnType<typeof makeUntypedHandle>
+export const untypedHandle: {
+  (runId: import("../../../core/durable/run-id.js").RunId): (store: RunStore) => UntypedHandle
+  (store: RunStore, runId: import("../../../core/durable/run-id.js").RunId): UntypedHandle
+} = Function.dual(2, makeUntypedHandle)
 
 /** @internal Construct typed Agent registration and start over one Runtime registry and store. */
 export const make = (options: {

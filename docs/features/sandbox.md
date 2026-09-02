@@ -42,6 +42,7 @@ A leaf rejects another command kind with `Unsupported`; it never guesses how to 
 | Leaf                                        | Isolation    | Commands           | Files         | Pause/resume  | Snapshot | Fork          | Enforced limits    | Billing model                                            |
 | ------------------------------------------- | ------------ | ------------------ | ------------- | ------------- | -------- | ------------- | ------------------ | -------------------------------------------------------- |
 | `layerBunKernel`                            | `process`    | `TypeScript`       | yes           | yes           | yes      | yes           | wall clock         | host process; no vendor billing claim                    |
+| `layerWorktree({ repo })`                   | `process`    | `Process`          | yes           | no            | yes      | yes           | none               | host process; no vendor billing claim                    |
 | `generalist/unstable/sandbox/worker-loader` | `v8-isolate` | `JavaScriptModule` | `Unsupported` | `Unsupported` | no       | no            | CPU and wall clock | Workers request CPU and invocation duration              |
 | `generalist/unstable/sandbox/e2b`           | `microvm`    | `Process`          | yes           | yes           | yes      | yes           | wall clock         | per-second CPU/RAM while running; paused is not billed   |
 | `generalist/unstable/sandbox/daytona`       | configured   | `Process`          | yes           | VM only       | no       | `Unsupported` | wall clock         | active vCPU/RAM/disk; stopped or paused bills disk only  |
@@ -51,6 +52,8 @@ A leaf rejects another command kind with `Unsupported`; it never guesses how to 
 | `generalist/unstable/sandbox/cloudflare`    | `container`  | `Process`          | yes           | `Unsupported` | no       | `Unsupported` | wall clock         | Containers vCPU, memory, disk, egress, Worker, and DO    |
 
 `process` is a factual process boundary, not confinement. The Bun kernel is for trusted local code: it shares the host operating-system identity and its rooted Effect `FileSystem` is a path view, not a security boundary. It does not claim container or microVM isolation. CPU and per-sandbox memory bounds are unsupported because the Bun leaf cannot enforce them independently.
+
+The worktree leaf is also for trusted local code. Its snapshot stages the complete working tree through a temporary Git index, writes an immutable commit under `refs/generalist/snapshots/`, and forks that commit into a detached temporary worktree. Releasing the Layer removes its worktrees; hidden snapshot refs remain available to later Layers. It does not pause, resume, or enforce resource limits.
 
 `v8-isolate` means a fresh Worker Loader isolate. It is not a container or microVM. The shipped loader disables outbound networking, admits the exact module graph and capability grants, and enforces the provider request's CPU and deadline bounds. It has no persistent filesystem or lifecycle checkpoint, so files, pause, resume, snapshot, and fork fail with typed `Unsupported` errors.
 

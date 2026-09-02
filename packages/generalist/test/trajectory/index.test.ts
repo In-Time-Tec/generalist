@@ -78,6 +78,7 @@ const snapshot: RunSnapshot = {
     waits: [],
     lastSequence: 2,
     durability: "durable",
+    branches: [],
   },
   cursor: 2,
   turn: 0,

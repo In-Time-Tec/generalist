@@ -182,6 +182,7 @@ Testing.runtimeDriver({
     "operator-resolve-unknown": { claim },
     "operator-scan": { claim },
     runTree: { claim },
+    "fork-rewind": { claim },
     sqlTransactions: { claim, forceRollback },
     multiWorkerClaims: { layer, expire },
     notificationRecovery: { claim },

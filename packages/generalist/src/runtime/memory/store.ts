@@ -86,6 +86,7 @@ import {
   wake as wakeRecovery,
 } from "./store/operation/operator.js"
 import { explain as explainRecovery } from "../execution/recovery/operator.js"
+import { fork, rewind } from "./store/fork/index.js"
 
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
@@ -219,6 +220,8 @@ const makeStoreServices = (options: LayerOptions) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => settlementNotifications(state, input))),
       deliverPendingMessages: (input) => modifyState((state) => deliverPendingMessages(state, input)),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
+      fork: (input) => modifyState((state) => fork(state, input)),
+      rewind: (input) => modifyState((state) => rewind(state, input)),
       snapshot: (runId) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>

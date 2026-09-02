@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { failureMessage } from "../../../errors-internal.js"
+import { failureMessage } from "../../../run/errors-internal.js"
 import { AgentExecutionFailure, RunTerminal, RuntimeUnavailable } from "../../../errors.js"
 import { ExecutionResult } from "../../../execution/state.js"
 import { isTerminal } from "../../../run.js"

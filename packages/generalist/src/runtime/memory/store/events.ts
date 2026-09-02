@@ -32,6 +32,11 @@ export const toInspection: {
     waits: openRunWaits(state, run.runId),
     lastSequence: run.lastSequence,
     durability: "ephemeral",
+    branches: [...state.runs.values()]
+      .filter((candidate) => candidate.forkedFrom === run.runId && candidate.forkSequence !== undefined)
+      .flatMap((candidate) =>
+        candidate.forkSequence === undefined ? [] : [{ runId: candidate.runId, forkedAt: candidate.forkSequence }],
+      ),
     ...optionals(),
   }
 })

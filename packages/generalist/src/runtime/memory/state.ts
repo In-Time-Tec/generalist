@@ -61,6 +61,8 @@ export interface StoredRun {
   readonly depth: number
   readonly treePolicy: TreePolicy
   readonly parentRunId?: string
+  readonly forkedFrom?: string
+  readonly forkSequence?: number
   readonly childReadiness?: ChildReadiness
   readonly invocationId?: string
   readonly lastSequence: number
@@ -82,6 +84,7 @@ export interface StoredRun {
     SteeringEntry & { readonly consumedOperationId?: string; readonly discardedReason?: SteeringDiscardReason }
   >
   readonly registrations: ReadonlyArray<ExecutableRegistration>
+  readonly checkpoints: ReadonlyMap<number, ExecutionCheckpoint | undefined>
 }
 
 export interface Lane {

@@ -76,6 +76,7 @@ import { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
 import { settlementNotifications } from "./settlement-notifications.js"
 import { reconcileCancellationRequested, sessionRoots, sessionRuns } from "./session/lifecycle.js"
 import { loadChildReadiness } from "./store/child/capacity.js"
+import { fork, loadRunBranches, rewind } from "./store/fork/index.js"
 import {
   acknowledge as acknowledgeExternalChild,
   acknowledgeExternalRootSettlement,
@@ -303,6 +304,7 @@ const makeSqlStoreServices = <DriverError>(
               const loaded = yield* loadRun(runId)
               if (loaded === undefined) return yield* RunNotFound.make({ runId })
               const waits = yield* loadRunWaitsByStatus(runId, "open")
+              const branches = yield* loadRunBranches(runId)
               const childReadiness = yield* loadChildReadiness(runId)
               const inspection = {
                 runId: loaded.runId,
@@ -314,12 +316,15 @@ const makeSqlStoreServices = <DriverError>(
                 waits,
                 lastSequence: loaded.lastSequence,
                 durability: "durable" as const,
+                branches,
               }
               if (loaded.parentRunId !== undefined) Object.assign(inspection, { parentRunId: loaded.parentRunId })
               if (childReadiness !== undefined) Object.assign(inspection, { childReadiness })
               return inspection
             }),
           ),
+        fork: (input) => locked(locks.run(input.runId), fork(transactionHub, input)),
+        rewind: (input) => locked(locks.run(input.runId), rewind(transactionHub, input)),
         snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
         acknowledge: (input) => locked(locks.run(input.runId), acknowledge(input)),
         acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),

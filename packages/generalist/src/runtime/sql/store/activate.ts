@@ -5,6 +5,7 @@ import { RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import type { RunInspection } from "../../run.js"
 import { loadChildReadiness } from "./child/capacity.js"
 import { appendEvent, loadRun, loadRunWaitsByStatus } from "./statements.js"
+import { loadRunBranches } from "./fork/index.js"
 import type { EventHub } from "../subscribers.js"
 
 type ActivateResult = Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable | SqlError, SqlClient.SqlClient>
@@ -14,6 +15,7 @@ const inspection = (runId: string): ActivateResult =>
     const run = yield* loadRun(runId)
     if (run === undefined) return yield* RunNotFound.make({ runId })
     const waits = yield* loadRunWaitsByStatus(runId, "open")
+    const branches = yield* loadRunBranches(runId)
     const childReadiness = yield* loadChildReadiness(runId)
     const result: RunInspection = {
       runId: run.runId,
@@ -25,6 +27,7 @@ const inspection = (runId: string): ActivateResult =>
       waits,
       lastSequence: run.lastSequence,
       durability: "durable",
+      branches,
     }
     if (run.parentRunId !== undefined) Object.assign(result, { parentRunId: run.parentRunId })
     if (childReadiness !== undefined) Object.assign(result, { childReadiness })

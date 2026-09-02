@@ -30,6 +30,8 @@ import { decodeCancellableOperation } from "../../../../core/tools/tool-executor
 import { markSqlTransitionDivergentRetry, markSqlTransitionExactRetry } from "../kernel/observability.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
+const encodeCheckpoint = (checkpoint: RecordOperationInput["checkpoint"]): string | null =>
+  checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, checkpoint)
 const isCompletedStatus = (status: OperationRow["status"]): boolean =>
   status === "cancelling" ||
   status === "cancelled" ||
@@ -177,11 +179,12 @@ export const recordOperation: {
     yield* sql`
       INSERT INTO generalist_run_operations (
         run_id, operation_id, operation_key, kind, status, input_digest, input_json,
-        result_json, error_json, replay_policy, attempt, started_at, finished_at
+        result_json, error_json, replay_policy, attempt, started_at, finished_at, checkpoint_json, completed_sequence
       ) VALUES (
         ${input.runId}, ${operationId}, ${input.operationKey}, ${input.kind}, 'requested',
         ${input.inputDigest}, ${encodeJsonValue(input.input)}, NULL, NULL, ${input.replayPolicy},
-        ${input.attempt}, NULL, NULL
+        ${input.attempt}, NULL, NULL,
+        ${encodeCheckpoint(input.checkpoint)}, NULL
       )
     `
     if (input.checkpoint !== undefined || input.continuation !== undefined) {
@@ -274,6 +277,8 @@ export const completeOperation: {
     }
     const finished = yield* nowIso
     yield* persistOperationOutcome(sql, input, finished)
+    yield* sql`UPDATE generalist_run_operations SET completed_sequence = ${run.lastSequence + 1}
+      WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}`
     yield* sql`
       UPDATE generalist_runs SET
         driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),

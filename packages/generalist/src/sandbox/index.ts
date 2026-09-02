@@ -27,3 +27,4 @@ export {
   Unsupported,
 } from "./service.js"
 export { type BunKernelOptions, layerBunKernel, makeBunKernelProvider } from "./bun-kernel.js"
+export { type WorktreeOptions, layerWorktree } from "./worktree.js"

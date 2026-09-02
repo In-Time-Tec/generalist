@@ -601,6 +601,7 @@ layer(memoryLayer)("RunTree", (it) => {
                     lastSequence: rootRun.lastSequence,
                     durability: rootRun.durability,
                     waits: [],
+                    branches: rootRun.branches,
                   }
                 : {
                     runId: rootRun.runId,
@@ -612,6 +613,7 @@ layer(memoryLayer)("RunTree", (it) => {
                     lastSequence: rootRun.lastSequence,
                     durability: rootRun.durability,
                     waits: [wait],
+                    branches: rootRun.branches,
                   },
           },
         ],

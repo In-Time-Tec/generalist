@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the closed durable Run event union remains one codec authority */
 import { Effect, Function, Schema, SchemaParser } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { ExecutableRef } from "../executable/manifest.js"
@@ -111,6 +112,10 @@ export type OperationUnknown = RunEventBase & {
   readonly _tag: "OperationUnknown"
   readonly operationId: string
 }
+export type Substituted = RunEventBase & {
+  readonly _tag: "Substituted"
+  readonly operationId: string
+}
 export type ChildLinked = RunEventBase & {
   readonly _tag: "ChildLinked"
   readonly childRunId: string
@@ -191,6 +196,7 @@ export type LifecycleEvent =
   | SteeringConsumed
   | SteeringDiscarded
   | OperationUnknown
+  | Substituted
   | ChildLinked
   | ChildReadinessChanged
   | ChildSettled
@@ -215,6 +221,7 @@ export const LifecycleTag = Schema.Literals([
   "SteeringConsumed",
   "SteeringDiscarded",
   "OperationUnknown",
+  "Substituted",
   "ChildLinked",
   "ChildReadinessChanged",
   "ChildSettled",
@@ -432,6 +439,7 @@ const LifecycleEventSchema = Schema.Union([
     reason: SteeringDiscardReason,
   }),
   Schema.TaggedStruct("OperationUnknown", { operationId: Schema.String }),
+  Schema.TaggedStruct("Substituted", { operationId: Schema.String }),
   Schema.TaggedStruct("ChildLinked", {
     childRunId: RunId,
     invocationId: Schema.String,

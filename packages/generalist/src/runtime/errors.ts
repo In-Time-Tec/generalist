@@ -119,6 +119,34 @@ export class IllegalOperatorAction extends ActionableTaggedError<IllegalOperator
   },
 ) {}
 
+/** A fork point has no committed sandbox image to restore. */
+export class NoSnapshot extends ActionableTaggedError<NoSnapshot>()("generalist/runtime/NoSnapshot", {
+  runId: Schema.String,
+  atSequence: Schema.Int,
+  hint: errorHint("Fork at or after a committed SandboxSnapshot progress event."),
+}) {}
+
+/** A fork or rewind sequence is outside the committed journal. */
+export class ForkSequenceInvalid extends ActionableTaggedError<ForkSequenceInvalid>()(
+  "generalist/runtime/ForkSequenceInvalid",
+  {
+    runId: Schema.String,
+    sequence: Schema.Int,
+    lastSequence: Schema.Int,
+    hint: errorHint("Choose a sequence from the Run's committed journal."),
+  },
+) {}
+
+/** A counterfactual substitution does not name a completed operation in the selected prefix. */
+export class SubstitutionInvalid extends ActionableTaggedError<SubstitutionInvalid>()(
+  "generalist/runtime/SubstitutionInvalid",
+  {
+    runId: Schema.String,
+    operationId: Schema.String,
+    hint: errorHint("Choose a completed operation from the selected journal prefix."),
+  },
+) {}
+
 /** An Agent name is already registered in this Runtime process. */
 export class DuplicateAgent extends ActionableTaggedError<DuplicateAgent>()("generalist/runtime/DuplicateAgent", {
   name: Schema.String,

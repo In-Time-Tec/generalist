@@ -7,6 +7,7 @@ import type { RunInspection } from "../../run.js"
 import { decodeEvent, decodeSqlInteger } from "../codec/codecs.js"
 import { isoFromSql } from "../store/run-decoding.js"
 import { decodeRunEffect, loadRunWaitsByStatus, nowIso } from "../store/statements.js"
+import { loadRunBranches } from "../store/fork/index.js"
 import type { RunRow } from "../codec/rows.js"
 import type { Service as RunStoreService } from "../../run/store.js"
 import type { EventHub } from "../subscribers.js"
@@ -96,6 +97,7 @@ export const hostSessionRuns = (sessionId: string) =>
       Effect.gen(function* () {
         const run = yield* decodeRunEffect(row)
         const waits = yield* loadRunWaitsByStatus(run.runId, "open")
+        const branches = yield* loadRunBranches(run.runId)
         const inspection: RunInspection = {
           runId: run.runId,
           status: run.status,
@@ -106,6 +108,7 @@ export const hostSessionRuns = (sessionId: string) =>
           waits,
           lastSequence: run.lastSequence,
           durability: "durable",
+          branches,
         }
         return inspection
       }),

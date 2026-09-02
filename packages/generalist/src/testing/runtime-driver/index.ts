@@ -14,6 +14,7 @@ import { registerApprovalSuspend } from "./approval-suspend.js"
 import { registerHostSessions } from "./host-sessions.js"
 import { registerOperator } from "./operator.js"
 import { Suite, record } from "../report.js"
+import { registerForkRewind } from "./fork-rewind.js"
 import type {
   MultiWorkerClaimCapability,
   NotificationRecoveryCapability,
@@ -454,6 +455,13 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
     }
     registerAgentStart({ options, provide: (use) => provide(options, use) })
     if (options.capabilities.runTree !== undefined) registerRunTree(options, options.capabilities.runTree)
+    if (options.capabilities["fork-rewind"] !== undefined) {
+      registerForkRewind({
+        options,
+        capability: options.capabilities["fork-rewind"],
+        provide: (use) => provide(options, use),
+      })
+    }
     if (options.capabilities.sqlTransactions !== undefined) {
       registerSqlTransactions(options, options.capabilities.sqlTransactions)
     }

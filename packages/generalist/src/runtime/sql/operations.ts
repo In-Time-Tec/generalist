@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { OperationResolution } from "../operation/resolution.js"
 import { decodeJson, decodeJsonValue } from "./codec/codecs.js"
 import type { OperationRow } from "./codec/rows.js"
+import { ExecutionCheckpoint } from "../execution/state.js"
 
 export const OperationKind = Schema.Literals([
   "model",
@@ -47,6 +48,8 @@ export interface OperationRecord {
   readonly attempt: number
   readonly resolutionIdempotencyKey?: string
   readonly resolution?: OperationResolution
+  readonly checkpoint?: ExecutionCheckpoint
+  readonly completedSequence?: number
 }
 
 export const toOperationRecord = (row: OperationRow): OperationRecord => {
@@ -67,9 +70,17 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => {
     row.resolution_idempotency_key === null
       ? withError
       : { ...withError, resolutionIdempotencyKey: row.resolution_idempotency_key }
-  return row.resolution_json === null
-    ? withResolutionKey
-    : { ...withResolutionKey, resolution: decodeJson(OperationResolution, row.resolution_json) }
+  const withResolution =
+    row.resolution_json === null
+      ? withResolutionKey
+      : { ...withResolutionKey, resolution: decodeJson(OperationResolution, row.resolution_json) }
+  const withCheckpoint =
+    row.checkpoint_json === null
+      ? withResolution
+      : { ...withResolution, checkpoint: decodeJson(ExecutionCheckpoint, row.checkpoint_json) }
+  return row.completed_sequence === null
+    ? withCheckpoint
+    : { ...withCheckpoint, completedSequence: row.completed_sequence }
 }
 
 export const canBlindRetry = (policy: ReplayPolicy): boolean => policy === "pure" || policy === "provider-idempotent"

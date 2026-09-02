@@ -62,6 +62,11 @@ export interface RunTreeCapability {
   readonly claim: ClaimExecution
 }
 
+/** Journal-prefix fork and retained rewind branch capability. */
+export interface ForkRewindCapability {
+  readonly claim: ClaimExecution
+}
+
 /** SQL transaction conformance capability. */
 export interface SqlTransactionCapability {
   readonly claim: ClaimExecution
@@ -113,6 +118,7 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly "idempotent-start"?: IdempotentStartCapability
   readonly "unknown-agent-on-recovery"?: UnknownAgentOnRecoveryCapability
   readonly runTree?: RunTreeCapability
+  readonly "fork-rewind"?: ForkRewindCapability
   readonly sqlTransactions?: SqlTransactionCapability
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>
   readonly notificationRecovery?: NotificationRecoveryCapability

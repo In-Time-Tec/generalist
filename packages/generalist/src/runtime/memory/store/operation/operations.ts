@@ -37,6 +37,9 @@ const operationUnknownEvent = (operationId: string) => ({ _tag: "OperationUnknow
 const sameEntries = (left: ReadonlyArray<string>, right: ReadonlyArray<string>) =>
   left.length === right.length && left.every((entryId, index) => entryId === right[index])
 
+const withCheckpoint = (record: OperationRecord, checkpoint: RecordOperationInput["checkpoint"]): OperationRecord =>
+  checkpoint === undefined ? record : { ...record, checkpoint }
+
 type StoredRun = MemoryState["runs"] extends ReadonlyMap<string, infer Run> ? Run : never
 
 const steeringProblem = (run: StoredRun, entryIds: ReadonlyArray<string>): string | undefined => {
@@ -144,17 +147,20 @@ export const recordOperation: {
       try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
     })
-    const record: OperationRecord = {
-      runId: input.runId,
-      operationId,
-      operationKey: input.operationKey,
-      kind: input.kind,
-      status: "requested",
-      inputDigest: input.inputDigest,
-      input: input.input,
-      replayPolicy: input.replayPolicy,
-      attempt: input.attempt,
-    }
+    const record = withCheckpoint(
+      {
+        runId: input.runId,
+        operationId,
+        operationKey: input.operationKey,
+        kind: input.kind,
+        status: "requested",
+        inputDigest: input.inputDigest,
+        input: input.input,
+        replayPolicy: input.replayPolicy,
+        attempt: input.attempt,
+      },
+      input.checkpoint,
+    )
     const operations = new Map(state.operations)
     operations.set(operationMapKey(input.runId, operationId), record)
     operations.set(operationKeyMapKey(input.runId, input.operationKey), record)
@@ -293,7 +299,10 @@ export const completeOperation: {
           Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
         )
       }
-      const record = completedRecord(current, input.outcome)
+      const record = {
+        ...completedRecord(current, input.outcome),
+        completedSequence: run.lastSequence + 1,
+      }
       const operations = new Map(state.operations)
       operations.set(operationMapKey(input.runId, input.operationId), record)
       operations.set(operationKeyMapKey(input.runId, record.operationKey), record)

@@ -208,6 +208,8 @@ const replayRuntime: Runtime.Service = {
   startExecution: unusedEffect,
   admit: unusedEffect,
   activate: unusedEffect,
+  fork: unusedEffect,
+  rewind: unusedEffect,
   send: unusedEffect,
   spawn: unusedEffect,
   events: unusedStream,

@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { RunInspection, RunStatus } from "../../run.js"
 import { decodeRunEffect, loadRunWaitsByStatus } from "./statements.js"
+import { loadRunBranches } from "./fork/index.js"
 import type { RunRow } from "../codec/rows.js"
 
 export const listRuns = (input: {
@@ -32,6 +33,7 @@ export const listRuns = (input: {
       Effect.gen(function* () {
         const loaded = yield* decodeRunEffect(row)
         const waits = yield* loadRunWaitsByStatus(loaded.runId, "open")
+        const branches = yield* loadRunBranches(loaded.runId)
         const inspection: RunInspection = {
           runId: loaded.runId,
           status: loaded.status,
@@ -42,6 +44,7 @@ export const listRuns = (input: {
           waits,
           lastSequence: loaded.lastSequence,
           durability: "durable",
+          branches,
         }
         if (loaded.parentRunId !== undefined) Object.assign(inspection, { parentRunId: loaded.parentRunId })
         return inspection

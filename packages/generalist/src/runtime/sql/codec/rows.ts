@@ -21,6 +21,8 @@ export interface RunRow {
   readonly max_subagents: number
   readonly parent_run_id: string | null
   readonly invocation_id: string | null
+  readonly forked_from: string | null
+  readonly fork_sequence: number | null
   readonly attempt: number
   readonly attempt_fence: number
   readonly last_sequence: number
@@ -44,6 +46,7 @@ export interface EventRow {
   readonly sequence: number
   readonly event_id: string
   readonly event_json: string
+  readonly checkpoint_json: string | null
 }
 
 export interface OperationRow {
@@ -62,6 +65,8 @@ export interface OperationRow {
   readonly finished_at: string | null
   readonly resolution_idempotency_key: string | null
   readonly resolution_json: string | null
+  readonly checkpoint_json: string | null
+  readonly completed_sequence: number | null
 }
 
 export interface LaneRow {
@@ -110,4 +115,6 @@ export interface DecodedRun {
   readonly suspension?: import("../../execution/state.js").ExecutionSuspension
   readonly continuation?: import("../../run/steering.js").ExecutionContinuation
   readonly pendingOutcome?: import("../../run/store.js").PendingRunOutcome
+  readonly forkedFrom?: string
+  readonly forkSequence?: number
 }
