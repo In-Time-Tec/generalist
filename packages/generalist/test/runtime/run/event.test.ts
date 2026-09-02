@@ -1,6 +1,6 @@
 import "./suites/event-telemetry-suite.js"
 import { expect, it } from "@effect/vitest"
-import { ProgramCapabilities, ProgramRunner, CodeExecutor } from "../../../src/index.js"
+import { ProgramCapabilities, ProgramRunner, CodeExecutor, Gate } from "../../../src/index.js"
 import { Effect, Layer, Schema, Stream, pipe } from "effect"
 import { provideScoped } from "../execution/scoped-provide.js"
 import { Response } from "effect/unstable/ai"
@@ -21,6 +21,10 @@ import { closedTestAgent } from "./identity.js"
 import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 const failures: ReadonlyArray<RunFailureType> = [
   Errors.AgentExecutionFailure.make({ message: "agent failed", cause: new Error("model detail") }),
+  Errors.AgentExecutionFailure.make({
+    message: "completion gate failed",
+    failure: Gate.GateFailed.make({ gate: { name: "quality", verdict: "fail", evidence: "rejected" } }),
+  }),
   Errors.ExecutablePinMissing.make({ runId: "run:codec", ref: assistantRef.ref }),
   Errors.ExecutableIdentityMismatch.make({
     runId: "run:codec",
@@ -127,6 +131,26 @@ it("round-trips exact identity-bearing steering lifecycle facts", () => {
   for (const event of events) {
     expect(decodeEvent(encodeEvent(event))).toEqual(event)
   }
+})
+
+it("round-trips a completion gate result", () => {
+  const base = failedEvent(failures[0]!)
+  const event: RunEvent.RunEvent = {
+    _tag: "GateResult",
+    specVersion: base.specVersion,
+    eventId: base.eventId,
+    runId: base.runId,
+    sequence: base.sequence,
+    executableRef: base.executableRef,
+    rootRunId: base.rootRunId,
+    depth: base.depth,
+    occurredAt: base.occurredAt,
+    turn: 2,
+    name: "quality",
+    verdict: "pass",
+    evidence: { score: 1 },
+  }
+  expect(decodeEvent(encodeEvent(event))).toEqual(event)
 })
 
 it("round-trips the canonical ApprovalRequested identity and payload", () => {

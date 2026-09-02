@@ -60,6 +60,7 @@ const trajectory: Trajectory = {
     },
   ],
   stopReason: "stop",
+  gates: [],
 }
 
 const sqliteLayer = (filename: string) =>

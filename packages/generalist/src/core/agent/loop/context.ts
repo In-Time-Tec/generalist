@@ -19,6 +19,7 @@ import type { Entry, SessionStore } from "../../context/session.js"
 import type { RunInbox } from "../../turn/steering-inbox.js"
 import type { Input } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
+import type { VerifierRunner } from "../gates/evaluation.js"
 
 export type ObjectSchema = Schema.Codec<Record<string, Schema.Top["Type"]>, object, unknown, unknown>
 export interface RequiredFieldCodec<out T, out E, out RD, out RE> extends Schema.Codec<T, E, RD, RE> {
@@ -79,6 +80,8 @@ export interface RunLoopContext<
   readonly seedSystem: string | undefined
   readonly recallInitialPrompt: (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter>
   readonly initialPrompt: Prompt.RawInput
+  readonly initialTurn?: number
+  readonly runGateVerifier: VerifierRunner
   readonly toolState: Ref.Ref<ToolState>
   readonly handoffStateRef?: Ref.Ref<HandoffRunState>
   readonly modelTurn: (

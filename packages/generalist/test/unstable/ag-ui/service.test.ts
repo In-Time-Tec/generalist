@@ -211,6 +211,7 @@ describe("AGUI", () => {
       usage: [],
       budget: {},
       compactions: [],
+      gates: [],
     }
     const runtime = mockRuntime({
       snapshot: () => Effect.succeed(snapshot),
@@ -271,6 +272,7 @@ describe("AGUI", () => {
       usage: [],
       budget: {},
       compactions: [],
+      gates: [],
     }
     const runtime = mockRuntime({
       send: () =>
@@ -320,6 +322,7 @@ describe("AGUI", () => {
       usage: [],
       budget: {},
       compactions: [],
+      gates: [],
     }
     const runtime = mockRuntime({
       send: () =>

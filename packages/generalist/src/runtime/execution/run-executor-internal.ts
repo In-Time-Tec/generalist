@@ -4,9 +4,9 @@ import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
 import { AgentError, type Event } from "../../core/agent/event.js"
 import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
-import { type DriverCheckpoint, DriverJournal, type Journal } from "../../core/durable/driver.js"
+import { type DriverCheckpoint, DriverJournal, type DriverOperation, type Journal } from "../../core/durable/driver.js"
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
-import { RunStore, type ExecutionClaim } from "../run/store.js"
+import { RunStore, type ExecutionClaim, type Service as RunStoreService } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../run/errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
@@ -48,6 +48,10 @@ import { make as makeRegisteredResolution } from "./agent/registered-resolution.
 import type { Service } from "./run-executor.js"
 import { requireRunAvailable } from "../budget/state.js"
 import { prepare as prepareBudget } from "../budget/suspend.js"
+
+const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
+  kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
+
 const makeFor = (
   agents: RegisteredAgents,
 ): Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> =>
@@ -206,7 +210,7 @@ const makeFor = (
                       const journal: Journal = {
                         onScheduled: (operation, checkpoint) =>
                           Effect.gen(function* () {
-                            yield* requireRunAvailable(runId)(store)
+                            yield* requireOperationBudget(operation.kind, runId, store)
                             const [steeringEntryIds, steeringPrompt, steeringEvents] =
                               operation.kind === "model"
                                 ? yield* Effect.all([

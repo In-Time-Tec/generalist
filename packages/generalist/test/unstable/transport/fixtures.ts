@@ -69,6 +69,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
           usage: [],
           budget: {},
           compactions: [],
+          gates: [],
         }),
       history: ({ cursor }) =>
         Effect.succeed([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
@@ -115,6 +116,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
           turn: 0,
           usage: [],
           budget: {},
+          gates: [],
         }),
       extendBudget: () => Effect.die("unused extendBudget"),
       fanOut: () => Effect.die("unused fanOut"),

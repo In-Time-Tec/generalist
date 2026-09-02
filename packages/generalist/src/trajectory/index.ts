@@ -6,6 +6,7 @@ import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { CompactionInspection, RawUsageFact, RunId, type RunSnapshot } from "../runtime/run.js"
 import { CompletedModelResponse, type RunEvent } from "../runtime/run/event.js"
 import type { InspectError, EventsError, Service as RuntimeService, SessionEntryError } from "../runtime/service.js"
+import { Result as GateResult } from "../core/agent/gates/definition.js"
 
 export const ToolCall = Schema.Struct({
   id: Schema.String,
@@ -31,6 +32,7 @@ export const Trajectory = Schema.Struct({
   agent: Schema.String,
   input: Prompt.Prompt,
   output: Schema.Unknown,
+  gates: Schema.Array(GateResult),
   turns: Schema.Array(Turn),
   /** Agent budget allocation when the journal's executable manifest declares one. */
   budget: Schema.optionalKey(BudgetLimits),
@@ -166,6 +168,7 @@ export const fromJournal = Effect.fn("Trajectory.fromJournal")(function* (
     agent: agent.manifest.name,
     input,
     output,
+    gates: snapshot.gates,
     turns,
     stopReason,
   }

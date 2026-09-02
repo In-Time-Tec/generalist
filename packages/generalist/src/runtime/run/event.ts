@@ -8,6 +8,7 @@ import { ExecutionResult as ExecutionResultSchema, RunFailure as RunFailureSchem
 import { RunWait, WaitResolution } from "./wait.js"
 import { Address } from "../address.js"
 import { ApprovalRequest } from "../../core/agent/event.js"
+import { Result as CompletionGateResult } from "../../core/agent/gates/definition.js"
 import {
   CompactionApplied,
   CompactionFailed,
@@ -409,6 +410,10 @@ const AgentLoopEventSchema = Schema.Union([
     usage: Schema.optionalKey(Usage),
     finishReason: Schema.optionalKey(Response.FinishReason),
     ...optionalMetadata,
+  }),
+  Schema.TaggedStruct("GateResult", {
+    turn: Schema.Finite,
+    ...CompletionGateResult.fields,
   }),
   ModelTelemetryEventSchema,
 ])

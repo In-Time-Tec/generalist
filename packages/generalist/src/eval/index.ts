@@ -49,6 +49,20 @@ export const outputMatches = <OutputSchema extends Schema.Top>(
     ),
 })
 
+/** Score whether the latest verdict for every completion gate passed. */
+export const gatesPassed = (): Scorer => ({
+  name: "gatesPassed",
+  evaluate: (trajectory) => {
+    const latest = new Map(trajectory.gates.map((gate) => [gate.name, gate] as const))
+    const failed = [...latest.values()].filter((gate) => gate.verdict === "fail")
+    const message =
+      failed.length === 0
+        ? `${latest.size} completion gate(s) passed`
+        : `Failed completion gate(s): ${failed.map((gate) => gate.name).join(", ")}`
+    return Effect.succeed(result("gatesPassed", failed.length === 0, message))
+  },
+})
+
 export const toolCalledAtMost: {
   (maximum: number): (tool: string) => Scorer
   (tool: string, maximum: number): Scorer

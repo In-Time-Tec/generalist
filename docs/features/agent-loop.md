@@ -1,6 +1,6 @@
 # Agent loop
 
-An `Agent` is a plain typed definition. It owns input/output schemas, instructions, tools, and policy. `Agent.stream` emits the authoritative event stream; `Agent.run` consumes that stream and returns the schema-decoded terminal output.
+An `Agent` is a plain typed definition. It owns input/output schemas, instructions, tools, policy, and optional completion gates. `Agent.stream` emits the authoritative event stream; `Agent.run` consumes that stream and returns the schema-decoded terminal output.
 
 ## Usage
 
@@ -70,7 +70,10 @@ model attempt fails
 └── text/reasoning/tool-call escaped → terminal failure
 
 terminal unstructured turn
-├── assistant text → Completed
+├── assistant text → ordered completion gates
+│   ├── all pass → onRunEnd → Completed
+│   ├── reject + retry → evidence prompt → next turn
+│   └── reject + fail → GateFailed
 └── no assistant text → TurnCompleted → RunEndedWithoutOutput
 ```
 
@@ -90,6 +93,7 @@ terminal unstructured turn
 - Failure, interruption, or scope close discards queued process-local input and wakes blocked producers; core keeps no Run registry or terminal tombstone, so process loss loses both lanes.
 - Middleware-transformed response parts are authoritative for events, history, tools, memory, Sessions, and compaction.
 - Ordered lifecycle hook decisions are checkpointed through the durable driver before the next hook runs; recovery applies recorded decisions without re-invoking a completed chain.
+- Ordered completion-gate results use the same checkpoint journal; replay emits recorded `GateResult` values without re-running gates, and `onRunEnd` runs only after all gates pass.
 - Transformed tool-call IDs must be unique within one response; duplicates fail before execution; transformed calls are schema-validated again and invalid transformations fail as `MiddlewareViolation`.
 - The visible `model` selection is the only agent default and is resolved at run time by `ModelRegistry`; without a registry selection, `LanguageModel` remains a visible requirement supplied at the run boundary.
 - Requirements remain visible through model selection, direct model provision, memory, tools, policy, handoffs, and transport composition.
@@ -126,11 +130,13 @@ terminal unstructured turn
 - That failure carries provider finish reason (`"unknown"` means no reason; absence means no terminal event) and pre-middleware provider text/reasoning character totals across all attempts.
 - Zero text with reasoning means reasoning-only; both zero means no output; nonzero uncommitted text means middleware removed it or its attempt was discarded.
 - Structured runs complete by schema value and may have no terminal text.
+- A completion rejected for retry begins an ordinary budgeted turn with gate evidence; budget exhaustion suspends and cannot expose `Completed`.
 - Nested `AgentTool` runs get fresh Run IDs, inboxes, and telemetry, so one provider invocation never emits to two Runs; same-run handoffs retain all three.
 
 ## Related
 
 - Source: `packages/generalist/src/core/agent/`, `packages/generalist/src/core/model/`, `packages/generalist/src/core/turn/policy.ts`
+- Sibling feature doc: [`gates.md`](./gates.md)
 - Site: `/docs/learn/agent-loop`
 - Site: `/docs/reference/core-agent`
 - Site: `/docs/reference/core-events`

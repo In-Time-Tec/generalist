@@ -2,6 +2,7 @@ import { Effect, Schema, Stream } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
 import type { AgentError, Event } from "../event.js"
 import type { PendingToolResult } from "../tools/result.js"
+import type { Entry } from "../../context/session.js"
 import { PolicyError, type Decision, type TurnOverrides } from "../../turn/policy.js"
 import type { Completion } from "../../turn/steering-inbox.js"
 import type { Input } from "../../turn/steering.js"
@@ -14,6 +15,9 @@ import { terminalCompletedEvent, TurnFinish, turnCompletedEvent } from "../model
 import { HandoffRequirementsMissing, takePendingContinuation } from "../handoff/state.js"
 import type { RunError } from "../service.js"
 import { steer as applySteer } from "../lifecycle/hooks.js"
+import { GateFailed } from "../gates/definition.js"
+import { evaluate as evaluateGates } from "../gates/evaluation.js"
+import { retryPrompt as gateRetryPrompt } from "../gates/prompt.js"
 
 interface AfterTurnResult<StructuredOutputSchema extends ObjectSchema> {
   readonly events: Stream.Stream<Event, RunError, SchemaServicesD<StructuredOutputSchema>>
@@ -79,6 +83,64 @@ const withoutPending = <
   }
 }
 
+const closedWithoutPending = <
+  Tools extends Record<string, Tool.Any>,
+  R,
+  P extends R,
+  A extends R,
+  StructuredOutputSchema extends ObjectSchema,
+  OutputValue,
+>(input: {
+  readonly context: RunLoopContext<Tools, R, P, A, StructuredOutputSchema, OutputValue>
+  readonly turn: number
+  readonly transcript: Prompt.Prompt
+  readonly path: ReadonlyArray<Entry>
+  readonly completed: Event
+  readonly completion: Completion
+  readonly promptFromSteeringInputs: (inputs: ReadonlyArray<Input>) => Prompt.Prompt
+}): Effect.Effect<AfterTurnResult<StructuredOutputSchema>, RunError, R | DriverInterpreter> =>
+  Effect.gen(function* () {
+    const { context, turn, transcript } = input
+    if (context.structured === undefined && context.state.text.length > 0) {
+      const evaluated = yield* evaluateGates({
+        agent: context.agent,
+        runVerifier: context.runGateVerifier,
+        turn,
+        output: context.state.text,
+      })
+      const gateEvents: ReadonlyArray<Event> = evaluated.results.map((result) => ({
+        _tag: "GateResult",
+        turn,
+        ...result,
+      }))
+      const retry = evaluated.failed !== undefined && context.agent.onGateFailure === "retry"
+      yield* context.rememberTurn(turn, transcript, !retry, input.path)
+      if (evaluated.failed === undefined) {
+        return {
+          events: Stream.fromIterable<Event>([
+            input.completed,
+            ...gateEvents,
+            terminalCompletedEvent(context.state, turn, transcript, context.state.text),
+          ]),
+        }
+      }
+      if (retry) {
+        return {
+          events: Stream.fromIterable<Event>([input.completed, ...gateEvents]),
+          next: { prompt: gateRetryPrompt(evaluated.failed) },
+        }
+      }
+      return {
+        events: Stream.concat(
+          Stream.fromIterable<Event>([input.completed, ...gateEvents]),
+          Stream.fail(GateFailed.make({ gate: evaluated.failed })),
+        ),
+      }
+    }
+    yield* context.rememberTurn(turn, transcript, true, input.path)
+    return withoutPending(input)
+  })
+
 /** Finish one model turn, clear its batch checkpoint, and decide the next transcript transition. */
 export const afterTurnFor = <
   Tools extends Record<string, Tool.Any>,
@@ -134,7 +196,6 @@ export const afterTurnFor = <
       const pending = alreadyProjectedPending ?? pendingResults()
       const transcript = yield* checkpointPending(turn, alreadyProjectedPending === undefined ? pending : [])
       const path = yield* syncSession(turn, transcript)
-      yield* rememberTurn(turn, transcript, pending.length === 0, path)
       const current = yield* checkpoint
       const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
         Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
@@ -148,6 +209,7 @@ export const afterTurnFor = <
           input.takeFollowUp,
         )
         if (completion._tag === "Pending") {
+          yield* rememberTurn(turn, transcript, true, path)
           const steeringPrompt = yield* applySteer({
             runId: input.context.inbox.runId,
             agentName: input.context.agent.name,
@@ -166,15 +228,17 @@ export const afterTurnFor = <
             promptFromSteeringInputs: input.promptFromSteeringInputs,
           })
         }
-        return withoutPending({
+        return yield* closedWithoutPending({
           context: input.context,
           turn,
           transcript,
+          path,
           completed,
           completion,
           promptFromSteeringInputs: input.promptFromSteeringInputs,
         })
       }
+      yield* rememberTurn(turn, transcript, false, path)
       const evaluated = yield* input.decidePolicy({
         turn: turn + 1,
         history: transcript,

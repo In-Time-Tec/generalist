@@ -39,6 +39,8 @@ import type { ObjectSchema, StructuredRunConfig } from "./loop/context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
 import type { RunInbox } from "../turn/steering-inbox.js"
 import { modelCallMiddleware, runStart as applyRunStart } from "./lifecycle/hooks.js"
+import { recoveredRetry as recoveredGateRetry } from "./gates/prompt.js"
+import { make as makeVerifierRunner } from "./gates/verifier-runner.js"
 const errorMessage = String
 const { insertRecalledItems, steeringDrainedEvent } = RunSupport
 const streamInternalImpl = <
@@ -378,10 +380,17 @@ const streamInternalImpl = <
       const withInterpreter = <A, E, RInner>(effect: Effect.Effect<A, E, RInner>) =>
         effect.pipe(Effect.provideContext(interpreterServices))
       if (validatedResume !== undefined) yield* withInterpreter(setToolBatch(validatedResume.checkpoint))
-      const loadInitialPrompt = () =>
-        options.resume === undefined && recoveredToolCheckpoint === undefined
-          ? recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
-          : Effect.succeed(baseInitialPrompt)
+      const gateRetry =
+        options.resume === undefined && recoveredToolCheckpoint === undefined && options.turnStart === undefined
+          ? recoveredGateRetry({ agent, checkpoint: options.driverCheckpoint })
+          : undefined
+      const loadInitialPrompt = () => {
+        if (gateRetry !== undefined) return Effect.succeed(gateRetry.prompt)
+        if (options.resume === undefined && recoveredToolCheckpoint === undefined) {
+          return recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
+        }
+        return Effect.succeed(baseInitialPrompt)
+      }
       const initialPrompt = yield* loadInitialPrompt()
       const applyContinuation = (continuation: HandoffRunState["pendingContinuation"]) => {
         if (continuation === undefined) return initialPrompt
@@ -420,6 +429,8 @@ const streamInternalImpl = <
               seedSystem,
               recallInitialPrompt,
               initialPrompt: prompt,
+              ...Object.assign({}, gateRetry === undefined ? undefined : { initialTurn: gateRetry.turn }),
+              runGateVerifier: makeVerifierRunner(streamInternalImpl),
               toolState,
               modelTurn,
               captureStructuredUsage,

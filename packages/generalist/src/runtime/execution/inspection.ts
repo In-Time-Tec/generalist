@@ -18,6 +18,7 @@ import {
 } from "../../core/durable/run-budget.js"
 import { cost as modelCost } from "../../ai/model-catalog.js"
 import { durationForEvents } from "../budget/state.js"
+import type { Result as GateResult } from "../../core/agent/gates/definition.js"
 
 export interface InspectionRun {
   readonly inspection: RunInspection
@@ -200,6 +201,25 @@ const factsForRuns = (
 
 const factsFor = (runs: ReadonlyArray<InspectionRun>) =>
   factsForRuns(runs.map((run) => ({ runId: run.inspection.runId, events: run.events })))
+
+const gatesFor = (run: InspectionRun): Effect.Effect<ReadonlyArray<GateResult>, RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const results: Array<GateResult> = []
+    const seen = new Map<string, GateResult>()
+    for (const event of run.events) {
+      if (event._tag !== "GateResult") continue
+      const key = `${event.turn}\u0000${event.name}`
+      const result: GateResult = { name: event.name, verdict: event.verdict, evidence: event.evidence }
+      const previous = seen.get(key)
+      if (previous !== undefined) {
+        if (!Equal.equals(previous, result)) return yield* corruption(`Conflicting completion gate ${event.name}`)
+        continue
+      }
+      seen.set(key, result)
+      results.push(result)
+    }
+    return results
+  })
 
 const factTokens = (fact: RawUsageFact): number => {
   if (fact._tag === "Failed") {
@@ -401,6 +421,7 @@ export const projectRunSnapshot = (run: InspectionRun) =>
       usage: yield* factsFor([run]),
       budget: yield* budgetForEvents(run.events),
       compactions: yield* compactionsFor([run]),
+      gates: yield* gatesFor(run),
     }
     return outcome === undefined ? snapshot : { ...snapshot, outcome }
   })

@@ -41,6 +41,9 @@ import { resumeBatch } from "../tools/resume-batch.js"
 import { isClosed } from "../lifecycle/closure-identity.js"
 import { afterTurnFor } from "./after-turn.js"
 import { runEnd as applyRunEnd, steer as applySteer, turnStart as applyTurnStart } from "../lifecycle/hooks.js"
+import { GateFailed } from "../gates/definition.js"
+import { evaluate as evaluateGates } from "../gates/evaluation.js"
+import { retryPrompt as gateRetryPrompt } from "../gates/prompt.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
@@ -98,7 +101,7 @@ export const make = <
     config: StructuredRunConfig<StructuredOutputSchema, OutputValue>,
     onPending: (input: { readonly prompt: Prompt.RawInput }) => void,
   ): Stream.Stream<Event, RunError, TurnServices<R, StructuredOutputSchema>> =>
-    Stream.fromEffect(
+    Stream.unwrap(
       Effect.gen(function* () {
         const turnPrompt = yield* applyTurnStart({
           runId: inbox.runId,
@@ -193,7 +196,32 @@ export const make = <
         )
         const completion = yield* inbox.complete
         if (completion._tag === "Closed") {
-          return [terminalCompletedEvent(state, structuredTurn, transcript, config.output(response.value))]
+          const output = config.output(response.value)
+          const evaluated = yield* evaluateGates({
+            agent,
+            runVerifier: context.runGateVerifier,
+            turn: structuredTurn,
+            output,
+          })
+          const gateEvents: ReadonlyArray<Event> = evaluated.results.map((result) => ({
+            _tag: "GateResult",
+            turn: structuredTurn,
+            ...result,
+          }))
+          if (evaluated.failed === undefined) {
+            return Stream.fromIterable<Event>([
+              ...gateEvents,
+              terminalCompletedEvent(state, structuredTurn, transcript, output),
+            ])
+          }
+          if (agent.onGateFailure === "retry") {
+            onPending({ prompt: gateRetryPrompt(evaluated.failed) })
+            return Stream.fromIterable<Event>([turnCompletedEvent(state, structuredTurn, transcript), ...gateEvents])
+          }
+          return Stream.concat(
+            Stream.fromIterable<Event>(gateEvents),
+            Stream.fail(GateFailed.make({ gate: evaluated.failed })),
+          )
         }
         const prompt = yield* applySteer({
           runId: inbox.runId,
@@ -204,12 +232,12 @@ export const make = <
           prompt: promptFromSteeringInputs(completion.inputs),
         })
         onPending({ prompt })
-        return [
+        return Stream.fromIterable<Event>([
           turnCompletedEvent(state, structuredTurn, transcript),
           context.steeringDrainedEvent(structuredTurn, completion.queue, completion.inputs),
-        ]
+        ])
       }),
-    ).pipe(Stream.flatMap((events) => Stream.fromIterable<Event>(events)))
+    )
   const promptFromSteeringInputs = (inputs: ReadonlyArray<Input>): Prompt.Prompt =>
     inputs.reduce<Prompt.Prompt>((prompt, input) => Prompt.concat(prompt, input.prompt), Prompt.empty)
   const takeSteering = (): Effect.Effect<ReadonlyArray<Input>> => inbox.takeSteering
@@ -382,7 +410,8 @@ export const make = <
     )
   }
   const toolCheckpoint = validatedResume ?? recoveredToolCheckpoint
-  const startTurn = options.turnStart ?? options.driverCheckpoint?.turn ?? toolCheckpoint?.checkpoint.turn ?? 0
+  const startTurn =
+    options.turnStart ?? context.initialTurn ?? options.driverCheckpoint?.turn ?? toolCheckpoint?.checkpoint.turn ?? 0
   const runStream =
     toolCheckpoint === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(toolCheckpoint, startTurn)
   const guardedStream = runStream.pipe(

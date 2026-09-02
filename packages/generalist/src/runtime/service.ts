@@ -63,6 +63,7 @@ import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agen
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
 import type { MessagingPolicy } from "./messaging/service.js"
 import type { RawUsageFact, RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
+import type { Result as GateResult } from "../core/agent/gates/definition.js"
 import type { CompletedModelResponse, RunCancelled, RunCompleted, RunEvent, RunFailed } from "./run/event.js"
 import type { AgentExecutionResult, ProgramExecutionResult } from "./execution/state.js"
 import type { WaitResolution } from "./run/wait.js"
@@ -205,6 +206,7 @@ export interface RuntimeInspection extends RunInspection {
   readonly turn: number
   readonly usage: ReadonlyArray<RawUsageFact>
   readonly budget: RemainingBudget
+  readonly gates: ReadonlyArray<GateResult>
   readonly suspension?: import("./execution/state.js").ExecutionSuspension
 }
 

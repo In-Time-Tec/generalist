@@ -143,6 +143,7 @@ describe("generalist public surface", () => {
         "ContextOverflow",
         "DurableDriver",
         "ExecutableManifest",
+        "Gate",
         "Guardrail",
         "Handoff",
         "Hooks",

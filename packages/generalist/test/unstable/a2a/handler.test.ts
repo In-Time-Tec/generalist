@@ -189,6 +189,7 @@ const makeRuntime = (acceptedSequence = 0) => {
         usage: [],
         budget: {},
         compactions: [],
+        gates: [],
       })
     },
     sessionEntry: () => Effect.die("not used"),
@@ -253,7 +254,8 @@ const makeRuntime = (acceptedSequence = 0) => {
     },
     cancelSession: () => Effect.die("not used"),
     awaitSessionTerminal: () => Effect.die("not used"),
-    inspect: (runId) => Effect.succeed({ ...inspection(runId, runs.get(runId)!), turn: 0, usage: [], budget: {} }),
+    inspect: (runId) =>
+      Effect.succeed({ ...inspection(runId, runs.get(runId)!), turn: 0, usage: [], budget: {}, gates: [] }),
     extendBudget: () => Effect.die("not used"),
   }
   return { runtime, runs, sentRunIds, observedCursors }
