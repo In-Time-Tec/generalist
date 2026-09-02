@@ -10,6 +10,7 @@ import {
   PolicyStopped,
 } from "../../../core/agent/event.js"
 import { Exhausted } from "../../../core/durable/run-budget.js"
+import { GateFailed } from "../../../core/agent/gates/definition.js"
 import { AgentExecutionFailure, StructuredAgentFailure } from "../../errors.js"
 import { HookFailed } from "../../../hooks/index.js"
 
