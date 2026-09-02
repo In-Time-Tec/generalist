@@ -114,7 +114,11 @@ const program = Effect.fn("RenderHosts.program")(function* (check: boolean) {
   yield* Console.log(`${documentationPath} matches ${certificationReportPath}`)
 })
 
-const command = Command.make("render-hosts", { check: Flag.boolean("check") }, ({ check }) => program(check))
+const command = Command.make(
+  "render-hosts",
+  { check: Flag.boolean("check").pipe(Flag.withDefault(false)) },
+  ({ check }) => program(check),
+)
 
 if (import.meta.main) {
   await Effect.runPromise(Command.run(command, { version: "1" }).pipe(Effect.provide(layer)))

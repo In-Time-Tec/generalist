@@ -132,7 +132,6 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
             "operator:approval-conformance",
           )
           .pipe(
-            Effect.provideService(Runtime, services.runtime),
             Effect.provideService(
               RuleStore,
               RuleStore.of({
