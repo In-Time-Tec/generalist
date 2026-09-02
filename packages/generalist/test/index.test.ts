@@ -42,8 +42,6 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "Runtime",
       "Steering",
       "TreePolicy",
-      "Triggers",
-      "Watcher",
     ],
   ],
   [
