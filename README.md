@@ -13,7 +13,6 @@ bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @effect
 Save this as `index.ts`, then run `bun index.ts`. The scripted model is a real `LanguageModel` Layer that needs no credentials, so this path also runs unchanged in CI.
 
 ```ts
-/* oxlint-disable effecttsgo/strict-effect-provide -- this example provides the Bun platform at its entry point. */
 import { layer as bunServices } from "@effect/platform-bun/BunServices"
 import { Console, Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { Agent } from "generalist"
