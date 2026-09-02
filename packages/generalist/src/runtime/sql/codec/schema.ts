@@ -322,6 +322,14 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS generalist_session_entries_seq_idx ON generalist_session_entries(session_id, seq)`,
   `CREATE INDEX IF NOT EXISTS generalist_session_entries_parent_idx ON generalist_session_entries(session_id, parent_id)`,
+  `CREATE TABLE IF NOT EXISTS generalist_permission_rules (
+  scope TEXT NOT NULL,
+  pattern TEXT NOT NULL,
+  level TEXT NOT NULL,
+  reason TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (scope, pattern)
+)`,
 ]
 
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(

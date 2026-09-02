@@ -12,7 +12,7 @@ import {
 export const SQL_SCHEMA_NAME = "generalist_runtime"
 
 /** @experimental The single logical SQL Runtime schema version. */
-export const SQL_SCHEMA_VERSION = 4
+export const SQL_SCHEMA_VERSION = 5
 
 export interface SqlLogicalTable {
   readonly name: string
@@ -66,6 +66,10 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
   tables: [
     { name: "generalist_schema_meta", columns: ["id", "version", "checksum", "dirty", "applied_at"] },
     { name: "generalist_sql_migrations", columns: ["migration_id", "name", "created_at"] },
+    {
+      name: "generalist_permission_rules",
+      columns: ["scope", "pattern", "level", "reason", "created_at"],
+    },
     { name: "generalist_lanes", columns: ["session_id", "accepted_sequence", "queue_json"] },
     {
       name: "generalist_runs",
@@ -364,6 +368,7 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
   ],
   constraints: [
     { table: "generalist_schema_meta", kind: "check", columns: ["id"] },
+    { table: "generalist_permission_rules", kind: "primary-key", columns: ["scope", "pattern"] },
     {
       table: "generalist_runs",
       kind: "unique",

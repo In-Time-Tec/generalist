@@ -28,6 +28,18 @@ const policy = Layer.mergeAll(
 const runnable = agent.run({ prompt: "Find authorization docs" }).pipe(Effect.provide(Layer.merge(handlers, policy)))
 ```
 
+For rules that survive process restarts, replace the memory store with a file or SQL store:
+
+```ts
+const projectRules = Permissions.layerRuleStoreFile({ path: ".generalist/permissions.json" }).pipe(
+  Layer.provideMerge(platformLayer), // FileSystem and Path
+)
+
+const sessionRules = Permissions.layerRuleStoreSql({ scope: sessionId }).pipe(Layer.provideMerge(runtimeSqlClientLayer))
+```
+
+The file store accepts a schema-validated JSON or YAML array of `{ pattern, level, reason? }`, watches the file for external changes, and writes remembered rules through a same-directory temporary file plus rename. Missing files start empty; malformed content fails as `InvalidRuleFile { path, issues }` rather than silently dropping rules. The SQL store uses `generalist_permission_rules`, replaces rules by `(scope, pattern)`, and shares the Runtime `SqlClient`; omitting `scope` uses the `"sessionId"` scope key.
+
 ## What runs
 
 ```text

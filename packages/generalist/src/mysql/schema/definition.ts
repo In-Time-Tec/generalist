@@ -344,6 +344,14 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
     ((settlement_id IS NULL AND outcome_json IS NULL AND outcome_event_id IS NULL AND settled_at IS NULL)
       OR (settlement_id IS NOT NULL AND outcome_json IS NOT NULL AND outcome_event_id IS NOT NULL AND settled_at IS NOT NULL))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS generalist_permission_rules (
+  scope VARCHAR(255) NOT NULL,
+  pattern VARCHAR(512) NOT NULL,
+  level VARCHAR(16) NOT NULL,
+  reason TEXT,
+  created_at VARCHAR(32) NOT NULL,
+  PRIMARY KEY (scope, pattern)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
 ]
 
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(

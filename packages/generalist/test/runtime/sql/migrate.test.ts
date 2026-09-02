@@ -104,6 +104,7 @@ const inspect = (filename: string) => {
     "generalist_fan_outs",
     "generalist_lanes",
     "generalist_messages",
+    "generalist_permission_rules",
     "generalist_program_operations",
     "generalist_program_runs",
     "generalist_run_acknowledgements",
