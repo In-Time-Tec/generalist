@@ -73,7 +73,12 @@ import type { Event as ModelPreviewEvent } from "./execution/model-response/prev
 import type { RunActivationProjection } from "./run/activation.js"
 import type { Point as AcknowledgementPoint } from "./acknowledgement.js"
 import type { RuntimeHostSessions } from "./session/host.js"
-import type { RunBudget, Remaining as RemainingBudget, Input as BudgetDelta } from "../core/durable/run-budget.js"
+import type {
+  RunBudget,
+  Remaining as RemainingBudget,
+  Input as BudgetDelta,
+  Invalid as BudgetInvalid,
+} from "../core/durable/run-budget.js"
 
 export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
@@ -381,7 +386,7 @@ export type SteerError =
   | RuntimeUnavailable
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
-export type ExtendBudgetError = InspectError | import("../core/durable/run-budget.js").Invalid
+export type ExtendBudgetError = InspectError | BudgetInvalid
 export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable
 export type ResolveModelResponseError = SessionEntryError
 export type FanOutError =
