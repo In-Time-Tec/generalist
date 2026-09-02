@@ -7,6 +7,7 @@ import {
   Effect,
   Exit,
   Fiber,
+  Function,
   Layer,
   Option,
   Ref,
@@ -473,6 +474,17 @@ const testTracer = () => {
 }
 
 const objectSchema = Schema.Struct({ ok: Schema.Boolean })
+const impossibleOutputSchema = Schema.Struct({ impossible: Schema.Finite.check(Schema.isLessThan(0)) })
+
+const providerHttp = (status: number) => ({
+  request: {
+    method: "POST" as const,
+    url: "https://provider.example/v1/chat",
+    urlParams: [],
+    headers: {},
+  },
+  response: { status, headers: {} },
+})
 
 const transientModelError = AiError.make({
   module: "AgentTestLanguageModel",
@@ -1118,6 +1130,51 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ] as const,
   )
+
+  it.effect("explains how to provide a missing LanguageModel", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "missing-model-agent" })
+      const failure = yield* Agent.run(agent, "hello").pipe(
+        Effect.provide(
+          Function.cast<Context.Context<never>, Context.Context<LanguageModel.LanguageModel>>(Context.empty()),
+        ),
+        Effect.flip,
+      )
+
+      expect(failure).toMatchObject({
+        _tag: "generalist/core/AgentError",
+        message: "Agent requires LanguageModel in context",
+      })
+      if (failure._tag === "generalist/core/AgentError") {
+        expect(failure.hint).toContain("generalist/providers/*")
+        expect(failure.hint).toContain("ModelRegistry.withModel")
+      }
+    }),
+  )
+
+  ItLayer.make(it, "explains how to correct a provider-rejected model ID", () => {
+    const error = AiError.make({
+      module: "AgentTestLanguageModel",
+      method: "streamText",
+      reason: AiError.InvalidRequestError.make({
+        parameter: "model",
+        description: "No endpoints found for model test/not-a-model",
+        http: providerHttp(400),
+      }),
+    })
+    return [
+      modelLayer(() => Stream.fail(error)),
+      Effect.gen(function* () {
+        const failure = yield* Agent.run(Agent.make({ name: "invalid-model-agent" }), "hello").pipe(Effect.flip)
+
+        expect(failure._tag).toBe("generalist/core/AgentError")
+        if (failure._tag === "generalist/core/AgentError") {
+          expect(failure.hint).toContain("model ID")
+          expect(failure.hint).toContain("provider's model catalog")
+        }
+      }),
+    ] as const
+  })
 
   ItLayer.make(
     it,
@@ -6359,14 +6416,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Layer.mergeAll(
         modelLayer(
           () => Stream.make(textDelta("normal answer")),
-          () => Effect.succeed([{ type: "text", text: '{"output":{"ok":"nope"}}' }]),
+          () => Effect.succeed([{ type: "text", text: '{"output":{"impossible":1}}' }]),
         ),
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "structured-decode-agent", output: objectSchema })
+        const agent = Agent.make({ name: "structured-decode-agent", output: impossibleOutputSchema })
 
         const failure = yield* Effect.flip(
           Stream.runCollect(Agent.stream(agent, "bad object")).pipe(Effect.withTracer(tracer)),
@@ -6375,6 +6432,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(failure._tag).toBe("generalist/core/InvalidOutput")
         if (failure._tag === "generalist/core/InvalidOutput") {
           expect(failure.issues).not.toHaveLength(0)
+          expect(failure.message).toContain('["output"]["impossible"]')
+          expect(Cause.pretty(Cause.fail(failure)).split("\n", 1)[0]).toContain('["output"]["impossible"]')
         }
         const structuredSpan = spans.find(
           (span) => span.name === "Generalist.Agent.turn" && span.attributes.get("generalist.turn") === 1,
@@ -9054,7 +9113,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const terminalStreamError = AiError.make({
       module: "AgentTestLanguageModel",
       method: "streamText",
-      reason: AiError.AuthenticationError.make({ kind: "InvalidKey" }),
+      reason: AiError.AuthenticationError.make({ kind: "InvalidKey", http: providerHttp(401) }),
     })
     return [
       Layer.mergeAll(
@@ -9080,6 +9139,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         )
 
         expect(failure._tag).toBe("generalist/core/AgentError")
+        if (failure._tag === "generalist/core/AgentError") {
+          expect(failure.hint).toContain("API key configuration name")
+        }
         const attemptFailed = seen.filter((event) => event._tag === "ModelAttemptFailed")
         const callFailed = seen.filter((event) => event._tag === "ModelCallFailed")
         expect(attemptFailed.map((event) => event.category)).toEqual(["authentication"])

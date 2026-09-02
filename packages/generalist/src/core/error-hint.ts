@@ -1,5 +1,5 @@
 /* oxlint-disable anti-slop/no-chained-type-assertions, anti-slop/no-object-parameters, anti-slop/no-runtime-typeof, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion, typescript/no-unsafe-type-assertion -- This internal adapter preserves Schema.TaggedError's overloaded public type while extending its generated Error class. */
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 
 /** @internal Required error hint with backwards-compatible decoding and constructor defaults. */
 export const errorHint = (value: string) =>
@@ -37,13 +37,27 @@ const identifyingFields = new Set([
 
 const oneLine = (value: string): string => value.replaceAll(/\s+/g, " ").trim()
 
+const maxIssueLength = 300
+const Issues = Schema.Union([Schema.String, Schema.Array(Schema.Json)])
+
+const firstIssue = (issues: typeof Issues.Type): string | undefined => {
+  const issue: unknown = typeof issues === "string" ? issues : issues[0]
+  if (issue === undefined) return undefined
+  const rendered = oneLine(typeof issue === "string" ? issue : (JSON.stringify(issue) ?? "null"))
+  return rendered.length <= maxIssueLength ? rendered : `${rendered.slice(0, maxIssueLength - 1)}…`
+}
+
 const describe = (error: Record<string, unknown>): string => {
   const context = Object.entries(error)
     .filter(([key, value]) => identifyingFields.has(key) && value !== undefined)
     .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
     .join(" ")
+  const decodedIssues = Schema.decodeUnknownOption(Issues)(error.issues)
+  const issue = Option.isSome(decodedIssues) ? firstIssue(decodedIssues.value) : undefined
+  const detail =
+    issue === undefined ? context : [context, `issue=${issue}`].filter((value) => value.length > 0).join(" ")
   const hint = oneLine(String(error.hint))
-  return context.length > 0 ? `${context}. Hint: ${hint}` : `Hint: ${hint}`
+  return detail.length > 0 ? `${detail}. Hint: ${hint}` : `Hint: ${hint}`
 }
 
 /**
