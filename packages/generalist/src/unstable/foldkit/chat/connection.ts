@@ -1,16 +1,16 @@
 import { Cause, Context, Effect, Layer, Option, Ref, Result, Schema, Scope, Stream } from "effect"
+import { HttpClient } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
+import { HostEvent } from "../../../host/event.js"
 import {
-  layerWebSocket as runClientLayerWebSocket,
-  RunClient,
-  type Connection as RunConnection,
+  client as serverClient,
+  type Connection as ServerConnection,
   type ConnectionStatus,
-} from "../../transport/run-client.js"
-import { TransportError } from "../../transport/errors.js"
-import { ObserverRunEvent } from "../../transport/wire.js"
+} from "../../../server/client.js"
+import { TransportError } from "../../../server/errors.js"
 import type { AgentCommand } from "./connection-command.js"
 
 /** @experimental */
@@ -29,13 +29,13 @@ export const ConnectionFailed: CallableTaggedStruct<
 
 /** @experimental */
 export type Incoming =
-  | ObserverRunEvent
+  | HostEvent
   | typeof ConnectionOpened.Type
   | typeof ConnectionLost.Type
   | typeof ConnectionFailed.Type
 /** @experimental */
 export const Incoming: Schema.Schema<Incoming> = Schema.Union([
-  ObserverRunEvent,
+  HostEvent,
   ConnectionOpened,
   ConnectionLost,
   ConnectionFailed,
@@ -73,8 +73,8 @@ export interface Service {
 export class Connection extends Context.Service<Connection, Service>()("generalist/unstable/foldkit/chat/connection") {}
 
 interface ActiveConnection {
-  readonly runId: string
-  readonly connection: RunConnection
+  readonly runId: Ref.Ref<string | undefined>
+  readonly connection: ServerConnection
 }
 
 const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<never>> => {
@@ -103,29 +103,35 @@ export const layerTest = (implementation: Connection["Service"]): Layer.Layer<Co
 
 /** @experimental */
 export const layerWebSocket = (options: {
-  readonly url: string
-}): Layer.Layer<Connection, never, Socket.WebSocketConstructor> =>
+  readonly baseUrl: string
+}): Layer.Layer<Connection, never, HttpClient.HttpClient | Socket.WebSocketConstructor> =>
   Layer.effect(
     Connection,
     Effect.gen(function* () {
-      const client = yield* RunClient
+      const client = yield* serverClient({ baseUrl: options.baseUrl })
+      const webSocketConstructor = yield* Socket.WebSocketConstructor
       const active = yield* Ref.make<ReadonlyMap<string, ActiveConnection>>(new Map())
 
-      const sendThrough = (owner: ActiveConnection, command: AgentCommand): Effect.Effect<void, AgentCommandError> =>
-        command._tag === "Cancel"
-          ? owner.connection.cancel()
-          : Effect.fail(SendFailed.make({ reason: `${command._tag} requires a Runtime host command adapter` }))
+      const sendThrough = (owner: ActiveConnection, command: AgentCommand): Effect.Effect<void, AgentCommandError> => {
+        if (command._tag !== "Cancel") {
+          return Effect.fail(SendFailed.make({ reason: `${command._tag} requires a Host command adapter` }))
+        }
+        return Effect.gen(function* () {
+          const runId = yield* Ref.get(owner.runId)
+          if (runId === undefined) {
+            return yield* SendFailed.make({ reason: "No Run event has been received for this Session" })
+          }
+          yield* owner.connection.cancel(runId)
+        })
+      }
 
       const session = ({ sessionId, afterSeq }: { readonly sessionId: string; readonly afterSeq?: number }) =>
         Effect.gen(function* () {
-          const connection = yield* client
-            .connect(
-              afterSeq === undefined
-                ? { url: options.url, runId: sessionId }
-                : { url: options.url, runId: sessionId, cursor: afterSeq },
-            )
-            .pipe(Effect.orDie)
-          const owner = { runId: sessionId, connection }
+          const connection = yield* client.events
+            .connect(afterSeq === undefined ? { sessionId } : { sessionId, cursor: afterSeq })
+            .pipe(Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor), Effect.orDie)
+          const runId = yield* Ref.make<string | undefined>(undefined)
+          const owner = { runId, connection }
           yield* Effect.acquireRelease(
             Ref.update(active, (current) => new Map(current).set(sessionId, owner)),
             () =>
@@ -142,6 +148,7 @@ export const layerWebSocket = (options: {
             ),
           )
           const events = connection.events.pipe(
+            Stream.tap((event) => Ref.set(runId, event.runId)),
             Stream.map((event): Incoming => event),
             Stream.catchCause((cause) =>
               Option.match(unexpectedCause(cause), {
@@ -178,4 +185,4 @@ export const layerWebSocket = (options: {
           ),
       })
     }),
-  ).pipe(Layer.provide(runClientLayerWebSocket))
+  )

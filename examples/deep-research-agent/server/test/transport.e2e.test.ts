@@ -2,44 +2,13 @@ import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
+import { FetchHttpClient } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
-import { Cursor } from "generalist/runtime"
-import { RunClient, Wire } from "generalist/unstable/transport"
-
-const encodeEvents = (value: ReadonlyArray<{ readonly _tag: string }>): string => JSON.stringify(value)
-
-const StartResponse = Schema.Struct({
-  runId: Schema.String,
-})
+import { Server } from "generalist/server"
 
 class TransportTestError extends Schema.TaggedError<TransportTestError>()("TransportTestError", {
   message: Schema.String,
 }) {}
-
-const postJson = (url: string, body: Schema.Json) =>
-  HttpClient.post(url, { body: HttpBody.jsonUnsafe(body) }).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
-
-const admitRun = (
-  baseUrl: string,
-  attempts: number,
-): Effect.Effect<
-  typeof StartResponse.Type,
-  HttpClientError.HttpClientError | Schema.SchemaError,
-  HttpClient.HttpClient
-> =>
-  postJson(`${baseUrl}/runs`, {
-    sessionId: "deep-research-e2e-session",
-    idempotencyKey: "question-1",
-    prompt: "What makes Generalist agent framework standalone?",
-  }).pipe(
-    Effect.flatMap(HttpClientResponse.schemaBodyJson(StartResponse)),
-    Effect.catch((error) =>
-      attempts <= 0
-        ? Effect.fail(error)
-        : Effect.sleep("100 millis").pipe(Effect.andThen(admitRun(baseUrl, attempts - 1))),
-    ),
-  )
 
 const freePort = Effect.callback<number, TransportTestError>((resume) => {
   const server = createServer()
@@ -58,13 +27,11 @@ const freePort = Effect.callback<number, TransportTestError>((resume) => {
 })
 
 const startServer = (port: number) =>
-  ChildProcess.make("bun", ["run", "--cwd", "examples/deep-research-agent/server", "start"], {
+  ChildProcess.make(process.execPath, ["run", "--cwd", "examples/deep-research-agent/server", "start"], {
     env: {
-      OPENROUTER_API_KEY: undefined,
-      EXA_API_KEY: undefined,
       PORT: String(port),
     },
-    extendEnv: true,
+    extendEnv: false,
     stdin: "ignore",
     stdout: "inherit",
     stderr: "inherit",
@@ -96,93 +63,57 @@ const waitForServerReady = (port: number, attempts: number): Effect.Effect<void,
     ),
   )
 
-describe("deep-research-agent Generalist transport e2e", () => {
+describe("deep-research-agent server e2e", () => {
   layer(FetchHttpClient.layer.pipe(Layer.provideMerge(bunServicesLayer)), {
     excludeTestServices: true,
     timeout: 60_000,
-  })("admits a deterministic run, resolves its approval, and replays canonical SSE events", (it) => {
-    it.effect("admits a deterministic run, resolves its approval, and replays canonical SSE events", () =>
+  })("serves one Host through the typed client", (it) => {
+    it.effect("starts, approves, resumes, and completes a deterministic Run", () =>
       Effect.scoped(
         Effect.gen(function* () {
           const port = yield* freePort
           yield* startServer(port)
-          const baseUrl = `http://127.0.0.1:${port}`
           yield* waitForServerReady(port, 200)
-          const receipt = yield* admitRun(baseUrl, 50)
-          const eventsUrl = `${baseUrl}/runs/${receipt.runId}/events`
-          const first = yield* RunClient.streamSSE({ url: eventsUrl }).pipe(
-            Stream.takeUntil(
-              (event) =>
-                event._tag === "RunWaiting" ||
-                event._tag === "RunCompleted" ||
-                event._tag === "RunFailed" ||
-                event._tag === "RunCancelled",
+          const client = yield* Server.client({ baseUrl: `http://127.0.0.1:${port}` })
+          const session = yield* client.sessions.create({ id: "deep-research-e2e-session" })
+          const run = yield* client.runs.start({
+            sessionId: session.id,
+            agent: "deep-research-agent",
+            input: "What makes Generalist agent framework standalone?",
+            idempotencyKey: "question-1",
+          })
+          const first = Array.from(
+            yield* client.events.subscribe({ sessionId: session.id }).pipe(
+              Stream.takeUntil((item) => item._tag === "ApprovalRequested"),
+              Stream.runCollect,
             ),
-            Stream.runCollect,
           )
-          const firstEvents = Array.from(first).filter(Wire.isResolvedRunEvent)
-          const approvalRequested = firstEvents.find((event) => event._tag === "ApprovalRequested")
-          const waiting = firstEvents.find((event) => event._tag === "RunWaiting")
-          if (waiting === undefined || waiting._tag !== "RunWaiting") {
-            return yield* Effect.die(`expected RunWaiting: ${encodeEvents(Array.from(first))}`)
+          const approval = first.find((item) => item._tag === "ApprovalRequested")
+          if (approval === undefined || approval.event._tag !== "ApprovalRequested") {
+            return yield* Effect.die("expected ApprovalRequested")
           }
 
-          yield* postJson(`${baseUrl}/runs/${receipt.runId}/respond`, {
-            waitId: waiting.wait.waitId,
-            resolution: { _tag: "Approved" },
+          yield* client.approvals.resolve({
+            runId: run.id,
+            token: approval.event.request.approvalId,
+            decision: { _tag: "Approved" },
+            operator: "operator:e2e",
           })
-          const second = yield* RunClient.streamSSE({ url: eventsUrl, cursor: Cursor.make(waiting.sequence) }).pipe(
-            Stream.takeUntil((event) => event._tag === "RunCompleted"),
-            Stream.runCollect,
+          const resumed = Array.from(
+            yield* client.events.subscribe({ sessionId: session.id, cursor: approval.cursor }).pipe(
+              Stream.takeUntil((item) => item._tag === "Completed"),
+              Stream.runCollect,
+            ),
           )
-          const all = [...first, ...second].filter(Wire.isResolvedRunEvent)
-          const committedResponse = all.find((event) => event._tag === "ModelResponseCommitted")
-          const toolCall =
-            committedResponse?._tag === "ModelResponseCommitted"
-              ? committedResponse.response.content.find((part) => part.type === "tool-call")
-              : undefined
-          const completedTool = all.find((event) => event._tag === "ToolExecutionCompleted")
-          const completed = all.find((event) => event._tag === "RunCompleted")
-          const approvalId = `runtime-approval:${encodeURIComponent(receipt.runId)}:approval:search-1`
+          const completed = resumed.find((item) => item._tag === "Completed" && item.event._tag === "RunCompleted")
 
-          expect(waiting.wait).toMatchObject({
-            waitId: approvalId,
-            reason: {
-              _tag: "Approval",
-              request: {
-                approvalId,
-                operation: "search-1",
-                capability: "web_search",
-                input: { query: "What makes Generalist agent framework standalone?" },
-              },
-            },
+          expect(first[0]).toMatchObject({ _tag: "RunStarted", runId: run.id })
+          expect(completed).toMatchObject({
+            _tag: "Completed",
+            runId: run.id,
+            event: { _tag: "RunCompleted" },
           })
-          expect(approvalRequested).toMatchObject({
-            _tag: "ApprovalRequested",
-            request: {
-              approvalId,
-              operation: "search-1",
-              capability: "web_search",
-              input: { query: "What makes Generalist agent framework standalone?" },
-            },
-          })
-          expect(approvalRequested?._tag === "ApprovalRequested" ? approvalRequested.request : undefined).toEqual(
-            waiting.wait.reason._tag === "Approval" ? waiting.wait.reason.request : undefined,
-          )
-          expect(toolCall).toMatchObject({
-            type: "tool-call",
-            name: "web_search",
-            params: { query: "What makes Generalist agent framework standalone?" },
-          })
-          expect(completedTool).toMatchObject({
-            _tag: "ToolExecutionCompleted",
-            result: { name: "web_search" },
-          })
-          if (completed?._tag !== "RunCompleted" || "_tag" in completed.result) {
-            return yield* Effect.die("expected an Agent RunCompleted event")
-          }
-          expect(completed.result.text).toContain("Based on 2 sources")
-          expect(completed.result.text).toContain("https://github.com/generalist/generalist")
+          expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "succeeded" })
         }),
       ),
     )

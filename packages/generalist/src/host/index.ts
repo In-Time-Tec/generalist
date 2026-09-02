@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context, typescript/no-unsafe-return -- Agent.Any intentionally hides invariant Agent parameters at the heterogeneous Host registry boundary; the distributive AgentDefinition/AgentServices types restore each configured Agent's exact contract. */
 import { Effect, Filter, Option, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
-import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
+import type { BudgetLimits } from "../core/durable/run-budget.js"
 import { Hooks, type Declaration as HookDeclaration, type Service as HooksService } from "../hooks/index.js"
 import {
   withTools,
@@ -27,63 +27,46 @@ import {
   type Service as InstructionsService,
 } from "../instructions/providers.js"
 import type { Cursor } from "../runtime/cursor.js"
-import type {
-  CreateSessionError,
-  HostSession,
-  HostSessionEvent,
-  SessionError,
-  SessionEventsError,
-} from "../runtime/session/host.js"
+import type { CreateSessionError, HostSession, SessionError, SessionEventsError } from "../runtime/session/host.js"
 import type { RunInspection } from "../runtime/run.js"
-import type { RunEvent } from "../runtime/run/event.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
+import type { Decision as ApprovalDecision } from "../runtime/operation/approval.js"
+import type { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
 import {
   Runtime,
   type CancelError,
   type ForkError,
   type InspectError,
+  type OperatorActionError,
+  type OperatorExtendBudgetError,
   type RewindError,
+  type RespondApprovalError,
   type RunHandle,
   type StartError,
   type StartOptions,
 } from "../runtime/service.js"
-import { DuplicateAgent, type RuntimeUnavailable } from "../runtime/errors.js"
+import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
+import { resolveApproval } from "./approval.js"
+import { project, type HostEvent } from "./event.js"
+import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 
 export type { HostSession } from "../runtime/session/host.js"
+export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
+export {
+  HostEvent,
+  type ApprovalRequested,
+  type Compacted,
+  type Completed,
+  type RunStarted,
+  type ToolCall,
+  type Turn,
+} from "./event.js"
 export {
   SessionNotFound,
   SessionConflict,
   SessionCursorExpired,
   SessionSubscriberLagged,
 } from "../runtime/session/host.js"
-
-/** A plugin name was declared more than once in one host. */
-export class PluginNameConflict extends ActionableTaggedError<PluginNameConflict>()(
-  "generalist/host/PluginNameConflict",
-  {
-    name: Schema.String,
-    hint: errorHint("Give each host plugin a unique name."),
-  },
-) {}
-
-/** Two host declarations attempted to install the same static tool name. */
-export class PluginToolConflict extends ActionableTaggedError<PluginToolConflict>()(
-  "generalist/host/PluginToolConflict",
-  {
-    name: Schema.String,
-    sources: Schema.Array(Schema.String),
-    hint: errorHint("Rename or remove one of the colliding static tools."),
-  },
-) {}
-
-/** A Run start used an Agent that was not configured on this host. */
-export class AgentNotRegistered extends ActionableTaggedError<AgentNotRegistered>()(
-  "generalist/host/AgentNotRegistered",
-  {
-    name: Schema.String,
-    hint: errorHint("Pass an Agent from the agents array supplied to Generalist.create."),
-  },
-) {}
 
 /** One deterministic collection of host-owned Agent contributions. */
 export interface Plugin<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {
@@ -119,30 +102,7 @@ export interface RunStartOptions {
   readonly idempotencyKey?: string
 }
 
-type EventWithTag<Tag extends RunEvent["_tag"]> = Extract<RunEvent, { readonly _tag: Tag }>
-type TurnEvent = EventWithTag<"TurnStarted" | "TurnCompleted">
-type ToolCallEvent = EventWithTag<
-  "ToolExecutionStarted" | "ToolProgress" | "ToolExecutionCompleted" | "ToolExecutionWaiting"
->
-type ApprovalRequestedEvent = EventWithTag<"ApprovalRequested">
-type CompactedEvent = EventWithTag<"CompactionApplied">
-type CompletedEvent = EventWithTag<"RunCompleted" | "RunFailed" | "RunCancelled">
-
-interface HostEventBase<Tag extends string, Event extends RunEvent> {
-  readonly _tag: Tag
-  readonly sessionId: string
-  readonly cursor: Cursor
-  readonly runId: string
-  readonly event: Event
-}
-
-export type RunStarted = HostEventBase<"RunStarted", EventWithTag<"RunAccepted">>
-export type Turn = HostEventBase<"Turn", TurnEvent>
-export type ToolCall = HostEventBase<"ToolCall", ToolCallEvent>
-export type ApprovalRequested = HostEventBase<"ApprovalRequested", ApprovalRequestedEvent>
-export type Compacted = HostEventBase<"Compacted", CompactedEvent>
-export type Completed = HostEventBase<"Completed", CompletedEvent>
-export type HostEvent = RunStarted | Turn | ToolCall | ApprovalRequested | Compacted | Completed
+export type EncodedAgentInput = Schema.Json
 
 export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
 
@@ -160,6 +120,12 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
       input: AgentInput<Selected>,
       options?: RunStartOptions,
     ) => Effect.Effect<HostRun<AgentOutput<Selected>>, StartError | SessionError | AgentNotRegistered>
+    readonly startByName: (
+      sessionId: string,
+      agent: string,
+      input: EncodedAgentInput,
+      options?: RunStartOptions,
+    ) => Effect.Effect<HostRun<unknown>, StartError | SessionError | AgentNotRegistered | AgentInputInvalid>
     readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
     readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
     readonly cancel: (runId: string, reason?: string) => Effect.Effect<void, CancelError>
@@ -167,6 +133,30 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   }
   readonly events: {
     readonly subscribe: (sessionId: string, cursor?: Cursor) => Stream.Stream<HostEvent, SessionEventsError>
+  }
+  readonly approvals: {
+    readonly resolve: (
+      runId: string,
+      token: string,
+      decision: ApprovalDecision,
+      operator: string,
+    ) => Effect.Effect<void, InspectError | RespondApprovalError | IllegalOperatorAction>
+  }
+  readonly operator: {
+    readonly explain: (runId: string) => Effect.Effect<Explanation, InspectError>
+    readonly retry: (runId: string, operator: string) => Effect.Effect<void, OperatorActionError>
+    readonly wake: (runId: string, operator: string) => Effect.Effect<void, OperatorActionError>
+    readonly resolveUnknown: (
+      runId: string,
+      operationId: string,
+      resolution: UnknownResolution,
+      operator: string,
+    ) => Effect.Effect<void, OperatorActionError>
+    readonly extendBudget: (
+      runId: string,
+      delta: BudgetLimits,
+      operator: string,
+    ) => Effect.Effect<void, OperatorExtendBudgetError>
   }
 }
 
@@ -369,32 +359,6 @@ const mergedHooks = (
   return Hooks.of({ declarations: [...(existing?.declarations ?? []), ...contributed] })
 }
 
-const projectedEvent = (sessionId: string, entry: HostSessionEvent): Option.Option<HostEvent> => {
-  const base = { sessionId, cursor: entry.cursor, runId: entry.event.runId }
-  switch (entry.event._tag) {
-    case "RunAccepted":
-      return Option.some({ ...base, _tag: "RunStarted", event: entry.event })
-    case "TurnStarted":
-    case "TurnCompleted":
-      return Option.some({ ...base, _tag: "Turn", event: entry.event })
-    case "ToolExecutionStarted":
-    case "ToolProgress":
-    case "ToolExecutionCompleted":
-    case "ToolExecutionWaiting":
-      return Option.some({ ...base, _tag: "ToolCall", event: entry.event })
-    case "ApprovalRequested":
-      return Option.some({ ...base, _tag: "ApprovalRequested", event: entry.event })
-    case "CompactionApplied":
-      return Option.some({ ...base, _tag: "Compacted", event: entry.event })
-    case "RunCompleted":
-    case "RunFailed":
-    case "RunCancelled":
-      return Option.some({ ...base, _tag: "Completed", event: entry.event })
-    default:
-      return Option.none()
-  }
-}
-
 const create = <
   const Agents extends ReadonlyArray<AnyAgent>,
   const Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
@@ -403,6 +367,7 @@ const create = <
 ): Effect.Effect<Host<Agents>, CreateError, CreateRequirements<Agents, Plugins>> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime
+    const environment = yield* Effect.context<CreateRequirements<Agents, Plugins>>()
     yield* LanguageModel.LanguageModel
     yield* Approvals
     yield* Permissions
@@ -417,6 +382,7 @@ const create = <
     const hooks = mergedHooks(currentHooks, contributions.hooks)
 
     const registered = new Map<AnyAgent, AnyAgent>()
+    const registeredByName = new Map<string, AnyAgent>()
     for (const agent of options.agents) {
       const configured = configuredAgent(agent, contributions.tools)
       let registration = registerAgent(runtime, configured)
@@ -427,6 +393,7 @@ const create = <
       if (hooks !== undefined) registration = registration.pipe(Effect.provideService(Hooks, hooks))
       yield* registration
       registered.set(agent, configured)
+      registeredByName.set(agent.name, configured)
     }
 
     const host: Host<Agents> = {
@@ -462,6 +429,29 @@ const create = <
             // oxlint-disable-next-line typescript/no-unsafe-type-assertion
             return hostRun(yield* startAgent(runtime, configured as typeof agent, input, runtimeOptions))
           }),
+        startByName: (sessionId, agentName, input, startOptions) =>
+          Effect.gen(function* () {
+            yield* runtime.session(sessionId)
+            const configured = registeredByName.get(agentName)
+            if (configured === undefined) {
+              return yield* AgentNotRegistered.make({
+                name: agentName,
+                hint: "Use an Agent name from the agents array supplied to Generalist.create.",
+              })
+            }
+            const decodeWithHostEnvironment = Schema.decodeEffect(configured.input)(input).pipe(
+              Effect.provide(environment),
+            )
+            // SAFETY: Generalist.create captured every decoding service declared by each configured Agent input.
+            // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion -- The heterogeneous name registry erases the configured Agent input context, which Generalist.create captures and provides here.
+            const decode = decodeWithHostEnvironment as Effect.Effect<unknown, Schema.SchemaError>
+            const decoded = yield* decode.pipe(
+              Effect.mapError((error) => AgentInputInvalid.make({ name: agentName, message: error.message })),
+            )
+            const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
+            if (startOptions?.idempotencyKey !== undefined) runtimeOptions.idempotencyKey = startOptions.idempotencyKey
+            return hostRun(yield* startAgent(runtime, configured, decoded, runtimeOptions))
+          }),
         list: runtime.sessionRuns,
         inspect: runtime.inspect,
         cancel: (runId, reason) => {
@@ -477,8 +467,18 @@ const create = <
           if (cursor !== undefined) input.cursor = cursor
           return runtime
             .sessionEvents(input)
-            .pipe(Stream.filterMap(Filter.fromPredicateOption((entry) => projectedEvent(sessionId, entry))))
+            .pipe(Stream.filterMap(Filter.fromPredicateOption((entry) => project(sessionId, entry))))
         },
+      },
+      approvals: {
+        resolve: (runId, token, decision, operator) => resolveApproval(runtime, runId, token, decision, operator),
+      },
+      operator: {
+        explain: runtime.operator.explain,
+        retry: runtime.operator.retry,
+        wake: runtime.operator.wake,
+        resolveUnknown: runtime.operator.resolveUnknown,
+        extendBudget: runtime.operator.extendBudget,
       },
     }
     return host

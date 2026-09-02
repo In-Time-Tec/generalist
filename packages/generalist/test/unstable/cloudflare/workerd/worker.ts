@@ -1,20 +1,11 @@
-import { Effect, Exit, Layer, Schema, Stream } from "effect"
+import { Effect, Exit, Layer, Schema } from "effect"
 import { Prompt, Response as AiResponse, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Permissions } from "generalist"
 import { decodeConfig as decodeOpenRouterConfig } from "generalist/providers/openrouter"
 import { TestModel } from "generalist/testing"
 import { SqlClient } from "effect/unstable/sql"
+import { Address, Errors, ExecutableManifest, Message, RunStore as RunStoreFacade } from "generalist/runtime"
 import {
-  Address,
-  Errors,
-  ExecutableManifest,
-  Message,
-  RunEvent,
-  RunStore as RunStoreFacade,
-  type Runtime,
-} from "generalist/runtime"
-import {
-  HibernatingWebSocket,
   layerRunStore,
   layerSqlClient,
   type DurableObjectStorage,
@@ -28,13 +19,6 @@ const AgentExecutionFailure = Errors.AgentExecutionFailure
 const RuntimeUnavailable = Errors.RuntimeUnavailable
 const RunStore = RunStoreFacade.RunStore
 
-declare global {
-  var WebSocketPair: new () => SocketPair
-  interface ResponseInit {
-    webSocket?: WebSocket
-  }
-}
-
 interface ObjectId {
   readonly name: string
 }
@@ -46,13 +30,10 @@ interface ObjectNamespace {
 
 interface Env {
   readonly SQL_OBJECTS: ObjectNamespace
-  readonly REPLAY_OBJECTS: ObjectNamespace
 }
 
 interface DurableObjectState {
   readonly storage: DurableObjectStorage
-  readonly acceptWebSocket: (socket: HibernatingWebSocket.Socket, tags?: ReadonlyArray<string>) => void
-  readonly getWebSockets: (tag?: string) => ReadonlyArray<HibernatingWebSocket.Socket>
 }
 
 const lookup = Tool.make("lookup", {
@@ -174,118 +155,6 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
     openRouterBundled: Object.keys(openRouterConfig).length === 0,
   })
 })
-
-const replayExecutable = test("workerd-replay", "1")
-const replayEvents: ReadonlyArray<RunEvent.RunEvent> = [0, 1].map(
-  (sequence): RunEvent.RunEvent => ({
-    _tag: "RunAttemptStarted",
-    specVersion: "1",
-    eventId: `replay-run:${sequence}`,
-    runId: "replay-run",
-    sequence,
-    executableRef: replayExecutable.ref,
-    rootRunId: "replay-run",
-    depth: 0,
-    occurredAt: "2026-08-19T00:00:00.000Z",
-    attempt: 1,
-  }),
-)
-const unusedEffect = () => Effect.die("unused Runtime operation")
-const unusedStream = () => Stream.die("unused Runtime operation")
-const replayRuntime: Runtime.Service = {
-  operator: {
-    explain: unusedEffect,
-    verify: unusedEffect,
-    retry: unusedEffect,
-    wake: unusedEffect,
-    scanObligations: unusedStream,
-    resolveUnknown: unusedEffect,
-    resolveApproval: unusedEffect,
-    extendBudget: unusedEffect,
-  },
-  register: unusedEffect,
-  start: unusedEffect,
-  schedule: unusedEffect,
-  startExecution: unusedEffect,
-  admit: unusedEffect,
-  activate: unusedEffect,
-  fork: unusedEffect,
-  rewind: unusedEffect,
-  send: unusedEffect,
-  spawn: unusedEffect,
-  events: unusedStream,
-  previews: unusedStream,
-  snapshot: unusedEffect,
-  history: ({ cursor }) => Effect.succeed(replayEvents.filter((event) => event.sequence > (cursor ?? -1))),
-  createSession: unusedEffect,
-  session: unusedEffect,
-  listSessions: unusedEffect(),
-  sessionRuns: unusedEffect,
-  sessionEvents: unusedStream,
-  acknowledge: unusedEffect,
-  acknowledged: unusedEffect,
-  sessionEntry: unusedEffect,
-  resolveModelResponse: unusedEffect,
-  treeReplay: unusedEffect,
-  treeChanges: unusedStream,
-  treeCheckpoint: unusedEffect,
-  list: unusedEffect,
-  respond: unusedEffect,
-  respondApproval: unusedEffect,
-  signal: unusedEffect,
-  wake: unusedEffect,
-  cancel: () => Effect.void,
-  cancelSession: unusedEffect,
-  awaitSessionTerminal: unusedEffect,
-  steer: unusedEffect,
-  sendMessage: unusedEffect,
-  messages: unusedEffect,
-  childSettlements: unusedEffect,
-  childSettlementChanges: unusedStream,
-  awaitChildSettlement: unusedEffect,
-  directory: unusedEffect,
-  registerAgentName: unusedEffect,
-  resolveOperation: unusedEffect,
-  inspect: unusedEffect,
-  extendBudget: unusedEffect,
-  fanOut: unusedEffect,
-  inspectFanOut: unusedEffect,
-  awaitFanOut: unusedEffect,
-}
-
-interface SocketPair {
-  readonly 0: WebSocket
-  readonly 1: HibernatingWebSocket.Socket
-}
-
-export class ReplayObject {
-  private readonly replay: ReturnType<typeof HibernatingWebSocket.make>
-
-  constructor(state: DurableObjectState) {
-    this.replay = HibernatingWebSocket.make({ state, runtime: replayRuntime, pageSize: 1, fuel: 1 })
-  }
-
-  fetch(request: Request): Promise<Response> {
-    if (new URL(request.url).pathname.endsWith("/flush")) {
-      return this.replay.flush("replay-run").then((result) => Response.json(result))
-    }
-    const pair = new WebSocketPair()
-    this.replay.accept(pair[1])
-    return Promise.resolve(new Response(null, { status: 101, webSocket: pair[0] }))
-  }
-
-  webSocketMessage(socket: HibernatingWebSocket.Socket, message: string | ArrayBuffer): Promise<void> {
-    return this.replay.webSocketMessage(socket, message)
-  }
-
-  webSocketClose(socket: HibernatingWebSocket.Socket): void {
-    this.replay.webSocketClose(socket)
-  }
-
-  webSocketError(socket: HibernatingWebSocket.Socket): void {
-    this.replay.webSocketError(socket)
-  }
-}
 
 export class SqlObject {
   constructor(private readonly state: DurableObjectState) {}
@@ -645,8 +514,7 @@ export default {
     if (new URL(request.url).pathname === "/agent") {
       return Effect.runPromise(Effect.scoped(agentConformance().pipe(Effect.orDie)))
     }
-    const replay = new URL(request.url).pathname.startsWith("/replay")
-    const namespace = replay ? bindings.REPLAY_OBJECTS : bindings.SQL_OBJECTS
+    const namespace = bindings.SQL_OBJECTS
     return namespace.get(namespace.idFromName("default")).fetch(request)
   },
 }

@@ -1,21 +1,31 @@
-import { Config, Console, Effect, ManagedRuntime, Stream } from "effect"
-import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
-import { RunClient, Wire } from "generalist/unstable/transport"
+import { Config, Console, Effect, ManagedRuntime, Option, Stream } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
+import { Server } from "generalist/server"
 
 const program = Effect.gen(function* () {
-  const runId = yield* Config.string("RUN_ID")
-  const events = yield* RunClient.streamSSE({ url: `http://localhost:4000/runs/${runId}/events` }).pipe(
-    Stream.takeUntil((event) => Wire.isResolvedRunEvent(event) && event._tag === "RunWaiting"),
-    Stream.runCollect,
+  const sessionId = yield* Config.string("SESSION_ID")
+  const client = yield* Server.client({ baseUrl: "http://localhost:4000" })
+  const approval = yield* client.events.subscribe({ sessionId }).pipe(
+    Stream.filter((event) => event._tag === "ApprovalRequested"),
+    Stream.runHead,
+    Effect.flatMap(
+      Option.match({
+        onNone: () => Effect.die("expected the session to emit ApprovalRequested"),
+        onSome: Effect.succeed,
+      }),
+    ),
   )
-  const waiting = Array.from(events).find((event) => Wire.isResolvedRunEvent(event) && event._tag === "RunWaiting")
-  if (waiting === undefined || !Wire.isResolvedRunEvent(waiting) || waiting._tag !== "RunWaiting") {
-    return yield* Effect.die("expected the run to emit RunWaiting")
+  if (approval.event._tag !== "ApprovalRequested") {
+    return yield* Effect.die("expected an ApprovalRequested Runtime event")
   }
-  const response = yield* HttpClient.post(`http://localhost:4000/runs/${runId}/respond`, {
-    body: HttpBody.jsonUnsafe({ waitId: waiting.wait.waitId, resolution: { _tag: "Approved" } }),
+
+  yield* client.approvals.resolve({
+    runId: approval.runId,
+    token: approval.event.request.approvalId,
+    decision: { _tag: "Approved" },
+    operator: "tutorial:human",
   })
-  yield* Console.log(`approval response: ${response.status}`)
+  yield* Console.log(`approved ${approval.event.request.capability} for ${approval.runId}`)
 })
 
 const runtime = ManagedRuntime.make(FetchHttpClient.layer)

@@ -53,24 +53,6 @@ const live = Layer.merge(sqlLayer, storeLayer)
 `layerRunStore` installs the SQL Runtime stores and defaults their source to
 `"durable-object"`; the Durable Object remains the scope owner.
 
-### Hibernating WebSocket replay
-
-```text
-client          Durable Object             Runtime history
-  │ Attach("run-1", cursor: -1) │                  │
-  │────────────▶│ page(run-1, -1, limit: 1) ──────▶│
-  │◀─ frame 0 ──│◀─────────────────────────────────│
-  │             │ persist { runId: "run-1", cursor: 0 }
-  │             │ flush("run-1")                   │
-  │             │ page(run-1, 0, limit: 1) ───────▶│
-  │◀─ frame 1 ──│◀─────────────────────────────────│
-```
-
-`HibernatingWebSocket.make({ state, runtime, pageSize, fuel })` returns native
-`accept`, message, close, error, and bounded flush handlers. There is no
-resident subscription, fiber, or timer. Attachments reconstruct replay after
-hibernation; each socket serializes concurrent commands and flushes.
-
 ## Dynamic Workers
 
 ```text
@@ -100,10 +82,6 @@ typed `SandboxUnavailable` boundary.
 - The three Cloudflare subpaths are independent; there is no exported `generalist/cloudflare` root.
 - Worker request scopes finalize before `fetch` resolves.
 - Durable Object SQLite transactions use the host storage transaction boundary.
-- Replay defaults clamp `pageSize` to 1–1,000 and `fuel` to 1–32.
-- A replay cursor advances only after its frame is sent and its attachment persists.
-- Re-attaching the same run never rewinds its cursor; another run closes with code 1008.
-- Socket close or error does not cancel a run; only a valid `Cancel` command does.
 - Source rejects bare, computed, CommonJS, missing, escaping, and case-conflicting imports.
 - Dynamic Worker outbound networking is disabled with `globalOutbound: null`.
 - `v8-isolate` is an honest runtime boundary, not a container or microVM claim.

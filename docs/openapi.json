@@ -1,0 +1,3047 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Generalist Server API",
+    "version": "1",
+    "description": "Product Sessions and durable Runs served by one Generalist Host."
+  },
+  "paths": {
+    "/sessions": {
+      "post": {
+        "tags": ["sessions"],
+        "operationId": "sessions.create",
+        "parameters": [],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "minLength": 1 },
+                    "title": { "type": "string" },
+                    "createdAt": { "type": "string" }
+                  },
+                  "required": ["id", "createdAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "id": { "type": "string" }, "title": { "type": "string" } },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "get": {
+        "tags": ["sessions"],
+        "operationId": "sessions.list",
+        "parameters": [],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "minLength": 1 },
+                      "title": { "type": "string" },
+                      "createdAt": { "type": "string" }
+                    },
+                    "required": ["id", "createdAt"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "get": {
+        "tags": ["sessions"],
+        "operationId": "sessions.get",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "minLength": 1 },
+                    "title": { "type": "string" },
+                    "createdAt": { "type": "string" }
+                  },
+                  "required": ["id", "createdAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{sessionId}/runs": {
+      "post": {
+        "tags": ["runs"],
+        "operationId": "runs.start",
+        "parameters": [{ "name": "sessionId", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "id": { "type": "string" } },
+                  "required": ["id"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "agent": { "type": "string" }, "input": {}, "idempotencyKey": { "type": "string" } },
+                "required": ["agent", "input"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "get": {
+        "tags": ["runs"],
+        "operationId": "runs.list",
+        "parameters": [{ "name": "sessionId", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "runId": { "type": "string", "minLength": 1 },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "running",
+                          "waiting",
+                          "needs-resolution",
+                          "cancelling",
+                          "succeeded",
+                          "failed",
+                          "cancelled"
+                        ]
+                      },
+                      "executableRef": {
+                        "type": "object",
+                        "properties": {
+                          "executable": { "type": "string", "pattern": "^executable-pin:v1:sha256:[0-9a-f]{64}$" },
+                          "active": {
+                            "anyOf": [
+                              { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                            ]
+                          }
+                        },
+                        "required": ["executable", "active"],
+                        "additionalProperties": false
+                      },
+                      "executableManifest": {
+                        "type": "object",
+                        "properties": {
+                          "version": { "type": "string", "enum": ["2"] },
+                          "root": {
+                            "anyOf": [
+                              { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                            ]
+                          },
+                          "profiles": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "selection": { "type": "string" },
+                                "agent": { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" }
+                              },
+                              "required": ["selection", "agent"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "entries": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Agent"] },
+                                    "pin": { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    "manifest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "version": { "type": "string", "enum": ["2"] },
+                                        "name": { "type": "string" },
+                                        "instructions": { "type": "string" },
+                                        "supplemental": { "type": "string" },
+                                        "model": { "type": "string", "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$" },
+                                        "tools": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "name": { "type": "string" },
+                                              "pin": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "content": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                  "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                  "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                },
+                                                "required": ["codec", "version", "digest"],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "required": ["name", "pin"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "skills": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "name": { "type": "string" },
+                                              "pin": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "content": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                  "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                  "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                },
+                                                "required": ["codec", "version", "digest"],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "required": ["name", "pin"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "services": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "name": { "type": "string" },
+                                              "pin": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "content": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                  "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                  "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                },
+                                                "required": ["codec", "version", "digest"],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "required": ["name", "pin"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "policy": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": { "type": "string", "enum": ["Portable"] },
+                                                "policy": { "$ref": "#/components/schemas/Suspend_" }
+                                              },
+                                              "required": ["_tag", "policy"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": { "type": "string", "enum": ["Pinned"] },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": ["_tag", "pin"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "toolScheduling": {
+                                          "type": "object",
+                                          "properties": {
+                                            "maxConcurrency": { "type": "integer", "exclusiveMinimum": 0 },
+                                            "parallelSafe": { "type": "array", "items": { "type": "string" } }
+                                          },
+                                          "required": ["maxConcurrency", "parallelSafe"],
+                                          "additionalProperties": false
+                                        },
+                                        "compaction": {
+                                          "type": "object",
+                                          "properties": {
+                                            "service": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "summaryModel": {
+                                              "type": "string",
+                                              "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "contextWindow": { "type": "integer", "exclusiveMinimum": 0 },
+                                            "reserveTokens": { "type": "integer", "minimum": 0 },
+                                            "keepRecentTokens": { "type": "integer", "minimum": 0 },
+                                            "strategyIdentity": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                            "summaryPromptIdentity": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 255
+                                            }
+                                          },
+                                          "required": [
+                                            "service",
+                                            "summaryModel",
+                                            "contextWindow",
+                                            "reserveTokens",
+                                            "keepRecentTokens",
+                                            "strategyIdentity",
+                                            "summaryPromptIdentity"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "programAuthority": {
+                                          "type": "object",
+                                          "properties": {
+                                            "sandbox": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "input": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "output": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "maxSourceBytes": { "type": "integer", "minimum": 0 },
+                                            "tools": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                  "pin": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "content": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                    },
+                                                    "required": ["codec", "version", "digest"],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "required": ["name", "pin"],
+                                                "additionalProperties": false
+                                              },
+                                              "maxItems": 64
+                                            },
+                                            "agents": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "selection": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                  "agent": {
+                                                    "type": "string",
+                                                    "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "input": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  }
+                                                },
+                                                "required": ["selection", "agent", "input"],
+                                                "additionalProperties": false
+                                              },
+                                              "maxItems": 64
+                                            },
+                                            "steps": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                  "pin": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "content": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                    },
+                                                    "required": ["codec", "version", "digest"],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "required": ["name", "pin"],
+                                                "additionalProperties": false
+                                              },
+                                              "maxItems": 64
+                                            },
+                                            "budget": {
+                                              "type": "object",
+                                              "properties": {
+                                                "agentRuns": { "type": "integer", "minimum": 0 },
+                                                "concurrency": { "type": "integer", "minimum": 1 },
+                                                "toolCalls": { "type": "integer", "minimum": 0 },
+                                                "tokens": { "type": "integer", "minimum": 0 },
+                                                "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                                "logBytes": { "type": "integer", "minimum": 0 },
+                                                "outputBytes": { "type": "integer", "minimum": 0 }
+                                              },
+                                              "required": [
+                                                "agentRuns",
+                                                "concurrency",
+                                                "toolCalls",
+                                                "tokens",
+                                                "wallClockMillis",
+                                                "logBytes",
+                                                "outputBytes"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "sandbox",
+                                            "input",
+                                            "output",
+                                            "maxSourceBytes",
+                                            "tools",
+                                            "agents",
+                                            "steps",
+                                            "budget"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "budget": {
+                                          "type": "object",
+                                          "properties": {
+                                            "tokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                            "usd": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                                            "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                                            "toolCalls": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        "children": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": { "selection": { "type": "string" } },
+                                            "required": ["selection"],
+                                            "additionalProperties": false
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "version",
+                                        "name",
+                                        "model",
+                                        "tools",
+                                        "skills",
+                                        "services",
+                                        "policy",
+                                        "toolScheduling",
+                                        "budget",
+                                        "children"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["_tag", "pin", "manifest"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Program"] },
+                                    "pin": { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    "manifest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "version": { "type": "string", "enum": ["1"] },
+                                        "name": { "type": "string" },
+                                        "source": {
+                                          "type": "object",
+                                          "properties": {
+                                            "language": { "type": "string", "enum": ["javascript"] },
+                                            "text": { "type": "string" }
+                                          },
+                                          "required": ["language", "text"],
+                                          "additionalProperties": false
+                                        },
+                                        "sandbox": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "input": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "output": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "capabilities": {
+                                          "type": "object",
+                                          "properties": {
+                                            "tools": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "name": { "type": "string" },
+                                                  "pin": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "content": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                    },
+                                                    "required": ["codec", "version", "digest"],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "required": ["name", "pin"],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "agents": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "selection": { "type": "string" },
+                                                  "agent": {
+                                                    "type": "string",
+                                                    "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "input": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  }
+                                                },
+                                                "required": ["selection", "agent", "input"],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "steps": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "name": { "type": "string" },
+                                                  "pin": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "content": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                      "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                    },
+                                                    "required": ["codec", "version", "digest"],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "required": ["name", "pin"],
+                                                "additionalProperties": false
+                                              }
+                                            }
+                                          },
+                                          "required": ["tools", "agents", "steps"],
+                                          "additionalProperties": false
+                                        },
+                                        "budget": {
+                                          "type": "object",
+                                          "properties": {
+                                            "agentRuns": { "type": "integer", "minimum": 0 },
+                                            "concurrency": { "type": "integer", "minimum": 1 },
+                                            "toolCalls": { "type": "integer", "minimum": 0 },
+                                            "tokens": { "type": "integer", "minimum": 0 },
+                                            "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                            "logBytes": { "type": "integer", "minimum": 0 },
+                                            "outputBytes": { "type": "integer", "minimum": 0 }
+                                          },
+                                          "required": [
+                                            "agentRuns",
+                                            "concurrency",
+                                            "toolCalls",
+                                            "tokens",
+                                            "wallClockMillis",
+                                            "logBytes",
+                                            "outputBytes"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "version",
+                                        "name",
+                                        "source",
+                                        "sandbox",
+                                        "input",
+                                        "output",
+                                        "capabilities",
+                                        "budget"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["_tag", "pin", "manifest"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": ["version", "root", "profiles", "entries"],
+                        "additionalProperties": false
+                      },
+                      "parentRunId": { "type": "string", "minLength": 1 },
+                      "childReadiness": { "type": "string", "enum": ["queued", "ready", "settled"] },
+                      "depth": { "type": "integer", "minimum": 0 },
+                      "treePolicy": {
+                        "type": "object",
+                        "properties": {
+                          "maxDepth": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                          "maxSubagents": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                        },
+                        "required": ["maxDepth", "maxSubagents"],
+                        "additionalProperties": false
+                      },
+                      "waits": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "waitId": { "type": "string" },
+                            "reason": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": { "_tag": { "type": "string", "enum": ["ToolWait"] } },
+                                  "required": ["_tag"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Approval"] },
+                                    "request": {
+                                      "type": "object",
+                                      "properties": {
+                                        "approvalId": { "type": "string", "minLength": 1 },
+                                        "operation": { "type": "string", "minLength": 1 },
+                                        "capability": { "type": "string", "minLength": 1 },
+                                        "input": {}
+                                      },
+                                      "required": ["approvalId", "operation", "capability", "input"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["_tag", "request"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Signal"] },
+                                    "name": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "name"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Timer"] },
+                                    "dueAt": { "type": "string" }
+                                  },
+                                  "required": ["_tag"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["External"] },
+                                    "capability": { "type": "string" }
+                                  },
+                                  "required": ["_tag"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["AwaitEvent"] },
+                                    "filter": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Timer"] },
+                                            "scheduleId": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Webhook"] },
+                                            "source": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                            "childRunId": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                            "path": { "type": "string" },
+                                            "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                            "approvalId": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "deadline": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "filter", "deadline"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "status": { "type": "string", "enum": ["open", "responded", "signaled", "cancelled"] },
+                            "resolution": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": { "_tag": { "type": "string", "enum": ["Approved"] } },
+                                  "required": ["_tag"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Denied"] },
+                                    "reason": { "type": "string" }
+                                  },
+                                  "required": ["_tag"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["ToolResult"] },
+                                    "result": {},
+                                    "encodedResult": {}
+                                  },
+                                  "required": ["_tag", "result", "encodedResult"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Signal"] },
+                                    "name": { "type": "string" },
+                                    "payload": {}
+                                  },
+                                  "required": ["_tag", "name"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "openedAt": { "type": "string" },
+                            "closedAt": { "type": "string" }
+                          },
+                          "required": ["waitId", "reason", "status", "openedAt"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "lastSequence": { "type": "integer", "minimum": -1 },
+                      "durability": { "type": "string", "enum": ["ephemeral", "durable"] },
+                      "branches": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "runId": { "type": "string", "minLength": 1 },
+                            "forkedAt": { "type": "integer", "minimum": 0 }
+                          },
+                          "required": ["runId", "forkedAt"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "runId",
+                      "status",
+                      "executableRef",
+                      "executableManifest",
+                      "depth",
+                      "treePolicy",
+                      "waits",
+                      "lastSequence",
+                      "durability",
+                      "branches"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}": {
+      "get": {
+        "tags": ["runs"],
+        "operationId": "runs.inspect",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": { "type": "string", "minLength": 1 },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "waiting",
+                        "needs-resolution",
+                        "cancelling",
+                        "succeeded",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "executableRef": {
+                      "type": "object",
+                      "properties": {
+                        "executable": { "type": "string", "pattern": "^executable-pin:v1:sha256:[0-9a-f]{64}$" },
+                        "active": {
+                          "anyOf": [
+                            { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                          ]
+                        }
+                      },
+                      "required": ["executable", "active"],
+                      "additionalProperties": false
+                    },
+                    "executableManifest": {
+                      "type": "object",
+                      "properties": {
+                        "version": { "type": "string", "enum": ["2"] },
+                        "root": {
+                          "anyOf": [
+                            { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                          ]
+                        },
+                        "profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "selection": { "type": "string" },
+                              "agent": { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" }
+                            },
+                            "required": ["selection", "agent"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Agent"] },
+                                  "pin": { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  "manifest": {
+                                    "type": "object",
+                                    "properties": {
+                                      "version": { "type": "string", "enum": ["2"] },
+                                      "name": { "type": "string" },
+                                      "instructions": { "type": "string" },
+                                      "supplemental": { "type": "string" },
+                                      "model": { "type": "string", "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      "tools": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": { "type": "string" },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "content": {
+                                              "type": "object",
+                                              "properties": {
+                                                "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                              },
+                                              "required": ["codec", "version", "digest"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["name", "pin"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "skills": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": { "type": "string" },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "content": {
+                                              "type": "object",
+                                              "properties": {
+                                                "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                              },
+                                              "required": ["codec", "version", "digest"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["name", "pin"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "services": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": { "type": "string" },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "content": {
+                                              "type": "object",
+                                              "properties": {
+                                                "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                              },
+                                              "required": ["codec", "version", "digest"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["name", "pin"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "policy": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": { "type": "string", "enum": ["Portable"] },
+                                              "policy": { "$ref": "#/components/schemas/Suspend_" }
+                                            },
+                                            "required": ["_tag", "policy"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": { "type": "string", "enum": ["Pinned"] },
+                                              "pin": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              }
+                                            },
+                                            "required": ["_tag", "pin"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      "toolScheduling": {
+                                        "type": "object",
+                                        "properties": {
+                                          "maxConcurrency": { "type": "integer", "exclusiveMinimum": 0 },
+                                          "parallelSafe": { "type": "array", "items": { "type": "string" } }
+                                        },
+                                        "required": ["maxConcurrency", "parallelSafe"],
+                                        "additionalProperties": false
+                                      },
+                                      "compaction": {
+                                        "type": "object",
+                                        "properties": {
+                                          "service": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "summaryModel": {
+                                            "type": "string",
+                                            "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "contextWindow": { "type": "integer", "exclusiveMinimum": 0 },
+                                          "reserveTokens": { "type": "integer", "minimum": 0 },
+                                          "keepRecentTokens": { "type": "integer", "minimum": 0 },
+                                          "strategyIdentity": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                          "summaryPromptIdentity": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 255
+                                          }
+                                        },
+                                        "required": [
+                                          "service",
+                                          "summaryModel",
+                                          "contextWindow",
+                                          "reserveTokens",
+                                          "keepRecentTokens",
+                                          "strategyIdentity",
+                                          "summaryPromptIdentity"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "programAuthority": {
+                                        "type": "object",
+                                        "properties": {
+                                          "sandbox": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "input": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "output": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "maxSourceBytes": { "type": "integer", "minimum": 0 },
+                                          "tools": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            },
+                                            "maxItems": 64
+                                          },
+                                          "agents": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "selection": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                "agent": {
+                                                  "type": "string",
+                                                  "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": ["selection", "agent", "input"],
+                                              "additionalProperties": false
+                                            },
+                                            "maxItems": 64
+                                          },
+                                          "steps": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            },
+                                            "maxItems": 64
+                                          },
+                                          "budget": {
+                                            "type": "object",
+                                            "properties": {
+                                              "agentRuns": { "type": "integer", "minimum": 0 },
+                                              "concurrency": { "type": "integer", "minimum": 1 },
+                                              "toolCalls": { "type": "integer", "minimum": 0 },
+                                              "tokens": { "type": "integer", "minimum": 0 },
+                                              "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                              "logBytes": { "type": "integer", "minimum": 0 },
+                                              "outputBytes": { "type": "integer", "minimum": 0 }
+                                            },
+                                            "required": [
+                                              "agentRuns",
+                                              "concurrency",
+                                              "toolCalls",
+                                              "tokens",
+                                              "wallClockMillis",
+                                              "logBytes",
+                                              "outputBytes"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "sandbox",
+                                          "input",
+                                          "output",
+                                          "maxSourceBytes",
+                                          "tools",
+                                          "agents",
+                                          "steps",
+                                          "budget"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "budget": {
+                                        "type": "object",
+                                        "properties": {
+                                          "tokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                          "usd": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                                          "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                                          "toolCalls": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                          "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "children": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": { "selection": { "type": "string" } },
+                                          "required": ["selection"],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "version",
+                                      "name",
+                                      "model",
+                                      "tools",
+                                      "skills",
+                                      "services",
+                                      "policy",
+                                      "toolScheduling",
+                                      "budget",
+                                      "children"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "pin", "manifest"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Program"] },
+                                  "pin": { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  "manifest": {
+                                    "type": "object",
+                                    "properties": {
+                                      "version": { "type": "string", "enum": ["1"] },
+                                      "name": { "type": "string" },
+                                      "source": {
+                                        "type": "object",
+                                        "properties": {
+                                          "language": { "type": "string", "enum": ["javascript"] },
+                                          "text": { "type": "string" }
+                                        },
+                                        "required": ["language", "text"],
+                                        "additionalProperties": false
+                                      },
+                                      "sandbox": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "input": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "output": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "capabilities": {
+                                        "type": "object",
+                                        "properties": {
+                                          "tools": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string" },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "agents": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "selection": { "type": "string" },
+                                                "agent": {
+                                                  "type": "string",
+                                                  "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": ["selection", "agent", "input"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "steps": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string" },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            }
+                                          }
+                                        },
+                                        "required": ["tools", "agents", "steps"],
+                                        "additionalProperties": false
+                                      },
+                                      "budget": {
+                                        "type": "object",
+                                        "properties": {
+                                          "agentRuns": { "type": "integer", "minimum": 0 },
+                                          "concurrency": { "type": "integer", "minimum": 1 },
+                                          "toolCalls": { "type": "integer", "minimum": 0 },
+                                          "tokens": { "type": "integer", "minimum": 0 },
+                                          "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                          "logBytes": { "type": "integer", "minimum": 0 },
+                                          "outputBytes": { "type": "integer", "minimum": 0 }
+                                        },
+                                        "required": [
+                                          "agentRuns",
+                                          "concurrency",
+                                          "toolCalls",
+                                          "tokens",
+                                          "wallClockMillis",
+                                          "logBytes",
+                                          "outputBytes"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "version",
+                                      "name",
+                                      "source",
+                                      "sandbox",
+                                      "input",
+                                      "output",
+                                      "capabilities",
+                                      "budget"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "pin", "manifest"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["version", "root", "profiles", "entries"],
+                      "additionalProperties": false
+                    },
+                    "parentRunId": { "type": "string", "minLength": 1 },
+                    "childReadiness": { "type": "string", "enum": ["queued", "ready", "settled"] },
+                    "depth": { "type": "integer", "minimum": 0 },
+                    "treePolicy": {
+                      "type": "object",
+                      "properties": {
+                        "maxDepth": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                        "maxSubagents": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                      },
+                      "required": ["maxDepth", "maxSubagents"],
+                      "additionalProperties": false
+                    },
+                    "waits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "waitId": { "type": "string" },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "_tag": { "type": "string", "enum": ["ToolWait"] } },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Approval"] },
+                                  "request": {
+                                    "type": "object",
+                                    "properties": {
+                                      "approvalId": { "type": "string", "minLength": 1 },
+                                      "operation": { "type": "string", "minLength": 1 },
+                                      "capability": { "type": "string", "minLength": 1 },
+                                      "input": {}
+                                    },
+                                    "required": ["approvalId", "operation", "capability", "input"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "request"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Signal"] },
+                                  "name": { "type": "string" }
+                                },
+                                "required": ["_tag", "name"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Timer"] },
+                                  "dueAt": { "type": "string" }
+                                },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["External"] },
+                                  "capability": { "type": "string" }
+                                },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["AwaitEvent"] },
+                                  "filter": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Timer"] },
+                                          "scheduleId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Webhook"] },
+                                          "source": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                          "childRunId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                          "path": { "type": "string" },
+                                          "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                          "approvalId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "deadline": { "type": "string" }
+                                },
+                                "required": ["_tag", "filter", "deadline"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "status": { "type": "string", "enum": ["open", "responded", "signaled", "cancelled"] },
+                          "resolution": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "_tag": { "type": "string", "enum": ["Approved"] } },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Denied"] },
+                                  "reason": { "type": "string" }
+                                },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["ToolResult"] },
+                                  "result": {},
+                                  "encodedResult": {}
+                                },
+                                "required": ["_tag", "result", "encodedResult"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Signal"] },
+                                  "name": { "type": "string" },
+                                  "payload": {}
+                                },
+                                "required": ["_tag", "name"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "openedAt": { "type": "string" },
+                          "closedAt": { "type": "string" }
+                        },
+                        "required": ["waitId", "reason", "status", "openedAt"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "lastSequence": { "type": "integer", "minimum": -1 },
+                    "durability": { "type": "string", "enum": ["ephemeral", "durable"] },
+                    "branches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "runId": { "type": "string", "minLength": 1 },
+                          "forkedAt": { "type": "integer", "minimum": 0 }
+                        },
+                        "required": ["runId", "forkedAt"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "status",
+                    "executableRef",
+                    "executableManifest",
+                    "depth",
+                    "treePolicy",
+                    "waits",
+                    "lastSequence",
+                    "durability",
+                    "branches"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/cancel": {
+      "post": {
+        "tags": ["runs"],
+        "operationId": "runs.cancel",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "reason": { "type": "string" } },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/sessions/{id}/events": {
+      "get": {
+        "tags": ["events"],
+        "operationId": "events.subscribe",
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "string" }, "required": true },
+          {
+            "name": "last-event-id",
+            "in": "header",
+            "schema": { "type": "string", "pattern": "^-?\\d+$" },
+            "required": false
+          },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "pattern": "^-?\\d+$" }, "required": false }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "event": { "type": "string" },
+                    "data": { "type": "string", "contentMediaType": "application/json" }
+                  },
+                  "required": ["id", "event", "data"],
+                  "additionalProperties": false
+                },
+                "x-effect-stream": {
+                  "encoding": "sse",
+                  "causeSchema": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Fail"] },
+                            "error": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/host/AgentInputInvalid"] },
+                                    "name": { "type": "string" },
+                                    "message": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "name", "message"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/host/AgentNotRegistered"] },
+                                    "name": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "name"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/ApprovalMismatch"] },
+                                    "runId": { "type": "string" },
+                                    "approvalId": { "type": "string" },
+                                    "mismatch": { "type": "string", "enum": ["approval-id", "wait-kind", "decision"] },
+                                    "expectedApprovalId": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "runId", "approvalId", "mismatch"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/ApprovalStale"] },
+                                    "runId": { "type": "string" },
+                                    "approvalId": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "runId", "approvalId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/core/RunBudgetInvalid"] },
+                                    "message": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "message"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/IllegalOperatorAction"] },
+                                    "runId": { "type": "string" },
+                                    "decision": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": { "_tag": { "type": "string", "enum": ["Resume"] } },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["RetryOperation"] },
+                                            "operationId": { "type": "string" },
+                                            "attempt": { "type": "integer" }
+                                          },
+                                          "required": ["_tag", "operationId", "attempt"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["AwaitApproval"] },
+                                            "token": { "type": "string" }
+                                          },
+                                          "required": ["_tag", "token"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["AwaitBudget"] },
+                                            "budget": {
+                                              "type": "string",
+                                              "enum": ["tokens", "usd", "duration", "toolCalls", "children"]
+                                            }
+                                          },
+                                          "required": ["_tag", "budget"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Unknown"] },
+                                            "operationId": { "type": "string" },
+                                            "reason": { "type": "string" }
+                                          },
+                                          "required": ["_tag", "operationId", "reason"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Failed"] },
+                                            "error": {}
+                                          },
+                                          "required": ["_tag", "error"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "action": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "runId", "decision", "action"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
+                                    "operation": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "operation"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/server/RequestFailed"] },
+                                    "operation": { "type": "string" },
+                                    "message": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "operation", "message"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/RunNotFound"] },
+                                    "runId": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "runId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/RuntimeUnavailable"] },
+                                    "message": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "message"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/host/SessionConflict"] },
+                                    "sessionId": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "sessionId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/host/SessionCursorExpired"] },
+                                    "sessionId": { "type": "string" },
+                                    "cursor": { "type": "integer" },
+                                    "earliestCursor": { "type": "integer" },
+                                    "latestCursor": { "type": "integer" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "sessionId", "cursor", "earliestCursor", "latestCursor"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/host/SessionNotFound"] },
+                                    "sessionId": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "sessionId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/host/SessionSubscriberLagged"] },
+                                    "sessionId": { "type": "string" },
+                                    "lastDeliveredCursor": { "type": "integer" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "sessionId", "lastDeliveredCursor"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["_tag", "error"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": { "_tag": { "type": "string", "enum": ["Die"] }, "defect": {} },
+                          "required": ["_tag", "defect"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Interrupt"] },
+                            "fiberId": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+                          },
+                          "required": ["_tag", "fiberId"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "errorSchema": {
+                    "anyOf": [
+                      { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                      { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                      { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                      { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                      { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                      { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                      { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                      { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                      { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                    ]
+                  },
+                  "failureEvent": "effect/httpapi/stream/failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/ws": {
+      "get": {
+        "tags": ["events"],
+        "operationId": "events.connect",
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "string" }, "required": true },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "pattern": "^-?\\d+$" }, "required": false }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/approvals/{token}": {
+      "post": {
+        "tags": ["approvals"],
+        "operationId": "approvals.resolve",
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "string" }, "required": true },
+          { "name": "token", "in": "path", "schema": { "type": "string" }, "required": true }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": { "_tag": { "type": "string", "enum": ["Approved"] } },
+                        "required": ["_tag"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "_tag": { "type": "string", "enum": ["Denied"] },
+                          "reason": { "type": "string" }
+                        },
+                        "required": ["_tag"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "operator": { "type": "string" }
+                },
+                "required": ["decision", "operator"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/runs/{id}/explain": {
+      "get": {
+        "tags": ["operator"],
+        "operationId": "operator.explain",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "waiting",
+                        "needs-resolution",
+                        "cancelling",
+                        "succeeded",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "decision": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": { "_tag": { "type": "string", "enum": ["Resume"] } },
+                          "required": ["_tag"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["RetryOperation"] },
+                            "operationId": { "type": "string" },
+                            "attempt": { "type": "integer" }
+                          },
+                          "required": ["_tag", "operationId", "attempt"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["AwaitApproval"] },
+                            "token": { "type": "string" }
+                          },
+                          "required": ["_tag", "token"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["AwaitBudget"] },
+                            "budget": {
+                              "type": "string",
+                              "enum": ["tokens", "usd", "duration", "toolCalls", "children"]
+                            }
+                          },
+                          "required": ["_tag", "budget"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Unknown"] },
+                            "operationId": { "type": "string" },
+                            "reason": { "type": "string" }
+                          },
+                          "required": ["_tag", "operationId", "reason"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": { "_tag": { "type": "string", "enum": ["Failed"] }, "error": {} },
+                          "required": ["_tag", "error"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "lastSequence": { "type": "integer" },
+                    "obligations": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": { "_tag": { "type": "string", "enum": ["Resume"] } },
+                            "required": ["_tag"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["RetryOperation"] },
+                              "operationId": { "type": "string" },
+                              "attempt": { "type": "integer" }
+                            },
+                            "required": ["_tag", "operationId", "attempt"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["AwaitApproval"] },
+                              "token": { "type": "string" }
+                            },
+                            "required": ["_tag", "token"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["AwaitBudget"] },
+                              "budget": {
+                                "type": "string",
+                                "enum": ["tokens", "usd", "duration", "toolCalls", "children"]
+                              }
+                            },
+                            "required": ["_tag", "budget"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["Unknown"] },
+                              "operationId": { "type": "string" },
+                              "reason": { "type": "string" }
+                            },
+                            "required": ["_tag", "operationId", "reason"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": { "_tag": { "type": "string", "enum": ["Failed"] }, "error": {} },
+                            "required": ["_tag", "error"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["status", "decision", "lastSequence", "obligations"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/retry": {
+      "post": {
+        "tags": ["operator"],
+        "operationId": "operator.retry",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "operator": { "type": "string" } },
+                "required": ["operator"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/runs/{id}/wake": {
+      "post": {
+        "tags": ["operator"],
+        "operationId": "operator.wake",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "operator": { "type": "string" } },
+                "required": ["operator"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/runs/{id}/resolve-unknown": {
+      "post": {
+        "tags": ["operator"],
+        "operationId": "operator.resolveUnknown",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operationId": { "type": "string" },
+                  "resolution": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": { "outcome": { "type": "string", "enum": ["succeeded"] }, "result": {} },
+                        "required": ["outcome", "result"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": { "outcome": { "type": "string", "enum": ["failed"] }, "error": {} },
+                        "required": ["outcome", "error"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "operator": { "type": "string" }
+                },
+                "required": ["operationId", "resolution", "operator"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/runs/{id}/extend-budget": {
+      "post": {
+        "tags": ["operator"],
+        "operationId": "operator.extendBudget",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "delta": {
+                    "type": "object",
+                    "properties": {
+                      "tokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "usd": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                      "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                      "toolCalls": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "additionalProperties": false
+                  },
+                  "operator": { "type": "string" }
+                },
+                "required": ["delta", "operator"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "generalist_host_AgentInputInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/AgentInputInvalid"] },
+          "name": { "type": "string" },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "name", "message"],
+        "additionalProperties": false
+      },
+      "generalist_host_AgentNotRegisteredEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/AgentNotRegistered"] },
+          "name": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "name"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ApprovalMismatchEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ApprovalMismatch"] },
+          "runId": { "type": "string" },
+          "approvalId": { "type": "string" },
+          "mismatch": { "type": "string", "enum": ["approval-id", "wait-kind", "decision"] },
+          "expectedApprovalId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId", "approvalId", "mismatch"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ApprovalStaleEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ApprovalStale"] },
+          "runId": { "type": "string" },
+          "approvalId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId", "approvalId"],
+        "additionalProperties": false
+      },
+      "generalist_core_RunBudgetInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/RunBudgetInvalid"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_IllegalOperatorActionEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/IllegalOperatorAction"] },
+          "runId": { "type": "string" },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": { "_tag": { "type": "string", "enum": ["Resume"] } },
+                "required": ["_tag"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": { "type": "string", "enum": ["RetryOperation"] },
+                  "operationId": { "type": "string" },
+                  "attempt": { "type": "integer" }
+                },
+                "required": ["_tag", "operationId", "attempt"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": { "type": "string", "enum": ["AwaitApproval"] },
+                  "token": { "type": "string" }
+                },
+                "required": ["_tag", "token"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": { "type": "string", "enum": ["AwaitBudget"] },
+                  "budget": { "type": "string", "enum": ["tokens", "usd", "duration", "toolCalls", "children"] }
+                },
+                "required": ["_tag", "budget"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": { "type": "string", "enum": ["Unknown"] },
+                  "operationId": { "type": "string" },
+                  "reason": { "type": "string" }
+                },
+                "required": ["_tag", "operationId", "reason"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": { "_tag": { "type": "string", "enum": ["Failed"] }, "error": {} },
+                "required": ["_tag", "error"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "action": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId", "decision", "action"],
+        "additionalProperties": false
+      },
+      "generalist_server_OperatorDisabledEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
+          "operation": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation"],
+        "additionalProperties": false
+      },
+      "generalist_server_RequestFailedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/RequestFailed"] },
+          "operation": { "type": "string" },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation", "message"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RunNotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RunNotFound"] },
+          "runId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RuntimeUnavailableEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RuntimeUnavailable"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_host_SessionConflictEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/SessionConflict"] },
+          "sessionId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "sessionId"],
+        "additionalProperties": false
+      },
+      "generalist_host_SessionCursorExpiredEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/SessionCursorExpired"] },
+          "sessionId": { "type": "string" },
+          "cursor": { "type": "integer" },
+          "earliestCursor": { "type": "integer" },
+          "latestCursor": { "type": "integer" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "sessionId", "cursor", "earliestCursor", "latestCursor"],
+        "additionalProperties": false
+      },
+      "generalist_host_SessionNotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/SessionNotFound"] },
+          "sessionId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "sessionId"],
+        "additionalProperties": false
+      },
+      "generalist_host_SessionSubscriberLaggedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/SessionSubscriberLagged"] },
+          "sessionId": { "type": "string" },
+          "lastDeliveredCursor": { "type": "integer" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "sessionId", "lastDeliveredCursor"],
+        "additionalProperties": false
+      },
+      "generalist_server_UnauthorizedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/Unauthorized"] },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag"],
+        "additionalProperties": false
+      },
+      "Suspend_": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": { "_tag": { "type": "string", "enum": ["Forever"] } },
+            "required": ["_tag"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_tag": { "type": "string", "enum": ["Recurs"] },
+              "count": { "type": "integer", "minimum": 0 }
+            },
+            "required": ["_tag", "count"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": { "_tag": { "type": "string", "enum": ["UntilToolCall"] }, "name": { "type": "string" } },
+            "required": ["_tag", "name"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_tag": { "type": "string", "enum": ["Both"] },
+              "first": { "$ref": "#/components/schemas/Suspend_" },
+              "second": { "$ref": "#/components/schemas/Suspend_" }
+            },
+            "required": ["_tag", "first", "second"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "securitySchemes": { "bearer": { "type": "http", "scheme": "Bearer" } }
+  },
+  "security": [],
+  "tags": [
+    { "name": "sessions" },
+    { "name": "runs" },
+    { "name": "events" },
+    { "name": "approvals" },
+    { "name": "operator" }
+  ]
+}

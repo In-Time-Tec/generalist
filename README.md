@@ -123,7 +123,7 @@ Runnable examples live in [`examples/`](examples/), one README each.
 | Model providers and a deterministic model     | `generalist/providers/*`                                                                             |
 | Memory, skills, versioned instructions        | `generalist/memory`, `generalist/instructions`                                                       |
 | MCP, A2A, and AG-UI integrations              | `generalist/unstable/mcp`, `generalist/unstable/a2a`, `generalist/unstable/ag-ui`                    |
-| SSE/WebSocket transport and FoldKit chat      | `generalist/unstable/transport`, `generalist/unstable/foldkit`                                       |
+| Host HTTP, SSE, WebSocket, and FoldKit chat   | `generalist/server`, `generalist/unstable/foldkit`                                                   |
 | Durable stores                                | `generalist/pg`, `generalist/mysql`, `generalist/unstable/cloudflare/*`, `generalist/unstable/rivet` |
 | Scripted models and public conformance suites | `generalist/testing`                                                                                 |
 

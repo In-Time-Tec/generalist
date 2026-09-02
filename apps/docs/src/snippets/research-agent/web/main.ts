@@ -42,8 +42,8 @@ const OpenSession = define("OpenSession", {
     const response = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
       body: HttpBody.jsonUnsafe({}),
     }).pipe(Effect.provideContext(httpClient))
-    const body = yield* HttpClientResponse.schemaBodyJson(Schema.Struct({ sessionId: Schema.String }))(response)
-    return OpenedSession({ sessionId: body.sessionId })
+    const body = yield* HttpClientResponse.schemaBodyJson(Schema.Struct({ id: Schema.String }))(response)
+    return OpenedSession({ sessionId: body.id })
   }).pipe(
     Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
@@ -206,8 +206,9 @@ const view = (model: Model): Document => {
   }
 }
 
-const resources = Connection.layerWebSocket({ url: "ws://localhost:4000/ws" }).pipe(
+const resources = Connection.layerWebSocket({ baseUrl: "http://localhost:4000" }).pipe(
   Layer.provide(Socket.layerWebSocketConstructorGlobal),
+  Layer.provide(FetchHttpClient.layer),
 )
 
 const application = makeApplication({

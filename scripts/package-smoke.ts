@@ -839,7 +839,7 @@ const OpenAI = await import("generalist/providers/openai")
 const skills = await import("generalist/instructions/skills")
 const { TestModel, Testing } = await import("generalist/testing")
 const { Runtime, RunEvent } = await import("generalist/runtime")
-const { Snapshot, Wire } = await import("generalist/unstable/transport")
+const { Server } = await import("generalist/server")
 const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
@@ -851,8 +851,10 @@ for (const value of [
   Testing.runtimeDriver,
   Runtime.layerMemory,
   RunEvent.RunEvent,
-  Snapshot.get,
-  Wire.observerCodec,
+  Server.api,
+  Server.layer,
+  Server.client,
+  Server.eventCodec,
 ]) {
   if (value === undefined) throw new Error("Runtime adapter package export is missing")
 }

@@ -90,7 +90,8 @@ export const RunBranch = Schema.Struct({
 export type RunBranch = typeof RunBranch.Type
 
 /** Encoded durable Run inspection. */
-interface RunInspectionEncoded extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "waits"> {
+export interface RunInspectionEncoded
+  extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "waits"> {
   readonly runId: typeof RunId.Encoded
   readonly executableRef: typeof ExecutableRef.Encoded
   readonly executableManifest: typeof ExecutableManifest.Encoded

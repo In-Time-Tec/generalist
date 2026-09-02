@@ -71,11 +71,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
     () => import("../src/instructions/skills/index.js"),
     ["FileSystemCatalog", "GitHubCatalog", "HttpCatalog", "S3Catalog"],
   ],
-  [
-    "transport",
-    () => import("../src/unstable/transport/index.js"),
-    ["Chaos", "Errors", "Replay", "RunClient", "SSE", "Snapshot", "WebSocket", "Wire"],
-  ],
+  ["server", () => import("../src/server/index.js"), ["Server"]],
   ["mcp", () => import("../src/unstable/mcp/index.js"), ["MCPClient", "OAuth"]],
   [
     "testing",

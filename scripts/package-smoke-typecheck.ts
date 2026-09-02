@@ -17,7 +17,7 @@ import { make as makeModelRoute } from "generalist/unstable/providers/model-rout
 import { TestModel, Testing } from "generalist/testing"
 import { Cursor, Runtime, RunEvent } from "generalist/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
-import { RunClient, Snapshot, SSE, WebSocket, Wire } from "generalist/unstable/transport"
+import { Server } from "generalist/server"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
@@ -28,7 +28,6 @@ type Equal<Left, Right> =
       : false
     : false
 type Assert<Value extends true> = Value
-type MemberEqual<Left, Right, Key extends keyof Left & keyof Right> = Equal<Left[Key], Right[Key]>
 type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
 type SkillsRoot = typeof import("generalist/instructions/skills")
 type InstructionsLoad = Assert<Equal<typeof load, typeof import("generalist/instructions").load>>
@@ -71,12 +70,13 @@ type MemoryRunRequirements = Assert<
   Equal<StreamServices<typeof memoryRun>, LanguageModel.LanguageModel | Memory.Memory>
 >
 void Handoff
-type TransportRoot = typeof import("generalist/unstable/transport")
+type ServerRoot = typeof import("generalist/server")
 type RuntimeRoot = typeof import("generalist/runtime")
 type A2ARoot = typeof import("generalist/unstable/a2a")
 type AGUIRoot = typeof import("generalist/unstable/ag-ui")
 type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
 type AGUICanonical = Assert<Equal<AGUIRoot["AGUI"], typeof AGUI>>
+type ServerCanonical = Assert<Equal<ServerRoot["Server"], typeof Server>>
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
 type RunEventCanonical = Assert<Equal<RuntimeRoot["RunEvent"], typeof RunEvent>>
 type RuntimeAdmitInputCanonical = Assert<
@@ -91,37 +91,15 @@ void SqliteRuntime.layerSqlite
 void SqliteRunStore.layerSqlite
 void deterministicLayer
 void makeModelRoute
-type TransportClientSubpath = Assert<
-  MemberEqual<TransportRoot["RunClient"], typeof import("generalist/unstable/transport/run-client"), "layerWebSocket">
->
-type TransportErrorsSubpath = Assert<
-  MemberEqual<TransportRoot["Errors"], typeof import("generalist/unstable/transport/errors"), "TransportError">
->
-type TransportSseSubpath = Assert<
-  MemberEqual<TransportRoot["SSE"], typeof import("generalist/unstable/transport/sse"), "respond">
->
-type TransportWsSubpath = Assert<
-  MemberEqual<TransportRoot["WebSocket"], typeof import("generalist/unstable/transport/websocket"), "handle">
->
-type TransportWireSubpath = Assert<
-  MemberEqual<TransportRoot["Wire"], typeof import("generalist/unstable/transport/wire"), "producerCodec">
->
-type TransportSnapshotSubpath = Assert<
-  MemberEqual<TransportRoot["Snapshot"], typeof import("generalist/unstable/transport/snapshot"), "get">
->
 const cursor: Cursor.Cursor = Cursor.origin
-const snapshot = Snapshot.get("run:package-smoke")
-const producerCodec = Wire.producerCodec
-const observerCodec = Wire.observerCodec
-const webSocketClient = RunClient.layerWebSocket
+const serverClient = Server.client({ baseUrl: "https://generalist.test" })
+type ServerClientRequirements = Assert<Equal<EffectServices<typeof serverClient>, HttpClient.HttpClient>>
 void cursor
-void snapshot
-void producerCodec
-void observerCodec
-void webSocketClient
-void SSE.streamSuccess
-void SSE.respond
-void WebSocket.handle
+void serverClient
+void Server.api
+void Server.layer
+void Server.authBearer(Config.redacted("TOKEN"))
+void Server.eventCodec
 const reasoning: TestModel.ReasoningPart = TestModel.reasoning("package smoke")
 void reasoning
 const tokenStore: OAuth.TokenStore["Service"] = {

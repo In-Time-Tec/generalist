@@ -1,15 +1,11 @@
 id: 0
-event: RunAccepted
-data: {"specVersion":"1","eventId":"run_1:0","runId":"run_1","sequence":0,"executableRef":{"executable":"executable-pin:v1:sha256:e9760e412577d083b897f6cad6c44e3cf4ed66a4d576f6f1eaac28b5da262b04","active":"agent-pin:v1:sha256:4c14d26fb440b1c0891b2dd63138729ff955ba0f25da7c28d1fc6a80e2ec8b47"},"rootRunId":"run_1","depth":0,"occurredAt":"2026-09-02T17:59:32.778Z","correlationId":"question-1","_tag":"RunAccepted","messageId":"start:question-1","address":"runtime:start","budget":{}}
+event: RunStarted
+data: {"_tag":"RunStarted","sessionId":"research-1","cursor":0,"runId":"run_1","event":{"specVersion":"1","eventId":"run_1:0","runId":"run_1","sequence":0,"executableRef":{"executable":"executable-pin:v1:sha256:81794eb076cb8c991e181deffa9229205e2eae4bc54eaec041e9e2ed66e56b54","active":"agent-pin:v1:sha256:280ce7a45d5d8a4242f9b322c68fb97682c66fcc5f7e26ce15ffd6896571298c"},"rootRunId":"run_1","depth":0,"correlationId":"question-1","occurredAt":"2026-09-02T19:07:48.815Z","_tag":"RunAccepted","messageId":"start:question-1","address":"runtime:start","budget":{}}}
 
-...
+id: 2
+event: Turn
+data: {"_tag":"Turn","sessionId":"research-1","cursor":2,"runId":"run_1","event":{"specVersion":"1","eventId":"run_1:2","runId":"run_1","sequence":2,"executableRef":{"executable":"executable-pin:v1:sha256:81794eb076cb8c991e181deffa9229205e2eae4bc54eaec041e9e2ed66e56b54","active":"agent-pin:v1:sha256:280ce7a45d5d8a4242f9b322c68fb97682c66fcc5f7e26ce15ffd6896571298c"},"attemptId":"run_1:attempt:1","rootRunId":"run_1","depth":0,"correlationId":"question-1","occurredAt":"2026-09-02T19:07:49.317Z","_tag":"TurnStarted","turn":0}}
 
 id: 9
 event: ApprovalRequested
-data: {"specVersion":"1","eventId":"run_1:9","runId":"run_1","sequence":9,"executableRef":{"executable":"executable-pin:v1:sha256:e9760e412577d083b897f6cad6c44e3cf4ed66a4d576f6f1eaac28b5da262b04","active":"agent-pin:v1:sha256:4c14d26fb440b1c0891b2dd63138729ff955ba0f25da7c28d1fc6a80e2ec8b47"},"rootRunId":"run_1","depth":0,"occurredAt":"2026-09-02T17:59:33.314Z","correlationId":"question-1","attemptId":"run_1:attempt:1","_tag":"ApprovalRequested","turn":0,"call":{"~effect/ai/Content/Part":"~effect/ai/Content/Part","metadata":{},"type":"tool-call","id":"search-1","name":"web_search","params":{"query":"What is Effect for TypeScript?"},"providerExecuted":false},"request":{"approvalId":"runtime-approval:run_1:approval:search-1","operation":"search-1","capability":"web_search","input":{"query":"What is Effect for TypeScript?"}}}
-
-id: 11
-event: RunWaiting
-data: {"specVersion":"1","eventId":"run_1:11","runId":"run_1","sequence":11,"executableRef":{"executable":"executable-pin:v1:sha256:e9760e412577d083b897f6cad6c44e3cf4ed66a4d576f6f1eaac28b5da262b04","active":"agent-pin:v1:sha256:4c14d26fb440b1c0891b2dd63138729ff955ba0f25da7c28d1fc6a80e2ec8b47"},"rootRunId":"run_1","depth":0,"occurredAt":"2026-09-02T17:59:33.335Z","correlationId":"question-1","attemptId":"run_1:attempt:1","_tag":"RunWaiting","wait":{"waitId":"runtime-approval:run_1:approval:search-1","reason":{"_tag":"Approval","request":{"approvalId":"runtime-approval:run_1:approval:search-1","operation":"search-1","capability":"web_search","input":{"query":"What is Effect for TypeScript?"}}},"status":"open","openedAt":"2026-09-02T17:59:33.333Z"}}
-
-: keep-alive
+data: {"_tag":"ApprovalRequested","sessionId":"research-1","cursor":9,"runId":"run_1","event":{"specVersion":"1","eventId":"run_1:9","runId":"run_1","sequence":9,"executableRef":{"executable":"executable-pin:v1:sha256:81794eb076cb8c991e181deffa9229205e2eae4bc54eaec041e9e2ed66e56b54","active":"agent-pin:v1:sha256:280ce7a45d5d8a4242f9b322c68fb97682c66fcc5f7e26ce15ffd6896571298c"},"attemptId":"run_1:attempt:1","rootRunId":"run_1","depth":0,"correlationId":"question-1","occurredAt":"2026-09-02T19:07:49.358Z","_tag":"ApprovalRequested","turn":0,"call":{"type":"tool-call","id":"search-1","name":"web_search","params":{"query":"What is Effect for TypeScript?"},"providerExecuted":false,"metadata":{}},"request":{"approvalId":"runtime-approval:run_1:approval:search-1","operation":"search-1","capability":"web_search","input":{"query":"What is Effect for TypeScript?"}}}}

@@ -1,8 +1,9 @@
-import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent } from "generalist"
+import { Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
+import { Agent, Approvals, Permissions } from "generalist"
+import { Generalist } from "generalist/host"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
+import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
-import { SSE } from "generalist/unstable/transport"
 
 const agent = Agent.make({ name: "transport-agent" })
 const agentServices = TestModel.layer([TestModel.text("Hello from transport.")])
@@ -12,19 +13,20 @@ const runtimeLayer = Layer.merge(
     addresses: [],
     subscriberQueueCapacity: 16,
   }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
-  agentServices,
+  Layer.mergeAll(agentServices, Permissions.layerAllowAll, Approvals.layerAutoApprove),
 )
 
 const program = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
-  const handle = yield* runtime.start(agent, "Say hello", {
-    sessionId: "guide-session",
-    idempotencyKey: "guide-message-1",
-  })
-  const first = yield* handle.events.pipe(Stream.take(1), Stream.runCollect)
+  const host = yield* Generalist.create({ agents: [agent] })
+  const session = yield* host.sessions.create({ id: "guide-session" })
+  const handle = yield* host.runs.start(session.id, agent, "Say hello", { idempotencyKey: "guide-message-1" })
+  const first = yield* host.events.subscribe(session.id).pipe(Stream.take(1), Stream.runHead)
+  const encoded = yield* Server.eventCodec.encode(Option.getOrThrow(first))
   yield* Console.log(
-    `admitted ${handle.runId}; first event: ${Array.from(first)[0]?._tag}; SSE schema: ${SSE.streamSuccess._tag}`,
+    `admitted ${handle.id}; first Server event: ${first.pipe(
+      Option.map((event) => event._tag),
+      Option.getOrUndefined,
+    )}; wire bytes: ${encoded.length}`,
   )
 })
 
