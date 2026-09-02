@@ -5,7 +5,7 @@ An `Agent` is a plain typed definition. It owns input/output schemas, instructio
 ## Usage
 
 ```ts
-import { Effect, Stream } from "effect"
+import { Effect, Fiber, Stream } from "effect"
 import { Agent } from "generalist"
 
 const agent = Agent.make({
@@ -20,6 +20,24 @@ const program = Effect.gen(function* () {
   return { tags: events.map((event) => event._tag), answer }
 })
 ```
+
+## Process-local inspection
+
+Provide `Agent.Inspector.layerMemory` at the run boundary to retain live snapshots without a durable Runtime. Inspection is optional: runs do not require or publish inspection state when no Inspector is provided.
+
+```ts
+const inspected = Effect.gen(function* () {
+  const inspector = yield* Agent.Inspector
+  const run = yield* Agent.allocateRun(agent, { prompt: "Find toolkit docs" })
+  const events = yield* run.events.pipe(Stream.runCollect, Effect.forkScoped)
+  const snapshot = yield* inspector.snapshot(run.runId)
+  // { runId, turn, usage: { inputTokens, outputTokens }, activeTools, lastEvent, elapsed }
+  yield* Fiber.join(events)
+  return snapshot
+}).pipe(Effect.scoped, Effect.provide(Agent.Inspector.layerMemory))
+```
+
+`layerTest(implementation)` installs a caller-supplied `Agent.Inspector.Service`. Snapshots begin when the run event stream is consumed, update for every published event, retain terminal state for the lifetime of the Layer, and use the Effect Clock for elapsed milliseconds. An unknown or not-yet-consumed run fails with `InspectorRunNotFound`.
 
 ## What runs
 
