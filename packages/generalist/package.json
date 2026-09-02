@@ -20,11 +20,13 @@
     "@effect/sql-sqlite-do": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@rivet-dev/agentos": "catalog:",
     "@smithy/types": "catalog:",
     "@standard-schema/spec": "catalog:",
     "effect": "4.0.0-rc.112",
     "es-module-lexer": "catalog:",
     "foldkit": "catalog:peer",
+    "modal": "catalog:",
     "rivetkit": "catalog:",
     "vitest": "catalog:"
   },
@@ -271,6 +273,14 @@
       "types": "./dist/unstable/sandbox/fly-sprites/index.d.ts",
       "import": "./dist/unstable/sandbox/fly-sprites/index.js"
     },
+    "./unstable/sandbox/modal": {
+      "types": "./dist/unstable/sandbox/modal/index.d.ts",
+      "import": "./dist/unstable/sandbox/modal/index.js"
+    },
+    "./unstable/sandbox/agentos": {
+      "types": "./dist/unstable/sandbox/agentos/index.d.ts",
+      "import": "./dist/unstable/sandbox/agentos/index.js"
+    },
     "./unstable/sandbox/cloudflare": {
       "types": "./dist/unstable/sandbox/cloudflare/index.d.ts",
       "import": "./dist/unstable/sandbox/cloudflare/index.js"
@@ -318,6 +328,7 @@
     "@effect/sql-sqlite-do": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@rivet-dev/agentos": "catalog:",
     "@smithy/types": "catalog:",
     "@standard-schema/spec": "catalog:",
     "@types/bun": "catalog:",
@@ -325,6 +336,7 @@
     "esbuild": "catalog:",
     "es-module-lexer": "catalog:",
     "foldkit": "catalog:",
+    "modal": "catalog:",
     "rivetkit": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
@@ -378,6 +390,9 @@
     "@modelcontextprotocol/sdk": {
       "optional": true
     },
+    "@rivet-dev/agentos": {
+      "optional": true
+    },
     "@smithy/types": {
       "optional": true
     },
@@ -388,6 +403,9 @@
       "optional": true
     },
     "foldkit": {
+      "optional": true
+    },
+    "modal": {
       "optional": true
     },
     "rivetkit": {
