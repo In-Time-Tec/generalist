@@ -138,7 +138,7 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
     expect(modelCalls).toBe(4)
     expect(inspection.status).toBe("succeeded")
     const snapshot = yield* runtime.snapshot(child.runId)
-    const completedFacts = snapshot.usage.filter((fact) => fact._tag === "Completed")
+    const completedFacts = snapshot.usageFacts.filter((fact) => fact._tag === "Completed")
     expect(completedFacts).toHaveLength(4)
     expect(completedFacts.reduce((sum, fact) => sum + (fact.usage.inputTokens.total ?? 0), 0)).toBe(1_200_000)
   }).pipe(scopedWith(runtimeLayer))

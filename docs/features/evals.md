@@ -17,7 +17,7 @@ const program = Effect.gen(function* () {
 })
 ```
 
-`fromJournal` uses only the Runtime's cross-driver read surface: `snapshot`, bounded `history`, `sessionEntry`, and `resolveModelResponse`. It does not read a driver or operation store directly. Each turn contains the exact Session projection before the model response, the resolved normalized response, framework tool calls and results, raw per-attempt usage, and the last compaction for that turn. Trajectory projection restores persisted usage as Effect AI `Response.Usage` values, so projected trajectories remain encodable after a store is closed and reopened.
+`fromJournal` uses only the Runtime's cross-driver read surface: `snapshot`, bounded `history`, `sessionEntry`, and `resolveModelResponse`. It does not read a driver or operation store directly. Each turn contains the exact Session projection before the model response, the resolved normalized response, framework tool calls and results, raw per-attempt `usageFacts`, and the last compaction for that turn. Trajectory projection restores persisted usage as Effect AI `Response.Usage` values, so projected trajectories remain encodable after a store is closed and reopened.
 
 The input is the durable `Prompt` before the first model response. Runtime encodes typed Agent input into that prompt before admission, so an arbitrary pre-encoding JavaScript value cannot be reconstructed later. Output is the encoded terminal Agent output. Failed, cancelled, and nonterminal snapshots use `null` output and their Runtime status as the stop reason. `gates` contains every ordered journaled completion-gate verdict, including rejected attempts that later retried.
 

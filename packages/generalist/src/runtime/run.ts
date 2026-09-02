@@ -111,7 +111,8 @@ const hasValidExecutable = (value: {
   }
 }
 
-export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = Schema.Struct({
+/** Field schemas shared by `RunInspection` and the schemas that extend it. */
+export const RunInspectionFields = {
   runId: RunId,
   status: RunStatus,
   executableRef: ExecutableRef,
@@ -124,7 +125,9 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   durability: Schema.Literals(["ephemeral", "durable"]),
   branches: Schema.Array(RunBranch),
-}).pipe(
+} as const
+
+export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = Schema.Struct(RunInspectionFields).pipe(
   Schema.refine((value): value is typeof value => hasValidExecutable(value), {
     message: "executableRef must match executableManifest",
   }),
@@ -299,7 +302,7 @@ export interface RunSnapshot {
   readonly cursor: Cursor
   readonly turn: number
   readonly outcome?: RunOutcome
-  readonly usage: ReadonlyArray<RawUsageFact>
+  readonly usageFacts: ReadonlyArray<RawUsageFact>
   readonly budget: Remaining
   readonly compactions: ReadonlyArray<CompactionInspection>
   readonly gates: ReadonlyArray<GateResult>
@@ -307,11 +310,11 @@ export interface RunSnapshot {
 
 /** Encoded durable Run snapshot. */
 interface RunSnapshotEncoded
-  extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions" | "gates"> {
+  extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usageFacts" | "compactions" | "gates"> {
   readonly run: RunInspectionEncoded
   readonly cursor: typeof Cursor.Encoded
   readonly outcome?: RunOutcomeEncoded
-  readonly usage: ReadonlyArray<RawUsageFactEncoded>
+  readonly usageFacts: ReadonlyArray<RawUsageFactEncoded>
   readonly compactions: ReadonlyArray<CompactionInspectionEncoded>
   readonly gates: ReadonlyArray<typeof CompletionGateResult.Encoded>
 }
@@ -321,7 +324,7 @@ export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema
   cursor: Cursor,
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   outcome: Schema.optionalKey(RunOutcome),
-  usage: Schema.Array(RawUsageFact),
+  usageFacts: Schema.Array(RawUsageFact),
   budget: RemainingBudget,
   compactions: Schema.Array(CompactionInspection),
   gates: Schema.Array(CompletionGateResult),

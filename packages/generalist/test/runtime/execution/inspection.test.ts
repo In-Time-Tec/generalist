@@ -1,8 +1,21 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
+import { expectTypeOf } from "vitest"
+import type { Agent } from "../../../src/index.js"
 import { Errors, Run, RunEvent, Runtime, RunStore } from "../../../src/runtime/index.js"
+import type { RuntimeInspection } from "../../../src/runtime/service.js"
 import { alternateAssistantRef, assistantAddress, memoryLayer, openWait, suspension, textPrompt } from "./fixtures.js"
+
+expectTypeOf<RuntimeInspection>().toExtend<Agent.InspectionSnapshot>()
+
+const activeCall = Schema.decodeSync(Response.ToolCallPart("active_tool", Schema.Unknown))({
+  type: "tool-call",
+  id: "tool:active",
+  name: "active_tool",
+  params: {},
+  providerExecuted: false,
+})
 
 layer(memoryLayer)("Runtime inspection contracts", (it) => {
   it.effect("exposes canonical snapshot, finite history, list, and structured wait resolution", () =>
@@ -140,6 +153,14 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       })
       yield* store.emitAgentEvent({
         ...claim,
+        event: {
+          _tag: "ToolExecutionStarted",
+          turn: 2,
+          call: activeCall,
+        },
+      })
+      yield* store.emitAgentEvent({
+        ...claim,
         event: { _tag: "TurnCompleted", turn: 2, usage },
       })
       yield* store.emitAgentEvent({
@@ -154,12 +175,16 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       })
       const snapshot = yield* runtime.snapshot(receipt.runId)
       expect(snapshot.turn).toBe(2)
-      expect(snapshot.usage.map((fact) => fact._tag)).toEqual(["Completed", "Failed"])
-      expect(snapshot.usage[0]).toMatchObject({ provider: "provider", model: "model", requestId: "request:1" })
+      expect(snapshot.usageFacts.map((fact) => fact._tag)).toEqual(["Completed", "Failed"])
+      expect(snapshot.usageFacts[0]).toMatchObject({ provider: "provider", model: "model", requestId: "request:1" })
       expect(snapshot.gates).toEqual([{ name: "quality", verdict: "pass", evidence: { score: 1 } }])
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
         turn: 2,
-        usage: snapshot.usage,
+        usage: { inputTokens: 13, outputTokens: 5 },
+        usageFacts: snapshot.usageFacts,
+        activeTools: ["active_tool"],
+        lastEvent: { _tag: "GateResult", turn: 2, name: "quality" },
+        elapsed: 0,
         gates: snapshot.gates,
       })
     }),

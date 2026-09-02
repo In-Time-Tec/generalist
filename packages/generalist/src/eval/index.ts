@@ -100,7 +100,7 @@ interface TokenCounts {
   readonly total: number
 }
 
-const completedTokens = (usage: Trajectory["turns"][number]["usage"][number]): TokenCounts => {
+const completedTokens = (usage: Trajectory["turns"][number]["usageFacts"][number]): TokenCounts => {
   if (usage._tag === "Failed") {
     const input = usage.providerUsage.inputTokens ?? 0
     const output = usage.providerUsage.outputTokens ?? 0
@@ -121,7 +121,7 @@ const metadataFrom = (entries: ReadonlyArray<ModelMetadata>, provider: string, m
   entries.find((entry) => entry.provider === provider && entry.model === model)
 
 const factCost = (
-  fact: Trajectory["turns"][number]["usage"][number],
+  fact: Trajectory["turns"][number]["usageFacts"][number],
   metadata: ModelMetadata | undefined,
 ): Option.Option<number> => {
   if (metadata?.pricing === undefined) return Option.none()
@@ -143,7 +143,7 @@ const factCost = (
 
 const usageTotal = Effect.fn("Eval.usageTotal")(function* (trajectory: Trajectory) {
   const catalog = yield* Effect.serviceOption(ModelCatalog)
-  const facts = trajectory.turns.flatMap((turn) => turn.usage)
+  const facts = trajectory.turns.flatMap((turn) => turn.usageFacts)
   let tokens = 0
   let usd: Option.Option<number> = Option.some(0)
   for (const fact of facts) {

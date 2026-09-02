@@ -97,7 +97,7 @@ const snapshot: RunSnapshot = {
     eventId: `${runId}:3`,
     occurredAt: "2026-01-01T00:00:01.000Z",
   },
-  usage: [
+  usageFacts: [
     {
       _tag: "Completed",
       runId,
@@ -205,7 +205,7 @@ it.effect("projects a recorded journal to stable JSON", () =>
               },
             },
             "toolCalls": [],
-            "usage": [
+            "usageFacts": [
               {
                 "_tag": "Completed",
                 "attempt": 0,
@@ -299,7 +299,7 @@ it.live("exports usage from a reopened SQLite journal as one decodable JSONL lin
         expect(line.split("\n")).toHaveLength(2)
         const record = yield* Schema.decodeEffect(Schema.fromJsonString(JsonlRecord))(line.trim())
         expect(record.trajectory).toEqual(trajectory)
-        expect(record.trajectory.turns[0]?.usage[0]).toMatchObject({
+        expect(record.trajectory.turns[0]?.usageFacts[0]).toMatchObject({
           _tag: "Completed",
           usage: recordedUsage,
         })

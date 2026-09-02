@@ -146,7 +146,8 @@ const registerStartByAgent = <LayerError, ClaimsLayerError>(
           runId: handle.runId,
           status: "succeeded",
           turn: 0,
-          usage: [],
+          usage: { inputTokens: 0, outputTokens: 0 },
+          usageFacts: [],
         })
       }),
     ),

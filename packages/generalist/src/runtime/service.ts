@@ -98,6 +98,7 @@ import type {
 import type { WakeEvent } from "../core/agent/tools/wake-event.js"
 import type { WakeDisposition, WakeEventInvalid } from "./execution/trigger/wake.js"
 import type { ScheduleInvalid, ScheduleReceipt } from "./execution/trigger/schedule.js"
+import type { InspectionEvent } from "./execution/agent/event.js"
 
 export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
@@ -224,10 +225,14 @@ export type RunSend = (
   ...input: Parameters<RunHandle<unknown>["send"]>
 ) => ReturnType<RunHandle<unknown>["send"]>
 
-/** Authoritative Runtime inspection with the latest zero-based turn and raw provider usage facts. */
+/** Authoritative Runtime inspection, including the process-local Inspector snapshot shape. */
 export interface RuntimeInspection extends RunInspection {
   readonly turn: number
-  readonly usage: ReadonlyArray<RawUsageFact>
+  readonly usage: { readonly inputTokens: number; readonly outputTokens: number }
+  readonly usageFacts: ReadonlyArray<RawUsageFact>
+  readonly activeTools: ReadonlyArray<string>
+  readonly lastEvent?: InspectionEvent
+  readonly elapsed: number
   readonly budget: RemainingBudget
   readonly gates: ReadonlyArray<GateResult>
   readonly children: ReadonlyArray<ChildInspection>

@@ -50,7 +50,7 @@ host.runs.start(sessionId, agent, typedInput, { idempotencyKey? })
 host.runs.startByName(sessionId, agentName, untrustedInput, { idempotencyKey? })
   -> { id, await, events, send }
 host.runs.list(sessionId)             -> root Run inspections
-host.runs.inspect(runId)              -> Run inspection
+host.runs.inspect(runId)              -> Runtime inspection, including Inspector snapshot fields
 host.runs.send(runId, prompt, { policy?, from?, idempotencyKey? })
                                       -> { entryId, sequence }
 host.runs.cancel(runId, reason?)       -> void

@@ -72,7 +72,8 @@ interface ProfileBindingEncoded extends Omit<ProfileBinding, "agent"> {
   readonly agent: string
 }
 
-interface ExecutableManifestEncoded extends Omit<ExecutableManifest, "root" | "profiles" | "entries"> {
+/** Encoded executable manifest. */
+export interface ExecutableManifestEncoded extends Omit<ExecutableManifest, "root" | "profiles" | "entries"> {
   readonly root: string
   readonly profiles: ReadonlyArray<ProfileBindingEncoded>
   readonly entries: ReadonlyArray<ExecutableEntryEncoded>

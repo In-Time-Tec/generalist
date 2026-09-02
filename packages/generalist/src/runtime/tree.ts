@@ -163,14 +163,14 @@ export const TreeRunInspection: Schema.Codec<TreeRunInspection, TreeRunInspectio
 const InspectionBase = {
   rootRunId: Schema.String,
   runs: Schema.Array(TreeRunInspection),
-  usage: Schema.Array(RawUsageFact),
+  usageFacts: Schema.Array(RawUsageFact),
   compactions: Schema.Array(CompactionInspection),
 }
 
 interface InspectionBase {
   readonly rootRunId: string
   readonly runs: ReadonlyArray<TreeRunInspection>
-  readonly usage: ReadonlyArray<RawUsageFact>
+  readonly usageFacts: ReadonlyArray<RawUsageFact>
   readonly compactions: ReadonlyArray<CompactionInspection>
 }
 
@@ -178,9 +178,9 @@ export type Inspection =
   | (InspectionBase & { readonly _tag: "Active"; readonly activeRunIds: ReadonlyArray<string> })
   | (InspectionBase & { readonly _tag: "Terminal" })
 
-interface InspectionBaseEncoded extends Omit<InspectionBase, "runs" | "usage" | "compactions"> {
+interface InspectionBaseEncoded extends Omit<InspectionBase, "runs" | "usageFacts" | "compactions"> {
   readonly runs: ReadonlyArray<TreeRunInspectionEncoded>
-  readonly usage: ReadonlyArray<typeof RawUsageFact.Encoded>
+  readonly usageFacts: ReadonlyArray<typeof RawUsageFact.Encoded>
   readonly compactions: ReadonlyArray<typeof CompactionInspection.Encoded>
 }
 

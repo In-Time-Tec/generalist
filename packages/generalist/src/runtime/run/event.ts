@@ -334,7 +334,7 @@ export const CompletedModelResponse = Schema.Struct({
 })
 export type CompletedModelResponse = typeof CompletedModelResponse.Type
 
-const AgentLoopEventSchema = Schema.Union([
+export const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("TurnStarted", { turn: Schema.Finite, ...optionalMetadata }),
   Schema.TaggedStruct("ModelResponseCommitted", {
     turn: Schema.Finite,
