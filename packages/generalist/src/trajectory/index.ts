@@ -1,5 +1,5 @@
 import { Effect, Function, Schema, Stream, Types } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { buildContext, type Entry as SessionEntry } from "../core/context/session.js"
 import { BudgetLimits } from "../core/durable/run-budget.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
@@ -147,7 +147,9 @@ export const fromJournal = Effect.fn("Trajectory.fromJournal")(function* (
       prompt: buildContext(path),
       response,
       toolCalls: toolCallsFor(events, event.turn),
-      usage: snapshot.usage.filter((fact) => fact.turn === event.turn),
+      usage: snapshot.usage
+        .filter((fact) => fact.turn === event.turn)
+        .map((fact) => (fact._tag === "Completed" ? { ...fact, usage: Response.Usage.make(fact.usage) } : fact)),
     }
     const compaction = snapshot.compactions.findLast((value) => value.turn === event.turn)
     if (compaction !== undefined) projected.compaction = compaction
