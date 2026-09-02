@@ -28,7 +28,9 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
   Layer.succeed(
     Runtime.Runtime,
     Runtime.Runtime.of({
+      register: () => Effect.die("unused register"),
       start: () => Effect.die("unused start"),
+      startExecution: () => Effect.die("unused startExecution"),
       admit: () => Effect.die("unused admit"),
       activate: () => Effect.die("unused activate"),
       send: () => Effect.die("unused send"),
@@ -50,6 +52,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
             waits: [],
           },
           cursor: 2,
+          turn: 0,
           usage: [],
           compactions: [],
         }),
@@ -89,6 +92,8 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
           lastSequence: 2,
           durability: "durable",
           waits: [],
+          turn: 0,
+          usage: [],
         }),
       fanOut: () => Effect.die("unused fanOut"),
       inspectFanOut: () => Effect.die("unused inspectFanOut"),

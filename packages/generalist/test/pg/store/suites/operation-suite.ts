@@ -121,7 +121,7 @@ describePostgres("PostgreSQL Program store contract", () => {
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const worker = yield* RuntimeWorker.RuntimeWorker
-            const receipt = yield* runtime.start({
+            const receipt = yield* runtime.startExecution({
               executable: programExecutable,
               registrations: registrationsFor(programExecutable),
               sessionId: "postgres-exact-root-worker",

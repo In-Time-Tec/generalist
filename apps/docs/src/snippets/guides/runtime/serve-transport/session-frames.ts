@@ -1,28 +1,9 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
+import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { Cursor, ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
+import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
-const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
-  model: Pins.makeModel({ fixture: "chat-agent", revision: "1" }),
-  tools: [],
-  skills: [],
-  services: [],
-  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
-  budget: agent.budget ?? {},
-  children: [],
-})
-const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
-const registrations = executable.manifest.entries.flatMap((entry) =>
-  entry._tag === "Agent"
-    ? [
-        entry.manifest.model,
-        ...entry.manifest.tools.map(({ pin }) => pin),
-        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
-      ].map((pin) => ({ pin, codec: "docs", version: "1", payload: { fixture: "chat-agent" } }))
-    : [],
-)
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
   outputTokens: { total: 0, text: 0, reasoning: 0 },
@@ -48,12 +29,11 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Runtime.layerMemory({
-  addresses: [],
-}).pipe(
-  Layer.provide(
-    ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(Layer.orDie),
-  ),
+const runtimeLayer = Layer.merge(
+  Runtime.layerMemory({
+    addresses: [],
+  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
+  agentServices,
 )
 
 const collectRun = (runId: string, cursor?: number) => {
@@ -74,19 +54,14 @@ const tags = (events: Iterable<{ readonly sequence: number; readonly _tag: strin
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const receipt = yield* runtime.start({
-    executable,
-    registrations,
+  yield* runtime.register(agent)
+  const handle = yield* runtime.start(agent, "Say hello", {
     sessionId: "docs-1",
     idempotencyKey: "hello-1",
-    prompt: "Say hello",
   })
-  const store = yield* RunStore.RunStore
-  const host = yield* RunExecutor.RunExecutor
-  yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "docs-example" }))
-  const live = yield* collectRun(receipt.runId)
+  const live = yield* collectRun(handle.runId)
   yield* Console.log(`live:   ${tags(live)}`)
-  const replayed = yield* collectRun(receipt.runId, 2)
+  const replayed = yield* collectRun(handle.runId, 2)
   yield* Console.log(`replay: ${tags(replayed)}`)
 })
 

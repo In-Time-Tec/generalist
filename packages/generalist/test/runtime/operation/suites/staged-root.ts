@@ -58,7 +58,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
       provide(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const broaderStart: Runtime.StartInput = {
+          const broaderStart: Runtime.StartExecutionInput = {
             ...input("one-root"),
             initialChildren: [
               {
@@ -167,11 +167,11 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const startInput = input("ordinary-start")
-          const first = yield* runtime.start(startInput)
+          const first = yield* runtime.startExecution(startInput)
 
           expect(yield* runtime.inspect(first.runId)).toMatchObject({ status: "running" })
           expect(yield* tags(first.runId)).toEqual(["RunAccepted", "RunAttemptStarted"])
-          expect(yield* runtime.start(startInput)).toEqual({ ...first, duplicate: true })
+          expect(yield* runtime.startExecution(startInput)).toEqual({ ...first, duplicate: true })
         }),
       ),
     )

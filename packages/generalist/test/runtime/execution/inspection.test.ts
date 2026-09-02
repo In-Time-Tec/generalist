@@ -98,7 +98,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         event: {
           _tag: "ModelCallStarted",
           deliveryId: "call",
-          turn: 0,
+          turn: 2,
           modelCallId: "call:1",
           purpose: "conversation",
           provider: "provider",
@@ -111,7 +111,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         event: {
           _tag: "ModelAttemptCompleted",
           deliveryId: "attempt:0",
-          turn: 0,
+          turn: 2,
           modelCallId: "call:1",
           modelAttemptId: "attempt:0",
           attempt: 0,
@@ -127,7 +127,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         event: {
           _tag: "ModelAttemptFailed",
           deliveryId: "attempt:1",
-          turn: 0,
+          turn: 2,
           modelCallId: "call:1",
           modelAttemptId: "attempt:1",
           attempt: 1,
@@ -140,11 +140,13 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       })
       yield* store.emitAgentEvent({
         ...claim,
-        event: { _tag: "TurnCompleted", turn: 0, usage },
+        event: { _tag: "TurnCompleted", turn: 2, usage },
       })
       const snapshot = yield* runtime.snapshot(receipt.runId)
+      expect(snapshot.turn).toBe(2)
       expect(snapshot.usage.map((fact) => fact._tag)).toEqual(["Completed", "Failed"])
       expect(snapshot.usage[0]).toMatchObject({ provider: "provider", model: "model", requestId: "request:1" })
+      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ turn: 2, usage: snapshot.usage })
     }),
   )
 

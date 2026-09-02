@@ -1,36 +1,15 @@
-import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
-import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
+import { Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { SSE, WebSocket } from "generalist/unstable/transport"
 import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { agent } from "./agent"
 import { modelLayer } from "./model"
-import { toolkit, toolkitLayer, webSearchTool } from "./tools"
+import { toolkit, toolkitLayer } from "./tools"
 import { cannedLayer } from "./web-search"
-
-const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
-  model: Pins.makeModel({ fixture: "research-agent", revision: "1" }),
-  tools: [{ name: webSearchTool.name, pin: Pins.makeCapability({ tool: webSearchTool.name, version: "1" }) }],
-  skills: [],
-  services: [],
-  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
-  budget: agent.budget ?? {},
-  children: [],
-})
-const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
-const registrations = executable.manifest.entries.flatMap((entry) =>
-  entry._tag === "Agent"
-    ? [
-        entry.manifest.model,
-        ...entry.manifest.tools.map(({ pin }) => pin),
-        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
-      ].map((pin) => ({ pin, codec: "docs", version: "1", payload: { fixture: "research-agent" } }))
-    : [],
-)
 
 const StartRunInput = Schema.Struct({
   body: Schema.Struct({
-    runId: Schema.optionalKey(Schema.String),
     sessionId: Schema.String,
     idempotencyKey: Schema.String,
     prompt: Schema.String,
@@ -55,13 +34,6 @@ const RespondInput = Schema.Struct({
 const errorResponse = (status: number) => (error: Error) =>
   Effect.succeed(HttpServerResponse.jsonUnsafe({ message: error.message }, { status }))
 
-const executeRun = (runId: string) =>
-  Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
-    const host = yield* RunExecutor.RunExecutor
-    yield* host.execute(yield* store.claimExecution({ runId, ownerId: "research-agent-server" }))
-  })
-
 const routesLayer = HttpRouter.use((router) =>
   Effect.gen(function* () {
     yield* router.add("GET", "/ws", WebSocket.handle)
@@ -85,20 +57,14 @@ const routesLayer = HttpRouter.use((router) =>
       "/runs",
       HttpRouter.schemaJson(StartRunInput).pipe(
         Effect.flatMap(({ body }) =>
-          Runtime.Runtime.use((runtime) => {
-            const input = {
-              executable,
-              registrations,
+          Runtime.Runtime.use((runtime) =>
+            runtime.start(agent, body.prompt, {
               sessionId: body.sessionId,
               idempotencyKey: body.idempotencyKey,
-              prompt: body.prompt,
-            }
-            if (body.runId !== undefined) Object.assign(input, { runId: body.runId })
-            return runtime.start(input)
-          }),
+            }),
+          ),
         ),
-        Effect.tap((receipt) => (receipt.duplicate ? Effect.void : executeRun(receipt.runId))),
-        Effect.map((receipt) => HttpServerResponse.jsonUnsafe(receipt, { status: 202 })),
+        Effect.map((handle) => HttpServerResponse.jsonUnsafe({ runId: handle.runId }, { status: 202 })),
         Effect.catch(errorResponse(400)),
       ),
     )
@@ -110,7 +76,7 @@ const routesLayer = HttpRouter.use((router) =>
         Effect.flatMap(({ pathParams, body }) =>
           Runtime.Runtime.use((runtime) =>
             runtime.respond({ runId: pathParams.id, waitId: body.waitId, resolution: body.resolution }),
-          ).pipe(Effect.andThen(executeRun(pathParams.id))),
+          ),
         ),
         Effect.map(() => HttpServerResponse.jsonUnsafe({ status: "accepted" }, { status: 202 })),
         Effect.catch(errorResponse(400)),
@@ -140,13 +106,14 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor> =
-  Runtime.layerMemory({ addresses: [] }).pipe(
-    Layer.provide(
-      ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(Layer.orDie),
-    ),
-  )
+const runtimeLayer = Runtime.layerMemory({ addresses: [] }).pipe(
+  Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+)
+
+const registrationLayer = Layer.effectDiscard(Runtime.Runtime.use((runtime) => runtime.register(agent))).pipe(
+  Layer.orDie,
+)
 
 export const httpLayer: Layer.Layer<never, never, HttpServer.HttpServer> = HttpRouter.serve(
-  Layer.mergeAll(routesLayer, HttpRouter.cors()),
-).pipe(Layer.provide(runtimeLayer))
+  Layer.mergeAll(routesLayer, HttpRouter.cors(), registrationLayer),
+).pipe(Layer.provideMerge(runtimeLayer), Layer.provideMerge(agentServices))

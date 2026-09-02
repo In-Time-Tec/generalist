@@ -9,6 +9,7 @@ import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
+import { make as makeRegisteredAgents, type RegisteredAgents } from "../executable/registered-agent.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
@@ -42,16 +43,23 @@ import {
   type RunOptionsInput,
 } from "./completion/operations.js"
 import { suspend as suspendAgent } from "./agent/suspend.js"
+import { make as makeRegisteredResolution } from "./agent/registered-resolution.js"
 import type { Service } from "./run-executor.js"
-
-export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> = Effect.gen(
-  function* () {
+const makeFor = (
+  agents: RegisteredAgents,
+): Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> =>
+  Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
+    const registered = makeRegisteredResolution({ agents, resolver, store })
     const journalFault = yield* Effect.serviceOption(JournalFault)
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
-    const reconcileCancellation = yield* makeToolCancellation({ store, resolver })
+    const reconcileCancellation = yield* makeToolCancellation({
+      store,
+      resolver: registered.resolver,
+      suspendUnknown: registered.suspendUnknown,
+    })
     const executeClaim = (claim: ExecutionClaim, afterExit: Ref.Ref<Effect.Effect<void>>): Effect.Effect<void> =>
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
@@ -84,7 +92,12 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
         })
         const scopedExecution = Effect.scoped(
           Effect.gen(function* () {
-            const resolved = yield* ExecutionResolution.resolve(resolver, claimed, deferProgramChildFailure)
+            const resolved = yield* ExecutionResolution.resolve(
+              registered.resolver,
+              claimed,
+              deferProgramChildFailure,
+              (error) => registered.suspendUnknown(claim, error),
+            )
             if (resolved === undefined) return
             if (resolved._tag === "Program") {
               yield* executeProgram({ claim, claimed, store, resolution: resolved })
@@ -481,5 +494,7 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
         yield* active.run(claim.runId, executeClaim(claim, afterExit), settleAndRelease)
       })
     return { execute, interrupt: (runId) => active.interrupt(runId) }
-  },
-)
+  })
+
+export const forAgents = (agents: RegisteredAgents) => makeFor(agents)
+export const make = makeFor(makeRegisteredAgents())

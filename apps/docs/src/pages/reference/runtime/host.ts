@@ -27,13 +27,15 @@ export const runtimeReference = definePage({
     h2("staged-root", "Staged root activation"),
     p(
       code("Runtime.admit(input)"),
-      " durably admits exactly one caller-identified root as queued without allowing a worker, scheduler, model, or tool to execute it. ",
+      " is the low-level pinned-executable path that durably admits exactly one caller-identified root as queued without allowing a worker, scheduler, model, or tool to execute it. ",
       code("Runtime.activate({ runId })"),
       " independently makes that root runnable and returns its current ",
       code("RunInspection"),
       ". Activation and cancellation serialize in the authoritative store: cancellation that wins remains terminal across later activation, while duplicate activation appends only one attempt. Exact repeated admission returns the same receipt; changed payloads and conflicting Run IDs fail typed. ",
-      code("Runtime.start(input)"),
-      " remains the ordinary immediate path.",
+      code("Runtime.register(agent)"),
+      " and ",
+      code("Runtime.start(agent, input, options?)"),
+      " are the ordinary typed immediate path.",
     ),
     h2("model-output", "Semantic history and disposable previews"),
     p(

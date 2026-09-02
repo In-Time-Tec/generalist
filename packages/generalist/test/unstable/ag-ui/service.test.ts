@@ -42,7 +42,9 @@ const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime meth
 
 const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
   Runtime.Runtime.of({
+    register: () => unused(),
     start: () => unused(),
+    startExecution: () => unused(),
     admit: () => unused(),
     activate: () => unused(),
     send: () => unused(),
@@ -186,6 +188,7 @@ describe("AGUI", () => {
         durability: "ephemeral" as const,
       },
       cursor: 3,
+      turn: 0,
       usage: [],
       compactions: [],
     }
@@ -243,6 +246,7 @@ describe("AGUI", () => {
         durability: "ephemeral" as const,
       },
       cursor: 8,
+      turn: 0,
       usage: [],
       compactions: [],
     }
@@ -289,6 +293,7 @@ describe("AGUI", () => {
         durability: "durable" as const,
       },
       cursor: 12,
+      turn: 0,
       usage: [],
       compactions: [],
     }

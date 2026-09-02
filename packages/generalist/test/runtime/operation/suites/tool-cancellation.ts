@@ -150,7 +150,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const host = yield* RunExecutor.RunExecutor
-            const receipt = yield* runtime.start({
+            const receipt = yield* runtime.startExecution({
               executable,
               registrations: registrationsFor(executable),
               sessionId: `session:tool-cancellation:${options.name}`,
@@ -288,7 +288,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const host = yield* RunExecutor.RunExecutor
-            const receipt = yield* runtime.start({
+            const receipt = yield* runtime.startExecution({
               executable,
               registrations: registrationsFor(executable),
               sessionId: `session:tool-interruption:${options.name}`,
@@ -359,7 +359,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const host = yield* RunExecutor.RunExecutor
-            const receipt = yield* runtime.start({
+            const receipt = yield* runtime.startExecution({
               executable: assistantRef,
               registrations: registrationsFor(assistantRef),
               sessionId: `session:tool-cancellation-tree:${options.name}`,

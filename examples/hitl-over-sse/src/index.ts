@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
+import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "generalist/runtime"
+import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { SSE } from "generalist/unstable/transport"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -24,25 +24,6 @@ const deployTool = Tool.make("deploy", {
 
 const toolkit = Toolkit.make(deployTool)
 const agent = Agent.make({ name: "release-agent", toolkit })
-const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
-  model: Pins.makeModel({ fixture: "release-agent", revision: "1" }),
-  tools: [{ name: deployTool.name, pin: Pins.makeCapability({ tool: deployTool.name, version: "1" }) }],
-  skills: [],
-  services: [],
-  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
-  budget: agent.budget ?? {},
-  children: [],
-})
-const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
-const registrations = executable.manifest.entries.flatMap((entry) =>
-  entry._tag === "Agent"
-    ? [
-        entry.manifest.model,
-        ...entry.manifest.tools.map(({ pin }) => pin),
-        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
-      ].map((pin) => ({ pin, codec: "example", version: "1", payload: { fixture: "release-agent" } }))
-    : [],
-)
 const toolkitLayer = toolkit.toLayer({ deploy: () => Effect.die("approval should suspend before execution") })
 const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -77,27 +58,21 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Runtime.layerMemory({
-  addresses: [],
-}).pipe(
-  Layer.provide(
-    ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(Layer.orDie),
-  ),
+const runtimeLayer = Layer.merge(
+  Runtime.layerMemory({
+    addresses: [],
+  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
+  agentServices,
 )
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const receipt = yield* runtime.start({
-    executable,
-    registrations,
+  yield* runtime.register(agent)
+  const handle = yield* runtime.start(agent, "Deploy api", {
     sessionId: "release-1",
     idempotencyKey: "deploy-api-1",
-    prompt: "Deploy api",
   })
-  const store = yield* RunStore.RunStore
-  const host = yield* RunExecutor.RunExecutor
-  yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "hitl-example" }))
-  const events = yield* runtime.events({ runId: receipt.runId }).pipe(
+  const events = yield* handle.events.pipe(
     Stream.takeUntil(
       (event) =>
         event._tag === "RunWaiting" ||
@@ -116,3 +91,4 @@ const program = Effect.gen(function* () {
 
 const runtime = ManagedRuntime.make(runtimeLayer)
 await runtime.runPromise(program)
+await runtime.dispose()

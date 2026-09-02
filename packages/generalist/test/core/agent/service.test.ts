@@ -47,7 +47,6 @@ import { withProviderFinish, withProviderFinishContent } from "../provider-finis
 import { layerModel as deterministicModel } from "../../../src/ai/provider/deterministic"
 import { layerTest as modelCatalogLayerTest } from "../../../src/ai/model-catalog"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index"
-import { registrationsFor } from "../../runtime/execution/fixtures"
 import { pinnedTestExecutable } from "../../runtime/run/identity"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -531,12 +530,13 @@ const typedStartRuntime = Runtime.layerMemory({ addresses: [] }).pipe(Layer.prov
 layer(typedStartRuntime)("Agent.start", (it) => {
   it.effect("starts a registered Agent and decodes its durable completion", () =>
     Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const model = yield* Layer.build(deterministicModel({ response: '{"output":{"answer":42}}' }))
+      yield* runtime.register(typedStartAgent).pipe(Effect.provideContext(model))
       const handle = yield* Agent.start(
         typedStartAgent,
         { question: "answer" },
         {
-          executable: typedStartExecutable,
-          registrations: registrationsFor(typedStartExecutable),
           sessionId: "typed-start-session",
           idempotencyKey: "typed-start-key",
         },
@@ -557,9 +557,10 @@ layer(typedStartRuntime)("Agent.start", (it) => {
 
   it.effect("preserves a valid null durable output instead of falling back to text", () =>
     Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const model = yield* Layer.build(deterministicModel({ response: '{"output":null}' }))
+      yield* runtime.register(nullStartAgent).pipe(Effect.provideContext(model))
       const handle = yield* Agent.start(nullStartAgent, "answer", {
-        executable: nullStartExecutable,
-        registrations: registrationsFor(nullStartExecutable),
         sessionId: "null-start-session",
         idempotencyKey: "null-start-key",
       })

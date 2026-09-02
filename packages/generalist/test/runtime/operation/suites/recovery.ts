@@ -106,7 +106,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
           const host = yield* RunExecutor.RunExecutor
-          const receipt = yield* runtime.start({
+          const receipt = yield* runtime.startExecution({
             executable,
             registrations: registrationsFor(executable),
             sessionId: `session:terminal-stream-decode:${options.name}`,
@@ -293,7 +293,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
-          const receipt = yield* runtime.start({
+          const receipt = yield* runtime.startExecution({
             executable: assistantRef,
             registrations: registrationsFor(assistantRef),
             sessionId: `session:operation-recovery:${options.name}:policies`,

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
 import { IdempotencyConflict, RunIdConflict } from "../../runtime/errors.js"
+import { RunExecutor } from "../../runtime/execution/run-executor.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
 import { StaleClaim } from "../../runtime/sql/errors.js"
 import { RunClaims } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
+import { registerAgentStart } from "./agent-start.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
 import { record } from "../report.js"
 import type {
@@ -27,11 +29,16 @@ export * from "./sql-transaction-fault.js"
 
 const servicesFrom = (context: Context.Context<Runtime | RunStore>): Services => {
   const optionalClaims = Context.getOption(context, RunClaims)
+  const optionalExecutor = Context.getOption(context, RunExecutor)
   const services: Services = {
     runtime: Context.get(context, Runtime),
     store: Context.get(context, RunStore),
   }
-  return Option.isSome(optionalClaims) ? { ...services, claims: optionalClaims.value } : services
+  return {
+    ...services,
+    ...(Option.isSome(optionalExecutor) ? { executor: optionalExecutor.value } : undefined),
+    ...(Option.isSome(optionalClaims) ? { claims: optionalClaims.value } : undefined),
+  }
 }
 
 const provideLayer = <A, E, LayerError>(
@@ -425,6 +432,7 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
   suite(`${options.name} Generalist Runtime driver conformance`, () => {
     if (options.capabilities.admission === true) registerAdmission(options)
     if (options.capabilities.runtime !== undefined) registerRuntime(options, options.capabilities.runtime)
+    registerAgentStart({ options, provide: (use) => provide(options, use) })
     if (options.capabilities.runTree !== undefined) registerRunTree(options, options.capabilities.runTree)
     if (options.capabilities.sqlTransactions !== undefined) {
       registerSqlTransactions(options, options.capabilities.sqlTransactions)

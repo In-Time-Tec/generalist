@@ -95,7 +95,11 @@ export const researchAgent = definePage({
     ),
     codeBlock({ label: "index.ts", source: mainSource }),
     h3("watch-a-run-suspend", "Watch a run suspend"),
-    p("With the server running, admit a run with a stable run ID, session ID, and idempotency key:"),
+    p(
+      "With the server running, admit a run with a stable session ID and idempotency key. Save the returned stable run ID in ",
+      code("RUN_ID"),
+      ":",
+    ),
     codeBlock({
       label: "Terminal",
       language: "bash",
@@ -119,7 +123,7 @@ export const researchAgent = definePage({
     h2("part-2-approvals-over-the-wire", "Part 2: Approvals over the wire"),
     p(
       "The run is waiting rather than failed. Its open wait is addressed by ",
-      code('waitId: "search-1"'),
+      code('waitId: "approval:search-1"'),
       ". ",
       link("/docs/learn/suspension", "Suspension as a typed error"),
       " explains the underlying typed suspension. To resume, an authenticated command route calls ",

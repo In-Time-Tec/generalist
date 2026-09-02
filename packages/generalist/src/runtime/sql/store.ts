@@ -88,11 +88,11 @@ import { acknowledge, loadAcknowledged } from "./acknowledgement.js"
 import { RunClaims } from "./run/claims.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
-import { RunExecutor } from "../execution/run-executor.js"
+import { layerRegisteredAgents as runExecutorLayer, RunExecutor } from "../execution/run-executor.js"
 import { ExecutableResolver } from "../executable/resolver.js"
-import { make as makeRunExecutor } from "../execution/run-executor-internal.js"
-import { layer as runtimeLayer } from "../memory/layer/service.js"
+import { layerRegisteredAgents as runtimeLayer } from "../memory/layer/service.js"
 import { Runtime } from "../service.js"
+import { make as makeRegisteredAgents } from "../executable/registered-agent.js"
 import { sqlClaims } from "./store/kernel/claims.js"
 import { SqlObservability } from "./store/kernel/observability.js"
 import { sqliteDriver } from "./store/driver/sqlite.js"
@@ -468,9 +468,10 @@ export const layerSqlRuntime = (input: {
       ),
     ),
   )
+  const agents = makeRegisteredAgents()
   const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = runtimeLayer(input.options).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(RunExecutor, makeRunExecutor).pipe(Layer.provide(dependencies))
+  const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
+  const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
   return Layer.mergeAll(runtime, host, services)
 }
 

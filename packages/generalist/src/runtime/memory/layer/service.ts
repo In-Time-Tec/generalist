@@ -3,9 +3,8 @@ import {
   AddressNotFound,
   ChildSelectionMissing,
   ExecutableIdentityMismatch,
+  ExecutablePinMissing,
   ExecutableRegistrationInvalid,
-  FanOutInvalid,
-  FanOutRemainderUnsupported,
   RunTerminal,
   StartInvalid,
   RuntimeUnavailable,
@@ -17,22 +16,25 @@ import { RunStore, type AdmitMessageInput, type AdmitSendInput, type AdmitStartI
 import {
   Runtime,
   type Service as RuntimeService,
-  type InitialFanOutInput,
   type LayerOptions,
   type SendInput,
-  type StartInput,
+  type StartExecutionInput,
   type SpawnInput,
 } from "../../service.js"
 import { normalizePrompt } from "../prompt.js"
 import { normalizeInitialChild, normalizeInitialFanOut } from "../start.js"
 import { ActiveExecutions } from "../../execution/active-executions.js"
 import { digest as steeringDigest } from "../../run/steering.js"
-import { fanOutIdFor, MAX_FAN_OUT_MEMBERS } from "../../child/fan-out-internal.js"
 import { parseCursor } from "../../tree/cursor.js"
 import { decodePinned, equals, resolveChild } from "../../executable/manifest-internal.js"
 import type { PinnedExecutable } from "../../executable/manifest.js"
 import { ExecutableResolver, type Input as ResolverInput } from "../../executable/resolver.js"
 import { validate as validateRegistrations, type ExecutableRegistration } from "../../executable/registration.js"
+import {
+  make as makeRegisteredAgents,
+  resolve as resolveRegisteredAgent,
+  type RegisteredAgents,
+} from "../../executable/registered-agent.js"
 import { ModelPreviewLane, previews as modelPreviews } from "../../execution/model-response/preview-internal.js"
 import { readEntry, resolveModelResponse } from "../../session/service.js"
 type Registrations = ReadonlyArray<ExecutableRegistration>
@@ -43,15 +45,18 @@ import { defaultBounds, digest as messageDigest, promptBytes } from "../../messa
 import { defaultTreePolicy } from "../../tree/policy.js"
 import { isTerminal } from "../../run.js"
 import { awaitSessionTerminal } from "../../session/lifecycle.js"
-import { messageDigestInput, messageDraft, normalizedFanOutMember } from "./message.js"
+import { make as makeAgentStart } from "./agent-start.js"
+import { normalizer as fanOutNormalizer } from "./fan-out.js"
+import { messageDigestInput, messageDraft } from "./message.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
 type MutableSendAdmission = { -readonly [Key in keyof AdmitSendInput]: AdmitSendInput[Key] }
 type MutableMessageAdmission = { -readonly [Key in keyof AdmitMessageInput]: AdmitMessageInput[Key] }
 
-export const makeRuntime = (
+const makeRuntimeWith = (
   options: LayerOptions,
+  agents: RegisteredAgents,
 ): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions | ExecutableResolver> =>
   Effect.gen(function* () {
     const store = yield* RunStore
@@ -70,7 +75,7 @@ export const makeRuntime = (
         registrations: Object.freeze([...entry.registrations]),
       })
     }
-    type ExecutableInput = StartInput["executable"]
+    type ExecutableInput = StartExecutionInput["executable"]
     const decode = (executable: ExecutableInput) =>
       Effect.try({
         try: () => decodePinned(executable),
@@ -84,14 +89,17 @@ export const makeRuntime = (
       Effect.gen(function* () {
         const registrations = yield* validateRegistrations(input.executable, input.registrations)
         const attestation = yield* Effect.scoped(
-          resolver
-            .resolve({
-              runId: input.runId,
-              ref: input.executable.ref,
-              manifest: input.executable.manifest,
-              registrations,
-            } satisfies ResolverInput)
-            .pipe(Effect.map((resolution) => resolution.attestation)),
+          resolveRegisteredAgent(agents, resolver, {
+            runId: input.runId,
+            ref: input.executable.ref,
+            manifest: input.executable.manifest,
+            registrations,
+          } satisfies ResolverInput).pipe(
+            Effect.map((resolution) => resolution.attestation),
+            Effect.catchTag("generalist/runtime/UnknownAgent", () =>
+              Effect.fail(ExecutablePinMissing.make({ runId: input.runId, ref: input.executable.ref })),
+            ),
+          ),
         )
         if (!equals(attestation, input.executable)) {
           return yield* ExecutableIdentityMismatch.make({
@@ -167,47 +175,11 @@ export const makeRuntime = (
           }),
         ),
       )
-    const normalizeFanOut = (parentRunId: string, input: InitialFanOutInput) =>
-      Effect.gen(function* () {
-        if (input.concurrency !== undefined && (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1)) {
-          return yield* FanOutInvalid.make({ message: "fan-out concurrency must be a positive integer" })
-        }
-        if (input.members.length === 0 || input.members.length > MAX_FAN_OUT_MEMBERS) {
-          return yield* FanOutInvalid.make({ message: `fan-out requires between 1 and ${MAX_FAN_OUT_MEMBERS} members` })
-        }
-        if (new Set(input.members.map((member) => member.key)).size !== input.members.length) {
-          return yield* FanOutInvalid.make({ message: "fan-out member keys must be unique" })
-        }
-        if (
-          input.join._tag === "Quorum" &&
-          (!Number.isSafeInteger(input.join.required) ||
-            input.join.required < 1 ||
-            input.join.required > input.members.length)
-        ) {
-          return yield* FanOutInvalid.make({
-            message: "fan-out quorum must be a positive safe integer no greater than member count",
-          })
-        }
-        const info = yield* store.info
-        if (input.remainder === "terminate") {
-          return yield* FanOutRemainderUnsupported.make({ remainder: "terminate", durability: info.durability })
-        }
-        const fanOutId = fanOutIdFor(parentRunId, input.idempotencyKey)
-        const members = input.members.map((member, ordinal) => normalizedFanOutMember({ fanOutId, ordinal, member }))
-        return {
-          parentRunId,
-          idempotencyKey: input.idempotencyKey,
-          members,
-          concurrency: Math.min(input.concurrency ?? members.length, members.length),
-          join: input.join,
-          remainder: input.remainder,
-          fanOutId,
-        }
-      })
+    const normalizeFanOut = fanOutNormalizer(store)
     const validateInitialChildren = (
-      input: StartInput,
+      input: StartExecutionInput,
       executable: PinnedExecutable,
-      initialChildren: NonNullable<StartInput["initialChildren"]>,
+      initialChildren: NonNullable<StartExecutionInput["initialChildren"]>,
     ) =>
       Effect.gen(function* () {
         if (initialChildren.length > 64) {
@@ -239,9 +211,9 @@ export const makeRuntime = (
       })
 
     const validateInitialFanOuts = (
-      input: StartInput,
+      input: StartExecutionInput,
       executable: PinnedExecutable,
-      initialFanOuts: NonNullable<StartInput["initialFanOuts"]>,
+      initialFanOuts: NonNullable<StartExecutionInput["initialFanOuts"]>,
     ) =>
       Effect.gen(function* () {
         if (initialFanOuts.length > 64) {
@@ -271,7 +243,7 @@ export const makeRuntime = (
         }
       })
 
-    const admitStart = (input: StartInput, activate: boolean) =>
+    const admitStart = (input: StartExecutionInput, activate: boolean) =>
       Effect.gen(function* () {
         const executable = yield* decode(input.executable)
         const registrations = yield* admissionRegistrations({
@@ -313,8 +285,11 @@ export const makeRuntime = (
         if (input.runId !== undefined) admission.runId = input.runId
         return yield* store.admitStart(admission, { activate })
       })
+    const agentStart = makeAgentStart({ agents, store, admitStart })
     return Runtime.of({
-      start: (input) => admitStart(input, true),
+      register: agentStart.register,
+      start: agentStart.start,
+      startExecution: (input) => admitStart(input, true),
       admit: (input) =>
         admitStart({ ...input, initialChildren: [], initialFanOuts: [] }, false).pipe(
           Effect.map(({ runId, messageId, acceptedSequence, duplicate }) => ({
@@ -488,7 +463,10 @@ export const makeRuntime = (
       directory: (runId) => reachable({ store, policy, runId }),
       registerAgentName: store.registerAgentName,
       resolveOperation: store.resolveOperation,
-      inspect: store.inspect,
+      inspect: (runId) =>
+        store
+          .snapshot(runId)
+          .pipe(Effect.map((snapshot) => ({ ...snapshot.run, turn: snapshot.turn, usage: snapshot.usage }))),
       fanOut: (input) =>
         Effect.gen(function* () {
           return yield* store.admitFanOut(yield* normalizeFanOut(input.parentRunId, input))
@@ -497,4 +475,12 @@ export const makeRuntime = (
       awaitFanOut,
     })
   })
+
+export const makeRuntime = (options: LayerOptions) => makeRuntimeWith(options, makeRegisteredAgents())
+
+export const makeWith = (agents: RegisteredAgents) => (options: LayerOptions) => makeRuntimeWith(options, agents)
+
 export const layer = (options: LayerOptions) => Layer.effect(Runtime, makeRuntime(options))
+
+export const layerRegisteredAgents = (agents: RegisteredAgents) => (options: LayerOptions) =>
+  Layer.effect(Runtime, makeRuntimeWith(options, agents))

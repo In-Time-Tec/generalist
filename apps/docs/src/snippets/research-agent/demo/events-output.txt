@@ -1,15 +1,15 @@
 id: 0
 event: RunAccepted
-data: {"specVersion":"1","eventId":"research-run-1:0","runId":"research-run-1","sequence":0,"agent":{"id":"research-agent","version":"1","digest":"sha256:research-agent"},"rootRunId":"research-run-1","occurredAt":"2026-08-03T12:00:00.000Z","_tag":"RunAccepted","messageId":"msg:question-1","address":"agent:research"}
+data: {"specVersion":"1","eventId":"run_1:0","runId":"run_1","sequence":0,"agent":{"id":"research-agent","version":"1","digest":"sha256:research-agent"},"rootRunId":"run_1","occurredAt":"2026-08-03T12:00:00.000Z","_tag":"RunAccepted","messageId":"msg:question-1","address":"agent:research"}
 
 ...
 
 id: 10
 event: ApprovalRequested
-data: {"specVersion":"1","eventId":"research-run-1:10","runId":"research-run-1","sequence":10,"agent":{"id":"research-agent","version":"1","digest":"sha256:research-agent"},"attemptId":"research-run-1:attempt:2","rootRunId":"research-run-1","occurredAt":"2026-08-03T12:00:00.100Z","_tag":"ApprovalRequested","turn":0,"call":{"type":"tool-call","id":"search-1","name":"web_search","params":{"query":"What is Effect for TypeScript?"},"providerExecuted":false,"metadata":{}}}
+data: {"specVersion":"1","eventId":"run_1:10","runId":"run_1","sequence":10,"agent":{"id":"research-agent","version":"1","digest":"sha256:research-agent"},"attemptId":"run_1:attempt:2","rootRunId":"run_1","occurredAt":"2026-08-03T12:00:00.100Z","_tag":"ApprovalRequested","turn":0,"call":{"type":"tool-call","id":"search-1","name":"web_search","params":{"query":"What is Effect for TypeScript?"},"providerExecuted":false,"metadata":{}}}
 
 id: 12
 event: RunWaiting
-data: {"specVersion":"1","eventId":"research-run-1:12","runId":"research-run-1","sequence":12,"agent":{"id":"research-agent","version":"1","digest":"sha256:research-agent"},"attemptId":"research-run-1:attempt:2","rootRunId":"research-run-1","occurredAt":"2026-08-03T12:00:00.120Z","_tag":"RunWaiting","wait":{"waitId":"search-1","reason":"approval","status":"open","openedAt":"2026-08-03T12:00:00.120Z"}}
+data: {"specVersion":"1","eventId":"run_1:12","runId":"run_1","sequence":12,"agent":{"id":"research-agent","version":"1","digest":"sha256:research-agent"},"attemptId":"run_1:attempt:2","rootRunId":"run_1","occurredAt":"2026-08-03T12:00:00.120Z","_tag":"RunWaiting","wait":{"waitId":"approval:search-1","reason":"approval","status":"open","openedAt":"2026-08-03T12:00:00.120Z"}}
 
 : keep-alive

@@ -186,7 +186,9 @@ const replayEvents: ReadonlyArray<RunEvent.RunEvent> = [0, 1].map(
 const unusedEffect = () => Effect.die("unused Runtime operation")
 const unusedStream = () => Stream.die("unused Runtime operation")
 const replayRuntime: Runtime.Service = {
+  register: unusedEffect,
   start: unusedEffect,
+  startExecution: unusedEffect,
   admit: unusedEffect,
   activate: unusedEffect,
   send: unusedEffect,

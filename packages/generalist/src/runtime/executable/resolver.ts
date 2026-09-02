@@ -115,14 +115,12 @@ export interface ProgramResolution {
 
 /** Exactly one reconstructed executable kind. */
 export type Resolution = AgentResolution | ProgramResolution
+
+/** Typed failures allowed while resolving one executable. */
+export type ResolveError = ExecutablePinMissing | ExecutableRegistrationInvalid | ExecutableRegistrationMissing
+
 export interface Service {
-  readonly resolve: (
-    input: Input,
-  ) => Effect.Effect<
-    Resolution,
-    ExecutablePinMissing | ExecutableRegistrationInvalid | ExecutableRegistrationMissing,
-    Scope.Scope
-  >
+  readonly resolve: (input: Input) => Effect.Effect<Resolution, ResolveError, Scope.Scope>
 }
 export class ExecutableResolver extends Context.Service<ExecutableResolver, Service>()(
   "generalist/runtime/executable/resolver/ExecutableResolver",

@@ -285,6 +285,7 @@ export const CompactionInspection: Schema.Codec<CompactionInspection, Compaction
 export interface RunSnapshot {
   readonly run: RunInspection
   readonly cursor: Cursor
+  readonly turn: number
   readonly outcome?: RunOutcome
   readonly usage: ReadonlyArray<RawUsageFact>
   readonly compactions: ReadonlyArray<CompactionInspection>
@@ -302,6 +303,7 @@ interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outco
 export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema.Struct({
   run: RunInspection,
   cursor: Cursor,
+  turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   outcome: Schema.optionalKey(RunOutcome),
   usage: Schema.Array(RawUsageFact),
   compactions: Schema.Array(CompactionInspection),

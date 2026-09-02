@@ -116,7 +116,9 @@ const makeRuntime = (acceptedSequence = 0) => {
   }
 
   const runtime: Runtime.Service = {
+    register: () => Effect.die("not used"),
     start: () => Effect.die("not used"),
+    startExecution: () => Effect.die("not used"),
     admit: () => Effect.die("not used"),
     activate: () => Effect.die("not used"),
     send: (input) => {
@@ -170,6 +172,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       return Effect.succeed({
         run: inspection(runId, run),
         cursor: run.events.at(-1)?.sequence ?? -1,
+        turn: 0,
         usage: [],
         compactions: [],
       })
@@ -231,7 +234,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     },
     cancelSession: () => Effect.die("not used"),
     awaitSessionTerminal: () => Effect.die("not used"),
-    inspect: (runId) => Effect.succeed(inspection(runId, runs.get(runId)!)),
+    inspect: (runId) => Effect.succeed({ ...inspection(runId, runs.get(runId)!), turn: 0, usage: [] }),
   }
   return { runtime, runs, sentRunIds, observedCursors }
 }

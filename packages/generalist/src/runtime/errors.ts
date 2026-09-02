@@ -86,6 +86,17 @@ export class RunNotFound extends Schema.TaggedError<RunNotFound>()("generalist/r
   runId: Schema.String,
 }) {}
 
+/** An Agent name is already registered in this Runtime process. */
+export class DuplicateAgent extends Schema.TaggedError<DuplicateAgent>()("generalist/runtime/DuplicateAgent", {
+  name: Schema.String,
+}) {}
+
+/** A durable Run names an Agent that this Runtime process has not registered. */
+export class UnknownAgent extends Schema.TaggedError<UnknownAgent>()("generalist/runtime/UnknownAgent", {
+  name: Schema.String,
+  runId: Schema.String,
+}) {}
+
 export class RunTerminal extends Schema.TaggedError<RunTerminal>()("generalist/runtime/RunTerminal", {
   runId: Schema.String,
   status: Schema.Literals(["succeeded", "failed", "cancelled"]),

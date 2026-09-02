@@ -94,7 +94,7 @@ export const coreAgentReference = definePage({
         [
           [code("Agent.start")],
           [code("(agent, input, options) => Effect<RunHandle, StartError, Runtime>")],
-          "Starts an already-registered durable executable through Runtime",
+          "Starts an Agent registered by unique name with Runtime and returns typed await/events",
         ],
       ],
     ),

@@ -72,8 +72,8 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         idempotencyKey: "exact-key",
         prompt: textPrompt("hello"),
       }
-      const first = yield* runtime.start(input)
-      const duplicate = yield* runtime.start(input)
+      const first = yield* runtime.startExecution(input)
+      const duplicate = yield* runtime.startExecution(input)
       expect(duplicate.runId).toBe(first.runId)
       expect(duplicate.duplicate).toBe(true)
     }),
@@ -89,17 +89,23 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         idempotencyKey: "same",
         prompt: textPrompt("hello"),
       }
-      yield* runtime.start(base)
-      expect(yield* runtime.start({ ...base, prompt: textPrompt("changed") }).pipe(Effect.flip)).toBeInstanceOf(
-        Errors.IdempotencyConflict,
-      )
+      yield* runtime.startExecution(base)
+      expect(
+        yield* runtime.startExecution({ ...base, prompt: textPrompt("changed") }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.IdempotencyConflict)
       expect(
         yield* runtime
-          .start({ ...base, executable: alternateAssistantRef, registrations: registrationsFor(alternateAssistantRef) })
+          .startExecution({
+            ...base,
+            executable: alternateAssistantRef,
+            registrations: registrationsFor(alternateAssistantRef),
+          })
           .pipe(Effect.flip),
       ).toBeInstanceOf(Errors.IdempotencyConflict)
       expect(
-        yield* runtime.start({ ...base, registrations: registrationsFor(assistantRef, "changed") }).pipe(Effect.flip),
+        yield* runtime
+          .startExecution({ ...base, registrations: registrationsFor(assistantRef, "changed") })
+          .pipe(Effect.flip),
       ).toBeInstanceOf(Errors.ExecutableRegistrationConflict)
     }),
   )
@@ -114,13 +120,15 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         idempotencyKey: "file-key",
         prompt: filePrompt(new Uint8Array([0, 1, 2, 255])),
       }
-      const first = yield* runtime.start(input)
-      expect(yield* runtime.start({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 2, 255])) })).toEqual({
+      const first = yield* runtime.startExecution(input)
+      expect(yield* runtime.startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 2, 255])) })).toEqual({
         ...first,
         duplicate: true,
       })
       expect(
-        yield* runtime.start({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) }).pipe(Effect.flip),
+        yield* runtime
+          .startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) })
+          .pipe(Effect.flip),
       ).toBeInstanceOf(Errors.IdempotencyConflict)
     }),
   )
@@ -130,7 +138,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
       const runtime = yield* Runtime.Runtime
       const registrations = registrationsFor(assistantRef)
       const mismatch = yield* runtime
-        .start({
+        .startExecution({
           executable: assistantRef,
           registrations: [...registrations, { pin: "capability:unrelated", codec: "test", version: "1", payload: {} }],
           sessionId: "invalid-session",
@@ -140,7 +148,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         .pipe(Effect.flip)
       expect(mismatch).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
       const missing = yield* runtime
-        .start({
+        .startExecution({
           executable: assistantRef,
           registrations: registrations.slice(1),
           sessionId: "invalid-session",
@@ -158,7 +166,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
       const store = yield* RunStore.RunStore
       const before = yield* store.list({ limit: 1000 })
       const unresolvable = yield* runtime
-        .start({
+        .startExecution({
           executable: researcherRef,
           registrations: registrationsFor(researcherRef),
           sessionId: "unresolvable-session",
@@ -199,8 +207,8 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const first = yield* runtime.start(base)
-      const duplicate = yield* runtime.start(base)
+      const first = yield* runtime.startExecution(base)
+      const duplicate = yield* runtime.startExecution(base)
       expect(duplicate).toEqual({ ...first, duplicate: true })
       expect(first.childRunIds).toHaveLength(1)
       const child = yield* store.loadExecution(first.childRunIds[0]!)
@@ -246,7 +254,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
       const runtime = yield* Runtime.Runtime
       const before = yield* runtime.list({ limit: 10 })
       const invalid = yield* runtime
-        .start({
+        .startExecution({
           ...base,
           idempotencyKey: "invalid-initial",
           initialChildren: [
@@ -264,22 +272,24 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
       expect(invalid).toBeInstanceOf(Errors.ChildSelectionMissing)
       expect(yield* runtime.list({ limit: 10 })).toEqual(before)
 
-      yield* runtime.start(base)
+      yield* runtime.startExecution(base)
       const changed = yield* runtime
-        .start({
+        .startExecution({
           ...base,
           initialChildren: [{ ...base.initialChildren[0]!, prompt: textPrompt("changed") }],
         })
         .pipe(Effect.flip)
       expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
-      expect((yield* runtime.treeCheckpoint((yield* runtime.start(base)).runId)).inspection.runs).toHaveLength(3)
+      expect((yield* runtime.treeCheckpoint((yield* runtime.startExecution(base)).runId)).inspection.runs).toHaveLength(
+        3,
+      )
     }),
   )
 
   it.effect("admits typed file bytes in an initial child prompt", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const receipt = yield* runtime.start({
+      const receipt = yield* runtime.startExecution({
         ...base,
         idempotencyKey: "initial-child-file",
         initialChildren: [{ ...base.initialChildren[0]!, prompt: filePrompt(new Uint8Array([4, 5, 6])) }],
@@ -314,8 +324,8 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const first = yield* runtime.start(input)
-      const duplicate = yield* runtime.start(input)
+      const first = yield* runtime.startExecution(input)
+      const duplicate = yield* runtime.startExecution(input)
       expect(first.childRunIds).toEqual([])
       expect(first.fanOuts).toHaveLength(1)
       expect(duplicate).toEqual({
@@ -344,7 +354,7 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
       expect(events.at(-1)).toMatchObject({ _tag: "RunCompleted", result: completedResult("root result") })
       expect(
         yield* runtime
-          .start({
+          .startExecution({
             ...input,
             initialFanOuts: [
               {
@@ -361,7 +371,7 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
   it.effect("admits typed file bytes in an initial fan-out member prompt", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const receipt = yield* runtime.start({
+      const receipt = yield* runtime.startExecution({
         ...input,
         idempotencyKey: "initial-fan-out-file",
         initialFanOuts: [
@@ -407,7 +417,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
         const runtime = yield* Runtime.Runtime
         expect(
           yield* runtime
-            .start({
+            .startExecution({
               ...input,
               initialChildren: [
                 ...input.initialChildren,
@@ -423,7 +433,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
             .pipe(Effect.flip),
         ).toBeInstanceOf(Errors.ChildSelectionMissing)
         expect(yield* runtime.list({ limit: 10 })).toEqual([])
-        const receipt = yield* runtime.start(input)
+        const receipt = yield* runtime.startExecution(input)
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("queued")
         const store = yield* RunStore.RunStore
         yield* store.complete({
@@ -438,7 +448,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
       SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const receipt = yield* runtime.start(input)
+        const receipt = yield* runtime.startExecution(input)
         expect((yield* runtime.treeCheckpoint(receipt.runId)).inspection.runs).toHaveLength(2)
         expect(
           (yield* runtime.history({ runId: receipt.runId, limit: 100 })).find((event) => event._tag === "ChildLinked"),
@@ -485,7 +495,7 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
       SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const receipt = yield* runtime.start(input)
+        const receipt = yield* runtime.startExecution(input)
         const store = yield* RunStore.RunStore
         assertFileBytes((yield* store.loadExecution(receipt.runId)).message.prompt)
         return receipt.runId
@@ -524,7 +534,7 @@ standalone.effect("reloads SQLite registrations without address binding and clos
       firstLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        return yield* runtime.start({
+        return yield* runtime.startExecution({
           executable: assistantRef,
           registrations,
           sessionId: "sqlite-exact",
@@ -711,18 +721,18 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
           }))
           expect(
             yield* runtime
-              .start({ ...base, idempotencyKey: "invalid-policy", registrations: invalidPolicy })
+              .startExecution({ ...base, idempotencyKey: "invalid-policy", registrations: invalidPolicy })
               .pipe(Effect.flip),
           ).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
           const missingService = yield* runtime
-            .start({
+            .startExecution({
               ...base,
               idempotencyKey: "missing-service",
               registrations: registrations.filter((item) => item.pin !== compaction.service),
             })
             .pipe(Effect.flip)
           const missingSummary = yield* runtime
-            .start({
+            .startExecution({
               ...base,
               idempotencyKey: "missing-summary",
               registrations: registrations.filter((item) => item.pin !== compaction.summaryModel),
@@ -731,7 +741,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
           expect(missingService).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
           expect(missingSummary).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
 
-          yield* runtime.start(base)
+          yield* runtime.startExecution(base)
           const changed = registrations.map((registration) => ({
             pin: registration.pin,
             codec: registration.codec,
@@ -743,7 +753,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
           }))
           expect(
             yield* runtime
-              .start({ ...base, idempotencyKey: "changed-policy", registrations: changed })
+              .startExecution({ ...base, idempotencyKey: "changed-policy", registrations: changed })
               .pipe(Effect.flip),
           ).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
         }),
