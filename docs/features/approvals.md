@@ -38,7 +38,7 @@ const approvals = Approvals.layerDurable({
 Resolve the exact emitted token through `Approvals.resolve`. Provide the same `Permissions.RuleStore` authority used by the Agent; an explicit `remember` rule is persisted before the Runtime wait closes.
 
 ```ts
-yield *
+const approve = (token: string) =>
   Approvals.resolve(
     token,
     Approvals.Approved({
