@@ -2,7 +2,7 @@ import { Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { type Match, type Service, VectorStore, VectorStoreError } from "./vector-store.js"
 
-/** @experimental PostgreSQL pgvector storage configuration. */
+/** PostgreSQL pgvector storage configuration. */
 export interface Options {
   readonly table: string
   readonly dimensions: number
@@ -26,7 +26,7 @@ const validateVector = (label: string, vector: ReadonlyArray<number>): Effect.Ef
     ? Effect.void
     : Effect.fail(VectorStoreError.make({ message: `${label} contains a non-finite value` }))
 
-/** @experimental Persistent PostgreSQL vector store. Requires the `vector` extension. */
+/** Persistent PostgreSQL vector store. Requires the `vector` extension. */
 export const layer = (options: Options): Layer.Layer<VectorStore, VectorStoreError, SqlClient.SqlClient> =>
   Layer.effect(
     VectorStore,

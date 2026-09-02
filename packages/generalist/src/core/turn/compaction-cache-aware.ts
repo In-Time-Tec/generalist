@@ -4,7 +4,7 @@ import { safeCutIndex } from "./compaction-cut.js"
 import { defaultKeepRecentTokens } from "./compaction-service.js"
 import type { Strategy } from "./compaction.js"
 
-/** @experimental Options for cache-aware semantic compaction. */
+/** Options for cache-aware semantic compaction. */
 export interface Options {
   readonly stablePrefixTurns: number
   readonly keepRecentTokens?: number
@@ -29,7 +29,7 @@ const stablePrefixEnd = (messages: ReadonlyArray<Prompt.Message>, stablePrefixTu
 }
 
 /**
- * @experimental Keep instructions and the oldest configured user turns byte-stable,
+ *Keep instructions and the oldest configured user turns byte-stable,
  * summarize only the middle, and retain the recent token-denominated tail verbatim.
  */
 export const cacheAware = (options: Options): Strategy => {

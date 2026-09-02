@@ -18,9 +18,9 @@ export interface Options {
   readonly semantic?: SemanticRecallOptions
 }
 
-/** @experimental Hosted semantic Memory backed by Supermemory. */
+/** Hosted semantic Memory backed by Supermemory. */
 export { layer as layerSupermemory, SupermemoryError, type Options as SupermemoryOptions } from "./supermemory.js"
-/** @experimental Persistent PostgreSQL vector store. Requires the `vector` extension. */
+/** Persistent PostgreSQL vector store. Requires the `vector` extension. */
 export { layer as layerPgVector, type Options as PgVectorOptions } from "./pgvector.js"
 
 /** @internal The ambient LanguageModel is required only when working memory summarizes without an explicit model layer. */

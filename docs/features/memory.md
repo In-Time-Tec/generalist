@@ -90,7 +90,7 @@ does not create a second connection pool or depend on `pg`.
 ```ts
 import { Layer } from "effect"
 import { layer as layerMemory, layerPgVector } from "generalist/memory"
-import { layerEmbedding } from "generalist/ai/amazon-bedrock"
+import { layerEmbedding } from "generalist/providers/amazon-bedrock"
 
 const memory = layerMemory({ semantic: { limit: 5 } }).pipe(
   Layer.provide(layerPgVector({ table: "generalist_memory", dimensions: 1024 })),
@@ -142,12 +142,12 @@ not put the key in source control.
 Semantic recall accepts the provider-neutral `EmbeddingModel` from
 `effect/unstable/ai`:
 
-- OpenAI: `generalist/ai/openai-embedding`.
+- OpenAI: `generalist/providers/openai-embedding`.
 - Amazon Bedrock Titan: `layerEmbedding` from
-  `generalist/ai/amazon-bedrock`. Titan v2 supports 256, 512, and 1024
+  `generalist/providers/amazon-bedrock`. Titan v2 supports 256, 512, and 1024
   dimensions; its default is 1024.
 - Ollama and other OpenAI-compatible servers:
-  `generalist/ai/openai-compatible-embedding` with the server base URL.
+  `generalist/providers/openai-compatible-embedding` with the server base URL.
 
 To bring your own provider, implement the batch boundary once:
 
