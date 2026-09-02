@@ -84,16 +84,16 @@ short-lived applications. It is not durable.
 
 ### PostgreSQL with pgvector
 
-`VectorStore.layerPgVector` uses the shared `SqlClient` from `@effect/sql`; it
+`layerPgVector` uses the shared `SqlClient` from `@effect/sql`; it
 does not create a second connection pool or depend on `pg`.
 
 ```ts
 import { Layer } from "effect"
-import { layer as layerMemory, VectorStore } from "generalist/memory"
+import { layer as layerMemory, layerPgVector } from "generalist/memory"
 import { layerEmbedding } from "generalist/ai/amazon-bedrock"
 
 const memory = layerMemory({ semantic: { limit: 5 } }).pipe(
-  Layer.provide(VectorStore.layerPgVector({ table: "generalist_memory", dimensions: 1024 })),
+  Layer.provide(layerPgVector({ table: "generalist_memory", dimensions: 1024 })),
   Layer.provide(layerEmbedding({ model: "amazon.titan-embed-text-v2:0" })),
 )
 ```
