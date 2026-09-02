@@ -47,7 +47,7 @@ export class BrowserAuthorization extends Context.Service<
       expectedState: Redacted.Redacted<string>,
     ) => Effect.Effect<AuthorizationResult, AuthError>
   }
->()("generalist/ai/provider/openai-account-auth/BrowserAuthorization") {}
+>()("generalist/unstable/providers/openai-account-auth/BrowserAuthorization") {}
 
 /** @experimental */
 export interface DevicePrompt {
@@ -61,7 +61,7 @@ export class DeviceAuthorizationPresenter extends Context.Service<
   {
     readonly device: (prompt: DevicePrompt) => Effect.Effect<void, AuthError>
   }
->()("generalist/ai/provider/openai-account-auth/DeviceAuthorizationPresenter") {}
+>()("generalist/unstable/providers/openai-account-auth/DeviceAuthorizationPresenter") {}
 
 /** @experimental */
 export const TokenResponse = Schema.Struct({
@@ -101,7 +101,7 @@ export class OAuthClient extends Context.Service<
       userCode: string,
     ) => Effect.Effect<Option.Option<typeof DevicePollResponse.Type>, AuthError>
   }
->()("generalist/ai/provider/openai-account-auth/OAuthClient") {}
+>()("generalist/unstable/providers/openai-account-auth/OAuthClient") {}
 
 /** @experimental */
 export const CredentialDisk = Schema.Struct({
@@ -147,7 +147,7 @@ export class CredentialStore extends Context.Service<
     readonly remove: Effect.Effect<boolean, StoreError>
     readonly serialized: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | StoreError, R>
   }
->()("generalist/ai/provider/openai-account-auth/CredentialStore") {}
+>()("generalist/unstable/providers/openai-account-auth/CredentialStore") {}
 
 const utf8 = (value: string) =>
   Result.match(Encoding.decodeBase64(Encoding.encodeBase64(value)), {
@@ -308,7 +308,7 @@ export class OpenAIAccountAuth extends Context.Service<
     readonly acquire: Effect.Effect<Credential, Error>
     readonly refreshRejected: (generation: string) => Effect.Effect<Credential, Error>
   }
->()("generalist/ai/provider/openai-account-auth/OpenAIAccountAuth") {}
+>()("generalist/unstable/providers/openai-account-auth/OpenAIAccountAuth") {}
 
 /** @experimental */
 export interface TimingOptions {

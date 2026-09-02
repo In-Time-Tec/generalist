@@ -68,7 +68,7 @@ export interface Service {
   readonly send: (command: AgentCommand) => Effect.Effect<void, AgentCommandError>
 }
 /** @experimental */
-export class Connection extends Context.Service<Connection, Service>()("generalist/foldkit/chat/connection") {}
+export class Connection extends Context.Service<Connection, Service>()("generalist/unstable/foldkit/chat/connection") {}
 
 interface ActiveConnection {
   readonly runId: string

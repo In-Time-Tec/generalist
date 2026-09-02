@@ -12,7 +12,7 @@ export interface Service {
 }
 
 /** @experimental A2A adapter service. */
-export class A2A extends Context.Service<A2A, Service>()("generalist/interoperability/a2a/service/A2A") {}
+export class A2A extends Context.Service<A2A, Service>()("generalist/unstable/a2a/service/A2A") {}
 
 /** @experimental Provide one explicit A2A deployment over the caller's Runtime. */
 export const layer = (deployment: Deployment): Layer.Layer<A2A, never, Runtime> =>

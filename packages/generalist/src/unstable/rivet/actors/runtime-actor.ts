@@ -84,7 +84,7 @@ const actionInputSchemas = {
 }
 
 class RuntimeOwner extends EffectContext.Service<RuntimeOwner, { readonly ownerId: string }>()(
-  "generalist/rivet/runtime-actor/RuntimeOwner",
+  "generalist/unstable/rivet/actors/runtime-actor/RuntimeOwner",
 ) {}
 
 type RuntimeHost = ManagedRuntime.ManagedRuntime<

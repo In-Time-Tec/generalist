@@ -17,7 +17,7 @@ export interface RequestContext {
 
 /** @experimental */
 export class WorkerContext extends Context.Service<WorkerContext, RequestContext>()(
-  "generalist/cloudflare/workers/WorkerContext",
+  "generalist/unstable/cloudflare/workers/WorkerContext",
 ) {}
 
 /** @experimental */

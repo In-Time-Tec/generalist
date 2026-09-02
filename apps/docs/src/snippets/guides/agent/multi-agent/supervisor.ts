@@ -1,7 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Toolkit } from "effect/unstable/ai"
+import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Handoff, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
-import { LanguageModel, Response } from "effect/unstable/ai"
 
 let supervisorCalls = 0
 

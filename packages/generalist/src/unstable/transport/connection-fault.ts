@@ -5,4 +5,4 @@ import type { TransportError } from "./errors.js"
 export class ConnectionFault extends Context.Service<
   ConnectionFault,
   { readonly afterEvent: Effect.Effect<void, TransportError> }
->()("generalist/transport/connection-fault/ConnectionFault") {}
+>()("generalist/unstable/transport/connection-fault/ConnectionFault") {}

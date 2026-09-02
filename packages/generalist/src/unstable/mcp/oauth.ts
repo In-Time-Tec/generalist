@@ -65,7 +65,7 @@ export class TokenStore extends Context.Service<
     readonly save: (server: string, tokens: Redacted.Redacted<string>) => Effect.Effect<void, OAuthProviderError>
     readonly remove: (server: string) => Effect.Effect<void, OAuthProviderError>
   }
->()("generalist/mcp/oauth/TokenStore") {}
+>()("generalist/unstable/mcp/oauth/TokenStore") {}
 
 /** @experimental */
 export const layerTokenStoreTest = (implementation: TokenStore["Service"]): Layer.Layer<TokenStore> =>
@@ -125,7 +125,7 @@ export interface Service {
 }
 
 /** @experimental */
-export class OAuth extends Context.Service<OAuth, Service>()("generalist/mcp/oauth") {}
+export class OAuth extends Context.Service<OAuth, Service>()("generalist/unstable/mcp/oauth") {}
 
 type OAuthFlow =
   | { readonly _tag: "Idle" }

@@ -42,7 +42,7 @@ export interface Service {
 }
 
 /** @experimental */
-export class AGUI extends Context.Service<AGUI, Service>()("generalist/interoperability/ag-ui/service/AGUI") {}
+export class AGUI extends Context.Service<AGUI, Service>()("generalist/unstable/ag-ui/service/AGUI") {}
 
 const validate = (value: RunAgentInput): Effect.Effect<RunAgentInput, InputMalformed> => {
   const parsed = RunAgentInputSchema.safeParse(value)

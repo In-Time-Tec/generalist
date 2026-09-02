@@ -63,7 +63,7 @@ export interface Service {
 }
 
 /** @experimental */
-export class MCPClient extends Context.Service<MCPClient, Service>()("generalist/mcp/client/MCPClient") {}
+export class MCPClient extends Context.Service<MCPClient, Service>()("generalist/unstable/mcp/client/MCPClient") {}
 
 const errorDetails = Schema.Struct({ name: Schema.String, message: Schema.String })
 
