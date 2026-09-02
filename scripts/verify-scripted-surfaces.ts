@@ -48,7 +48,11 @@ const credentialNames = [
 
 const failure = (message: string): ScriptedSurfaceFailed => ScriptedSurfaceFailed.make({ message })
 
-const sorted = (values: Iterable<string>): Array<string> => Array.from(values).sort((a, b) => a.localeCompare(b))
+const sorted = (values: Iterable<string>): Array<string> => {
+  const result = Array.from(values)
+  result.sort((a, b) => a.localeCompare(b))
+  return result
+}
 
 const exampleTargets = Effect.fn("VerifyScriptedSurfaces.exampleTargets")(function* () {
   const fileSystem = yield* FileSystem.FileSystem
