@@ -1,4 +1,5 @@
 import { Context, Effect, Schema, Stream, Option } from "effect"
+import type { BudgetLimits, Exhausted as RunBudgetExhausted } from "../../core/durable/run-budget.js"
 import type { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
 import type { InboxFull } from "../../core/turn/steering.js"
 import type { SessionStore as SessionService } from "../../core/context/session.js"
@@ -164,16 +165,13 @@ export interface Service {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | import("../../core/durable/run-budget.js").Exhausted
+    | RunBudgetExhausted
     | TreePolicyInvalid
   >
   readonly activate: (input: {
     readonly runId: string
   }) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
-  readonly extendBudget: (
-    runId: string,
-    delta: import("../../core/durable/run-budget.js").BudgetLimits,
-  ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable>
+  readonly extendBudget: (runId: string, delta: BudgetLimits) => Effect.Effect<void, RunNotFound | RuntimeUnavailable>
   readonly admitSpawn: (
     input: SpawnInput & {
       readonly message: Message
@@ -188,7 +186,7 @@ export interface Service {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | import("../../core/durable/run-budget.js").Exhausted
+    | RunBudgetExhausted
   >
   readonly admitProgramChild: (
     input: AdmitProgramChildInput,
@@ -203,7 +201,7 @@ export interface Service {
     | import("../sql/errors.js").StaleSessionClaim
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | import("../../core/durable/run-budget.js").Exhausted
+    | RunBudgetExhausted
   >
   readonly admitProgramChildAndSuspend: (
     input: AdmitProgramChildAndSuspendInput,
@@ -218,7 +216,7 @@ export interface Service {
     | import("../sql/errors.js").StaleSessionClaim
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | import("../../core/durable/run-budget.js").Exhausted
+    | RunBudgetExhausted
   >
   readonly events: (input: {
     readonly runId: string
@@ -456,7 +454,7 @@ export interface Service {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | import("../../core/durable/run-budget.js").Exhausted
+    | RunBudgetExhausted
   >
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable>
   readonly reserveProgramOperation: (
