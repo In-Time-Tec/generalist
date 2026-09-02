@@ -20,6 +20,9 @@ const wakeupChanges = (pg: PgClient.PgClient, source: string) => {
       const listener = yield* PgClient.make({ ...pg.config, applicationName, maxConnections: 1 }).pipe(
         Effect.provide(Reactivity.layer),
       )
+      // The pinned @effect/sql-pg swallows listener `error`/`end`, so liveness is probed through
+      // pg_stat_activity. PID discovery yields instead of sleeping because LISTEN is issued
+      // concurrently and callers may run under TestClock.
       const health = Stream.unwrap(
         Effect.gen(function* () {
           let listenerPid: number | undefined
