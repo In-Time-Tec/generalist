@@ -25,7 +25,7 @@ const resetSchema = Effect.gen(function* () {
     generalist_messages, generalist_agent_names,
     generalist_external_child_placements,
     generalist_run_links, generalist_run_waits, generalist_run_operations, generalist_run_acknowledgements,
-    generalist_run_events, generalist_runs, generalist_lanes,
+    generalist_run_events, generalist_runs, generalist_lanes, generalist_permission_rules,
     generalist_runtime_locks, generalist_sql_migrations, generalist_schema_meta CASCADE`)
 })
 

@@ -39,6 +39,7 @@ const tables = [
   "generalist_run_events",
   "generalist_runs",
   "generalist_lanes",
+  "generalist_permission_rules",
   "generalist_runtime_locks",
   "generalist_sql_migrations",
   "generalist_schema_meta",
