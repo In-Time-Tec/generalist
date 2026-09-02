@@ -12,6 +12,8 @@ interface RecordedRequest {
   readonly body: string | undefined
 }
 
+const CreateRequest = Schema.Struct({ name: Schema.String })
+
 const bodyText = (request: Parameters<Parameters<typeof HttpClient.make>[0]>[0]): string | undefined =>
   request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : undefined
 
@@ -52,50 +54,58 @@ const processResponse = (
 const fixture = (requests: Array<RecordedRequest> = []) => {
   const sprites = new Set<string>()
   const files = new Map<string, string>()
-  return HttpClient.make((request, url) => {
-    const body = bodyText(request)
-    requests.push({ method: request.method, url: url.toString(), headers: request.headers, body })
-    if (url.pathname === "/v1/sprites" && request.method === "POST") {
-      const decoded = Schema.decodeUnknownSync(Schema.Struct({ name: Schema.String }))(
-        Schema.decodeSync(Schema.fromJsonString(Schema.Json))(body ?? ""),
-      )
-      sprites.add(decoded.name)
-      return Effect.succeed(
-        jsonResponse(request, { id: `id-${decoded.name}`, name: decoded.name, status: "cold" }, 201),
-      )
-    }
-    const segments = url.pathname.split("/")
-    const name = decodeURIComponent(segments[3] ?? "")
-    if (request.method === "GET" && segments.length === 4)
-      return Effect.succeed(
-        sprites.has(name)
-          ? jsonResponse(request, { id: `id-${name}`, name, status: "cold" })
-          : jsonResponse(request, { message: "missing" }, 404),
-      )
-    if (request.method === "DELETE" && segments.length === 4) {
-      sprites.delete(name)
-      return Effect.succeed(jsonResponse(request, null, 204))
-    }
-    if (url.pathname.endsWith("/fs/write")) {
-      files.set(`${name}:${url.searchParams.get("path")}`, body ?? "")
-      return Effect.succeed(
-        jsonResponse(request, { path: url.searchParams.get("path"), size: body?.length ?? 0, mode: "0644" }),
-      )
-    }
-    if (url.pathname.endsWith("/fs/read"))
-      return Effect.succeed(
-        HttpClientResponse.fromWeb(
-          request,
-          new Response(files.get(`${name}:${url.searchParams.get("path")}`) ?? "", { status: 200 }),
-        ),
-      )
-    if (!url.pathname.endsWith("/exec"))
-      return Effect.succeed(jsonResponse(request, { message: "missing fixture" }, 404))
+  const createSprite = (request: Parameters<Parameters<typeof HttpClient.make>[0]>[0], body: string | undefined) => {
+    const decoded = Schema.decodeSync(Schema.fromJsonString(CreateRequest))(body ?? "")
+    sprites.add(decoded.name)
+    return Effect.succeed(jsonResponse(request, { id: `id-${decoded.name}`, name: decoded.name, status: "cold" }, 201))
+  }
+  const getSprite = (request: Parameters<Parameters<typeof HttpClient.make>[0]>[0], name: string) =>
+    Effect.succeed(
+      sprites.has(name)
+        ? jsonResponse(request, { id: `id-${name}`, name, status: "cold" })
+        : jsonResponse(request, { message: "missing" }, 404),
+    )
+  const writeFile = (
+    request: Parameters<Parameters<typeof HttpClient.make>[0]>[0],
+    url: URL,
+    name: string,
+    body: string | undefined,
+  ) => {
+    files.set(`${name}:${url.searchParams.get("path")}`, body ?? "")
+    return Effect.succeed(
+      jsonResponse(request, { path: url.searchParams.get("path"), size: body?.length ?? 0, mode: "0644" }),
+    )
+  }
+  const readFile = (request: Parameters<Parameters<typeof HttpClient.make>[0]>[0], url: URL, name: string) =>
+    Effect.succeed(
+      HttpClientResponse.fromWeb(
+        request,
+        new Response(files.get(`${name}:${url.searchParams.get("path")}`) ?? "", { status: 200 }),
+      ),
+    )
+  const execute = (request: Parameters<Parameters<typeof HttpClient.make>[0]>[0], url: URL) => {
     const command = url.searchParams.getAll("cmd")
     if (command[0] === "sleep") return Effect.sleep("100 millis").pipe(Effect.as(processResponse(request, "")))
     if (command[0] === "mkdir") return Effect.succeed(processResponse(request, ""))
     const output = command[0] === "printf" ? (command.at(-1) ?? "") : ""
     return Effect.succeed(processResponse(request, output))
+  }
+  return HttpClient.make((request, url) => {
+    const body = bodyText(request)
+    requests.push({ method: request.method, url: url.toString(), headers: request.headers, body })
+    if (url.pathname === "/v1/sprites" && request.method === "POST") return createSprite(request, body)
+    const segments = url.pathname.split("/")
+    const name = decodeURIComponent(segments[3] ?? "")
+    if (request.method === "GET" && segments.length === 4) return getSprite(request, name)
+    if (request.method === "DELETE" && segments.length === 4) {
+      sprites.delete(name)
+      return Effect.succeed(jsonResponse(request, null, 204))
+    }
+    if (url.pathname.endsWith("/fs/write")) return writeFile(request, url, name, body)
+    if (url.pathname.endsWith("/fs/read")) return readFile(request, url, name)
+    if (!url.pathname.endsWith("/exec"))
+      return Effect.succeed(jsonResponse(request, { message: "missing fixture" }, 404))
+    return execute(request, url)
   })
 }
 
@@ -134,9 +144,8 @@ it.effect("shapes Fly Sprites create, exec, file, and cleanup requests", () =>
       }),
     )
     expect(requests[0]?.headers.authorization).toBe("Bearer sprites-secret")
-    expect(Schema.decodeSync(Schema.fromJsonString(Schema.Json))(requests[0]?.body ?? "")).toMatchObject({
-      name: expect.stringMatching(/^generalist-/),
-    })
+    const created = yield* Schema.decodeEffect(Schema.fromJsonString(CreateRequest))(requests[0]?.body ?? "")
+    expect(created.name).toMatch(/^generalist-/)
     const execution = requests.find((item) => new URL(item.url).pathname.endsWith("/exec"))
     expect(execution).toBeDefined()
     if (execution === undefined) return
