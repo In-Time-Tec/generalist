@@ -23,6 +23,7 @@ export interface Ruleset {
 }
 export interface Allow {
   readonly _tag: "Allow"
+  readonly reason?: string
 }
 export interface Deny {
   readonly _tag: "Deny"
@@ -31,6 +32,7 @@ export interface Deny {
 export interface Ask {
   readonly _tag: "Ask"
   readonly token: string
+  readonly reason?: string
 }
 
 /** Resolved policy decision for one tool call. */
@@ -165,11 +167,13 @@ const decisionFor = (ruleset: Ruleset, request: AccessRequest): Decision => {
   const level = rule?.level ?? ruleset.fallback ?? "ask"
   switch (level) {
     case "allow":
-      return { _tag: "Allow" }
+      return rule?.reason === undefined ? { _tag: "Allow" } : { _tag: "Allow", reason: rule.reason }
     case "deny":
       return rule?.reason === undefined ? { _tag: "Deny" } : { _tag: "Deny", reason: rule.reason }
     case "ask":
-      return { _tag: "Ask", token: tokenFor(request) }
+      return rule?.reason === undefined
+        ? { _tag: "Ask", token: tokenFor(request) }
+        : { _tag: "Ask", token: tokenFor(request), reason: rule.reason }
   }
 }
 
@@ -188,11 +192,13 @@ export const evaluateWithRules: {
       if (rule === undefined) return baseDecision
       switch (rule.level) {
         case "allow":
-          return { _tag: "Allow" }
+          return rule.reason === undefined ? { _tag: "Allow" } : { _tag: "Allow", reason: rule.reason }
         case "deny":
           return rule.reason === undefined ? { _tag: "Deny" } : { _tag: "Deny", reason: rule.reason }
         case "ask":
-          return { _tag: "Ask", token: tokenFor(request) }
+          return rule.reason === undefined
+            ? { _tag: "Ask", token: tokenFor(request) }
+            : { _tag: "Ask", token: tokenFor(request), reason: rule.reason }
       }
     }),
 )

@@ -175,6 +175,7 @@ Testing.runtimeDriver({
     "start-by-agent": { claim },
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
+    "approval-suspend": { claim, recovery: "rebuild" },
     runTree: { claim },
     sqlTransactions: { claim, forceRollback },
     multiWorkerClaims: { layer, expire },

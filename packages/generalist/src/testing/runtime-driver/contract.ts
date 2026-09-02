@@ -68,6 +68,13 @@ export interface NotificationRecoveryCapability {
   readonly claim: ClaimExecution
 }
 
+/** Durable approval suspension and recovery capability. */
+export interface ApprovalSuspendCapability {
+  readonly claim: ClaimExecution
+  /** Persistent drivers rebuild their Runtime; process-memory drivers reclaim through a fresh owner. */
+  readonly recovery: "rebuild" | "reclaim"
+}
+
 /** Multi-worker claim and fencing conformance capability. */
 export interface MultiWorkerClaimCapability<E = never> {
   readonly layer: Layer.Layer<Runtime | RunStore | RunClaims, E, never>
@@ -85,6 +92,7 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly sqlTransactions?: SqlTransactionCapability
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>
   readonly notificationRecovery?: NotificationRecoveryCapability
+  readonly "approval-suspend"?: ApprovalSuspendCapability
 }
 
 /** Configuration for the authoritative Runtime driver conformance suites. */

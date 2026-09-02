@@ -52,8 +52,8 @@
       "import": "./dist/index.js"
     },
     "./approvals": {
-      "types": "./dist/core/policy/approvals.d.ts",
-      "import": "./dist/core/policy/approvals.js"
+      "types": "./dist/approvals.d.ts",
+      "import": "./dist/approvals.js"
     },
     "./compaction": {
       "types": "./dist/core/turn/compaction.d.ts",

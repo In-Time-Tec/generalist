@@ -1,7 +1,7 @@
-import { Cause, Context, Effect, Layer, Schema } from "effect"
+import { Cause, Context, Effect, Layer, Schema, Types } from "effect"
 import type { Prompt, Response, Tool } from "effect/unstable/ai"
 import type { ApprovalRequest } from "../agent/event.js"
-import { RuleStore, evaluateWithRules, type RuleStoreError } from "../policy/permissions.js"
+import { RuleStore, evaluateWithRules, type Decision, type RuleStoreError } from "../policy/permissions.js"
 
 type Approvals = import("../policy/approvals.js").Service
 type PendingApproval = import("../policy/approvals.js").Pending
@@ -13,6 +13,7 @@ export interface AccessRequest {
   readonly agentName: string
   readonly turn: number
   readonly sessionId?: string
+  readonly runId?: string
 }
 
 /** A final authorization denial. */
@@ -98,6 +99,49 @@ const suspend = (request: Request, token: string): Suspend => ({
   token,
 })
 
+const durableToken = (runId: string, token: string): string => `runtime-approval:${encodeURIComponent(runId)}:${token}`
+
+type ApprovalDecision = Exclude<Decision, { readonly _tag: "Deny" }>
+
+const pendingFor = (request: Request, decision: ApprovalDecision): PendingApproval => {
+  const baseToken = decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`
+  const token = request.runId === undefined ? baseToken : durableToken(request.runId, baseToken)
+  const reason =
+    decision.reason ?? (decision._tag === "Ask" ? "Permission policy requires approval" : "Tool requires approval")
+  const pending: Types.Mutable<PendingApproval> = {
+    _tag: "Pending",
+    token,
+    level: decision._tag === "Ask" ? "ask" : "allow",
+    reason,
+    call: request.call,
+    agentName: request.agentName,
+    turn: request.turn,
+  }
+  if (request.sessionId !== undefined) pending.sessionId = request.sessionId
+  if (request.runId !== undefined) pending.runId = request.runId
+  return pending
+}
+
+const applyResolution = (
+  options: Options,
+  request: Request,
+  pending: PendingApproval,
+  resolution: import("../policy/approvals.js").Resolution,
+): Effect.Effect<ToolAuthorization, AuthorizationError> =>
+  Effect.gen(function* () {
+    switch (resolution._tag) {
+      case "Approved":
+        if (resolution.remember !== undefined) {
+          yield* options.ruleStore.remember(resolution.remember).pipe(Effect.mapError(authorizationError))
+        }
+        return { _tag: "Execute" }
+      case "Denied":
+        return deny(resolution.reason ?? "Tool call denied")
+      case "Pending":
+        return suspend(request, pending.token)
+    }
+  })
+
 /** Build the authorizer from its three required policy seams. */
 export const make = (options: Options): Authorizer => ({
   authorize: (request) =>
@@ -110,23 +154,7 @@ export const make = (options: Options): Authorizer => ({
       if (decision._tag === "Deny") return deny(decision.reason ?? "Permission denied")
       const required = decision._tag === "Ask" || (yield* approvalRequired(request))
       if (!required) return { _tag: "Execute" }
-      const pending: PendingApproval =
-        request.sessionId === undefined
-          ? {
-              _tag: "Pending",
-              token: decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`,
-              call: request.call,
-              agentName: request.agentName,
-              turn: request.turn,
-            }
-          : {
-              _tag: "Pending",
-              token: decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`,
-              call: request.call,
-              agentName: request.agentName,
-              turn: request.turn,
-              sessionId: request.sessionId,
-            }
+      const pending = pendingFor(request, decision)
       yield* request.onApprovalRequired({
         approvalId: pending.token,
         operation: request.call.id,
@@ -134,16 +162,7 @@ export const make = (options: Options): Authorizer => ({
         input: request.call.params,
       })
       const resolution = yield* options.approvals.resolve(pending)
-      switch (resolution._tag) {
-        case "Approved":
-          if (resolution.remember !== undefined)
-            yield* options.ruleStore.remember(resolution.remember).pipe(Effect.mapError(authorizationError))
-          return { _tag: "Execute" }
-        case "Denied":
-          return deny(resolution.reason ?? "Tool call denied")
-        case "Pending":
-          return suspend(request, pending.token)
-      }
+      return yield* applyResolution(options, request, pending, resolution)
     }),
 })
 

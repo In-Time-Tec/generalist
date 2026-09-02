@@ -62,7 +62,7 @@ describe("ToolAuthorization", () => {
       for (const resolution of [
         { _tag: "Approved" },
         { _tag: "Denied" },
-        { ...request, _tag: "Pending", token: "approval-1" },
+        { ...request, _tag: "Pending", token: "approval-1", level: "ask", reason: "test approval" },
       ] as const) {
         const result = yield* ToolAuthorization.make({
           permissions: policy,

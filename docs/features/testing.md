@@ -22,10 +22,13 @@ Testing.runtimeDriver({
   capabilities: {
     admission: true,
     runtime: { claim },
+    "approval-suspend": { claim, recovery: "rebuild" },
     runTree: { claim },
   },
 })
 ```
+
+`approval-suspend` runs the shared durable human-approval scenario: notify, suspend, recover the same store, resolve by token, finish, and prove the tool dispatched once. Persistent drivers use `recovery: "rebuild"`; process-memory drivers use `"reclaim"` to exercise the same owner handoff without pretending their store survives process exit.
 
 Memory and permission rule stores have smaller service contracts:
 
