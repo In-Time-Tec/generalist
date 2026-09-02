@@ -29,10 +29,7 @@ export type ConnectionStatus =
   | { readonly _tag: "Retrying"; readonly attempt: number }
 
 /** @experimental */
-export interface ReconnectPolicy {
-  readonly schedule: Schedule.Schedule<unknown, TransportError>
-  readonly retryable: (error: TransportError) => boolean
-}
+export type ReconnectSchedule = Schedule.Schedule<unknown, TransportError>
 
 /** @experimental */
 export interface ConnectOptions {
@@ -40,7 +37,7 @@ export interface ConnectOptions {
   readonly runId: string
   readonly cursor?: Cursor
   readonly eventCapacity?: number
-  readonly reconnect?: ReconnectPolicy
+  readonly reconnect?: ReconnectSchedule
 }
 
 /** @experimental The connection options cannot create a bounded client. */
@@ -79,31 +76,61 @@ const urlWithCursor = (url: string, cursor: Cursor | undefined): string => {
   return /^[a-z][a-z0-9+.-]*:/i.test(url) ? parsed.toString() : `${parsed.pathname}${parsed.search}${parsed.hash}`
 }
 
-/** @experimental Follows canonical RunEvents over SSE from an exclusive cursor. */
+const reconnectBackoff: ReconnectSchedule = Schedule.exponential("250 millis").pipe(
+  Schedule.jittered,
+  Schedule.upTo({ duration: "2 minutes" }),
+)
+
+/** @experimental Jittered socket reconnect backoff bounded by two elapsed minutes. */
+export const defaultReconnectSchedule: ReconnectSchedule = reconnectBackoff.pipe(
+  Schedule.while(({ input }) => input.kind === "socket"),
+)
+
+/** @experimental Follows canonical RunEvents over SSE from an exclusive cursor and reconnects from the last event. */
 export const streamSSE = (options: {
   readonly url: string
   readonly cursor?: Cursor
+  readonly reconnect?: ReconnectSchedule
 }): Stream.Stream<ObserverRunEvent, TransportError, HttpClient.HttpClient> =>
-  HttpClientResponse.stream(HttpClient.get(urlWithCursor(options.url, options.cursor))).pipe(
-    Stream.decodeText,
-    Stream.pipeThroughChannel(Sse.decodeDataSchema(ObserverRunEvent)),
-    Stream.mapEffect((event) => {
-      if (event.id === undefined || event.id !== String(event.data.sequence)) {
-        return Effect.fail(transportError("SSE event ID does not match RunEvent sequence", "protocol"))
-      }
-      return Effect.succeed(event.data)
+  Stream.unwrap(
+    Effect.gen(function* () {
+      const cursor = yield* Ref.make(options.cursor)
+      const connectionFault = yield* Effect.serviceOption(ConnectionFault)
+      const attempt = Stream.unwrap(
+        Ref.get(cursor).pipe(
+          Effect.map((currentCursor) =>
+            HttpClientResponse.stream(HttpClient.get(urlWithCursor(options.url, currentCursor))).pipe(
+              Stream.mapError((error) => transportError(error.message, "socket")),
+              Stream.decodeText,
+              Stream.pipeThroughChannel(Sse.decodeDataSchema(ObserverRunEvent)),
+              Stream.mapEffect((event) => {
+                if (event.id === undefined || event.id !== String(event.data.sequence)) {
+                  return Effect.fail(transportError("SSE event ID does not match RunEvent sequence", "protocol"))
+                }
+                return Ref.set(cursor, makeCursor(event.data.sequence)).pipe(Effect.as(event.data))
+              }),
+              Stream.flatMap((event) =>
+                Stream.succeed(event).pipe(
+                  Stream.concat(
+                    Option.match(connectionFault, {
+                      onNone: () => Stream.empty,
+                      onSome: (fault) => Stream.fromEffect(fault.afterEvent).pipe(Stream.drain),
+                    }),
+                  ),
+                ),
+              ),
+              Stream.mapError((error) =>
+                Schema.is(TransportError)(error)
+                  ? error
+                  : transportError(error instanceof Error ? error.message : JSON.stringify(error), "protocol"),
+              ),
+            ),
+          ),
+        ),
+      )
+      return attempt.pipe(Stream.retry(options.reconnect ?? defaultReconnectSchedule))
     }),
-    Stream.mapError((error) =>
-      Schema.is(TransportError)(error)
-        ? error
-        : transportError(error instanceof Error ? error.message : JSON.stringify(error), "protocol"),
-    ),
   )
-
-const defaultReconnectPolicy: ReconnectPolicy = {
-  schedule: Schedule.exponential("100 millis").pipe(Schedule.upTo({ times: 5 })),
-  retryable: (error) => error.kind === "socket",
-}
 
 const writeSocket = (
   writer: (chunk: string | Uint8Array | Socket.CloseEvent) => Effect.Effect<void, Socket.SocketError>,
@@ -131,7 +158,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
           if (!Number.isSafeInteger(capacity) || capacity <= 0) {
             return yield* InvalidConnectOptions.make({ message: "eventCapacity must be a positive safe integer" })
           }
-          const reconnect = options.reconnect ?? defaultReconnectPolicy
+          const reconnect = options.reconnect ?? defaultReconnectSchedule
           const scope = yield* Effect.scope
           const eventQueue = yield* Queue.bounded<ObserverRunEvent, TransportError>(capacity)
           const statusQueue = yield* Queue.sliding<ConnectionStatus>(8)
@@ -221,7 +248,7 @@ export const layerWebSocket: Layer.Layer<RunClient, never, Socket.WebSocketConst
           )
 
           const runClient = runSocket.pipe(
-            Effect.retry({ schedule: reconnect.schedule, while: reconnect.retryable }),
+            Effect.retry(reconnect),
             Effect.catch((error) => {
               const failure = ReconnectExhausted.make({ lastError: error })
               return Deferred.fail(exhausted, failure).pipe(

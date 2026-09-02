@@ -1,4 +1,7 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer, Option, Schema } from "effect"
+
+/** @experimental Conservative context window used when model metadata is unavailable. */
+export const conservativeContextWindow = 32_768
 
 /** @experimental */
 export interface Metadata {
@@ -28,6 +31,10 @@ export interface Service {
     readonly model: string
   }) => Effect.Effect<Metadata | undefined>
   readonly get: (selection: { readonly provider: string; readonly model: string }) => Effect.Effect<Metadata, NotFound>
+  readonly contextWindow: (selection: {
+    readonly provider: string
+    readonly model: string
+  }) => Effect.Effect<Option.Option<number>>
   readonly list: Effect.Effect<ReadonlyArray<Metadata>>
 }
 
@@ -121,6 +128,7 @@ const mergeEntries = (base: ReadonlyArray<Metadata>, overrides: ReadonlyArray<Me
 
 const make = (entries: ReadonlyArray<Metadata>): Service => {
   const byKey = new Map(entries.map((entry) => [metadataKey(entry), entry] as const))
+  const warnedMissing = new Set<string>()
 
   const find: Service["find"] = (selection) => Effect.succeed(byKey.get(metadataKey(selection)))
   const get: Service["get"] = (selection) =>
@@ -131,13 +139,27 @@ const make = (entries: ReadonlyArray<Metadata>): Service => {
           : Effect.succeed(metadata),
       ),
     )
+  const contextWindow: Service["contextWindow"] = (selection) =>
+    Effect.suspend(() => {
+      const key = metadataKey(selection)
+      const metadata = byKey.get(key)
+      if (metadata !== undefined) return Effect.succeed(Option.some(metadata.contextWindow))
+      if (warnedMissing.has(key)) return Effect.succeed(Option.none())
+      warnedMissing.add(key)
+      return Effect.logWarning(
+        `ModelCatalog has no context window for ${selection.provider}/${selection.model}; compaction will use the conservative ${conservativeContextWindow}-token default`,
+      ).pipe(Effect.as(Option.none()))
+    })
 
   return {
     find,
     get,
+    contextWindow,
     list: Effect.succeed(entries),
   }
 }
+
+const defaultCatalog = make(bundled)
 
 /** @experimental */
 export const layer = (overrides: ReadonlyArray<Metadata> = []): Layer.Layer<ModelCatalog> =>
@@ -163,6 +185,18 @@ export const get = Effect.fn("ModelCatalog.get.call")(function* (selection: {
 }) {
   const catalog = yield* ModelCatalog
   return yield* catalog.get(selection)
+})
+
+/** @experimental Resolve a model context window from the provided catalog or bundled snapshot. */
+export const contextWindow = Effect.fn("ModelCatalog.contextWindow.call")(function* (selection: {
+  readonly provider: string
+  readonly model: string
+}) {
+  const catalog = yield* Effect.serviceOption(ModelCatalog)
+  return yield* Option.match(catalog, {
+    onNone: () => defaultCatalog.contextWindow(selection),
+    onSome: (service) => service.contextWindow(selection),
+  })
 })
 
 /** @experimental */

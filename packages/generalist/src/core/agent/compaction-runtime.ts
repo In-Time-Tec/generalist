@@ -1,5 +1,6 @@
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
-import { AiError, Chat, Prompt, Tokenizer } from "effect/unstable/ai"
+import { AiError, Chat, Model, Prompt, Tokenizer } from "effect/unstable/ai"
+import { conservativeContextWindow, contextWindow as catalogContextWindow } from "../../ai/model-catalog.js"
 import { AgentError, MiddlewareViolation } from "./event.js"
 import { Compaction, defaultReserveTokens, Result as CompactionResult, type Usage } from "../turn/compaction.js"
 import { diagnose as diagnoseSessionSync } from "../context/session-sync.js"
@@ -49,7 +50,10 @@ type CompactionContext = {
   readonly prepareTelemetry: (event: import("../model/telemetry/events.js").EventPayload) => ModelTelemetryEvent
   readonly publishTelemetry: (event: ModelTelemetryEvent) => void
   readonly errorMessage: (error: AiError.AiError) => string
-  readonly agent: { readonly name: string }
+  readonly agent: {
+    readonly name: string
+    readonly model?: { readonly provider: string; readonly model: string }
+  }
   readonly memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined
   readonly memoryError: (turn: number, error: MemoryError) => AgentError
   readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
@@ -200,24 +204,39 @@ export const make = (context: CompactionContext) => {
     prompt: Prompt.Prompt,
   ): Effect.Effect<Usage, AgentError> => {
     const promptContext = Prompt.concat(history, prompt)
-    return countTokens(turn, promptContext).pipe(
-      Effect.map((estimatedTokens) => {
-        const reported = state.reportedContextUsage
-        const canApplyReportedGrowth =
-          reported !== undefined &&
-          isAppendOnlyDescendant(reported.prompt, promptContext) &&
-          estimatedTokens >= reported.estimatedTokens
-        const contextTokens = canApplyReportedGrowth
-          ? reported.reportedTokens + estimatedTokens - reported.estimatedTokens
-          : estimatedTokens
-        if (reported !== undefined && !canApplyReportedGrowth) state.reportedContextUsage = undefined
-        return {
-          contextTokens,
-          contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
-          reserveTokens: options.compaction?.reserveTokens ?? defaultReserveTokens,
+    return Effect.gen(function* () {
+      const estimatedTokens = yield* countTokens(turn, promptContext)
+      const reported = state.reportedContextUsage
+      const canApplyReportedGrowth =
+        reported !== undefined &&
+        isAppendOnlyDescendant(reported.prompt, promptContext) &&
+        estimatedTokens >= reported.estimatedTokens
+      const contextTokens = canApplyReportedGrowth
+        ? reported.reportedTokens + estimatedTokens - reported.estimatedTokens
+        : estimatedTokens
+      if (reported !== undefined && !canApplyReportedGrowth) state.reportedContextUsage = undefined
+      let contextWindow = options.compaction?.contextWindow
+      if (contextWindow === undefined) {
+        const provider = yield* Effect.serviceOption(Model.ProviderName)
+        const model = yield* Effect.serviceOption(Model.ModelName)
+        const selection =
+          agent.model ??
+          (Option.isSome(provider) && Option.isSome(model)
+            ? { provider: provider.value, model: model.value }
+            : undefined)
+        if (selection === undefined) {
+          contextWindow = Number.POSITIVE_INFINITY
+        } else {
+          const catalogWindow = yield* catalogContextWindow(selection)
+          contextWindow = Option.getOrElse(catalogWindow, () => conservativeContextWindow)
         }
-      }),
-    )
+      }
+      return {
+        contextTokens,
+        contextWindow,
+        reserveTokens: options.compaction?.reserveTokens ?? defaultReserveTokens,
+      }
+    })
   }
   const applyCompactionResultBody = (
     turn: number,

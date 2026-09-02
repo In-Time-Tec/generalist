@@ -54,18 +54,21 @@ describe("Agent default model resilience", () => {
       yield* Effect.yieldNow
 
       expect(model.calls()).toBe(1)
-      yield* TestClock.adjust("1999 millis")
+      yield* TestClock.adjust("399 millis")
       expect(model.calls()).toBe(1)
-      yield* TestClock.adjust("1 millis")
+      yield* TestClock.adjust("201 millis")
       expect(model.calls()).toBe(2)
-      yield* TestClock.adjust("4 seconds")
+      yield* TestClock.adjust("2 seconds")
       const events = yield* Fiber.join(fiber)
 
       expect(model.calls()).toBe(3)
       expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(1)
-      expect(events.flatMap((event) => (event._tag === "ModelRetryScheduled" ? [event.delayMillis] : []))).toEqual([
-        2_000, 4_000,
-      ])
+      const delays = events.flatMap((event) => (event._tag === "ModelRetryScheduled" ? [event.delayMillis] : []))
+      expect(delays).toHaveLength(2)
+      expect(delays[0]).toBeGreaterThanOrEqual(400)
+      expect(delays[0]).toBeLessThanOrEqual(600)
+      expect(delays[1]).toBeGreaterThanOrEqual(800)
+      expect(delays[1]).toBeLessThanOrEqual(1_200)
       expect(events.at(-1)).toMatchObject({ _tag: "Completed", text: "recovered" })
     }),
   )
@@ -88,10 +91,10 @@ describe("Agent default model resilience", () => {
       const model = scriptedModel(() => Stream.fail(unavailable))
       const fiber = yield* Effect.flip(run(model.layer)).pipe(Effect.forkChild)
       yield* Effect.yieldNow
-      yield* TestClock.adjust("6 seconds")
+      yield* TestClock.adjust("1 minute")
       const finalFailure = yield* Fiber.join(fiber)
 
-      expect(model.calls()).toBe(3)
+      expect(model.calls()).toBe(6)
       expect(finalFailure._tag).toBe("generalist/core/AgentError")
       if (finalFailure._tag === "generalist/core/AgentError") expect(finalFailure.cause).toBe(unavailable)
     }),
