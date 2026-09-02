@@ -38,7 +38,7 @@ interface StartFunction {
 
 const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)
 
-/** @experimental Start an Agent previously registered with the durable Runtime. */
+/** Start an Agent previously registered with the durable Runtime. */
 export const start: StartFunction = dual(
   isDataFirst,
   <

@@ -116,10 +116,9 @@ export interface ProgramResolution {
 /** Exactly one reconstructed executable kind. */
 export type Resolution = AgentResolution | ProgramResolution
 
-/** @experimental Typed failures allowed while resolving one executable. */
+/** Typed failures allowed while resolving one executable. */
 export type ResolveError = ExecutablePinMissing | ExecutableRegistrationInvalid | ExecutableRegistrationMissing
 
-/** @experimental */
 export interface Service {
   readonly resolve: (input: Input) => Effect.Effect<Resolution, ResolveError, Scope.Scope>
 }

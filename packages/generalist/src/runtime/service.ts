@@ -126,7 +126,7 @@ export interface StartExecutionInput {
   readonly initialFanOuts?: ReadonlyArray<InitialFanOutInput>
 }
 
-/** @experimental One exact root admission held behind Generalist's durable execution gate. */
+/** One exact root admission held behind Generalist's durable execution gate. */
 export type AdmitInput = Omit<StartExecutionInput, "initialChildren" | "initialFanOuts">
 
 /** Release one admitted root's durable execution gate. */
@@ -150,7 +150,7 @@ export interface StartReceipt extends RunReceipt {
   readonly fanOuts: ReadonlyArray<FanOutReceipt>
 }
 
-/** @experimental Typed durable start identity. Budget admission is reserved for the RunBudget contract. */
+/** Typed durable start identity. Budget admission is reserved for the RunBudget contract. */
 export interface StartOptions {
   readonly sessionId?: string
   readonly idempotencyKey?: string
@@ -158,14 +158,14 @@ export interface StartOptions {
 
 type StartedAgentResult<Output> = Omit<AgentExecutionResult, "output"> & { readonly output: Output }
 
-/** @experimental Durable Runtime event with Agent completion decoded through its output Schema. */
+/** Durable Runtime event with Agent completion decoded through its output Schema. */
 export type StartEvent<Output> =
   | Exclude<RunEvent, RunCompleted>
   | (Omit<RunCompleted, "result"> & {
       readonly result: StartedAgentResult<Output> | ProgramExecutionResult
     })
 
-/** @experimental One typed durable Run and its replay-then-live event stream. */
+/** One typed durable Run and its replay-then-live event stream. */
 export interface RunHandle<Output> {
   readonly runId: import("../core/durable/run-id.js").RunId
   readonly await: Effect.Effect<Output, RunFailed | RunCancelled | EventsError | InvalidOutput>
@@ -174,7 +174,7 @@ export interface RunHandle<Output> {
   readonly followUp: (input: import("../core/turn/steering.js").Input) => Effect.Effect<SteeringReceipt, SteerError>
 }
 
-/** @experimental Authoritative Runtime inspection with the latest zero-based turn and raw provider usage facts. */
+/** Authoritative Runtime inspection with the latest zero-based turn and raw provider usage facts. */
 export interface RuntimeInspection extends RunInspection {
   readonly turn: number
   readonly usage: ReadonlyArray<RawUsageFact>
@@ -254,7 +254,9 @@ export interface SteerInput {
   readonly prompt: Prompt.Prompt | Prompt.RawInput
 }
 
-/** One addressed send between agents.
+/**
+ * One addressed send between agents.
+ *
  * `fromRunId` is the authoritative sender: Generalist reads its identity, parentage, and session from the
  * durable Run record, so callers cannot forge a sender by supplying an Address.
  */
@@ -319,11 +321,11 @@ export type StartExecutionError =
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
   | RuntimeUnavailable
-/** @experimental Typed Agent start failures before a Run handle exists. */
+/** Typed Agent start failures before a Run handle exists. */
 export type StartError = StartExecutionError | UnknownAgent | AgentError
-/** @experimental Exact-root staged admission failures. */
+/** Exact-root staged admission failures. */
 export type AdmitError = StartExecutionError
-/** @experimental Staged root activation failures. */
+/** Staged root activation failures. */
 export type ActivateError = RunNotFound | RuntimeUnavailable
 export type SpawnError =
   | RunNotFound
@@ -386,7 +388,7 @@ export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
 
 export interface Service {
-  /** @experimental Register one Agent name and its exact environment for start and recovery. */
+  /** Register one Agent name and its exact environment for start and recovery. */
   readonly register: <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -397,7 +399,7 @@ export interface Service {
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
   ) => Effect.Effect<void, DuplicateAgent, ClosedServices<Tools, R, InputCodec, OutputCodec>>
-  /** @experimental Start one registered Agent with Schema-derived input and output. */
+  /** Start one registered Agent with Schema-derived input and output. */
   readonly start: <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -412,7 +414,7 @@ export interface Service {
   ) => Effect.Effect<RunHandle<OutputCodec["Type"]>, StartError, never>
   /** @internal Begin one already-normalized pinned execution. */
   readonly startExecution: (input: StartExecutionInput) => Effect.Effect<StartReceipt, StartExecutionError>
-  /** @experimental Durably admit one exact root without making it executable. */
+  /** Durably admit one exact root without making it executable. */
   readonly admit: (input: AdmitInput) => Effect.Effect<RunReceipt, AdmitError>
   /** Idempotently activate an admitted root and return its authoritative current state. */
   readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>

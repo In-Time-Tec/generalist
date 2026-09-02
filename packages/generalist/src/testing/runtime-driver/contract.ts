@@ -37,22 +37,22 @@ export interface RuntimeCapability {
   readonly claim: ClaimExecution
 }
 
-/** @experimental Typed Agent start capability exercised with one storage-issued execution claim. */
+/** Typed Agent start capability exercised with one storage-issued execution claim. */
 export interface StartByAgentCapability {
   readonly claim: ClaimExecution
 }
 
-/** @experimental Typed Agent idempotent-start capability exercised with one storage-issued execution claim. */
+/** Typed Agent idempotent-start capability exercised with one storage-issued execution claim. */
 export interface IdempotentStartCapability {
   readonly claim: ClaimExecution
 }
 
-/** @experimental Missing-registration recovery capability exercised with one storage-issued execution claim. */
+/** Missing-registration recovery capability exercised with one storage-issued execution claim. */
 export interface UnknownAgentOnRecoveryCapability {
   readonly claim: ClaimExecution
 }
 
-/** @experimental RunTree finite replay conformance capability. */
+/** RunTree finite replay conformance capability. */
 export interface RunTreeCapability {
   readonly claim: ClaimExecution
 }

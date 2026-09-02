@@ -86,12 +86,12 @@ export class RunNotFound extends Schema.TaggedError<RunNotFound>()("generalist/r
   runId: Schema.String,
 }) {}
 
-/** @experimental An Agent name is already registered in this Runtime process. */
+/** An Agent name is already registered in this Runtime process. */
 export class DuplicateAgent extends Schema.TaggedError<DuplicateAgent>()("generalist/runtime/DuplicateAgent", {
   name: Schema.String,
 }) {}
 
-/** @experimental A durable Run names an Agent that this Runtime process has not registered. */
+/** A durable Run names an Agent that this Runtime process has not registered. */
 export class UnknownAgent extends Schema.TaggedError<UnknownAgent>()("generalist/runtime/UnknownAgent", {
   name: Schema.String,
   runId: Schema.String,

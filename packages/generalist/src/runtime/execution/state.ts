@@ -40,7 +40,7 @@ export type ProgramCheckpoint = typeof ProgramCheckpoint.Type
 export const ExecutionCheckpoint = Schema.Union([DriverCheckpoint, ProgramCheckpoint])
 export type ExecutionCheckpoint = typeof ExecutionCheckpoint.Type
 
-/** @experimental Executable-neutral persisted suspension state. */
+/** Executable-neutral persisted suspension state. */
 export type ExecutionSuspension = AgentSuspended | ProgramSuspended | UnknownAgent
 export const ExecutionSuspension: Schema.Codec<ExecutionSuspension, unknown> = Schema.Union([
   AgentSuspended,
