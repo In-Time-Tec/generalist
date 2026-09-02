@@ -1,6 +1,12 @@
 import { Effect, Function, Predicate, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { ForkSequenceInvalid, NoSnapshot, RunNotFound, SubstitutionInvalid } from "../../../errors.js"
+import {
+  ForkSequenceInvalid,
+  NoSnapshot,
+  RunNotFound,
+  RuntimeUnavailable,
+  SubstitutionInvalid,
+} from "../../../errors.js"
 import type { Message } from "../../../messaging/message.js"
 import { eventIdFor, RunEvent } from "../../../run/event.js"
 import type { ForkRunInput, RewindRunInput } from "../../../run/store-types.js"
@@ -86,6 +92,27 @@ const leafAt = (events: ReadonlyArray<RunEvent>): string | null => {
   )
   return committed?.sessionEntryId ?? null
 }
+
+const rewindSession = (sessionId: string, leafId: string | null) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    if (leafId === null) {
+      yield* sql`DELETE FROM generalist_session_entries WHERE session_id = ${sessionId}`
+    } else {
+      const retained = yield* sql<{ readonly seq: number }>`
+        SELECT seq FROM generalist_session_entries WHERE session_id = ${sessionId} AND entry_id = ${leafId}
+      `
+      const row = retained[0]
+      if (row === undefined) {
+        return yield* RuntimeUnavailable.make({
+          message: `Session entry ${leafId} could not be retained during rewind`,
+        })
+      }
+      yield* sql`DELETE FROM generalist_session_entries WHERE session_id = ${sessionId} AND seq > ${row.seq}`
+    }
+    yield* sql`UPDATE generalist_sessions SET leaf_id = ${leafId}, writer_run_id = NULL,
+      writer_owner_id = NULL, writer_attempt_fence = NULL WHERE session_id = ${sessionId}`
+  })
 
 const copyRun = (input: {
   readonly source: RunRow
@@ -250,8 +277,7 @@ const rewindEffect = (hub: EventHub, input: RewindRunInput) =>
     yield* sql`DELETE FROM generalist_run_waits WHERE run_id = ${input.runId}`
     yield* sql`DELETE FROM generalist_run_steering WHERE run_id = ${input.runId}`
     yield* sql`UPDATE generalist_tree_roots SET last_position = ${input.toSequence} WHERE root_run_id = ${input.runId}`
-    yield* sql`UPDATE generalist_sessions SET leaf_id = ${leafAt(selected.events)}, writer_run_id = NULL,
-      writer_owner_id = NULL, writer_attempt_fence = NULL WHERE session_id = ${selected.source.session_id}`
+    yield* rewindSession(selected.source.session_id, leafAt(selected.events))
     yield* sql`UPDATE generalist_runs SET status = 'queued', last_sequence = ${input.toSequence},
       last_turn_completed_sequence = CASE WHEN last_turn_completed_sequence > ${input.toSequence}
         THEN ${input.toSequence} ELSE last_turn_completed_sequence END,

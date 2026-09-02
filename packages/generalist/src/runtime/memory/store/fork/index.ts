@@ -1,6 +1,12 @@
 import { Effect, Function, Predicate, Schema, Types } from "effect"
 import { ExecutionCheckpoint } from "../../../execution/state.js"
-import { ForkSequenceInvalid, NoSnapshot, RunNotFound, SubstitutionInvalid } from "../../../errors.js"
+import {
+  ForkSequenceInvalid,
+  NoSnapshot,
+  RunNotFound,
+  RuntimeUnavailable,
+  SubstitutionInvalid,
+} from "../../../errors.js"
 import { eventIdFor, type RunEvent } from "../../../run/event.js"
 import type { ForkRunInput, RewindRunInput } from "../../../run/store-types.js"
 import type { OperationRecord } from "../../../sql/operations.js"
@@ -147,6 +153,23 @@ const copiedSession = (session: MemorySession, leaf: string | null): MemorySessi
   return copy
 }
 
+const rewoundSession = (session: MemorySession, leaf: string | null) => {
+  const retainedLength = leaf === null ? 0 : session.order.indexOf(leaf) + 1
+  if (leaf !== null && retainedLength === 0) {
+    return RuntimeUnavailable.make({ message: `Session entry ${leaf} could not be retained during rewind` })
+  }
+  const order = session.order.slice(0, retainedLength)
+  const retained = new Set(order)
+  const copy: Types.Mutable<MemorySession> = {
+    entries: new Map([...session.entries].filter(([entryId]) => retained.has(entryId))),
+    order,
+    leaf,
+    counter: session.counter,
+    writerEpoch: 0n,
+  }
+  return Effect.succeed(copy)
+}
+
 const copiedRun = (
   source: StoredRun,
   runId: string,
@@ -286,7 +309,7 @@ const rewindEffect = (state: MemoryState, input: RewindRunInput) =>
     const sourceSession = sessions.get(source.message.sessionId)
     if (sourceSession !== undefined) {
       sessions.set(branch.message.sessionId, copiedSession(sourceSession, leafAt(branchEvents)))
-      sessions.set(source.message.sessionId, copiedSession(sourceSession, leafAt(events)))
+      sessions.set(source.message.sessionId, yield* rewoundSession(sourceSession, leafAt(events)))
     }
     let operations = replaceOperations({
       operations: state.operations,
