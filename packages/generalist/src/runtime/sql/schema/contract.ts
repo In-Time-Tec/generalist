@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the logical SQL schema contract is one checksum authority */
 import { Effect, Function } from "effect"
 import { sha256Text } from "../../../core/durable/canonical-json.js"
 import {

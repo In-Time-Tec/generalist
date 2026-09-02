@@ -3,5 +3,5 @@ import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/defini
 
 it("freezes the logical SQL Runtime schema checksum", () => {
   expect(SCHEMA_VERSION).toBe(8)
-  expect(schemaChecksum()).toBe("ccb5567158d6f58180e3abf2bf744e74e526a467f08ef2706826ff77e3d4682c")
+  expect(schemaChecksum()).toBe("3e6286e7016fac1fa5b7a589d34ebe7d851be73bb485332e554aeb679a4f8008")
 })

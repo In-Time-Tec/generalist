@@ -13,18 +13,17 @@ import {
   type StoredRun,
 } from "../../state.js"
 
-const snapshotAt = (run: StoredRun, sequence: number): string | undefined => {
-  for (const event of run.events.toReversed()) {
-    if (event.sequence > sequence || event._tag !== "ToolProgress" || event.message !== "SandboxSnapshot") continue
-    if (
-      Predicate.isObject(event.data) &&
-      event.data._tag === "SandboxSnapshot" &&
-      Predicate.isString(event.data.snapshotId)
-    ) {
-      return event.data.snapshotId
-    }
-  }
-  return undefined
+const snapshotUnavailableAt = (run: StoredRun, sequence: number): boolean => {
+  const latest = run.events.findLast(
+    (event): event is Extract<RunEvent, { readonly _tag: "ToolProgress" }> =>
+      event.sequence <= sequence && event._tag === "ToolProgress" && event.message === "SandboxSnapshot",
+  )
+  if (latest === undefined) return false
+  return (
+    !Predicate.isObject(latest.data) ||
+    latest.data._tag !== "SandboxSnapshot" ||
+    !Predicate.isString(latest.data.snapshotId)
+  )
 }
 
 const validateSequence = (run: StoredRun, sequence: number) => {
@@ -215,7 +214,7 @@ const forkEffect = (state: MemoryState, input: ForkRunInput) =>
     const source = state.runs.get(input.runId)
     if (source === undefined) return yield* RunNotFound.make({ runId: input.runId })
     yield* validateSequence(source, input.atSequence)
-    if (snapshotAt(source, input.atSequence) === undefined) {
+    if (snapshotUnavailableAt(source, input.atSequence)) {
       return yield* NoSnapshot.make({ runId: input.runId, atSequence: input.atSequence })
     }
     const selection = yield* selectedOperations(state, input.runId, input.atSequence, input.substitute)
@@ -264,7 +263,7 @@ const rewindEffect = (state: MemoryState, input: RewindRunInput) =>
     const source = state.runs.get(input.runId)
     if (source === undefined) return yield* RunNotFound.make({ runId: input.runId })
     yield* validateSequence(source, input.toSequence)
-    if (snapshotAt(source, input.toSequence) === undefined) {
+    if (snapshotUnavailableAt(source, input.toSequence)) {
       return yield* NoSnapshot.make({ runId: input.runId, atSequence: input.toSequence })
     }
     const selection = {

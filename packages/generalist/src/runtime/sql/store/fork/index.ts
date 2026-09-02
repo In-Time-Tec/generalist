@@ -20,11 +20,11 @@ export const loadRunBranches = (runId: string) =>
     return rows.map((row) => ({ runId: row.run_id, forkedAt: row.fork_sequence }))
   })
 
-const snapshotId = (event: RunEvent): string | undefined => {
-  if (event._tag !== "ToolProgress" || event.message !== "SandboxSnapshot") return undefined
-  if (!Predicate.isObject(event.data) || event.data._tag !== "SandboxSnapshot") return undefined
-  return Predicate.isString(event.data.snapshotId) ? event.data.snapshotId : undefined
-}
+const isSandboxSnapshot = (event: RunEvent): event is Extract<RunEvent, { readonly _tag: "ToolProgress" }> =>
+  event._tag === "ToolProgress" && event.message === "SandboxSnapshot"
+
+const snapshotUnavailable = (event: Extract<RunEvent, { readonly _tag: "ToolProgress" }>): boolean =>
+  !Predicate.isObject(event.data) || event.data._tag !== "SandboxSnapshot" || !Predicate.isString(event.data.snapshotId)
 
 const prefix = (runId: string, sequence: number) =>
   Effect.gen(function* () {
@@ -46,11 +46,12 @@ const prefix = (runId: string, sequence: number) =>
       )
     const eventRows = retained.map(({ row }) => row)
     const events = retained.map(({ event }) => event)
-    const snapshot = events.findLast(snapshotId)
-    const selectedSnapshot = snapshot === undefined ? undefined : snapshotId(snapshot)
-    if (selectedSnapshot === undefined) return yield* NoSnapshot.make({ runId, atSequence: sequence })
+    const snapshot = events.findLast(isSandboxSnapshot)
+    if (snapshot !== undefined && snapshotUnavailable(snapshot)) {
+      return yield* NoSnapshot.make({ runId, atSequence: sequence })
+    }
     const checkpoint = eventRows.findLast((row) => row.checkpoint_json !== null)?.checkpoint_json ?? null
-    return { source, eventRows, events, checkpoint, snapshotId: selectedSnapshot }
+    return { source, eventRows, events, checkpoint }
   })
 
 const copiedMessage = (source: RunRow, runId: string) => {

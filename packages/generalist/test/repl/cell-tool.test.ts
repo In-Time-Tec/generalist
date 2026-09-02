@@ -167,8 +167,9 @@ layer(executorLayer)("cell tool route", (it) => {
       collected.length = 0
       yield* executor.execute(request("1 + 1"))
       const progress = [...collected]
-      expect(progress.map((item) => item.message)).toEqual(["KernelReady", "Stdout", "Result"])
-      expect(progress.map((item) => item.data?.sequence)).toEqual([0, 1, 2])
+      expect(progress.map((item) => item.message)).toEqual(["KernelReady", "Stdout", "Result", "SandboxSnapshot"])
+      expect(progress.map((item) => item.data?.sequence)).toEqual([0, 1, 2, undefined])
+      expect(progress.at(-1)?.data).toEqual({ _tag: "SandboxSnapshotUnavailable" })
       expect(new Set(progress.map((item) => item.toolCallId))).toEqual(new Set(["call-1"]))
     }),
   )
@@ -181,7 +182,9 @@ layer(executorLayer)("cell tool route", (it) => {
       const stdout = collected.filter((item) => item.message === "Stdout")
       expect(stdout.length).toBeGreaterThan(0)
       expect(stdout.map((item) => item.data?.["text"])).toEqual(["out"])
-      const sequences = collected.map((item) => item.data?.["sequence"])
+      const sequences = collected
+        .filter((item) => item.message !== "SandboxSnapshot")
+        .map((item) => item.data?.["sequence"])
       expect(sequences).toEqual(sequences.toSorted((left, right) => Number(left) - Number(right)))
     }),
   )
@@ -203,7 +206,8 @@ layer(executorLayer)("cell tool route", (it) => {
       const executor = yield* ToolExecutor.ToolExecutor
       collected.length = 0
       yield* executor.execute(request("1 + 1"))
-      expect(collected.map((item) => item.data?.["sequence"])).toEqual(collected.map((_, index) => index))
+      const cellProgress = collected.filter((item) => item.message !== "SandboxSnapshot")
+      expect(cellProgress.map((item) => item.data?.["sequence"])).toEqual(cellProgress.map((_, index) => index))
     }),
   )
 
@@ -299,9 +303,8 @@ layer(oversizedLayer)("cell tool progress bounds", (it) => {
       const executor = yield* ToolExecutor.ToolExecutor
       oversizedCollected.length = 0
       yield* executor.execute(request("oversized"))
-      expect(oversizedCollected.map((item) => item.data?.["sequence"])).toEqual(
-        oversizedCollected.map((_, index) => index),
-      )
+      const cellProgress = oversizedCollected.filter((item) => item.message !== "SandboxSnapshot")
+      expect(cellProgress.map((item) => item.data?.["sequence"])).toEqual(cellProgress.map((_, index) => index))
     }),
   )
 })

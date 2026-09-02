@@ -12,7 +12,7 @@ import {
 } from "../core/tools/tool-executor.js"
 import type { Route } from "../core/tools/tool-placement.js"
 import { CellEvent, CellFailure, CellResult, KernelProtocolViolation, KernelUnavailable } from "./cell.js"
-import { ExecutionFailed, LimitExceeded, type SandboxError, SandboxProvider } from "../sandbox/service.js"
+import { ExecutionFailed, LimitExceeded, type SandboxError, SandboxProvider, SnapshotId } from "../sandbox/service.js"
 
 /** The only name a Generalist REPL host advertises to a model. */
 export const name = "typescript"
@@ -58,6 +58,12 @@ const schemaMessage = (error: { readonly message: string }): string => error.mes
 
 /** Largest encoded cell event carried in one progress record. */
 export const maxProgressBytes = 16_384
+
+/** A durable marker naming the Sandbox image committed after a cell. */
+export const SandboxSnapshot = Schema.TaggedStruct("SandboxSnapshot", { snapshotId: SnapshotId })
+
+/** A durable marker recording that cell state cannot be restored. */
+export const SandboxSnapshotUnavailable = Schema.TaggedStruct("SandboxSnapshotUnavailable", {})
 
 const encodeEvent = Schema.encodeUnknownEffect(CellEvent)
 
@@ -164,14 +170,20 @@ const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, Too
             }),
           ),
         )
-        if (sandbox.capabilities.snapshot) {
+        if (!sandbox.capabilities.snapshot) {
+          yield* context.emit({
+            toolCallId,
+            message: "SandboxSnapshot",
+            data: SandboxSnapshotUnavailable.make({}),
+          })
+        } else {
           const snapshotId = yield* sandbox.snapshot.pipe(
             Effect.mapError((failure) => sandboxFailure(request.sessionId, cellId, failure)),
           )
           yield* context.emit({
             toolCallId,
             message: "SandboxSnapshot",
-            data: { _tag: "SandboxSnapshot", snapshotId },
+            data: SandboxSnapshot.make({ snapshotId }),
           })
         }
         return cell

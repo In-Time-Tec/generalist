@@ -28,11 +28,28 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           idempotencyKey: identity,
           prompt: "fork and rewind",
         })
+        const plainForkRunId = `${source.runId}:plain-fork`
+        yield* services.store.fork({ runId: source.runId, newRunId: plainForkRunId, atSequence: 0 })
+        expect((yield* services.store.inspect(source.runId)).branches).toContainEqual({
+          runId: plainForkRunId,
+          forkedAt: 0,
+        })
+        const claim = yield* capability.claim(services, { runId: source.runId, workerId: "fork-rewind" })
+        yield* services.store.emitAgentEvent({
+          ...claim,
+          event: {
+            _tag: "ToolProgress",
+            turn: 0,
+            toolCallId: "sandbox",
+            message: "SandboxSnapshot",
+            data: { _tag: "SandboxSnapshotUnavailable" },
+          },
+        })
+        const unavailableAt = (yield* services.store.inspect(source.runId)).lastSequence
         const noSnapshot = yield* services.store
-          .fork({ runId: source.runId, newRunId: `${source.runId}:no-snapshot`, atSequence: 0 })
+          .fork({ runId: source.runId, newRunId: `${source.runId}:no-snapshot`, atSequence: unavailableAt })
           .pipe(Effect.flip)
         expect(noSnapshot._tag).toBe("generalist/runtime/NoSnapshot")
-        const claim = yield* capability.claim(services, { runId: source.runId, workerId: "fork-rewind" })
         yield* services.store.emitAgentEvent({
           ...claim,
           event: {
@@ -61,6 +78,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         expect(inspection.lastSequence).toBe(forkAt)
         expect(inspection.branches).toEqual(
           expect.arrayContaining([
+            { runId: plainForkRunId, forkedAt: 0 },
             { runId: forkRunId, forkedAt: forkAt },
             { runId: branchRunId, forkedAt: forkAt },
           ]),

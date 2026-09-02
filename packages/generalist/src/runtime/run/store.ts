@@ -298,11 +298,7 @@ export interface Service {
     input: ForkRunInput,
   ) => Effect.Effect<
     RunReceipt,
-    | RunNotFound
-    | ForkSequenceInvalid
-    | NoSnapshot
-    | SubstitutionInvalid
-    | RuntimeUnavailable
+    RunNotFound | ForkSequenceInvalid | NoSnapshot | SubstitutionInvalid | RuntimeUnavailable
   >
   readonly rewind: (
     input: RewindRunInput,

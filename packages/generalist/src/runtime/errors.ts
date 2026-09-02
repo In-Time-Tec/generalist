@@ -119,11 +119,11 @@ export class IllegalOperatorAction extends ActionableTaggedError<IllegalOperator
   },
 ) {}
 
-/** A fork point has no committed sandbox image to restore. */
+/** A fork point includes sandbox state that has no committed image to restore. */
 export class NoSnapshot extends ActionableTaggedError<NoSnapshot>()("generalist/runtime/NoSnapshot", {
   runId: Schema.String,
   atSequence: Schema.Int,
-  hint: errorHint("Fork at or after a committed SandboxSnapshot progress event."),
+  hint: errorHint("Choose a point before sandbox use, or use a snapshot-capable Sandbox provider."),
 }) {}
 
 /** A fork or rewind sequence is outside the committed journal. */

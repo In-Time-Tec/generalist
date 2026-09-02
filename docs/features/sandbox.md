@@ -126,7 +126,9 @@ After a successful `CellTool` call, the adapter snapshots capable leaves and emi
 }
 ```
 
-Runtime persists that `ToolProgress` with the tool completion. A reopened host can read the latest committed `SnapshotId`, fork it, and continue the Session without executing earlier cells again. The snapshot is working state only; the Runtime journal, operations, Session entries, and children remain authority.
+When the leaf cannot snapshot, `CellTool` instead emits the same progress message with `data: { _tag: "SandboxSnapshotUnavailable" }`. Runtime persists either marker with the tool completion, so fork and rewind can distinguish a Run that never used a Sandbox from sandbox state that cannot be restored.
+
+The copied branch journal carries an available `SnapshotId`, but branch acquisition does not yet call `sandbox.fork(snapshotId)`; keyed acquisition currently receives the branch Session ID and starts fresh. Wiring that durable host hint is a separate integration step. `layerWorktree` is the process-host leaf that will serve it: its hidden Git commit is an immutable snapshot and `git worktree add` creates the isolated branch workspace. The snapshot is working state only; the Runtime journal, operations, Session entries, and children remain authority.
 
 ## Errors
 
