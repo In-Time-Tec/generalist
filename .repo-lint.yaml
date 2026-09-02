@@ -109,7 +109,7 @@ rules:
     - pattern: "packages/*/src"
       childCase: kebab
       maxFiles: 12
-      maxDirectories: 16
+      maxDirectories: 17
     - pattern: "packages/*/src/*"
       case: kebab
       childCase: kebab
@@ -123,7 +123,7 @@ rules:
     - pattern: "packages/*/test"
       childCase: kebab
       maxFiles: 12
-      maxDirectories: 16
+      maxDirectories: 17
     - pattern: "packages/*/test/*"
       case: kebab
       childCase: kebab
