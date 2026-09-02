@@ -24,6 +24,7 @@ const plain = Tool.make("memo_plain", {
 
 const invoke = (input: {
   readonly tool?: Tool.Any
+  readonly query: string
   readonly counter: Ref.Ref<number>
   readonly run: string
   readonly operation: string
@@ -32,7 +33,7 @@ const invoke = (input: {
 }) =>
   memoize({
     tool: input.tool ?? declared,
-    params: { query: "effect" },
+    params: { query: input.query },
     run: input.run,
     operation: input.operation,
     execute: Ref.updateAndGet(input.counter, (count) => count + 1).pipe(
@@ -58,15 +59,20 @@ const provide = <A, E, LayerError>(options: Options<LayerError>, effect: Effect.
     Layer.build(options.layer).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
   )
 
+let suites = 0
+
 export const memo = <E>(options: Options<E>): void => {
+  // Durable stores keep entries across tests, so every test uses its own key material.
+  const suite = (suites += 1)
+  const query = (test: string) => `memo-conformance:${suite}:${test}`
   describe("Generalist Memo conformance", () => {
     it.effect("misses once and hits without dispatch", () =>
       provide(
         options,
         Effect.gen(function* () {
           const counter = yield* Ref.make(0)
-          const first = yield* invoke({ counter, run: "run-1", operation: "operation-1" })
-          const second = yield* invoke({ counter, run: "run-2", operation: "operation-2" })
+          const first = yield* invoke({ query: query("hit"), counter, run: "run-1", operation: "operation-1" })
+          const second = yield* invoke({ query: query("hit"), counter, run: "run-2", operation: "operation-2" })
           expect(first).not.toHaveProperty("memoized")
           expect(second).toMatchObject({
             result: "result-1",
@@ -82,9 +88,9 @@ export const memo = <E>(options: Options<E>): void => {
         options,
         Effect.gen(function* () {
           const counter = yield* Ref.make(0)
-          yield* invoke({ counter, run: "run-1", operation: "operation-1" })
+          yield* invoke({ query: query("expiry"), counter, run: "run-1", operation: "operation-1" })
           yield* options.adjustClock
-          const expired = yield* invoke({ counter, run: "run-2", operation: "operation-2" })
+          const expired = yield* invoke({ query: query("expiry"), counter, run: "run-2", operation: "operation-2" })
           expect(expired).toMatchObject({ _tag: "Success", result: "result-2" })
           expect(yield* Ref.get(counter)).toBe(2)
         }),
@@ -96,9 +102,15 @@ export const memo = <E>(options: Options<E>): void => {
         options,
         Effect.gen(function* () {
           const counter = yield* Ref.make(0)
-          yield* invoke({ counter, run: "run-1", operation: "operation-1" })
-          yield* invoke({ counter, run: "run-2", operation: "operation-2", version: "v2" })
-          yield* invoke({ counter, run: "run-3", operation: "operation-3", tenant: "tenant-b" })
+          yield* invoke({ query: query("isolation"), counter, run: "run-1", operation: "operation-1" })
+          yield* invoke({ query: query("isolation"), counter, run: "run-2", operation: "operation-2", version: "v2" })
+          yield* invoke({
+            query: query("isolation"),
+            counter,
+            run: "run-3",
+            operation: "operation-3",
+            tenant: "tenant-b",
+          })
           expect(yield* Ref.get(counter)).toBe(3)
         }),
       ),
@@ -109,8 +121,8 @@ export const memo = <E>(options: Options<E>): void => {
         options,
         Effect.gen(function* () {
           const counter = yield* Ref.make(0)
-          yield* invoke({ tool: plain, counter, run: "run-1", operation: "operation-1" })
-          yield* invoke({ tool: plain, counter, run: "run-2", operation: "operation-2" })
+          yield* invoke({ tool: plain, query: query("plain"), counter, run: "run-1", operation: "operation-1" })
+          yield* invoke({ tool: plain, query: query("plain"), counter, run: "run-2", operation: "operation-2" })
           expect(yield* Ref.get(counter)).toBe(2)
         }),
       ),
