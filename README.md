@@ -1,151 +1,135 @@
 # Generalist
 
-Generalist is a TypeScript framework for building AI agents on [Effect](https://effect.website). An agent is a plain value — a name, instructions, tools, and a turn policy — and running one produces a typed event stream. Models, approvals, permissions, memory, skills, and every other capability are Effect layers you provide at the call site, each with a deterministic test layer, so agents run in CI with no API keys.
+Generalist is an Effect-native TypeScript agent framework with a portable durable Runtime for specialized or general agents. It is for teams that want typed agent behavior inside an Effect application while keeping ownership of models, tools, storage, interfaces, and deployment. Compaction, approvals, memory, sandboxes, and multi-agent execution are swappable Layers, typed budgets travel with durable Runs, and the same Agent runs process-locally or on a recoverable host instead of becoming a separate agent product.
 
-```ts
-import { Config, Effect, Layer, Schema } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
-import { FetchHttpClient } from "effect/unstable/http"
-import { Agent, Approvals, Compaction, Permissions } from "generalist"
-import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/providers/openai"
-import { WorkingMemory } from "generalist/memory"
+## Five-minute path
 
-const searchDocs = Tool.make("search_docs", {
-  description: "Search the product docs",
-  parameters: Schema.Struct({ query: Schema.String }),
-  success: Schema.Array(Schema.String),
-})
-const toolkit = Toolkit.make(searchDocs)
+Install Generalist, the Effect version it currently targets, and the testing, Bun platform, and SQLite peers used by this example:
 
-const support = Agent.make({
-  name: "support",
-  instructions: "Answer from the docs. Be brief.",
-  toolkit,
-})
-
-// One provider client; models are thin layers over it.
-const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(Layer.provide(FetchHttpClient.layer))
-const sol = openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAi)) // any OpenAI model id
-
-const program = Agent.run(support, "How do I rotate my API key?", {
-  memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
-  compaction: { contextWindow: 200_000 }, // old turns compress, never drop
-})
-
-await program.pipe(
-  Effect.provide(sol), // choose the model per run — nothing else changes
-  Effect.provide(
-    Layer.mergeAll(
-      toolkit.toLayer({ search_docs: () => Effect.succeed(["Settings → API keys → Rotate"]) }),
-      Permissions.layerAllowAll, // explicit tool policy: no implicit defaults
-      Approvals.layerAutoApprove,
-      WorkingMemory.layer({ maxMessages: 50 }),
-      Compaction.layer({
-        contextWindow: 200_000,
-        reserveTokens: 16_384,
-        strategy: Compaction.strategy([
-          Compaction.toolOutputBound({ maxBytes: 16_384 }),
-          Compaction.structuredSummary({ objectName: "AgentSummary" }),
-          Compaction.keepRecent({ tokens: 20_000 }),
-        ]),
-      }),
-    ),
-  ),
-  Effect.runPromise,
-)
+```bash
+bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @effect/sql-sqlite-bun@4.0.0-rc.112 @effect/vitest@4.0.0-rc.112
 ```
 
-One agent, typed tools, per-user memory, and compaction against the context window — all layers you can swap for tests. Change the model by providing a different model layer; change the provider by providing a different client layer under it. [Anthropic](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [OpenRouter](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), [Bedrock](https://generalist-docs-production.up.railway.app/docs/guides/runtime/providers), and a deterministic model all work the same way.
-
-Agents compose, and each child inherits the ambient model or chooses its own:
+Save this as `index.ts`, then run `bun index.ts`. The scripted model is a real `LanguageModel` Layer that needs no credentials, so this path also runs unchanged in CI.
 
 ```ts
-import { Handoff } from "generalist"
+import { layer as bunServices } from "@effect/platform-bun/BunServices"
+import { Console, Effect, FileSystem, Layer, Path, Schema } from "effect"
+import { Agent } from "generalist"
+import { ExecutableResolver, Runtime } from "generalist/runtime"
+import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
+import { TestModel } from "generalist/testing"
 
-const luna = openAiModel({ model: "gpt-5.6-luna" }).pipe(Layer.provide(openAi), Layer.orDie) // closed layer: config resolves at startup
-
-const billing = Agent.make({ name: "billing", instructions: "Resolve billing requests." })
-
-const frontDesk = Handoff.supervisor({
-  name: "front-desk",
-  instructions: "Route each request to the right specialist.",
-  specialists: [
-    Handoff.target(billing, { model: luna }), // this specialist runs on Luna; omit to inherit Sol
-  ],
+const assistant = Agent.make({
+  name: "five-minute-assistant",
+  input: Schema.Struct({ topic: Schema.String }),
+  output: Schema.Struct({ summary: Schema.String }),
+  instructions: "Summarize the topic in one sentence.",
 })
-```
 
-The same agent runs durably. Register it once when the Runtime process starts, then use the same typed input contract as a local run. Durable stores recover by the registered Agent name after restart:
+const input = { topic: "durable agents" }
+const startOptions = {
+  sessionId: "session:five-minutes",
+  idempotencyKey: "summary:durable-agents",
+}
+const expected = "A durable agent can continue an accepted run after its host restarts."
 
-```ts
-import { Effect } from "effect"
-import { Runtime } from "generalist/runtime"
+const model = TestModel.layer([
+  TestModel.text("Preparing a summary."),
+  TestModel.object({ output: { summary: expected } }),
+])
 
 const program = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
-  yield* runtime.register(frontDesk)
-  const handle = yield* runtime.start(frontDesk, "…", {
-    sessionId: "user:42",
-    idempotencyKey: "q:1",
+  const local = yield* Effect.scoped(
+    Layer.build(model).pipe(Effect.flatMap((context) => Agent.run(assistant, input).pipe(Effect.provide(context)))),
+  )
+  yield* Console.log(`Local: ${local.summary}`)
+
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-five-minutes-" })
+  const filename = path.join(directory, "runs.sqlite")
+  const runtimeLayer = () =>
+    Layer.merge(
+      SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(
+        Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      ),
+      model,
+    )
+  const start = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    yield* runtime.register(assistant)
+    return yield* runtime.start(assistant, input, startOptions)
   })
-  yield* handle.await // typed Agent output
-  yield* runtime.inspect(handle.runId) // authoritative status + journal cursor
+
+  const firstRunId = yield* Effect.scoped(
+    Layer.build(runtimeLayer()).pipe(
+      Effect.flatMap((context) =>
+        start.pipe(
+          Effect.provide(context),
+          Effect.map((handle) => handle.runId),
+        ),
+      ),
+    ),
+  )
+
+  const recovered = yield* Effect.scoped(
+    Layer.build(runtimeLayer()).pipe(
+      Effect.flatMap((context) =>
+        Effect.gen(function* () {
+          const handle = yield* start
+          return { runId: handle.runId, output: yield* handle.await }
+        }).pipe(Effect.provide(context)),
+      ),
+    ),
+  )
+
+  if (recovered.runId !== firstRunId) return yield* Effect.fail("SQLite did not recover the same Run")
+  if (recovered.output.summary !== expected) return yield* Effect.fail("SQLite recovered an unexpected result")
+  yield* Console.log(`Recovered ${recovered.runId}: ${recovered.output.summary}`)
 })
+
+await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(bunServices)))
 ```
 
-See the [multi-agent guide](https://generalist-docs-production.up.railway.app/docs/guides/agent/multi-agent) for supervisors, handoffs, and fan-out.
+`Agent.run` returns the Schema-decoded output; `Agent.stream` exposes the same loop as typed events. The first scoped SQLite Layer calls `runtime.start` and closes before the code awaits the Run. The fresh Layer registers the same Agent, reuses the same `{ sessionId, idempotencyKey }`, receives the same `runId`, and awaits the recovered output. The runnable copy is [`examples/five-minutes`](examples/five-minutes).
 
-## Install
+## Choose your batteries
 
-```bash
-bun add generalist @effect/ai-openai # or the provider you use
-```
+No global setup chooses these policies for you. Provide the Layers needed by one Agent or host and swap them without changing the Agent definition.
 
-`effect` is a peer dependency — install it only if your project does not have it already. Requires `effect@4.0.0-rc.112`, Node 22+ or Bun 1.4+. Everything ships as the single `generalist` package: names like `generalist/runtime` or `generalist/pg` are import subpaths, not separate packages, and each adapter's host dependencies are optional peers, so you install only what you import. Every export is `@experimental` while `effect/unstable/ai` is unstable.
+| Seam                    | Default Layer or behavior                                            | Adapters                                                                    | Current contract                                                    |
+| ----------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Model                   | caller-provided `LanguageModel`; `TestModel.layer` for offline tests | OpenAI, Anthropic, OpenRouter, Bedrock, OpenAI-compatible, deterministic    | [Providers](docs/features/providers.md)                             |
+| Tools and authorization | `ToolExecutor.layerToolkit`; allow-all and auto-approve run defaults | routed/remote execution, fail-closed rules, console or durable approvals    | [Tools and authorization](docs/features/tools-and-authorization.md) |
+| Memory                  | off; `Memory.layerNoop` when an explicit Layer is useful             | working memory, semantic recall, pgvector, Supermemory                      | [Memory](docs/features/memory.md)                                   |
+| Compaction              | off                                                                  | summary, cache-aware, exact or estimated truncation                         | [Compaction](docs/features/compaction.md)                           |
+| Budgets                 | no limit; `RunBudget` is attached to a durable Run                   | token, cost, time, tool-call, and child limits                              | [Budgets](docs/features/budget.md)                                  |
+| Multi-agent             | process-local `Agent.fanOut` with inherited services                 | typed child tools, durable children, handoffs                               | [Multi-agent](docs/features/multi-agent.md)                         |
+| Sandbox                 | none                                                                 | trusted Bun/worktree Layers; hosted providers under `generalist/unstable/*` | [Sandboxes](docs/features/sandbox.md)                               |
+| Runtime                 | optional; `Runtime.layerMemory`                                      | Bun SQLite, PostgreSQL, MySQL, Cloudflare, Rivet                            | [Runtime](docs/features/runtime.md)                                 |
+| Testing                 | `TestModel.layer` and `layerTest`/`layerMemory` seams                | Runtime, memory, rule-store, and sandbox conformance kits                   | [Testing](docs/features/testing.md)                                 |
 
-## Documentation
+## Hosts
 
-Full documentation lives at [generalist-docs-production.up.railway.app](https://generalist-docs-production.up.railway.app), organized in [Diátaxis](https://diataxis.fr) style:
+The Runtime contract stays the same while the host and storage Layer change. The [generated host matrix](docs/features/hosts.md) is the authority for current certification evidence and exact capabilities.
 
-- **Tutorials** ([Start](https://generalist-docs-production.up.railway.app/docs/start/introduction)) — introduction, a five-minute quickstart, and two full app walkthroughs.
-- **How-to guides** ([Guides](https://generalist-docs-production.up.railway.app/docs/guides/define-tools)) — tools, providers, approvals, memory, MCP, transport, testing, and more.
-- **Explanation** ([Learn](https://generalist-docs-production.up.railway.app/docs/learn/agent-loop)) — how the agent loop, sessions, suspension, and the durable Runtime work, and why.
-- **Reference** ([Reference](https://generalist-docs-production.up.railway.app/docs/reference/core-agent)) — every public entrypoint and its contract.
+| Need                                   | Host                                | Tier                        |
+| -------------------------------------- | ----------------------------------- | --------------------------- |
+| Process-local execution                | `Runtime.layerMemory`               | stable, not restart-durable |
+| One Bun process with restart recovery  | `generalist/runtime/sqlite-bun`     | stable                      |
+| Shared workers                         | `generalist/pg`, `generalist/mysql` | stable                      |
+| Cloudflare Workers and Durable Objects | `generalist/unstable/cloudflare/*`  | unstable                    |
+| Rivet actors                           | `generalist/unstable/rivet`         | unstable                    |
 
-Runnable examples live in [`examples/`](examples/), one README each.
+Use [`Generalist.create()`](docs/features/host.md) from `generalist/host` for product-facing Sessions and Runs. Mount that Host through [`generalist/server`](docs/features/server.md) when an application needs the schema-first HTTP, SSE, or WebSocket boundary.
 
-## Capabilities at a glance
+## How it compares
 
-| Area                                          | Import                                                                                               |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Agent loop, typed tools, approvals, steering  | `generalist`                                                                                         |
-| Durable, addressable, replayable runs         | `generalist/runtime`                                                                                 |
-| Model providers and a deterministic model     | `generalist/providers/*`                                                                             |
-| Memory, skills, versioned instructions        | `generalist/memory`, `generalist/instructions`                                                       |
-| MCP, A2A, and AG-UI integrations              | `generalist/unstable/mcp`, `generalist/unstable/a2a`, `generalist/unstable/ag-ui`                    |
-| Host HTTP, SSE, WebSocket, and FoldKit chat   | `generalist/server`, `generalist/unstable/foldkit`                                                   |
-| Durable stores                                | `generalist/pg`, `generalist/mysql`, `generalist/unstable/cloudflare/*`, `generalist/unstable/rivet` |
-| Scripted models and public conformance suites | `generalist/testing`                                                                                 |
+[effect-agent](https://effect-agent.com) is the closest alternative for an Effect-native harness and includes typed agent I/O, budgets, testing, and durable Node/SQLite and Cloudflare hosts; Generalist differs by using one Runtime driver contract across process memory, SQLite, PostgreSQL, MySQL, Cloudflare, and Rivet, with typed recovery/operator surfaces and reusable conformance kits. [Pi](https://github.com/badlogic/pi-mono) is strong as a small, extensible coding-agent harness and also publishes lower-level model, agent-loop, and TUI packages. [OpenCode](https://opencode.ai) is a ready-to-use coding agent for terminal, IDE, and desktop workflows with broad model support. [Vercel AI SDK](https://ai-sdk.dev) is a provider-neutral toolkit for AI applications and agents, especially web UI and streaming integrations; Generalist is the Effect-native choice when the application wants dependencies, failures, interruption, durable recovery, and test implementations expressed as Effects and Layers.
 
-## Repository layout
+## Stability and versions
 
-| Path                                         | Purpose                                                             |
-| -------------------------------------------- | ------------------------------------------------------------------- |
-| [`packages/generalist`](packages/generalist) | The framework: core agent loop, Runtime, feature entries, adapters. |
-| [`apps/docs`](apps/docs)                     | The documentation site.                                             |
-| [`docs/`](docs/README.md)                    | Contributor-facing behavior records, decisions, and tradeoffs.      |
-| [`examples/`](examples)                      | Runnable Bun examples, typechecked in CI.                           |
+Generalist is pre-1.0 and has no compatibility promise yet. Every public export is marked `@experimental` while `effect/unstable/ai` is unstable, and Generalist currently targets exactly `effect@4.0.0-rc.112`. Supported subpaths such as `generalist`, `generalist/runtime`, `generalist/host`, `generalist/server`, and `generalist/testing` are the v1 candidates; `generalist/unstable/*` subpaths may change or disappear faster. Keep Generalist, Effect, and imported optional peers on compatible exact versions, and expect deliberate breaking changes to replace old contracts rather than add compatibility shims.
 
-## Verification
-
-```bash
-bun install
-bun run check
-bun run test
-```
-
-`bun run package` additionally builds the published tarball and verifies it in fresh Bun and npm consumers. Tag pushes named `v<version>` publish to npm after checksum and provenance verification.
-
-## License and contributions
-
-Generalist is available under the [MIT License](LICENSE) and was developed by [In Time Tec](https://intimetec.com). The npm package is public; this repository is private. See [CONTRIBUTING.md](CONTRIBUTING.md) for access and review expectations, and [SECURITY.md](SECURITY.md) for private vulnerability disclosure.
+Generalist requires Node 22+ or Bun 1.4+, is available under the [MIT License](LICENSE), and was developed by [In Time Tec](https://intimetec.com). See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) for contribution and vulnerability-reporting guidance.

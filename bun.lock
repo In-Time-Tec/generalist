@@ -127,6 +127,20 @@
         "typescript": "catalog:",
       },
     },
+    "examples/five-minutes": {
+      "name": "generalist-example-five-minutes",
+      "dependencies": {
+        "@effect/platform-bun": "catalog:",
+        "@effect/sql-sqlite-bun": "catalog:",
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/hitl-over-sse": {
       "name": "generalist-example-hitl-over-sse",
       "dependencies": {
@@ -1539,6 +1553,8 @@
     "generalist-example-deep-research-agent-web": ["generalist-example-deep-research-agent-web@workspace:examples/deep-research-agent/web"],
 
     "generalist-example-eval-in-ci": ["generalist-example-eval-in-ci@workspace:examples/eval-in-ci"],
+
+    "generalist-example-five-minutes": ["generalist-example-five-minutes@workspace:examples/five-minutes"],
 
     "generalist-example-hitl-over-sse": ["generalist-example-hitl-over-sse@workspace:examples/hitl-over-sse"],
 
