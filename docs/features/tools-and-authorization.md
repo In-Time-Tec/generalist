@@ -38,7 +38,7 @@ const projectRules = Permissions.layerRuleStoreFile({ path: ".generalist/permiss
 const sessionRules = Permissions.layerRuleStoreSql({ scope: sessionId }).pipe(Layer.provideMerge(runtimeSqlClientLayer))
 ```
 
-The file store accepts a schema-validated JSON or YAML array of `{ pattern, level, reason? }`, watches the file for external changes, and writes remembered rules through a same-directory temporary file plus rename. Missing files start empty; malformed content fails as `InvalidRuleFile { path, issues }` rather than silently dropping rules. The SQL store uses `generalist_permission_rules`, replaces rules by `(scope, pattern)`, and shares the Runtime `SqlClient`; omitting `scope` uses the `"sessionId"` scope key.
+The file store accepts a schema-validated JSON or YAML array of `{ pattern, level, reason? }`, watches the file for external changes, and writes remembered rules through a same-directory temporary file plus rename. Missing files start empty; malformed content fails as `InvalidRuleFile { path, issues }` rather than silently dropping rules. The SQL store uses the `generalist_permission_rules` table from the Runtime SQL schema (so the schema must be migrated first), replaces rules by `(scope, pattern)`, and shares the Runtime `SqlClient`; omitting `scope` stores rules under the `"global"` scope.
 
 ## What runs
 

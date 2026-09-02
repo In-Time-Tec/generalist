@@ -6,6 +6,7 @@ import { Response, Tool } from "effect/unstable/ai"
 import { Permissions } from "../../../src/index.js"
 import { make as makeAuthorizer } from "../../../src/core/tools/tool-authorization.js"
 import { RuntimeSchema } from "../../../src/pg/index.js"
+import { apply as applySqliteSchema } from "../../../src/runtime/sql/migrate.js"
 import { Testing } from "../../../src/testing/index.js"
 
 const ruleFile = "/project/.generalist/permissions.json"
@@ -58,9 +59,10 @@ const invalidFileLayer = Permissions.layerRuleStoreFile({ path: ruleFile }).pipe
     Layer.merge(layerMemoryFileSystem([[ruleFile, '[{"pattern":"shell","level":"invalid"}]']]), Path.layer),
   ),
 )
-const sqlLayer = Permissions.layerRuleStoreSql({ scope: "session:test" }).pipe(
-  Layer.provide(sqliteClientLayer({ filename: ":memory:" })),
+const sqliteSchema = Layer.effectDiscard(applySqliteSchema("rule-store")).pipe(
+  Layer.provideMerge(sqliteClientLayer({ filename: ":memory:" })),
 )
+const sqlLayer = Permissions.layerRuleStoreSql({ scope: "session:test" }).pipe(Layer.provide(sqliteSchema))
 
 Testing.ruleStore({ layer: fileLayer })
 Testing.ruleStore({ layer: sqlLayer })
@@ -75,7 +77,11 @@ if (postgresUrl === undefined || postgresUrl.length === 0) {
 } else {
   Testing.ruleStore({
     layer: Permissions.layerRuleStoreSql({ scope: `rule-store:${process.pid}` }).pipe(
-      Layer.provide(RuntimeSchema.layerClient({ url: postgresUrl, maxConnections: 2 })),
+      Layer.provide(
+        Layer.effectDiscard(RuntimeSchema.apply("rule-store")).pipe(
+          Layer.provideMerge(RuntimeSchema.layerClient({ url: postgresUrl, maxConnections: 2 })),
+        ),
+      ),
     ),
   })
 }

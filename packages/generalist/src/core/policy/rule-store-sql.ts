@@ -5,7 +5,10 @@ import { PermissionError, RuleSchema, RuleStore } from "./rule-store.js"
 
 const table = "generalist_permission_rules"
 
-/** @experimental SQL permission-rule scope. Use a session id for per-session rules. */
+/**
+ * @experimental SQL permission-rule scope. Rules are stored and read per scope; pass a session id for
+ * per-session rules. Defaults to `"global"`.
+ */
 export interface RuleStoreSqlOptions {
   readonly scope?: string
 }
@@ -24,16 +27,8 @@ const permissionError =
 const make = (options: RuleStoreSqlOptions) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const scope = options.scope ?? "sessionId"
+    const scope = options.scope ?? "global"
     const writes = yield* Semaphore.make(1)
-    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(table)} (
-      scope VARCHAR(255) NOT NULL,
-      pattern VARCHAR(512) NOT NULL,
-      level VARCHAR(16) NOT NULL,
-      reason TEXT,
-      created_at VARCHAR(32) NOT NULL,
-      PRIMARY KEY (scope, pattern)
-    )`.pipe(Effect.mapError(permissionError("migration")))
     return RuleStore.of({
       remember: (rule) =>
         writes.withPermit(
@@ -69,7 +64,10 @@ const make = (options: RuleStoreSqlOptions) =>
     })
   })
 
-/** @experimental A RuleStore in the current Runtime SqlClient. */
+/**
+ * @experimental A RuleStore in the Runtime `SqlClient`. The `generalist_permission_rules` table is part of
+ * the Runtime SQL schema, so the schema must be migrated before this Layer is used.
+ */
 export const layerRuleStoreSql = (
   options: RuleStoreSqlOptions = {},
 ): Layer.Layer<RuleStore, PermissionError, SqlClient.SqlClient> => Layer.effect(RuleStore, make(options))
