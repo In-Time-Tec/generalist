@@ -4,7 +4,7 @@ import { Prompt, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
 import type { RunSnapshot } from "../../src/runtime/run.js"
 import type { RunEvent } from "../../src/runtime/run/event.js"
-import * as Trajectory from "../../src/trajectory/trajectory.js"
+import * as Trajectory from "../../src/trajectory/index.js"
 import { pinnedTestExecutable } from "../runtime/run/identity.js"
 
 const runId = "run:trajectory:golden"

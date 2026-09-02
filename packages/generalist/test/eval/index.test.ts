@@ -2,9 +2,9 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
-import * as Eval from "../../src/eval/eval.js"
+import * as Eval from "../../src/eval/index.js"
 import { ExecutableResolver, Runtime } from "../../src/runtime/index.js"
-import type { Trajectory } from "../../src/trajectory/trajectory.js"
+import type { Trajectory } from "../../src/trajectory/index.js"
 import { TestModel } from "../../src/testing/index.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
 
@@ -85,9 +85,11 @@ it.effect("checks token and bundled-catalog USD limits", () =>
 it.effect("uses the required LanguageModel for judge", () =>
   Effect.gen(function* () {
     const fixture = yield* TestModel.make([TestModel.object({ passed: true, reason: "faithful" })])
-    const [judged] = yield* Eval.score(trajectory, [Eval.judge({ rubric: "faithful", model: "scripted" })]).pipe(
-      (effect) => provideScoped(fixture.layer, effect),
-    )
+    const [matched, judged] = yield* Eval.score(trajectory, [
+      Eval.outputMatches(Schema.Struct({ severity: Schema.Literal("high") })),
+      Eval.judge({ rubric: "faithful", model: "scripted" }),
+    ]).pipe((effect) => provideScoped(fixture.layer, effect))
+    expect(matched?.passed).toBe(true)
     expect(judged).toMatchObject({ scorer: "judge:scripted", passed: true, message: "faithful" })
   }),
 )

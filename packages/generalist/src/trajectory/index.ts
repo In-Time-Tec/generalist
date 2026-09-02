@@ -24,7 +24,7 @@ export const Turn = Schema.Struct({
 })
 export type Turn = typeof Turn.Type
 
-/** Stable, serializable projection of one Runtime Run journal. */
+/** Stable, serializable projection of one Runtime journal. */
 export const Trajectory = Schema.Struct({
   runId: RunId,
   agent: Schema.String,

@@ -3,7 +3,7 @@ import { LanguageModel } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../core/agent/lifecycle/definition.js"
 import { ModelCatalog, bundled, type Metadata as ModelMetadata } from "../ai/model-catalog.js"
 import { Runtime } from "../runtime/service.js"
-import { fromJournal, type Trajectory } from "../trajectory/trajectory.js"
+import { fromJournal, type Trajectory } from "../trajectory/index.js"
 
 export const Score = Schema.Struct({
   scorer: Schema.String,
@@ -240,7 +240,7 @@ type SuiteError<E> =
   | import("../runtime/run/event.js").RunCancelled
   | import("../runtime/service.js").EventsError
   | import("../core/agent/event.js").InvalidOutput
-  | import("../trajectory/trajectory.js").FromJournalError
+  | import("../trajectory/index.js").FromJournalError
   | InvalidSuiteOptions
 
 interface RunSuite {
