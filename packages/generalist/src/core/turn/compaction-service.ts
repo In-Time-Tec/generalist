@@ -10,6 +10,9 @@ export interface Usage {
   readonly reserveTokens: number
 }
 
+/** @experimental Default recent-session suffix target kept verbatim. */
+export const defaultKeepRecentTokens = 20_000
+
 /** @experimental What to keep verbatim and what the summary replaces. */
 export interface Plan {
   readonly keep: Prompt.Prompt

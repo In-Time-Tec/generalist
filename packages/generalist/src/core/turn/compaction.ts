@@ -12,6 +12,7 @@ import { bound } from "../tools/tool-output.js"
 import {
   Compaction,
   CompactionError,
+  defaultKeepRecentTokens,
   microcompactResult,
   type Plan,
   type Request,
@@ -20,7 +21,7 @@ import {
   type Usage,
 } from "./compaction-service.js"
 
-export { Compaction, CompactionError, Result, withLifecycle } from "./compaction-service.js"
+export { Compaction, CompactionError, defaultKeepRecentTokens, Result, withLifecycle } from "./compaction-service.js"
 export type { MicrocompactResult, Plan, Request, Service, SummarizeResult, Usage } from "./compaction-service.js"
 export { cacheAware } from "./compaction-cache-aware.js"
 export type { Options as CacheAwareOptions } from "./compaction-cache-aware.js"
@@ -28,8 +29,6 @@ export { layerTruncate, layerTruncateEstimated } from "./compaction-truncate.js"
 
 /** @experimental Default headroom kept for the next model response. */
 export const defaultReserveTokens = 16_384
-/** @experimental Default recent-session suffix target kept verbatim. */
-export const defaultKeepRecentTokens = 20_000
 /** @experimental Fixed prompt used for dedicated summary calls. */
 export const summaryTemplate = `Summarize the conversation so another agent can continue seamlessly.
 

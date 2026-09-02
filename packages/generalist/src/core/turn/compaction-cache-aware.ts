@@ -1,6 +1,7 @@
 import { Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { safeCutIndex } from "./compaction-cut.js"
+import { defaultKeepRecentTokens } from "./compaction-service.js"
 import type { Strategy } from "./compaction.js"
 
 /** @experimental Options for cache-aware semantic compaction. */
@@ -9,8 +10,6 @@ export interface Options {
   readonly keepRecentTokens?: number
   readonly summarize: Strategy["summarize"]
 }
-
-const defaultKeepRecentTokens = 20_000
 
 const safeNonNegativeInteger = (name: string, value: number): number => {
   if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${name} must be a non-negative safe integer`)
