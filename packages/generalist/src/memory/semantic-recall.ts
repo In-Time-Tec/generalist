@@ -1,5 +1,5 @@
-import { Effect, Layer, Ref } from "effect"
-import { EmbeddingModel, Prompt } from "effect/unstable/ai"
+import { Effect, Layer } from "effect"
+import { EmbeddingModel, IdGenerator, Prompt } from "effect/unstable/ai"
 import { type Item, Memory, MemoryError, type Service } from "../core/context/memory.js"
 import { VectorStore, type Match, type Query } from "./vector-store.js"
 /** @experimental */
@@ -62,7 +62,6 @@ export const make = (
   Effect.gen(function* () {
     const store = yield* VectorStore
     const embeddingModel = yield* EmbeddingModel.EmbeddingModel
-    const counter = yield* Ref.make(0)
     const limit = options.limit ?? 5
 
     return {
@@ -95,19 +94,9 @@ export const make = (
         return embeddingModel.embed(text).pipe(
           Effect.mapError((error) => memoryError("embedding", error)),
           Effect.flatMap((embedding) =>
-            Ref.modify(counter, (current) => [`semantic-${current + 1}`, current + 1]).pipe(
-              Effect.flatMap((id) =>
-                store
-                  .upsert([
-                    {
-                      id,
-                      key: input.key,
-                      text,
-                      embedding: embedding.vector,
-                    },
-                  ])
-                  .pipe(Effect.mapError((error) => memoryError("vector-store", error))),
-              ),
+            IdGenerator.defaultIdGenerator.generateId().pipe(
+              Effect.flatMap((id) => store.upsert([{ id, key: input.key, text, embedding: embedding.vector }])),
+              Effect.mapError((error) => memoryError("vector-store", error)),
             ),
           ),
         )

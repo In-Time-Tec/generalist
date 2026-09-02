@@ -131,6 +131,7 @@ const fakeClient = (options?: {
         $metadata: options?.requestId === undefined ? {} : { requestId: options.requestId },
       }
     }),
+  invokeModel: () => Effect.die("unexpected invokeModel call"),
 })
 
 describe("Amazon Bedrock", () => {
@@ -176,9 +177,11 @@ describe("Amazon Bedrock", () => {
         "isRecoverableCredentialFailure",
         "layer",
         "layerClient",
+        "layerEmbedding",
         "layerLanguageModel",
         "layerModel",
         "make",
+        "makeEmbedding",
         "toolJsonSchemaCompiler",
       ])
     }),
