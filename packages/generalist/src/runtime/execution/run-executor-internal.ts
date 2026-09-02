@@ -53,8 +53,7 @@ import type { Service } from "./run-executor.js"
 export const makeWith = (
   agents: RegisteredAgents = makeRegisteredAgents(),
 ): Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> =>
-  Effect.gen(
-  function* () {
+  Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
@@ -520,7 +519,6 @@ export const makeWith = (
         yield* active.run(claim.runId, executeClaim(claim, afterExit), settleAndRelease)
       })
     return { execute, interrupt: (runId) => active.interrupt(runId) }
-  },
-)
+  })
 
 export const make = makeWith()

@@ -90,16 +90,22 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         prompt: textPrompt("hello"),
       }
       yield* runtime.startExecution(base)
-      expect(yield* runtime.startExecution({ ...base, prompt: textPrompt("changed") }).pipe(Effect.flip)).toBeInstanceOf(
-        Errors.IdempotencyConflict,
-      )
+      expect(
+        yield* runtime.startExecution({ ...base, prompt: textPrompt("changed") }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.IdempotencyConflict)
       expect(
         yield* runtime
-          .startExecution({ ...base, executable: alternateAssistantRef, registrations: registrationsFor(alternateAssistantRef) })
+          .startExecution({
+            ...base,
+            executable: alternateAssistantRef,
+            registrations: registrationsFor(alternateAssistantRef),
+          })
           .pipe(Effect.flip),
       ).toBeInstanceOf(Errors.IdempotencyConflict)
       expect(
-        yield* runtime.startExecution({ ...base, registrations: registrationsFor(assistantRef, "changed") }).pipe(Effect.flip),
+        yield* runtime
+          .startExecution({ ...base, registrations: registrationsFor(assistantRef, "changed") })
+          .pipe(Effect.flip),
       ).toBeInstanceOf(Errors.ExecutableRegistrationConflict)
     }),
   )
@@ -120,7 +126,9 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         duplicate: true,
       })
       expect(
-        yield* runtime.startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) }).pipe(Effect.flip),
+        yield* runtime
+          .startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) })
+          .pipe(Effect.flip),
       ).toBeInstanceOf(Errors.IdempotencyConflict)
     }),
   )
@@ -272,7 +280,9 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
         })
         .pipe(Effect.flip)
       expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
-      expect((yield* runtime.treeCheckpoint((yield* runtime.startExecution(base)).runId)).inspection.runs).toHaveLength(3)
+      expect((yield* runtime.treeCheckpoint((yield* runtime.startExecution(base)).runId)).inspection.runs).toHaveLength(
+        3,
+      )
     }),
   )
 

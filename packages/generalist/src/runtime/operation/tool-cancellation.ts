@@ -5,22 +5,14 @@ import { decodeCancellableOperation, supportsCancellation } from "../../core/too
 import { AgentExecutionFailure, type UnknownAgent } from "../errors.js"
 import { selectToolExecutor } from "../execution/context.js"
 import { ExecutionResolution, type Resolver } from "../execution/resolution/resolve.js"
-import type {
-  ExecutionClaim,
-  ExecutionRecord,
-  Service as RunStore,
-  WorkerMutationError,
-} from "../run/store.js"
+import type { ExecutionClaim, ExecutionRecord, Service as RunStore, WorkerMutationError } from "../run/store.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
 
 export const make = (options: {
   readonly store: RunStore
   readonly resolver: Resolver
-  readonly suspendUnknown: (
-    claim: ExecutionClaim,
-    error: UnknownAgent,
-  ) => Effect.Effect<void, WorkerMutationError>
+  readonly suspendUnknown: (claim: ExecutionClaim, error: UnknownAgent) => Effect.Effect<void, WorkerMutationError>
 }) =>
   Effect.gen(function* () {
     const ambient = yield* Effect.serviceOption(ToolExecutor)

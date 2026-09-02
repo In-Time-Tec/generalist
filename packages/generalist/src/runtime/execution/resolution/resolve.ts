@@ -25,22 +25,24 @@ const resolveExecution = (
   suspendUnknown: (error: UnknownAgent) => Effect.Effect<void, WorkerMutationError>,
 ) =>
   Effect.gen(function* () {
-    const resolution = yield* resolver.resolve(
-      verifyInput({
-        runId: claimed.runId,
-        ref: claimed.executableRef,
-        manifest: claimed.executableManifest,
-        registrations: claimed.registrations,
-      }),
-    ).pipe(
-      Effect.matchEffect({
-        onFailure: (error) =>
-          error._tag === "generalist/runtime/UnknownAgent"
-            ? suspendUnknown(error).pipe(Effect.as(undefined))
-            : fail(error).pipe(Effect.as(undefined)),
-        onSuccess: Effect.succeed,
-      }),
-    )
+    const resolution = yield* resolver
+      .resolve(
+        verifyInput({
+          runId: claimed.runId,
+          ref: claimed.executableRef,
+          manifest: claimed.executableManifest,
+          registrations: claimed.registrations,
+        }),
+      )
+      .pipe(
+        Effect.matchEffect({
+          onFailure: (error) =>
+            error._tag === "generalist/runtime/UnknownAgent"
+              ? suspendUnknown(error).pipe(Effect.as(undefined))
+              : fail(error).pipe(Effect.as(undefined)),
+          onSuccess: Effect.succeed,
+        }),
+      )
     if (resolution === undefined) return undefined
     const identityMatches = yield* Effect.sync(() => {
       try {

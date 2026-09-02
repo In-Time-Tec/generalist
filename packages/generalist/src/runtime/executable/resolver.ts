@@ -121,9 +121,7 @@ export type ResolveError = ExecutablePinMissing | ExecutableRegistrationInvalid 
 
 /** @experimental */
 export interface Service {
-  readonly resolve: (
-    input: Input,
-  ) => Effect.Effect<Resolution, ResolveError, Scope.Scope>
+  readonly resolve: (input: Input) => Effect.Effect<Resolution, ResolveError, Scope.Scope>
 }
 export class ExecutableResolver extends Context.Service<ExecutableResolver, Service>()(
   "generalist/runtime/executable/resolver/ExecutableResolver",
