@@ -91,6 +91,7 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 - Reusing the active parent's Session ID fails before the child model call; it does not wait on the parent's lane.
 - Parent, child, and sibling control inputs never cross Run boundaries.
 - Same-run handoff retains the Run ID, inbox, Session identity, `DriverInterpreter`, tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event order.
+- On the target's first turn, its instructions are live system context only; the `Handoff` projection remains the active Session history, and the target's non-system conversation appends after it.
 - A producer holding the original `RunHandle` can keep steering after handoff.
 - Same-run handoff tools execute through the agent loop, never direct toolkit invocation.
 - The catalog resolves targets but does not provide target requirements.
