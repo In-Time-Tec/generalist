@@ -1,13 +1,10 @@
 import { Schema } from "effect"
 
 /** @experimental Transport framing, encoding, or connection operation failed. */
-export class TransportError extends Schema.TaggedError<TransportError>()(
-  "generalist/transport/TransportError",
-  {
-    message: Schema.String,
-    kind: Schema.optional(Schema.Literals(["socket", "protocol", "encoding", "not-open"])),
-  },
-) {}
+export class TransportError extends Schema.TaggedError<TransportError>()("generalist/transport/TransportError", {
+  message: Schema.String,
+  kind: Schema.optional(Schema.Literals(["socket", "protocol", "encoding", "not-open"])),
+}) {}
 
 /** @experimental A replay cursor supplied at the transport boundary is malformed. */
 export class InvalidCursor extends Schema.TaggedError<InvalidCursor>()("generalist/transport/InvalidCursor", {
@@ -32,9 +29,6 @@ export class ReconnectExhausted extends Schema.TaggedError<ReconnectExhausted>()
 ) {}
 
 /** @experimental A client or server wire frame could not be schema-encoded or decoded. */
-export class WireCodecFailed extends Schema.TaggedError<WireCodecFailed>()(
-  "generalist/transport/WireCodecFailed",
-  {
-    message: Schema.String,
-  },
-) {}
+export class WireCodecFailed extends Schema.TaggedError<WireCodecFailed>()("generalist/transport/WireCodecFailed", {
+  message: Schema.String,
+}) {}

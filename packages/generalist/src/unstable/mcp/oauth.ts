@@ -51,14 +51,11 @@ export class OAuthExpired extends Schema.TaggedError<OAuthExpired>()("generalist
 }) {}
 
 /** @experimental */
-export class OAuthProviderError extends Schema.TaggedError<OAuthProviderError>()(
-  "generalist/mcp/OAuthProviderError",
-  {
-    server: Schema.String,
-    operation: Schema.String,
-    message: Schema.String,
-  },
-) {}
+export class OAuthProviderError extends Schema.TaggedError<OAuthProviderError>()("generalist/mcp/OAuthProviderError", {
+  server: Schema.String,
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
 
 /** @experimental */
 export class TokenStore extends Context.Service<

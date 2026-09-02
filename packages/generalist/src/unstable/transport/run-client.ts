@@ -62,9 +62,7 @@ export interface Service {
 }
 
 /** @experimental */
-export class RunClient extends Context.Service<RunClient, Service>()(
-  "generalist/transport/run-client/RunClient",
-) {}
+export class RunClient extends Context.Service<RunClient, Service>()("generalist/transport/run-client/RunClient") {}
 
 const transportError = (message: string, kind?: TransportError["kind"]): TransportError =>
   TransportError.make(kind === undefined ? { message } : { message, kind })

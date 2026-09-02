@@ -22,14 +22,11 @@ export class MCPConnectionFailed extends Schema.TaggedError<MCPConnectionFailed>
 ) {}
 
 /** @experimental */
-export class MCPToolCallFailed extends Schema.TaggedError<MCPToolCallFailed>()(
-  "generalist/mcp/MCPToolCallFailed",
-  {
-    server: Schema.String,
-    tool: Schema.String,
-    message: Schema.String,
-  },
-) {}
+export class MCPToolCallFailed extends Schema.TaggedError<MCPToolCallFailed>()("generalist/mcp/MCPToolCallFailed", {
+  server: Schema.String,
+  tool: Schema.String,
+  message: Schema.String,
+}) {}
 
 /** @experimental */
 export const MCPToolFailure = Schema.Struct(MCPToolCallFailed.fields)

@@ -145,9 +145,7 @@ describe("AGUI", () => {
             const failures = yield* Effect.forEach(cases, (value) =>
               service.run(value).pipe(Stream.runCollect, Effect.flip),
             )
-            expect(failures.map((failure) => failure._tag)).toEqual(
-              Array(4).fill("generalist/ag-ui/InputRejected"),
-            )
+            expect(failures.map((failure) => failure._tag)).toEqual(Array(4).fill("generalist/ag-ui/InputRejected"))
             const malformedInput = input({ runId: "missing-fields" })
             Reflect.deleteProperty(malformedInput, "threadId")
             const malformedFailure = yield* service.run(malformedInput).pipe(Stream.runCollect, Effect.flip)

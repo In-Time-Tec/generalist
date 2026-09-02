@@ -689,8 +689,7 @@ describe("OAuth", () => {
         ).pipe(Effect.flip)
 
         expect(error).toBeInstanceOf(OAuth.OAuthPending)
-        if (error._tag === "generalist/mcp/OAuthPending")
-          expect(error.authorizationUrl).toBe(authorization.url)
+        if (error._tag === "generalist/mcp/OAuthPending") expect(error.authorizationUrl).toBe(authorization.url)
       }),
     ),
   )
