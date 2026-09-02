@@ -1,4 +1,4 @@
-import * as chaos from "./chaos.js"
+import { layerDropConnection, layerFlakyModel, layerInterruptAfter } from "./chaos.js"
 import { memory } from "./memory.js"
 import { write } from "./report.js"
 import { ruleStore } from "./rule-store.js"
@@ -18,9 +18,9 @@ export const Testing = {
   memory,
   ruleStore,
   chaos: {
-    interruptAfter: chaos.interruptAfter,
-    dropConnection: chaos.dropConnection,
-    flakyModel: chaos.flakyModel,
+    interruptAfter: layerInterruptAfter,
+    dropConnection: layerDropConnection,
+    flakyModel: layerFlakyModel,
   },
   report: { write },
 } as const

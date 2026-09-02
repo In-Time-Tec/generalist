@@ -11,7 +11,7 @@ const positiveSafeInteger = (name: string, value: number): void => {
 }
 
 /** @experimental Interrupts the current run fiber immediately after its Nth durable operation is journaled. */
-export const interruptAfter = (operationCount: number): Layer.Layer<JournalFault> => {
+export const layerInterruptAfter = (operationCount: number): Layer.Layer<JournalFault> => {
   positiveSafeInteger("operationCount", operationCount)
   return Layer.effect(
     JournalFault,
@@ -28,7 +28,7 @@ export const interruptAfter = (operationCount: number): Layer.Layer<JournalFault
 }
 
 /** @experimental Drops a reconnecting transport immediately after admitting its Nth event. */
-export const dropConnection = (afterEvents: number): Layer.Layer<ConnectionFault> => {
+export const layerDropConnection = (afterEvents: number): Layer.Layer<ConnectionFault> => {
   positiveSafeInteger("afterEvents", afterEvents)
   return Layer.effect(
     ConnectionFault,
@@ -56,7 +56,7 @@ const unavailable = (method: string): AiError.AiError =>
   })
 
 /** @experimental Deterministic model provider that fails every Nth request. */
-export const flakyModel = (options: { readonly failEvery: number }): Layer.Layer<LanguageModel.LanguageModel> => {
+export const layerFlakyModel = (options: { readonly failEvery: number }): Layer.Layer<LanguageModel.LanguageModel> => {
   positiveSafeInteger("failEvery", options.failEvery)
   const wrapper = Layer.effect(
     LanguageModel.LanguageModel,
