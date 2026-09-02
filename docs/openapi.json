@@ -872,6 +872,65 @@
                                   },
                                   "required": ["_tag"],
                                   "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["AwaitEvent"] },
+                                    "filter": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Timer"] },
+                                            "scheduleId": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Webhook"] },
+                                            "source": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                            "childRunId": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                            "path": { "type": "string" },
+                                            "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                            "approvalId": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "deadline": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "filter", "deadline"],
+                                  "additionalProperties": false
                                 }
                               ]
                             },
@@ -1596,6 +1655,65 @@
                                   "capability": { "type": "string" }
                                 },
                                 "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["AwaitEvent"] },
+                                  "filter": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Timer"] },
+                                          "scheduleId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Webhook"] },
+                                          "source": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                          "childRunId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                          "path": { "type": "string" },
+                                          "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                          "approvalId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "deadline": { "type": "string" }
+                                },
+                                "required": ["_tag", "filter", "deadline"],
                                 "additionalProperties": false
                               }
                             ]

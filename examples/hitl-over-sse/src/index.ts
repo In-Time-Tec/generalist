@@ -71,10 +71,7 @@ const program = Effect.gen(function* () {
   const session = yield* host.sessions.create({ id: "release-1" })
   yield* host.runs.start(session.id, agent, "Deploy api", { idempotencyKey: "deploy-api-1" })
   const events = yield* host.events.subscribe(session.id).pipe(
-    Stream.takeUntil(
-      (event) =>
-        (event._tag === "ToolCall" && event.event._tag === "ToolExecutionWaiting") || event._tag === "Completed",
-    ),
+    Stream.takeUntil((event) => event._tag === "ApprovalRequested" || event._tag === "Completed"),
     Stream.runCollect,
   )
   const collected = Array.from(events)

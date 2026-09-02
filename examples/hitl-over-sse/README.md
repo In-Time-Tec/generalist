@@ -1,9 +1,9 @@
 # HITL over SSE
 
-Run an in-memory `generalist/runtime` example that produces an approval suspension as canonical `RunEvent` values and encodes them for SSE. A real server provides the same Runtime layer to `SSE.respond` for downstream UI streaming.
+Run an in-memory Host example that produces a durable approval request as a `HostEvent` and encodes it with the same wire contract used by `generalist/server` SSE and WebSocket streams.
 
 ```bash
 bun --cwd examples/hitl-over-sse start
 ```
 
-Manual acceptance path: admit a message, attach to its Run over SSE, observe `ApprovalRequested` and `RunWaiting`, resolve the wait through a command route, then reattach with the last event id.
+Manual acceptance path: create a Session, start a named Agent, follow `/sessions/:id/events` until `ApprovalRequested`, resolve its token through `/runs/:id/approvals/:token`, then resume after the last Host cursor.

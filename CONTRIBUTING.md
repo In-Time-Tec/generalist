@@ -16,13 +16,14 @@ Imports under `generalist/*` are stable and follow semantic versioning. Imports 
 | `generalist/approvals`                                                                     | `generalist/unstable/ag-ui`                          |
 | `generalist/compaction`                                                                    | `generalist/unstable/cloudflare/*`                   |
 | `generalist/instructions` and `generalist/instructions/skills`                             | `generalist/unstable/foldkit`                        |
+| `generalist/host` and `generalist/server`                                                  |                                                      |
 | `generalist/memory`                                                                        | `generalist/unstable/mcp/*`                          |
 | `generalist/mysql` and `generalist/pg`                                                     | `generalist/unstable/providers/model-route`          |
 | `generalist/permissions`                                                                   | `generalist/unstable/providers/openai-account-auth*` |
 | `generalist/providers/*` except the unstable leaves at right                               | `generalist/unstable/rivet`                          |
 | `generalist/repl` and `generalist/repl/bun`                                                | `generalist/unstable/runtime/external-child-*`       |
 | `generalist/runtime`, `generalist/runtime/sql-driver`, and `generalist/runtime/sqlite-bun` | `generalist/unstable/sandbox/*`                      |
-| `generalist/sandbox`                                                                       | `generalist/unstable/transport/*`                    |
+| `generalist/sandbox`                                                                       |                                                      |
 | `generalist/testing` and `generalist/testing/runtime-driver`                               |                                                      |
 
 Stable modules must not import modules under `src/unstable`. A service can move to the stable tier only when it provides its production `layer`, a deterministic `layerTest`, and a reusable conformance suite exported from `generalist/testing`. Promotion also requires complete public documentation, a maintainer review of the resulting semver commitment, and all of the following:
