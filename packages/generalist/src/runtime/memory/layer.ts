@@ -9,7 +9,7 @@ import { layer as localSchedulerLayer } from "../execution/local-scheduler-inter
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
 import { RunStore } from "../run/store.js"
 import { Runtime, type LayerOptions } from "../service.js"
-import { make as makeRegisteredAgents } from "../registered-agent.js"
+import { make as makeRegisteredAgents } from "../executable/registered-agent.js"
 import { layer as runtimeLayer } from "./layer/service.js"
 import { layerMemory as storeLayer } from "./store.js"
 

@@ -7,7 +7,7 @@ import { DuplicateAgent, IdempotencyConflict, RunIdConflict, UnknownAgent } from
 import { RunExecutor } from "../../runtime/execution/run-executor.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { make as makeMessage } from "../../runtime/messaging/message.js"
-import { durableIdentity } from "../../runtime/registered-agent.js"
+import { durableIdentity } from "../../runtime/executable/registered-agent.js"
 import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
 import { StaleClaim } from "../../runtime/sql/errors.js"

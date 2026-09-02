@@ -12,7 +12,7 @@ import { layer as localSchedulerLayer } from "../execution/local-scheduler-inter
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import { ExecutableResolver } from "../executable/resolver.js"
-import { make as makeRegisteredAgents } from "../registered-agent.js"
+import { make as makeRegisteredAgents } from "../executable/registered-agent.js"
 
 export interface BunSqliteStoreOptions extends SqliteStoreOptions {
   readonly filename: string

@@ -1,18 +1,18 @@
 import { Context, Effect, Layer, Option, Schema, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
-import { fromLiveAgent } from "../core/durable/manifest/agent-manifest.js"
-import { makeCapability, makeModel } from "../core/durable/pin.js"
-import { close, type Agent, type Closed, type ClosedServices } from "../core/agent/lifecycle/definition.js"
+import { fromLiveAgent } from "../../core/durable/manifest/agent-manifest.js"
+import { makeCapability, makeModel } from "../../core/durable/pin.js"
+import { close, type Agent, type Closed, type ClosedServices } from "../../core/agent/lifecycle/definition.js"
 import {
   DuplicateAgent,
   ExecutablePinMissing,
   type ExecutableRegistrationInvalid,
   type ExecutableRegistrationMissing,
   UnknownAgent,
-} from "./errors.js"
-import { make as makeExecutable } from "./executable/manifest.js"
-import type { Input as ResolverInput, Resolution, Service as ResolverService } from "./executable/resolver.js"
-import { requiredPins, type ExecutableRegistration } from "./executable/registration.js"
+} from "../errors.js"
+import { make as makeExecutable } from "./manifest.js"
+import type { Input as ResolverInput, Resolution, Service as ResolverService } from "./resolver.js"
+import { requiredPins, type ExecutableRegistration } from "./registration.js"
 
 const codec = "generalist/runtime/registered-agent"
 const version = "1"
@@ -27,14 +27,14 @@ export interface RegisteredAgent<
   readonly name: string
   readonly agent: Closed
   readonly context: Context.Context<ClosedServices<Tools, R, InputCodec, OutputCodec>>
-  readonly executable: import("./executable/manifest.js").PinnedExecutable
+  readonly executable: import("./manifest.js").PinnedExecutable
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
 interface RecoverableAgent {
   readonly name: string
   readonly agent: Closed
-  readonly executable: import("./executable/manifest.js").PinnedExecutable
+  readonly executable: import("./manifest.js").PinnedExecutable
   readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 

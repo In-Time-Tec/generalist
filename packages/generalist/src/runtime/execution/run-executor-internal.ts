@@ -13,7 +13,7 @@ import {
   make as makeRegisteredAgents,
   resolve as resolveRegisteredAgent,
   type RegisteredAgents,
-} from "../registered-agent.js"
+} from "../executable/registered-agent.js"
 import type { UnknownAgent } from "../errors.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"

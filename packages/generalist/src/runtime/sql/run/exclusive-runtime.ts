@@ -11,7 +11,7 @@ import { makeWith as makeRunExecutor } from "../../execution/run-executor-intern
 import { layer as runtimeLayer } from "../../memory/layer/service.js"
 import { RunStore } from "../../run/store.js"
 import { Runtime } from "../../service.js"
-import { make as makeRegisteredAgents } from "../../registered-agent.js"
+import { make as makeRegisteredAgents } from "../../executable/registered-agent.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "../store.js"
 
 /** Services constructed by an exclusive SQLite Runtime host. */

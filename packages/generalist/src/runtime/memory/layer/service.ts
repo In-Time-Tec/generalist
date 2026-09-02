@@ -46,7 +46,7 @@ import {
   make as makeRegisteredAgents,
   resolve as resolveRegisteredAgent,
   type RegisteredAgents,
-} from "../../registered-agent.js"
+} from "../../executable/registered-agent.js"
 import { ModelPreviewLane, previews as modelPreviews } from "../../execution/model-response/preview-internal.js"
 import { readEntry, resolveModelResponse } from "../../session/service.js"
 type Registrations = ReadonlyArray<ExecutableRegistration>
