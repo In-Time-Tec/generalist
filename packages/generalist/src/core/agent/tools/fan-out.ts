@@ -5,14 +5,27 @@ import { FrameworkFailure, type Outcome, type Request } from "../../tools/tool-e
 import type { Child as LifecycleChild } from "../../../hooks/index.js"
 import { AgentError } from "../event.js"
 import { childEnd as applyChildEnd, childStart as applyChildStart } from "../lifecycle/hooks.js"
-import { validateAuthority, type Definition } from "../tool/fan-out.js"
+import { definition as fanOutDefinition, validateAuthority, type Definition } from "../tool/fan-out.js"
 import type { Any as AnyAgent } from "../lifecycle/definition.js"
 import { inheritedHistory, ProcessRunner, child, run, type AnyChild } from "../lifecycle/fan-out.js"
+import { current as currentTasks } from "../../../tasks/internal.js"
+import { get, type Registry } from "../../tools/tool-registry.js"
 
 type Invocation = AnyChild & { readonly lifecycle: LifecycleChild }
 
 const frameworkFailure = (request: Request, stage: "decode-input" | "encode-success" | "handler", message: string) =>
   FrameworkFailure.make({ stage, tool: request.call.name, message })
+
+/** @internal Attach the current parent list only when a durable fan-out profile requests it. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- Internal executor seam with two required inputs.
+export const withParentTasks = (request: Request, registry: Registry) => {
+  const registered = get(registry, request.call.name)
+  const definition = registered === undefined ? undefined : fanOutDefinition(registered.tool)
+  if (definition === undefined || !Object.values(definition.inheritance).some((inherit) => inherit.tasks === "read")) {
+    return Effect.succeed(request)
+  }
+  return currentTasks.pipe(Effect.map((tasks) => ({ ...request, tasks })))
+}
 
 /** @internal Execute one model-authored fan-out through Agent.run's process-local child runner. */
 // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal tool-execution seam with two required direct-style arguments.
@@ -34,6 +47,9 @@ export const execute = (parentAgent: AnyAgent, definition: Definition, request: 
       parameters.children.map((member) => member.agent),
     )
     const parentHistory = parent.history === undefined ? undefined : yield* parent.history
+    const parentTasks = parameters.children.some((member) => member.inherit.tasks === "read")
+      ? yield* currentTasks
+      : undefined
     const invocations: Array<Invocation> = []
     for (const [index, member] of parameters.children.entries()) {
       const agent = definition.agents[member.agent]
@@ -47,6 +63,7 @@ export const execute = (parentAgent: AnyAgent, definition: Definition, request: 
       invocations.push({
         ...child(agent, member.input, { inherit: member.inherit }),
         ...Object.assign({}, history === undefined ? undefined : { history }),
+        ...Object.assign({}, member.inherit.tasks === "read" ? { tasks: parentTasks ?? [] } : undefined),
         lifecycle: {
           operation: `${request.call.id}:${index}`,
           selection: member.agent,

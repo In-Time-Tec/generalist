@@ -53,6 +53,8 @@ import { prepare as prepareBudget } from "../budget/suspend.js"
 import { Runtime } from "../service.js"
 import { make as makeMessaging, Policy as MessagingPolicy } from "../messaging/service.js"
 import { RuntimeUnavailable } from "../errors.js"
+import { withInherited as withInheritedTasks } from "../../tasks/internal.js"
+import { Items as TaskItems } from "../../tasks/item.js"
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
@@ -522,7 +524,12 @@ const makeFor = (
                 const parent = yield* agents.get(parentName.value)
                 if (Option.isNone(parent)) return yield* runClosed(agent, environment)
                 const inherited = yield* applyInheritance(parent.value.source, agent, policy.value)
-                return yield* runClosed(inherited, environment)
+                const tasks = Schema.decodeUnknownOption(TaskItems)(claimed.message.metadata.parentTasks)
+                const child =
+                  policy.value.tasks === "read" && Option.isSome(tasks)
+                    ? withInheritedTasks(inherited, tasks.value)
+                    : inherited
+                return yield* runClosed(child, environment)
               }).pipe(Effect.orDie),
             )
           }),

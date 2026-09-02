@@ -33,8 +33,9 @@ import { toolResult as applyToolResult } from "../lifecycle/hooks.js"
 import type { RunId } from "../../durable/run-id.js"
 import { make as makeToolAuthorization } from "./authorization.js"
 import { definition as fanOutDefinition, withoutFanOut } from "../tool/fan-out.js"
-import { execute as executeFanOut } from "./fan-out.js"
+import { execute as executeFanOut, withParentTasks } from "./fan-out.js"
 import type { RunInbox } from "../../turn/steering-inbox.js"
+import { eventFields as taskEventFields } from "../../../tasks/internal.js"
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
   readonly inbox?: RunInbox
@@ -84,17 +85,21 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       : Effect.succeed(outcome)
   const outcomeEvent = (
     turn: number,
-    toolCallBatch: Request["toolCallBatch"],
-    toolCallIndex: number,
     call: AnyToolCall,
     outcome: Outcome,
     droppedProgress: number,
-    registry: Registry,
     durableOperationKey: string,
   ): Effect.Effect<Event, RunError> => {
     const metadata = droppedProgress === 0 ? {} : { metadata: { toolProgress: { dropped: droppedProgress } } }
     const completionEvent = (result: PendingToolResult): Effect.Effect<Event> =>
-      Effect.succeed({ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata })
+      Effect.succeed({
+        _tag: "ToolExecutionCompleted",
+        turn,
+        call,
+        result,
+        ...taskEventFields({ name: call.name, isFailure: result.isFailure, result: result.result }),
+        ...metadata,
+      })
     switch (outcome._tag) {
       case "Success":
         return completionEvent(successResult(call, outcome))
@@ -305,6 +310,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const toolContext = ToolContext.of(contextBase)
         const handoffExecution = handoffFor(request, registry)
         const skillActivation = isSkillActivationCall(call, registry)
+        const executionRequest = yield* withParentTasks(request, registry)
         const requestExecutor =
           !skillActivation && handoffExecution === undefined && Option.isSome(executor) ? executor.value : undefined
         const replayPolicy = requestExecutor?.replayPolicy?.(request) ?? "never"
@@ -327,7 +333,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
             execute: executionFor(
               turn,
               call,
-              request,
+              executionRequest,
               registry,
               handoffExecution,
               requestExecutor,
@@ -375,18 +381,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           restore(execution.pipe(Effect.provideService(ToolContext, toolContext))).pipe(
             Effect.flatMap((outcome) =>
               Ref.get(droppedProgress).pipe(
-                Effect.flatMap((dropped) =>
-                  outcomeEvent(
-                    turn,
-                    request.toolCallBatch,
-                    request.toolCallIndex,
-                    call,
-                    outcome,
-                    dropped,
-                    registry,
-                    durableOperationKey,
-                  ),
-                ),
+                Effect.flatMap((dropped) => outcomeEvent(turn, call, outcome, dropped, durableOperationKey)),
               ),
             ),
           ),

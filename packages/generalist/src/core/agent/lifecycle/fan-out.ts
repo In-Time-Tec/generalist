@@ -12,6 +12,8 @@ import {
 } from "./definition.js"
 import { BudgetLimits } from "../../durable/run-budget.js"
 import { ToolContext } from "../../tools/tool-context.js"
+import { withInherited as withInheritedTasks } from "../../../tasks/internal.js"
+import type { Items as TaskItems } from "../../../tasks/item.js"
 
 /** Authority and context inherited by one child Run. */
 export const Inheritance = Schema.Struct({
@@ -22,6 +24,7 @@ export const Inheritance = Schema.Struct({
   sandbox: Schema.Literals(["share", "fork", "fresh"]),
   instructions: Schema.Literals(["inherit", "own"]),
   memory: Schema.Literals(["inherit", "fresh"]),
+  tasks: Schema.Literals(["read", "none"]),
 })
 export type Inheritance = typeof Inheritance.Type
 
@@ -36,6 +39,7 @@ export const defaultInheritance: Inheritance = {
   sandbox: "fork",
   instructions: "inherit",
   memory: "inherit",
+  tasks: "none",
 }
 
 /** Normalize one child inheritance record before execution or journaling. */
@@ -152,6 +156,8 @@ export interface Child<A extends AnyAgent = AnyAgent> {
   readonly inherit: Inheritance
   /** @internal Exact parent prefix captured by AgentTool.fanOut. */
   readonly history?: Prompt.Prompt
+  /** @internal Read-only parent task snapshot captured by AgentTool.fanOut. */
+  readonly tasks?: TaskItems
 }
 
 /** Process-local fan-out policy. */
@@ -192,6 +198,7 @@ export interface AgentRunner {
     input: BoundaryValue,
     inherit: Inheritance,
     history?: Prompt.Prompt,
+    tasks?: TaskItems,
   ) => Effect.Effect<BoundaryValue, RunError>
 }
 
@@ -203,14 +210,14 @@ type RunChild = (
 
 /** @internal Construct the recursive runner used by Agent.run. */
 export const recursiveAgentRunner = (execute: RunChild): AgentRunner => ({
-  run: (agent, input, inherit, history) =>
+  run: (agent, input, inherit, history, tasks) =>
     Effect.gen(function* () {
       const context = yield* Effect.serviceOption(ToolContext)
       const parent = Option.isSome(context) ? context.value : undefined
       const inheritedAgent = parent?.agent === undefined ? agent : yield* applyInheritance(parent.agent, agent, inherit)
       const parentHistory = history ?? (parent?.history === undefined ? undefined : yield* parent.history)
       const historyProjection = inheritedHistory(inherit.history, parentHistory)
-      return yield* execute(inheritedAgent, input, {
+      return yield* execute(tasks === undefined ? inheritedAgent : withInheritedTasks(inheritedAgent, tasks), input, {
         ...Object.assign({}, inherit.budget === undefined ? undefined : { budget: inherit.budget }),
         ...Object.assign({}, historyProjection === undefined ? undefined : { history: historyProjection }),
       })
@@ -230,7 +237,8 @@ export class ProcessRunner extends Context.Service<ProcessRunner, ProcessRunnerS
 const executeChild = (runner: AgentRunner, invocation: AnyChild) => {
   const hiddenAgent: unknown = invocation.agent
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.child accepts only Agent definitions and preserves the paired input before existential erasure.
-  return runner.run(hiddenAgent as ErasedAgent, invocation.input, invocation.inherit, invocation.history)
+  const agent = hiddenAgent as ErasedAgent
+  return runner.run(agent, invocation.input, invocation.inherit, invocation.history, invocation.tasks)
 }
 
 /** @internal Close a recursive runner over the caller's exact process-local Agent environment. */

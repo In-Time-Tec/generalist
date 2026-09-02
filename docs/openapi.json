@@ -2317,6 +2317,20 @@
                               ],
                               "additionalProperties": false
                             },
+                            "tasksUpdated": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": { "type": "string", "minLength": 1 },
+                                  "title": { "type": "string", "minLength": 1 },
+                                  "status": { "type": "string", "enum": ["todo", "doing", "done"] },
+                                  "note": { "type": "string" }
+                                },
+                                "required": ["id", "title", "status"],
+                                "additionalProperties": false
+                              }
+                            },
                             "metadata": { "type": "object" }
                           },
                           "required": ["_tag", "turn", "call", "result"],

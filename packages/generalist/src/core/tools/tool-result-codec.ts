@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect"
 import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { AwaitEvent } from "../agent/tools/wake-event.js"
+import type { Items as TaskItems } from "../../tasks/item.js"
 
 type BoundaryValue = typeof Schema.Unknown.Type
 
@@ -30,6 +31,7 @@ export interface Request {
   readonly toolCallIndex: number
   readonly agentName: string
   readonly sessionId: string
+  readonly tasks?: TaskItems
 }
 
 export interface Suspend {

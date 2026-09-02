@@ -69,8 +69,9 @@ Provide the local Effects and `handoffLayer` with the model, permissions, approv
 | `sandbox`      | `"share"`, `"fork"`, `"fresh"`  | `"fork"`      | Parent sandbox, snapshot/fork of it, or the child profile's fresh sandbox                                   |
 | `instructions` | `"inherit"`, `"own"`            | `"inherit"`   | Parent instructions or the child Agent's instructions                                                       |
 | `memory`       | `"inherit"`, `"fresh"`          | `"inherit"`   | Parent memory key or no inherited memory                                                                    |
+| `tasks`        | `"read"`, `"none"`              | `"none"`      | Read-only admission-time snapshot of the parent's current task list, or no parent task context              |
 
-The declaration, not the model call, owns this policy. A child tool, custom authorization policy, or sandbox absent from the parent fails at spawn with `ChildExceedsParent { field }`; no child Run or model call is admitted. Durable fan-out includes the normalized record in its admission digest and `ChildLinked` event, so restart reattaches with the same history, authority, budget, sandbox, instructions, and memory choices.
+The declaration, not the model call, owns this policy. A child tool, custom authorization policy, or sandbox absent from the parent fails at spawn with `ChildExceedsParent { field }`; no child Run or model call is admitted. Durable fan-out includes the normalized record in its admission digest and `ChildLinked` event, so restart reattaches with the same history, authority, budget, sandbox, instructions, memory, and task choices. A `tasks: "read"` child receives an immutable snapshot; its own task writes remain local to its Run.
 
 ## What runs
 
@@ -156,6 +157,7 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 - An inline child without `sessionId` has no Session.
 - Reusing the active parent's Session ID fails before the child model call; it does not wait on the parent's lane.
 - Parent, child, and sibling control inputs never cross Run boundaries.
+- Parent tasks cross a child boundary only as the explicit `tasks: "read"` snapshot; children cannot mutate the parent's list.
 - A durable Runtime journals an inline child as the parent's AgentTool operation. The child loop keeps its own process-local driver journal and never writes child checkpoints or model responses into the parent's Runtime journal or Session; replay of a completed parent tool operation returns the recorded child result without redispatch.
 - Same-run handoff retains the Run ID, inbox, Session identity, `DriverInterpreter`, tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event order.
 - On the target's first turn, its instructions are live system context only; the `Handoff` projection remains the active Session history, and the target's non-system conversation appends after it.

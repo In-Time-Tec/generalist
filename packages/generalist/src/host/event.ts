@@ -2,6 +2,7 @@ import { Function, Option, Schema } from "effect"
 import { Cursor } from "../runtime/cursor.js"
 import type { HostSessionEvent } from "../runtime/session/host.js"
 import { RunEvent } from "../runtime/run/event.js"
+import { Items as TaskItems } from "../tasks/item.js"
 
 type TaggedRunEvent<Tag extends RunEvent["_tag"]> = RunEvent & { readonly _tag: Tag }
 
@@ -32,6 +33,15 @@ const ToolCall = Schema.TaggedStruct("ToolCall", {
 })
 export type ToolCall = typeof ToolCall.Type
 
+/** The authoritative journaled task list changed. */
+export const TasksUpdated = Schema.TaggedStruct("TasksUpdated", {
+  sessionId: Schema.String,
+  cursor: Cursor,
+  runId: Schema.String,
+  items: TaskItems,
+})
+export type TasksUpdated = typeof TasksUpdated.Type
+
 const ApprovalRequested = Schema.TaggedStruct("ApprovalRequested", {
   sessionId: Schema.String,
   cursor: Cursor,
@@ -57,7 +67,15 @@ const Completed = Schema.TaggedStruct("Completed", {
 export type Completed = typeof Completed.Type
 
 /** One product-facing event at its exclusive Session cursor. */
-export const HostEvent = Schema.Union([RunStarted, Turn, ToolCall, ApprovalRequested, Compacted, Completed])
+export const HostEvent = Schema.Union([
+  RunStarted,
+  Turn,
+  ToolCall,
+  TasksUpdated,
+  ApprovalRequested,
+  Compacted,
+  Completed,
+])
 export type HostEvent = typeof HostEvent.Type
 
 /** Project one durable Runtime event into the product-facing Host stream. */
@@ -74,9 +92,12 @@ export const project: {
       return Option.some({ ...base, _tag: "Turn", event: entry.event })
     case "ToolExecutionStarted":
     case "ToolProgress":
-    case "ToolExecutionCompleted":
     case "ToolExecutionWaiting":
       return Option.some({ ...base, _tag: "ToolCall", event: entry.event })
+    case "ToolExecutionCompleted":
+      return entry.event.tasksUpdated === undefined
+        ? Option.some({ ...base, _tag: "ToolCall", event: entry.event })
+        : Option.some({ ...base, _tag: "TasksUpdated", items: entry.event.tasksUpdated })
     case "ApprovalRequested":
       return Option.some({ ...base, _tag: "ApprovalRequested", event: entry.event })
     case "CompactionApplied":

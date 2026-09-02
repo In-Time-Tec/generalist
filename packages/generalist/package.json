@@ -77,6 +77,10 @@
       "types": "./dist/server/index.d.ts",
       "import": "./dist/server/index.js"
     },
+    "./tasks": {
+      "types": "./dist/tasks/index.d.ts",
+      "import": "./dist/tasks/index.js"
+    },
     "./permissions": {
       "types": "./dist/core/policy/permissions.d.ts",
       "import": "./dist/core/policy/permissions.js"

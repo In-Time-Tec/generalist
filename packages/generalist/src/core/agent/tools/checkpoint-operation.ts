@@ -4,6 +4,7 @@ import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { domainFailureResult, successResult, type AnyToolCall } from "./result.js"
 import { completed, effectiveCall, updateCall } from "./checkpoint.js"
 import { AwaitEvent } from "./wake-event.js"
+import { Items as TaskItems, writeToolName } from "../../../tasks/item.js"
 
 const PersistedToolOutcome = Schema.Union([
   Schema.TaggedStruct("Success", { result: Schema.Unknown, encodedResult: Schema.Unknown }),
@@ -79,5 +80,17 @@ export const applyToolOutcome =
         invocationPath: input.invocationPath,
       })
     })()
-    return { ...checkpoint, state: { ...state, toolBatch: nextBatch } }
+    const tasks = (() => {
+      if (input.call.name !== writeToolName || outcome._tag !== "Succeeded") return state.tasks
+      const decoded = Schema.decodeUnknownSync(PersistedToolOutcome)(outcome.value)
+      return decoded._tag === "Success" ? Schema.decodeUnknownSync(TaskItems)(decoded.result) : state.tasks
+    })()
+    return {
+      ...checkpoint,
+      state: {
+        ...state,
+        toolBatch: nextBatch,
+        ...Object.assign({}, tasks === undefined ? undefined : { tasks }),
+      },
+    }
   }

@@ -39,7 +39,7 @@ export const minimumConsumerProfiles = [
     name: "core-runtime",
     peers: [],
     imports: [
-      { specifier: "generalist", runtimes: nodeAndBun, exports: ["Agent", "Session"] },
+      { specifier: "generalist", runtimes: nodeAndBun, exports: ["Agent", "Session", "Tasks"] },
       { specifier: "generalist/approvals", runtimes: nodeAndBun },
       { specifier: "generalist/compaction", runtimes: nodeAndBun },
       { specifier: "generalist/hooks", runtimes: nodeAndBun, exports: ["Hooks", "onToolCall"] },
@@ -62,6 +62,7 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/repl", runtimes: nodeAndBun },
       { specifier: "generalist/repl/bun", runtimes: bunOnly },
       { specifier: "generalist/runtime", runtimes: nodeAndBun, exports: ["Runtime"] },
+      { specifier: "generalist/tasks", runtimes: nodeAndBun, exports: ["layer", "update"] },
       { specifier: "generalist/trajectory", runtimes: nodeAndBun, exports: ["fromJournal", "export"] },
       { specifier: "generalist/unstable/runtime/external-child-placement", runtimes: nodeAndBun },
       { specifier: "generalist/unstable/runtime/external-child-store", runtimes: nodeAndBun },
@@ -235,6 +236,7 @@ export const workerSafePackageExports = [
   "generalist/sandbox",
   "generalist/eval",
   "generalist/memo",
+  "generalist/tasks",
   "generalist/trajectory",
 ] as const
 
@@ -291,6 +293,7 @@ export const exactPackageExports = [
   "./runtime/sqlite-bun",
   "./sandbox",
   "./server",
+  "./tasks",
   "./testing",
   "./testing/runtime-driver",
   "./trajectory",

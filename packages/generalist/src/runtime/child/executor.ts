@@ -69,6 +69,7 @@ export interface FanOutGroupInput {
   readonly parentRunId: string
   readonly toolCallId: string
   readonly operationKey?: string
+  readonly tasks?: Request["tasks"]
   readonly members: ReadonlyArray<{
     readonly key: string
     readonly selection: string
@@ -277,6 +278,7 @@ const makeExecutor = <
         budgetDivisor: definition.maxChildren,
         join: failFast ? { _tag: "AllSuccess" } : { _tag: "AllSettled" },
         remainder: failFast ? "request-cancel" : "await",
+        ...Object.assign({}, request.tasks === undefined ? undefined : { tasks: request.tasks }),
         ...Object.assign({}, context.operationKey === undefined ? undefined : { operationKey: context.operationKey }),
       }
       const outcome = yield* options.implementation.fanOut(input)
