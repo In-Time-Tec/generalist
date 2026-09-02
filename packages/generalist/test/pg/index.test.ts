@@ -9,7 +9,7 @@ import {
 import { Testing } from "generalist/testing"
 import { Effect, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { assistantAddress } from "../../../generalist/test/runtime/execution/fixtures.js"
+import { assistantAddress, scheduleDefinition } from "../../../generalist/test/runtime/execution/fixtures.js"
 import { postgresAvailable, postgresDatabase, postgresLayer } from "./database.js"
 
 const database = postgresDatabase("runtime-driver-conformance")
@@ -177,6 +177,8 @@ Testing.runtimeDriver({
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
     "approval-suspend": { claim, recovery: "rebuild" },
+    "await-event": { claim, recovery: "rebuild" },
+    schedules: { definition: scheduleDefinition, recovery: "rebuild" },
     "operator-explain": true,
     "operator-retry": { claim },
     "operator-resolve-unknown": { claim },

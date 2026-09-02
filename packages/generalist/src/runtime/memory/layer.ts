@@ -11,6 +11,7 @@ import { Runtime, type LayerOptions } from "../service.js"
 import { make as makeRegisteredAgents } from "../executable/registered-agent.js"
 import { layerRegisteredAgents as runtimeLayer } from "./layer/service.js"
 import { layerMemory as storeLayer } from "./store.js"
+import { layer as triggerSchedulerLayer } from "../execution/trigger/scheduler.js"
 
 export { makeRuntime } from "./layer/service.js"
 
@@ -28,5 +29,6 @@ export const layerMemory = (
     const scheduler = localSchedulerLayer({ workerId: "memory", ...options.scheduler }).pipe(
       Layer.provide(Layer.mergeAll(store, active, host)),
     )
-    return Layer.mergeAll(runtime, host, store, scheduler)
+    const triggers = triggerSchedulerLayer(options.scheduler).pipe(Layer.provide(Layer.merge(runtime, store)))
+    return Layer.mergeAll(runtime, host, store, scheduler, triggers)
   })

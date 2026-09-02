@@ -42,21 +42,24 @@ export const suspend = (input: {
       const authoredWaits = Schema.is(AgentSuspended)(input.suspension) ? input.suspension.waits : []
       waits = yield* Effect.forEach(authoredWaits, (wait) =>
         input.nested.waitFor(wait).pipe(
-          Effect.map(
-            (nestedWait) =>
-              nestedWait ?? {
+          Effect.map((nestedWait) => {
+            if (nestedWait !== undefined) return nestedWait
+            if (wait.awaitEvent !== undefined) {
+              return { waitId: wait.waitId, reason: { _tag: "AwaitEvent" as const, ...wait.awaitEvent } }
+            }
+            if (wait.reason === "approval") {
+              return {
                 waitId: wait.waitId,
-                reason:
-                  wait.reason === "approval"
-                    ? approvalReason({
-                        approvalId: wait.token,
-                        operation: wait.call.id,
-                        capability: wait.call.name,
-                        input: wait.call.params,
-                      })
-                    : { _tag: "ToolWait" as const },
-              },
-          ),
+                reason: approvalReason({
+                  approvalId: wait.token,
+                  operation: wait.call.id,
+                  capability: wait.call.name,
+                  input: wait.call.params,
+                }),
+              }
+            }
+            return { waitId: wait.waitId, reason: { _tag: "ToolWait" as const } }
+          }),
         ),
       )
     }

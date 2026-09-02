@@ -33,6 +33,7 @@ export type { ClosedToolSet, DomainFailure, ReplayPolicy, Request, Success, Susp
 import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
 import type { HookFailed } from "../../hooks/index.js"
 import type { DriverError, DriverStateInvalid } from "../durable/service.js"
+import { suspendedFromCause, suspendedOutcome } from "../agent/tools/wake-event.js"
 
 export type SettledOutcome = Success | DomainFailure
 
@@ -157,6 +158,10 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
       },
     ),
     Effect.catchIf(() => true, handleFailure, handleFailure),
+    Effect.catchCause((cause) => {
+      const suspension = suspendedFromCause(cause)
+      return suspension === undefined ? Effect.failCause(cause) : Effect.succeed(suspendedOutcome(suspension))
+    }),
   )
 }
 

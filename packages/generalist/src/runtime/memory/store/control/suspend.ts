@@ -76,6 +76,14 @@ const appendWaits = (state: MemoryState, runId: string, inserted: ReadonlyArray<
     let next = state
     for (const wait of inserted) {
       ;[, next] = yield* appendLifecycle(next, runId, waitingEvent(wait), "waiting")
+      if (wait.reason._tag === "AwaitEvent") {
+        ;[, next] = yield* appendLifecycle(next, runId, {
+          _tag: "Awaiting",
+          waitId: wait.waitId,
+          filter: wait.reason.filter,
+          deadline: wait.reason.deadline,
+        })
+      }
     }
     if (inserted.length === 0) {
       const runs = new Map(next.runs)

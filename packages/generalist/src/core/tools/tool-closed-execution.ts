@@ -12,6 +12,7 @@ import {
 } from "./tool-result-codec.js"
 import { HookFailed } from "../../hooks/index.js"
 import { DriverError, DriverStateInvalid } from "../durable/service.js"
+import { suspendedFromCause, suspendedOutcome } from "../agent/tools/wake-event.js"
 
 type AgentToolSchemaServices<Parameters extends Schema.Top, Success extends Schema.Top> =
   | Parameters["DecodingServices"]
@@ -58,6 +59,10 @@ export const executeWithClosedSet: {
         Effect.flatMap((params) => toolkit.invoke(request.call.name, params)),
         Effect.flatMap((result) => toolResultCodec.decodeSuccess<T["successSchema"]>(tool, result)),
         Effect.catchIf(() => true, handleFailure, handleFailure),
+        Effect.catchCause((cause) => {
+          const suspension = suspendedFromCause(cause)
+          return suspension === undefined ? Effect.failCause(cause) : Effect.succeed(suspendedOutcome(suspension))
+        }),
       )
     return executed
   },
@@ -116,7 +121,7 @@ export const executeWithClosedToolkit: {
         ),
       )
     }
-    const handleFailure = (error: typeof Schema.Unknown.Type) => {
+    const handleFailure = (error: typeof Schema.Unknown.Type): Effect.Effect<Outcome, FrameworkFailure> => {
       if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
       return toolResultCodec.encodeDomainCandidate(toolkit.tool, error)
     }
@@ -126,6 +131,10 @@ export const executeWithClosedToolkit: {
       Effect.flatMap(toolkit.invoke),
       Effect.flatMap((result) => toolResultCodec.decodeSuccess(toolkit.tool, result)),
       Effect.catchIf((error) => !isHookFailure(error), handleFailure, handleFailure),
+      Effect.catchCause((cause) => {
+        const suspension = suspendedFromCause(cause)
+        return suspension === undefined ? Effect.failCause(cause) : Effect.succeed(suspendedOutcome(suspension))
+      }),
     )
   },
 )

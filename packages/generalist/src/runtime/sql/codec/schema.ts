@@ -1,8 +1,5 @@
-export {
-  SQL_SCHEMA_NAME as MIGRATION_NAME,
-  SQL_SCHEMA_VERSION as SCHEMA_VERSION,
-  sqlSchemaChecksum as schemaChecksum,
-} from "../schema/contract.js"
+export { SQL_SCHEMA_NAME as MIGRATION_NAME, SQL_SCHEMA_VERSION as SCHEMA_VERSION } from "../schema/contract.js"
+export { sqlSchemaChecksum as schemaChecksum } from "../schema/management.js"
 export const SCHEMA_META_TABLE = "generalist_schema_meta"
 export const MIGRATIONS_TABLE = "generalist_sql_migrations"
 
@@ -109,11 +106,34 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   reason TEXT NOT NULL,
   status TEXT NOT NULL,
   response_json TEXT,
+  due_at TEXT,
   opened_at TEXT NOT NULL,
   closed_at TEXT,
   PRIMARY KEY (run_id, wait_id),
   FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
 )`,
+  `CREATE INDEX IF NOT EXISTS generalist_run_waits_due_idx ON generalist_run_waits(status, due_at)`,
+  `CREATE TABLE IF NOT EXISTS generalist_run_wake_events (
+  run_id TEXT NOT NULL,
+  dedupe_key TEXT NOT NULL,
+  event_json TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  PRIMARY KEY (run_id, dedupe_key),
+  FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
+)`,
+  `CREATE TABLE IF NOT EXISTS generalist_schedules (
+  schedule_id TEXT PRIMARY KEY,
+  definition_json TEXT NOT NULL,
+  rrule TEXT NOT NULL,
+  next_at TEXT NOT NULL,
+  occurrence INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  owner_worker_id TEXT,
+  lease_expires_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)`,
+  `CREATE INDEX IF NOT EXISTS generalist_schedules_due_idx ON generalist_schedules(status, next_at, lease_expires_at)`,
   `CREATE TABLE IF NOT EXISTS generalist_run_links (
   parent_run_id TEXT NOT NULL,
   child_run_id TEXT NOT NULL,

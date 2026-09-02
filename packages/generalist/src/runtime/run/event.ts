@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the closed durable Run event union remains one codec authority */
-import { Effect, Function, Schema, SchemaParser } from "effect"
+import { Effect, Schema, SchemaParser } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { ExecutableRef } from "../executable/manifest.js"
 import type { AgentLoopEvent, DurableAgentLoopEvent } from "../execution/agent/event.js"
@@ -28,17 +28,14 @@ import { FanOutJoin, FanOutRemainder } from "../child/fan-out.js"
 import { FanOutMemberOrigin, type FanOutMemberOrigin as FanOutOrigin } from "../child/fan-out-internal.js"
 import { ChildReadiness } from "../child/readiness.js"
 import { BudgetLimits, Dimension, Spend } from "../../core/durable/run-budget.js"
+import { TriggerEventSchema, TriggerTags, type TriggerEvent } from "./trigger-event.js"
+import { Sequence, SpecVersion } from "./event-identity.js"
+import { AwaitEvent } from "../../core/agent/tools/wake-event.js"
 
 export type { AgentLoopEvent, ExecutionResult }
-
-export const SpecVersion = Schema.Literals(["1"])
-export type SpecVersion = typeof SpecVersion.Type
-
-export const Sequence = Schema.Int.check(
-  Schema.isGreaterThanOrEqualTo(0),
-  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
-)
-export type Sequence = typeof Sequence.Type
+export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "./trigger-event.js"
+export { eventIdFor } from "./event-identity.js"
+export { Sequence, SpecVersion }
 
 export const RunEventBase = Schema.Struct({
   specVersion: SpecVersion,
@@ -187,6 +184,7 @@ type ProgramLog = RunEventBase & {
 }
 
 export type LifecycleEvent =
+  | TriggerEvent
   | RunAccepted
   | BudgetExtended
   | BudgetSuspended
@@ -212,6 +210,7 @@ export type LifecycleEvent =
 export type RunEvent = (RunEventBase & DurableAgentLoopEvent) | LifecycleEvent
 
 export const LifecycleTag = Schema.Literals([
+  ...TriggerTags,
   "RunAccepted",
   "BudgetExtended",
   "BudgetSuspended",
@@ -370,6 +369,7 @@ const AgentLoopEventSchema = Schema.Union([
     call: ToolCall,
     waitId: Schema.String,
     token: Schema.String,
+    awaitEvent: Schema.optionalKey(AwaitEvent),
     ...optionalMetadata,
   }),
   Schema.TaggedStruct("HandoffRequested", {
@@ -418,6 +418,7 @@ const AgentLoopEventSchema = Schema.Union([
   ModelTelemetryEventSchema,
 ])
 const LifecycleEventSchema = Schema.Union([
+  TriggerEventSchema,
   Schema.TaggedStruct("RunAccepted", {
     messageId: Schema.String,
     address: Address,
@@ -507,7 +508,3 @@ export const RunEvent: Schema.Codec<RunEvent, RunEventEncoded> = Schema.declareC
         (base, payload) => Object.assign({}, base, payload),
       ),
 )
-export const eventIdFor: {
-  (sequence: number): (runId: string) => string
-  (runId: string, sequence: number): string
-} = Function.dual(2, (runId: string, sequence: number): string => `${runId}:${sequence}`)

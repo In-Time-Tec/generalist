@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { Request as ApprovalRequest } from "../operation/approval.js"
+import { AwaitEvent } from "../../core/agent/tools/wake-event.js"
 
 export const WaitResolution = Schema.Union([
   Schema.TaggedStruct("Approved", {}),
@@ -19,6 +20,7 @@ export const WaitReason = Schema.Union([
   Schema.TaggedStruct("Signal", { name: Schema.String }),
   Schema.TaggedStruct("Timer", { dueAt: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct("External", { capability: Schema.optionalKey(Schema.String) }),
+  Schema.TaggedStruct("AwaitEvent", AwaitEvent.fields),
 ])
 export type WaitReason = typeof WaitReason.Type
 

@@ -8,6 +8,8 @@ export type {
   SendInput,
   StartExecutionInput,
   StartOptions,
+  ScheduleOptions,
+  ScheduleError,
   StartEvent,
   RunHandle,
   RuntimeInspection,
@@ -53,6 +55,7 @@ export type {
   RespondError,
   RespondApprovalError,
   SignalError,
+  WakeError,
   CancelError,
   SteerError,
   InspectError,
@@ -90,4 +93,6 @@ export type {
   Event as ModelPreviewEvent,
 } from "../execution/model-response/preview.js"
 export type { SteeringReceipt } from "../run/steering.js"
+export { ScheduleInvalid, ScheduleReceipt } from "../execution/trigger/schedule.js"
+export { WakeDisposition, WakeEventInvalid } from "../execution/trigger/wake.js"
 export { layerMemory } from "../memory/layer.js"

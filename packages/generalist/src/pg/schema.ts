@@ -180,6 +180,26 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE INDEX IF NOT EXISTS generalist_lanes_head_idx ON generalist_lanes(head_run_id)`,
   `CREATE INDEX IF NOT EXISTS generalist_run_operations_status_idx ON generalist_run_operations(status)`,
   `CREATE INDEX IF NOT EXISTS generalist_run_waits_due_idx ON generalist_run_waits(status, due_at)`,
+  `CREATE TABLE IF NOT EXISTS generalist_run_wake_events (
+  run_id TEXT NOT NULL REFERENCES generalist_runs(run_id),
+  dedupe_key TEXT NOT NULL,
+  event_json TEXT NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (run_id, dedupe_key)
+)`,
+  `CREATE TABLE IF NOT EXISTS generalist_schedules (
+  schedule_id TEXT PRIMARY KEY,
+  definition_json TEXT NOT NULL,
+  rrule TEXT NOT NULL,
+  next_at TIMESTAMPTZ NOT NULL,
+  occurrence BIGINT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  owner_worker_id TEXT,
+  lease_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+)`,
+  `CREATE INDEX IF NOT EXISTS generalist_schedules_due_idx ON generalist_schedules(status, next_at, lease_expires_at)`,
   `CREATE TABLE IF NOT EXISTS generalist_fan_outs (
   fan_out_id TEXT PRIMARY KEY,
   parent_run_id TEXT NOT NULL REFERENCES generalist_runs(run_id),

@@ -12,6 +12,7 @@ import { layer as modelPreviewLayer } from "../execution/model-response/preview-
 import { ExternalChildStore } from "../child/external/store.js"
 import { ExecutableResolver } from "../executable/resolver.js"
 import { make as makeRegisteredAgents } from "../executable/registered-agent.js"
+import { layer as triggerSchedulerLayer } from "../execution/trigger/scheduler.js"
 
 export interface BunSqliteStoreOptions extends SqliteStoreOptions {
   readonly filename: string
@@ -37,5 +38,6 @@ export const layerSqlite = (
     const scheduler = localSchedulerLayer({ workerId: "sqlite", ...options.scheduler }).pipe(
       Layer.provide(Layer.merge(dependencies, host)),
     )
-    return Layer.mergeAll(runtime, host, store, scheduler)
+    const triggers = triggerSchedulerLayer(options.scheduler).pipe(Layer.provide(Layer.merge(runtime, store)))
+    return Layer.mergeAll(runtime, host, store, scheduler, triggers)
   })

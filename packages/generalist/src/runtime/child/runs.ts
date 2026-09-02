@@ -330,7 +330,7 @@ export const make = (store: RunStoreService): Service => {
       admitGroup(input).pipe(
         Effect.flatMap(({ receipt, inspection }) =>
           inspection.status === "running"
-            ? Effect.succeed({ _tag: "Suspend" as const, token: receipt.groupId })
+            ? Effect.succeed<Outcome>({ _tag: "Suspend", token: receipt.groupId })
             : ChildLifecycle.endGroup(input.parentRunId, resultFromInspection(inspection)).pipe(Effect.map(success)),
         ),
       ),
@@ -346,7 +346,7 @@ export const make = (store: RunStoreService): Service => {
             })
           }
           return inspection.status === "running"
-            ? Effect.succeed({ _tag: "Suspend" as const, token: input.groupId })
+            ? Effect.succeed<Outcome>({ _tag: "Suspend", token: input.groupId })
             : ChildLifecycle.endGroup(input.parentRunId, resultFromInspection(inspection)).pipe(Effect.map(success))
         }),
       ),

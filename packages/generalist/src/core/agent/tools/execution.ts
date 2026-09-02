@@ -114,6 +114,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
             call,
             waitId: durableOperationKey,
             token: outcome.token,
+            ...(outcome.awaitEvent === undefined ? undefined : { awaitEvent: outcome.awaitEvent }),
           } satisfies Event
         })
     }

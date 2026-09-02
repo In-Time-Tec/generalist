@@ -1,6 +1,6 @@
 import { Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Agent, AgentEvent, AgentManifest } from "../../../src/index.js"
+import { Agent, AgentEvent, AgentManifest, RunBudget } from "../../../src/index.js"
 import {
   Address,
   ExecutableManifest,
@@ -80,6 +80,14 @@ export const analystRef = analystExecutable
 
 export const assistantAddress = Address.make("agent:assistant")
 export const researcherAddress = Address.make("agent:researcher")
+
+export const scheduleDefinition = {
+  executable: assistantRef,
+  registrations: registrationsFor(assistantRef),
+  sessionId: "session:scheduled",
+  prompt: Prompt.make("scheduled"),
+  budget: RunBudget.make({}),
+}
 
 export const alternateAssistant: Agent.Agent = Agent.make({ name: "alternate-assistant" })
 const alternateResearcher = Agent.make({ name: "alternate-researcher" })

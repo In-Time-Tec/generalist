@@ -11,7 +11,8 @@ import {
   StaleClaim,
   StaleSessionClaim,
 } from "../../errors.js"
-import { SQL_SCHEMA_VERSION, sqlSchemaChecksum } from "../../schema/contract.js"
+import { SQL_SCHEMA_VERSION } from "../../schema/contract.js"
+import { sqlSchemaChecksum } from "../../schema/management.js"
 import type { SqlStoreLocks } from "../driver/protocol.js"
 
 export type SqlTransitionOutcome = "committed" | "exact-retry" | "divergent-retry" | "stale-claim" | "rolled-back"

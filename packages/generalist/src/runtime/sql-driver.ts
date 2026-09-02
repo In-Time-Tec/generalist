@@ -39,10 +39,6 @@ export {
   SQL_LOGICAL_SCHEMA,
   SQL_SCHEMA_NAME,
   SQL_SCHEMA_VERSION,
-  checkSqlMigrationIdentity,
-  checkSqlSchemaMeta,
-  planSqlSchema,
-  sqlSchemaChecksum,
   type SqlLogicalConstraint,
   type SqlLogicalIndex,
   type SqlLogicalTable,
@@ -50,4 +46,10 @@ export {
   type SqlSchemaMeta,
   type SqlSchemaPlan,
 } from "./sql/schema/contract.js"
+export {
+  checkSqlMigrationIdentity,
+  checkSqlSchemaMeta,
+  planSqlSchema,
+  sqlSchemaChecksum,
+} from "./sql/schema/management.js"
 export type { RunActivation, RunActivationProjection } from "./run/activation.js"

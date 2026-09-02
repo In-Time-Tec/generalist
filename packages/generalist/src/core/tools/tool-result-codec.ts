@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
+import { AwaitEvent } from "../agent/tools/wake-event.js"
 
 type BoundaryValue = typeof Schema.Unknown.Type
 
@@ -34,6 +35,7 @@ export interface Request {
 export interface Suspend {
   readonly _tag: "Suspend"
   readonly token: string
+  readonly awaitEvent?: AwaitEvent
 }
 
 /** Durable tool execution outcome. */
@@ -51,7 +53,11 @@ export const Outcome = Schema.Union([
     ),
   }),
   Schema.Struct({ _tag: Schema.tag("DomainFailure"), failure: Schema.Unknown, encodedFailure: Schema.Unknown }),
-  Schema.Struct({ _tag: Schema.tag("Suspend"), token: Schema.String }),
+  Schema.Struct({
+    _tag: Schema.tag("Suspend"),
+    token: Schema.String,
+    awaitEvent: Schema.optionalKey(AwaitEvent),
+  }),
 ])
 
 export type Outcome = Success | DomainFailure | Suspend

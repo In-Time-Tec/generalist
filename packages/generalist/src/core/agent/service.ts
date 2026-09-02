@@ -61,6 +61,15 @@ export {
   type Usage as InspectionUsage,
 } from "./inspection/service.js"
 export { streamToolCalls } from "./tool-calls.js"
+export {
+  AwaitEvent,
+  AwaitEventInvalid,
+  AwaitEventResult,
+  WakeEvent,
+  WakeEventFilter,
+  awaitEvent,
+  type AwaitEventOptions,
+} from "./tools/wake-event.js"
 export { defaultObjectPrompt, type RunHandle }
 /** Allocate one scoped Run and its producer handle before consuming its event stream. */
 export { allocateRun }

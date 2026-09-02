@@ -118,6 +118,9 @@ import type {
   SqlStoreOptions,
   SqlStoreServices,
 } from "./store/driver/protocol.js"
+import { dueAwaitEvents, timeoutAwaitEvent, wake } from "./store/trigger/wake.js"
+import { advanceSchedule, claimSchedules, registerSchedule } from "./store/trigger/schedule.js"
+import { layer as triggerSchedulerLayer } from "../execution/trigger/scheduler.js"
 
 export type {
   SqlClaimMechanics,
@@ -273,6 +276,12 @@ const makeSqlStoreServices = <DriverError>(
             ),
           ),
         signal: (input) => locked(locks.run(input.runId), signal(transactionHub, input)),
+        wake: (input) => locked(locks.run(input.runId), wake(transactionHub, input)),
+        dueAwaitEvents: (input) => runNoTxn(dueAwaitEvents(input)),
+        timeoutAwaitEvent: (input) => locked(locks.run(input.runId), timeoutAwaitEvent(transactionHub, input)),
+        registerSchedule: (record) => run(registerSchedule(record)),
+        claimSchedules: (input) => run(claimSchedules(input)),
+        advanceSchedule: (input) => run(advanceSchedule(input)),
         cancel: (input) => locked(locks.hierarchy(input.runId), cancel(transactionHub, input)),
         cancelSession: (input) =>
           run(
@@ -561,7 +570,8 @@ export const layerSqlRuntime = (input: {
     const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
     const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
     const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
-    return Layer.mergeAll(runtime, host, services)
+    const triggers = triggerSchedulerLayer(input.options.scheduler).pipe(Layer.provide(Layer.merge(runtime, services)))
+    return Layer.mergeAll(runtime, host, services, triggers)
   })
 
 export const makeSqliteRunStore = (

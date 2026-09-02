@@ -176,6 +176,8 @@ describe("generalist public surface", () => {
         "ToolExecutor",
         "ToolOutput",
         "ToolPlacement",
+        "Triggers",
+        "Watcher",
         "withCacheBreakpoints",
       ])
     }),

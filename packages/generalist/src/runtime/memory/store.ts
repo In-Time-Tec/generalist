@@ -87,6 +87,8 @@ import {
 } from "./store/operation/operator.js"
 import { explain as explainRecovery } from "../execution/recovery/operator.js"
 import { fork, rewind } from "./store/fork/index.js"
+import { dueAwaitEvents, timeoutAwaitEvent, wake } from "./store/trigger/wake.js"
+import { advanceSchedule, claimSchedules, registerSchedule } from "./store/trigger/schedule.js"
 
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
@@ -190,6 +192,19 @@ const makeStoreServices = (options: LayerOptions) =>
           ),
         ),
       signal: (input) => update((state) => signal(state, input)),
+      wake: (input) => modifyState((state) => wake(state, input)),
+      dueAwaitEvents: (input) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            state.closed
+              ? RuntimeUnavailable.make({ message: "runtime store released" })
+              : Effect.succeed(dueAwaitEvents(state, input)),
+          ),
+        ),
+      timeoutAwaitEvent: (input) => modifyState((state) => timeoutAwaitEvent(state, input)),
+      registerSchedule: (record) => modifyState((state) => registerSchedule(state, record)),
+      claimSchedules: (input) => modifyState((state) => claimSchedules(state, input)),
+      advanceSchedule: (input) => update((state) => advanceSchedule(state, input)),
       cancel: (input) => update((state) => cancel(state, input)),
       cancelSession: (input) => modifyState((state) => cancelSession(state, input)),
       admitSteering: (input) => modifyState((state) => admitSteering(state, input)),
