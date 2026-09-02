@@ -8,6 +8,7 @@ import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { DriverStateInvalid } from "../../durable/service.js"
 import type { Registry } from "../../tools/tool-registry.js"
+import { PermissionDenied } from "../../tools/tool-authorization.js"
 import type { Request } from "../../tools/tool-executor.js"
 import {
   completed,
@@ -94,6 +95,9 @@ export const resumeBatch = <R, R2>(input: {
     if (entry.state._tag === "Waiting") {
       const resolution = resolutionFor(input.resolutions, entry.state.waitId)
       if (resolution === undefined) return Stream.empty
+      if (resolution._tag === "Denied") {
+        return Stream.fail(PermissionDenied.make({ message: resolution.reason ?? "Tool call denied" }))
+      }
       if (resolution._tag === "Approved") {
         return Stream.unwrap(
           updateToolBatch((current) =>

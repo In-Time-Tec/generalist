@@ -38,6 +38,7 @@ const approvals = Approvals.layerDurable({
 ```
 
 Resolve the exact emitted token through `Approvals.resolve`. Provide the same `Permissions.RuleStore` authority used by the Agent; an explicit `remember` rule is persisted before the Runtime wait closes.
+An approved resolution resumes tool execution; a denied resolution fails with `generalist/core/PermissionDenied` and preserves its reason. Durable `RunFailed` events carry that error in `AgentExecutionFailure.failure`.
 
 ```ts
 const approve = (token: string) =>

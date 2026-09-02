@@ -21,6 +21,7 @@ import { Misconfigured } from "../../model/resilience.js"
 import { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from "../../model/tool-call-validation.js"
 import { LanguageModelNotRegistered } from "../../model/registry.js"
 import { FrameworkFailure } from "../../tools/tool-executor.js"
+import { PermissionDenied } from "../../tools/tool-authorization.js"
 import { HandoffLimitExceeded, HandoffRequirementsMissing, TargetMissing } from "../handoff/state.js"
 import { ProjectionInvalid } from "../../policy/handoff-projection.js"
 import { Rejected } from "../../policy/handoff-rejected.js"
@@ -51,6 +52,7 @@ export const RunError = Schema.Union([
   ToolNameCollision,
   AiError.AiError,
   LanguageModelNotRegistered,
+  PermissionDenied,
   FrameworkFailure,
   DriverError,
   DriverStateInvalid,

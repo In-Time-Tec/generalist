@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { make as makeAgent } from "../../core/agent/service.js"
-import { Approved, layerDurable, type DurableRequest } from "../../approvals.js"
+import { Approved, Denied, layerDurable, type DurableRequest } from "../../approvals.js"
 import { layerAllowAll, layerRuleStoreMemory, RuleStore } from "../../core/policy/permissions.js"
 import { Runtime } from "../../runtime/service.js"
 import type { ApprovalSuspendCapability, Options, Services } from "./contract.js"
@@ -30,7 +30,7 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
   readonly open: Open<LayerError>
 }): void => {
   const { capability, open, options, prepare } = input
-  it.effect("suspends for durable approval, recovers, and dispatches the tool exactly once", () => {
+  it.effect("preserves approved and denied durable approval decisions across recovery", () => {
     const notifications: Array<DurableRequest> = []
     let modelCalls = 0
     let toolCalls = 0
@@ -88,19 +88,18 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
           Effect.flatMap((context) => runtime.register(agent).pipe(Effect.provideContext(context))),
         ),
       )
-    const start = (services: Services) =>
+    const start = (services: Services, key = "approval-suspend", expectedToolCalls = 0) =>
       Effect.gen(function* () {
         if (services.executor === undefined)
           return yield* Effect.die(`${options.name} approval recovery requires RunExecutor`)
-        yield* register(services.runtime)
         const handle = yield* services.runtime.start(agent, "write once after approval", {
-          sessionId: `session:${slug(options.name)}:approval-suspend`,
-          idempotencyKey: `approval-suspend:${slug(options.name)}`,
+          sessionId: `session:${slug(options.name)}:${key}`,
+          idempotencyKey: `${key}:${slug(options.name)}`,
         })
         const claim = yield* capability.claim(services, { runId: handle.runId, workerId: "approval-before" })
         yield* services.executor.execute(claim)
         expect((yield* services.runtime.inspect(handle.runId)).status).toBe("waiting")
-        expect(toolCalls).toBe(0)
+        expect(toolCalls).toBe(expectedToolCalls)
         expect(notifications).toHaveLength(1)
         expect(notifications[0]).toMatchObject({
           runId: handle.runId,
@@ -155,21 +154,60 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
         expect(history.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
         expect(history.filter((event) => event._tag === "ToolExecutionCompleted")).toHaveLength(1)
         expect(toolCalls).toBe(1)
+
+        modelCalls = 0
+        notifications.length = 0
+        const denied = yield* start(services, "approval-denied", 1)
+        yield* services.runtime.operator
+          .resolveApproval(denied.token, Denied({ reason: "TEST_OPERATOR_DENIED" }), "operator:denial-conformance")
+          .pipe(
+            Effect.provideService(
+              RuleStore,
+              RuleStore.of({
+                rules: Effect.succeed([]),
+                remember: () => Effect.die("denial must not remember a rule"),
+              }),
+            ),
+          )
+        const deniedClaim = yield* capability.claim(services, {
+          runId: denied.runId,
+          workerId: "approval-denied-after",
+        })
+        yield* services.executor.execute(deniedClaim)
+        expect((yield* services.runtime.inspect(denied.runId)).status).toBe("failed")
+        const deniedHistory = yield* services.runtime.history({ runId: denied.runId, limit: 100 })
+        const failure = deniedHistory.find((event) => event._tag === "RunFailed")
+        expect(failure?._tag).toBe("RunFailed")
+        if (failure?._tag === "RunFailed") {
+          expect(failure.error).toMatchObject({
+            _tag: "generalist/runtime/AgentExecutionFailure",
+            message: "TEST_OPERATOR_DENIED",
+            failure: {
+              _tag: "generalist/core/PermissionDenied",
+              message: "TEST_OPERATOR_DENIED",
+            },
+          })
+        }
+        expect(deniedHistory.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(0)
+        expect(toolCalls).toBe(1)
       })
 
     if (capability.recovery === "rebuild") {
       return prepare(
         Effect.gen(function* () {
-          const suspended = yield* open(start)
+          const suspended = yield* open((services) => register(services.runtime).pipe(Effect.andThen(start(services))))
           yield* open((services) => recover(services, suspended, true))
         }).pipe(Effect.orDie),
       )
     }
     return prepare(
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- LayerError is selected by each driver and is terminated below at the test boundary.
-      open((services) => Effect.flatMap(start(services), (suspended) => recover(services, suspended, false))).pipe(
-        Effect.orDie,
-      ),
+      open((services) =>
+        register(services.runtime).pipe(
+          Effect.andThen(start(services)),
+          Effect.flatMap((suspended) => recover(services, suspended, false)),
+        ),
+      ).pipe(Effect.orDie),
     )
   })
 }

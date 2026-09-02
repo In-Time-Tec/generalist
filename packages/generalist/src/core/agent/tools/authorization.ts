@@ -151,13 +151,7 @@ export const make = <AuthorizationR, ExecuteR>(input: AuthorizationContext<Autho
                     ).pipe(Effect.map(() => input.executeApproved(turn, resolvedCall, resolvedRequest, registry))),
                   )
                 case "Deny":
-                  return Stream.fail(
-                    FrameworkFailure.make({
-                      stage: "authorization",
-                      tool: resolvedCall.name,
-                      message: decision.error.message,
-                    }),
-                  )
+                  return Stream.fail(decision.error)
                 case "Suspend":
                   return Stream.fromEffect(
                     Effect.gen(function* () {
