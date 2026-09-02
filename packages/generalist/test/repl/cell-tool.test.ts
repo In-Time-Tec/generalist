@@ -1,9 +1,10 @@
 import "./suites/bun-cell-isolation-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Layer, Schema, Stream } from "effect"
 import { ToolContext, ToolExecutor } from "generalist"
 import { Response } from "effect/unstable/ai"
-import { Cell, CellTool, KernelProfile, TestKernel } from "../../src/repl/index"
+import { Cell, CellTool, KernelPool, KernelProfile, TestKernel } from "../../src/repl/index"
+import * as Sandbox from "../../src/sandbox/index.js"
 
 const sessionId = "session-a"
 
@@ -63,7 +64,57 @@ const contextLayer = ToolContext.layerTest({
 
 const poolLayer = TestKernel.layerTestPool({ profile, script })
 
-const executorLayer = CellTool.layer.pipe(Layer.provideMerge(Layer.mergeAll(contextLayer, poolLayer)))
+const unsupported = (operation: Sandbox.Unsupported["operation"]) =>
+  Effect.fail(Sandbox.Unsupported.make({ operation, message: `test sandbox does not support ${operation}` }))
+
+const sandboxLayer = (pool: Layer.Layer<KernelPool.KernelPool>): Layer.Layer<Sandbox.SandboxProvider> =>
+  Layer.effect(
+    Sandbox.SandboxProvider,
+    Effect.map(KernelPool.KernelPool, (kernel) =>
+      Sandbox.SandboxProvider.of({
+        defaultImage: "test-kernel",
+        acquire: () =>
+          Effect.succeed(
+            Sandbox.make({
+              isolation: "process",
+              limits: {},
+              capabilities: {
+                commands: ["TypeScript"],
+                files: false,
+                pause: false,
+                resume: false,
+                snapshot: false,
+                fork: false,
+                limits: [],
+              },
+              start: (command) =>
+                command._tag !== "TypeScript"
+                  ? unsupported(command._tag === "Process" ? "exec:process" : "exec:javascript-module")
+                  : kernel.execute({ sessionId, cellId: command.cellId, code: command.source }).pipe(
+                      Effect.mapError((cause) => Sandbox.ExecutionFailed.make({ message: cause.message, cause })),
+                      Effect.map((execution) => ({
+                        events: execution.events.pipe(
+                          Stream.map((value) => ({ _tag: "Metadata" as const, value })),
+                          Stream.mapError((cause) => Sandbox.ExecutionFailed.make({ message: cause.message, cause })),
+                        ),
+                        result: execution.result.pipe(
+                          Effect.map((value) => ({ stdout: value.stdout, stderr: value.stderr, exitCode: 0, value })),
+                          Effect.mapError((cause) => Sandbox.ExecutionFailed.make({ message: cause.message, cause })),
+                        ),
+                      })),
+                    ),
+              files: unsupported("files"),
+              pause: unsupported("pause"),
+              resume: unsupported("resume"),
+              snapshot: unsupported("snapshot"),
+              fork: () => unsupported("fork"),
+            }),
+          ),
+      }),
+    ),
+  ).pipe(Layer.provide(pool))
+
+const executorLayer = CellTool.layer.pipe(Layer.provideMerge(Layer.merge(contextLayer, sandboxLayer(poolLayer))))
 
 describe("cell tool schema", () => {
   standalone("advertises exactly one tool named typescript", () => {
@@ -252,10 +303,12 @@ const oversizedLayer = Layer.provideMerge(
   CellTool.layer,
   Layer.merge(
     oversizedContext,
-    TestKernel.layerTestPool({
-      profile,
-      script: () => ({ _tag: "Value", value: "done", stdout: "z".repeat(CellTool.maxProgressBytes * 2) }),
-    }),
+    sandboxLayer(
+      TestKernel.layerTestPool({
+        profile,
+        script: () => ({ _tag: "Value", value: "done", stdout: "z".repeat(CellTool.maxProgressBytes * 2) }),
+      }),
+    ),
   ),
 )
 

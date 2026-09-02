@@ -3,6 +3,7 @@ import { memory } from "./memory.js"
 import { write } from "./report.js"
 import { ruleStore } from "./rule-store.js"
 import { runtimeDriver } from "./runtime-driver/index.js"
+import { sandbox } from "./sandbox.js"
 
 export * as TestModel from "./model/service.js"
 
@@ -17,6 +18,7 @@ export const Testing = {
   runtimeDriver,
   memory,
   ruleStore,
+  sandbox,
   chaos: {
     interruptAfter: layerInterruptAfter,
     dropConnection: layerDropConnection,
