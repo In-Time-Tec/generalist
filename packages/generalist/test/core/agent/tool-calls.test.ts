@@ -186,7 +186,7 @@ it.effect("enforces authorization and tool-call budget before handler entry", ()
 
   return Effect.gen(function* () {
     const denied = yield* Effect.flip(Stream.runDrain(Agent.streamToolCalls(agent, options)))
-    expect(denied).toMatchObject({ _tag: "generalist/core/FrameworkFailure", stage: "authorization" })
+    expect(denied).toMatchObject({ _tag: "generalist/core/PermissionDenied", message: "Permission denied" })
     expect(handlerCalls).toBe(0)
 
     const exhausted = yield* Effect.flip(

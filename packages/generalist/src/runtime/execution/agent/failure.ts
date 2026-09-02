@@ -10,6 +10,7 @@ import {
   PolicyStopped,
 } from "../../../core/agent/event.js"
 import { Exhausted } from "../../../core/durable/run-budget.js"
+import { PermissionDenied } from "../../../core/tools/tool-authorization.js"
 import { AgentExecutionFailure } from "../../errors.js"
 import { HookFailed } from "../../../hooks/index.js"
 
@@ -76,8 +77,8 @@ const summary = (failure: SummaryFailure): string | undefined => {
 const typedFailure = (cause: Cause.Cause<unknown>) => {
   const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
-  return Schema.decodeUnknownOption(Schema.Union([Exhausted, ResumeMismatch]))(reason.error).pipe((decoded) =>
-    decoded._tag === "Some" ? decoded.value : undefined,
+  return Schema.decodeUnknownOption(Schema.Union([Exhausted, PermissionDenied, ResumeMismatch]))(reason.error).pipe(
+    (decoded) => (decoded._tag === "Some" ? decoded.value : undefined),
   )
 }
 

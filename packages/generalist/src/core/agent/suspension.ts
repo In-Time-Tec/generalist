@@ -7,7 +7,7 @@ import {
   type ToolBatchCheckpoint,
   type ToolBatchResolution,
 } from "./tools/checkpoint.js"
-import { domainFailureResult, successResult, type AnyToolCall, type PendingToolResult } from "./tools/result.js"
+import { successResult, type AnyToolCall, type PendingToolResult } from "./tools/result.js"
 import type { ResumeResolution } from "./lifecycle/resume.js"
 
 export interface ToolCheckpoint {
@@ -131,17 +131,20 @@ export const sameSuspension: {
 } = Function.dual(2, (left: AgentSuspended, right: AgentSuspended): boolean => Equal.equals(left, right))
 
 export const resolvedToolResult: {
-  (resolution: Exclude<ResumeResolution, { readonly _tag: "Approved" }>): (call: AnyToolCall) => PendingToolResult
-  (call: AnyToolCall, resolution: Exclude<ResumeResolution, { readonly _tag: "Approved" }>): PendingToolResult
+  (
+    resolution: Exclude<ResumeResolution, { readonly _tag: "Approved" | "Denied" }>,
+  ): (call: AnyToolCall) => PendingToolResult
+  (
+    call: AnyToolCall,
+    resolution: Exclude<ResumeResolution, { readonly _tag: "Approved" | "Denied" }>,
+  ): PendingToolResult
 } = Function.dual(
   2,
-  (call: AnyToolCall, resolution: Exclude<ResumeResolution, { readonly _tag: "Approved" }>): PendingToolResult => {
-    if (resolution._tag === "Denied") {
-      const failure = { reason: "denied", message: resolution.reason ?? "Denied" }
-      return domainFailureResult(call, { _tag: "DomainFailure", failure, encodedFailure: failure })
-    }
-    return resolution._tag === "Signal"
+  (
+    call: AnyToolCall,
+    resolution: Exclude<ResumeResolution, { readonly _tag: "Approved" | "Denied" }>,
+  ): PendingToolResult =>
+    resolution._tag === "Signal"
       ? successResult(call, { _tag: "Success", result: resolution.payload, encodedResult: resolution.payload })
-      : successResult(call, { _tag: "Success", result: resolution.result, encodedResult: resolution.encodedResult })
-  },
+      : successResult(call, { _tag: "Success", result: resolution.result, encodedResult: resolution.encodedResult }),
 )

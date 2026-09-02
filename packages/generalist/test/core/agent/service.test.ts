@@ -2852,7 +2852,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         )
 
         expect(approvalSessionId).toBe("session-approval")
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied" })
       }),
     ] as const
   })
@@ -2894,7 +2894,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(fiber.pollUnsafe()).toBeUndefined()
         yield* Deferred.succeed(approval, { _tag: "Denied" })
         const failure = yield* Fiber.join(fiber).pipe(Effect.flip)
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied" })
       }),
     ] as const
   })
@@ -2923,7 +2923,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Stream.runForEach(Agent.stream(agent, "needs permission"), (event) => Effect.sync(() => events.push(event))),
         )
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied", message: "Permission denied" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
@@ -2932,35 +2932,54 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "allows through Permissions while preserving tool-declared approvals", () => {
-    let calls = 0
+  ItLayer.make(it, "surfaces approval denial from Agent.stream as PermissionDenied", () => {
+    const reason = "TEST_OPERATOR_DENIED"
+    const ask = Approvals.layerTest({
+      resolve: () => Effect.succeed(Approvals.Denied({ reason })),
+    })
     return [
       Layer.mergeAll(
-        modelLayer(() => {
-          calls += 1
-          if (calls === 1) {
-            return Stream.make(toolCallPart("tool-call-permission-allow", "gated", { text: "still gated" }))
-          }
-          return Stream.make(textDelta("saw approval denial"))
-        }),
+        modelLayer(() => Stream.make(toolCallPart("tool-call-approval-denied-stream", "gated", { text: "blocked" }))),
         ToolExecutor.layerTest({ execute: () => Effect.die("approval-denied call must not execute") }),
-        Approvals.layerDenyAll,
-        Permissions.layerAllowAll,
+        Approvals.layerTiered({ askAbove: "ask", ask }),
+        Permissions.layerRuleset({ rules: [{ pattern: "gated", level: "ask" }] }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "permission-allow-agent", toolkit: Toolkit.make(gatedTool) })
+        const agent = Agent.make({ name: "approval-denied-stream-agent", toolkit: Toolkit.make(gatedTool) })
         const events: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(
           Stream.runForEach(Agent.stream(agent, "needs approval"), (event) => Effect.sync(() => events.push(event))),
         )
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied", message: reason })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
-        expect(calls).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "surfaces approval denial from Agent.run as PermissionDenied", () => {
+    const reason = "TEST_OPERATOR_DENIED"
+    const ask = Approvals.layerTest({
+      resolve: () => Effect.succeed(Approvals.Denied({ reason })),
+    })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(toolCallPart("tool-call-approval-denied-run", "gated", { text: "blocked" }))),
+        ToolExecutor.layerTest({ execute: () => Effect.die("approval-denied call must not execute") }),
+        Approvals.layerTiered({ askAbove: "ask", ask }),
+        Permissions.layerRuleset({ rules: [{ pattern: "gated", level: "ask" }] }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "approval-denied-run-agent", toolkit: Toolkit.make(gatedTool) })
+
+        const failure = yield* Effect.flip(Agent.run(agent, "needs approval"))
+
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied", message: reason })
       }),
     ] as const
   })
@@ -3035,7 +3054,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Stream.runForEach(Agent.stream(agent, "ask then approve"), (event) => Effect.sync(() => events.push(event))),
         )
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
@@ -8436,7 +8455,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         )
 
         expect(approvals).toBe(1)
-        expect(failure).toMatchObject({ stage: "authorization", tool: "dynamic-gated" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
@@ -8499,7 +8518,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         )
 
         expect(approvals).toBe(1)
-        expect(failure).toMatchObject({ stage: "authorization", tool: "throwing-approval" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied" })
         expect(events.filter((event) => event._tag === "ApprovalRequested")).toHaveLength(1)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
@@ -8566,7 +8585,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ),
         )
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
