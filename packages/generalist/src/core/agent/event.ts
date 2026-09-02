@@ -222,13 +222,7 @@ export type Event<Output = unknown> =
 const defaultAgentErrorHint =
   "Inspect the cause and diagnostics, correct the failing boundary, and run the Agent again."
 
-const agentErrorHint = (message: string, cause: unknown): string => {
-  if (message === "Agent requires LanguageModel in context") {
-    return (
-      "Provide a provider layer from generalist/providers/*, then select it with ModelRegistry.withModel " +
-      "before running the Agent."
-    )
-  }
+const agentErrorHint = (cause: unknown): string => {
   if (!AiError.isAiError(cause)) return defaultAgentErrorHint
   if (cause.reason._tag === "AuthenticationError") {
     return "Check the selected provider's API key configuration name and provide the correct credential."
@@ -260,7 +254,7 @@ export class AgentError extends ActionableTaggedError<AgentError>()("generalist/
     },
     options?: Schema.MakeOptions,
   ): AgentError {
-    return super.make({ ...props, hint: props.hint ?? agentErrorHint(props.message, props.cause) }, options)
+    return super.make({ ...props, hint: props.hint ?? agentErrorHint(props.cause) }, options)
   }
 }
 
