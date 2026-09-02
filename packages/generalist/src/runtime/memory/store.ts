@@ -228,6 +228,7 @@ const makeStoreServices = (options: LayerOptions) =>
             )
             const continuation = {
               schemaVersion: 1 as const,
+              queue: "steering" as const,
               prompt: input.prompt,
               nextTurn: (previousTurn?.turn ?? -1) + 1,
               steeringEntryIds: [admission.receipt.entryId],
@@ -415,6 +416,7 @@ const makeStoreServices = (options: LayerOptions) =>
                       followUp.length > 0 ? followUp : pending.filter((entry) => entry.policy !== "enqueue")
                     const continuation = {
                       schemaVersion: 1 as const,
+                      queue: followUp.length > 0 ? ("followUp" as const) : ("steering" as const),
                       prompt: selected.reduce<Prompt.Prompt>(
                         (prompt, entry) => Prompt.concat(prompt, entry.prompt),
                         Prompt.empty,

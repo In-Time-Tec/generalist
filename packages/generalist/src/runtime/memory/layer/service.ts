@@ -1,4 +1,4 @@
-import { Clock, DateTime, Effect, Layer, Option, Predicate, Ref, Stream } from "effect"
+import { Clock, DateTime, Effect, Layer, Option, Predicate, Ref, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 /* eslint-disable max-lines -- the memory Runtime layer implements one service contract */
 import {

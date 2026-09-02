@@ -45,6 +45,15 @@ export const make = (input: {
   if (input.history !== undefined) Object.assign(options, { history: input.history })
   const turnStart = input.turnStart ?? input.continuation?.nextTurn
   if (turnStart !== undefined) Object.assign(options, { turnStart })
+  if (input.continuation !== undefined) {
+    Object.assign(options, {
+      initialSteering: {
+        queue: input.continuation.queue ?? "steering",
+        count: input.continuation.steeringEntryIds.length,
+        turn: Math.max(0, input.continuation.nextTurn - 1),
+      },
+    })
+  }
   if (Option.isSome(agentSuspension)) {
     const resume: NonNullable<HostedRunOptions["resume"]> = { suspension: agentSuspension.value }
     const waitIds = new Set(agentSuspension.value.waits.map((wait) => wait.waitId))

@@ -50,6 +50,7 @@ export const ExecutionContinuation = Schema.Struct({
   prompt: Prompt.Prompt,
   nextTurn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   steeringEntryIds: Schema.Array(Schema.String),
+  queue: Schema.optionalKey(Schema.Literals(["steering", "followUp"])),
 })
 
 /** Durable reconstruction data for a steering-driven turn. */

@@ -1,10 +1,19 @@
 import { Effect, Schema, Scope, Stream } from "effect"
 import { dual } from "effect/Function"
-import type { Tool } from "effect/unstable/ai"
+import { Prompt, type Tool } from "effect/unstable/ai"
 import { generateId } from "../../model/telemetry/events.js"
 import type { RunId } from "../../durable/run-id.js"
 import { allocateRunInbox, type RunInbox } from "../../turn/steering-inbox.js"
-import type { InboxFull, Input as SteeringInput, PolicyInvalid, RunClosed } from "../../turn/steering.js"
+import {
+  RollbackRequiresRuntime,
+  type AdmissionPolicy,
+  type InboxFull,
+  type Input as SteeringInput,
+  type PolicyInvalid,
+  type Receipt as SteeringReceipt,
+  type RunBusy,
+  type RunClosed,
+} from "../../turn/steering.js"
 import { streamInternal } from "../run.js"
 import type { Agent, RunError, RunOptions, RunRequirements } from "../service.js"
 import { AgentError, type Event, InvalidOutput } from "../event.js"
@@ -37,6 +46,38 @@ export interface RunHandle<
     ) => Effect.Effect<ControlReceipt, ControlError | import("../../turn/steering.js").RunBusy>
   }
 }
+
+export type SendError = InboxFull | RunClosed | RollbackRequiresRuntime | RunBusy
+
+const sendEffect = <EventValue, EventError, EventServices>(
+  handle: RunHandle<EventValue, EventError, EventServices>,
+  message: Prompt.Prompt | string,
+  policy: AdmissionPolicy,
+): Effect.Effect<SteeringReceipt, SendError> => {
+  if (policy === "rollback") return Effect.fail(RollbackRequiresRuntime.make({ runId: handle.runId }))
+  const input = { prompt: message }
+  if (policy === "enqueue") return handle.followUp(input)
+  if (policy === "interrupt") {
+    return handle.steer(input).pipe(Effect.tap(() => handle[RunControlTypeId].interruptTools))
+  }
+  if (policy === "steer") return handle.steer(input)
+  return handle[RunControlTypeId].reject(input)
+}
+
+/** Admit one message to a process-local Run under an explicit policy. */
+export const send: {
+  (
+    message: Prompt.Prompt | string,
+    policy: AdmissionPolicy,
+  ): <EventValue, EventError, EventServices>(
+    handle: RunHandle<EventValue, EventError, EventServices>,
+  ) => Effect.Effect<SteeringReceipt, SendError>
+  <EventValue, EventError, EventServices>(
+    handle: RunHandle<EventValue, EventError, EventServices>,
+    message: Prompt.Prompt | string,
+    policy: AdmissionPolicy,
+  ): Effect.Effect<SteeringReceipt, SendError>
+} = dual(3, sendEffect)
 
 type WrappedOutputCodec<OutputCodec extends Schema.Top> = Schema.Codec<
   { readonly output: OutputCodec["Type"] },

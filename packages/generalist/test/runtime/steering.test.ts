@@ -1,7 +1,7 @@
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, ToolExecutor } from "../../src/index.js"
+import { Agent, Hooks, ToolExecutor } from "../../src/index.js"
 import {
   Address,
   Errors,
@@ -72,6 +72,9 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
           return { _tag: "Success" as const, result: "tool result", encodedResult: "tool result" }
         }),
     })
+    const hooks = Hooks.layer([
+      Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:hooked admission`))),
+    ])
     const handlers = toolkit.toLayer({ controlled_tool: () => Effect.die("ToolExecutor owns controlled_tool") })
     const runtimeLayer = Runtime.layerMemory({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
@@ -80,7 +83,7 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
         ExecutableResolver.layerStatic([
           {
             executable,
-            agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),
+            agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers, hooks)),
           },
         ]).pipe(Layer.orDie),
       ),
@@ -115,6 +118,7 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
 
         const deliveredAt = requests.findIndex((request) => request.includes(`${policy} message`))
         expect(deliveredAt).toBe(policy === "steer" ? 1 : 2)
+        expect(requests[deliveredAt]).toContain(`${policy === "enqueue" ? "followUp" : "steering"}:1:hooked admission`)
         const history = yield* runtime.history({ runId: run.runId, limit: 100 })
         const inbox = history.find((event) => event._tag === "Inbox")
         expect(inbox).toMatchObject({ _tag: "Inbox", policy })
@@ -322,6 +326,70 @@ layer(sqliteManualClaimLayer(tempDbPath("steering-mixed-completion-lanes")))(
   },
 )
 
+it.effect("completion continuations retain their lane and pass through onSteer", () =>
+  Effect.gen(function* () {
+    let modelPrompt = ""
+    const agent = Agent.make({ name: "completion-hook" })
+    const executable = testExecutable(agent, "1")
+    const address = Address.make("agent:completion-hook")
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: (request) => {
+          modelPrompt = JSON.stringify(request.prompt)
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "done", delta: "done" }),
+            finish,
+          ])
+        },
+      }),
+    )
+    const hooks = Hooks.layer([
+      Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:completion hook`))),
+    ])
+    const runtimeLayer = Runtime.layerMemory({
+      addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, hooks)) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
+
+    yield* provideScoped(
+      runtimeLayer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor.RunExecutor
+        const run = yield* runtime.send({
+          to: address,
+          sessionId: "session:completion-hook",
+          idempotencyKey: "run",
+          prompt: "start",
+        })
+        const claim = yield* store.claimExecution({ runId: run.runId, ownerId: "completion-hook" })
+        const receipt = yield* runtime.send(run.runId, "queued continuation", {
+          policy: "enqueue",
+          idempotencyKey: "queued",
+        })
+        const outcome = yield* store.complete({ ...claim, result: completedResult("first") })
+        expect(outcome).toMatchObject({
+          _tag: "SteeringPending",
+          continuation: { queue: "followUp", steeringEntryIds: [receipt.entryId] },
+        })
+
+        yield* host.execute(claim)
+
+        expect(modelPrompt).toContain("queued continuation")
+        expect(modelPrompt).toContain("followUp:1:completion hook")
+      }),
+    )
+  }),
+)
+
 layer(memoryLayer)("rollback admission", (test) => {
   test.effect("rewinds to the previous TurnCompleted event before admitting exactly once", () =>
     Effect.gen(function* () {
@@ -399,6 +467,9 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
     const executor = ToolExecutor.layerTest({
       execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
     })
+    const hooks = Hooks.layer([
+      Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:rollback hook`))),
+    ])
     const handlers = toolkit.toLayer({ rollback_write: () => Effect.die("ToolExecutor owns rollback_write") })
     const runtimeLayer = Runtime.layerMemory({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
@@ -407,7 +478,7 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
         ExecutableResolver.layerStatic([
           {
             executable,
-            agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),
+            agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers, hooks)),
           },
         ]).pipe(Layer.orDie),
       ),
@@ -440,6 +511,7 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
 
         expect(requests).toHaveLength(2)
         expect(requests[1]).toContain("replace the active turn")
+        expect(requests[1]).toContain("steering:1:rollback hook")
         expect((yield* runtime.inspect(run.runId)).status).toBe("succeeded")
         const history = yield* runtime.history({ runId: run.runId, limit: 100 })
         expect(history.filter((event) => event._tag === "Inbox")).toEqual([

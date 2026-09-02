@@ -167,6 +167,7 @@ export const saveCompletionContinuation: {
         ? undefined
         : {
             schemaVersion: 1,
+            queue: followUp.length > 0 ? "followUp" : "steering",
             prompt: selected.reduce<Prompt.Prompt>(
               (prompt, entry) => Prompt.concat(prompt, entry.prompt),
               Prompt.empty,

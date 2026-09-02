@@ -24,6 +24,7 @@ export const continuationForOperation = (input: {
   readonly model: boolean
   readonly steeringEntryIds: ReadonlyArray<string>
   readonly steeringPrompt: Prompt.Prompt | undefined
+  readonly queue: "steering" | "followUp" | undefined
   readonly completed: DurableAgentLoopEvent | undefined
   readonly current: ExecutionContinuation | undefined
 }): ExecutionContinuation | null | undefined => {
@@ -32,6 +33,7 @@ export const continuationForOperation = (input: {
   if (input.completed?._tag !== "TurnCompleted" || input.steeringPrompt === undefined) return input.current
   return {
     schemaVersion: 1,
+    queue: input.queue ?? "steering",
     prompt: input.steeringPrompt,
     nextTurn: input.completed.turn + 1,
     steeringEntryIds: input.steeringEntryIds,

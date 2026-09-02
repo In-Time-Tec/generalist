@@ -22,6 +22,7 @@ import type {
 import type { SteeringReceipt } from "../../run/steering.js"
 import { make as makeBudget } from "../../../core/durable/run-budget.js"
 import { nextAt, parseRRule } from "../../execution/trigger/schedule.js"
+import { normalizePrompt } from "../prompt.js"
 
 const decodeEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event: RunEvent) => {
   if (event._tag !== "RunCompleted") return Effect.succeed<StartEvent<OutputCodec["Type"]>>(event)

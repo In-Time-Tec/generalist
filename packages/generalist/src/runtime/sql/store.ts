@@ -313,6 +313,7 @@ const makeSqlStoreServices = <DriverError>(
               yield* database`
                 UPDATE generalist_runs SET continuation_json = ${encodeContinuation({
                   schemaVersion: 1,
+                  queue: "steering",
                   prompt: input.prompt,
                   nextTurn,
                   steeringEntryIds: [admission.receipt.entryId],

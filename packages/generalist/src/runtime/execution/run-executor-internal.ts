@@ -174,6 +174,9 @@ const makeFor = (
                       if (budget === undefined) return
                       const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
                       const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuation?.prompt)
+                      const observedQueue = yield* Ref.make<"steering" | "followUp" | undefined>(
+                        continuation === undefined ? undefined : (continuation.queue ?? "steering"),
+                      )
                       const activeContinuation = yield* Ref.make(continuation)
                       const bufferedEvents = yield* Ref.make<ReadonlyArray<DurableAgentLoopEvent>>(
                         continuation === undefined
@@ -182,7 +185,7 @@ const makeFor = (
                               {
                                 _tag: "SteeringDrained",
                                 turn: Math.max(0, continuation.nextTurn - 1),
-                                queue: "steering",
+                                queue: continuation.queue ?? "steering",
                                 count: continuation.steeringEntryIds.length,
                               },
                             ],
@@ -207,6 +210,7 @@ const makeFor = (
                               Prompt.empty,
                             ),
                           )
+                          yield* Ref.set(observedQueue, queue)
                           return entries.map((entry) => ({ prompt: entry.prompt }))
                         }).pipe(Effect.orDie)
                       const inbox = externalRunInbox({
@@ -228,20 +232,22 @@ const makeFor = (
                         onScheduled: (operation, checkpoint) =>
                           Effect.gen(function* () {
                             yield* requireOperationBudget(operation.kind, runId, store)
-                            const [steeringEntryIds, steeringPrompt, steeringEvents] =
+                            const [steeringEntryIds, steeringPrompt, steeringQueue, steeringEvents] =
                               operation.kind === "model"
                                 ? yield* Effect.all([
                                     Ref.get(observed),
                                     Ref.get(observedPrompt),
+                                    Ref.get(observedQueue),
                                     Ref.get(bufferedEvents),
                                   ])
-                                : [[], undefined, []]
+                                : [[], undefined, undefined, []]
                             const completed = steeringEvents.findLast((event) => event._tag === "TurnCompleted")
                             const currentContinuation = yield* Ref.get(activeContinuation)
                             const scheduledContinuation = continuationForOperation({
                               model: operation.kind === "model",
                               steeringEntryIds,
                               steeringPrompt,
+                              queue: steeringQueue,
                               completed,
                               current: currentContinuation,
                             })
@@ -279,6 +285,7 @@ const makeFor = (
                             if (operation.kind === "model") {
                               yield* Ref.set(observed, [])
                               yield* Ref.set(observedPrompt, undefined)
+                              yield* Ref.set(observedQueue, undefined)
                               yield* Ref.set(bufferedEvents, [])
                               yield* Ref.set(
                                 activeContinuation,
