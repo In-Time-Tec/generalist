@@ -1,4 +1,4 @@
-import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream, Types } from "effect"
 import { Chat, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./result.js"
@@ -6,7 +6,7 @@ import type { Agent, ClosedServices, ProgressOverflowPolicy, RunOptions } from "
 import { RunError } from "../run/error.js"
 import type { AgentRunState } from "../run-state.js"
 import type { HandoffRunState } from "../handoff/state.js"
-import type { AuthorizationError, Authorizer } from "../../tools/tool-authorization.js"
+import type { AuthorizationError, Authorizer, Request as AuthorizationRequest } from "../../tools/tool-authorization.js"
 import {
   FrameworkFailure,
   Outcome,
@@ -412,26 +412,26 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const resolvedRequest = { ...request, agentName }
         const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
         const approvalEvents = yield* Queue.bounded<Event, Cause.Done>(1)
-        const authorization = authorizer
-          .authorize({
-            call,
-            agentName,
-            turn,
-            sessionId,
-            tool: candidate.tool,
-            active: true,
-            activeTools,
-            activatedSkills,
-            messages,
-            onApprovalRequired: (approval) =>
-              Queue.offer(approvalEvents, { _tag: "ApprovalRequested", turn, call, request: approval }).pipe(
-                Effect.asVoid,
-              ),
-          })
-          .pipe(
-            Effect.mapError((error) => authorizationError(turn, error)),
-            Effect.ensuring(Queue.end(approvalEvents).pipe(Effect.asVoid)),
-          )
+        const authorizationRequest: Types.Mutable<AuthorizationRequest> = {
+          call,
+          agentName,
+          turn,
+          sessionId,
+          tool: candidate.tool,
+          active: true,
+          activeTools,
+          activatedSkills,
+          messages,
+          onApprovalRequired: (approval) =>
+            Queue.offer(approvalEvents, { _tag: "ApprovalRequested", turn, call, request: approval }).pipe(
+              Effect.asVoid,
+            ),
+        }
+        if (options.invocation?.runId !== undefined) authorizationRequest.runId = options.invocation.runId
+        const authorization = authorizer.authorize(authorizationRequest).pipe(
+          Effect.mapError((error) => authorizationError(turn, error)),
+          Effect.ensuring(Queue.end(approvalEvents).pipe(Effect.asVoid)),
+        )
         const fiber = yield* Effect.forkScoped(authorization, { startImmediately: true })
         return Stream.concat(
           Stream.fromQueue(approvalEvents),

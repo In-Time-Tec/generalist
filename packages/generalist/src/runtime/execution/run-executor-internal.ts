@@ -497,4 +497,4 @@ const makeFor = (
   })
 
 export const forAgents = (agents: RegisteredAgents) => makeFor(agents)
-export const make = makeFor(makeRegisteredAgents())
+export const make = Effect.suspend(() => makeFor(makeRegisteredAgents()))

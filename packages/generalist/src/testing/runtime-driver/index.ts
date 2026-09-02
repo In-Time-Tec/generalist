@@ -10,6 +10,7 @@ import { RunClaims } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
 import { registerAgentStart } from "./agent-start.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
+import { registerApprovalSuspend } from "./approval-suspend.js"
 import { record } from "../report.js"
 import type {
   MultiWorkerClaimCapability,
@@ -442,6 +443,14 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
     }
     if (options.capabilities.notificationRecovery !== undefined) {
       registerNotificationRecovery(options, options.capabilities.notificationRecovery)
+    }
+    if (options.capabilities["approval-suspend"] !== undefined) {
+      registerApprovalSuspend({
+        options,
+        capability: options.capabilities["approval-suspend"],
+        prepare: (effect) => prepare(options, effect),
+        open: (use) => provideLayer(options.layer, use),
+      })
     }
   })
 }

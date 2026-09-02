@@ -206,6 +206,8 @@ export const make = (input: {
               const resolution = yield* Option.getOrElse(approvals, () => autoApprove).resolve({
                 _tag: "Pending",
                 token: approvalId,
+                level: "ask",
+                reason: "Nested operation requires approval",
                 call: Response.toolCallPart({
                   id: approvalId,
                   name: capability,
@@ -215,6 +217,7 @@ export const make = (input: {
                 agentName: capability,
                 turn: 0,
                 sessionId: context.sessionId,
+                runId: input.claimed.runId,
               })
               if (resolution._tag === "Denied") return yield* denied(resolution.reason ?? "nested operation denied")
               if (resolution._tag === "Pending") {

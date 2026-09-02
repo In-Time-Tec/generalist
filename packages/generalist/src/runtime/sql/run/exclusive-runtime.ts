@@ -24,16 +24,18 @@ export interface SqliteRuntimeOptions {
 /** Assemble one exclusive SQLite host around Runtime's lifecycle kernel. */
 export const layerSqliteRuntime = (
   input: SqliteRuntimeOptions,
-): Layer.Layer<SqliteRuntimeServices, SqliteStoreError, SqlClient.SqlClient | ExecutableResolver> => {
-  const store = layerSqliteStore(input.options)
-  const agents = makeRegisteredAgents()
-  const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
-  const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
-  const scheduler = (
-    input.schedulerMode === "external"
-      ? Layer.effect(LocalScheduler, makeLocalScheduler({ workerId: input.workerId, ...input.options.scheduler }))
-      : localSchedulerLayer({ workerId: input.workerId, ...input.options.scheduler })
-  ).pipe(Layer.provide(Layer.merge(dependencies, host)))
-  return Layer.mergeAll(runtime, host, store, scheduler)
-}
+): Layer.Layer<SqliteRuntimeServices, SqliteStoreError, SqlClient.SqlClient | ExecutableResolver> =>
+  // Registrations belong to one built Runtime, so the map is created per build rather than per Layer value.
+  Layer.suspend(() => {
+    const store = layerSqliteStore(input.options)
+    const agents = makeRegisteredAgents()
+    const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
+    const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
+    const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
+    const scheduler = (
+      input.schedulerMode === "external"
+        ? Layer.effect(LocalScheduler, makeLocalScheduler({ workerId: input.workerId, ...input.options.scheduler }))
+        : localSchedulerLayer({ workerId: input.workerId, ...input.options.scheduler })
+    ).pipe(Layer.provide(Layer.merge(dependencies, host)))
+    return Layer.mergeAll(runtime, host, store, scheduler)
+  })

@@ -16,15 +16,17 @@ export { makeRuntime } from "./layer/service.js"
 
 export const layerMemory = (
   options: LayerOptions,
-): Layer.Layer<Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler, never, ExecutableResolver> => {
-  const store = storeLayer(options)
-  const active = activeExecutionsLayer
-  const agents = makeRegisteredAgents()
-  const dependencies = Layer.mergeAll(store, active, modelPreviewLayer)
-  const runtime = runtimeLayer(agents)(options).pipe(Layer.provide(dependencies))
-  const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
-  const scheduler = localSchedulerLayer({ workerId: "memory", ...options.scheduler }).pipe(
-    Layer.provide(Layer.mergeAll(store, active, host)),
-  )
-  return Layer.mergeAll(runtime, host, store, scheduler)
-}
+): Layer.Layer<Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler, never, ExecutableResolver> =>
+  // Registrations belong to one built Runtime, so the map is created per build rather than per Layer value.
+  Layer.suspend(() => {
+    const store = storeLayer(options)
+    const active = activeExecutionsLayer
+    const agents = makeRegisteredAgents()
+    const dependencies = Layer.mergeAll(store, active, modelPreviewLayer)
+    const runtime = runtimeLayer(agents)(options).pipe(Layer.provide(dependencies))
+    const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
+    const scheduler = localSchedulerLayer({ workerId: "memory", ...options.scheduler }).pipe(
+      Layer.provide(Layer.mergeAll(store, active, host)),
+    )
+    return Layer.mergeAll(runtime, host, store, scheduler)
+  })

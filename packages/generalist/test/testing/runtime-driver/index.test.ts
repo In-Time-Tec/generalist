@@ -69,6 +69,7 @@ Testing.runtimeDriver({
     "start-by-agent": { claim },
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
+    "approval-suspend": { claim, recovery: "reclaim" },
     runTree: { claim },
   },
 })
@@ -83,6 +84,7 @@ Testing.runtimeDriver({
     "start-by-agent": { claim },
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
+    "approval-suspend": { claim, recovery: "rebuild" },
     runTree: { claim },
   },
 })

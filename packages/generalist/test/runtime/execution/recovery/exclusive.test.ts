@@ -396,8 +396,9 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
         yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-restart" }))
 
         const inspection = yield* runtime.inspect(receipt.runId)
+        const approvalToken = `runtime-approval:${encodeURIComponent(receipt.runId)}:approval:gated-write-1`
         expect(inspection.status).toBe("waiting")
-        expect(inspection.waits).toMatchObject([{ waitId: "approval:gated-write-1", reason: { _tag: "Approval" } }])
+        expect(inspection.waits).toMatchObject([{ waitId: approvalToken, reason: { _tag: "Approval" } }])
         const execution = yield* store.loadExecution(receipt.runId)
         if (execution.checkpoint === undefined || !("driverVersion" in execution.checkpoint)) {
           return yield* Effect.die("durable checkpoint missing")
@@ -408,7 +409,7 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
         expect(checkpointCall.state).toMatchObject({
           _tag: "Waiting",
           reason: "approval",
-          waitId: "approval:gated-write-1",
+          waitId: approvalToken,
         })
         expect(
           yield* store.getOperationByKey({
@@ -416,7 +417,7 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
             operationKey: checkpointCall.operationKey,
           }),
         ).toBeUndefined()
-        return { runId: receipt.runId, operationKey: checkpointCall.operationKey }
+        return { runId: receipt.runId, operationKey: checkpointCall.operationKey, approvalToken }
       }),
     )
     expect(suspended.operationKey).toBe(`${suspended.runId}:tool:0:gated-write-1:gated_write`)
@@ -478,7 +479,7 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
 
         yield* runtime.respond({
           runId: suspended.runId,
-          waitId: "approval:gated-write-1",
+          waitId: suspended.approvalToken,
           resolution: { _tag: "Approved" },
         })
         yield* host.execute(yield* store.claimExecution({ runId: suspended.runId, ownerId: "after-restart" }))
