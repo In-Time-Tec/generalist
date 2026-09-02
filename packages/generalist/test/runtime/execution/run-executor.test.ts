@@ -333,7 +333,8 @@ describe("RunExecutor", () => {
         }),
       )
 
-      expect(observed).toEqual({ tokens: expect.any(Number), contextWindow: 30_720 })
+      expect(observed?.tokens).toBeGreaterThan(0)
+      expect(observed?.contextWindow).toBe(30_720)
       expect(observedKeepRecent).toBe(777)
     }),
   )

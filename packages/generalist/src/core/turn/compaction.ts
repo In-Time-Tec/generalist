@@ -22,6 +22,8 @@ import {
 
 export { Compaction, CompactionError, Result, withLifecycle } from "./compaction-service.js"
 export type { MicrocompactResult, Plan, Request, Service, SummarizeResult, Usage } from "./compaction-service.js"
+export { cacheAware } from "./compaction-cache-aware.js"
+export type { Options as CacheAwareOptions } from "./compaction-cache-aware.js"
 export { layerTruncate, layerTruncateEstimated } from "./compaction-truncate.js"
 
 /** @experimental Default headroom kept for the next model response. */
@@ -114,13 +116,6 @@ export interface SummarizeWithModelOptions {
   /** Closed model layer for summary calls; omit to use the ambient LanguageModel. */
   readonly model?: Layer.Layer<LanguageModel.LanguageModel>
   readonly prompt?: string
-}
-
-/** @experimental Options for cache-aware semantic compaction. */
-export interface CacheAwareOptions {
-  readonly stablePrefixTurns: number
-  readonly keepRecentTokens?: number
-  readonly summarize: Strategy["summarize"]
 }
 
 const serialized = (value: Prompt.Prompt["content"]): string => {
@@ -265,10 +260,9 @@ export const summarizeWithModel = (options: SummarizeWithModelOptions = {}): Str
 
 /** @experimental The default two-stage compaction strategy. */
 export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
-  const summarizeOptions = {
-    ...(options.summaryModel === undefined ? {} : { model: options.summaryModel }),
-    ...(options.summaryPrompt === undefined ? {} : { prompt: options.summaryPrompt }),
-  }
+  const summarizeOptions: SummarizeWithModelOptions = {}
+  if (options.summaryModel !== undefined) Object.assign(summarizeOptions, { model: options.summaryModel })
+  if (options.summaryPrompt !== undefined) Object.assign(summarizeOptions, { prompt: options.summaryPrompt })
   return {
     shouldCompact: ({ tokens, contextWindow }) => Number.isFinite(contextWindow) && tokens > contextWindow,
     cut: (prompt, keepRecentTokens) => {
@@ -289,53 +283,6 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
       })
     },
     summarize: summarizeWithModel(summarizeOptions),
-  }
-}
-
-const startsTurn = (message: Prompt.Message): boolean => message.role === "user"
-
-const stablePrefixEnd = (messages: ReadonlyArray<Prompt.Message>, stablePrefixTurns: number): number => {
-  let turns = 0
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = messages[index]
-    if (message !== undefined && startsTurn(message)) {
-      if (turns === stablePrefixTurns) return index
-      turns += 1
-    }
-  }
-  return messages.length
-}
-
-/**
- * @experimental Keep instructions and the oldest configured user turns byte-stable,
- * summarize only the middle, and retain the recent token-denominated tail verbatim.
- */
-export const cacheAware = (options: CacheAwareOptions): Strategy => {
-  const stablePrefixTurns = safeNonNegativeInteger("CacheAwareOptions.stablePrefixTurns", options.stablePrefixTurns)
-  const keepRecentTokens =
-    options.keepRecentTokens === undefined
-      ? defaultKeepRecentTokens
-      : safeNonNegativeInteger("CacheAwareOptions.keepRecentTokens", options.keepRecentTokens)
-  return {
-    shouldCompact: defaultStrategy().shouldCompact,
-    keepRecentTokens,
-    cut: (prompt, recentTokens) => {
-      const entries = prompt.content.map((message, index) => ({
-        _tag: "Message" as const,
-        id: String(index),
-        parentId: index === 0 ? null : String(index - 1),
-        message,
-      }))
-      const recentStart = safeCutIndex(entries, recentTokens)
-      const prefixEnd = stablePrefixEnd(prompt.content, stablePrefixTurns)
-      if (prefixEnd >= recentStart) return Option.none()
-      return Option.some({
-        keep: Prompt.fromMessages(prompt.content.slice(0, prefixEnd)),
-        compact: Prompt.fromMessages(prompt.content.slice(prefixEnd, recentStart)),
-        recent: Prompt.fromMessages(prompt.content.slice(recentStart)),
-      })
-    },
-    summarize: options.summarize,
   }
 }
 
@@ -493,13 +440,14 @@ const compact = (
   })
 
 /** @experimental Layer wiring the default or provided strategy. */
-export function layer(options?: LayerOptions): Layer.Layer<Compaction>
-export function layer(providedStrategy: Strategy, options?: DefaultOptions): Layer.Layer<Compaction>
-export function layer(
-  input: LayerOptions | Strategy = {},
-  strategyOptions: DefaultOptions = {},
-): Layer.Layer<Compaction> {
-  const options = "shouldCompact" in input ? strategyOptions : input
+export interface LayerConstructor {
+  (options?: LayerOptions): Layer.Layer<Compaction>
+  (providedStrategy: Strategy): Layer.Layer<Compaction>
+}
+
+/** @experimental Layer wiring the default or provided strategy. */
+export const layer: LayerConstructor = (input: LayerOptions | Strategy = {}): Layer.Layer<Compaction> => {
+  const options = "shouldCompact" in input ? {} : input
   const providedStrategy = "shouldCompact" in input ? input : (input.strategy ?? defaultStrategy(input))
   return Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options)))
 }

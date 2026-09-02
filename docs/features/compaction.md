@@ -60,7 +60,7 @@ const mine = Compaction.make({
 })
 ```
 
-`Compaction.make(strategy, options?)` constructs the process-local service. `Compaction.layer(strategy, options?)` provides it as a Layer. `Compaction.layer(options)` uses `defaultStrategy(options)`.
+`Compaction.make(strategy, options?)` constructs the process-local service. `Compaction.layer(strategy)` provides it as a Layer. `Compaction.layer(options)` uses `defaultStrategy(options)`; pass `{ strategy, ...options }` when a custom strategy also needs Layer options.
 
 Every `Strategy` field has one owner:
 
