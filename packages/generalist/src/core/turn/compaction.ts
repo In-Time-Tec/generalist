@@ -409,8 +409,9 @@ const compact = (
       if (changed && fits(history, prompt, usage)) return Option.some(microcompactResult({ history, prompt }))
     }
 
+    const strategyPrompt = history.content.length === 0 ? buildContext(input.path ?? []) : history
     const plan = compactionStrategy.cut(
-      buildContext(input.path ?? []),
+      strategyPrompt,
       compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? defaultKeepRecentTokens,
     )
     if (Option.isNone(plan))
