@@ -23,106 +23,131 @@ export type RunStartPayload = typeof RunStartPayload.Type
 export const RunCancelPayload = Schema.Struct({ reason: Schema.optionalKey(Schema.String) })
 export type RunCancelPayload = typeof RunCancelPayload.Type
 
-export const EventStreamItem = Schema.Struct({
+export interface EventStreamItem {
+  readonly id: string
+  readonly event: string
+  readonly data: HostEvent
+}
+
+interface EventStreamItemEncoded {
+  readonly id: string
+  readonly event: string
+  readonly data: string
+}
+
+export const EventStreamItem: Schema.Codec<EventStreamItem, EventStreamItemEncoded> = Schema.Struct({
   id: Schema.String,
   event: Schema.String,
   data: Schema.fromJsonString(HostEvent),
 })
-export type EventStreamItem = typeof EventStreamItem.Type
 
-export const eventStream = HttpApiSchema.StreamSse({ events: EventStreamItem, error: ApiError })
+export const eventStream: HttpApiSchema.StreamSse<typeof EventStreamItem, typeof ApiError> = HttpApiSchema.StreamSse({
+  events: EventStreamItem,
+  error: ApiError,
+})
 
-const sessions = HttpApiGroup.make("sessions").add(
-  HttpApiEndpoint.post("create", "/sessions", {
-    payload: Schema.Struct({ id: Schema.optionalKey(Schema.String), title: Schema.optionalKey(Schema.String) }),
-    success: HostSession,
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.get("get", "/sessions/:id", {
-    params: { id: Schema.String },
-    success: HostSession,
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.get("list", "/sessions", { success: Schema.Array(HostSession), error: apiErrors }),
-)
+const createSession = HttpApiEndpoint.post("create", "/sessions", {
+  payload: Schema.Struct({ id: Schema.optionalKey(Schema.String), title: Schema.optionalKey(Schema.String) }),
+  success: HostSession,
+  error: apiErrors,
+})
+const getSession = HttpApiEndpoint.get("get", "/sessions/:id", {
+  params: { id: Schema.String },
+  success: HostSession,
+  error: apiErrors,
+})
+const listSessions = HttpApiEndpoint.get("list", "/sessions", {
+  success: Schema.Array(HostSession),
+  error: apiErrors,
+})
+const sessions: HttpApiGroup.HttpApiGroup<"sessions", typeof createSession | typeof getSession | typeof listSessions> =
+  HttpApiGroup.make("sessions").add(createSession, getSession, listSessions)
 
-const runs = HttpApiGroup.make("runs").add(
-  HttpApiEndpoint.post("start", "/sessions/:sessionId/runs", {
-    params: { sessionId: Schema.String },
-    payload: RunStartPayload,
-    success: RunStarted,
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.get("list", "/sessions/:sessionId/runs", {
-    params: { sessionId: Schema.String },
-    success: Schema.Array(RunInspection),
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.get("inspect", "/runs/:id", {
-    params: { id: Schema.String },
-    success: RunInspection,
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.post("cancel", "/runs/:id/cancel", {
-    params: { id: Schema.String },
-    payload: RunCancelPayload,
-    error: apiErrors,
-  }),
-)
+const startRun = HttpApiEndpoint.post("start", "/sessions/:sessionId/runs", {
+  params: { sessionId: Schema.String },
+  payload: RunStartPayload,
+  success: RunStarted,
+  error: apiErrors,
+})
+const listRuns = HttpApiEndpoint.get("list", "/sessions/:sessionId/runs", {
+  params: { sessionId: Schema.String },
+  success: Schema.Array(RunInspection),
+  error: apiErrors,
+})
+const inspectRun = HttpApiEndpoint.get("inspect", "/runs/:id", {
+  params: { id: Schema.String },
+  success: RunInspection,
+  error: apiErrors,
+})
+const cancelRun = HttpApiEndpoint.post("cancel", "/runs/:id/cancel", {
+  params: { id: Schema.String },
+  payload: RunCancelPayload,
+  error: apiErrors,
+})
+const runs: HttpApiGroup.HttpApiGroup<
+  "runs",
+  typeof startRun | typeof listRuns | typeof inspectRun | typeof cancelRun
+> = HttpApiGroup.make("runs").add(startRun, listRuns, inspectRun, cancelRun)
 
-const events = HttpApiGroup.make("events").add(
-  HttpApiEndpoint.get("subscribe", "/sessions/:id/events", {
-    params: { id: Schema.String },
-    query: { cursor: Schema.optionalKey(CursorFromString) },
-    headers: { "last-event-id": Schema.optionalKey(CursorFromString) },
-    success: eventStream,
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.get("connect", "/sessions/:id/ws", {
-    params: { id: Schema.String },
-    query: { cursor: Schema.optionalKey(CursorFromString) },
-    error: apiErrors,
-  }),
-)
+const subscribeEvents = HttpApiEndpoint.get("subscribe", "/sessions/:id/events", {
+  params: { id: Schema.String },
+  query: { cursor: Schema.optionalKey(CursorFromString) },
+  headers: { "last-event-id": Schema.optionalKey(CursorFromString) },
+  success: eventStream,
+  error: apiErrors,
+})
+const connectEvents = HttpApiEndpoint.get("connect", "/sessions/:id/ws", {
+  params: { id: Schema.String },
+  query: { cursor: Schema.optionalKey(CursorFromString) },
+  error: apiErrors,
+})
+const events: HttpApiGroup.HttpApiGroup<"events", typeof subscribeEvents | typeof connectEvents> = HttpApiGroup.make(
+  "events",
+).add(subscribeEvents, connectEvents)
 
-const approvals = HttpApiGroup.make("approvals").add(
-  HttpApiEndpoint.post("resolve", "/runs/:id/approvals/:token", {
-    params: { id: Schema.String, token: Schema.String },
-    payload: Schema.Struct({ decision: Decision, operator: Schema.String }),
-    error: apiErrors,
-  }),
-)
+const resolveApproval = HttpApiEndpoint.post("resolve", "/runs/:id/approvals/:token", {
+  params: { id: Schema.String, token: Schema.String },
+  payload: Schema.Struct({ decision: Decision, operator: Schema.String }),
+  error: apiErrors,
+})
+const approvals: HttpApiGroup.HttpApiGroup<"approvals", typeof resolveApproval> =
+  HttpApiGroup.make("approvals").add(resolveApproval)
 
-const operator = HttpApiGroup.make("operator").add(
-  HttpApiEndpoint.get("explain", "/runs/:id/explain", {
-    params: { id: Schema.String },
-    success: Explanation,
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.post("retry", "/runs/:id/retry", {
-    params: { id: Schema.String },
-    payload: Schema.Struct({ operator: Schema.String }),
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.post("wake", "/runs/:id/wake", {
-    params: { id: Schema.String },
-    payload: Schema.Struct({ operator: Schema.String }),
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.post("resolveUnknown", "/runs/:id/resolve-unknown", {
-    params: { id: Schema.String },
-    payload: Schema.Struct({ operationId: Schema.String, resolution: UnknownResolution, operator: Schema.String }),
-    error: apiErrors,
-  }),
-  HttpApiEndpoint.post("extendBudget", "/runs/:id/extend-budget", {
-    params: { id: Schema.String },
-    payload: Schema.Struct({ delta: BudgetLimits, operator: Schema.String }),
-    error: apiErrors,
-  }),
-)
+const explainRun = HttpApiEndpoint.get("explain", "/runs/:id/explain", {
+  params: { id: Schema.String },
+  success: Explanation,
+  error: apiErrors,
+})
+const retryRun = HttpApiEndpoint.post("retry", "/runs/:id/retry", {
+  params: { id: Schema.String },
+  payload: Schema.Struct({ operator: Schema.String }),
+  error: apiErrors,
+})
+const wakeRun = HttpApiEndpoint.post("wake", "/runs/:id/wake", {
+  params: { id: Schema.String },
+  payload: Schema.Struct({ operator: Schema.String }),
+  error: apiErrors,
+})
+const resolveUnknown = HttpApiEndpoint.post("resolveUnknown", "/runs/:id/resolve-unknown", {
+  params: { id: Schema.String },
+  payload: Schema.Struct({ operationId: Schema.String, resolution: UnknownResolution, operator: Schema.String }),
+  error: apiErrors,
+})
+const extendBudget = HttpApiEndpoint.post("extendBudget", "/runs/:id/extend-budget", {
+  params: { id: Schema.String },
+  payload: Schema.Struct({ delta: BudgetLimits, operator: Schema.String }),
+  error: apiErrors,
+})
+const operator: HttpApiGroup.HttpApiGroup<
+  "operator",
+  typeof explainRun | typeof retryRun | typeof wakeRun | typeof resolveUnknown | typeof extendBudget
+> = HttpApiGroup.make("operator").add(explainRun, retryRun, wakeRun, resolveUnknown, extendBudget)
+
+type Groups = typeof sessions | typeof runs | typeof events | typeof approvals | typeof operator
+type AuthenticatedGroups = HttpApiGroup.AddMiddleware<Groups, Authentication>
 
 /** Schema-first public API. New ingress modules add one group to this value. */
-export const api = HttpApi.make("generalist")
+export const api: HttpApi.HttpApi<"generalist", AuthenticatedGroups> = HttpApi.make("generalist")
   .add(sessions, runs, events, approvals, operator)
   .middleware(Authentication)
   .annotateMerge(
