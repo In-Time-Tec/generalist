@@ -31,6 +31,10 @@ import {
 export { FrameworkFailure, FrameworkStage, Outcome, RemoteRetryMisconfigured }
 export type { ClosedToolSet, DomainFailure, ReplayPolicy, Request, Success, Suspend, ToolkitInput }
 import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
+import type { HookFailed } from "../../hooks/index.js"
+import type { DriverError, DriverStateInvalid } from "../durable/service.js"
+
+export type SettledOutcome = Success | DomainFailure
 
 type AgentToolSchemaServices<Parameters extends Schema.Top, SuccessSchema extends Schema.Top> =
   | Parameters["DecodingServices"]
@@ -40,7 +44,23 @@ type AgentToolSchemaServices<Parameters extends Schema.Top, SuccessSchema extend
 export interface Service<R = ToolContext> {
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly cancellable?: ((request: Request) => boolean) | undefined
-  readonly execute: (request: Request) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, R>
+  readonly execute: (
+    request: Request,
+  ) => Effect.Effect<
+    Outcome,
+    FrameworkFailure | RemoteRetryMisconfigured | HookFailed | DriverError | DriverStateInvalid,
+    R
+  >
+  readonly transformResolved?:
+    | ((
+        request: Request,
+        outcome: SettledOutcome,
+      ) => Effect.Effect<
+        SettledOutcome,
+        FrameworkFailure | RemoteRetryMisconfigured | HookFailed | DriverError | DriverStateInvalid,
+        R
+      >)
+    | undefined
   readonly cancel?:
     | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
     | undefined
@@ -152,7 +172,11 @@ function executeToolkitUncurried<
 >(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
   request: Request,
-): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
+): Effect.Effect<
+  Outcome,
+  FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+  R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
+>
 function executeToolkitUncurried<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
@@ -187,7 +211,11 @@ export const executeToolkit: typeof executeToolkitUncurried & {
     request: Request,
   ): (
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-  ) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
+  ) => Effect.Effect<
+    Outcome,
+    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
+  >
   <Tools extends Record<string, Tool.Any>>(
     request: Request,
   ): (

@@ -144,6 +144,7 @@ describe("generalist public surface", () => {
         "ExecutableManifest",
         "Guardrail",
         "Handoff",
+        "Hooks",
         "Instructions",
         "Memo",
         "Memory",

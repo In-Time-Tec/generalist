@@ -13,6 +13,7 @@ import { DriverStateInvalid } from "../../durable/service.js"
 import { terminalCompletedEvent, TurnFinish, turnCompletedEvent } from "../model-turn/finish.js"
 import { HandoffRequirementsMissing, takePendingContinuation } from "../handoff/state.js"
 import type { RunError } from "../service.js"
+import { steer as applySteer } from "../lifecycle/hooks.js"
 
 interface AfterTurnResult<StructuredOutputSchema extends ObjectSchema> {
   readonly events: Stream.Stream<Event, RunError, SchemaServicesD<StructuredOutputSchema>>
@@ -47,6 +48,7 @@ const withoutPending = <
   readonly transcript: Prompt.Prompt
   readonly completed: Event
   readonly completion?: Completion
+  readonly steeringPrompt?: Prompt.Prompt
   readonly promptFromSteeringInputs: (inputs: ReadonlyArray<Input>) => Prompt.Prompt
 }): AfterTurnResult<StructuredOutputSchema> => {
   if (input.completion?._tag === "Pending") {
@@ -55,7 +57,7 @@ const withoutPending = <
         input.completed,
         input.context.steeringDrainedEvent(input.turn, input.completion.queue, input.completion.inputs),
       ]),
-      next: { prompt: input.promptFromSteeringInputs(input.completion.inputs) },
+      next: { prompt: input.steeringPrompt ?? input.promptFromSteeringInputs(input.completion.inputs) },
     }
   }
   if (input.context.structured !== undefined) {
@@ -109,6 +111,17 @@ export const afterTurnFor = <
     syncSession,
     withSystem,
   } = input.context
+  const applySteering = (turn: number, steering: ReadonlyArray<Input>) =>
+    steering.length === 0
+      ? Effect.succeed(Prompt.empty)
+      : applySteer({
+          runId: input.context.inbox.runId,
+          agentName: input.context.agent.name,
+          turn,
+          queue: "steering",
+          count: steering.length,
+          prompt: input.promptFromSteeringInputs(steering),
+        })
   return (
     turn: number,
     alreadyProjectedPending?: ReadonlyArray<PendingToolResult>,
@@ -134,6 +147,25 @@ export const afterTurnFor = <
           input.takeCompletion,
           input.takeFollowUp,
         )
+        if (completion._tag === "Pending") {
+          const steeringPrompt = yield* applySteer({
+            runId: input.context.inbox.runId,
+            agentName: input.context.agent.name,
+            turn,
+            queue: completion.queue,
+            count: completion.inputs.length,
+            prompt: input.promptFromSteeringInputs(completion.inputs),
+          })
+          return withoutPending({
+            context: input.context,
+            turn,
+            transcript,
+            completed,
+            completion,
+            steeringPrompt,
+            promptFromSteeringInputs: input.promptFromSteeringInputs,
+          })
+        }
         return withoutPending({
           context: input.context,
           turn,
@@ -167,7 +199,7 @@ export const afterTurnFor = <
       }
       state.pending.clear()
       const steering = yield* input.takeSteering()
-      const basePrompt = steering.length === 0 ? Prompt.empty : input.promptFromSteeringInputs(steering)
+      const basePrompt = yield* applySteering(turn, steering)
       let continuationOverrides = decision.overrides
       let continuationPrompt = basePrompt
       if (handoffStateRef !== undefined) {

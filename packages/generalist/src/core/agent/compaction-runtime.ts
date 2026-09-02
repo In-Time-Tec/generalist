@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- compaction preparation, operation replay, and session projection remain one ownership path. */
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
 import { AiError, Chat, Model, Prompt, Tokenizer } from "effect/unstable/ai"
 import { conservativeContextWindow, contextWindow as catalogContextWindow } from "../../ai/model-catalog.js"
@@ -32,7 +33,10 @@ import { operationKey, type DriverInterpreter } from "../durable/driver/interpre
 import type { Key, Memory, MemoryError } from "../context/memory.js"
 import type { SkillCatalogError } from "../context/skill-catalog.js"
 import { CompactionProjection } from "./session/compaction-projection.js"
+import { compaction as applyCompactionHooks } from "./lifecycle/hooks.js"
+import type { RunId } from "../durable/run-id.js"
 type CompactionContext = {
+  readonly runId: RunId
   readonly activeSession: Option.Option<SessionStore>
   readonly sessionId: string
   readonly sessionAppendOptions: (expectedLeafId: string | null) => {
@@ -62,6 +66,7 @@ type CompactionContext = {
 }
 export const make = (context: CompactionContext) => {
   const {
+    runId,
     activeSession,
     sessionId,
     sessionAppendOptions,
@@ -418,9 +423,22 @@ export const make = (context: CompactionContext) => {
             options.toolOutputMaxBytes === undefined
               ? compactBase
               : { ...compactBase, toolOutputMaxBytes: options.toolOutputMaxBytes }
-          const compactEffect = Effect.scoped(compaction.maybeCompact(compactInput)).pipe(
-            Effect.mapError((error) => compactionError(turn, error)),
-          )
+          const hook = yield* applyCompactionHooks({
+            runId,
+            agentName: agent.name,
+            turn,
+            before: Prompt.concat(detachedHistory, detachedPrompt),
+            overflow,
+            history: compactInput.history,
+            prompt: compactInput.prompt,
+          })
+          const hookedInput = { ...compactInput, history: hook.input.history, prompt: hook.input.prompt }
+          const compactEffect =
+            hook.blocked === undefined
+              ? Effect.scoped(compaction.maybeCompact(hookedInput)).pipe(
+                  Effect.mapError((error) => compactionError(turn, error)),
+                )
+              : Effect.succeed(Option.none<CompactionResult>())
           const compacted = overflow
             ? yield* compactEffect
             : yield* intercept(

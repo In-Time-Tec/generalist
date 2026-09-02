@@ -89,6 +89,7 @@ terminal unstructured turn
 - An offer committed before completion causes another turn; completion committed first closes admission.
 - Failure, interruption, or scope close discards queued process-local input and wakes blocked producers; core keeps no Run registry or terminal tombstone, so process loss loses both lanes.
 - Middleware-transformed response parts are authoritative for events, history, tools, memory, Sessions, and compaction.
+- Ordered lifecycle hook decisions are checkpointed through the durable driver before the next hook runs; recovery applies recorded decisions without re-invoking a completed chain.
 - Transformed tool-call IDs must be unique within one response; duplicates fail before execution; transformed calls are schema-validated again and invalid transformations fail as `MiddlewareViolation`.
 - The visible `model` selection is the only agent default and is resolved at run time by `ModelRegistry`; without a registry selection, `LanguageModel` remains a visible requirement supplied at the run boundary.
 - Requirements remain visible through model selection, direct model provision, memory, tools, policy, handoffs, and transport composition.

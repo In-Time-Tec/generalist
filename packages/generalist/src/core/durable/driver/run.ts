@@ -92,6 +92,7 @@ export const updateToolBatch = (
     checkpoint: import("../../agent/tools/checkpoint.js").ToolBatchCheckpoint,
   ) => import("../../agent/tools/checkpoint.js").ToolBatchCheckpoint,
 ) => Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.updateToolBatch(update))
+
 export const abortPending = (error: typeof Schema.Unknown.Type) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.abortPending(error))
 export const chargeUsage = (usage: BudgetLimits) =>

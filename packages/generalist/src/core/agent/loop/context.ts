@@ -139,6 +139,13 @@ export interface RunLoopContext<
     call: AnyToolCall,
     registry: Registry,
   ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools> | DriverInterpreter>
+  readonly transformResolved: (
+    turn: number,
+    batch: Request["toolCallBatch"],
+    index: number,
+    call: AnyToolCall,
+    result: PendingToolResult,
+  ) => Effect.Effect<PendingToolResult, RunError, R | StaticToolServices<Tools> | DriverInterpreter>
   readonly rememberTurn: (
     turn: number,
     transcript: Prompt.Prompt,

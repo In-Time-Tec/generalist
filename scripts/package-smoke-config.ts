@@ -42,6 +42,7 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist", runtimes: nodeAndBun, exports: ["Agent", "Session"] },
       { specifier: "generalist/approvals", runtimes: nodeAndBun },
       { specifier: "generalist/compaction", runtimes: nodeAndBun },
+      { specifier: "generalist/hooks", runtimes: nodeAndBun, exports: ["Hooks", "onToolCall"] },
       { specifier: "generalist/eval", runtimes: nodeAndBun, exports: ["score", "runSuite"] },
       { specifier: "generalist/host", runtimes: nodeAndBun, exports: ["Generalist"] },
       { specifier: "generalist/permissions", runtimes: nodeAndBun },
@@ -220,6 +221,7 @@ export const minimumConsumerProfiles = [
 
 export const workerSafePackageExports = [
   "generalist",
+  "generalist/hooks",
   "generalist/host",
   "generalist/unstable/mcp",
   "generalist/unstable/mcp/client",
@@ -261,6 +263,7 @@ export const exactPackageExports = [
   "./approvals",
   "./compaction",
   "./eval",
+  "./hooks",
   "./host",
   "./instructions",
   "./instructions/skills",

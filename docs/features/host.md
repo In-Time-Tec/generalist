@@ -67,9 +67,9 @@ The Host event union intentionally projects the product events above and retains
 ## Plugins
 
 ```ts
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { Instructions } from "generalist"
+import { Hooks, Instructions } from "generalist"
 import { Generalist } from "generalist/host"
 
 const status = Tool.make("git_status", {
@@ -82,13 +82,14 @@ const git = Generalist.plugin({
   name: "git",
   tools: [status],
   instructions: [Instructions.fromText("git", "Inspect status before changing files.")],
+  hooks: [Hooks.onToolCall(() => Effect.succeed(Hooks.Continue()))],
   skills: [],
 })
 ```
 
-Plugins are inert values with only `name`, `tools`, `instructions`, and `skills`. Tools are installed on every configured Agent. Duplicate plugin names and static tool-name collisions fail `Generalist.create` before registration.
+Plugins are inert values with only `name`, `tools`, `instructions`, `skills`, and lifecycle `hooks`. Tools are installed on every configured Agent. Duplicate plugin names and static tool-name collisions fail `Generalist.create` before registration.
 
-Plugins load and log sequentially in caller order. Existing ambient instructions and skills come first, followed by plugin declarations in caller order. Existing `SkillCatalog.merge` semantics apply to duplicate skill names, so the later plugin value wins. Plugin event hooks are deliberately absent; #348 adds lifecycle hook declarations and journaling.
+Plugins load and log sequentially in caller order. Existing ambient instructions, skills, and Hooks declarations come first, followed by plugin declarations in caller order. Existing `SkillCatalog.merge` semantics apply to duplicate skill names, so the later plugin value wins. Hook declarations use the Agent driver's existing checkpoint journal; Host does not add `onEvent` or another event authority.
 
 ## Invariants
 

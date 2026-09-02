@@ -18,6 +18,7 @@ import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
 import { scheduleOperations } from "./schedule.js"
+import type { Checkpoint as HookCheckpoint } from "../../../hooks/index.js"
 export type { OperationSpec } from "./operation.js"
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
 /** Recorded operation for tests and future runtime journaling. */
@@ -84,6 +85,9 @@ export interface Service {
   readonly updateToolBatch: (
     update: (checkpoint: ToolBatchCheckpoint) => ToolBatchCheckpoint,
   ) => Effect.Effect<ToolBatchCheckpoint, DriverError | DriverStateInvalid>
+  readonly recordHookDecisions: (
+    checkpoint: HookCheckpoint,
+  ) => Effect.Effect<HookCheckpoint, DriverError | DriverStateInvalid>
   readonly recorded: Effect.Effect<ReadonlyArray<RecordedOperation>>
   readonly abortPending: (
     error: OperationFailure,
@@ -363,6 +367,32 @@ export const make = (input: {
             yield* Ref.set(checkpointRef, next)
             yield* journal.onCheckpoint(next)
             return toolBatch
+          }),
+        ),
+      recordHookDecisions: (hookCheckpoint) =>
+        commitSemaphore.withPermit(
+          Effect.gen(function* () {
+            const current = yield* Ref.get(checkpointRef)
+            const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
+              Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+            )
+            const existingIndex = state.hooks?.findIndex((entry) => entry.key === hookCheckpoint.key) ?? -1
+            const existing = state.hooks?.[existingIndex]
+            if (existing !== undefined) {
+              if (existing.event !== hookCheckpoint.event) {
+                return yield* DriverStateInvalid.make({
+                  message: `Hook checkpoint ${hookCheckpoint.key} changed from ${existing.event} to ${hookCheckpoint.event}`,
+                })
+              }
+              if (existing.complete || existing.decisions.length >= hookCheckpoint.decisions.length) return existing
+            }
+            const hooks = [...(state.hooks ?? [])]
+            if (existingIndex === -1) hooks.push(hookCheckpoint)
+            else hooks[existingIndex] = hookCheckpoint
+            const next = { ...current, state: { ...state, hooks } }
+            yield* Ref.set(checkpointRef, next)
+            yield* journal.onCheckpoint(next)
+            return hookCheckpoint
           }),
         ),
       abortPending: (error) =>

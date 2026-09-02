@@ -146,11 +146,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       toolkit: Toolkit.make(serviceTool),
       execute: () => Effect.succeed({ _tag: "Success", result: "ok" }),
     })
-    const needsPrefix: Effect.Effect<
-      ToolExecutor.Outcome,
-      ToolExecutor.FrameworkFailure | ToolExecutor.RemoteRetryMisconfigured,
-      ToolContext.ToolContext | PlacementPrefix
-    > = route.execute(request("service-placement", { value: "value" }))
+    const needsPrefix = route.execute(request("service-placement", { value: "value" }))
     return [
       Layer.mergeAll(allowAllAuthorization, Layer.succeed(PlacementPrefix, PlacementPrefix.of("!"))).pipe(
         Layer.provideMerge(ToolContext.layerDefault),

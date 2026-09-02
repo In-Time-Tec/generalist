@@ -40,6 +40,7 @@ import { terminalCompletedEvent, turnCompletedEvent } from "../model-turn/finish
 import { resumeBatch } from "../tools/resume-batch.js"
 import { isClosed } from "../lifecycle/closure-identity.js"
 import { afterTurnFor } from "./after-turn.js"
+import { runEnd as applyRunEnd, steer as applySteer, turnStart as applyTurnStart } from "../lifecycle/hooks.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
@@ -89,6 +90,7 @@ export const make = <
     pendingResults,
     toolCallEvents,
     resumeApproved,
+    transformResolved,
     handoffStateRef,
   } = context
   const structuredFinalEvents = (
@@ -98,7 +100,13 @@ export const make = <
   ): Stream.Stream<Event, RunError, TurnServices<R, StructuredOutputSchema>> =>
     Stream.fromEffect(
       Effect.gen(function* () {
-        const transformedPrompt = yield* applyPromptChain(chain, Prompt.make(config.objectPrompt), {
+        const turnPrompt = yield* applyTurnStart({
+          runId: inbox.runId,
+          agentName: agent.name,
+          turn: structuredTurn,
+          prompt: Prompt.make(config.objectPrompt),
+        })
+        const transformedPrompt = yield* applyPromptChain(chain, turnPrompt, {
           agentName: agent.name,
           turn: structuredTurn,
         })
@@ -187,7 +195,15 @@ export const make = <
         if (completion._tag === "Closed") {
           return [terminalCompletedEvent(state, structuredTurn, transcript, config.output(response.value))]
         }
-        onPending({ prompt: promptFromSteeringInputs(completion.inputs) })
+        const prompt = yield* applySteer({
+          runId: inbox.runId,
+          agentName: agent.name,
+          turn: structuredTurn,
+          queue: completion.queue,
+          count: completion.inputs.length,
+          prompt: promptFromSteeringInputs(completion.inputs),
+        })
+        onPending({ prompt })
         return [
           turnCompletedEvent(state, structuredTurn, transcript),
           context.steeringDrainedEvent(structuredTurn, completion.queue, completion.inputs),
@@ -247,21 +263,32 @@ export const make = <
         }
       | undefined
     let structuredTurn: number | undefined
-    const currentTurn = Stream.fromIterable<Event>([{ _tag: "TurnStarted", turn }]).pipe(
-      Stream.concat(resetTurnState(turn)),
-      Stream.concat(
-        Stream.unwrap(
-          Ref.get(toolState).pipe(Effect.map(({ registry }) => modelTurn(turn, prompt, registry, overrides))),
-        ),
-      ),
-      Stream.concat(
-        Stream.unwrap(
-          afterTurn(turn).pipe(
-            Effect.map((result) => {
-              next = result.next
-              structuredTurn = result.structuredTurn
-              return result.events
-            }),
+    const currentTurn = Stream.fromEffect(
+      applyTurnStart({
+        runId: inbox.runId,
+        agentName: agent.name,
+        turn,
+        prompt: Prompt.make(prompt),
+      }),
+    ).pipe(
+      Stream.flatMap((turnPrompt) =>
+        Stream.fromIterable<Event>([{ _tag: "TurnStarted", turn }]).pipe(
+          Stream.concat(resetTurnState(turn)),
+          Stream.concat(
+            Stream.unwrap(
+              Ref.get(toolState).pipe(Effect.map(({ registry }) => modelTurn(turn, turnPrompt, registry, overrides))),
+            ),
+          ),
+          Stream.concat(
+            Stream.unwrap(
+              afterTurn(turn).pipe(
+                Effect.map((result) => {
+                  next = result.next
+                  structuredTurn = result.structuredTurn
+                  return result.events
+                }),
+              ),
+            ),
           ),
         ),
       ),
@@ -307,6 +334,7 @@ export const make = <
                 toolScheduling: resumedAgent.toolScheduling,
                 toolCallEvents,
                 resumeApproved,
+                transformResolved,
                 onCheckpoint: (current) =>
                   Effect.sync(() => {
                     for (const [index, result] of projectableResults(
@@ -384,6 +412,17 @@ export const make = <
     Stream.provideService(CurrentPurpose, "conversation"),
     Stream.provideService(CurrentCompactionId, undefined),
     Stream.provideService(CurrentSummaryCall, undefined),
+    Stream.mapEffect((event) => {
+      if (event._tag !== "Completed") return Effect.succeed(event)
+      return applyRunEnd({
+        runId: inbox.runId,
+        agentName: agent.name,
+        turns: event.turns,
+        text: event.text,
+        output: event.output,
+        transcript: event.transcript,
+      }).pipe(Effect.map((result): Event => ({ ...event, output: result.output })))
+    }),
     Stream.mapEffect(
       (event): Effect.Effect<ReadonlyArray<Event>, RunError> =>
         deliverPending.pipe(Effect.map(() => [...flushTelemetry(), event])),

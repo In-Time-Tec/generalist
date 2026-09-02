@@ -2,6 +2,7 @@
 import { Effect, Filter, Option, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
+import { Hooks, type Declaration as HookDeclaration, type Service as HooksService } from "../hooks/index.js"
 import {
   withTools,
   type Agent,
@@ -81,12 +82,13 @@ export class AgentNotRegistered extends ActionableTaggedError<AgentNotRegistered
   },
 ) {}
 
-/** One deterministic collection of host-owned Agent contributions. Hooks are added by #348. */
+/** One deterministic collection of host-owned Agent contributions. */
 export interface Plugin<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {
   readonly name: string
   readonly tools?: Tools
   readonly instructions?: ReadonlyArray<InstructionProvider>
   readonly skills?: ReadonlyArray<Skill>
+  readonly hooks?: ReadonlyArray<HookDeclaration>
 }
 
 export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {
@@ -94,6 +96,7 @@ export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyA
   readonly tools?: Tools
   readonly instructions?: ReadonlyArray<InstructionProvider>
   readonly skills?: ReadonlyArray<Skill>
+  readonly hooks?: ReadonlyArray<HookDeclaration>
 }
 
 export interface CreateOptions<
@@ -269,6 +272,7 @@ interface PluginContributions {
   readonly tools: ReadonlyArray<Tool.Any>
   readonly instructions: ReadonlyArray<InstructionProvider>
   readonly skills: ReadonlyArray<Skill>
+  readonly hooks: ReadonlyArray<HookDeclaration>
 }
 
 const preparePlugins = (
@@ -280,6 +284,7 @@ const preparePlugins = (
     const pluginTools = new Map<string, { readonly plugin: string; readonly tool: Tool.Any }>()
     const instructions: Array<InstructionProvider> = []
     const skills: Array<Skill> = []
+    const hooks: Array<HookDeclaration> = []
     for (const current of plugins) {
       if (pluginNames.has(current.name)) {
         return yield* PluginNameConflict.make({
@@ -302,6 +307,7 @@ const preparePlugins = (
       }
       instructions.push(...(current.instructions ?? []))
       skills.push(...(current.skills ?? []))
+      hooks.push(...(current.hooks ?? []))
     }
 
     const tools = [...pluginTools.values()].map(({ tool }) => tool)
@@ -326,7 +332,7 @@ const preparePlugins = (
         }),
       )
     }
-    return { tools, instructions, skills }
+    return { tools, instructions, skills, hooks }
   })
 
 const mergedInstructions = (
@@ -347,6 +353,15 @@ const mergedSkills = (
   if (contributed.length === 0) return existing
   const additions = staticSkillCatalog(contributed)
   return Option.isSome(current) ? mergeSkillCatalogs(current.value, additions) : additions
+}
+
+const mergedHooks = (
+  current: Option.Option<HooksService>,
+  contributed: ReadonlyArray<HookDeclaration>,
+): HooksService | undefined => {
+  const existing = Option.getOrUndefined(current)
+  if (contributed.length === 0) return existing
+  return Hooks.of({ declarations: [...(existing?.declarations ?? []), ...contributed] })
 }
 
 const projectedEvent = (sessionId: string, entry: HostSessionEvent): Option.Option<HostEvent> => {
@@ -390,9 +405,11 @@ const create = <
     const plugins: ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = options.plugins ?? []
     const currentInstructions = yield* Effect.serviceOption(Instructions)
     const currentSkills = yield* Effect.serviceOption(SkillCatalog)
+    const currentHooks = yield* Effect.serviceOption(Hooks)
     const contributions = yield* preparePlugins(plugins, options.agents)
     const instructions = mergedInstructions(currentInstructions, contributions.instructions)
     const skills = mergedSkills(currentSkills, contributions.skills)
+    const hooks = mergedHooks(currentHooks, contributions.hooks)
 
     const registered = new Map<AnyAgent, AnyAgent>()
     for (const agent of options.agents) {
@@ -402,6 +419,7 @@ const create = <
         registration = registration.pipe(Effect.provideService(Instructions, instructions))
       }
       if (skills !== undefined) registration = registration.pipe(Effect.provideService(SkillCatalog, skills))
+      if (hooks !== undefined) registration = registration.pipe(Effect.provideService(Hooks, hooks))
       yield* registration
       registered.set(agent, configured)
     }

@@ -1,19 +1,23 @@
 import { Context, Effect, Layer, Option, Schema, SchemaIssue } from "effect"
-import { Tool } from "effect/unstable/ai"
+import { Prompt, Tool } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../../core/agent/service.js"
+import { DriverError, DriverStateInvalid } from "../../core/durable/service.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import {
   type CancellationRequest,
+  type DomainFailure,
   FrameworkFailure,
   type Outcome,
   type Request,
   type Service as ToolExecutorService,
+  type SettledOutcome,
   ToolExecutor,
   executeToolkit,
   route as toolExecutorRoute,
 } from "../../core/tools/tool-executor.js"
 import type { Route } from "../../core/tools/tool-placement.js"
 import type { Service as RunStoreService } from "../run/store.js"
+import type { RunSnapshot } from "../run.js"
 import { make as makeAddress } from "../address.js"
 import { make as makeMessage } from "../messaging/message.js"
 import { normalizePrompt } from "../memory/prompt.js"
@@ -34,6 +38,8 @@ import {
 import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
 import { supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { Exhausted } from "../../core/durable/run-budget.js"
+import { HookFailed } from "../../hooks/index.js"
+import { ChildLifecycle, type ChildHookError } from "./lifecycle.js"
 
 export * from "./group.js"
 
@@ -59,13 +65,18 @@ export type AwaitGroupInput = AwaitGroupParameters & {
 
 type MutableInput = { -readonly [Key in keyof Input]: Input[Key] }
 type MutableGroupInput = { -readonly [Key in keyof StartGroupInput]: StartGroupInput[Key] }
+type Mutable<Value> = Value extends Value ? { -readonly [Key in keyof Value]: Value[Key] } : never
+type MutableResult = Mutable<typeof import("./group.js").Result.Type>
 
 /** Runtime-owned child execution operations used by the model-facing routes. */
 export interface Service {
-  readonly invoke: (input: Input) => Effect.Effect<Outcome>
-  readonly runGroup: (input: StartGroupInput) => Effect.Effect<Outcome>
-  readonly startGroup: (input: StartGroupInput) => Effect.Effect<Outcome>
-  readonly awaitGroup: (input: AwaitGroupInput) => Effect.Effect<Outcome>
+  readonly invoke: (input: Input) => Effect.Effect<Outcome, ChildHookError>
+  readonly runGroup: (input: StartGroupInput) => Effect.Effect<Outcome, ChildHookError>
+  readonly startGroup: (input: StartGroupInput) => Effect.Effect<Outcome, ChildHookError>
+  readonly awaitGroup: (input: AwaitGroupInput) => Effect.Effect<Outcome, ChildHookError>
+  readonly transformResolved?:
+    | ((request: Request, outcome: SettledOutcome) => Effect.Effect<SettledOutcome, ChildHookError>)
+    | undefined
 }
 
 /** Runtime-owned child execution service. */
@@ -75,7 +86,7 @@ const success = <Result>(result: Result): Outcome => ({ _tag: "Success", result,
 
 const ErrorMessage = Schema.Struct({ message: Schema.String })
 
-const domainFailure = <Error>(error: Error): Outcome => {
+const domainFailure = <Error>(error: Error): DomainFailure => {
   if (Schema.is(Exhausted)(error)) {
     return { _tag: "DomainFailure", failure: error, encodedFailure: Schema.encodeSync(Exhausted)(error) }
   }
@@ -88,6 +99,18 @@ const domainFailure = <Error>(error: Error): Outcome => {
         }
   return { _tag: "DomainFailure", failure, encodedFailure: Schema.encodeSync(Failure)(failure) }
 }
+
+const catchDomainFailure = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A | DomainFailure, ChildHookError, R> =>
+  effect.pipe(
+    Effect.catch((error): Effect.Effect<DomainFailure, ChildHookError> => {
+      if (Schema.is(HookFailed)(error)) return Effect.fail(error)
+      if (Schema.is(DriverError)(error)) return Effect.fail(error)
+      if (Schema.is(DriverStateInvalid)(error)) return Effect.fail(error)
+      return Effect.succeed(domainFailure(error))
+    }),
+  )
 
 const schemaIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1()
 
@@ -110,6 +133,31 @@ const schemaIssueMessage = (error: Schema.SchemaError): string =>
     })
     .join("\n")
 
+const lifecycleIdentity = (parent: Option.Option<typeof ToolContext.Service>) => ({
+  agentName: Option.isSome(parent) ? (parent.value.agentName ?? "runtime") : "runtime",
+  turn: Option.isSome(parent) ? (parent.value.turn ?? 0) : 0,
+})
+
+const childResultFromSnapshot = (childRunId: string, snapshot: RunSnapshot): MutableResult | undefined => {
+  if (snapshot.outcome?._tag === "Succeeded") {
+    return "text" in snapshot.outcome.result
+      ? {
+          _tag: "Succeeded",
+          childRunId,
+          text: snapshot.outcome.result.text,
+          turns: snapshot.outcome.result.turns,
+        }
+      : { _tag: "Failed", childRunId, message: "non-Agent child executable" }
+  }
+  if (snapshot.outcome?._tag === "Failed") {
+    return { _tag: "Failed", childRunId, message: snapshot.outcome.error.message }
+  }
+  if (snapshot.outcome?._tag !== "Cancelled") return undefined
+  const result: MutableResult = { _tag: "Cancelled", childRunId }
+  if (snapshot.outcome.reason !== undefined) result.reason = snapshot.outcome.reason
+  return result
+}
+
 /** Construct Runtime-owned child execution operations over one RunStore. */
 export const make = (store: RunStoreService): Service => {
   interface Origin {
@@ -130,77 +178,94 @@ export const make = (store: RunStoreService): Service => {
     childGroupKey: string
     childGroupLabel?: string
   }
-  type Mutable<Value> = Value extends Value ? { -readonly [Key in keyof Value]: Value[Key] } : never
-  type MutableResult = Mutable<typeof import("./group.js").Result.Type>
   type MutableReceiptChild = {
     -readonly [Key in keyof GroupReceipt["children"][number]]: GroupReceipt["children"][number][Key]
   }
   const invoke: Service["invoke"] = (input) =>
-    Effect.gen(function* () {
-      const idempotencyKey = `child-tool:${input.parentRunId}:${input.toolCallId}`
-      const origin: Origin = { parentToolCallId: input.toolCallId }
-      if (input.operationKey !== undefined) origin.operationKey = input.operationKey
-      const metadata: ChildMetadata = {
-        runtimeChildTool: true,
-        parentRunId: input.parentRunId,
-        parentToolCallId: input.toolCallId,
-      }
-      if (input.label !== undefined) metadata.childLabel = input.label
-      const admission = {
-        parentRunId: input.parentRunId,
-        invocationId: input.toolCallId,
-        selection: input.selection,
-        origin,
-        prompt: input.prompt,
-        message: makeMessage({
-          id: `spawn:${idempotencyKey}`,
-          to: makeAddress(`spawn:${input.parentRunId}`),
-          sessionId: `child:${input.parentRunId}`,
-          prompt: normalizePrompt(input.prompt),
-          idempotencyKey,
-          correlationId: input.parentRunId,
-          metadata,
-        }),
-      }
-      const admissionWithLabel: typeof admission & { label?: string } = admission
-      if (input.label !== undefined) admissionWithLabel.label = input.label
-      const receipt = yield* store.admitSpawn(admissionWithLabel)
-      const snapshot = yield* store.snapshot(receipt.runId)
-      if (snapshot.outcome?._tag === "Succeeded") {
-        const result: MutableResult =
-          "text" in snapshot.outcome.result
-            ? {
-                _tag: "Succeeded",
-                childRunId: receipt.runId,
-                text: snapshot.outcome.result.text,
-                turns: snapshot.outcome.result.turns,
-              }
-            : { _tag: "Failed", childRunId: receipt.runId, message: "non-Agent child executable" }
-        if (input.label !== undefined) result.label = input.label
-        return success(result)
-      }
-      if (snapshot.outcome?._tag === "Failed") {
-        const result: MutableResult = {
-          _tag: "Failed",
-          childRunId: receipt.runId,
-          message: snapshot.outcome.error.message,
+    catchDomainFailure(
+      Effect.gen(function* () {
+        const parent = yield* Effect.serviceOption(ToolContext)
+        const identity = lifecycleIdentity(parent)
+        const child: Mutable<import("../../hooks/index.js").Child> = {
+          operation: input.operationKey ?? input.toolCallId,
+          selection: input.selection,
+          prompt: Prompt.make(input.prompt),
         }
+        if (input.label !== undefined) child.label = input.label
+        yield* ChildLifecycle.start(
+          {
+            runId: input.parentRunId,
+            ...identity,
+            child,
+          },
+          `'${input.selection}'`,
+        )
+        const idempotencyKey = `child-tool:${input.parentRunId}:${input.toolCallId}`
+        const origin: Origin = { parentToolCallId: input.toolCallId }
+        if (input.operationKey !== undefined) origin.operationKey = input.operationKey
+        const metadata: ChildMetadata = {
+          runtimeChildTool: true,
+          parentRunId: input.parentRunId,
+          parentToolCallId: input.toolCallId,
+        }
+        if (input.label !== undefined) metadata.childLabel = input.label
+        const admission = {
+          parentRunId: input.parentRunId,
+          invocationId: input.toolCallId,
+          selection: input.selection,
+          origin,
+          prompt: input.prompt,
+          message: makeMessage({
+            id: `spawn:${idempotencyKey}`,
+            to: makeAddress(`spawn:${input.parentRunId}`),
+            sessionId: `child:${input.parentRunId}`,
+            prompt: normalizePrompt(input.prompt),
+            idempotencyKey,
+            correlationId: input.parentRunId,
+            metadata,
+          }),
+        }
+        const admissionWithLabel: typeof admission & { label?: string } = admission
+        if (input.label !== undefined) admissionWithLabel.label = input.label
+        const receipt = yield* store.admitSpawn(admissionWithLabel)
+        const snapshot = yield* store.snapshot(receipt.runId)
+        const result = childResultFromSnapshot(receipt.runId, snapshot)
+        if (result === undefined) return { _tag: "Suspend" as const, token: receipt.runId }
         if (input.label !== undefined) result.label = input.label
-        return success(result)
-      }
-      if (snapshot.outcome?._tag === "Cancelled") {
-        const result: MutableResult = { _tag: "Cancelled", childRunId: receipt.runId }
-        if (input.label !== undefined) result.label = input.label
-        if (snapshot.outcome.reason !== undefined) result.reason = snapshot.outcome.reason
-        return success(result)
-      }
-      return { _tag: "Suspend" as const, token: receipt.runId }
-    }).pipe(Effect.catch((error) => Effect.succeed(domainFailure(error))))
+        return success(
+          yield* ChildLifecycle.end(
+            {
+              runId: input.parentRunId,
+              ...identity,
+              child: { ...child, childRunId: receipt.runId },
+              result,
+            },
+            `'${input.selection}'`,
+          ),
+        )
+      }),
+    )
 
   const admitGroup = (input: StartGroupInput) =>
     Effect.gen(function* () {
       const idempotencyKey = `child-group:${input.parentRunId}:${input.toolCallId}`
       const groupId = fanOutIdFor(input.parentRunId, idempotencyKey)
+      const parent = yield* Effect.serviceOption(ToolContext)
+      const agentName = Option.isSome(parent) ? (parent.value.agentName ?? "runtime") : "runtime"
+      const turn = Option.isSome(parent) ? (parent.value.turn ?? 0) : 0
+      for (const [ordinal, member] of input.members.entries()) {
+        const child: Mutable<import("../../hooks/index.js").Child> = {
+          operation: `${groupId}:${member.key}`,
+          selection: member.selection,
+          prompt: Prompt.make(member.prompt),
+          childRunId: childRunIdFor(groupId, ordinal),
+        }
+        if (member.label !== undefined) child.label = member.label
+        yield* ChildLifecycle.start(
+          { runId: input.parentRunId, agentName, turn, child },
+          `group member '${member.key}'`,
+        )
+      }
       const receipt = yield* store.admitFanOut({
         fanOutId: groupId,
         parentRunId: input.parentRunId,
@@ -258,37 +323,39 @@ export const make = (store: RunStoreService): Service => {
     })
 
   const startGroup: Service["startGroup"] = (input) =>
-    admitGroup(input).pipe(
-      Effect.map(({ receipt }) => success(receipt)),
-      Effect.catch((error) => Effect.succeed(domainFailure(error))),
-    )
+    catchDomainFailure(admitGroup(input).pipe(Effect.map(({ receipt }) => success(receipt))))
 
   const runGroup: Service["runGroup"] = (input) =>
-    admitGroup(input).pipe(
-      Effect.map(({ receipt, inspection }) =>
-        inspection.status === "running"
-          ? ({ _tag: "Suspend", token: receipt.groupId } as const)
-          : success(resultFromInspection(inspection)),
+    catchDomainFailure(
+      admitGroup(input).pipe(
+        Effect.flatMap(({ receipt, inspection }) =>
+          inspection.status === "running"
+            ? Effect.succeed({ _tag: "Suspend" as const, token: receipt.groupId })
+            : ChildLifecycle.endGroup(input.parentRunId, resultFromInspection(inspection)).pipe(Effect.map(success)),
+        ),
       ),
-      Effect.catch((error) => Effect.succeed(domainFailure(error))),
     )
 
   const awaitGroup: Service["awaitGroup"] = (input) =>
-    store.inspectFanOut(input.groupId).pipe(
-      Effect.map((inspection) => {
-        if (inspection.parentRunId !== input.parentRunId) {
-          return domainFailure(
-            new Error(`child group ${input.groupId} is not owned by parent Run ${input.parentRunId}`),
-          )
-        }
-        return inspection.status === "running"
-          ? ({ _tag: "Suspend", token: input.groupId } as const)
-          : success(resultFromInspection(inspection))
-      }),
-      Effect.catch((error) => Effect.succeed(domainFailure(error))),
+    catchDomainFailure(
+      store.inspectFanOut(input.groupId).pipe(
+        Effect.flatMap((inspection) => {
+          if (inspection.parentRunId !== input.parentRunId) {
+            return Effect.fail({
+              message: `child group ${input.groupId} is not owned by parent Run ${input.parentRunId}`,
+            })
+          }
+          return inspection.status === "running"
+            ? Effect.succeed({ _tag: "Suspend" as const, token: input.groupId })
+            : ChildLifecycle.endGroup(input.parentRunId, resultFromInspection(inspection)).pipe(Effect.map(success))
+        }),
+      ),
     )
 
-  return ChildRuns.of({ invoke, runGroup, startGroup, awaitGroup })
+  const transformResolved: Service["transformResolved"] = (request, outcome) =>
+    catchDomainFailure(ChildLifecycle.transformResolved(request, outcome))
+
+  return ChildRuns.of({ invoke, runGroup, startGroup, awaitGroup, transformResolved })
 }
 
 /** Route Runtime-owned child tools and preserve every resolved upstream handler. */
@@ -331,6 +398,16 @@ const makeExecutor = <
           ),
         ),
       )
+    },
+    transformResolved: (request, outcome) => {
+      if (route.matches(request)) {
+        return options.implementation.transformResolved === undefined
+          ? Effect.succeed(outcome)
+          : options.implementation.transformResolved(request, outcome)
+      }
+      return upstream?.transformResolved === undefined
+        ? Effect.succeed(outcome)
+        : upstream.transformResolved(request, outcome)
     },
     ...upstreamCancellation,
   })

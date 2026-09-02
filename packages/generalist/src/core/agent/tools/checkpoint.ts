@@ -36,6 +36,7 @@ export type ToolCallCheckpointState = typeof ToolCallCheckpointState.Type
 /** One call and its exact state, retained in model-authored order. */
 export const ToolCallCheckpoint = Schema.Struct({
   call: CanonicalToolCall,
+  effectiveCall: Schema.optionalKey(CanonicalToolCall),
   operationKey: Schema.String,
   state: ToolCallCheckpointState,
 })
@@ -88,6 +89,9 @@ export const canonicalCall = (
   metadata: call.metadata ?? {},
 })
 
+/** Effective call after any journaled ToolCall replacement; otherwise the model-authored call. */
+export const effectiveCall = (entry: ToolCallCheckpoint): CanonicalToolCall => entry.effectiveCall ?? entry.call
+
 export const make = (input: {
   readonly turn: number
   readonly calls: ReadonlyArray<Response.ToolCallPart<string, unknown>>
@@ -126,6 +130,31 @@ export const updateCall: {
     ),
     activatedSkills: input.activatedSkills === undefined ? checkpoint.activatedSkills : [...input.activatedSkills],
     invocationPath: input.invocationPath === undefined ? checkpoint.invocationPath : [...input.invocationPath],
+  }),
+)
+
+/** Replace one canonical call after a ToolCall hook modifies its arguments. */
+export const replaceCall: {
+  (
+    callIndex: number,
+    call: Response.ToolCallPart<string, unknown>,
+  ): (checkpoint: ToolBatchCheckpoint) => ToolBatchCheckpoint
+  (
+    checkpoint: ToolBatchCheckpoint,
+    callIndex: number,
+    call: Response.ToolCallPart<string, unknown>,
+  ): ToolBatchCheckpoint
+} = Function.dual(
+  3,
+  (
+    checkpoint: ToolBatchCheckpoint,
+    callIndex: number,
+    call: Response.ToolCallPart<string, unknown>,
+  ): ToolBatchCheckpoint => ({
+    ...checkpoint,
+    calls: checkpoint.calls.map((entry, index) =>
+      index === callIndex ? { ...entry, effectiveCall: canonicalCall(call) } : entry,
+    ),
   }),
 )
 
@@ -199,7 +228,7 @@ export const waits = (checkpoint: ToolBatchCheckpoint): ReadonlyArray<ToolBatchW
             token: entry.state.token,
             reason: entry.state.reason,
             callIndex,
-            call: entry.call,
+            call: effectiveCall(entry),
           },
         ]
       : [],
