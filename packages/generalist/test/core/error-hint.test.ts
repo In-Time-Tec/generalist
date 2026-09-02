@@ -20,8 +20,6 @@ describe("actionable errors", () => {
 
     expect(pretty).toContain('runId="run-17"')
     expect(pretty).toContain(error.hint)
-    expect(pretty.split("\n", 1)[0]).toBe(
-      `generalist/runtime/RunNotFound: generalist/runtime/RunNotFound (runId="run-17"). Hint: ${error.hint}`,
-    )
+    expect(pretty.split("\n", 1)[0]).toBe(`generalist/runtime/RunNotFound (runId="run-17"). Hint: ${error.hint}: `)
   })
 })

@@ -20,6 +20,8 @@ const identifyingFields = new Set([
   "toolCallId",
   "agent",
   "agentName",
+  "name",
+  "address",
   "provider",
   "model",
   "operation",
@@ -36,19 +38,15 @@ const identifyingFields = new Set([
 const oneLine = (value: string): string => value.replaceAll(/\s+/g, " ").trim()
 
 const describe = (error: Record<string, unknown>): string => {
-  const current = typeof error.message === "string" ? oneLine(error.message) : ""
-  if (current.includes(" Hint: ")) return current
-
   const context = Object.entries(error)
     .filter(([key, value]) => identifyingFields.has(key) && value !== undefined)
     .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
     .join(" ")
-  const what = current.length > 0 ? current : String(error._tag)
   const hint = oneLine(String(error.hint))
-  return `${what}${context.length > 0 ? ` (${context})` : ""}. Hint: ${hint}`
+  return `${String(error._tag)}${context.length > 0 ? ` (${context})` : ""}. Hint: ${hint}`
 }
 
-/** @internal Schema TaggedError whose native message includes identifying fields and its actionable hint. */
+/** @internal Schema TaggedError whose printed name includes identifying fields and its actionable hint. */
 type ErrorConstructor = new (props: Record<string, unknown>) => Error & Record<string, unknown>
 const taggedError = Schema.TaggedError as unknown as (
   identifier?: string,
@@ -60,7 +58,16 @@ export const ActionableTaggedError: typeof Schema.TaggedError = ((identifier?: s
     return class extends Base {
       constructor(props: Record<string, unknown>) {
         super(props)
-        this.message = describe(this)
+        const actionable = describe(this)
+        if (Object.hasOwn(this, "name")) {
+          if (!this.message.includes(". Hint: ")) this.message = `${oneLine(this.message)} ${actionable}`.trim()
+        } else {
+          Object.defineProperty(this, "name", {
+            value: actionable,
+            configurable: true,
+            writable: true,
+          })
+        }
       }
     }
   }) as typeof Schema.TaggedError

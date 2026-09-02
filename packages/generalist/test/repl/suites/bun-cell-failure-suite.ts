@@ -19,7 +19,8 @@ layer(platform, liveOptions)("Bun kernel cell failure", (it) => {
           expect(Schema.is(Cell.CellExecutionFailed)(failure)).toBe(true)
           if (Schema.is(Cell.CellExecutionFailed)(failure)) {
             expect(failure.name).toBe("TypeError")
-            expect(failure.message).toBe("boom")
+            expect(failure.message).toContain("boom")
+            expect(failure.message).toContain(failure.hint)
             expect(failure.cellId).toBe("c1")
           }
         }),
