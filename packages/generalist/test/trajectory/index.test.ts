@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest"
-import { Effect, Schema, Stream } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
-import { Agent } from "../../src/index.js"
+import { Effect, Layer, Schema, Stream } from "effect"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { Agent, Permissions } from "../../src/index.js"
+import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../src/runtime/index.js"
 import type { RunSnapshot } from "../../src/runtime/run.js"
 import type { RunEvent } from "../../src/runtime/run/event.js"
+import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 import {
   JsonlRecord,
   encode,
@@ -11,7 +13,9 @@ import {
   fromJournal,
   type JournalReader,
 } from "../../src/trajectory/index.js"
+import { provideScoped } from "../runtime/execution/scoped-provide.js"
 import { pinnedTestExecutable } from "../runtime/run/identity.js"
+import { tempDbPath } from "../runtime/sql/scenario.js"
 
 const runId = "run:trajectory:golden"
 const sessionId = "session:trajectory:golden"
@@ -239,3 +243,67 @@ it.effect("exports one documented JSONL record as bytes", () =>
     expect(record.schemaVersion).toBe("1")
   }),
 )
+
+it.live("exports usage from a reopened SQLite journal as one decodable JSONL line", () => {
+  const filename = tempDbPath("trajectory-jsonl-reopen")
+  const recordedUsage = Response.Usage.make({
+    inputTokens: { total: 23, uncached: 11, cacheRead: 7, cacheWrite: 5 },
+    outputTokens: { total: 13, text: 8, reasoning: 5 },
+  })
+  const model = Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      streamText: () =>
+        Stream.fromIterable<Response.StreamPartEncoded>([
+          Response.makePart("reasoning-delta", { id: "reasoning", delta: "brief thought" }),
+          Response.makePart("text-delta", { id: "answer", delta: "journaled answer" }),
+          Response.makePart("finish", { reason: "stop", usage: recordedUsage, response: undefined }),
+        ]),
+    }),
+  )
+  const recordedAgent = Agent.make({ name: "trajectory-jsonl-reopen" })
+  const runtimeLayer = SqliteRuntime.layerSqlite({
+    filename,
+    addresses: [],
+    scheduler: { pollInterval: "1 hour" },
+  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)))
+
+  return Effect.gen(function* () {
+    const recordedRunId = yield* provideScoped(
+      runtimeLayer,
+      Effect.gen(function* () {
+        const durableRuntime = yield* Runtime.Runtime
+        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        const context = yield* Layer.build(Layer.merge(model, Permissions.layerAllowAll))
+        yield* durableRuntime.register(recordedAgent).pipe(Effect.provideContext(context))
+        const handle = yield* durableRuntime.start(recordedAgent, "answer once", {
+          sessionId: "session:trajectory-jsonl-reopen",
+          idempotencyKey: "trajectory-jsonl-reopen",
+        })
+        yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "trajectory-test" }))
+        expect(yield* handle.await).toBe("journaled answer")
+        return handle.runId
+      }),
+    )
+
+    yield* provideScoped(
+      runtimeLayer,
+      Effect.gen(function* () {
+        const reopenedRuntime = yield* Runtime.Runtime
+        const trajectory = yield* fromJournal(reopenedRuntime, recordedRunId)
+        const bytes = yield* Stream.runCollect(exportTrajectory(trajectory, { format: "jsonl" }))
+        const line = new TextDecoder().decode(bytes[0])
+        expect(line.endsWith("\n")).toBe(true)
+        expect(line.split("\n")).toHaveLength(2)
+        const record = yield* Schema.decodeEffect(Schema.fromJsonString(JsonlRecord))(line.trim())
+        expect(record.trajectory).toEqual(trajectory)
+        expect(record.trajectory.turns[0]?.usage[0]).toMatchObject({
+          _tag: "Completed",
+          usage: recordedUsage,
+        })
+      }),
+    )
+  })
+})
