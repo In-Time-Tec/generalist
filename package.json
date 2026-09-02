@@ -14,7 +14,7 @@
     "dev": "bun --cwd apps/docs dev",
     "format": "prettier --write .",
     "package": "bun scripts/package-smoke.ts",
-    "test": "bun run build && bun --bun vitest run",
+    "test": "bun run build && bun --bun vitest run && bun scripts/render-hosts.ts --check",
     "typecheck": "ast-grep scan --config sgconfig.yml --filter '^effect-' --report-style short && bun turbo typecheck && bun tsc --noEmit -p tsconfig.json",
     "prepare": "effect-tsgo patch --no-typescript --oxlint"
   },

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 import { sourceTextPlugin } from "./apps/docs/scripts/source-text-plugin"
 import generalistManifest from "./packages/generalist/package.json" with { type: "json" }
+import { RuntimeDriverReport } from "./scripts/runtime-driver-report"
 
 const repositoryRoot = fileURLToPath(new URL(".", import.meta.url))
 const generalistRoot = new URL("./packages/generalist/", import.meta.url)
@@ -61,6 +62,7 @@ export default defineConfig({
     },
   ],
   test: {
+    reporters: ["default", new RuntimeDriverReport()],
     maxWorkers: workers,
     testTimeout: 60_000,
     hookTimeout: 60_000,

@@ -49,15 +49,19 @@ const provideLayer = <A, E, LayerError>(
 ): Effect.Effect<A, E | LayerError> =>
   Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => use(servicesFrom(context))))
 
+const capabilityNames = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): Array<string> =>
+  Object.entries(options.capabilities).flatMap(([name, value]) =>
+    value === undefined || value === false ? [] : [name],
+  )
+
 const prepare = <A, E, LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
   effect: Effect.Effect<A, E>,
 ): Effect.Effect<A, E> => {
-  const capabilities = Object.entries(options.capabilities).flatMap(([name, value]) =>
-    value === undefined || value === false ? [] : [name],
-  )
   const prepared = options.setup === undefined ? effect : Effect.andThen(options.setup, effect)
-  return record({ name: `runtimeDriver:${options.name}`, capabilities }).pipe(Effect.andThen(prepared))
+  return record({ name: `runtimeDriver:${options.name}`, capabilities: capabilityNames(options) }).pipe(
+    Effect.andThen(prepared),
+  )
 }
 
 const provide = <A, E, LayerError, ClaimsLayerError>(
@@ -431,7 +435,8 @@ const registerNotificationRecovery = <LayerError, ClaimsLayerError>(
 /** Registers only the conformance suites selected by the supplied driver capabilities. */
 export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): void => {
   const suite = options.skip === true ? describe.skip : describe
-  suite(`${options.name} Generalist Runtime driver conformance`, () => {
+  const certification = [options.name, ...capabilityNames(options)].map(encodeURIComponent).join(",")
+  suite(`${options.name} Generalist Runtime driver conformance [generalist-certification:${certification}]`, () => {
     if (options.capabilities.admission === true) registerAdmission(options)
     if (options.capabilities.runtime !== undefined) registerRuntime(options, options.capabilities.runtime)
     if (options.capabilities["host-sessions"] !== undefined) {
