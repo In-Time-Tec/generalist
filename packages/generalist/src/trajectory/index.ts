@@ -4,7 +4,7 @@ import { buildContext, type Entry as SessionEntry } from "../core/context/sessio
 import { BudgetLimits } from "../core/durable/run-budget.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { CompactionInspection, RawUsageFact, RunId, type RunSnapshot } from "../runtime/run.js"
-import { CompletedModelResponse } from "../runtime/run/event.js"
+import { CompletedModelResponse, type RunEvent } from "../runtime/run/event.js"
 import type { InspectError, EventsError, Service as RuntimeService, SessionEntryError } from "../runtime/service.js"
 
 export const ToolCall = Schema.Struct({
@@ -81,10 +81,7 @@ const pathTo = Effect.fn("Trajectory.pathTo")(function* (
 
 type ModelResponseEvent = Parameters<RuntimeService["resolveModelResponse"]>[0]
 
-const toolCallsFor = (
-  events: ReadonlyArray<import("../runtime/run/event.js").RunEvent>,
-  turn: number,
-): ReadonlyArray<ToolCall> => {
+const toolCallsFor = (events: ReadonlyArray<RunEvent>, turn: number): ReadonlyArray<ToolCall> => {
   const calls = new Map<string, ToolCall>()
   for (const event of events) {
     if (!("turn" in event) || event.turn !== turn) continue

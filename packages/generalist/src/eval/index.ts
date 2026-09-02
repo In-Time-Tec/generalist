@@ -1,10 +1,13 @@
 import { Console, Effect, Function, Option, Schema, Types } from "effect"
-import { LanguageModel } from "effect/unstable/ai"
+import { type AiError, LanguageModel, type Tool } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../core/agent/lifecycle/definition.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { ModelCatalog, bundled, type Metadata as ModelMetadata } from "../ai/model-catalog.js"
-import { Runtime } from "../runtime/service.js"
-import { fromJournal, type Trajectory } from "../trajectory/index.js"
+import type { InvalidOutput } from "../core/agent/event.js"
+import type { DuplicateAgent } from "../runtime/errors.js"
+import type { RunCancelled, RunFailed } from "../runtime/run/event.js"
+import { Runtime, type EventsError, type StartError } from "../runtime/service.js"
+import { fromJournal, type FromJournalError, type Trajectory } from "../trajectory/index.js"
 
 export const Score = Schema.Struct({
   scorer: Schema.String,
@@ -181,9 +184,7 @@ export interface JudgeOptions {
 }
 
 /** Score with the LanguageModel supplied in the Effect environment. */
-export const judge = (
-  options: JudgeOptions,
-): Scorer<LanguageModel.LanguageModel, import("effect/unstable/ai").AiError.AiError> => ({
+export const judge = (options: JudgeOptions): Scorer<LanguageModel.LanguageModel, AiError.AiError> => ({
   name: `judge:${options.model}`,
   evaluate: (trajectory) =>
     LanguageModel.generateObject({
@@ -235,18 +236,18 @@ const table = (suite: SuiteResult): string => {
 
 type SuiteError<E> =
   | E
-  | import("../runtime/service.js").StartError
-  | import("../runtime/errors.js").DuplicateAgent
-  | import("../runtime/run/event.js").RunFailed
-  | import("../runtime/run/event.js").RunCancelled
-  | import("../runtime/service.js").EventsError
-  | import("../core/agent/event.js").InvalidOutput
-  | import("../trajectory/index.js").FromJournalError
+  | StartError
+  | DuplicateAgent
+  | RunFailed
+  | RunCancelled
+  | EventsError
+  | InvalidOutput
+  | FromJournalError
   | InvalidSuiteOptions
 
 interface RunSuite {
   <
-    Tools extends Record<string, import("effect/unstable/ai").Tool.Any>,
+    Tools extends Record<string, Tool.Any>,
     AgentRequirements,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
@@ -264,7 +265,7 @@ interface RunSuite {
     Runtime | ClosedServices<Tools, AgentRequirements, InputSchema, OutputSchema> | ScorerRequirements
   >
   <
-    Tools extends Record<string, import("effect/unstable/ai").Tool.Any>,
+    Tools extends Record<string, Tool.Any>,
     AgentRequirements,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
@@ -286,7 +287,7 @@ interface RunSuite {
 export const runSuite: RunSuite = Function.dual(
   4,
   <
-    Tools extends Record<string, import("effect/unstable/ai").Tool.Any>,
+    Tools extends Record<string, Tool.Any>,
     AgentRequirements,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
