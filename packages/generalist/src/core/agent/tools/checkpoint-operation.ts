@@ -3,11 +3,12 @@ import type { DriverCheckpoint, OperationOutcome } from "../../durable/driver/co
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { domainFailureResult, successResult, type AnyToolCall } from "./result.js"
 import { completed, effectiveCall, updateCall } from "./checkpoint.js"
+import { AwaitEvent } from "./wake-event.js"
 
 const PersistedToolOutcome = Schema.Union([
   Schema.TaggedStruct("Success", { result: Schema.Unknown, encodedResult: Schema.Unknown }),
   Schema.TaggedStruct("DomainFailure", { failure: Schema.Unknown, encodedFailure: Schema.Unknown }),
-  Schema.TaggedStruct("Suspend", { token: Schema.String }),
+  Schema.TaggedStruct("Suspend", { token: Schema.String, awaitEvent: Schema.optionalKey(AwaitEvent) }),
 ])
 
 /** Apply one durable operation outcome to its exact authored call checkpoint. */
@@ -72,6 +73,7 @@ export const applyToolOutcome =
           reason: "tool-wait",
           waitId: input.operationKey,
           token: decoded.token,
+          ...(decoded.awaitEvent === undefined ? undefined : { awaitEvent: decoded.awaitEvent }),
         },
         activatedSkills: input.activatedSkills,
         invocationPath: input.invocationPath,

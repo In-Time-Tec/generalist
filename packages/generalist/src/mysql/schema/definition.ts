@@ -134,6 +134,27 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   KEY generalist_run_waits_due_idx (status, due_at),
   CONSTRAINT generalist_run_waits_run_fk FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS generalist_run_wake_events (
+  run_id VARCHAR(255) NOT NULL,
+  dedupe_key VARCHAR(255) NOT NULL,
+  event_json LONGTEXT NOT NULL,
+  received_at VARCHAR(30) NOT NULL,
+  PRIMARY KEY (run_id, dedupe_key),
+  CONSTRAINT generalist_run_wake_events_run_fk FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS generalist_schedules (
+  schedule_id VARCHAR(255) PRIMARY KEY,
+  definition_json LONGTEXT NOT NULL,
+  rrule VARCHAR(255) NOT NULL,
+  next_at VARCHAR(30) NOT NULL,
+  occurrence BIGINT NOT NULL DEFAULT 0,
+  status VARCHAR(32) NOT NULL,
+  owner_worker_id VARCHAR(255),
+  lease_expires_at VARCHAR(30),
+  created_at VARCHAR(30) NOT NULL,
+  updated_at VARCHAR(30) NOT NULL,
+  KEY generalist_schedules_due_idx (status, next_at, lease_expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS generalist_run_links (
   parent_run_id VARCHAR(255) NOT NULL,
   child_run_id VARCHAR(255) NOT NULL,

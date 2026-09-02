@@ -42,6 +42,8 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "Runtime",
       "Steering",
       "TreePolicy",
+      "Triggers",
+      "Watcher",
     ],
   ],
   [
@@ -176,6 +178,8 @@ describe("generalist public surface", () => {
         "ToolExecutor",
         "ToolOutput",
         "ToolPlacement",
+        "Triggers",
+        "Watcher",
         "withCacheBreakpoints",
       ])
     }),

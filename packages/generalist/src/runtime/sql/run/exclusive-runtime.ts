@@ -12,6 +12,7 @@ import { RunStore } from "../../run/store.js"
 import { Runtime } from "../../service.js"
 import { make as makeRegisteredAgents } from "../../executable/registered-agent.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "../store.js"
+import { layer as triggerSchedulerLayer } from "../../execution/trigger/scheduler.js"
 
 /** Services constructed by an exclusive SQLite Runtime host. */
 export type SqliteRuntimeServices = Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler
@@ -37,5 +38,6 @@ export const layerSqliteRuntime = (
         ? Layer.effect(LocalScheduler, makeLocalScheduler({ workerId: input.workerId, ...input.options.scheduler }))
         : localSchedulerLayer({ workerId: input.workerId, ...input.options.scheduler })
     ).pipe(Layer.provide(Layer.merge(dependencies, host)))
-    return Layer.mergeAll(runtime, host, store, scheduler)
+    const triggers = triggerSchedulerLayer(input.options.scheduler).pipe(Layer.provide(Layer.merge(runtime, store)))
+    return Layer.mergeAll(runtime, host, store, scheduler, triggers)
   })

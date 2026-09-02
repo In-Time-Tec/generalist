@@ -111,6 +111,9 @@ import type {
   RetryInput,
   WakeInput,
 } from "../execution/recovery/operator.js"
+import type { WakeEvent } from "../../core/agent/tools/wake-event.js"
+import type { DueAwaitEvent, WakeDisposition } from "../execution/trigger/wake.js"
+import type { ClaimedSchedule, ScheduleReceipt, ScheduleRecord } from "../execution/trigger/schedule.js"
 export type {
   AdmitMessageError,
   AdmitMessageInput,
@@ -244,6 +247,35 @@ export interface Service {
     input: RespondApprovalInput,
   ) => Effect.Effect<void, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable>
   readonly signal: (input: SignalInput) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable>
+  readonly wake: (input: {
+    readonly runId: string
+    readonly event: WakeEvent
+    readonly now: number
+  }) => Effect.Effect<WakeDisposition, RunNotFound | RunTerminal | RuntimeUnavailable>
+  readonly dueAwaitEvents: (input: {
+    readonly now: number
+    readonly limit: number
+  }) => Effect.Effect<ReadonlyArray<DueAwaitEvent>, RuntimeUnavailable>
+  readonly timeoutAwaitEvent: (input: {
+    readonly runId: string
+    readonly waitId: string
+    readonly deadline: string
+    readonly now: number
+  }) => Effect.Effect<boolean, RunNotFound | RunTerminal | RuntimeUnavailable>
+  readonly registerSchedule: (record: ScheduleRecord) => Effect.Effect<ScheduleReceipt, RuntimeUnavailable>
+  readonly claimSchedules: (input: {
+    readonly ownerId: string
+    readonly now: number
+    readonly leaseMillis: number
+    readonly limit: number
+  }) => Effect.Effect<ReadonlyArray<ClaimedSchedule>, RuntimeUnavailable>
+  readonly advanceSchedule: (input: {
+    readonly scheduleId: string
+    readonly ownerId: string
+    readonly occurrence: number
+    readonly nextAt: string
+    readonly now: number
+  }) => Effect.Effect<void, RuntimeUnavailable>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, RunNotFound | RuntimeUnavailable>
   readonly cancelSession: (input: {
     readonly sessionId: string

@@ -5,7 +5,7 @@ import { messagingMailboxSuite } from "../../../generalist/test/runtime/messagin
 import { messagingPolicySuite } from "../../../generalist/test/runtime/messaging/suites/policy.js"
 import { messagingSendOperationSuite } from "../../../generalist/test/runtime/messaging/suites/send-operation.js"
 import { claimReadyWorker } from "../../../generalist/test/runtime/run/queued-activation.js"
-import { assistantAddress } from "../../../generalist/test/runtime/execution/fixtures.js"
+import { assistantAddress, scheduleDefinition } from "../../../generalist/test/runtime/execution/fixtures.js"
 import {
   modelResponseFaultConformance,
   sqlTransactionFaultConformance,
@@ -126,6 +126,8 @@ Testing.runtimeDriver({
     "start-by-agent": { claim: conformanceClaim },
     "idempotent-start": { claim: conformanceClaim },
     "unknown-agent-on-recovery": { claim: conformanceClaim },
+    "await-event": { claim: conformanceClaim, recovery: "rebuild" },
+    schedules: { definition: scheduleDefinition, recovery: "rebuild" },
     "operator-explain": true,
     "operator-retry": { claim: conformanceClaim },
     "operator-resolve-unknown": { claim: conformanceClaim },

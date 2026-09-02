@@ -17,7 +17,8 @@ import {
   schemaChecksum,
 } from "./codec/schema.js"
 import { mapSqlError } from "./effect.js"
-import { checkSqlMigrationIdentity, checkSqlSchemaMeta, planSqlSchema, type SqlSchemaPlan } from "./schema/contract.js"
+import type { SqlSchemaPlan } from "./schema/contract.js"
+import { checkSqlMigrationIdentity, checkSqlSchemaMeta, planSqlSchema } from "./schema/management.js"
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient

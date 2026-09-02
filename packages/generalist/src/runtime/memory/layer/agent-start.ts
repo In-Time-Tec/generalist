@@ -1,4 +1,4 @@
-import { Effect, Function, Option, Predicate, Schema, Stream } from "effect"
+import { Clock, DateTime, Effect, Function, Option, Predicate, Schema, Stream } from "effect"
 import { InvalidOutput } from "../../../core/agent/event.js"
 import { encode as encodeAgentInput } from "../../../core/agent/lifecycle/input.js"
 import { generateId } from "../../../core/model/telemetry/events.js"
@@ -20,6 +20,7 @@ import type {
 } from "../../service.js"
 import { normalizePrompt } from "../prompt.js"
 import { make as makeBudget } from "../../../core/durable/run-budget.js"
+import { nextAt, parseRRule } from "../../execution/trigger/schedule.js"
 
 const decodeEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event: RunEvent) => {
   if (event._tag !== "RunCompleted") return Effect.succeed<StartEvent<OutputCodec["Type"]>>(event)
@@ -82,6 +83,36 @@ export const make = (options: {
   ) => Effect.Effect<StartReceipt, StartExecutionError>
 }) => {
   const register: RuntimeService["register"] = (agent) => capture(agent).pipe(Effect.flatMap(options.agents.register))
+  const schedule: RuntimeService["schedule"] = (agent, input, scheduleOptions) =>
+    Effect.gen(function* () {
+      const registration = yield* options.agents.getFor(agent)
+      if (Option.isNone(registration)) {
+        return yield* UnknownAgent.make({ name: agent.name, runId: `schedule_${yield* generateId}` })
+      }
+      const encoded = yield* encodeAgentInput(agent.input, input).pipe(
+        Effect.provideContext(registration.value.context),
+      )
+      const rule = yield* parseRRule(scheduleOptions.rrule)
+      const scheduleId = `schedule_${yield* generateId}`
+      const now = yield* Clock.currentTimeMillis
+      const createdAt = DateTime.formatIso(DateTime.makeUnsafe(now))
+      return yield* options.store.registerSchedule({
+        scheduleId,
+        rrule: `FREQ=${rule.frequency}${rule.interval === 1 ? "" : `;INTERVAL=${rule.interval}`}`,
+        rule,
+        definition: {
+          executable: registration.value.executable,
+          registrations: registration.value.registrations,
+          sessionId: scheduleOptions.sessionId,
+          prompt: normalizePrompt(encoded),
+          budget: scheduleOptions.budget ?? makeBudget(agent.budget ?? {}),
+        },
+        nextAt: nextAt(rule, now),
+        occurrence: 0,
+        status: "active",
+        createdAt,
+      })
+    })
   const start: RuntimeService["start"] = (agent, input, startOptions) =>
     Effect.gen(function* () {
       const registration = yield* options.agents.getFor(agent)
@@ -131,5 +162,5 @@ export const make = (options: {
       )
       return { runId: receipt.runId, await: awaitOutput(events), events, steer, followUp: steer }
     })
-  return { register, start }
+  return { register, schedule, start }
 }

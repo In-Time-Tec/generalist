@@ -3,6 +3,7 @@ import { Prompt, Response } from "effect/unstable/ai"
 import { ReplayPolicy } from "../../durable/driver/contract.js"
 import type { ResumeResolution } from "../lifecycle/resume.js"
 import type { PendingToolResult } from "./result.js"
+import { AwaitEvent } from "./wake-event.js"
 
 /** Canonical model-authored framework call persisted in one tool-batch checkpoint. */
 export const CanonicalToolCall = Schema.Struct({
@@ -26,6 +27,7 @@ export const ToolCallCheckpointState = Schema.Union([
     reason: Schema.Literals(["approval", "tool-wait"]),
     waitId: Schema.String,
     token: Schema.String,
+    awaitEvent: Schema.optionalKey(AwaitEvent),
   }),
   Schema.TaggedStruct("Completed", { result: Prompt.ToolResultPart }),
   Schema.TaggedStruct("Unknown", { operationId: Schema.String }),
@@ -60,6 +62,7 @@ export const ToolBatchWait = Schema.Struct({
   reason: Schema.Literals(["approval", "tool-wait"]),
   callIndex: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   call: CanonicalToolCall,
+  awaitEvent: Schema.optionalKey(AwaitEvent),
 })
 export type ToolBatchWait = typeof ToolBatchWait.Type
 
@@ -229,6 +232,7 @@ export const waits = (checkpoint: ToolBatchCheckpoint): ReadonlyArray<ToolBatchW
             reason: entry.state.reason,
             callIndex,
             call: effectiveCall(entry),
+            ...(entry.state.awaitEvent === undefined ? undefined : { awaitEvent: entry.state.awaitEvent }),
           },
         ]
       : [],

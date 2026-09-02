@@ -1,19 +1,8 @@
-/* eslint-disable max-lines -- the logical SQL schema contract is one checksum authority */
-import { Effect, Function } from "effect"
-import { sha256Text } from "../../../core/durable/canonical-json.js"
-import {
-  SchemaChecksumMismatch,
-  SchemaDirty,
-  SchemaMigrationFailed,
-  SchemaUpgradeRequired,
-  SchemaVersionUnsupported,
-} from "../errors.js"
-
 /** The single logical SQL Runtime schema identity. */
 export const SQL_SCHEMA_NAME = "generalist_runtime"
 
 /** The single logical SQL Runtime schema version. */
-export const SQL_SCHEMA_VERSION = 8
+export const SQL_SCHEMA_VERSION = 9
 
 export interface SqlLogicalTable {
   readonly name: string
@@ -158,7 +147,36 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
     },
     {
       name: "generalist_run_waits",
-      columns: ["run_id", "wait_id", "authored_order", "reason", "status", "response_json", "opened_at", "closed_at"],
+      columns: [
+        "run_id",
+        "wait_id",
+        "authored_order",
+        "reason",
+        "status",
+        "response_json",
+        "due_at",
+        "opened_at",
+        "closed_at",
+      ],
+    },
+    {
+      name: "generalist_run_wake_events",
+      columns: ["run_id", "dedupe_key", "event_json", "received_at"],
+    },
+    {
+      name: "generalist_schedules",
+      columns: [
+        "schedule_id",
+        "definition_json",
+        "rrule",
+        "next_at",
+        "occurrence",
+        "status",
+        "owner_worker_id",
+        "lease_expires_at",
+        "created_at",
+        "updated_at",
+      ],
     },
     {
       name: "generalist_run_links",
@@ -369,6 +387,16 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
       columns: ["status"],
     },
     {
+      name: "generalist_run_waits_due_idx",
+      table: "generalist_run_waits",
+      columns: ["status", "due_at"],
+    },
+    {
+      name: "generalist_schedules_due_idx",
+      table: "generalist_schedules",
+      columns: ["status", "next_at", "lease_expires_at"],
+    },
+    {
       name: "generalist_fan_out_members_status_idx",
       table: "generalist_fan_out_members",
       columns: ["fan_out_id", "status", "ordinal"],
@@ -408,6 +436,7 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
     { table: "generalist_run_events", kind: "foreign-key", columns: ["run_id"] },
     { table: "generalist_run_events", kind: "foreign-key", columns: ["host_session_id"] },
     { table: "generalist_run_operations", kind: "unique", columns: ["run_id", "operation_key"] },
+    { table: "generalist_run_wake_events", kind: "foreign-key", columns: ["run_id"] },
     { table: "generalist_run_links", kind: "unique", columns: ["child_run_id"] },
     {
       table: "generalist_external_child_placements",
@@ -438,68 +467,3 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
     { table: "generalist_sessions", kind: "check", columns: ["writer_run_id", "writer_owner_id"] },
   ],
 }
-
-/** Stable checksum of the logical contract, independent of physical dialect DDL. */
-export const sqlSchemaChecksum = (): string =>
-  sha256Text(
-    JSON.stringify({
-      name: SQL_SCHEMA_NAME,
-      version: SQL_SCHEMA_VERSION,
-      inventory: SQL_LOGICAL_SCHEMA,
-    }),
-  )
-
-/** Derive the one logical migration plan from physical metadata and dialect DDL. */
-export const planSqlSchema: {
-  (meta: SqlSchemaMeta, statements: ReadonlyArray<string>): SqlSchemaPlan
-  (statements: ReadonlyArray<string>): (meta: SqlSchemaMeta) => SqlSchemaPlan
-} = Function.dual(
-  2,
-  (meta: SqlSchemaMeta, statements: ReadonlyArray<string>): SqlSchemaPlan => ({
-    current: meta.version,
-    required: SQL_SCHEMA_VERSION,
-    checksum: sqlSchemaChecksum(),
-    statements: meta.present ? [] : statements,
-    upgradeRequired: meta.version < SQL_SCHEMA_VERSION,
-  }),
-)
-
-/** Check the shared version/checksum/dirty state before dialect-owned verification. */
-export const checkSqlSchemaMeta: {
-  (
-    meta: SqlSchemaMeta,
-    source: string,
-  ): Effect.Effect<void, SchemaUpgradeRequired | SchemaDirty | SchemaVersionUnsupported | SchemaChecksumMismatch>
-  (
-    source: string,
-  ): (
-    meta: SqlSchemaMeta,
-  ) => Effect.Effect<void, SchemaUpgradeRequired | SchemaDirty | SchemaVersionUnsupported | SchemaChecksumMismatch>
-} = Function.dual(2, (meta: SqlSchemaMeta, source: string) => {
-  if (!meta.present) {
-    return SchemaUpgradeRequired.make({ source, current: 0, required: SQL_SCHEMA_VERSION })
-  }
-  if (meta.dirty) return SchemaDirty.make({ source, version: meta.version })
-  if (meta.version !== SQL_SCHEMA_VERSION) {
-    return SchemaVersionUnsupported.make({
-      source,
-      version: meta.version,
-      supported: SQL_SCHEMA_VERSION,
-    })
-  }
-  const expected = sqlSchemaChecksum()
-  if (meta.checksum !== expected) {
-    return SchemaChecksumMismatch.make({ source, expected, actual: meta.checksum })
-  }
-  return Effect.void
-})
-
-/** Check the single greenfield baseline migration identity. */
-export const checkSqlMigrationIdentity: {
-  (migrations: ReadonlyArray<SqlMigrationRecord>, source: string): Effect.Effect<void, SchemaMigrationFailed>
-  (source: string): (migrations: ReadonlyArray<SqlMigrationRecord>) => Effect.Effect<void, SchemaMigrationFailed>
-} = Function.dual(2, (migrations: ReadonlyArray<SqlMigrationRecord>, source: string) =>
-  migrations.length === 1 && Number(migrations[0]?.migration_id) === 1 && migrations[0]?.name === SQL_SCHEMA_NAME
-    ? Effect.void
-    : SchemaMigrationFailed.make({ source, message: "migration identity mismatch" }),
-)

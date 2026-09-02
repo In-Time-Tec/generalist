@@ -96,6 +96,9 @@ import type {
   UnknownResolution,
   Verification as RecoveryVerification,
 } from "./execution/recovery/operator.js"
+import type { WakeEvent } from "../core/agent/tools/wake-event.js"
+import type { WakeDisposition, WakeEventInvalid } from "./execution/trigger/wake.js"
+import type { ScheduleInvalid, ScheduleReceipt } from "./execution/trigger/schedule.js"
 
 export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
@@ -180,6 +183,13 @@ export interface StartReceipt extends RunReceipt {
 export interface StartOptions {
   readonly sessionId?: string
   readonly idempotencyKey?: string
+  readonly budget?: RunBudget
+}
+
+/** Durable fixed-interval fresh-Run recurrence. */
+export interface ScheduleOptions {
+  readonly rrule: string
+  readonly sessionId: string
   readonly budget?: RunBudget
 }
 
@@ -354,6 +364,8 @@ export type StartExecutionError =
   | import("../core/durable/run-budget.js").Exhausted
 /** Typed Agent start failures before a Run handle exists. */
 export type StartError = StartExecutionError | UnknownAgent | AgentError
+export type ScheduleError = UnknownAgent | AgentError | ScheduleInvalid | RuntimeUnavailable
+export type WakeError = RunNotFound | RunTerminal | RuntimeUnavailable | WakeEventInvalid
 /** Exact-root staged admission failures. */
 export type AdmitError = StartExecutionError
 /** Staged root activation failures. */
@@ -477,6 +489,19 @@ export interface Service extends RuntimeHostSessions {
     input: InputCodec["Type"],
     options?: StartOptions,
   ) => Effect.Effect<RunHandle<OutputCodec["Type"]>, StartError, never>
+  /** Register recurring fresh Runs for one registered Agent. */
+  readonly schedule: <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
+    input: InputCodec["Type"],
+    options: ScheduleOptions,
+  ) => Effect.Effect<ScheduleReceipt, ScheduleError>
   /** @internal Begin one already-normalized pinned execution. */
   readonly startExecution: (input: StartExecutionInput) => Effect.Effect<StartReceipt, StartExecutionError>
   /** Durably admit one exact root without making it executable. */
@@ -513,6 +538,8 @@ export interface Service extends RuntimeHostSessions {
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
+  /** Journal one validated environmental event and resume one matching wait at most once. */
+  readonly wake: (runId: string, event: WakeEvent) => Effect.Effect<WakeDisposition, WakeError>
   /** Durably admit cancellation and request interruption from a process-local owner.
    * Successful return does not acknowledge terminal cancellation. Observe Run state or events when
    * the caller must know whether owned work exited and external outcomes became definitive.

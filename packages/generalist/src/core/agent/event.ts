@@ -7,6 +7,7 @@ import { StopReason } from "../turn/policy.js"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { ToolBatchCheckpoint, ToolBatchWait } from "./tools/checkpoint.js"
 import type { Result as CompletionGateResult } from "./gates/definition.js"
+import type { AwaitEvent } from "./tools/wake-event.js"
 /** Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
 
@@ -114,6 +115,7 @@ interface ToolExecutionWaiting {
   readonly call: Response.ToolCallPart<string, unknown>
   readonly waitId: string
   readonly token: string
+  readonly awaitEvent?: AwaitEvent
   readonly metadata?: Metadata
 }
 

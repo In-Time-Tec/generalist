@@ -9,6 +9,7 @@ import type {
 import type { Runtime, Service as RuntimeService } from "../../runtime/service.js"
 import type { Service as RunExecutorService } from "../../runtime/execution/run-executor.js"
 import type { RunClaims } from "../../runtime/sql/run/claims.js"
+import type { ScheduleDefinition } from "../../runtime/execution/trigger/schedule.js"
 
 /** A multi-worker claim without the driver's decoded persisted Run representation. */
 export interface WorkerClaim {
@@ -85,6 +86,18 @@ export interface ApprovalSuspendCapability {
   readonly recovery: "rebuild" | "reclaim"
 }
 
+/** Durable environmental wait conformance, including reopen where the driver persists. */
+export interface AwaitEventCapability {
+  readonly claim: ClaimExecution
+  readonly recovery: "rebuild" | "reclaim"
+}
+
+/** Durable recurring admission and per-occurrence claim conformance. */
+export interface SchedulesCapability {
+  readonly definition: ScheduleDefinition
+  readonly recovery: "rebuild" | "reclaim"
+}
+
 /** Read-only recovery projection conformance capability. */
 export type OperatorExplainCapability = true
 
@@ -123,6 +136,8 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>
   readonly notificationRecovery?: NotificationRecoveryCapability
   readonly "approval-suspend"?: ApprovalSuspendCapability
+  readonly "await-event"?: AwaitEventCapability
+  readonly schedules?: SchedulesCapability
   readonly "operator-explain"?: OperatorExplainCapability
   readonly "operator-retry"?: OperatorRetryCapability
   readonly "operator-resolve-unknown"?: OperatorResolveUnknownCapability

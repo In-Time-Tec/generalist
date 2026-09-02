@@ -129,6 +129,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     },
     register: () => Effect.die("not used"),
     start: () => Effect.die("not used"),
+    schedule: () => Effect.die("not used"),
     startExecution: () => Effect.die("not used"),
     admit: () => Effect.die("not used"),
     activate: () => Effect.die("not used"),
@@ -223,6 +224,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       return Effect.void
     },
     signal: () => Effect.void,
+    wake: () => Effect.die("not used"),
     steer: () => Effect.succeed({ entryId: "steering:test", sequence: 0 }),
     sendMessage: () => Effect.die("not used"),
     messages: () => Effect.die("not used"),

@@ -13,6 +13,7 @@ import { registerAcknowledgement } from "./acknowledgement.js"
 import { registerApprovalSuspend } from "./approval-suspend.js"
 import { registerHostSessions } from "./host-sessions.js"
 import { registerOperator } from "./operator.js"
+import { registerTriggers } from "./triggers.js"
 import { Suite, record } from "../report.js"
 import { registerForkRewind } from "./fork-rewind.js"
 import type {
@@ -30,7 +31,6 @@ import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 export type * from "./contract.js"
 export * from "./model-response-fault.js"
 export * from "./sql-transaction-fault.js"
-
 const servicesFrom = (context: Context.Context<Runtime | RunStore>): Services => {
   const optionalClaims = Context.getOption(context, RunClaims)
   const optionalExecutor = Context.getOption(context, RunExecutor)
@@ -50,6 +50,16 @@ const provideLayer = <A, E, LayerError>(
   use: (services: Services) => Effect.Effect<A, E>,
 ): Effect.Effect<A, E | LayerError> =>
   Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => use(servicesFrom(context))))
+
+const provideLayerPair = <A, E, LayerError>(
+  layer: Layer.Layer<Runtime | RunStore, LayerError, never>,
+  use: (left: Services, right: Services) => Effect.Effect<A, E>,
+): Effect.Effect<A, E | LayerError> =>
+  Effect.scoped(
+    Effect.flatMap(Layer.build(layer), (left) =>
+      Effect.flatMap(Layer.build(layer), (right) => use(servicesFrom(left), servicesFrom(right))),
+    ),
+  )
 
 const certification = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): Suite =>
   Suite.make({
@@ -479,6 +489,12 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
         open: (use) => provideLayer(options.layer, use),
       })
     }
+    registerTriggers({
+      options,
+      prepare: (effect) => prepare(options, effect),
+      open: (use) => provideLayer(options.layer, use),
+      openPair: (use) => provideLayerPair(options.layer, use),
+    })
     registerOperator({ options, open: (use) => provide(options, use) })
   })
 }

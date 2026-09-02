@@ -21,6 +21,8 @@ import type { Entry as SessionEntry } from "../../core/context/session.js"
 import type { ExternalRoot, Placement as ExternalChildPlacement } from "../child/external/placement.js"
 import type { Point as AcknowledgementPoint } from "../acknowledgement.js"
 import type { HostSession, HostSessionEvent, SessionSubscriberLagged } from "../session/host.js"
+import type { WakeEvent } from "../../core/agent/tools/wake-event.js"
+import type { ClaimedSchedule, ScheduleRecord } from "../execution/trigger/schedule.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -137,6 +139,9 @@ export interface MemoryState {
   readonly externalChildPlacements: ReadonlyMap<string, ExternalChildPlacement>
   readonly externalRoots: ReadonlyMap<string, ExternalRoot>
   readonly acknowledgements: ReadonlyMap<string, AcknowledgementPoint>
+  readonly wakeEvents: ReadonlyMap<string, WakeEvent>
+  readonly schedules: ReadonlyMap<string, ScheduleRecord>
+  readonly scheduleClaims: ReadonlyMap<string, ClaimedSchedule>
   readonly subscriberQueueCapacity: number
   readonly publications: ReadonlyArray<MemoryPublication>
 }
@@ -195,6 +200,9 @@ export const emptyState = (input: {
   externalChildPlacements: new Map(),
   externalRoots: new Map(),
   acknowledgements: new Map(),
+  wakeEvents: new Map(),
+  schedules: new Map(),
+  scheduleClaims: new Map(),
   subscriberQueueCapacity: input.subscriberQueueCapacity,
   publications: [],
 })

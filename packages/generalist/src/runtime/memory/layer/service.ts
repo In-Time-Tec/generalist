@@ -1,4 +1,4 @@
-import { Clock, Effect, Layer, Option, Ref, Stream } from "effect"
+import { Clock, Effect, Layer, Option, Ref, Schema, Stream } from "effect"
 /* eslint-disable max-lines -- the memory Runtime layer implements one service contract */
 import {
   AddressNotFound,
@@ -54,6 +54,8 @@ import { normalizer as fanOutNormalizer } from "./fan-out.js"
 import { messageDigestInput, messageDraft } from "./message.js"
 import { Invalid as BudgetInvalid, make as makeBudget } from "../../../core/durable/run-budget.js"
 import { generateId } from "../../../core/model/telemetry/events.js"
+import { WakeEvent } from "../../../core/agent/tools/wake-event.js"
+import { WakeEventInvalid } from "../../execution/trigger/wake.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
@@ -381,6 +383,7 @@ const makeRuntimeWith = (
     const service: RuntimeService = {
       operator,
       register: agentStart.register,
+      schedule: agentStart.schedule,
       start: agentStart.start,
       startExecution: (input) => admitStart(input, true),
       admit: (input) =>
@@ -479,6 +482,13 @@ const makeRuntimeWith = (
       respond: store.respond,
       respondApproval: store.respondApproval,
       signal: store.signal,
+      wake: (runId, event) =>
+        Schema.decodeEffect(WakeEvent, { onExcessProperty: "error" })(event).pipe(
+          Effect.mapError((error) => WakeEventInvalid.make({ message: String(error) })),
+          Effect.flatMap((validated) =>
+            Clock.currentTimeMillis.pipe(Effect.flatMap((now) => store.wake({ runId, event: validated, now }))),
+          ),
+        ),
       cancel: (input) =>
         Effect.gen(function* () {
           yield* store.cancel(input)

@@ -56,9 +56,12 @@ const persistWaits = (runId: string, waits: SuspendInput["waits"], openedAt: str
       identities.add(requested.waitId)
       const prior = yield* loadRunWait(runId, requested.waitId)
       if (prior === undefined) {
+        const dueAt = requested.reason._tag === "AwaitEvent" ? requested.reason.deadline : null
         yield* sql`
-          INSERT INTO generalist_run_waits (run_id, wait_id, authored_order, reason, status, response_json, opened_at, closed_at)
-          VALUES (${runId}, ${requested.waitId}, ${authoredOrder}, ${encodeReason(requested.reason)}, 'open', NULL, ${openedAt}, NULL)
+          INSERT INTO generalist_run_waits
+            (run_id, wait_id, authored_order, reason, status, response_json, due_at, opened_at, closed_at)
+          VALUES
+            (${runId}, ${requested.waitId}, ${authoredOrder}, ${encodeReason(requested.reason)}, 'open', NULL, ${dueAt}, ${openedAt}, NULL)
         `
         inserted.push({ ...requested, openedAt })
       } else if (prior.status !== "open" || !Equal.equals(prior.reason, requested.reason)) {
@@ -75,6 +78,15 @@ const appendWaits = (hub: EventHub, loaded: DecodedRun, inserted: SuspendInput["
     for (const wait of inserted) {
       yield* appendEvent(hub, current, { _tag: "RunWaiting", wait }, "waiting")
       current = (yield* loadRun(loaded.runId))!
+      if (wait.reason._tag === "AwaitEvent") {
+        yield* appendEvent(hub, current, {
+          _tag: "Awaiting",
+          waitId: wait.waitId,
+          filter: wait.reason.filter,
+          deadline: wait.reason.deadline,
+        })
+        current = (yield* loadRun(loaded.runId))!
+      }
     }
     if (inserted.length === 0) {
       yield* sql`UPDATE generalist_runs SET status = 'waiting', updated_at = ${openedAt} WHERE run_id = ${loaded.runId}`

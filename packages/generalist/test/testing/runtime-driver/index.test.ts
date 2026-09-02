@@ -6,7 +6,7 @@ import {
 } from "generalist/testing/runtime-driver"
 import { Testing } from "generalist/testing"
 import { Effect } from "effect"
-import { assistantAddress, memoryLayer } from "../../runtime/execution/fixtures.js"
+import { assistantAddress, memoryLayer, scheduleDefinition } from "../../runtime/execution/fixtures.js"
 import { sqliteManualClaimLayer, tempDbPath } from "../../runtime/sql/scenario.js"
 
 const claim: ClaimExecution = ({ store }, { runId, workerId }) =>
@@ -71,6 +71,8 @@ Testing.runtimeDriver({
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
     "approval-suspend": { claim, recovery: "reclaim" },
+    "await-event": { claim, recovery: "reclaim" },
+    schedules: { definition: scheduleDefinition, recovery: "reclaim" },
     "operator-explain": true,
     "operator-retry": { claim },
     "operator-resolve-unknown": { claim },
@@ -92,6 +94,8 @@ Testing.runtimeDriver({
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
     "approval-suspend": { claim, recovery: "rebuild" },
+    "await-event": { claim, recovery: "rebuild" },
+    schedules: { definition: scheduleDefinition, recovery: "rebuild" },
     "operator-explain": true,
     "operator-retry": { claim },
     "operator-resolve-unknown": { claim },
