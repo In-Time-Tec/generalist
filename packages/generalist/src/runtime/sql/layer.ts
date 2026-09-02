@@ -1,11 +1,10 @@
 import { Layer } from "effect"
 import { layer } from "@effect/sql-sqlite-bun/SqliteClient"
-import { layer as runtimeLayer } from "../memory/layer/service.js"
+import { layerRegisteredAgents as runtimeLayer } from "../memory/layer/service.js"
 import { Runtime } from "../service.js"
 import { RunStore } from "../run/store.js"
 import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "./store.js"
-import { RunExecutor } from "../execution/run-executor.js"
-import { makeWith as makeRunExecutor } from "../execution/run-executor-internal.js"
+import { layerRegisteredAgents as runExecutorLayer, RunExecutor } from "../execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../execution/active-executions.js"
 import { LocalScheduler } from "../execution/local-scheduler.js"
 import { layer as localSchedulerLayer } from "../execution/local-scheduler-internal.js"
@@ -29,8 +28,8 @@ export const layerSqlite = (
   const store = layerSqliteStore({ ...options, source: options.source ?? options.filename }).pipe(Layer.provide(client))
   const agents = makeRegisteredAgents()
   const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = runtimeLayer(options, agents).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(RunExecutor, makeRunExecutor(agents)).pipe(Layer.provide(dependencies))
+  const runtime = runtimeLayer(agents)(options).pipe(Layer.provide(dependencies))
+  const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
   const scheduler = localSchedulerLayer({ workerId: "sqlite", ...options.scheduler }).pipe(
     Layer.provide(Layer.merge(dependencies, host)),
   )

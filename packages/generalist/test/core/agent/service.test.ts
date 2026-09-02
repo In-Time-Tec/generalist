@@ -531,9 +531,8 @@ layer(typedStartRuntime)("Agent.start", (it) => {
   it.effect("starts a registered Agent and decodes its durable completion", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      yield* runtime
-        .register(typedStartAgent)
-        .pipe(Effect.provide(deterministicModel({ response: '{"output":{"answer":42}}' })))
+      const model = yield* Layer.build(deterministicModel({ response: '{"output":{"answer":42}}' }))
+      yield* runtime.register(typedStartAgent).pipe(Effect.provideContext(model))
       const handle = yield* Agent.start(
         typedStartAgent,
         { question: "answer" },
@@ -559,7 +558,8 @@ layer(typedStartRuntime)("Agent.start", (it) => {
   it.effect("preserves a valid null durable output instead of falling back to text", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      yield* runtime.register(nullStartAgent).pipe(Effect.provide(deterministicModel({ response: '{"output":null}' })))
+      const model = yield* Layer.build(deterministicModel({ response: '{"output":null}' }))
+      yield* runtime.register(nullStartAgent).pipe(Effect.provideContext(model))
       const handle = yield* Agent.start(nullStartAgent, "answer", {
         sessionId: "null-start-session",
         idempotencyKey: "null-start-key",

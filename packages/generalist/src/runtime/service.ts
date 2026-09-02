@@ -254,9 +254,7 @@ export interface SteerInput {
   readonly prompt: Prompt.Prompt | Prompt.RawInput
 }
 
-/**
- * One addressed send between agents.
- *
+/** One addressed send between agents.
  * `fromRunId` is the authoritative sender: Generalist reads its identity, parentage, and session from the
  * durable Run record, so callers cannot forge a sender by supplying an Address.
  */
@@ -421,9 +419,7 @@ export interface Service {
   readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
-  /**
-   * Observe the memory-only live preview lane for one Run.
-   *
+  /** Observe the memory-only live preview lane for one Run.
    * Frames contain bounded UTF-16 appends with per-attempt sequences and per-channel offsets.
    * Subscribers may lose frames without blocking execution and detect that loss from the next
    * frame. Preview events are memory-only and never durable RunEvents.
@@ -450,9 +446,7 @@ export interface Service {
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
-  /**
-   * Durably admit cancellation and request interruption from a process-local owner.
-   *
+  /** Durably admit cancellation and request interruption from a process-local owner.
    * Successful return does not acknowledge terminal cancellation. Observe Run state or events when
    * the caller must know whether owned work exited and external outcomes became definitive.
    */

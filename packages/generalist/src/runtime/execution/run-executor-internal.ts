@@ -1,4 +1,4 @@
-import { Cause, Context, DateTime, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
 import { AgentError, type Event } from "../../core/agent/event.js"
@@ -9,12 +9,7 @@ import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
-import {
-  make as makeRegisteredAgents,
-  resolve as resolveRegisteredAgent,
-  type RegisteredAgents,
-} from "../executable/registered-agent.js"
-import type { UnknownAgent } from "../errors.js"
+import { make as makeRegisteredAgents, type RegisteredAgents } from "../executable/registered-agent.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
@@ -48,42 +43,22 @@ import {
   type RunOptionsInput,
 } from "./completion/operations.js"
 import { suspend as suspendAgent } from "./agent/suspend.js"
+import { make as makeRegisteredResolution } from "./agent/registered-resolution.js"
 import type { Service } from "./run-executor.js"
-
-export const makeWith = (
-  agents: RegisteredAgents = makeRegisteredAgents(),
+const makeFor = (
+  agents: RegisteredAgents,
 ): Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> =>
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
-    const registeredResolver = {
-      resolve: (input: Parameters<typeof resolver.resolve>[0]) => resolveRegisteredAgent(agents, resolver, input),
-    }
-    const suspendUnknown = (claim: ExecutionClaim, error: UnknownAgent) =>
-      DateTime.now.pipe(
-        Effect.map(DateTime.formatIso),
-        Effect.flatMap((openedAt) =>
-          store.suspend({
-            ...claim,
-            waits: [
-              {
-                waitId: `agent:${error.name}`,
-                reason: { _tag: "External", capability: "agent-registration" },
-                status: "open",
-                openedAt,
-              },
-            ],
-            suspension: error,
-          }),
-        ),
-      )
+    const registered = makeRegisteredResolution({ agents, resolver, store })
     const journalFault = yield* Effect.serviceOption(JournalFault)
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
     const reconcileCancellation = yield* makeToolCancellation({
       store,
-      resolver: registeredResolver,
-      suspendUnknown,
+      resolver: registered.resolver,
+      suspendUnknown: registered.suspendUnknown,
     })
     const executeClaim = (claim: ExecutionClaim, afterExit: Ref.Ref<Effect.Effect<void>>): Effect.Effect<void> =>
       Effect.gen(function* () {
@@ -118,10 +93,10 @@ export const makeWith = (
         const scopedExecution = Effect.scoped(
           Effect.gen(function* () {
             const resolved = yield* ExecutionResolution.resolve(
-              registeredResolver,
+              registered.resolver,
               claimed,
               deferProgramChildFailure,
-              (error) => suspendUnknown(claim, error),
+              (error) => registered.suspendUnknown(claim, error),
             )
             if (resolved === undefined) return
             if (resolved._tag === "Program") {
@@ -521,4 +496,5 @@ export const makeWith = (
     return { execute, interrupt: (runId) => active.interrupt(runId) }
   })
 
-export const make = makeWith()
+export const forAgents = (agents: RegisteredAgents) => makeFor(agents)
+export const make = makeFor(makeRegisteredAgents())

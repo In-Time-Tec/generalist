@@ -1,20 +1,14 @@
-import { Clock, Effect, Layer, Option, Predicate, Ref, Schema, Stream } from "effect"
+import { Clock, Effect, Layer, Option, Ref, Stream } from "effect"
 import {
   AddressNotFound,
   ChildSelectionMissing,
   ExecutableIdentityMismatch,
   ExecutablePinMissing,
   ExecutableRegistrationInvalid,
-  FanOutInvalid,
-  FanOutRemainderUnsupported,
   RunTerminal,
   StartInvalid,
   RuntimeUnavailable,
-  UnknownAgent,
 } from "../../errors.js"
-import { InvalidOutput } from "../../../core/agent/event.js"
-import { encode as encodeAgentInput } from "../../../core/agent/lifecycle/input.js"
-import { generateId } from "../../../core/model/telemetry/events.js"
 import { make as makeAddress, type Address } from "../../address.js"
 import { origin as cursorOrigin } from "../../cursor.js"
 import { make as makeMessage } from "../../messaging/message.js"
@@ -22,10 +16,8 @@ import { RunStore, type AdmitMessageInput, type AdmitSendInput, type AdmitStartI
 import {
   Runtime,
   type Service as RuntimeService,
-  type InitialFanOutInput,
   type LayerOptions,
   type SendInput,
-  type StartEvent,
   type StartExecutionInput,
   type SpawnInput,
 } from "../../service.js"
@@ -33,16 +25,12 @@ import { normalizePrompt } from "../prompt.js"
 import { normalizeInitialChild, normalizeInitialFanOut } from "../start.js"
 import { ActiveExecutions } from "../../execution/active-executions.js"
 import { digest as steeringDigest } from "../../run/steering.js"
-import { fanOutIdFor, MAX_FAN_OUT_MEMBERS } from "../../child/fan-out-internal.js"
 import { parseCursor } from "../../tree/cursor.js"
 import { decodePinned, equals, resolveChild } from "../../executable/manifest-internal.js"
 import type { PinnedExecutable } from "../../executable/manifest.js"
 import { ExecutableResolver, type Input as ResolverInput } from "../../executable/resolver.js"
 import { validate as validateRegistrations, type ExecutableRegistration } from "../../executable/registration.js"
-import { AgentExecutionResult, ProgramExecutionResult } from "../../execution/state.js"
-import type { RunCompleted, RunEvent } from "../../run/event.js"
 import {
-  capture as captureRegisteredAgent,
   make as makeRegisteredAgents,
   resolve as resolveRegisteredAgent,
   type RegisteredAgents,
@@ -57,58 +45,18 @@ import { defaultBounds, digest as messageDigest, promptBytes } from "../../messa
 import { defaultTreePolicy } from "../../tree/policy.js"
 import { isTerminal } from "../../run.js"
 import { awaitSessionTerminal } from "../../session/lifecycle.js"
-import { messageDigestInput, messageDraft, normalizedFanOutMember } from "./message.js"
+import { make as makeAgentStart } from "./agent-start.js"
+import { normalizer as fanOutNormalizer } from "./fan-out.js"
+import { messageDigestInput, messageDraft } from "./message.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
 type MutableSendAdmission = { -readonly [Key in keyof AdmitSendInput]: AdmitSendInput[Key] }
 type MutableMessageAdmission = { -readonly [Key in keyof AdmitMessageInput]: AdmitMessageInput[Key] }
 
-const decodeStartEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event: RunEvent) => {
-  if (event._tag !== "RunCompleted") return Effect.succeed<StartEvent<OutputCodec["Type"]>>(event)
-  if (Schema.is(ProgramExecutionResult)(event.result)) {
-    return Effect.succeed<StartEvent<OutputCodec["Type"]>>({ ...event, result: event.result })
-  }
-  const encoded = Predicate.hasProperty(event.result, "output") ? event.result.output : event.result.text
-  return Schema.decodeEffect(schema)(encoded).pipe(
-    Effect.map((output) => ({ ...event, result: { ...event.result, output } })),
-    Effect.mapError((error) => InvalidOutput.make({ issues: [error.message] })),
-  )
-}
-
-const awaitStart = <Output>(
-  events: Stream.Stream<StartEvent<Output>, import("../../service.js").EventsError | InvalidOutput>,
-) =>
-  events.pipe(
-    Stream.filter(
-      (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
-    ),
-    Stream.runHead,
-    Effect.flatMap(
-      (
-        event,
-      ): Effect.Effect<
-        Output,
-        | import("../../service.js").EventsError
-        | import("../../run/event.js").RunFailed
-        | import("../../run/event.js").RunCancelled
-        | InvalidOutput
-      > => {
-        if (Option.isNone(event)) {
-          return Effect.fail(RuntimeUnavailable.make({ message: "Run event stream ended before a terminal event" }))
-        }
-        if (event.value._tag === "RunFailed" || event.value._tag === "RunCancelled") return Effect.fail(event.value)
-        if (Schema.is(AgentExecutionResult)(event.value.result)) {
-          return Effect.succeed(event.value.result.output as Output)
-        }
-        return Effect.fail(InvalidOutput.make({ issues: ["Registered Agent completed with a Program result"] }))
-      },
-    ),
-  )
-
-export const makeRuntime = (
+const makeRuntimeWith = (
   options: LayerOptions,
-  agents: RegisteredAgents = makeRegisteredAgents(),
+  agents: RegisteredAgents,
 ): Effect.Effect<RuntimeService, never, RunStore | ActiveExecutions | ExecutableResolver> =>
   Effect.gen(function* () {
     const store = yield* RunStore
@@ -227,43 +175,7 @@ export const makeRuntime = (
           }),
         ),
       )
-    const normalizeFanOut = (parentRunId: string, input: InitialFanOutInput) =>
-      Effect.gen(function* () {
-        if (input.concurrency !== undefined && (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1)) {
-          return yield* FanOutInvalid.make({ message: "fan-out concurrency must be a positive integer" })
-        }
-        if (input.members.length === 0 || input.members.length > MAX_FAN_OUT_MEMBERS) {
-          return yield* FanOutInvalid.make({ message: `fan-out requires between 1 and ${MAX_FAN_OUT_MEMBERS} members` })
-        }
-        if (new Set(input.members.map((member) => member.key)).size !== input.members.length) {
-          return yield* FanOutInvalid.make({ message: "fan-out member keys must be unique" })
-        }
-        if (
-          input.join._tag === "Quorum" &&
-          (!Number.isSafeInteger(input.join.required) ||
-            input.join.required < 1 ||
-            input.join.required > input.members.length)
-        ) {
-          return yield* FanOutInvalid.make({
-            message: "fan-out quorum must be a positive safe integer no greater than member count",
-          })
-        }
-        const info = yield* store.info
-        if (input.remainder === "terminate") {
-          return yield* FanOutRemainderUnsupported.make({ remainder: "terminate", durability: info.durability })
-        }
-        const fanOutId = fanOutIdFor(parentRunId, input.idempotencyKey)
-        const members = input.members.map((member, ordinal) => normalizedFanOutMember({ fanOutId, ordinal, member }))
-        return {
-          parentRunId,
-          idempotencyKey: input.idempotencyKey,
-          members,
-          concurrency: Math.min(input.concurrency ?? members.length, members.length),
-          join: input.join,
-          remainder: input.remainder,
-          fanOutId,
-        }
-      })
+    const normalizeFanOut = fanOutNormalizer(store)
     const validateInitialChildren = (
       input: StartExecutionInput,
       executable: PinnedExecutable,
@@ -373,65 +285,10 @@ export const makeRuntime = (
         if (input.runId !== undefined) admission.runId = input.runId
         return yield* store.admitStart(admission, { activate })
       })
-    const register: RuntimeService["register"] = (agent) =>
-      captureRegisteredAgent(agent).pipe(Effect.flatMap(agents.register))
-    const start: RuntimeService["start"] = (agent, input, startOptions) =>
-      Effect.gen(function* () {
-        const registration = yield* agents.getFor(agent)
-        if (Option.isNone(registration)) {
-          return yield* UnknownAgent.make({ name: agent.name, runId: `run_${yield* generateId}` })
-        }
-        const prompt = yield* encodeAgentInput(agent.input, input).pipe(
-          Effect.provideContext(registration.value.context),
-        )
-        const identity = yield* generateId
-        const idempotencyKey = startOptions?.idempotencyKey ?? `start_${identity}`
-        const sessionId =
-          startOptions?.sessionId ??
-          (startOptions?.idempotencyKey === undefined ? `session_${identity}` : `agent:${agent.name}`)
-        const receipt = yield* admitStart(
-          {
-            executable: registration.value.executable,
-            registrations: registration.value.registrations,
-            sessionId,
-            idempotencyKey,
-            prompt,
-          },
-          true,
-        )
-        const steer = (steering: import("../../../core/turn/steering.js").Input) =>
-          generateId.pipe(
-            Effect.flatMap((idempotencyKey) =>
-              Effect.sync(() => normalizePrompt(steering.prompt)).pipe(
-                Effect.flatMap((prompt) =>
-                  store.admitSteering({
-                    runId: receipt.runId,
-                    idempotencyKey,
-                    prompt,
-                    digest: steeringDigest(prompt),
-                  }),
-                ),
-              ),
-            ),
-          )
-        const events = store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
-          Stream.mapEffect((event) => decodeStartEvent(agent.output, event)),
-          Stream.takeUntil(
-            (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
-          ),
-          Stream.provideContext(registration.value.context),
-        )
-        return {
-          runId: receipt.runId,
-          await: awaitStart(events),
-          events,
-          steer,
-          followUp: steer,
-        }
-      })
+    const agentStart = makeAgentStart({ agents, store, admitStart })
     return Runtime.of({
-      register,
-      start,
+      register: agentStart.register,
+      start: agentStart.start,
       startExecution: (input) => admitStart(input, true),
       admit: (input) =>
         admitStart({ ...input, initialChildren: [], initialFanOuts: [] }, false).pipe(
@@ -618,5 +475,12 @@ export const makeRuntime = (
       awaitFanOut,
     })
   })
-export const layer = (options: LayerOptions, agents: RegisteredAgents = makeRegisteredAgents()) =>
-  Layer.effect(Runtime, makeRuntime(options, agents))
+
+export const makeRuntime = (options: LayerOptions) => makeRuntimeWith(options, makeRegisteredAgents())
+
+export const makeWith = (agents: RegisteredAgents) => (options: LayerOptions) => makeRuntimeWith(options, agents)
+
+export const layer = (options: LayerOptions) => Layer.effect(Runtime, makeRuntime(options))
+
+export const layerRegisteredAgents = (agents: RegisteredAgents) => (options: LayerOptions) =>
+  Layer.effect(Runtime, makeRuntimeWith(options, agents))
