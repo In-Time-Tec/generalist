@@ -513,10 +513,16 @@ const typedStartAgent = Agent.make({
   output: typedStartOutput,
 })
 const typedStartExecutable = pinnedTestExecutable(typedStartAgent, "typed-start-v1")
+const nullStartAgent = Agent.make({ name: "null-start", output: Schema.Null })
+const nullStartExecutable = pinnedTestExecutable(nullStartAgent, "null-start-v1")
 const typedStartResolver = ExecutableResolver.layerStatic([
   {
     executable: typedStartExecutable,
     agent: Agent.close(typedStartAgent, deterministicModel({ response: '{"output":{"answer":42}}' })),
+  },
+  {
+    executable: nullStartExecutable,
+    agent: Agent.close(nullStartAgent, deterministicModel({ response: '{"output":null}' })),
   },
 ]).pipe(Layer.orDie)
 const typedStartRuntime = Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(typedStartResolver))
@@ -544,6 +550,28 @@ layer(typedStartRuntime)("Agent.start", (it) => {
       expect(completed?._tag).toBe("RunCompleted")
       if (completed?._tag === "RunCompleted" && "output" in completed.result) {
         expect(completed.result.output).toEqual({ answer: 42 })
+      }
+    }),
+  )
+
+  it.effect("preserves a valid null durable output instead of falling back to text", () =>
+    Effect.gen(function* () {
+      const handle = yield* Agent.start(nullStartAgent, "answer", {
+        executable: nullStartExecutable,
+        registrations: registrationsFor(nullStartExecutable),
+        sessionId: "null-start-session",
+        idempotencyKey: "null-start-key",
+      })
+      const store = yield* RunStore.RunStore
+      const host = yield* RunExecutor.RunExecutor
+      const claim = yield* store.claimExecution({ runId: handle.runId, ownerId: "null-start-test" })
+      yield* host.execute(claim)
+      const events = yield* Stream.runCollect(handle.events)
+      const completed = events.find((event) => event._tag === "RunCompleted")
+
+      expect(completed?._tag).toBe("RunCompleted")
+      if (completed?._tag === "RunCompleted" && "output" in completed.result) {
+        expect(completed.result.output).toBeNull()
       }
     }),
   )

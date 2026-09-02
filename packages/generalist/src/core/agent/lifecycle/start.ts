@@ -45,7 +45,8 @@ const decodeEvent = <OutputCodec extends Schema.Top>(
 ): Effect.Effect<StartEvent<OutputCodec["Type"]>, InvalidOutput, OutputCodec["DecodingServices"]> => {
   if (event._tag !== "RunCompleted") return Effect.succeed(event)
   if (Schema.is(ProgramExecutionResult)(event.result)) return Effect.succeed({ ...event, result: event.result })
-  return Schema.decodeEffect(schema)(event.result.output ?? event.result.text).pipe(
+  const encoded = Predicate.hasProperty(event.result, "output") ? event.result.output : event.result.text
+  return Schema.decodeEffect(schema)(encoded).pipe(
     Effect.map((output) => ({ ...event, result: { ...event.result, output } })),
     Effect.mapError((error) => InvalidOutput.make({ issues: [error.message] })),
   )
