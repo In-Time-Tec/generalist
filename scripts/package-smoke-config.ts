@@ -77,7 +77,7 @@ export const minimumConsumerProfiles = [
   },
   {
     name: "sandbox",
-    peers: ["es-module-lexer"],
+    peers: ["@rivet-dev/agentos", "es-module-lexer", "modal"],
     imports: [
       {
         specifier: "generalist/sandbox",
@@ -96,6 +96,16 @@ export const minimumConsumerProfiles = [
       },
       {
         specifier: "generalist/unstable/sandbox/fly-sprites",
+        runtimes: nodeAndBun,
+        exports: ["layer", "makeProvider"],
+      },
+      {
+        specifier: "generalist/unstable/sandbox/modal",
+        runtimes: nodeAndBun,
+        exports: ["layer", "makeProvider"],
+      },
+      {
+        specifier: "generalist/unstable/sandbox/agentos",
         runtimes: nodeAndBun,
         exports: ["layer", "makeProvider"],
       },
@@ -294,10 +304,12 @@ export const exactPackageExports = [
   "./unstable/rivet",
   "./unstable/runtime/external-child-placement",
   "./unstable/runtime/external-child-store",
+  "./unstable/sandbox/agentos",
   "./unstable/sandbox/cloudflare",
   "./unstable/sandbox/daytona",
   "./unstable/sandbox/e2b",
   "./unstable/sandbox/fly-sprites",
+  "./unstable/sandbox/modal",
   "./unstable/sandbox/worker-loader",
   "./unstable/transport",
   "./unstable/transport/errors",
