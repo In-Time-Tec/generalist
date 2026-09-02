@@ -66,8 +66,13 @@ for (const [backend, runtimeLayer] of [
         expect(yield* host.runs.list(session.id)).toEqual([expect.objectContaining({ runId: run.id })])
         expect(yield* host.runs.inspect(run.id)).toMatchObject({ runId: run.id, status: "succeeded" })
 
+        expect(yield* host.events.subscribe("session:missing").pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/host/SessionNotFound",
+          sessionId: "session:missing",
+        })
+        const eventStream = yield* host.events.subscribe(session.id)
         const events = Array.from(
-          yield* host.events.subscribe(session.id).pipe(
+          yield* eventStream.pipe(
             Stream.takeUntil((event) => event._tag === "Completed"),
             Stream.runCollect,
           ),

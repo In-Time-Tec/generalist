@@ -7,7 +7,7 @@ import { Decision } from "../runtime/operation/approval.js"
 import { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
 import { RunInspection } from "../runtime/run.js"
 import { Authentication } from "./auth.js"
-import { ApiError } from "./errors.js"
+import { ApiError, apiErrors } from "./errors.js"
 import { CursorFromString } from "./wire.js"
 
 export const RunStarted = Schema.Struct({ id: Schema.String })
@@ -36,14 +36,14 @@ const sessions = HttpApiGroup.make("sessions").add(
   HttpApiEndpoint.post("create", "/sessions", {
     payload: Schema.Struct({ id: Schema.optionalKey(Schema.String), title: Schema.optionalKey(Schema.String) }),
     success: HostSession,
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.get("get", "/sessions/:id", {
     params: { id: Schema.String },
     success: HostSession,
-    error: ApiError,
+    error: apiErrors,
   }),
-  HttpApiEndpoint.get("list", "/sessions", { success: Schema.Array(HostSession), error: ApiError }),
+  HttpApiEndpoint.get("list", "/sessions", { success: Schema.Array(HostSession), error: apiErrors }),
 )
 
 const runs = HttpApiGroup.make("runs").add(
@@ -51,22 +51,22 @@ const runs = HttpApiGroup.make("runs").add(
     params: { sessionId: Schema.String },
     payload: RunStartPayload,
     success: RunStarted,
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.get("list", "/sessions/:sessionId/runs", {
     params: { sessionId: Schema.String },
     success: Schema.Array(RunInspection),
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.get("inspect", "/runs/:id", {
     params: { id: Schema.String },
     success: RunInspection,
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.post("cancel", "/runs/:id/cancel", {
     params: { id: Schema.String },
     payload: RunCancelPayload,
-    error: ApiError,
+    error: apiErrors,
   }),
 )
 
@@ -76,12 +76,12 @@ const events = HttpApiGroup.make("events").add(
     query: { cursor: Schema.optionalKey(CursorFromString) },
     headers: { "last-event-id": Schema.optionalKey(CursorFromString) },
     success: eventStream,
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.get("connect", "/sessions/:id/ws", {
     params: { id: Schema.String },
     query: { cursor: Schema.optionalKey(CursorFromString) },
-    error: ApiError,
+    error: apiErrors,
   }),
 )
 
@@ -89,7 +89,7 @@ const approvals = HttpApiGroup.make("approvals").add(
   HttpApiEndpoint.post("resolve", "/runs/:id/approvals/:token", {
     params: { id: Schema.String, token: Schema.String },
     payload: Schema.Struct({ decision: Decision, operator: Schema.String }),
-    error: ApiError,
+    error: apiErrors,
   }),
 )
 
@@ -97,27 +97,27 @@ const operator = HttpApiGroup.make("operator").add(
   HttpApiEndpoint.get("explain", "/runs/:id/explain", {
     params: { id: Schema.String },
     success: Explanation,
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.post("retry", "/runs/:id/retry", {
     params: { id: Schema.String },
     payload: Schema.Struct({ operator: Schema.String }),
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.post("wake", "/runs/:id/wake", {
     params: { id: Schema.String },
     payload: Schema.Struct({ operator: Schema.String }),
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.post("resolveUnknown", "/runs/:id/resolve-unknown", {
     params: { id: Schema.String },
     payload: Schema.Struct({ operationId: Schema.String, resolution: UnknownResolution, operator: Schema.String }),
-    error: ApiError,
+    error: apiErrors,
   }),
   HttpApiEndpoint.post("extendBudget", "/runs/:id/extend-budget", {
     params: { id: Schema.String },
     payload: Schema.Struct({ delta: BudgetLimits, operator: Schema.String }),
-    error: ApiError,
+    error: apiErrors,
   }),
 )
 

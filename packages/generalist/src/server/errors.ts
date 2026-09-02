@@ -83,8 +83,7 @@ const conflict = HttpApiSchema.status(409)
 const notFound = HttpApiSchema.status(404)
 const unavailable = HttpApiSchema.status(503)
 
-/** Errors encoded by the declared HttpApi endpoints and SSE stream. */
-export const ApiError = Schema.Union([
+export const apiErrors = [
   AgentInputInvalid.pipe(badRequest),
   AgentNotRegistered.pipe(notFound),
   ApprovalMismatch.pipe(conflict),
@@ -99,7 +98,10 @@ export const ApiError = Schema.Union([
   SessionCursorExpired.pipe(conflict),
   SessionNotFound.pipe(notFound),
   SessionSubscriberLagged.pipe(conflict),
-])
+] as const
+
+/** Errors encoded by the declared HttpApi endpoints and SSE stream. */
+export const ApiError = Schema.Union(apiErrors)
 export type ApiError = typeof ApiError.Type
 
 const dedicatedErrors = Schema.Union([

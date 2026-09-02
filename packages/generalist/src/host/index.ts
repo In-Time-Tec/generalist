@@ -132,7 +132,10 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   }
   readonly events: {
-    readonly subscribe: (sessionId: string, cursor?: Cursor) => Stream.Stream<HostEvent, SessionEventsError>
+    readonly subscribe: (
+      sessionId: string,
+      cursor?: Cursor,
+    ) => Effect.Effect<Stream.Stream<HostEvent, SessionEventsError>, SessionError>
   }
   readonly approvals: {
     readonly resolve: (
@@ -466,8 +469,14 @@ const create = <
           const input: Types.Mutable<{ readonly sessionId: string; readonly cursor?: Cursor }> = { sessionId }
           if (cursor !== undefined) input.cursor = cursor
           return runtime
-            .sessionEvents(input)
-            .pipe(Stream.filterMap(Filter.fromPredicateOption((entry) => project(sessionId, entry))))
+            .session(sessionId)
+            .pipe(
+              Effect.as(
+                runtime
+                  .sessionEvents(input)
+                  .pipe(Stream.filterMap(Filter.fromPredicateOption((entry) => project(sessionId, entry)))),
+              ),
+            )
         },
       },
       approvals: {

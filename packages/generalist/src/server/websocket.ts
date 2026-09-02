@@ -2,8 +2,8 @@ import { Cause, Effect, Fiber, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import type { Any as AnyAgent } from "../core/agent/service.js"
+import type { HostEvent } from "../host/event.js"
 import type { Host } from "../host/index.js"
-import type { Cursor } from "../runtime/cursor.js"
 import type { SessionEventsError } from "../runtime/session/host.js"
 import { decodeCommand, eventCodec } from "./wire.js"
 
@@ -37,15 +37,15 @@ const runBelongsTo = <Agents extends ReadonlyArray<AnyAgent>>(
 export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
   readonly host: Host<Agents>
   readonly sessionId: string
-  readonly cursor?: Cursor
   readonly request: HttpServerRequest.HttpServerRequest
+  readonly events: Stream.Stream<HostEvent, SessionEventsError>
 }) =>
   Effect.gen(function* () {
     const socket = yield* options.request.upgrade
     const writer = yield* socket.writer
     const close = (code: number, reason: string) => writer(new Socket.CloseEvent(code, reason))
 
-    const eventFiber = yield* options.host.events.subscribe(options.sessionId, options.cursor).pipe(
+    const eventFiber = yield* options.events.pipe(
       Stream.mapEffect((event) =>
         eventCodec.encode(event).pipe(
           Effect.flatMap(writer),

@@ -70,7 +70,7 @@ const program = Effect.gen(function* () {
   const host = yield* Generalist.create({ agents: [agent] })
   const session = yield* host.sessions.create({ id: "release-1" })
   yield* host.runs.start(session.id, agent, "Deploy api", { idempotencyKey: "deploy-api-1" })
-  const events = yield* host.events.subscribe(session.id).pipe(
+  const events = yield* (yield* host.events.subscribe(session.id)).pipe(
     Stream.takeUntil((event) => event._tag === "ApprovalRequested" || event._tag === "Completed"),
     Stream.runCollect,
   )

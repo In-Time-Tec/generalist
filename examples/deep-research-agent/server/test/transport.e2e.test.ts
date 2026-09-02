@@ -2,7 +2,7 @@ import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
+import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Server } from "generalist/server"
 
@@ -74,6 +74,12 @@ describe("deep-research-agent server e2e", () => {
           const port = yield* freePort
           yield* startServer(port)
           yield* waitForServerReady(port, 200)
+          const unknown = yield* HttpClient.get(`http://127.0.0.1:${port}/sessions/not-real/events`)
+          expect(unknown.status).toBe(404)
+          expect(yield* HttpClientResponse.schemaBodyJson(Server.ApiError)(unknown)).toMatchObject({
+            _tag: "generalist/host/SessionNotFound",
+            sessionId: "not-real",
+          })
           const client = yield* Server.client({ baseUrl: `http://127.0.0.1:${port}` })
           const session = yield* client.sessions.create({ id: "deep-research-e2e-session" })
           const run = yield* client.runs.start({

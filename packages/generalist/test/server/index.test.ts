@@ -48,6 +48,54 @@ const runScheduler = Effect.gen(function* () {
 })
 
 layer(services)("Server", (it) => {
+  it.effect("rejects unknown Session streams and Run inspection before committing a success response", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "server-not-found" })
+        const host = yield* Generalist.create({ agents: [agent] })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            host,
+            auth: Server.authBearer(Config.succeed(Redacted.make("secret"))),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        const request = (path: string) =>
+          app.handler(new Request(`http://generalist.test${path}`, { headers: { authorization: "Bearer secret" } }))
+
+        for (const path of ["/sessions/not-real/events", "/sessions/not-real/ws"]) {
+          const response = yield* Effect.promise(() => request(path))
+          expect(response.status).toBe(404)
+          expect(yield* Effect.promise(() => response.json())).toMatchObject({
+            _tag: "generalist/host/SessionNotFound",
+            sessionId: "not-real",
+          })
+        }
+
+        const response = yield* Effect.promise(() => request("/runs/not-real"))
+        expect(response.status).toBe(404)
+        expect(yield* Effect.promise(() => response.json())).toMatchObject({
+          _tag: "generalist/runtime/RunNotFound",
+          runId: "not-real",
+        })
+
+        yield* host.sessions.create({ id: "session:expired-cursor" })
+        const committed = yield* Effect.promise(() =>
+          app.handler(
+            new Request("http://generalist.test/sessions/session:expired-cursor/events", {
+              headers: { authorization: "Bearer secret", "last-event-id": "1" },
+            }),
+          ),
+        )
+        expect(committed.status).toBe(200)
+        expect(yield* Effect.promise(() => committed.text())).toContain(
+          'event: effect/httpapi/stream/failure\ndata: [{"_tag":"Fail","error":{"_tag":"generalist/host/SessionCursorExpired"',
+        )
+      }),
+    ),
+  )
+
   it.effect("serves authenticated Host operations and resumes SSE from Last-Event-ID", () =>
     Effect.scoped(
       Effect.gen(function* () {

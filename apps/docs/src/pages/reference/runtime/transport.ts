@@ -29,6 +29,15 @@ export const transportReference = definePage({
       code("client.events.connect({ sessionId, cursor? })"),
       " opens WebSocket. Both carry the same HostEvent and resume strictly after the last durable Session cursor. Last-Event-ID takes precedence over the SSE query cursor.",
     ),
+    p(
+      "Both routes resolve the Session before committing the response, so an unknown Session returns the typed ",
+      code("SessionNotFound"),
+      " body with HTTP 404 instead of opening a stream. After SSE headers are committed, a cursor, lag, or Runtime failure is sent as one terminal ",
+      code("effect/httpapi/stream/failure"),
+      " event containing the encoded ",
+      code("ApiError"),
+      "; the generated client exposes it as the stream failure.",
+    ),
     h2("commands", "Commands and inspection"),
     p(
       "The client creates and lists Sessions, starts named configured Agents, lists, inspects, and cancels Runs, resolves durable approvals, and calls the Runtime operator surface. Operator mutations return a typed 403 unless the host opts in with ",

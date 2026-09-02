@@ -22,7 +22,7 @@ const program = Effect.gen(function* () {
   const session = yield* host.sessions.create({ title: "Support inbox" })
   const run = yield* host.runs.start(session.id, triage, { ticket: "Cannot sign in" })
 
-  const events = host.events.subscribe(session.id)
+  const events = yield* host.events.subscribe(session.id)
   const answer = yield* run.await
   return { session, runId: run.id, events, answer }
 })
@@ -55,7 +55,7 @@ host.runs.cancel(runId, reason?)       -> void
 host.runs.rewind(runId, { toSequence }) -> void
 
 host.events.subscribe(sessionId, cursor?)
-  -> Stream<RunStarted | Turn | ToolCall | ApprovalRequested | Compacted | Completed>
+  -> Effect<Stream<RunStarted | Turn | ToolCall | ApprovalRequested | Compacted | Completed>, SessionError>
 
 host.approvals.resolve(runId, token, decision, operator) -> void
 
@@ -74,7 +74,7 @@ Session run lists contain root Runs only. Runtime child Runs contribute events t
 
 ## Events and cursors
 
-One durable Session cursor is assigned where Runtime appends each root-tree Run event. `subscribe(sessionId, cursor)` replays entries strictly after that exclusive cursor and then follows committed live entries without a subscribe/catch-up gap. The same typed expiry and subscriber-lag failures used by Runtime-backed streams remain visible.
+One durable Session cursor is assigned where Runtime appends each root-tree Run event. `subscribe(sessionId, cursor)` first resolves the Session or fails with `SessionNotFound`, then returns a stream that replays entries strictly after that exclusive cursor and follows committed live entries without a subscribe/catch-up gap. The same typed expiry and subscriber-lag failures used by Runtime-backed streams remain visible.
 
 The Host event union intentionally projects the product events above and retains the complete Runtime event in each wrapper's `event` field. Runtime events outside that projection are filtered, so two adjacent visible Host events can have nonadjacent cursor values. Persist the last delivered cursor rather than counting Host events.
 

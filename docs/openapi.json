@@ -30,34 +30,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -101,34 +137,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -159,34 +231,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -213,34 +321,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -1014,34 +1158,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -1797,34 +1977,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -1839,34 +2055,70 @@
         "security": [{ "bearer": [] }],
         "responses": {
           "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2185,34 +2437,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2230,34 +2518,70 @@
         "security": [{ "bearer": [] }],
         "responses": {
           "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2275,34 +2599,70 @@
         "security": [{ "bearer": [] }],
         "responses": {
           "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2495,34 +2855,70 @@
               }
             }
           },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2537,34 +2933,70 @@
         "security": [{ "bearer": [] }],
         "responses": {
           "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2592,34 +3024,70 @@
         "security": [{ "bearer": [] }],
         "responses": {
           "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2647,34 +3115,70 @@
         "security": [{ "bearer": [] }],
         "responses": {
           "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2721,34 +3225,70 @@
         "security": [{ "bearer": [] }],
         "responses": {
           "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
-          "500": {
-            "description": "Error",
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
-                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
-                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
                   ]
                 }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
               }
             }
           }
@@ -2795,6 +3335,16 @@
         "required": ["_tag", "name", "message"],
         "additionalProperties": false
       },
+      "generalist_core_RunBudgetInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/RunBudgetInvalid"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
       "generalist_host_AgentNotRegisteredEncoded": {
         "type": "object",
         "properties": {
@@ -2803,6 +3353,26 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "name"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RunNotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RunNotFound"] },
+          "runId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId"],
+        "additionalProperties": false
+      },
+      "generalist_host_SessionNotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/SessionNotFound"] },
+          "sessionId": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "sessionId"],
         "additionalProperties": false
       },
       "generalist_runtime_ApprovalMismatchEncoded": {
@@ -2827,16 +3397,6 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "runId", "approvalId"],
-        "additionalProperties": false
-      },
-      "generalist_core_RunBudgetInvalidEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/core/RunBudgetInvalid"] },
-          "message": { "type": "string" },
-          "hint": { "type": "string" }
-        },
-        "required": ["_tag", "message"],
         "additionalProperties": false
       },
       "generalist_runtime_IllegalOperatorActionEncoded": {
@@ -2904,16 +3464,6 @@
         "required": ["_tag", "runId", "decision", "action"],
         "additionalProperties": false
       },
-      "generalist_server_OperatorDisabledEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
-          "operation": { "type": "string" },
-          "hint": { "type": "string" }
-        },
-        "required": ["_tag", "operation"],
-        "additionalProperties": false
-      },
       "generalist_server_RequestFailedEncoded": {
         "type": "object",
         "properties": {
@@ -2923,26 +3473,6 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "operation", "message"],
-        "additionalProperties": false
-      },
-      "generalist_runtime_RunNotFoundEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/runtime/RunNotFound"] },
-          "runId": { "type": "string" },
-          "hint": { "type": "string" }
-        },
-        "required": ["_tag", "runId"],
-        "additionalProperties": false
-      },
-      "generalist_runtime_RuntimeUnavailableEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/runtime/RuntimeUnavailable"] },
-          "message": { "type": "string" },
-          "hint": { "type": "string" }
-        },
-        "required": ["_tag", "message"],
         "additionalProperties": false
       },
       "generalist_host_SessionConflictEncoded": {
@@ -2968,16 +3498,6 @@
         "required": ["_tag", "sessionId", "cursor", "earliestCursor", "latestCursor"],
         "additionalProperties": false
       },
-      "generalist_host_SessionNotFoundEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/host/SessionNotFound"] },
-          "sessionId": { "type": "string" },
-          "hint": { "type": "string" }
-        },
-        "required": ["_tag", "sessionId"],
-        "additionalProperties": false
-      },
       "generalist_host_SessionSubscriberLaggedEncoded": {
         "type": "object",
         "properties": {
@@ -2987,6 +3507,26 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "sessionId", "lastDeliveredCursor"],
+        "additionalProperties": false
+      },
+      "generalist_server_OperatorDisabledEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
+          "operation": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RuntimeUnavailableEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RuntimeUnavailable"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "message"],
         "additionalProperties": false
       },
       "generalist_server_UnauthorizedEncoded": {
