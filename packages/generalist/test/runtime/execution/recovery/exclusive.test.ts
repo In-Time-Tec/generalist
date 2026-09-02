@@ -11,7 +11,7 @@ import { operationRecoverySuite } from "../../operation/suites/recovery.js"
 import { tempDbPath } from "../../sql/scenario.js"
 import { toolCancellationSuite } from "../../operation/suites/tool-cancellation.js"
 import { allowAllAuthorization } from "../../../authorization.js"
-import { Testing } from "../../../../src/testing/index.js"
+import { Chaos } from "../../../../src/unstable/transport/index.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -85,7 +85,7 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
     )
     const firstEnvironment = Layer.mergeAll(allowAllAuthorization, firstModel, handlers)
     const firstLayer = Layer.merge(
-      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(Layer.merge(resolver, Testing.chaos.interruptAfter(5)))),
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(Layer.merge(resolver, Chaos.layerInterruptAfter(5)))),
       firstEnvironment,
     )
 
