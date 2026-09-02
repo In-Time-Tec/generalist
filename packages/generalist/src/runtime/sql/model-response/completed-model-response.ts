@@ -11,7 +11,7 @@ import type { CompletedSessionEntry } from "../../execution/model-response/commi
 import { handoffPayload, type HandoffSessionEntry } from "../../session/handoff.js"
 import { type EntryRow, type SessionRow, SessionStorage } from "../session/storage.js"
 
-const { encodePayload, entryPayloadEquivalence, storeError, toEntry } = SessionStorage
+const { decodeSession, encodePayload, entryPayloadEquivalence, storeError, toEntry } = SessionStorage
 
 const completedPayload = (input: CompletedSessionEntry): AppendInput => ({
   _tag: "ModelResponse",
@@ -81,7 +81,7 @@ export const appendCompletedSessionEntry = (
       SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
       FROM generalist_sessions WHERE session_id = ${input.sessionId}
     `
-    const session = sessionRows[0]
+    const session = sessionRows[0] === undefined ? undefined : decodeSession(sessionRows[0])
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
     const existingRows = yield* sql<EntryRow>`
       SELECT entry_id, parent_id, seq, tag, payload_json FROM generalist_session_entries
@@ -171,7 +171,7 @@ export const appendHandoffSessionEntry = (
       SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
       FROM generalist_sessions WHERE session_id = ${input.sessionId}
     `
-    const session = sessionRows[0]
+    const session = sessionRows[0] === undefined ? undefined : decodeSession(sessionRows[0])
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
     const existingRows = yield* sql<EntryRow>`
       SELECT entry_id, parent_id, seq, tag, payload_json FROM generalist_session_entries

@@ -10,6 +10,7 @@ import {
   decodeJson,
   decodeEvent,
   decodeQueue,
+  decodeSqlInteger,
   encodeExecutableManifest,
   encodeExecutableRef,
   encodeEvent,
@@ -242,12 +243,13 @@ export const appendEvent: {
       VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)})
     `
       yield* sql`UPDATE generalist_tree_roots SET last_position = last_position + 1 WHERE root_run_id = ${run.rootRunId}`
-      const treeRoot = (yield* sql<{ last_position: number }>`
+      const treeRoot = (yield* sql<{ last_position: number | string | bigint }>`
       SELECT last_position FROM generalist_tree_roots WHERE root_run_id = ${run.rootRunId}
     `)[0]!
+      const treePosition = decodeSqlInteger(treeRoot.last_position)
       yield* sql`
       INSERT INTO generalist_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
-      VALUES (${run.rootRunId}, ${treeRoot.last_position}, ${run.runId}, ${sequence}, ${event.eventId})
+      VALUES (${run.rootRunId}, ${treePosition}, ${run.runId}, ${sequence}, ${event.eventId})
     `
       const status = nextStatus ?? run.status
       const terminalEventId = isTerminalEvent(event) ? event.eventId : (run.terminalEventId ?? null)

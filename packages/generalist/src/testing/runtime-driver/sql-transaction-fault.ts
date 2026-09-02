@@ -41,9 +41,10 @@ export const sqlTransactionFaultConformance = <LayerError>(options: SqlTransacti
           .pipe(Effect.forkChild)
         yield* Deferred.await(inserted)
         yield* Fiber.interrupt(transaction)
-        expect(yield* sql<{ count: number }>`SELECT COUNT(*) AS count FROM generalist_transaction_fault_probe`).toEqual(
-          [{ count: 0 }],
-        )
+        const count = yield* sql<{ count: number | string | bigint }>`
+          SELECT COUNT(*) AS count FROM generalist_transaction_fault_probe
+        `
+        expect(Number(count[0]?.count)).toBe(0)
         yield* sql.withTransaction(sql`INSERT INTO generalist_transaction_fault_probe VALUES (1, 2)`)
         expect(
           yield* sql<{ value: number }>`SELECT value FROM generalist_transaction_fault_probe WHERE id = 1`,

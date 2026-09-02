@@ -1,6 +1,7 @@
 import { layer as backendLayer } from "generalist/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { SqlClient } from "effect/unstable/sql"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { RunClaims } from "generalist/runtime/sql-driver"
@@ -17,7 +18,7 @@ import { postgresAvailable, postgresDatabase, uniqueSession } from "../../databa
 const describePostgres = postgresAvailable ? describe : describe.skip
 const database = postgresDatabase("worker-wakeup")
 const source = "postgres-worker-wakeup"
-const applicationName = `generalist-runtime-worker:${source}`
+const applicationName = `generalist-runtime-worker:%:${source}`
 
 const layer = database.provision(
   backendLayer({
@@ -85,11 +86,12 @@ describePostgres("PostgreSQL RuntimeWorker wakeups", () => {
             return yield* sql<{ readonly terminated: boolean }>`
               SELECT pg_terminate_backend(pid) AS terminated
               FROM pg_stat_activity
-              WHERE application_name = ${applicationName} AND pid <> pg_backend_pid()
+              WHERE application_name LIKE ${applicationName} AND pid <> pg_backend_pid()
             `
           }),
         )
         expect(terminated.some((row) => row.terminated)).toBe(true)
+        yield* TestClock.adjust("1 second")
         expect((yield* Effect.exit(Fiber.join(listener)))._tag).toBe("Failure")
 
         yield* claims.changes.pipe(Stream.take(1), Stream.runDrain)

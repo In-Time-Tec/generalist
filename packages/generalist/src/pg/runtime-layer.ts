@@ -64,7 +64,10 @@ export function layer(
           message: "PostgreSQL maxConnections must be a positive integer",
         })
       }
-      return layerClient({ url: options.url, maxConnections })
+      return layerClient({
+        url: options.url,
+        maxConnections,
+      })
     }),
   )
   return layerWithClient(options).pipe(Layer.provide(client))

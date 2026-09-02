@@ -11,7 +11,7 @@ import { type EntryRow, type SessionRow, SessionStorage } from "./storage.js"
 import { acquireUnboundSessionWriteClaim, requireSessionWriteClaim, revokeSessionWriteClaim } from "./claim.js"
 import type { SessionWriteClaim } from "../../run/store.js"
 
-const { encodePayload, entryPayloadEquivalence, pathFromRows, requireActive, toEntry } = SessionStorage
+const { decodeSession, encodePayload, entryPayloadEquivalence, pathFromRows, requireActive, toEntry } = SessionStorage
 
 const unavailable = (message: string) => RuntimeUnavailable.make({ message })
 
@@ -89,7 +89,7 @@ export const appendTerminalToolResults = (input: {
       SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
       FROM generalist_sessions WHERE session_id = ${input.run.sessionId}
     `
-    const session = sessionRows[0]
+    const session = sessionRows[0] === undefined ? undefined : decodeSession(sessionRows[0])
     if (session === undefined) return
     const authority = yield* terminalClaim(input.run, session)
     const id = `${input.run.runId}:terminal-tool-results`
