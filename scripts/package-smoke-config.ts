@@ -42,6 +42,7 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist", runtimes: nodeAndBun, exports: ["Agent", "Session"] },
       { specifier: "generalist/approvals", runtimes: nodeAndBun },
       { specifier: "generalist/compaction", runtimes: nodeAndBun },
+      { specifier: "generalist/eval", runtimes: nodeAndBun, exports: ["score", "runSuite"] },
       { specifier: "generalist/permissions", runtimes: nodeAndBun },
       { specifier: "generalist/providers/deterministic", runtimes: nodeAndBun, exports: ["layer"] },
       { specifier: "generalist/providers/model-catalog", runtimes: nodeAndBun, exports: ["layer"] },
@@ -52,6 +53,7 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/repl", runtimes: nodeAndBun },
       { specifier: "generalist/repl/bun", runtimes: bunOnly },
       { specifier: "generalist/runtime", runtimes: nodeAndBun, exports: ["Runtime"] },
+      { specifier: "generalist/trajectory", runtimes: nodeAndBun, exports: ["fromJournal", "export"] },
       { specifier: "generalist/unstable/runtime/external-child-placement", runtimes: nodeAndBun },
       { specifier: "generalist/unstable/runtime/external-child-store", runtimes: nodeAndBun },
       { specifier: "generalist/runtime/sql-driver", runtimes: nodeAndBun },
@@ -215,6 +217,8 @@ export const workerSafePackageExports = [
   "generalist/runtime",
   "generalist/runtime/sql-driver",
   "generalist/sandbox",
+  "generalist/eval",
+  "generalist/trajectory",
 ] as const
 
 export const wildcardExportExamples = [] as const
@@ -242,6 +246,7 @@ export const exactPackageExports = [
   ".",
   "./approvals",
   "./compaction",
+  "./eval",
   "./instructions",
   "./instructions/skills",
   "./memory",
@@ -267,6 +272,7 @@ export const exactPackageExports = [
   "./sandbox",
   "./testing",
   "./testing/runtime-driver",
+  "./trajectory",
   "./unstable/a2a",
   "./unstable/ag-ui",
   "./unstable/cloudflare/durable-objects",
