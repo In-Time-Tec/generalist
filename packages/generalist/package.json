@@ -61,6 +61,10 @@
       "types": "./dist/core/turn/compaction.d.ts",
       "import": "./dist/core/turn/compaction.js"
     },
+    "./hooks": {
+      "types": "./dist/hooks/index.d.ts",
+      "import": "./dist/hooks/index.js"
+    },
     "./eval": {
       "types": "./dist/eval/index.d.ts",
       "import": "./dist/eval/index.js"

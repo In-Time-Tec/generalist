@@ -1,5 +1,5 @@
 import { Cause, Effect, Function, Layer, Option, Schema } from "effect"
-import { LanguageModel, Tool } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { type Agent, run, type RunError, type RunRequirements } from "./service.js"
 import {
   AgentError,
@@ -17,6 +17,10 @@ import { PolicyError as TurnPolicyError } from "../turn/policy.js"
 import { DriverInterpreter } from "../durable/driver/interpreter.js"
 import { Exhausted, Invalid as BudgetInvalid, type RunBudget } from "../durable/run-budget.js"
 import { RegistrationError, type Registration } from "./tool/registration.js"
+import { DriverError, DriverStateInvalid } from "../durable/service.js"
+import { childEnd as applyChildEnd, childStart as applyChildStart } from "./lifecycle/hooks.js"
+import type { HookFailed } from "../../hooks/index.js"
+import { ToolContext } from "../tools/tool-context.js"
 
 export { RegistrationError }
 
@@ -107,7 +111,9 @@ export interface AgentToolToolkit<_Name extends string, Parameters extends Schem
   readonly tools: { readonly [name: string]: AgentToolTool<Parameters, Success> }
   readonly parametersSchema: Schema.Top
   readonly successSchema: Schema.Top
-  readonly invoke: (params: ToolInput) => Effect.Effect<Success["Type"], string, R>
+  readonly invoke: (
+    params: ToolInput,
+  ) => Effect.Effect<Success["Type"], string | HookFailed | DriverError | DriverStateInvalid, R>
   readonly requirements: (value: R) => R
 }
 
@@ -213,7 +219,7 @@ const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success
   tool: AgentToolTool<Parameters, Success>,
   name: string,
   parameters: Parameters | DefaultParameters,
-  invoke: (params: ToolInput) => Effect.Effect<ToolInput, string, R>,
+  invoke: (params: ToolInput) => Effect.Effect<ToolInput, string | HookFailed | DriverError | DriverStateInvalid, R>,
 ): AgentToolToolkit<Name, Parameters, Success, R> => ({
   name,
   tool,
@@ -284,12 +290,32 @@ export const asTool: {
       params: ToolInput,
     ): Effect.Effect<
       ToolInput,
-      string,
+      string | HookFailed | DriverError | DriverStateInvalid,
       RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"] | ModelR
     > =>
       Effect.gen(function* () {
-        const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
-        const runChild = (runOptions: AgentToolRunOptions) => {
+        const authoredPrompt = yield* promptFor(options.parameters, options.toPrompt, params)
+        const parent = yield* Effect.serviceOption(ToolContext)
+        const parentContext = Option.getOrUndefined(parent)
+        const runId = parentContext?.runId ?? `local:${name}`
+        const agentName = parentContext?.agentName ?? "process-local"
+        const turn = parentContext?.turn ?? 0
+        const operation = parentContext?.toolCallId ?? `agent-tool:${name}`
+        const started = yield* applyChildStart({
+          runId,
+          agentName,
+          turn,
+          child: {
+            operation,
+            selection: agent.name,
+            prompt: Prompt.make(authoredPrompt),
+          },
+        })
+        if (started.blocked !== undefined) {
+          return yield* Effect.fail(`ChildStart hook blocked '${agent.name}': ${started.blocked}`)
+        }
+        const child = started.input.child
+        const runChild = (prompt: string, runOptions: AgentToolRunOptions) => {
           const base: Effect.Effect<
             string,
             RunError | RegistrationError,
@@ -317,24 +343,28 @@ export const asTool: {
           return handled
         }
         const interpreter = yield* Effect.serviceOption(DriverInterpreter)
+        let result: string
         if (Option.isNone(interpreter)) {
-          const result = yield* runChild({})
-          return yield* resultFor(options.success, options.fromResult, result)
-        }
-        const grant = "budget" in agent && agent.budget !== undefined ? agent.budget : {}
-        const childBudget = yield* interpreter.value
-          .reserveChild(grant)
-          .pipe(
-            Effect.mapError((error) =>
-              Schema.is(Exhausted)(error) || Schema.is(BudgetInvalid)(error)
-                ? errorMessage(error)
-                : errorMessage(error),
-            ),
+          result = yield* runChild(authoredPrompt, {})
+        } else {
+          const grant = "budget" in agent && agent.budget !== undefined ? agent.budget : {}
+          const childBudget = yield* interpreter.value.reserveChild(grant).pipe(Effect.mapError(errorMessage))
+          result = yield* runChild(authoredPrompt, { inheritedBudget: childBudget }).pipe(
+            Effect.ensuring(interpreter.value.refundChild(childBudget).pipe(Effect.orDie)),
           )
-        const result = yield* runChild({ inheritedBudget: childBudget }).pipe(
-          Effect.ensuring(interpreter.value.refundChild(childBudget).pipe(Effect.orDie)),
-        )
-        return yield* resultFor(options.success, options.fromResult, result)
+        }
+        const ended = yield* applyChildEnd({
+          runId,
+          agentName,
+          turn,
+          child,
+          result,
+        })
+        if (ended.blocked !== undefined) {
+          return yield* Effect.fail(`ChildEnd hook blocked '${agent.name}' result: ${ended.blocked}`)
+        }
+        if (!Schema.is(Schema.String)(ended.input.result)) return ended.input.result
+        return yield* resultFor(options.success, options.fromResult, ended.input.result)
       })
     const tool = Tool.make(name, {
       description: options.description,

@@ -38,6 +38,7 @@ import { type HandoffRunState, make as makeHandoffStateRef, takePendingContinuat
 import type { ObjectSchema, StructuredRunConfig } from "./loop/context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
 import type { RunInbox } from "../turn/steering-inbox.js"
+import { modelCallMiddleware, runStart as applyRunStart } from "./lifecycle/hooks.js"
 const errorMessage = String
 const { insertRecalledItems, steeringDrainedEvent } = RunSupport
 const streamInternalImpl = <
@@ -89,6 +90,7 @@ const streamInternalImpl = <
         seedSystem,
         chat,
       } = setup
+      const middlewareChain = [...chain, modelCallMiddleware(inbox.runId)]
       const appendPending = (
         _turn: number,
         pending: ReadonlyArray<PendingToolResult>,
@@ -295,6 +297,7 @@ const streamInternalImpl = <
           )
         })
       const compactionRuntime = makeCompactionRuntime({
+        runId: inbox.runId,
         activeSession,
         system,
         sessionId,
@@ -319,6 +322,7 @@ const streamInternalImpl = <
       })
       const { preparePrompt, applyCompactionResult, countTokens, syncSession } = compactionRuntime
       const toolContext = {
+        runId: inbox.runId,
         options,
         state,
         isSkillActivationCall,
@@ -340,7 +344,7 @@ const streamInternalImpl = <
         handoffStateRef === undefined
           ? makeToolExecution(toolContext)
           : makeToolExecution({ ...toolContext, handoffState: handoffStateRef })
-      const { resumeApproved, toolCallEvents } = toolRuntime
+      const { resumeApproved, toolCallEvents, transformResolved } = toolRuntime
       const modelContext = {
         agent,
         modelSource,
@@ -349,7 +353,7 @@ const streamInternalImpl = <
         telemetryIdentity,
         modelCallUsage,
         instrumentModel,
-        chain,
+        chain: middlewareChain,
         preparePrompt,
         countTokens,
         syncSession,
@@ -390,7 +394,14 @@ const streamInternalImpl = <
         options.resume === undefined && options.driverCheckpoint !== undefined && handoffStateRef !== undefined
           ? takePendingContinuation(handoffStateRef, setHandoffState).pipe(Effect.map(applyContinuation))
           : Effect.succeed(initialPrompt)
-      const runPrompt = loadRunPrompt()
+      const runPrompt = loadRunPrompt().pipe(
+        Effect.flatMap((prompt) =>
+          applyRunStart({
+            input: { runId: inbox.runId, agentName: agent.name, input: Prompt.make(prompt) },
+            turn: state.turn,
+          }),
+        ),
+      )
       return Stream.unwrap(
         runPrompt.pipe(
           Effect.map((prompt) => {
@@ -399,7 +410,7 @@ const streamInternalImpl = <
               options,
               state,
               chat,
-              chain,
+              chain: middlewareChain,
               activeSession,
               memoryRuntime,
               inbox,
@@ -424,6 +435,7 @@ const streamInternalImpl = <
               pendingResults,
               toolCallEvents,
               resumeApproved,
+              transformResolved,
               isPolicyDecision,
               steeringDrainedEvent,
               withSystem,

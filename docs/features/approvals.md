@@ -2,6 +2,8 @@
 
 Approvals is the single human-decision seam for permission asks and Effect AI tools marked `needsApproval`. Immediate adapters return `Approved` or `Denied`; the durable adapter returns the existing `Pending { token }` decision so Runtime uses its ordinary suspension and recovery path.
 
+`Hooks.onToolCall` may return `Hooks.Ask()` to force this same seam even when Permissions and the tool declaration would otherwise execute immediately. `Hooks.onApprovalRequest` runs before `Approvals.resolve`; `Block` denies without invoking the adapter. Both decisions use the Agent driver's existing checkpoint and replay path.
+
 ## Console
 
 `layerConsole()` displays the tool name, arguments, Permissions level, and reason through Effect `Terminal`, then reads one line. `y` and `yes` approve; every other answer denies. A quit or terminal failure denies rather than silently approving.

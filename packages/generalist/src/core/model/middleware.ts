@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Option } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/event.js"
+import type { HookFailed } from "../../hooks/index.js"
 /** Typed operation-level adapter for LanguageModel.Service wrappers. */
 export { adapt } from "./service.js"
 /** Turn-scoped info handed to middleware. */
@@ -12,7 +13,10 @@ export interface TurnContext {
 /** A single middleware. Both hooks are optional; omitted hooks are identity. */
 export interface Middleware {
   /** Transform the prompt for a turn before it is sent to the model. Recalled-memory messages must preserve lineage. */
-  readonly transformPrompt?: (prompt: Prompt.Prompt, context: TurnContext) => Effect.Effect<Prompt.Prompt, AgentError>
+  readonly transformPrompt?: (
+    prompt: Prompt.Prompt,
+    context: TurnContext,
+  ) => Effect.Effect<Prompt.Prompt, AgentError | HookFailed>
   /**
    * Transform or drop a model stream part before the loop processes it.
    * Return `Option.none()` to drop the part (it is not folded, not emitted, not persisted).
@@ -22,7 +26,7 @@ export interface Middleware {
   readonly transformPart?: (
     part: Response.StreamPart<Record<string, Tool.Any>>,
     context: TurnContext,
-  ) => Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError>
+  ) => Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError | HookFailed>
 }
 
 /** Service holding the middleware chain, applied in array order. */

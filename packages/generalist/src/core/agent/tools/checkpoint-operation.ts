@@ -2,7 +2,7 @@ import { Equal, Schema } from "effect"
 import type { DriverCheckpoint, OperationOutcome } from "../../durable/driver/contract.js"
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { domainFailureResult, successResult, type AnyToolCall } from "./result.js"
-import { completed, updateCall } from "./checkpoint.js"
+import { completed, effectiveCall, updateCall } from "./checkpoint.js"
 
 const PersistedToolOutcome = Schema.Union([
   Schema.TaggedStruct("Success", { result: Schema.Unknown, encodedResult: Schema.Unknown }),
@@ -24,13 +24,15 @@ export const applyToolOutcome =
     const state = Schema.decodeUnknownSync(LoopDriverState)(checkpoint.state)
     const batch = state.toolBatch
     const entry = batch?.calls[input.callIndex]
+    const expectedCall = entry === undefined ? undefined : effectiveCall(entry)
     if (
       batch === undefined ||
       entry === undefined ||
+      expectedCall === undefined ||
       entry.operationKey !== input.operationKey ||
-      entry.call.id !== input.call.id ||
-      entry.call.name !== input.call.name ||
-      !Equal.equals(entry.call.params, input.call.params)
+      expectedCall.id !== input.call.id ||
+      expectedCall.name !== input.call.name ||
+      !Equal.equals(expectedCall.params, input.call.params)
     ) {
       throw new TypeError(`Tool operation ${input.operationKey} does not match its batch checkpoint`)
     }

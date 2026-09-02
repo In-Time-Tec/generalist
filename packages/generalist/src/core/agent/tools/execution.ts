@@ -1,17 +1,18 @@
-import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream, Types } from "effect"
-import { Chat, Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Chat, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./result.js"
 import type { Agent, ClosedServices, ProgressOverflowPolicy, RunOptions } from "../service.js"
 import { RunError } from "../run/error.js"
 import type { AgentRunState } from "../run-state.js"
 import type { HandoffRunState } from "../handoff/state.js"
-import type { AuthorizationError, Authorizer, Request as AuthorizationRequest } from "../../tools/tool-authorization.js"
+import type { Authorizer } from "../../tools/tool-authorization.js"
 import {
   FrameworkFailure,
   Outcome,
   type Request,
   RemoteRetryMisconfigured,
+  type SettledOutcome,
   ToolExecutor,
   executeToolkit,
 } from "../../tools/tool-executor.js"
@@ -22,14 +23,18 @@ import { ToolContext, type Progress } from "../../tools/tool-context.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
 import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
-import { intercept, updateToolBatch } from "../../durable/driver/run.js"
+import { intercept } from "../../durable/driver/run.js"
 import { operationKey as makeOperationKey } from "../../durable/driver/interpreter.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
-import { updateCall } from "./checkpoint.js"
 import { applyToolOutcome } from "./checkpoint-operation.js"
 import { Exhausted } from "../../durable/run-budget.js"
 import { memoizeRegistered } from "../../memo/tool.js"
+import { toolResult as applyToolResult } from "../lifecycle/hooks.js"
+import type { RunId } from "../../durable/run-id.js"
+import { make as makeToolAuthorization } from "./authorization.js"
+
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
+  readonly runId: RunId
   readonly options: RunOptions
   readonly state: AgentRunState
   readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
@@ -52,6 +57,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
   inputContext: ToolExecutionContext<T, AgentR, PolicyR, AuthorizationR>,
 ) => {
   const {
+    runId,
     options,
     isSkillActivationCall,
     agent,
@@ -67,8 +73,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     progressPolicy,
     skillError,
   } = inputContext
-  const toolNames = (registry: Registry): ReadonlyArray<string> =>
-    registry.entries.map((entry) => Schema.decodeUnknownSync(Schema.String)(entry.tool.name))
   const boundOutcome = (call: AnyToolCall, outcome: Outcome): Effect.Effect<Outcome> =>
     outcome._tag === "Success"
       ? bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes ?? 50 * 1024 })
@@ -238,11 +242,46 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     })
   }
 
+  const hookBlockedOutcome = (event: "ToolCall" | "ToolResult", reason: string): Outcome => {
+    const failure = { reason: "hook-blocked", message: `${event} hook blocked the tool: ${reason}` }
+    return { _tag: "DomainFailure", failure, encodedFailure: failure }
+  }
+
+  const hookToolResult = (
+    agentName: string,
+    turn: number,
+    call: AnyToolCall,
+    outcome: Outcome,
+  ): Effect.Effect<Outcome, RunError, import("../../durable/driver/interpreter.js").DriverInterpreter> => {
+    if (outcome._tag === "Suspend") return Effect.succeed(outcome)
+    const result = outcome._tag === "Success" ? outcome.result : outcome.failure
+    return applyToolResult({
+      runId,
+      agentName,
+      turn,
+      tool: call.name,
+      args: call.params,
+      call,
+      result,
+    }).pipe(
+      Effect.map((hook) => {
+        if (hook.blocked !== undefined) return hookBlockedOutcome("ToolResult", hook.blocked)
+        const replaced = hook.decisions.some((decision) => decision._tag === "Replace")
+        if (!replaced) return outcome
+        if (outcome._tag === "Success") {
+          return { ...outcome, result: hook.input.result, encodedResult: hook.input.result }
+        }
+        return { ...outcome, failure: hook.input.result, encodedFailure: hook.input.result }
+      }),
+    )
+  }
+
   const executeApproved = (
     turn: number,
     call: AnyToolCall,
     request: Request,
     registry: Registry,
+    blockedReason?: string,
   ): Stream.Stream<
     Event,
     RunError,
@@ -263,6 +302,9 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           const contextBase = {
             signal,
             sessionId,
+            runId,
+            agentName: request.agentName,
+            turn,
             toolCallId: call.id,
             operationKey: durableOperationKey,
             idempotencyKey: durableOperationKey,
@@ -282,24 +324,28 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
           const invocationPath =
             handoffState === undefined ? [] : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-          const executionBase = memoizeRegistered({
-            registry,
-            name: call.name,
-            skillActivation,
-            handoff: handoffExecution !== undefined,
-            params: call.params,
-            run: options.invocation?.runId ?? sessionId,
-            operation: durableOperationKey,
-            execute: executionFor(
-              turn,
-              call,
-              request,
-              registry,
-              handoffExecution,
-              requestExecutor,
-              skillActivation,
-            ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome))),
-          })
+          const executionBase = (
+            blockedReason === undefined
+              ? memoizeRegistered({
+                  registry,
+                  name: call.name,
+                  skillActivation,
+                  handoff: handoffExecution !== undefined,
+                  params: call.params,
+                  run: options.invocation?.runId ?? sessionId,
+                  operation: durableOperationKey,
+                  execute: executionFor(
+                    turn,
+                    call,
+                    request,
+                    registry,
+                    handoffExecution,
+                    requestExecutor,
+                    skillActivation,
+                  ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome))),
+                })
+              : Effect.succeed(hookBlockedOutcome("ToolCall", blockedReason))
+          ).pipe(Effect.flatMap((outcome) => hookToolResult(request.agentName, turn, call, outcome)))
           const execution = intercept(
             {
               kind: "tool",
@@ -363,9 +409,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       ),
     )
 
-  const authorizationError = (turn: number, error: AuthorizationError): AgentError =>
-    AgentError.make({ message: error.message, turn, cause: error })
-
   const resumeApproved = (
     turn: number,
     toolCallBatch: Request["toolCallBatch"],
@@ -385,107 +428,70 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       ),
     )
 
-  const toolCallEvents = (
+  const transformResolved = (
     turn: number,
     toolCallBatch: Request["toolCallBatch"],
     toolCallIndex: number,
     call: AnyToolCall,
-    messages: ReadonlyArray<Prompt.Message>,
-    registry: Registry,
-  ): Stream.Stream<
-    Event,
+    result: PendingToolResult,
+  ): Effect.Effect<
+    PendingToolResult,
     RunError,
-    ClosedServices<T, never> | AuthorizationR | import("../../durable/driver/interpreter.js").DriverInterpreter
-  > => {
-    const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: "", sessionId }
-    const candidate = get(registry, call.name)
-    if (candidate === undefined)
-      return Stream.fail(
-        FrameworkFailure.make({
-          stage: "authorization",
-          tool: call.name,
-          message: `Tool ${call.name} is not active for turn ${turn}`,
-        }),
-      )
-    const activeTools = toolNames(registry)
-    return Stream.unwrap(
-      Effect.gen(function* () {
-        const agentName = yield* activeAgentName()
-        const resolvedRequest = { ...request, agentName }
-        const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
-        const approvalEvents = yield* Queue.bounded<Event, Cause.Done>(1)
-        const authorizationRequest: Types.Mutable<AuthorizationRequest> = {
-          call,
-          agentName,
-          turn,
-          sessionId,
-          tool: candidate.tool,
-          active: true,
-          activeTools,
-          activatedSkills,
-          messages,
-          onApprovalRequired: (approval) =>
-            Queue.offer(approvalEvents, { _tag: "ApprovalRequested", turn, call, request: approval }).pipe(
-              Effect.asVoid,
-            ),
-        }
-        if (options.invocation?.runId !== undefined) authorizationRequest.runId = options.invocation.runId
-        const authorization = authorizer.authorize(authorizationRequest).pipe(
-          Effect.mapError((error) => authorizationError(turn, error)),
-          Effect.ensuring(Queue.end(approvalEvents).pipe(Effect.asVoid)),
-        )
-        const fiber = yield* Effect.forkScoped(authorization, { startImmediately: true })
-        return Stream.concat(
-          Stream.fromQueue(approvalEvents),
-          Stream.fromEffect(Fiber.join(fiber)).pipe(
-            Stream.flatMap((decision) => {
-              switch (decision._tag) {
-                case "Execute":
-                  return Stream.unwrap(
-                    updateToolBatch((checkpoint) =>
-                      updateCall(checkpoint, {
-                        callIndex: toolCallIndex,
-                        state: { _tag: "Ready", stage: "execution" },
-                      }),
-                    ).pipe(Effect.map(() => executeApproved(turn, call, resolvedRequest, registry))),
-                  )
-                case "Deny":
-                  return Stream.fail(
-                    FrameworkFailure.make({
-                      stage: "authorization",
-                      tool: call.name,
-                      message: decision.error.message,
-                    }),
-                  )
-                case "Suspend":
-                  return Stream.fromEffect(
-                    Effect.gen(function* () {
-                      const invocationPath =
-                        handoffState === undefined
-                          ? []
-                          : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-                      yield* updateToolBatch((checkpoint) =>
-                        updateCall(checkpoint, {
-                          callIndex: toolCallIndex,
-                          state: {
-                            _tag: "Waiting",
-                            reason: "approval",
-                            waitId: decision.token,
-                            token: decision.token,
-                          },
-                          activatedSkills,
-                          invocationPath,
-                        }),
-                      )
-                    }),
-                  ).pipe(Stream.drain)
-              }
-            }),
-          ),
-        )
-      }),
-    )
-  }
+    ClosedServices<T, never> | import("../../durable/driver/interpreter.js").DriverInterpreter
+  > =>
+    Effect.gen(function* () {
+      const agentName = yield* activeAgentName()
+      const request = { call, toolCallBatch, turn, toolCallIndex, agentName, sessionId }
+      const outcome: SettledOutcome = result.isFailure
+        ? { _tag: "DomainFailure", failure: result.result, encodedFailure: result.encodedResult }
+        : { _tag: "Success", result: result.result, encodedResult: result.encodedResult }
+      const transform = Option.isSome(executor) ? executor.value.transformResolved : undefined
+      const transformed =
+        transform !== undefined
+          ? yield* Effect.scoped(
+              Effect.gen(function* () {
+                const signal = yield* Effect.abortSignal
+                const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+                const operationKey = makeOperationKey(logicalId, "tool", turn, call.id, call.name)
+                const context = ToolContext.of({
+                  signal,
+                  sessionId,
+                  runId,
+                  agentName,
+                  turn,
+                  toolCallId: call.id,
+                  operationKey,
+                  idempotencyKey: operationKey,
+                  ...options.invocation,
+                  emit: () => Effect.succeed(true),
+                })
+                return yield* transform(request, outcome).pipe(Effect.provideService(ToolContext, context))
+              }),
+            ).pipe(
+              Effect.mapError((error) =>
+                Schema.is(RemoteRetryMisconfigured)(error)
+                  ? AgentError.make({ message: error.message, turn, cause: error })
+                  : error,
+              ),
+            )
+          : outcome
+      const hooked = yield* hookToolResult(agentName, turn, call, transformed)
+      if (hooked._tag === "Suspend") {
+        return yield* AgentError.make({ message: `Resolved tool ${call.name} suspended again`, turn })
+      }
+      return hooked._tag === "Success" ? successResult(call, hooked) : domainFailureResult(call, hooked)
+    })
+
+  const toolCallEvents = makeToolAuthorization({
+    runId,
+    sessionId,
+    invocationRunId: options.invocation?.runId,
+    authorizer,
+    toolState,
+    handoffState,
+    activeAgentName,
+    executeApproved,
+  })
   return {
     boundOutcome,
     outcomeEvent,
@@ -493,8 +499,8 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     makeProgressQueue,
     executeApproved,
     activateSkillOutcome,
-    authorizationError,
     resumeApproved,
+    transformResolved,
     toolCallEvents,
   }
 }

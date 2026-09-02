@@ -26,11 +26,13 @@ import { ProjectionInvalid } from "../../policy/handoff-projection.js"
 import { Rejected } from "../../policy/handoff-rejected.js"
 import { PolicyError } from "../../turn/policy.js"
 import { PolicyInvalid } from "../../turn/steering.js"
+import { HookFailed } from "../../../hooks/index.js"
 
 /** The error channel and durable codec of `Agent.run` and `Agent.stream`. */
 export const RunError = Schema.Union([
   SinkFailed,
   InvocationLifecycleFailed,
+  HookFailed,
   AgentError,
   InvalidOutput,
   AgentSuspended,

@@ -11,6 +11,7 @@ import {
 } from "../../../core/agent/event.js"
 import { Exhausted } from "../../../core/durable/run-budget.js"
 import { AgentExecutionFailure } from "../../errors.js"
+import { HookFailed } from "../../../hooks/index.js"
 
 const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; readonly tool_call_id: string }>): string =>
   pending.length === 0
@@ -24,6 +25,7 @@ const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; reado
  */
 const SummaryFailure = Schema.Union([
   Exhausted,
+  HookFailed,
   ResumeMismatch,
   TurnLimitExceeded,
   PolicyStopped,
@@ -36,6 +38,9 @@ const SummaryFailure = Schema.Union([
 type SummaryFailure = typeof SummaryFailure.Type
 
 const summary = (failure: SummaryFailure): string | undefined => {
+  if (Schema.is(HookFailed)(failure)) {
+    return `${failure.event} hook failed: ${failure.hint}`
+  }
   if (Schema.is(Exhausted)(failure)) {
     const remaining = failure.remaining === undefined ? "unavailable" : failure.remaining
     return `Run budget exhausted for ${failure.budget}: requested ${failure.requested}, remaining ${remaining}`

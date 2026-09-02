@@ -13,6 +13,8 @@ export interface Service {
   readonly emit: (progress: Progress) => Effect.Effect<boolean>
   readonly sessionId: string
   readonly runId?: string
+  readonly agentName?: string
+  readonly turn?: number
   readonly rootRunId?: string
   readonly toolCallId?: string
   readonly operationKey?: string

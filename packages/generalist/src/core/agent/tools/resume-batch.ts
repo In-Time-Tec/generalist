@@ -11,6 +11,7 @@ import type { Registry } from "../../tools/tool-registry.js"
 import type { Request } from "../../tools/tool-executor.js"
 import {
   completed,
+  effectiveCall,
   pendingResult,
   resolutionFor,
   updateCall,
@@ -50,18 +51,26 @@ export const resumeBatch = <R, R2>(input: {
     call: AnyToolCall,
     registry: Registry,
   ) => Stream.Stream<Event, RunError, R>
+  readonly transformResolved: (
+    turn: number,
+    batch: Request["toolCallBatch"],
+    index: number,
+    call: AnyToolCall,
+    result: import("./result.js").PendingToolResult,
+  ) => Effect.Effect<import("./result.js").PendingToolResult, RunError, R>
   readonly onCheckpoint: (checkpoint: ToolBatchCheckpoint) => Effect.Effect<void, RunError, R2>
 }): Stream.Stream<Event, RunError, R | R2 | DriverInterpreter> => {
   const turn = input.checkpoint.turn
-  const calls = input.checkpoint.calls.map((entry) =>
-    Response.makePart("tool-call", {
-      id: entry.call.id,
-      name: entry.call.name,
-      params: entry.call.params,
-      providerExecuted: entry.call.providerExecuted,
-      metadata: entry.call.metadata,
-    }),
-  )
+  const calls = input.checkpoint.calls.map((entry) => {
+    const call = effectiveCall(entry)
+    return Response.makePart("tool-call", {
+      id: call.id,
+      name: call.name,
+      params: call.params,
+      providerExecuted: call.providerExecuted,
+      metadata: call.metadata,
+    })
+  })
   const toolCallBatch: Request["toolCallBatch"] = { calls }
   const executions: ReadonlyArray<ResumedExecution> = input.checkpoint.calls.flatMap((entry, toolCallIndex) => {
     const call = calls[toolCallIndex]
@@ -97,7 +106,13 @@ export const resumeBatch = <R, R2>(input: {
       }
       return Stream.fromEffect(
         Effect.gen(function* () {
-          const result = resolvedToolResult(call, resolution)
+          const result = yield* input.transformResolved(
+            turn,
+            toolCallBatch,
+            toolCallIndex,
+            call,
+            resolvedToolResult(call, resolution),
+          )
           yield* updateToolBatch((current) => completed(current, toolCallIndex, result))
           return { _tag: "ToolExecutionCompleted" as const, turn, call, result }
         }),

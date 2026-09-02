@@ -3,6 +3,7 @@ import { DriverOperationKind, ReplayPolicy } from "./driver/contract.js"
 import { ControlState } from "../agent/handoff/state.js"
 import { Exhausted } from "./run-budget.js"
 import { ToolBatchCheckpoint } from "../agent/tools/checkpoint.js"
+import { Checkpoint as HookCheckpoint } from "../../hooks/index.js"
 
 /** Pending operation the interpreter schedules before decide. */
 export const PendingOperation = Schema.Struct({
@@ -22,6 +23,7 @@ export const LoopDriverState = Schema.Struct({
   handoff: Schema.optionalKey(ControlState),
   pending: Schema.optionalKey(PendingOperation),
   toolBatch: Schema.optionalKey(ToolBatchCheckpoint),
+  hooks: Schema.optionalKey(Schema.Array(HookCheckpoint)),
   postCommitFailure: Schema.optionalKey(Exhausted),
   terminal: Schema.optionalKey(
     Schema.Struct({

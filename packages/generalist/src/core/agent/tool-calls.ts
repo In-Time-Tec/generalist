@@ -306,6 +306,7 @@ const streamToolCallsImpl = <Tools extends Record<string, Tool.Any>, R, P, A>(
         providerOutput: providerOutputState(),
       }
       const toolRuntime = makeToolExecution({
+        runId: options.invocation?.runId ?? options.logicalOperationId ?? options.sessionId ?? agent.name,
         options,
         state,
         isSkillActivationCall: () => false,
@@ -346,6 +347,7 @@ const streamToolCallsImpl = <Tools extends Record<string, Tool.Any>, R, P, A>(
               emitCompleted: true,
               toolCallEvents: toolRuntime.toolCallEvents,
               resumeApproved: toolRuntime.resumeApproved,
+              transformResolved: toolRuntime.transformResolved,
               onCheckpoint: () => Effect.void,
             })
       return withInterpreter(

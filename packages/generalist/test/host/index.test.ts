@@ -1,7 +1,7 @@
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Instructions, Permissions } from "generalist"
+import { Agent, Approvals, Hooks, Instructions, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
 import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
 import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
@@ -150,6 +150,7 @@ layer(Layer.mergeAll(memoryRuntime, model, authorization, handlers))("host plugi
         name: "echo-plugin",
         tools: [pluginTool],
         instructions: [Instructions.fromText("echo-plugin", "Plugin guidance")],
+        hooks: [Hooks.onRunEnd(() => Effect.succeed(Hooks.Replace("plugin hook complete")))],
         skills: [
           {
             name: "plugin-skill",
@@ -165,7 +166,7 @@ layer(Layer.mergeAll(memoryRuntime, model, authorization, handlers))("host plugi
       const run = yield* host.runs.start(session.id, agent, "use the plugin")
       yield* completeRun
 
-      expect(yield* run.await).toBe("plugin complete")
+      expect(yield* run.await).toBe("plugin hook complete")
       expect(handled).toBe(true)
       expect(advertisedTools).toContain("plugin_echo")
       expect(system).toContain("Plugin guidance")

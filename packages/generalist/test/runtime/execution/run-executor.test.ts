@@ -9,6 +9,7 @@ import {
   AgentProgram,
   Compaction,
   ExecutableManifest,
+  Hooks,
   Pins,
   ProgramHandlers,
   ProgramCapabilities,
@@ -1356,6 +1357,7 @@ describe("RunExecutor", () => {
     const address = Address.make("agent:hosted-child-group")
     const advertisedTools: Array<ReadonlyArray<string>> = []
     const prompts: Array<string> = []
+    const childLifecycle: Array<string> = []
     let modelCalls = 0
     const model = Layer.effect(
       LanguageModel.LanguageModel,
@@ -1394,8 +1396,22 @@ describe("RunExecutor", () => {
         },
       }),
     )
+    const hooks = Hooks.layer([
+      Hooks.onChildStart(({ child }) =>
+        Effect.sync(() => {
+          childLifecycle.push(`start:${child.operation}`)
+          return Hooks.Continue()
+        }),
+      ),
+      Hooks.onChildEnd(({ child }) =>
+        Effect.sync(() => {
+          childLifecycle.push(`end:${child.operation}`)
+          return Hooks.Continue()
+        }),
+      ),
+    ])
     const resolverLayer = ExecutableResolver.layerStatic([
-      { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)) },
+      { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model, hooks)) },
     ]).pipe(Layer.orDie)
     const layerSqlite = () =>
       SqliteRuntime.layerSqlite({
@@ -1476,6 +1492,12 @@ describe("RunExecutor", () => {
       expect(prompts[1]).toContain("first child complete")
       expect(prompts[1]).toContain("second child failed")
       expect(modelCalls).toBe(2)
+      expect(childLifecycle).toEqual([
+        expect.stringMatching(/^start:fanout_.+:research$/),
+        expect.stringMatching(/^start:fanout_.+:analysis$/),
+        expect.stringMatching(/^end:fanout_.+:research$/),
+        expect.stringMatching(/^end:fanout_.+:analysis$/),
+      ])
     })
   })
 

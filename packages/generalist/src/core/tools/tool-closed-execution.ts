@@ -10,6 +10,8 @@ import {
   type SchemaTool,
   type ToolSchemaServices,
 } from "./tool-result-codec.js"
+import { HookFailed } from "../../hooks/index.js"
+import { DriverError, DriverStateInvalid } from "../durable/service.js"
 
 type AgentToolSchemaServices<Parameters extends Schema.Top, Success extends Schema.Top> =
   | Parameters["DecodingServices"]
@@ -72,7 +74,11 @@ export const executeWithClosedToolkit: {
     SuccessSchema extends Schema.Top = Schema.Top,
   >(
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-  ) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
+  ) => Effect.Effect<
+    Outcome,
+    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
+  >
   <
     R,
     Name extends string = string,
@@ -81,7 +87,11 @@ export const executeWithClosedToolkit: {
   >(
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
     request: Request,
-  ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>>
+  ): Effect.Effect<
+    Outcome,
+    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
+  >
 } = Function.dual(
   2,
   <
@@ -92,15 +102,30 @@ export const executeWithClosedToolkit: {
   >(
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
     request: Request,
-  ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>> => {
-    const executed = executeWithClosedSet(
-      {
-        tools: toolkit.tools,
-        invoke: (name, params) =>
-          name === toolkit.name ? toolkit.invoke(params) : Effect.fail(`Unknown tool ${name}`),
-      },
-      request,
+  ): Effect.Effect<
+    Outcome,
+    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
+  > => {
+    if (request.call.name !== toolkit.name) {
+      return Effect.fail(
+        toolResultCodec.frameworkFailure(
+          "missing-handler",
+          request.call.name,
+          `Tool ${request.call.name} is not registered`,
+        ),
+      )
+    }
+    const handleFailure = (error: typeof Schema.Unknown.Type) => {
+      if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
+      return toolResultCodec.encodeDomainCandidate(toolkit.tool, error)
+    }
+    const isHookFailure = (error: typeof Schema.Unknown.Type): error is HookFailed | DriverError | DriverStateInvalid =>
+      Schema.is(HookFailed)(error) || Schema.is(DriverError)(error) || Schema.is(DriverStateInvalid)(error)
+    return toolResultCodec.decodeInput(toolkit.tool, request.call.params).pipe(
+      Effect.flatMap(toolkit.invoke),
+      Effect.flatMap((result) => toolResultCodec.decodeSuccess(toolkit.tool, result)),
+      Effect.catchIf((error) => !isHookFailure(error), handleFailure, handleFailure),
     )
-    return executed
   },
 )

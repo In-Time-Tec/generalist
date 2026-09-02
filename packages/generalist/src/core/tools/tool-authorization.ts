@@ -51,18 +51,19 @@ export interface Suspend {
 export type ToolAuthorization = Execute | Deny | Suspend
 
 /** Input to the final tool authorization boundary. */
-export interface Request extends AccessRequest {
+export interface Request<E = never> extends AccessRequest {
   readonly tool: Tool.Any | undefined
   readonly active: boolean
   readonly activeTools: ReadonlyArray<string>
   readonly activatedSkills: ReadonlyArray<string>
   readonly messages: ReadonlyArray<Prompt.Message>
-  readonly onApprovalRequired: (request: ApprovalRequest) => Effect.Effect<void>
+  readonly forceApproval?: boolean
+  readonly onApprovalRequired: (request: ApprovalRequest) => Effect.Effect<void | string, E>
 }
 
 /** Final tool authorization boundary. */
 export interface Authorizer<R = never> {
-  readonly authorize: (request: Request) => Effect.Effect<ToolAuthorization, AuthorizationError, R>
+  readonly authorize: <E>(request: Request<E>) => Effect.Effect<ToolAuthorization, AuthorizationError | E, R>
 }
 
 /** Optional exact tool authorizer service for run-layer composition. */
@@ -87,7 +88,7 @@ const authorizationError = (error: RuleStoreError): AuthorizationError =>
     cause: error,
   })
 
-const approvalRequired = (request: Request): Effect.Effect<boolean> => {
+const approvalRequired = (request: Request<unknown>): Effect.Effect<boolean> => {
   const needsApproval = request.tool?.needsApproval
   if (needsApproval === undefined) return Effect.succeed(false)
   if (Schema.is(Schema.Boolean)(needsApproval)) return Effect.succeed(needsApproval)
@@ -100,7 +101,7 @@ const approvalRequired = (request: Request): Effect.Effect<boolean> => {
   }).pipe(Effect.catchCause((cause) => (Cause.hasInterrupts(cause) ? Effect.interrupt : Effect.succeed(true))))
 }
 
-const suspend = (request: Request, token: string): Suspend => ({
+const suspend = (request: Request<unknown>, token: string): Suspend => ({
   _tag: "Suspend",
   token,
 })
@@ -109,7 +110,7 @@ const durableToken = (runId: string, token: string): string => `runtime-approval
 
 type ApprovalDecision = Exclude<Decision, { readonly _tag: "Deny" }>
 
-const pendingFor = (request: Request, decision: ApprovalDecision): PendingApproval => {
+const pendingFor = (request: Request<unknown>, decision: ApprovalDecision): PendingApproval => {
   const baseToken = decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`
   const token = request.runId === undefined ? baseToken : durableToken(request.runId, baseToken)
   const reason =
@@ -130,7 +131,7 @@ const pendingFor = (request: Request, decision: ApprovalDecision): PendingApprov
 
 const applyResolution = (
   options: Options,
-  request: Request,
+  request: Request<unknown>,
   pending: PendingApproval,
   resolution: import("../policy/approvals.js").Resolution,
 ): Effect.Effect<ToolAuthorization, AuthorizationError> =>
@@ -158,15 +159,16 @@ export const make = (options: Options): Authorizer => ({
         Effect.mapError(authorizationError),
       )
       if (decision._tag === "Deny") return deny(decision.reason ?? "Permission denied")
-      const required = decision._tag === "Ask" || (yield* approvalRequired(request))
+      const required = request.forceApproval === true || decision._tag === "Ask" || (yield* approvalRequired(request))
       if (!required) return { _tag: "Execute" }
       const pending = pendingFor(request, decision)
-      yield* request.onApprovalRequired({
+      const blocked = yield* request.onApprovalRequired({
         approvalId: pending.token,
         operation: request.call.id,
         capability: request.call.name,
         input: request.call.params,
       })
+      if (blocked !== undefined) return deny(blocked)
       const resolution = yield* options.approvals.resolve(pending)
       return yield* applyResolution(options, request, pending, resolution)
     }),

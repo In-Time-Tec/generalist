@@ -75,6 +75,7 @@ transformPart(tool-call)
 - `transformPart` runs on every provider stream part before folding, emission, or persistence.
 - Both hooks receive `{ agentName, turn }` as `ModelMiddleware.TurnContext`.
 - Middleware runs in array order; each hook sees the preceding hook's result.
+- `Hooks.onModelCall` is appended after the configured middleware chain and sees its transformed prompt; response-part transforms remain middleware-only.
 - The first dropped part short-circuits the rest of the chain and enters no model event, committed response, or transcript.
 - Tool-call parts may be transformed but cannot be dropped or changed into another part type.
 - Every transformed tool call is decoded and its parameters validated against the selected tool before execution.
