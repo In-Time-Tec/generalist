@@ -49,7 +49,9 @@ export const transportReference = definePage({
       " accepts Attach and explicit Cancel only. Closing an observer never cancels its Run.",
     ),
     p(
-      "Runtime owns subscriber capacity and lag failures. The WebSocket client reconnects from the last delivered semantic or lifecycle RunEvent sequence; a lag close carries that sequence so replay resumes without transport-owned state. Disposable ",
+      "Runtime owns subscriber capacity and lag failures. SSE and WebSocket clients reconnect from the last delivered semantic or lifecycle RunEvent sequence with a shared jittered exponential schedule bounded to two elapsed minutes; callers can supply another schedule through ",
+      code("reconnect"),
+      ". A lag close carries the sequence so replay resumes without transport-owned state. Disposable ",
       code("Runtime.previews"),
       " are process-local observers and are not part of SSE, WebSocket, cursors, snapshots, or replay.",
     ),

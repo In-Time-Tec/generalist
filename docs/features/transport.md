@@ -75,7 +75,7 @@ WebSocket lag close    -> code 4000, reason "lagged:23"
 SSE id 24 + sequence 25 -> protocol/InvalidCursor failure
 ```
 
-The reconnecting WebSocket `RunClient` keeps a bounded event queue, records the last decoded event sequence, and sends `{ _tag: "Attach", runId: "run-1", cursor: 7 }` on reconnect. Its default policy retries socket failures with bounded exponential backoff; exhaustion completes `connection.exhausted` with `ReconnectExhausted` and fails the event stream.
+`RunClient.streamSSE` and the reconnecting WebSocket client both resume from the last admitted event sequence, so the exclusive replay cursor neither duplicates nor skips events. The WebSocket client keeps a bounded event queue and sends `{ _tag: "Attach", runId: "run-1", cursor: 7 }` on reconnect. Their shared default socket schedule starts at 250 ms, doubles with ±20% jitter, and stops after two elapsed minutes; callers can replace it with `reconnect`. WebSocket exhaustion completes `connection.exhausted` with `ReconnectExhausted` and fails the event stream.
 
 ## Invariants
 

@@ -15,13 +15,15 @@ export const compaction = definePage({
       code("Compaction"),
       " layer is present, the loop consults it before model turns and once more after a context-overflow failure. The default strategy works in two stages: first it microcompacts oversized tool outputs, and only if that is not enough does it summarize older history into a checkpoint while keeping a recent suffix verbatim.",
     ),
-    h2("provide-the-layer", "1. Provide the layer and declare the window"),
+    h2("provide-the-layer", "1. Provide the layer"),
     p(
       "Wire ",
       code("Compaction.layer"),
-      " with your thresholds and tell the run its window via ",
+      " with your thresholds. Generalist resolves the active model's window from ",
+      code("ModelCatalog"),
+      "; set ",
       code("RunOptions.compaction.contextWindow"),
-      ". Set ",
+      " only to override it. Set ",
       code("toolOutputMaxBytes"),
       " so stage one has a bound to enforce:",
     ),
@@ -29,7 +31,11 @@ export const compaction = definePage({
     table(
       ["Option", "Default", "Meaning"],
       [
-        [[code("contextWindow")], ["unbounded"], ["Model context size the strategy compacts against"]],
+        [
+          [code("contextWindow")],
+          ["active model catalog; 32,768 when unknown"],
+          ["Model context size the strategy compacts against"],
+        ],
         [[code("reserveTokens")], [code("16_384")], ["Headroom kept free for the next model response"]],
         [[code("keepRecentTokens")], [code("20_000")], ["Recent history kept verbatim past the summary cut"]],
         [[code("summaryModel")], ["the run's model"], ["Dedicated model layer for summary calls"]],

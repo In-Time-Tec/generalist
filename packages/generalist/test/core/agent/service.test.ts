@@ -15,7 +15,7 @@ import {
   Stream,
   Tracer,
 } from "effect"
-import { AiError, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, LanguageModel, Model, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
@@ -45,6 +45,7 @@ import { ItLayer } from "../it-layer"
 import { estimatePromptTokens } from "../../../src/core/turn/prompt-token-estimate"
 import { withProviderFinish, withProviderFinishContent } from "../provider-finish"
 import { layerModel as deterministicModel } from "../../../src/ai/provider/deterministic"
+import { layerTest as modelCatalogLayerTest } from "../../../src/ai/model-catalog"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index"
 import { registrationsFor } from "../../runtime/execution/fixtures"
 import { pinnedTestExecutable } from "../../runtime/run/identity"
@@ -3652,6 +3653,58 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(prompt).toContain("compacted prompt")
         expect(prompt).not.toContain("original prompt")
         expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "uses each ambient model's catalog context window without run configuration", () => {
+    const contextWindows: Array<number> = []
+    const prompts = new Map<string, string>()
+    const catalog = modelCatalogLayerTest([
+      { provider: "test", model: "small", contextWindow: 1, maxOutput: 1_000 },
+      { provider: "test", model: "large", contextWindow: 200_000, maxOutput: 1_000 },
+    ])
+    const model = (name: string) =>
+      Layer.mergeAll(
+        modelLayer((options) => {
+          prompts.set(name, Json.stringify(options.prompt.content))
+          return Stream.make(textDelta("done"))
+        }),
+        Layer.succeed(Model.ProviderName, "test"),
+        Layer.succeed(Model.ModelName, name),
+      )
+    return [
+      Layer.mergeAll(
+        catalog,
+        Compaction.layerTest({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              contextWindows.push(request.usage.contextWindow)
+              return request.usage.contextTokens > request.usage.contextWindow * 0.8
+                ? Option.some({
+                    _tag: "Microcompact",
+                    history: Prompt.empty,
+                    prompt: Prompt.make("catalog compacted"),
+                  })
+                : Option.none()
+            }),
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "catalog-context-window-agent" })
+
+        yield* Stream.runDrain(Agent.stream(agent, "small model").pipe(Stream.provide(model("small"))))
+        yield* Stream.runDrain(Agent.stream(agent, "large model").pipe(Stream.provide(model("large"))))
+        yield* Stream.runDrain(Agent.stream(agent, "unlisted model").pipe(Stream.provide(model("unlisted"))))
+
+        expect(contextWindows).toEqual([1, 200_000, 32_768])
+        expect(prompts.get("small")).toContain("catalog compacted")
+        expect(prompts.get("large")).toContain("large model")
+        expect(prompts.get("large")).not.toContain("catalog compacted")
+        expect(prompts.get("unlisted")).toContain("unlisted model")
       }),
     ] as const
   })

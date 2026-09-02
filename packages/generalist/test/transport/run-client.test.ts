@@ -83,10 +83,10 @@ describe("RunClient", () => {
     }),
   )
 
-  it.effect("SSE resumes after the last event without duplicates", () => {
+  {
     const cursors: Array<number | undefined> = []
-    const events = [event(0), event(1), event(2)]
-    const frames = events.map(
+    const sourceEvents = [event(0), event(1), event(2)]
+    const frames = sourceEvents.map(
       (item) => `id: ${item.sequence}\ndata: ${Effect.runSync(Wire.producerCodec.encode(item))}\n\n`,
     )
     const client = HttpClient.make((request, url) =>
@@ -96,21 +96,25 @@ describe("RunClient", () => {
         cursors.push(cursor)
         return HttpClientResponse.fromWeb(
           request,
-          new Response(frames.filter((_, index) => events[index]!.sequence > (cursor ?? -1)).join(""), {
+          new Response(frames.filter((_, index) => sourceEvents[index]!.sequence > (cursor ?? -1)).join(""), {
             headers: { "content-type": "text/event-stream" },
           }),
         )
       }),
     )
-    return RunClient.streamSSE({ url: "https://test/runs/run-1/events", reconnect: Schedule.recurs(1) }).pipe(
-      Stream.runCollect,
-      Effect.map((events) => {
-        expect(events.map((item) => item.sequence)).toEqual([0, 1, 2])
-        expect(cursors).toEqual([undefined, 1])
-      }),
-      Effect.provide(Layer.merge(Layer.succeed(HttpClient.HttpClient, client), Testing.chaos.dropConnection(2))),
-    )
-  })
+    const testLayer = Layer.merge(Layer.succeed(HttpClient.HttpClient, client), Testing.chaos.dropConnection(2))
+    layer(testLayer, { excludeTestServices: true })("SSE reconnect", (suite) => {
+      suite.effect("resumes after the last event without duplicates", () =>
+        RunClient.streamSSE({ url: "https://test/runs/run-1/events", reconnect: Schedule.recurs(1) }).pipe(
+          Stream.runCollect,
+          Effect.map((events) => {
+            expect(events.map((item) => item.sequence)).toEqual([0, 1, 2])
+            expect(cursors).toEqual([undefined, 1])
+          }),
+        ),
+      )
+    })
+  }
 
   {
     const sockets: Array<FakeWebSocket> = []

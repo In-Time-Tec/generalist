@@ -65,7 +65,7 @@ Amazon Bedrock is Node-only and accepts foundation-model IDs, inference-profile 
   modalities: ["text", "image"] }
 ```
 
-`bundled` is a hand-maintained six-model snapshot. `layer(overrides)` replaces matching provider/model entries while preserving order; `layerTest(entries)` uses exactly its input. `find` returns `undefined`; `get` fails with typed `NotFound`; `list` returns all entries.
+`bundled` is a hand-maintained six-model snapshot. `layer(overrides)` replaces matching provider/model entries while preserving order; `layerTest(entries)` uses exactly its input. `find` returns `undefined`; `get` fails with typed `NotFound`; `contextWindow` returns `Option<number>`; `list` returns all entries. Without a provided catalog Layer, `contextWindow` consults `bundled` so model-aware defaults add no service requirement. A known but unlisted model returns `None` and logs one warning per catalog Layer; compaction then uses the documented conservative 32,768-token window. A custom bare `LanguageModel` with no provider/model identity preserves the Compaction Layer's own fallback.
 
 ## Model routes
 
