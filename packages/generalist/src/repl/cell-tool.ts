@@ -12,7 +12,7 @@ import {
 } from "../core/tools/tool-executor.js"
 import type { Route } from "../core/tools/tool-placement.js"
 import { CellEvent, CellFailure, CellResult, KernelProtocolViolation, KernelUnavailable } from "./cell.js"
-import { ExecutionFailed, LimitExceeded, type SandboxError, SandboxProvider } from "../sandbox/index.js"
+import { ExecutionFailed, LimitExceeded, type SandboxError, SandboxProvider } from "../sandbox/service.js"
 
 /** @experimental The only name a Generalist REPL host advertises to a model. */
 export const name = "typescript"
