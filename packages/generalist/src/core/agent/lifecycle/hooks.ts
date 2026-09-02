@@ -6,6 +6,7 @@ import {
   Decision,
   HookFailed,
   Hooks,
+  type Checkpoint as HookCheckpoint,
   type Declaration,
   type Decision as HookDecision,
   type Event as HookEvent,
@@ -98,7 +99,7 @@ const loadRecorded = (
   interpreter: Option.Option<typeof DriverInterpreter.Service>,
   key: string,
   event: HookEvent,
-): Effect.Effect<Option.Option<import("../../../hooks/index.js").Checkpoint>, DriverStateInvalid> => {
+): Effect.Effect<Option.Option<HookCheckpoint>, DriverStateInvalid> => {
   if (Option.isNone(interpreter)) return Effect.succeed(Option.none())
   return Effect.gen(function* () {
     const checkpoint = yield* interpreter.value.checkpoint
