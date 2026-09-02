@@ -81,7 +81,7 @@ export const installation = definePage({
           "Node and Bun, except Bedrock's Node credential-chain profile",
         ],
         [
-          [code("generalist/test"), " / ", code("generalist/test/runtime-driver")],
+          [code("generalist/testing"), " / ", code("generalist/testing/runtime-driver")],
           [code("@effect/vitest@4.0.0-rc.112"), " and ", code("vitest@4.1.11")],
           "Test host",
         ],

@@ -1,5 +1,5 @@
 import { Deferred, Effect, Exit, Ref, Stream, SynchronizedRef } from "effect"
-import type { ConnectionLoss, RemoteHarness } from "../../src/test/repl/kernel-provider.js"
+import type { ConnectionLoss, RemoteHarness } from "../../src/testing/repl/kernel-provider.js"
 import {
   CellExecutionFailed,
   CellOutcomeUnknown,

@@ -7,12 +7,12 @@ import { messagingSendOperationSuite } from "../../../generalist/test/runtime/me
 import { claimReadyWorker } from "../../../generalist/test/runtime/run/queued-activation.js"
 import { assistantAddress } from "../../../generalist/test/runtime/execution/fixtures.js"
 import {
-  driverConformance,
   modelResponseFaultConformance,
   sqlTransactionFaultConformance,
   type ClaimExecution,
   type ModelResponseFaultBoundary,
-} from "generalist/test/runtime-driver"
+} from "generalist/testing/runtime-driver"
+import { Testing } from "generalist/testing"
 import { Effect, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { mysqlAvailable, mysqlDatabase, mysqlMessagingLayer, mysqlLayer } from "./runtime/environment.js"
@@ -115,7 +115,7 @@ const removeModelFault = () =>
     }),
   ).pipe(Effect.orDie)
 
-driverConformance({
+Testing.runtimeDriver({
   name: "MySQL",
   address: assistantAddress,
   layer: conformanceLayer,

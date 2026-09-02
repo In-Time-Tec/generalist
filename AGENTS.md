@@ -57,11 +57,11 @@ Package manifests, `scripts/package-smoke*.ts`, and `.github/workflows/publish.y
 
 ## Durable Runtime checks
 
-`generalist/test/runtime-driver` is the authoritative capability-based driver suite. Add shared expectations there and register only capabilities a driver implements; do not copy generic conformance tests into each driver. Memory and PostgreSQL register the suite directly. MySQL and Cloudflare also have backend-specific package suites.
+`generalist/testing/runtime-driver` is the authoritative capability-based driver suite. Add shared expectations there and register only capabilities a driver implements; do not copy generic conformance tests into each driver. Memory and PostgreSQL register the suite directly. MySQL and Cloudflare also have backend-specific package suites.
 
 ```bash
 bun --bun vitest run \
-  packages/generalist/test/test/runtime-driver/index.test.ts \
+  packages/generalist/test/testing/runtime-driver/index.test.ts \
   packages/generalist/test/pg/index.test.ts \
   --no-file-parallelism --maxWorkers=1
 bun --bun vitest run packages/generalist/test/pg packages/generalist/test/mysql packages/generalist/test/cloudflare --no-file-parallelism

@@ -1,12 +1,12 @@
 import {
-  driverConformance,
   modelResponseFaultConformance,
   sqlTransactionFaultConformance,
   type ClaimExecution,
   type ModelResponseFaultBoundary,
   type MultiWorkerClaimCapability,
   type SqlTransactionCapability,
-} from "generalist/test/runtime-driver"
+} from "generalist/testing/runtime-driver"
+import { Testing } from "generalist/testing"
 import { Effect, Layer } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { assistantAddress } from "../../../generalist/test/runtime/execution/fixtures.js"
@@ -163,7 +163,7 @@ const expire: MultiWorkerClaimCapability["expire"] = (stale) =>
     }),
   ).pipe(Effect.orDie)
 
-driverConformance({
+Testing.runtimeDriver({
   name: "PostgreSQL",
   address: assistantAddress,
   layer,

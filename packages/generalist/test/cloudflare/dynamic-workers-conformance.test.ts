@@ -1,4 +1,4 @@
-import { codeExecutorConformance } from "generalist/test"
+import { codeExecutorConformance } from "generalist/testing"
 import { Effect } from "effect"
 import { layer } from "generalist/cloudflare/dynamic-workers"
 import { makeVmWorkerLoader } from "./dynamic-workers-vm-loader.js"

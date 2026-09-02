@@ -14,7 +14,7 @@ import {
   Tool,
   Toolkit,
 } from "generalist"
-import { TestModel } from "generalist/test"
+import { TestModel } from "generalist/testing"
 import { allowAllAuthorization } from "../../authorization.js"
 
 const echoTool = Tool.make("echo", {
@@ -26,7 +26,7 @@ const echoTool = Tool.make("echo", {
 const echoToolkit = Toolkit.make(echoTool)
 
 class Fixture extends Context.Service<Fixture, TestModel.Fixture>()(
-  "generalist/test/test/model/service.test/Fixture",
+  "generalist/test/testing/model/service.test/Fixture",
 ) {}
 
 const fixtureLayer = (
