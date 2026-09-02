@@ -1,9 +1,14 @@
 import { Context, Effect, Exit, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentError, ChildExceedsParent } from "../event.js"
+import { AgentError, type ChildExceedsParent } from "../event.js"
 import { encode as encodeAgentInput } from "../lifecycle/input.js"
 import type { Any as AnyAgent, ExecutionServices, Input, Output } from "../lifecycle/definition.js"
-import { inheritance, type Inheritance, type InheritanceOptions } from "../lifecycle/fan-out.js"
+import {
+  inheritance,
+  validateAuthority as validateChildAuthority,
+  type Inheritance,
+  type InheritanceOptions,
+} from "../lifecycle/fan-out.js"
 import { RunError } from "../run/error.js"
 
 export const FanOutTypeId = "generalist/core/agent-tool/FanOut"
@@ -208,25 +213,11 @@ export const validateAuthority = (
   selections: ReadonlyArray<string>,
 ): Effect.Effect<void, ChildExceedsParent> =>
   Effect.gen(function* () {
-    const parentTools = Object.keys(parent.toolkit.tools)
     for (const selection of selections) {
       const child = fanOut.agents[selection]
       const policy = fanOut.inheritance[selection]
       if (child === undefined || policy === undefined) continue
-      const childTools = Object.keys(child.toolkit.tools)
-      if (policy.tools === "attenuate" && !childTools.every((name) => parentTools.includes(name))) {
-        return yield* ChildExceedsParent.make({ field: "tools" })
-      }
-      if (
-        policy.permissions === "fresh" &&
-        child.authorization !== undefined &&
-        (parent.authorization === undefined || child.authorization !== parent.authorization)
-      ) {
-        return yield* ChildExceedsParent.make({ field: "permissions" })
-      }
-      if (policy.sandbox === "fresh" && child.sandbox !== undefined && parent.sandbox === undefined) {
-        return yield* ChildExceedsParent.make({ field: "sandbox" })
-      }
+      yield* validateChildAuthority(parent, child, policy)
     }
   })
 

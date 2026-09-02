@@ -77,7 +77,13 @@ export const inheritedHistory = (
   return latest === undefined ? undefined : Prompt.fromMessages([latest])
 }
 
-const validateAuthority = (parent: AnyAgent, child: AnyAgent, inherit: Inheritance) => {
+/** @internal Reject child authority that the parent does not hold. Shared by process-local and durable spawn paths. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal authority check with three required direct-style arguments.
+export const validateAuthority = (
+  parent: AnyAgent,
+  child: AnyAgent,
+  inherit: Inheritance,
+): Effect.Effect<void, ChildExceedsParent> => {
   const parentTools = Object.keys(parent.toolkit.tools)
   const childTools = Object.keys(child.toolkit.tools)
   if (inherit.tools === "attenuate" && !childTools.every((name) => parentTools.includes(name))) {
