@@ -20,7 +20,7 @@ const program = Effect.gen(function* () {
   const host = yield* Generalist.create({ agents: [agent] })
   const session = yield* host.sessions.create({ id: "guide-session" })
   const handle = yield* host.runs.start(session.id, agent, "Say hello", { idempotencyKey: "guide-message-1" })
-  const first = yield* host.events.subscribe(session.id).pipe(Stream.take(1), Stream.runHead)
+  const first = yield* (yield* host.events.subscribe(session.id)).pipe(Stream.take(1), Stream.runHead)
   const encoded = yield* Server.eventCodec.encode(Option.getOrThrow(first))
   yield* Console.log(
     `admitted ${handle.id}; first Server event: ${first.pipe(

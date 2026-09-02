@@ -44,22 +44,24 @@ const eventsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agent
     handlers
       .handle("subscribe", ({ params, query, headers }) => {
         const cursor = headers["last-event-id"] ?? query.cursor
-        return Effect.succeed(
-          host.events.subscribe(params.id, cursor).pipe(
-            Stream.map((event): EventStreamItem => ({ id: String(event.cursor), event: event._tag, data: event })),
-            Stream.mapError((error) => apiError({ operation: "events.subscribe", error })),
+        return host.events.subscribe(params.id, cursor).pipe(
+          Effect.map((events) =>
+            events.pipe(
+              Stream.map((event): EventStreamItem => ({ id: String(event.cursor), event: event._tag, data: event })),
+              Stream.mapError((error) => apiError({ operation: "events.subscribe", error })),
+            ),
           ),
+          mapError("events.subscribe"),
         )
       })
-      .handleRaw("connect", ({ params, query, request }) => {
-        const websocketOptions =
-          query.cursor === undefined
-            ? { host, sessionId: params.id, request }
-            : { host, sessionId: params.id, request, cursor: query.cursor }
-        return host.sessions
-          .get(params.id)
-          .pipe(mapError("events.connect"), Effect.andThen(handleWebSocket(websocketOptions).pipe(Effect.orDie)))
-      }),
+      .handleRaw("connect", ({ params, query, request }) =>
+        host.events.subscribe(params.id, query.cursor).pipe(
+          mapError("events.connect"),
+          Effect.flatMap((events) =>
+            handleWebSocket({ host, sessionId: params.id, request, events }).pipe(Effect.orDie),
+          ),
+        ),
+      ),
   )
 
 const approvalsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>) =>

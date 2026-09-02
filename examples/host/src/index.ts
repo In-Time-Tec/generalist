@@ -74,7 +74,7 @@ const program = Effect.gen(function* () {
   )
   const answer = yield* run.await
   const events = Array.from(
-    yield* host.events.subscribe(session.id).pipe(
+    yield* (yield* host.events.subscribe(session.id)).pipe(
       Stream.takeUntil((event) => event._tag === "Completed"),
       Stream.runCollect,
     ),

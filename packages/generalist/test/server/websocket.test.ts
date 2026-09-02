@@ -64,10 +64,12 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         const session = yield* host.sessions.create({ id: "session-1" })
         const run = yield* host.runs.start(session.id, agent, "wait")
         const fake = yield* makeFakeSocket()
+        const events = yield* host.events.subscribe(session.id)
         const fiber = yield* handle<readonly [typeof agent]>({
           host,
           sessionId: session.id,
           request: request(fake.socket),
+          events,
         }).pipe(Effect.forkChild)
 
         const output = yield* Queue.take(fake.outbound)
