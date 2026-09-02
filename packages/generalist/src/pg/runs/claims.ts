@@ -12,13 +12,13 @@ import {
 import { RuntimeUnavailable } from "../../runtime/errors.js"
 import { NOTIFY_CHANNEL } from "../schema.js"
 
-const wakeupChanges = (pg: PgClient.PgClient, source: string) => {
-  return Stream.unwrap(
+const wakeupChanges = (pg: PgClient.PgClient, source: string) =>
+  Stream.unwrap(
     Effect.gen(function* () {
       const listenerId = ((yield* Random.nextInt) >>> 0).toString(16)
       const applicationName = `generalist-runtime-worker:${listenerId}:${source}`.slice(0, 63)
       const listener = yield* PgClient.make({ ...pg.config, applicationName, maxConnections: 1 }).pipe(
-        Effect.provide(Reactivity.layer),
+        Effect.provideServiceEffect(Reactivity.Reactivity, Reactivity.make),
       )
       // The pinned @effect/sql-pg swallows listener `error`/`end`, so liveness is probed through
       // pg_stat_activity. PID discovery yields instead of sleeping because LISTEN is issued
@@ -57,7 +57,6 @@ const wakeupChanges = (pg: PgClient.PgClient, source: string) => {
       RuntimeUnavailable.make({ message: `PostgreSQL RunClaims wakeup listener failed (${source}): ${error.message}` }),
     ),
   )
-}
 
 /** PostgreSQL's optimized claim/lease protocol; lifecycle transitions remain in Runtime. */
 export const postgresClaimMechanics = (input: {
