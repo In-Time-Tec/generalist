@@ -236,7 +236,7 @@ describe("RunExecutor", () => {
 
   it.effect("passes the exact pinned context window and reserve to compaction", () =>
     Effect.gen(function* () {
-      let observed: Compaction.Usage | undefined
+      let observed: Parameters<Compaction.Strategy["shouldCompact"]>[0] | undefined
       let observedKeepRecent: number | undefined
       const agent = Agent.make({ name: "pinned-compaction" })
       const compaction = {
@@ -333,7 +333,7 @@ describe("RunExecutor", () => {
         }),
       )
 
-      expect(observed).toMatchObject({ contextWindow: 32_768, reserveTokens: 2_048 })
+      expect(observed).toEqual({ tokens: expect.any(Number), contextWindow: 30_720 })
       expect(observedKeepRecent).toBe(777)
     }),
   )

@@ -1453,7 +1453,7 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
-  it.effect("replays a settled compacted Session model request after outcome-before-checkpoint interruption", () =>
+  it.effect("replays a settled summarized Session request without rerunning compaction", () =>
     Effect.gen(function* () {
       const rawPrompt = Prompt.fromMessages([
         Prompt.makeMessage("user", {
@@ -1462,6 +1462,7 @@ describe("DurableDriver Agent.stream integration", () => {
       ])
       const compactedRequest = Prompt.make("exact compacted provider request")
       const normalizedCompactionInputs = new Array<Prompt.Prompt>()
+      let summaryCalls = 0
       const providerPrompts = {
         baseline: new Array<Prompt.Prompt>(),
         recovery: new Array<Prompt.Prompt>(),
@@ -1473,10 +1474,12 @@ describe("DurableDriver Agent.stream integration", () => {
             const context = Prompt.concat(request.history, request.prompt)
             if (Json.stringify(context.content).includes("exact compacted provider request")) return Option.none()
             normalizedCompactionInputs.push(request.prompt)
+            summaryCalls += 1
             return Option.some({
-              _tag: "Microcompact" as const,
+              _tag: "Summarize" as const,
               history: Prompt.empty,
               prompt: compactedRequest,
+              summary: "exact compacted provider request",
             })
           }),
       })
@@ -1599,6 +1602,7 @@ describe("DurableDriver Agent.stream integration", () => {
           const recoveredFinal = yield* sessionContext("compacted-recovery")
 
           expect(normalizedCompactionInputs).toHaveLength(2)
+          expect(summaryCalls).toBe(2)
           for (const input of normalizedCompactionInputs) {
             const message = input.content[0]
             expect(message?.role).toBe("user")

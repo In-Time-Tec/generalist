@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Json } from "../json"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
-import { Compaction, Session, ToolOutput } from "../../../src/index"
+import { Compaction, Session, ToolOutput, withCacheBreakpoints } from "../../../src/index"
 import { ItLayer } from "../it-layer"
 import { estimatePromptTokens } from "../../../src/core/turn/prompt-token-estimate"
 import { make as makeThresholdState } from "../../../src/core/turn/compaction-threshold-state"
@@ -76,12 +76,10 @@ describe("Compaction", () => {
   it("uses strict reserve-token boundary math", () => {
     const strategy = Compaction.defaultStrategy()
 
-    expect(strategy.shouldCompact({ contextTokens: 79, contextWindow: 100, reserveTokens: 20 })).toBe(false)
-    expect(strategy.shouldCompact({ contextTokens: 80, contextWindow: 100, reserveTokens: 20 })).toBe(false)
-    expect(strategy.shouldCompact({ contextTokens: 81, contextWindow: 100, reserveTokens: 20 })).toBe(true)
-    expect(
-      strategy.shouldCompact({ contextTokens: 10_000, contextWindow: Number.POSITIVE_INFINITY, reserveTokens: 20 }),
-    ).toBe(false)
+    expect(strategy.shouldCompact({ tokens: 79, contextWindow: 80 })).toBe(false)
+    expect(strategy.shouldCompact({ tokens: 80, contextWindow: 80 })).toBe(false)
+    expect(strategy.shouldCompact({ tokens: 81, contextWindow: 80 })).toBe(true)
+    expect(strategy.shouldCompact({ tokens: 10_000, contextWindow: Number.POSITIVE_INFINITY })).toBe(false)
   })
 
   it("preserves text-only estimates at strict threshold boundaries", () => {
@@ -90,12 +88,11 @@ describe("Compaction", () => {
     const strategy = Compaction.defaultStrategy()
 
     expect(estimatePromptTokens(prompt)).toBe(contextTokens)
-    expect(strategy.shouldCompact({ contextTokens, contextWindow: contextTokens + 20, reserveTokens: 20 })).toBe(false)
+    expect(strategy.shouldCompact({ tokens: contextTokens, contextWindow: contextTokens })).toBe(false)
     expect(
       strategy.shouldCompact({
-        contextTokens: contextTokens + 1,
-        contextWindow: contextTokens + 20,
-        reserveTokens: 20,
+        tokens: contextTokens + 1,
+        contextWindow: contextTokens,
       }),
     ).toBe(true)
   })
@@ -108,12 +105,12 @@ describe("Compaction", () => {
       entry("2", toolResult("call-1", "result")),
     ]
 
-    const plan = strategy.cut(entries, 1)
+    const plan = strategy.cut(Prompt.fromMessages(entries.map((item) => item.message)), 1)
 
     expect(Option.isSome(plan)).toBe(true)
     if (Option.isSome(plan)) {
-      expect(plan.value.head.map((item) => item.id)).toEqual(["0"])
-      expect(plan.value.recent.map((item) => item.id)).toEqual(["1", "2"])
+      expect(Json.stringify(plan.value.compact.content)).toContain("old")
+      expect(plan.value.recent.content).toHaveLength(2)
     }
   })
 
@@ -126,12 +123,12 @@ describe("Compaction", () => {
       entry("3", user("ddd ".repeat(100))),
     ]
 
-    const plan = strategy.cut(entries, 200)
+    const plan = strategy.cut(Prompt.fromMessages(entries.map((item) => item.message)), 200)
 
     expect(Option.isSome(plan)).toBe(true)
     if (Option.isSome(plan)) {
-      expect(plan.value.head.map((item) => item.id)).toEqual(["0", "1"])
-      expect(plan.value.recent.map((item) => item.id)).toEqual(["2", "3"])
+      expect(plan.value.compact.content).toHaveLength(2)
+      expect(plan.value.recent.content).toHaveLength(2)
     }
   })
 
@@ -144,12 +141,12 @@ describe("Compaction", () => {
       entry("3", user("recent")),
     ]
 
-    const plan = strategy.cut(entries, 2_000)
+    const plan = strategy.cut(Prompt.fromMessages(entries.map((item) => item.message)), 2_000)
 
     expect(Option.isSome(plan)).toBe(true)
     if (Option.isSome(plan)) {
-      expect(plan.value.head.map((item) => item.id)).toEqual(["0"])
-      expect(plan.value.recent.map((item) => item.id)).toEqual(["1", "2", "3"])
+      expect(plan.value.compact.content).toHaveLength(1)
+      expect(plan.value.recent.content).toHaveLength(3)
     }
   })
 
@@ -335,7 +332,13 @@ describe("Compaction", () => {
         shouldCompact: () => true,
         cut: () => {
           cuts += 1
-          return cuts === 2 ? Option.some({ head: [path[0]!], recent: [path[1]!] }) : Option.none()
+          return cuts === 2
+            ? Option.some({
+                keep: Prompt.empty,
+                compact: Prompt.fromMessages([path[0]!.message]),
+                recent: Prompt.fromMessages([path[1]!.message]),
+              })
+            : Option.none()
         },
         summarize: () => Effect.fail(Compaction.CompactionError.make({ message: "summary failed" })),
       })
@@ -1002,6 +1005,71 @@ describe("Compaction", () => {
       ] as const,
   )
 
+  ItLayer.make(it, "keeps the encoded cache prefix and recent tail byte-identical", () => {
+    const instructions = Prompt.makeMessage("system", { content: "Keep this instruction stable." })
+    const stableUser = user("stable user turn")
+    const stableAssistant = Prompt.makeMessage("assistant", {
+      content: [Prompt.makePart("text", { text: "stable assistant response" })],
+    })
+    const middleUser = user("middle user turn")
+    const middleAssistant = Prompt.makeMessage("assistant", {
+      content: [Prompt.makePart("text", { text: "middle assistant response" })],
+    })
+    const recent = user("recent tail")
+    const messages = [instructions, stableUser, stableAssistant, middleUser, middleAssistant, recent]
+    let summarized: Prompt.Prompt | undefined
+    const cacheAware = Compaction.cacheAware({
+      stablePrefixTurns: 1,
+      keepRecentTokens: 1,
+      summarize: (plan) =>
+        Effect.sync(() => {
+          summarized = plan.compact
+          return "middle checkpoint"
+        }),
+    })
+    const service = Compaction.make(cacheAware)
+    const path = messages.map((message, index) => entry(String(index), message))
+    const prefixLength = 3
+    const encoded = (prompt: Prompt.Prompt): string => Json.stringify(Schema.encodeSync(Prompt.Prompt)(prompt))
+    const before = withCacheBreakpoints(Prompt.fromMessages(messages), "conversation", undefined)
+    const prefixBefore = encoded(Prompt.fromMessages(before.content.slice(0, prefixLength)))
+    const recentBefore = encoded(Prompt.fromMessages(before.content.slice(-1)))
+
+    return [
+      modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+      Effect.gen(function* () {
+        const compacted = yield* service.maybeCompact({
+          compactionId: "cache-aware",
+          agentName: "cache-aware-agent",
+          sessionId: "session",
+          turn: 3,
+          history: Prompt.fromMessages(messages),
+          prompt: Prompt.make("current input"),
+          path,
+          usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 0 },
+          overflow: false,
+        })
+
+        expect(Option.isSome(compacted)).toBe(true)
+        if (Option.isNone(compacted) || compacted.value._tag !== "Summarize") return
+        const after = withCacheBreakpoints(compacted.value.history, "conversation", undefined)
+        expect(encoded(Prompt.fromMessages(after.content.slice(0, prefixLength)))).toBe(prefixBefore)
+        expect(encoded(Prompt.fromMessages(after.content.slice(-1)))).toBe(recentBefore)
+        expect(encoded(summarized ?? Prompt.empty)).toBe(encoded(Prompt.fromMessages([middleUser, middleAssistant])))
+        expect(encoded(after)).not.toContain("middle user turn")
+        expect(encoded(after)).not.toContain("middle assistant response")
+      }),
+    ] as const
+  })
+
+  it("rejects invalid cache-aware bounds", () => {
+    const summarize = Compaction.summarizeWithModel()
+    expect(() => Compaction.cacheAware({ stablePrefixTurns: -1, summarize })).toThrow(TypeError)
+    expect(() =>
+      Compaction.cacheAware({ stablePrefixTurns: 1, keepRecentTokens: Number.POSITIVE_INFINITY, summarize }),
+    ).toThrow(TypeError)
+  })
+
   it("composes ordered strategy parts onto the default strategy", () => {
     const composed = Compaction.strategy([
       { shouldCompact: () => false },
@@ -1010,7 +1078,7 @@ describe("Compaction", () => {
       Compaction.keepRecent({ tokens: 256 }),
     ])
 
-    expect(composed.shouldCompact({ contextTokens: 0, contextWindow: 100, reserveTokens: 10 })).toBe(true)
+    expect(composed.shouldCompact({ tokens: 0, contextWindow: 90 })).toBe(true)
     expect(composed.toolOutputMaxBytes).toBe(128)
     expect(composed.keepRecentTokens).toBe(256)
   })

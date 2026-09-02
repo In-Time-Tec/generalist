@@ -12,8 +12,9 @@ export interface Usage {
 
 /** @experimental What to keep verbatim and what the summary replaces. */
 export interface Plan {
-  readonly head: ReadonlyArray<Entry>
-  readonly recent: ReadonlyArray<Entry>
+  readonly keep: Prompt.Prompt
+  readonly compact: Prompt.Prompt
+  readonly recent: Prompt.Prompt
 }
 
 /** @experimental Request passed to a compaction implementation. */
