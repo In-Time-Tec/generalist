@@ -49,6 +49,8 @@ const sqlBool = (sql: SqlClient.SqlClient, value: boolean): boolean | 0 | 1 =>
     mysql: () => (value ? 1 : 0),
     orElse: () => (value ? 1 : 0),
   })
+/** Dialect-correct SQL false for BOOLEAN or INTEGER flag columns. */
+export const sqlFalse = (sql: SqlClient.SqlClient): boolean | 0 | 1 => sqlBool(sql, false)
 
 export const clearLeaseOnOwnerRelease = (sql: SqlClient.SqlClient) =>
   sql.onDialectOrElse({

@@ -7,7 +7,7 @@ import type { ForkRunInput, RewindRunInput } from "../../../run/store-types.js"
 import { decodeEvent, decodeMessage, encodeEvent, encodeJsonValue, encodeMessage } from "../../codec/codecs.js"
 import type { EventRow, OperationRow, RunRow } from "../../codec/rows.js"
 import type { EventHub } from "../../subscribers.js"
-import { appendEvent, loadRun } from "../statements.js"
+import { appendEvent, loadRun, sqlFalse } from "../statements.js"
 
 export const loadRunBranches = (runId: string) =>
   Effect.gen(function* () {
@@ -113,7 +113,7 @@ const copyRun = (input: {
         ${input.targetRunId}, 0, max_depth, max_subagents, ${input.source.run_id}, ${input.forkSequence},
         attempt, attempt_fence + 1, ${lastSequence},
         CASE WHEN last_turn_completed_sequence > ${lastSequence} THEN ${lastSequence} ELSE last_turn_completed_sequence END,
-        0, accepted_sequence, ${input.checkpoint}, created_at, updated_at
+        ${sqlFalse(sql)}, accepted_sequence, ${input.checkpoint}, created_at, updated_at
       FROM generalist_runs WHERE run_id = ${input.source.run_id}
     `
     yield* sql`INSERT INTO generalist_tree_roots (root_run_id, earliest_position, last_position)
@@ -255,7 +255,7 @@ const rewindEffect = (hub: EventHub, input: RewindRunInput) =>
     yield* sql`UPDATE generalist_runs SET status = 'queued', last_sequence = ${input.toSequence},
       last_turn_completed_sequence = CASE WHEN last_turn_completed_sequence > ${input.toSequence}
         THEN ${input.toSequence} ELSE last_turn_completed_sequence END,
-      cancellation_requested = 0, cancel_reason = NULL, terminal_event_id = NULL,
+      cancellation_requested = ${sqlFalse(sql)}, cancel_reason = NULL, terminal_event_id = NULL,
       owner_worker_id = NULL, driver_checkpoint_json = ${selected.checkpoint}, suspension_json = NULL,
       continuation_json = NULL, pending_outcome_json = NULL, attempt_fence = attempt_fence + 1
       WHERE run_id = ${input.runId}`
