@@ -3,7 +3,7 @@ import { ProgramExecutionResult } from "../../runtime/execution/state.js"
 import type { RunInspection } from "../../runtime/run.js"
 import type { RunCompleted, RunEvent } from "../../runtime/run/event.js"
 import type { Service as RuntimeService } from "../../runtime/service.js"
-import { Effect, Function, Schema } from "effect"
+import { Effect, Function, Predicate, Schema } from "effect"
 import { TaskProjectionFailed } from "./errors.js"
 
 const textPart = (text: string): Part => ({
@@ -83,7 +83,7 @@ const artifactFrom = (event: RunCompleted): Artifact => {
     parts = [dataPart(Schema.decodeUnknownSync(Schema.Json)(event.result.value))]
   } else {
     const output = event.result.output ?? event.result.text
-    parts = typeof output === "string" ? [textPart(output)] : [dataPart(Schema.decodeUnknownSync(Schema.Json)(output))]
+    parts = Predicate.isString(output) ? [textPart(output)] : [dataPart(Schema.decodeUnknownSync(Schema.Json)(output))]
   }
   return {
     artifactId: `${event.eventId}:result`,

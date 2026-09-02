@@ -64,7 +64,7 @@ describe("layerModel", () => {
 
   it.effect("decodes typed output and rejects malformed deterministic output", () => {
     const input = Schema.Struct({ question: Schema.String })
-    const output = Schema.Struct({ answer: Schema.Number })
+    const output = Schema.Struct({ answer: Schema.Finite })
     const typedAgent = Agent.make({ name: "typed", input, output })
     const textAgent = Agent.make({ name: "text" })
     const validModel = deterministicModel({ response: '{"output":{"answer":42}}' })

@@ -172,13 +172,12 @@ const follow = (
   task: Task,
   cursor: Cursor,
   bus: ExecutionEventBus,
-): Effect.Effect<void, EventsError> => {
-  return runtime.events({ runId: task.id, cursor }).pipe(
+): Effect.Effect<void, EventsError> =>
+  runtime.events({ runId: task.id, cursor }).pipe(
     Stream.tap((event) => Effect.sync(() => publishEvent(bus, task, event))),
     Stream.takeUntil(isBoundary),
     Stream.runDrain,
   )
-}
 
 const makeExecutor = (runtime: RuntimeService, deployment: Deployment): AgentExecutor => ({
   execute: (context: RequestContext, bus: ExecutionEventBus): Promise<void> => {
@@ -325,8 +324,8 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     const resubscribeResponses = (
       task: Task,
       events: Stream.Stream<RunEvent, EventsError>,
-    ): Stream.Stream<StreamResponse, EventsError> => {
-      return events.pipe(
+    ): Stream.Stream<StreamResponse, EventsError> =>
+      events.pipe(
         Stream.takeUntil(isBoundary),
         Stream.map((event) => {
           const responses: Array<StreamResponse> = []
@@ -358,7 +357,6 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
         }),
         Stream.flatMap((responses) => Stream.fromIterable(responses)),
       )
-    }
     return toAsyncGenerator(
       Stream.toAsyncIterable(
         Stream.fromEffect(

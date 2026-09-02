@@ -506,7 +506,7 @@ const retryTransientModelError = ModelResilience.layer({
   classify: (error) => (error === transientModelError ? "transient" : "terminal"),
 })
 
-const typedStartOutput = Schema.Struct({ answer: Schema.Number })
+const typedStartOutput = Schema.Struct({ answer: Schema.Finite })
 const typedStartAgent = Agent.make({
   name: "typed-start",
   input: Schema.Struct({ question: Schema.String }),
